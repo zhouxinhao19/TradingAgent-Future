@@ -1196,6 +1196,8 @@ def version():
     console.print(f"[green]框架 | Framework:[/green] 多智能体金融交易分析 | Multi-Agent Financial Trading Analysis")
     console.print(f"[green]支持的语言 | Languages:[/green] 中文 | English")
     console.print(f"[green]开发状态 | Development Status:[/green] [yellow]早期预览版，功能持续完善中[/yellow]")
+    console.print(f"[green]基于项目 | Based on:[/green] [blue]TauricResearch/TradingAgents[/blue]")
+    console.print(f"[green]创建目的 | Purpose:[/green] [cyan]更好地在中国推广TradingAgents[/cyan]")
     console.print(f"[green]主要功能 | Features:[/green]")
     console.print("  • 🤖 多智能体协作分析 | Multi-agent collaborative analysis")
     console.print("  • 🇨🇳 阿里百炼大模型支持 | Alibaba DashScope support")
@@ -1208,6 +1210,11 @@ def version():
     console.print("  • 建议仅在测试环境中使用")
     console.print("  • 投资建议仅供参考，请谨慎决策")
     console.print("  • 欢迎反馈问题和改进建议")
+
+    console.print(f"\n[blue]🙏 致敬源项目 | Tribute to Original Project:[/blue]")
+    console.print("  • 感谢 Tauric Research 团队的杰出贡献")
+    console.print("  • 本项目旨在更好地在中国推广TradingAgents")
+    console.print("  • 源项目: https://github.com/TauricResearch/TradingAgents")
 
 
 @app.command(
