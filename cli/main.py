@@ -29,8 +29,9 @@ console = Console()
 
 app = typer.Typer(
     name="TradingAgents",
-    help="TradingAgents CLI: Multi-Agents LLM Financial Trading Framework",
+    help="TradingAgents CLI: 多智能体大语言模型金融交易框架 | Multi-Agents LLM Financial Trading Framework",
     add_completion=True,  # Enable shell completion
+    rich_markup_mode="rich",  # Enable rich markup
 )
 
 
@@ -399,9 +400,10 @@ def get_user_selections():
 
     # Create welcome box content
     welcome_content = f"{welcome_ascii}\n"
-    welcome_content += "[bold green]TradingAgents: Multi-Agents LLM Financial Trading Framework - CLI[/bold green]\n\n"
-    welcome_content += "[bold]Workflow Steps:[/bold]\n"
-    welcome_content += "I. Analyst Team → II. Research Team → III. Trader → IV. Risk Management → V. Portfolio Management\n\n"
+    welcome_content += "[bold green]TradingAgents: 多智能体大语言模型金融交易框架 - CLI[/bold green]\n"
+    welcome_content += "[bold green]Multi-Agents LLM Financial Trading Framework - CLI[/bold green]\n\n"
+    welcome_content += "[bold]工作流程 | Workflow Steps:[/bold]\n"
+    welcome_content += "I. 分析师团队 | Analyst Team → II. 研究团队 | Research Team → III. 交易员 | Trader → IV. 风险管理 | Risk Management → V. 投资组合管理 | Portfolio Management\n\n"
     welcome_content += (
         "[dim]Built by [Tauric Research](https://github.com/TauricResearch)[/dim]"
     )
@@ -411,8 +413,8 @@ def get_user_selections():
         welcome_content,
         border_style="green",
         padding=(1, 2),
-        title="Welcome to TradingAgents",
-        subtitle="Multi-Agents LLM Financial Trading Framework",
+        title="欢迎使用 TradingAgents | Welcome to TradingAgents",
+        subtitle="多智能体大语言模型金融交易框架 | Multi-Agents LLM Financial Trading Framework",
     )
     console.print(Align.center(welcome_box))
     console.print()  # Add a blank line after the welcome box
@@ -428,7 +430,9 @@ def get_user_selections():
     # Step 1: Ticker symbol
     console.print(
         create_question_box(
-            "Step 1: Ticker Symbol", "Enter the ticker symbol to analyze", "SPY"
+            "步骤 1: 股票代码 | Step 1: Ticker Symbol",
+            "请输入要分析的股票代码 | Enter the ticker symbol to analyze",
+            "SPY"
         )
     )
     selected_ticker = get_ticker()
@@ -437,8 +441,8 @@ def get_user_selections():
     default_date = datetime.datetime.now().strftime("%Y-%m-%d")
     console.print(
         create_question_box(
-            "Step 2: Analysis Date",
-            "Enter the analysis date (YYYY-MM-DD)",
+            "步骤 2: 分析日期 | Step 2: Analysis Date",
+            "请输入分析日期 (YYYY-MM-DD) | Enter the analysis date (YYYY-MM-DD)",
             default_date,
         )
     )
@@ -447,34 +451,38 @@ def get_user_selections():
     # Step 3: Select analysts
     console.print(
         create_question_box(
-            "Step 3: Analysts Team", "Select your LLM analyst agents for the analysis"
+            "步骤 3: 分析师团队 | Step 3: Analysts Team",
+            "选择您的LLM分析师智能体进行分析 | Select your LLM analyst agents for the analysis"
         )
     )
     selected_analysts = select_analysts()
     console.print(
-        f"[green]Selected analysts:[/green] {', '.join(analyst.value for analyst in selected_analysts)}"
+        f"[green]已选择的分析师 | Selected analysts:[/green] {', '.join(analyst.value for analyst in selected_analysts)}"
     )
 
     # Step 4: Research depth
     console.print(
         create_question_box(
-            "Step 4: Research Depth", "Select your research depth level"
+            "步骤 4: 研究深度 | Step 4: Research Depth",
+            "选择您的研究深度级别 | Select your research depth level"
         )
     )
     selected_research_depth = select_research_depth()
 
-    # Step 5: OpenAI backend
+    # Step 5: LLM Provider
     console.print(
         create_question_box(
-            "Step 5: OpenAI backend", "Select which service to talk to"
+            "步骤 5: LLM提供商 | Step 5: LLM Provider",
+            "选择要使用的LLM服务 | Select which LLM service to use"
         )
     )
     selected_llm_provider, backend_url = select_llm_provider()
-    
+
     # Step 6: Thinking agents
     console.print(
         create_question_box(
-            "Step 6: Thinking Agents", "Select your thinking agents for analysis"
+            "步骤 6: 思考智能体 | Step 6: Thinking Agents",
+            "选择您的思考智能体进行分析 | Select your thinking agents for analysis"
         )
     )
     selected_shallow_thinker = select_shallow_thinking_agent(selected_llm_provider)
@@ -494,25 +502,25 @@ def get_user_selections():
 
 def get_ticker():
     """Get ticker symbol from user input."""
-    return typer.prompt("", default="SPY")
+    return typer.prompt("请输入股票代码 | Enter ticker", default="SPY")
 
 
 def get_analysis_date():
     """Get the analysis date from user input."""
     while True:
         date_str = typer.prompt(
-            "", default=datetime.datetime.now().strftime("%Y-%m-%d")
+            "请输入分析日期 | Enter analysis date", default=datetime.datetime.now().strftime("%Y-%m-%d")
         )
         try:
             # Validate date format and ensure it's not in the future
             analysis_date = datetime.datetime.strptime(date_str, "%Y-%m-%d")
             if analysis_date.date() > datetime.datetime.now().date():
-                console.print("[red]Error: Analysis date cannot be in the future[/red]")
+                console.print("[red]错误：分析日期不能是未来日期 | Error: Analysis date cannot be in the future[/red]")
                 continue
             return date_str
         except ValueError:
             console.print(
-                "[red]Error: Invalid date format. Please use YYYY-MM-DD[/red]"
+                "[red]错误：日期格式无效，请使用 YYYY-MM-DD 格式 | Error: Invalid date format. Please use YYYY-MM-DD[/red]"
             )
 
 
@@ -1096,9 +1104,245 @@ def run_analysis():
         update_display(layout)
 
 
-@app.command()
+@app.command(
+    name="analyze",
+    help="开始股票分析 | Start stock analysis"
+)
 def analyze():
+    """
+    启动交互式股票分析工具
+    Launch interactive stock analysis tool
+    """
     run_analysis()
+
+
+@app.command(
+    name="config",
+    help="配置设置 | Configuration settings"
+)
+def config():
+    """
+    显示和配置系统设置
+    Display and configure system settings
+    """
+    console.print("\n[bold blue]🔧 TradingAgents 配置 | Configuration[/bold blue]")
+    console.print("\n[yellow]当前支持的LLM提供商 | Supported LLM Providers:[/yellow]")
+
+    providers_table = Table(show_header=True, header_style="bold magenta")
+    providers_table.add_column("提供商 | Provider", style="cyan")
+    providers_table.add_column("模型 | Models", style="green")
+    providers_table.add_column("状态 | Status", style="yellow")
+    providers_table.add_column("说明 | Description")
+
+    providers_table.add_row(
+        "🇨🇳 阿里百炼 (DashScope)",
+        "qwen-turbo, qwen-plus, qwen-max",
+        "✅ 推荐 | Recommended",
+        "国产大模型，中文优化 | Chinese-optimized"
+    )
+    providers_table.add_row(
+        "🌍 OpenAI",
+        "gpt-4o, gpt-4o-mini, gpt-3.5-turbo",
+        "✅ 支持 | Supported",
+        "需要国外API | Requires overseas API"
+    )
+    providers_table.add_row(
+        "🤖 Anthropic",
+        "claude-3-opus, claude-3-sonnet",
+        "✅ 支持 | Supported",
+        "需要国外API | Requires overseas API"
+    )
+    providers_table.add_row(
+        "🔍 Google AI",
+        "gemini-pro, gemini-2.0-flash",
+        "✅ 支持 | Supported",
+        "需要国外API | Requires overseas API"
+    )
+
+    console.print(providers_table)
+
+    console.print("\n[yellow]配置API密钥 | Configure API Keys:[/yellow]")
+    console.print("1. 编辑项目根目录的 .env 文件 | Edit .env file in project root")
+    console.print("2. 或设置环境变量 | Or set environment variables:")
+    console.print("   - DASHSCOPE_API_KEY (阿里百炼)")
+    console.print("   - OPENAI_API_KEY (OpenAI)")
+    console.print("   - FINNHUB_API_KEY (金融数据 | Financial data)")
+
+    console.print("\n[yellow]示例程序 | Example Programs:[/yellow]")
+    console.print("• python examples/dashscope/demo_dashscope_chinese.py  # 中文分析演示")
+    console.print("• python examples/dashscope/demo_dashscope_simple.py   # 简单测试")
+    console.print("• python tests/integration/test_dashscope_integration.py  # 集成测试")
+
+
+@app.command(
+    name="version",
+    help="版本信息 | Version information"
+)
+def version():
+    """
+    显示版本信息
+    Display version information
+    """
+    console.print("\n[bold blue]📊 TradingAgents 版本信息 | Version Information[/bold blue]")
+    console.print(f"[green]版本 | Version:[/green] 1.0.0")
+    console.print(f"[green]框架 | Framework:[/green] 多智能体金融交易分析 | Multi-Agent Financial Trading Analysis")
+    console.print(f"[green]支持的语言 | Languages:[/green] 中文 | English")
+    console.print(f"[green]主要功能 | Features:[/green]")
+    console.print("  • 🤖 多智能体协作分析 | Multi-agent collaborative analysis")
+    console.print("  • 🇨🇳 阿里百炼大模型支持 | Alibaba DashScope support")
+    console.print("  • 📈 实时股票数据分析 | Real-time stock data analysis")
+    console.print("  • 🧠 智能投资建议 | Intelligent investment recommendations")
+    console.print("  • 🔍 风险评估 | Risk assessment")
+
+
+@app.command(
+    name="examples",
+    help="示例程序 | Example programs"
+)
+def examples():
+    """
+    显示可用的示例程序
+    Display available example programs
+    """
+    console.print("\n[bold blue]📚 TradingAgents 示例程序 | Example Programs[/bold blue]")
+
+    examples_table = Table(show_header=True, header_style="bold magenta")
+    examples_table.add_column("类型 | Type", style="cyan")
+    examples_table.add_column("文件名 | Filename", style="green")
+    examples_table.add_column("说明 | Description")
+
+    examples_table.add_row(
+        "🇨🇳 阿里百炼",
+        "examples/dashscope/demo_dashscope_chinese.py",
+        "中文优化的股票分析演示 | Chinese-optimized stock analysis"
+    )
+    examples_table.add_row(
+        "🇨🇳 阿里百炼",
+        "examples/dashscope/demo_dashscope.py",
+        "完整功能演示 | Full feature demonstration"
+    )
+    examples_table.add_row(
+        "🇨🇳 阿里百炼",
+        "examples/dashscope/demo_dashscope_simple.py",
+        "简化测试版本 | Simplified test version"
+    )
+    examples_table.add_row(
+        "🌍 OpenAI",
+        "examples/openai/demo_openai.py",
+        "OpenAI模型演示 | OpenAI model demonstration"
+    )
+    examples_table.add_row(
+        "🧪 测试",
+        "tests/integration/test_dashscope_integration.py",
+        "集成测试 | Integration test"
+    )
+
+    console.print(examples_table)
+
+    console.print("\n[yellow]运行示例 | Run Examples:[/yellow]")
+    console.print("1. 确保已配置API密钥 | Ensure API keys are configured")
+    console.print("2. 选择合适的示例程序运行 | Choose appropriate example to run")
+    console.print("3. 推荐从中文版本开始 | Recommended to start with Chinese version")
+
+
+@app.command(
+    name="test",
+    help="运行测试 | Run tests"
+)
+def test():
+    """
+    运行系统测试
+    Run system tests
+    """
+    console.print("\n[bold blue]🧪 TradingAgents 测试 | Tests[/bold blue]")
+
+    import subprocess
+    import sys
+
+    console.print("[yellow]正在运行集成测试... | Running integration tests...[/yellow]")
+
+    try:
+        result = subprocess.run([
+            sys.executable,
+            "tests/integration/test_dashscope_integration.py"
+        ], capture_output=True, text=True, cwd=".")
+
+        if result.returncode == 0:
+            console.print("[green]✅ 测试通过 | Tests passed[/green]")
+            console.print(result.stdout)
+        else:
+            console.print("[red]❌ 测试失败 | Tests failed[/red]")
+            console.print(result.stderr)
+
+    except Exception as e:
+        console.print(f"[red]❌ 测试执行错误 | Test execution error: {e}[/red]")
+        console.print("\n[yellow]手动运行测试 | Manual test execution:[/yellow]")
+        console.print("python tests/integration/test_dashscope_integration.py")
+
+
+@app.command(
+    name="help",
+    help="中文帮助 | Chinese help"
+)
+def help_chinese():
+    """
+    显示中文帮助信息
+    Display Chinese help information
+    """
+    console.print("\n[bold blue]📖 TradingAgents 中文帮助 | Chinese Help[/bold blue]")
+
+    console.print("\n[bold yellow]🚀 快速开始 | Quick Start:[/bold yellow]")
+    console.print("1. [cyan]python -m cli.main config[/cyan]     # 查看配置信息")
+    console.print("2. [cyan]python -m cli.main examples[/cyan]   # 查看示例程序")
+    console.print("3. [cyan]python -m cli.main test[/cyan]       # 运行测试")
+    console.print("4. [cyan]python -m cli.main analyze[/cyan]    # 开始股票分析")
+
+    console.print("\n[bold yellow]📋 主要命令 | Main Commands:[/bold yellow]")
+
+    commands_table = Table(show_header=True, header_style="bold magenta")
+    commands_table.add_column("命令 | Command", style="cyan")
+    commands_table.add_column("功能 | Function", style="green")
+    commands_table.add_column("说明 | Description")
+
+    commands_table.add_row(
+        "analyze",
+        "股票分析 | Stock Analysis",
+        "启动交互式多智能体股票分析工具"
+    )
+    commands_table.add_row(
+        "config",
+        "配置设置 | Configuration",
+        "查看和配置LLM提供商、API密钥等设置"
+    )
+    commands_table.add_row(
+        "examples",
+        "示例程序 | Examples",
+        "查看可用的演示程序和使用说明"
+    )
+    commands_table.add_row(
+        "test",
+        "运行测试 | Run Tests",
+        "执行系统集成测试，验证功能正常"
+    )
+    commands_table.add_row(
+        "version",
+        "版本信息 | Version",
+        "显示软件版本和功能特性信息"
+    )
+
+    console.print(commands_table)
+
+    console.print("\n[bold yellow]🇨🇳 推荐使用阿里百炼大模型:[/bold yellow]")
+    console.print("• 无需翻墙，网络稳定")
+    console.print("• 中文理解能力强")
+    console.print("• 成本相对较低")
+    console.print("• 符合国内合规要求")
+
+    console.print("\n[bold yellow]📞 获取帮助 | Get Help:[/bold yellow]")
+    console.print("• 项目文档: docs/ 目录")
+    console.print("• 示例程序: examples/ 目录")
+    console.print("• 集成测试: tests/ 目录")
+    console.print("• GitHub: https://github.com/TauricResearch/TradingAgents")
 
 
 if __name__ == "__main__":
