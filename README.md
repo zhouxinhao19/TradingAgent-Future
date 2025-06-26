@@ -2,11 +2,13 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/Version-0.1.1--preview-yellow.svg)](./VERSION)
+[![Version](https://img.shields.io/badge/Version-cn--0.1.1--preview-yellow.svg)](./VERSION)
 [![Documentation](https://img.shields.io/badge/docs-中文文档-green.svg)](./docs/)
 [![Original](https://img.shields.io/badge/基于-TauricResearch/TradingAgents-orange.svg)](https://github.com/TauricResearch/TradingAgents)
 
-> ⚠️ **预览版本提醒**: 当前版本为 0.1.1 预览版，功能仍在完善中，建议仅在测试环境使用。
+> ⚠️ **预览版本提醒**: 当前版本为 cn-0.1.1 预览版，功能仍在完善中，建议仅在测试环境使用。
+>
+> 📝 **版本说明**: 为避免与源项目版本冲突，中文增强版使用 `cn-` 前缀的独立版本体系。
 
 基于多智能体大语言模型的中文金融交易决策框架。本项目基于 [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents) 开发，专为中文用户提供完整的文档体系和本地化支持。
 

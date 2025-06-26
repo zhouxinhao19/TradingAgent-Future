@@ -23,7 +23,7 @@ class VersionManager:
             with open(self.version_file, 'r') as f:
                 return f.read().strip()
         except FileNotFoundError:
-            return "0.0.0"
+            return "cn-0.0.0"
     
     def set_version(self, version):
         """设置版本号"""
@@ -34,8 +34,21 @@ class VersionManager:
     def bump_version(self, bump_type):
         """递增版本号"""
         current = self.get_current_version()
-        major, minor, patch = map(int, current.split('.'))
-        
+
+        # 处理cn-前缀
+        if current.startswith('cn-'):
+            prefix = 'cn-'
+            version_part = current[3:]  # 去掉cn-前缀
+        else:
+            prefix = 'cn-'  # 默认添加cn-前缀
+            version_part = current
+
+        try:
+            major, minor, patch = map(int, version_part.split('.'))
+        except ValueError:
+            # 如果解析失败，使用默认值
+            major, minor, patch = 0, 1, 0
+
         if bump_type == 'major':
             major += 1
             minor = 0
@@ -47,8 +60,8 @@ class VersionManager:
             patch += 1
         else:
             raise ValueError("bump_type must be 'major', 'minor', or 'patch'")
-        
-        new_version = f"{major}.{minor}.{patch}"
+
+        new_version = f"{prefix}{major}.{minor}.{patch}"
         self.set_version(new_version)
         return new_version
     

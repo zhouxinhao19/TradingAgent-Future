@@ -5,9 +5,11 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [0.1.1] - 2025-06-26
+## [cn-0.1.1] - 2025-06-26
 
-### 🎉 首个预览版本 | First Preview Release
+### 🎉 首个中文增强预览版本 | First Chinese Enhanced Preview Release
+
+> 📝 **版本说明**: 为避免与源项目版本冲突，中文增强版使用 `cn-` 前缀的独立版本体系
 
 #### ✨ 新增功能 | Added Features
 
@@ -233,6 +235,31 @@
 - **GitHub Issues**: [提交问题和建议](https://github.com/hsliuping/TradingAgents-CN/issues)
 - **GitHub Discussions**: [参与讨论](https://github.com/hsliuping/TradingAgents-CN/discussions)
 - **邮箱**: hsliup@163.com
+
+## 版本规范 | Version Convention
+
+### 中文增强版版本体系
+
+为避免与源项目版本冲突，本项目采用独立的版本号体系：
+
+**格式**: `cn-X.Y.Z`
+- **cn-**: 中文增强版标识前缀
+- **X.Y.Z**: 遵循[语义化版本](https://semver.org/lang/zh-CN/)规范
+
+**版本对应关系**:
+- **cn-0.x.x**: 基于源项目的中文增强预览版
+- **cn-1.x.x**: 中文增强正式版
+- **cn-2.x.x**: 重大功能更新版
+
+### 语义化版本规范
+- **主版本号(X)**：不兼容的API修改
+- **次版本号(Y)**：向下兼容的功能性新增
+- **修订号(Z)**：向下兼容的问题修正
+
+### 版本示例
+- `cn-0.1.1`: 首个中文增强预览版
+- `cn-0.2.0`: 新增LLM支持的预览版
+- `cn-1.0.0`: 首个正式稳定版
 
 ## 许可证
 
