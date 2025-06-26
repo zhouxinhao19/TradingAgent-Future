@@ -1183,8 +1183,16 @@ def version():
     显示版本信息
     Display version information
     """
+    # 读取版本号
+    try:
+        with open("VERSION", "r") as f:
+            version = f.read().strip()
+    except FileNotFoundError:
+        version = "1.0.0"
+
     console.print("\n[bold blue]📊 TradingAgents 版本信息 | Version Information[/bold blue]")
-    console.print(f"[green]版本 | Version:[/green] 1.0.0")
+    console.print(f"[green]版本 | Version:[/green] {version}")
+    console.print(f"[green]发布日期 | Release Date:[/green] 2025-01-26")
     console.print(f"[green]框架 | Framework:[/green] 多智能体金融交易分析 | Multi-Agent Financial Trading Analysis")
     console.print(f"[green]支持的语言 | Languages:[/green] 中文 | English")
     console.print(f"[green]主要功能 | Features:[/green]")

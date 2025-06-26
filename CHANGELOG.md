@@ -1,21 +1,65 @@
-# 更新日志
+# 更新日志 | Changelog
 
 本文档记录了 TradingAgents 中文增强版的所有重要更改。
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [未发布]
+## [1.0.0] - 2025-01-26
 
-### 计划中
+### 🎉 首个正式版本 | First Official Release
+
+#### ✨ 新增功能 | Added Features
+
+**🇨🇳 阿里百炼大模型集成**
+- 完整的ChatDashScope适配器实现
+- 支持qwen-turbo、qwen-plus、qwen-max模型
+- 优化的中文理解和生成能力
+- 与LangChain框架完美兼容
+
+**🏗️ 项目结构重构**
+- 创建规范的examples/目录存放演示程序
+- 创建tests/目录存放测试程序
+- 按功能分类组织子目录
+- 添加完整的Python包结构
+
+**🖥️ CLI工具中文化**
+- 完整的中文用户界面
+- 双语命令说明和帮助信息
+- 中文错误提示和用户引导
+- 新增config、version、examples、test、help命令
+
+**📚 示例程序**
+- demo_dashscope_chinese.py: 中文优化的股票分析演示
+- demo_dashscope.py: 完整功能演示
+- demo_dashscope_simple.py: 简化测试版本
+- demo_dashscope_no_memory.py: 无记忆版本
+- demo_openai.py: OpenAI模型演示
+
+**🧪 测试系统**
+- 集成测试框架
+- 阿里百炼连接测试
+- LangChain适配器测试
+- 自动化测试脚本
+
+#### 📊 项目统计 | Project Statistics
+- **新增文件**: 27个
+- **代码行数**: +2720行
+- **支持的LLM**: 阿里百炼、OpenAI、Anthropic、Google AI
+- **示例程序**: 6个
+- **测试覆盖**: 集成测试
+
+## [未发布] | Unreleased
+
+### 计划中 | Planned
 - 中国股票市场支持（A股、港股、新三板）
 - 中文数据源集成（Tushare、AkShare、Wind）
-- 国产大语言模型支持（文心一言、通义千问、智谱清言）
+- 更多国产大语言模型支持（文心一言、智谱清言）
 - 中文金融术语和表达优化
 - 监管合规功能（风险提示、免责声明）
 - 私有化部署支持
 
-## [1.0.0-cn] - 2024-01-XX
+## [1.0.0-cn] - 2024-01-XX (历史版本)
 
 ### 新增
 - ✅ **完整的中文文档体系**
