@@ -5,11 +5,13 @@
 
 import os
 import json
-from typing import Any, Dict, List, Optional, Union, Iterator, AsyncIterator
+from typing import Any, Dict, List, Optional, Union, Iterator, AsyncIterator, Sequence
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import BaseMessage, AIMessage, HumanMessage, SystemMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.callbacks.manager import CallbackManagerForLLMRun, AsyncCallbackManagerForLLMRun
+from langchain_core.tools import BaseTool
+from langchain_core.utils.function_calling import convert_to_openai_tool
 from pydantic import Field, SecretStr
 import dashscope
 from dashscope import Generation
@@ -147,6 +149,44 @@ class ChatDashScope(BaseChatModel):
         # 目前使用同步方法，后续可以实现真正的异步
         return self._generate(messages, stop, run_manager, **kwargs)
     
+    def bind_tools(
+        self,
+        tools: Sequence[Union[Dict[str, Any], type, BaseTool]],
+        **kwargs: Any,
+    ) -> "ChatDashScope":
+        """绑定工具到模型"""
+        # 注意：DashScope 目前不直接支持工具调用
+        # 这里我们返回一个新的实例，但实际上工具调用需要在应用层处理
+        formatted_tools = []
+        for tool in tools:
+            if hasattr(tool, "name") and hasattr(tool, "description"):
+                # 这是一个 BaseTool 实例
+                formatted_tools.append({
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": getattr(tool, "args_schema", {})
+                })
+            elif isinstance(tool, dict):
+                formatted_tools.append(tool)
+            else:
+                # 尝试转换为 OpenAI 工具格式
+                try:
+                    formatted_tools.append(convert_to_openai_tool(tool))
+                except Exception:
+                    pass
+
+        # 创建新实例，保存工具信息
+        new_instance = self.__class__(
+            model=self.model,
+            api_key=self.api_key,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            top_p=self.top_p,
+            **kwargs
+        )
+        new_instance._tools = formatted_tools
+        return new_instance
+
     @property
     def _identifying_params(self) -> Dict[str, Any]:
         """返回标识参数"""

@@ -152,11 +152,20 @@ print(f"推理过程: {decision['reasoning']}")
 
 #### 快速启动脚本
 ```bash
-# 阿里百炼演示
-python demo_dashscope.py
+# 阿里百炼演示（推荐中文用户）
+python examples/dashscope/demo_dashscope_chinese.py
+
+# 阿里百炼完整演示
+python examples/dashscope/demo_dashscope.py
+
+# 阿里百炼简化测试
+python examples/dashscope/demo_dashscope_simple.py
 
 # OpenAI演示（需要国外API）
-python demo_openai.py
+python examples/openai/demo_openai.py
+
+# 集成测试
+python tests/integration/test_dashscope_integration.py
 ```
 
 ### 交互式分析
