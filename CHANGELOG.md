@@ -5,9 +5,9 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [1.0.0] - 2025-01-26
+## [0.1.0] - 2025-01-26
 
-### 🎉 首个正式版本 | First Official Release
+### 🎉 首个预览版本 | First Preview Release
 
 #### ✨ 新增功能 | Added Features
 
@@ -48,6 +48,12 @@
 - **支持的LLM**: 阿里百炼、OpenAI、Anthropic、Google AI
 - **示例程序**: 6个
 - **测试覆盖**: 集成测试
+
+#### ⚠️ 预览版本说明 | Preview Version Notes
+- 这是一个早期预览版本，功能仍在完善中
+- 建议在测试环境中使用
+- 欢迎反馈问题和建议
+- 后续版本可能包含破坏性更改
 
 ## [未发布] | Unreleased
 

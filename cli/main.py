@@ -1191,16 +1191,23 @@ def version():
         version = "1.0.0"
 
     console.print("\n[bold blue]📊 TradingAgents 版本信息 | Version Information[/bold blue]")
-    console.print(f"[green]版本 | Version:[/green] {version}")
-    console.print(f"[green]发布日期 | Release Date:[/green] 2025-01-26")
+    console.print(f"[green]版本 | Version:[/green] {version} [yellow](预览版 | Preview)[/yellow]")
+    console.print(f"[green]发布日期 | Release Date:[/green] 2025-06-26")
     console.print(f"[green]框架 | Framework:[/green] 多智能体金融交易分析 | Multi-Agent Financial Trading Analysis")
     console.print(f"[green]支持的语言 | Languages:[/green] 中文 | English")
+    console.print(f"[green]开发状态 | Development Status:[/green] [yellow]早期预览版，功能持续完善中[/yellow]")
     console.print(f"[green]主要功能 | Features:[/green]")
     console.print("  • 🤖 多智能体协作分析 | Multi-agent collaborative analysis")
     console.print("  • 🇨🇳 阿里百炼大模型支持 | Alibaba DashScope support")
     console.print("  • 📈 实时股票数据分析 | Real-time stock data analysis")
     console.print("  • 🧠 智能投资建议 | Intelligent investment recommendations")
     console.print("  • 🔍 风险评估 | Risk assessment")
+
+    console.print(f"\n[yellow]⚠️  预览版本提醒 | Preview Version Notice:[/yellow]")
+    console.print("  • 这是早期预览版本，功能仍在完善中")
+    console.print("  • 建议仅在测试环境中使用")
+    console.print("  • 投资建议仅供参考，请谨慎决策")
+    console.print("  • 欢迎反馈问题和改进建议")
 
 
 @app.command(
