@@ -1212,9 +1212,11 @@ def version():
     console.print("  • 欢迎反馈问题和改进建议")
 
     console.print(f"\n[blue]🙏 致敬源项目 | Tribute to Original Project:[/blue]")
-    console.print("  • 感谢 Tauric Research 团队的杰出贡献")
-    console.print("  • 本项目旨在更好地在中国推广TradingAgents")
-    console.print("  • 源项目: https://github.com/TauricResearch/TradingAgents")
+    console.print("  • 💎 感谢 Tauric Research 团队提供的珍贵源码")
+    console.print("  • 🔄 感谢持续的维护、更新和改进工作")
+    console.print("  • 🌍 感谢选择Apache 2.0协议的开源精神")
+    console.print("  • 🎯 本项目旨在更好地在中国推广TradingAgents")
+    console.print("  • 🔗 源项目: https://github.com/TauricResearch/TradingAgents")
 
 
 @app.command(
