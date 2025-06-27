@@ -1,6 +1,7 @@
 from typing import Optional
 import datetime
 import typer
+import os
 from pathlib import Path
 from functools import wraps
 from rich.console import Console
@@ -19,6 +20,10 @@ from rich.tree import Tree
 from rich import box
 from rich.align import Align
 from rich.rule import Rule
+
+# 加载环境变量
+from dotenv import load_dotenv
+load_dotenv()
 
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
@@ -739,9 +744,53 @@ def extract_content_string(content):
     else:
         return str(content)
 
+def check_api_keys(llm_provider: str) -> bool:
+    """检查必要的API密钥是否已配置"""
+
+    missing_keys = []
+
+    # 检查LLM提供商对应的API密钥
+    if "阿里百炼" in llm_provider or "dashscope" in llm_provider.lower():
+        if not os.getenv("DASHSCOPE_API_KEY"):
+            missing_keys.append("DASHSCOPE_API_KEY (阿里百炼)")
+    elif "openai" in llm_provider.lower():
+        if not os.getenv("OPENAI_API_KEY"):
+            missing_keys.append("OPENAI_API_KEY")
+    elif "anthropic" in llm_provider.lower():
+        if not os.getenv("ANTHROPIC_API_KEY"):
+            missing_keys.append("ANTHROPIC_API_KEY")
+    elif "google" in llm_provider.lower():
+        if not os.getenv("GOOGLE_API_KEY"):
+            missing_keys.append("GOOGLE_API_KEY")
+
+    # 检查金融数据API密钥
+    if not os.getenv("FINNHUB_API_KEY"):
+        missing_keys.append("FINNHUB_API_KEY (金融数据)")
+
+    if missing_keys:
+        console.print("\n[red]❌ 缺少必要的API密钥 | Missing required API keys:[/red]")
+        for key in missing_keys:
+            console.print(f"   • {key}")
+
+        console.print("\n[yellow]💡 解决方案 | Solutions:[/yellow]")
+        console.print("1. 在项目根目录创建 .env 文件 | Create .env file in project root:")
+        console.print("   DASHSCOPE_API_KEY=your_dashscope_key")
+        console.print("   FINNHUB_API_KEY=your_finnhub_key")
+        console.print("\n2. 或设置环境变量 | Or set environment variables")
+        console.print("\n3. 运行 'python -m cli.main config' 查看详细配置说明")
+
+        return False
+
+    return True
+
 def run_analysis():
     # First get all user selections
     selections = get_user_selections()
+
+    # Check API keys before proceeding
+    if not check_api_keys(selections["llm_provider"]):
+        console.print("\n[red]分析终止 | Analysis terminated[/red]")
+        return
 
     # Create config with selected research depth
     config = DEFAULT_CONFIG.copy()
@@ -764,9 +813,14 @@ def run_analysis():
         config["llm_provider"] = llm_provider
 
     # Initialize the graph
-    graph = TradingAgentsGraph(
-        [analyst.value for analyst in selections["analysts"]], config=config, debug=True
-    )
+    try:
+        graph = TradingAgentsGraph(
+            [analyst.value for analyst in selections["analysts"]], config=config, debug=True
+        )
+    except Exception as e:
+        console.print(f"\n[red]❌ 初始化失败 | Initialization failed: {str(e)}[/red]")
+        console.print("\n[yellow]💡 请检查API密钥配置 | Please check API key configuration[/yellow]")
+        return
 
     # Create result directory
     results_dir = Path(config["results_dir"]) / selections["ticker"] / selections["analysis_date"]
@@ -1172,12 +1226,63 @@ def config():
 
     console.print(providers_table)
 
+    # 检查API密钥状态
+    console.print("\n[yellow]API密钥状态 | API Key Status:[/yellow]")
+
+    api_keys_table = Table(show_header=True, header_style="bold magenta")
+    api_keys_table.add_column("API密钥 | API Key", style="cyan")
+    api_keys_table.add_column("状态 | Status", style="yellow")
+    api_keys_table.add_column("说明 | Description")
+
+    # 检查各个API密钥
+    dashscope_key = os.getenv("DASHSCOPE_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY")
+    finnhub_key = os.getenv("FINNHUB_API_KEY")
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+    google_key = os.getenv("GOOGLE_API_KEY")
+
+    api_keys_table.add_row(
+        "DASHSCOPE_API_KEY",
+        "✅ 已配置" if dashscope_key else "❌ 未配置",
+        f"阿里百炼 | {dashscope_key[:12]}..." if dashscope_key else "阿里百炼API密钥"
+    )
+    api_keys_table.add_row(
+        "FINNHUB_API_KEY",
+        "✅ 已配置" if finnhub_key else "❌ 未配置",
+        f"金融数据 | {finnhub_key[:12]}..." if finnhub_key else "金融数据API密钥"
+    )
+    api_keys_table.add_row(
+        "OPENAI_API_KEY",
+        "✅ 已配置" if openai_key else "❌ 未配置",
+        f"OpenAI | {openai_key[:12]}..." if openai_key else "OpenAI API密钥"
+    )
+    api_keys_table.add_row(
+        "ANTHROPIC_API_KEY",
+        "✅ 已配置" if anthropic_key else "❌ 未配置",
+        f"Anthropic | {anthropic_key[:12]}..." if anthropic_key else "Anthropic API密钥"
+    )
+    api_keys_table.add_row(
+        "GOOGLE_API_KEY",
+        "✅ 已配置" if google_key else "❌ 未配置",
+        f"Google AI | {google_key[:12]}..." if google_key else "Google AI API密钥"
+    )
+
+    console.print(api_keys_table)
+
     console.print("\n[yellow]配置API密钥 | Configure API Keys:[/yellow]")
     console.print("1. 编辑项目根目录的 .env 文件 | Edit .env file in project root")
     console.print("2. 或设置环境变量 | Or set environment variables:")
     console.print("   - DASHSCOPE_API_KEY (阿里百炼)")
     console.print("   - OPENAI_API_KEY (OpenAI)")
     console.print("   - FINNHUB_API_KEY (金融数据 | Financial data)")
+
+    # 如果缺少关键API密钥，给出提示
+    if not dashscope_key or not finnhub_key:
+        console.print("\n[red]⚠️  警告 | Warning:[/red]")
+        if not dashscope_key:
+            console.print("   • 缺少阿里百炼API密钥，无法使用推荐的中文优化模型")
+        if not finnhub_key:
+            console.print("   • 缺少金融数据API密钥，无法获取实时股票数据")
 
     console.print("\n[yellow]示例程序 | Example Programs:[/yellow]")
     console.print("• python examples/dashscope/demo_dashscope_chinese.py  # 中文分析演示")
