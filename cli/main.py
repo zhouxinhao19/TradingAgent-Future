@@ -750,7 +750,18 @@ def run_analysis():
     config["quick_think_llm"] = selections["shallow_thinker"]
     config["deep_think_llm"] = selections["deep_thinker"]
     config["backend_url"] = selections["backend_url"]
-    config["llm_provider"] = selections["llm_provider"].lower()
+    # 处理LLM提供商名称，确保正确识别
+    llm_provider = selections["llm_provider"].lower()
+    if "阿里百炼" in selections["llm_provider"] or "dashscope" in llm_provider:
+        config["llm_provider"] = "dashscope"
+    elif "openai" in llm_provider:
+        config["llm_provider"] = "openai"
+    elif "anthropic" in llm_provider:
+        config["llm_provider"] = "anthropic"
+    elif "google" in llm_provider:
+        config["llm_provider"] = "google"
+    else:
+        config["llm_provider"] = llm_provider
 
     # Initialize the graph
     graph = TradingAgentsGraph(
