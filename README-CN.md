@@ -35,16 +35,26 @@
 
 ### 🧠 多LLM模型支持
 
+- **阿里百炼**: qwen-turbo, qwen-plus, qwen-max ✅
+- **Google AI**: gemini-2.0-flash, gemini-1.5-pro, gemini-1.5-flash ✅
 - **OpenAI**: GPT-4o, GPT-4o-mini, GPT-3.5-turbo
 - **Anthropic**: Claude-3-Opus, Claude-3-Sonnet, Claude-3-Haiku
-- **Google AI**: Gemini-Pro, Gemini-2.0-Flash
-- **国产模型** (计划中): 文心一言、通义千问、智谱清言等
+- **智能混合**: Google AI推理 + 阿里百炼嵌入 ✅
+
+### 🌐 Web管理界面 (v0.1.2新增)
+
+- **Streamlit Web平台**: 直观的股票分析界面 ✅
+- **实时进度显示**: 分析过程可视化跟踪 ✅
+- **多模型选择**: 支持阿里百炼和Google AI切换 ✅
+- **分析师配置**: 灵活的分析师组合选择 ✅
+- **结果可视化**: 专业的分析报告展示 ✅
+- **响应式设计**: 支持桌面和移动端访问 ✅
 
 ### 📊 全面数据集成
 
-- **实时数据**: FinnHub、Yahoo Finance
-- **新闻数据**: Google News、财经新闻
-- **社交数据**: Reddit、Twitter情绪分析
+- **实时数据**: FinnHub、Yahoo Finance ✅
+- **新闻数据**: Google News、财经新闻 ✅
+- **社交数据**: Reddit、Twitter情绪分析 ✅
 - **中文数据** (计划中): Tushare、AkShare、东方财富
 
 ### 🚀 高性能特性
@@ -104,39 +114,80 @@ pip install -r requirements.txt
 ### 配置API密钥
 
 ```bash
-# 设置环境变量
-export OPENAI_API_KEY="your_openai_api_key"
-export FINNHUB_API_KEY="your_finnhub_api_key"
+# 复制环境变量模板
+cp .env.example .env
 
-# 或创建 .env 文件
-echo "OPENAI_API_KEY=your_openai_api_key" > .env
-echo "FINNHUB_API_KEY=your_finnhub_api_key" >> .env
+# 编辑 .env 文件，添加您的API密钥
+# 阿里百炼API（推荐，国产模型）
+DASHSCOPE_API_KEY=your_dashscope_api_key
+
+# Google AI API（可选，支持Gemini模型）
+GOOGLE_API_KEY=your_google_api_key
+
+# 金融数据API（可选）
+FINNHUB_API_KEY=your_finnhub_api_key
+
+# Reddit API（可选，用于社交媒体分析）
+REDDIT_CLIENT_ID=your_reddit_client_id
+REDDIT_CLIENT_SECRET=your_reddit_client_secret
+REDDIT_USER_AGENT=your_reddit_user_agent
 ```
 
-### 基本使用
+### 🌐 Web界面使用 (推荐)
+
+```bash
+# 启动Web管理界面
+python -m streamlit run web/app.py
+
+# 或使用快捷脚本
+# Windows
+start_web.bat
+
+# Linux/macOS
+./start_web.sh
+```
+
+然后在浏览器中访问 `http://localhost:8501`，您可以：
+
+- 🎯 选择LLM提供商（阿里百炼/Google AI）
+- 🤖 选择AI模型（qwen-plus/gemini-2.0-flash等）
+- 📊 配置分析师组合（市场/基本面/新闻/社交媒体）
+- 📈 输入股票代码进行分析
+- 📋 查看详细的分析报告和投资建议
+
+### 🖥️ 命令行界面
+
+```bash
+# 启动交互式命令行界面
+python cli/main.py
+
+# 直接分析指定股票
+python cli/main.py --stock AAPL --analysts market fundamentals
+```
+
+### 🐍 Python API使用
 
 ```python
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
 
+# 配置使用阿里百炼模型
+config = DEFAULT_CONFIG.copy()
+config["llm_provider"] = "dashscope"
+config["deep_think_llm"] = "qwen-plus"
+config["quick_think_llm"] = "qwen-turbo"
+
 # 创建交易智能体
-ta = TradingAgentsGraph(debug=True, config=DEFAULT_CONFIG.copy())
+ta = TradingAgentsGraph(["market", "fundamentals"], config=config)
 
 # 分析股票 (以苹果公司为例)
-state, decision = ta.propagate("AAPL", "2024-01-15")
+state, decision = ta.propagate("AAPL", "2025-06-27")
 
 # 输出分析结果
 print(f"推荐动作: {decision['action']}")
 print(f"置信度: {decision['confidence']:.1%}")
 print(f"风险评分: {decision['risk_score']:.1%}")
 print(f"推理过程: {decision['reasoning']}")
-```
-
-### 交互式分析
-
-```bash
-# 启动交互式命令行界面
-python -m cli.main
 ```
 
 ## 📚 完整文档

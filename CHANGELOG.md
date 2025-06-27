@@ -5,6 +5,79 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [cn-0.1.2] - 2025-06-27
+
+### 🌐 Web管理界面和Google AI支持 | Web Interface & Google AI Support
+
+#### ✨ 新增功能 | Added Features
+
+**🌐 Streamlit Web管理界面**
+
+- 完整的Web股票分析平台
+- 直观的用户界面和实时进度显示
+- 支持多种分析师组合选择
+- 可视化的分析结果展示
+- 响应式设计，支持移动端访问
+
+**🤖 Google AI模型集成**
+
+- 完整的Google Gemini模型支持
+- 支持gemini-2.0-flash、gemini-1.5-pro等模型
+- 智能混合嵌入服务（Google AI + 阿里百炼）
+- 完美的中文分析能力
+- 稳定的LangChain集成
+
+**🔧 多LLM提供商支持**
+
+- Web界面支持LLM提供商选择
+- 阿里百炼和Google AI无缝切换
+- 自动配置最优嵌入服务
+- 统一的配置管理界面
+
+**🧪 完整的测试体系**
+
+- 25+个专业测试文件
+- API集成测试和模型兼容性测试
+- 调试和诊断工具
+- 规范化的tests目录结构
+
+#### 🔧 改进优化 | Improvements
+
+**📊 分析结果展示**
+
+- 新增分析配置信息显示
+- 显示使用的LLM提供商和模型
+- 展示参与的分析师信息
+- 优化的结果格式化
+
+**🗂️ 项目结构优化**
+
+- 所有测试文件移至tests目录
+- 文档统一放在docs目录
+- Web相关代码集中在web目录
+- 更清晰的目录组织结构
+
+**🔑 API密钥管理**
+
+- 支持多种API服务配置
+- 智能的API密钥检测
+- 详细的配置指南
+- 安全的环境变量管理
+
+#### 🐛 问题修复 | Bug Fixes
+
+- 修复了Gemini 2.5模型的LangChain集成问题
+- 解决了Web界面模型选择的配置问题
+- 优化了内存系统的稳定性
+- 改进了错误处理和用户反馈
+
+#### 📚 文档更新 | Documentation
+
+- 完整的Web界面使用指南
+- Google AI配置教程
+- 测试文件分类和使用说明
+- API密钥配置安全指南
+
 ## [cn-0.1.1] - 2025-06-26
 
 ### 🎉 首个中文增强预览版本 | First Chinese Enhanced Preview Release

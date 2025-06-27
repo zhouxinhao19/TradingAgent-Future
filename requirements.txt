@@ -25,3 +25,5 @@ questionary
 langchain_anthropic
 langchain-google-genai
 dashscope
+streamlit
+plotly

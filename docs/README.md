@@ -30,6 +30,8 @@
 ### ⚙️ 配置与部署
 - [配置说明](./configuration/config-guide.md) - 配置文件详解
 - [LLM配置](./configuration/llm-config.md) - 大语言模型配置
+- [Google AI配置](./configuration/google-ai-setup.md) - Google AI (Gemini)模型配置指南 ✨
+- [Web界面配置](../web/README.md) - Web管理界面使用指南 ✨
 - [部署指南](./deployment/deployment-guide.md) - 生产环境部署
 
 ### 🔧 开发指南

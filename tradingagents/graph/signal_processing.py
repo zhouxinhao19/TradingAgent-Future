@@ -23,7 +23,7 @@ class SignalProcessor:
         messages = [
             (
                 "system",
-                "You are an efficient assistant designed to analyze paragraphs or financial reports provided by a group of analysts. Your task is to extract the investment decision: SELL, BUY, or HOLD. Provide only the extracted decision (SELL, BUY, or HOLD) as your output, without adding any additional text or information.",
+                "你是一位高效的助手，专门分析一组分析师提供的段落或财务报告。你的任务是提取投资决策：卖出、买入或持有。仅提供提取的决策（卖出、买入或持有）作为输出，不要添加任何额外的文本或信息。",
             ),
             ("human", full_signal),
         ]

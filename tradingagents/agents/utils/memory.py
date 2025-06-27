@@ -19,6 +19,18 @@ class FinancialSituationMemory:
             dashscope_key = os.getenv('DASHSCOPE_API_KEY')
             if dashscope_key:
                 dashscope.api_key = dashscope_key
+        elif self.llm_provider == "google":
+            # Google AI使用阿里百炼嵌入（如果可用），否则使用OpenAI
+            dashscope_key = os.getenv('DASHSCOPE_API_KEY')
+            if dashscope_key:
+                self.embedding = "text-embedding-v3"
+                self.client = None
+                dashscope.api_key = dashscope_key
+                print("💡 Google AI使用阿里百炼嵌入服务")
+            else:
+                self.embedding = "text-embedding-3-small"
+                self.client = OpenAI(base_url=config["backend_url"])
+                print("⚠️ Google AI回退到OpenAI嵌入服务")
         elif config["backend_url"] == "http://localhost:11434/v1":
             self.embedding = "nomic-embed-text"
             self.client = OpenAI(base_url=config["backend_url"])
@@ -38,7 +50,9 @@ class FinancialSituationMemory:
     def get_embedding(self, text):
         """Get embedding for a text using the configured provider"""
 
-        if self.llm_provider == "dashscope" or self.llm_provider == "alibaba":
+        if (self.llm_provider == "dashscope" or
+            self.llm_provider == "alibaba" or
+            (self.llm_provider == "google" and self.client is None)):
             # 使用阿里百炼的嵌入模型
             try:
                 response = TextEmbedding.call(
