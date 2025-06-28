@@ -121,6 +121,71 @@ class Toolkit:
 
     @staticmethod
     @tool
+    def get_chinese_social_sentiment(
+        ticker: Annotated[str, "Ticker of a company. e.g. AAPL, TSM"],
+        curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
+    ) -> str:
+        """
+        获取中国社交媒体和财经平台上关于特定股票的情绪分析和讨论热度。
+        整合雪球、东方财富股吧、新浪财经等中国本土平台的数据。
+        Args:
+            ticker (str): 股票代码，如 AAPL, TSM
+            curr_date (str): 当前日期，格式为 yyyy-mm-dd
+        Returns:
+            str: 包含中国投资者情绪分析、讨论热度、关键观点的格式化报告
+        """
+        try:
+            # 这里可以集成多个中国平台的数据
+            chinese_sentiment_results = interface.get_chinese_social_sentiment(ticker, curr_date)
+            return chinese_sentiment_results
+        except Exception as e:
+            # 如果中国平台数据获取失败，回退到原有的Reddit数据
+            return interface.get_reddit_company_news(ticker, curr_date, 7, 5)
+
+    @staticmethod
+    @tool
+    def get_china_stock_data(
+        stock_code: Annotated[str, "中国股票代码，如 000001(平安银行), 600519(贵州茅台)"],
+        start_date: Annotated[str, "开始日期，格式 yyyy-mm-dd"],
+        end_date: Annotated[str, "结束日期，格式 yyyy-mm-dd"],
+    ) -> str:
+        """
+        获取中国A股实时和历史数据，通过通达信API提供高质量的本土股票数据。
+        支持实时行情、历史K线、技术指标等全面数据。
+        Args:
+            stock_code (str): 中国股票代码，如 000001(平安银行), 600519(贵州茅台)
+            start_date (str): 开始日期，格式 yyyy-mm-dd
+            end_date (str): 结束日期，格式 yyyy-mm-dd
+        Returns:
+            str: 包含实时行情、历史数据、技术指标的完整股票分析报告
+        """
+        try:
+            from tradingagents.dataflows.tdx_utils import get_china_stock_data
+            return get_china_stock_data(stock_code, start_date, end_date)
+        except Exception as e:
+            return f"中国股票数据获取失败: {str(e)}。建议安装pytdx库: pip install pytdx"
+
+    @staticmethod
+    @tool
+    def get_china_market_overview(
+        curr_date: Annotated[str, "当前日期，格式 yyyy-mm-dd"],
+    ) -> str:
+        """
+        获取中国股市整体概览，包括主要指数的实时行情。
+        涵盖上证指数、深证成指、创业板指、科创50等主要指数。
+        Args:
+            curr_date (str): 当前日期，格式 yyyy-mm-dd
+        Returns:
+            str: 包含主要指数实时行情的市场概览报告
+        """
+        try:
+            from tradingagents.dataflows.tdx_utils import get_china_market_overview
+            return get_china_market_overview()
+        except Exception as e:
+            return f"中国市场概览获取失败: {str(e)}。建议安装pytdx库: pip install pytdx"
+
+    @staticmethod
+    @tool
     def get_YFin_data(
         symbol: Annotated[str, "ticker symbol of the company"],
         start_date: Annotated[str, "Start date in yyyy-mm-dd format"],
@@ -360,6 +425,28 @@ class Toolkit:
         google_news_results = interface.get_google_news(query, curr_date, 7)
 
         return google_news_results
+
+    @staticmethod
+    @tool
+    def get_realtime_stock_news(
+        ticker: Annotated[str, "Ticker of a company. e.g. AAPL, TSM"],
+        curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
+    ) -> str:
+        """
+        获取股票的实时新闻分析，解决传统新闻源的滞后性问题。
+        整合多个专业财经API，提供15-30分钟内的最新新闻。
+        Args:
+            ticker (str): 股票代码，如 AAPL, TSM
+            curr_date (str): 当前日期，格式为 yyyy-mm-dd
+        Returns:
+            str: 包含实时新闻分析、紧急程度评估、时效性说明的格式化报告
+        """
+        try:
+            from tradingagents.dataflows.realtime_news_utils import get_realtime_stock_news
+            return get_realtime_stock_news(ticker, curr_date, hours_back=6)
+        except Exception as e:
+            # 如果实时新闻获取失败，回退到Google新闻
+            return interface.get_google_news(f"{ticker} stock news", curr_date, 1)
 
     @staticmethod
     @tool

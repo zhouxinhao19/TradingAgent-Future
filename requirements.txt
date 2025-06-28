@@ -27,3 +27,4 @@ langchain-google-genai
 dashscope
 streamlit
 plotly
+pytdx  # 通达信API，用于获取中国股票实时数据

@@ -91,10 +91,11 @@
 
 ### 📊 全面数据集成
 
-- **实时数据**: FinnHub、Yahoo Finance
-- **新闻数据**: Google News、财经新闻
+- **美股数据**: FinnHub、Yahoo Finance 实时行情
+- **🇨🇳 A股数据**: 通达信API 实时行情和历史数据
+- **新闻数据**: Google News、财经新闻、实时新闻API
 - **社交数据**: Reddit、Twitter情绪分析
-- **中文数据** (计划中): Tushare、AkShare、东方财富
+- **中文数据**: AkShare、Tushare 金融数据支持
 
 ### 🚀 高性能特性
 
@@ -102,6 +103,14 @@
 - **智能缓存**: 多层缓存策略，减少API调用成本
 - **实时分析**: 支持实时市场数据分析
 - **灵活配置**: 高度可定制的智能体行为和模型选择
+
+### 🌐 Web管理界面
+
+- **直观操作**: 基于Streamlit的现代化Web界面
+- **实时进度**: 分析过程可视化，实时显示进度
+- **智能配置**: 5级研究深度，从快速分析(2-4分钟)到全面分析(15-25分钟)
+- **结果展示**: 结构化显示投资建议、目标价位、风险评估等
+- **中文界面**: 完全中文化的用户界面和分析结果
 
 ## 🆚 与原版的主要区别
 
@@ -149,25 +158,33 @@ git clone https://github.com/hsliuping/TradingAgents-CN.git
 cd TradingAgents-CN
 
 # 2. 创建虚拟环境
-python -m venv tradingagents
-source tradingagents/bin/activate  # Linux/macOS
-# tradingagents\Scripts\activate  # Windows
+python -m venv env
+# Windows
+env\Scripts\activate
+# Linux/macOS
+source env/bin/activate
 
 # 3. 安装依赖
 pip install -r requirements.txt
+
+# 4. 安装A股数据支持（可选）
+pip install pytdx  # 通达信API，用于A股实时数据
 ```
 
 ### 配置API密钥
 
 #### 🇨🇳 推荐：使用阿里百炼（国产大模型）
 ```bash
-# 设置阿里百炼API密钥
-set DASHSCOPE_API_KEY=your_dashscope_api_key
-set FINNHUB_API_KEY=your_finnhub_api_key
+# 复制配置模板
+cp .env.example .env
 
-# 或创建 .env 文件
-echo "DASHSCOPE_API_KEY=your_dashscope_api_key" > .env
-echo "FINNHUB_API_KEY=your_finnhub_api_key" >> .env
+# 编辑 .env 文件，配置以下必需的API密钥：
+DASHSCOPE_API_KEY=your_dashscope_api_key_here
+FINNHUB_API_KEY=your_finnhub_api_key_here
+
+# 可选：减少新闻滞后性的API密钥
+ALPHA_VANTAGE_API_KEY=your_alpha_vantage_api_key_here
+NEWSAPI_KEY=your_newsapi_key_here
 ```
 
 #### 使用国外模型
@@ -181,7 +198,39 @@ set FINNHUB_API_KEY=your_finnhub_api_key
 
 ### 基本使用
 
-#### 🇨🇳 使用阿里百炼大模型（推荐）
+#### 🌐 Web界面（推荐新手）
+```bash
+# 启动Web管理界面
+# Windows
+.\env\Scripts\Activate.ps1
+python -m streamlit run web/app.py
+
+# Linux/macOS
+source env/bin/activate
+python -m streamlit run web/app.py
+```
+
+然后在浏览器中访问 `http://localhost:8501`
+
+**Web界面特色功能**:
+- 🇺🇸 **美股分析**: 支持 AAPL, TSLA, NVDA 等美股代码
+- 🇨🇳 **A股分析**: 支持 000001, 600519, 300750 等A股代码
+- 📊 **实时数据**: 通达信API提供A股实时行情数据
+- 🤖 **智能体选择**: 可选择不同的分析师组合
+- 🎯 **5级研究深度**: 从快速分析(2-4分钟)到全面分析(15-25分钟)
+- 📊 **智能分析师选择**: 市场技术、基本面、新闻、社交媒体分析师
+- 🔄 **实时进度显示**: 可视化分析过程，避免等待焦虑
+- 📈 **结构化结果**: 投资建议、目标价位、置信度、风险评估
+- 🇨🇳 **完全中文化**: 界面和分析结果全中文显示
+
+**研究深度级别说明**:
+- **1级 - 快速分析** (2-4分钟): 日常监控，基础决策
+- **2级 - 基础分析** (4-6分钟): 常规投资，平衡速度
+- **3级 - 标准分析** (6-10分钟): 重要决策，推荐默认
+- **4级 - 深度分析** (10-15分钟): 重大投资，详细研究
+- **5级 - 全面分析** (15-25分钟): 最重要决策，最全面分析
+
+#### 💻 代码调用（适合开发者）
 ```python
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
@@ -376,13 +425,19 @@ docs/
    > 看涨/看跌研究员辩论机制的创新设计
 
 #### 💼 **实用工具文档**
-1. **[🧠 LLM配置](docs/configuration/llm-config.md)**
+1. **[🌐 Web界面指南](docs/usage/web-interface-guide.md)** - ⭐⭐⭐⭐⭐
+   > 完整的Web界面使用教程，包含5级研究深度详细说明
+
+2. **[💰 投资分析指南](docs/usage/investment_analysis_guide.md)**
+   > 从基础到高级的完整投资分析教程
+
+3. **[🧠 LLM配置](docs/configuration/llm-config.md)**
    > 多LLM模型配置和成本优化策略
 
-2. **[💾 缓存策略](docs/data/caching.md)**
+4. **[💾 缓存策略](docs/data/caching.md)**
    > 多层缓存设计，显著降低API调用成本
 
-3. **[🆘 常见问题](docs/faq/faq.md)**
+5. **[🆘 常见问题](docs/faq/faq.md)**
    > 详细的FAQ和故障排除指南
 
 ### 📖 **按模块浏览文档**

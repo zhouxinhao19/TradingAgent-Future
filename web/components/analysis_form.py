@@ -15,13 +15,29 @@ def render_analysis_form():
         col1, col2 = st.columns(2)
         
         with col1:
-            # 股票代码输入
-            stock_symbol = st.text_input(
-                "股票代码 📈",
-                value="AAPL",
-                placeholder="输入股票代码，如 AAPL, TSLA, MSFT",
-                help="输入要分析的股票代码，支持美股代码"
-            ).upper().strip()
+            # 市场选择
+            market_type = st.selectbox(
+                "选择市场 🌍",
+                options=["美股", "A股"],
+                index=0,
+                help="选择要分析的股票市场"
+            )
+
+            # 根据市场类型显示不同的输入提示
+            if market_type == "美股":
+                stock_symbol = st.text_input(
+                    "股票代码 📈",
+                    value="AAPL",
+                    placeholder="输入美股代码，如 AAPL, TSLA, MSFT",
+                    help="输入要分析的美股代码"
+                ).upper().strip()
+            else:  # A股
+                stock_symbol = st.text_input(
+                    "股票代码 📈",
+                    value="000001",
+                    placeholder="输入A股代码，如 000001, 600519",
+                    help="输入要分析的A股代码，如 000001(平安银行), 600519(贵州茅台)"
+                ).strip()
             
             # 分析日期
             analysis_date = st.date_input(
@@ -126,6 +142,7 @@ def render_analysis_form():
         return {
             'submitted': True,
             'stock_symbol': stock_symbol,
+            'market_type': market_type,
             'analysis_date': str(analysis_date),
             'analysts': [a[0] for a in selected_analysts],
             'research_depth': research_depth,
