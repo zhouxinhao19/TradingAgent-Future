@@ -18,8 +18,24 @@ python -m cli.main config
 python -m cli.main test
 ```
 
-### 2. 运行预设分析
+### 2. 使用方式选择
 
+#### 🌐 Web界面 (推荐新手)
+```bash
+# 启动Web界面
+python -m streamlit run web/app.py
+```
+然后在浏览器中访问 `http://localhost:8501`
+
+**优点**:
+- 直观易用的图形界面
+- 实时进度显示
+- 详细的配置选项
+- 结果可视化展示
+
+**详细使用说明**: 请参考 [Web界面使用指南](web-interface-guide.md)
+
+#### 💻 命令行界面 (适合开发者)
 ```bash
 # 中文优化版本（推荐）
 python examples/dashscope/demo_dashscope_chinese.py
@@ -30,6 +46,11 @@ python examples/dashscope/demo_dashscope.py
 # 简化测试版本
 python examples/dashscope/demo_dashscope_simple.py
 ```
+
+**优点**:
+- 快速执行
+- 易于自动化
+- 适合批量处理
 
 ## 📊 分析内容详解
 

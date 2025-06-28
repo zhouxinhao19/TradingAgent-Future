@@ -15,7 +15,47 @@ sys.path.insert(0, str(project_root))
 # 确保环境变量正确加载
 load_dotenv(project_root / ".env", override=True)
 
-def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, llm_provider, llm_model, progress_callback=None):
+def extract_risk_assessment(state):
+    """从分析状态中提取风险评估数据"""
+    try:
+        risk_debate_state = state.get('risk_debate_state', {})
+
+        if not risk_debate_state:
+            return None
+
+        # 提取各个风险分析师的观点
+        risky_analysis = risk_debate_state.get('risky_history', '')
+        safe_analysis = risk_debate_state.get('safe_history', '')
+        neutral_analysis = risk_debate_state.get('neutral_history', '')
+        judge_decision = risk_debate_state.get('judge_decision', '')
+
+        # 格式化风险评估报告
+        risk_assessment = f"""
+## ⚠️ 风险评估报告
+
+### 🔴 激进风险分析师观点
+{risky_analysis if risky_analysis else '暂无激进风险分析'}
+
+### 🟡 中性风险分析师观点
+{neutral_analysis if neutral_analysis else '暂无中性风险分析'}
+
+### 🟢 保守风险分析师观点
+{safe_analysis if safe_analysis else '暂无保守风险分析'}
+
+### 🏛️ 风险管理委员会最终决议
+{judge_decision if judge_decision else '暂无风险管理决议'}
+
+---
+*风险评估基于多角度分析，请结合个人风险承受能力做出投资决策*
+        """.strip()
+
+        return risk_assessment
+
+    except Exception as e:
+        print(f"提取风险评估数据时出错: {e}")
+        return None
+
+def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, llm_provider, llm_model, market_type="美股", progress_callback=None):
     """执行股票分析
 
     Args:
@@ -63,10 +103,47 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         config["llm_provider"] = llm_provider
         config["deep_think_llm"] = llm_model
         config["quick_think_llm"] = llm_model
-        config["max_debate_rounds"] = research_depth
-        config["max_risk_discuss_rounds"] = research_depth
-        config["memory_enabled"] = True  # 启用内存系统
-        config["online_tools"] = True  # 启用在线工具获取数据
+        # 根据研究深度调整配置
+        if research_depth == 1:  # 1级 - 快速分析
+            config["max_debate_rounds"] = 1
+            config["max_risk_discuss_rounds"] = 1
+            config["memory_enabled"] = False  # 禁用记忆功能加速
+            config["online_tools"] = False  # 使用缓存数据加速
+            if llm_provider == "dashscope":
+                config["quick_think_llm"] = "qwen-turbo"  # 使用最快模型
+                config["deep_think_llm"] = "qwen-plus"
+        elif research_depth == 2:  # 2级 - 基础分析
+            config["max_debate_rounds"] = 1
+            config["max_risk_discuss_rounds"] = 1
+            config["memory_enabled"] = True
+            config["online_tools"] = True
+            if llm_provider == "dashscope":
+                config["quick_think_llm"] = "qwen-plus"
+                config["deep_think_llm"] = "qwen-plus"
+        elif research_depth == 3:  # 3级 - 标准分析 (默认)
+            config["max_debate_rounds"] = 1
+            config["max_risk_discuss_rounds"] = 2
+            config["memory_enabled"] = True
+            config["online_tools"] = True
+            if llm_provider == "dashscope":
+                config["quick_think_llm"] = "qwen-plus"
+                config["deep_think_llm"] = "qwen-max"
+        elif research_depth == 4:  # 4级 - 深度分析
+            config["max_debate_rounds"] = 2
+            config["max_risk_discuss_rounds"] = 2
+            config["memory_enabled"] = True
+            config["online_tools"] = True
+            if llm_provider == "dashscope":
+                config["quick_think_llm"] = "qwen-plus"
+                config["deep_think_llm"] = "qwen-max"
+        else:  # 5级 - 全面分析
+            config["max_debate_rounds"] = 3
+            config["max_risk_discuss_rounds"] = 3
+            config["memory_enabled"] = True
+            config["online_tools"] = True
+            if llm_provider == "dashscope":
+                config["quick_think_llm"] = "qwen-max"
+                config["deep_think_llm"] = "qwen-max"
 
         # 根据LLM提供商设置不同的配置
         if llm_provider == "dashscope":
@@ -91,16 +168,34 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         print(f"股票代码: {stock_symbol}")
         print(f"分析日期: {analysis_date}")
 
+        # 根据市场类型调整股票代码格式
+        if market_type == "A股":
+            # A股代码不需要特殊处理，保持原样
+            formatted_symbol = stock_symbol
+            update_progress(f"准备分析A股: {formatted_symbol}")
+        else:
+            # 美股代码转为大写
+            formatted_symbol = stock_symbol.upper()
+            update_progress(f"准备分析美股: {formatted_symbol}")
+
         # 初始化交易图
         update_progress("初始化分析引擎...")
         graph = TradingAgentsGraph(analysts, config=config, debug=False)
 
         # 执行分析
-        update_progress(f"开始分析 {stock_symbol} 股票，这可能需要几分钟时间...")
-        state, decision = graph.propagate(stock_symbol, analysis_date)
+        update_progress(f"开始分析 {formatted_symbol} 股票，这可能需要几分钟时间...")
+        state, decision = graph.propagate(formatted_symbol, analysis_date)
 
         # 格式化结果
         update_progress("分析完成，正在整理结果...")
+
+        # 提取风险评估数据
+        risk_assessment = extract_risk_assessment(state)
+
+        # 将风险评估添加到状态中
+        if risk_assessment:
+            state['risk_assessment'] = risk_assessment
+
         results = {
             'stock_symbol': stock_symbol,
             'analysis_date': analysis_date,

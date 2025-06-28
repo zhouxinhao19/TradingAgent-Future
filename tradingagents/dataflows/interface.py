@@ -1,5 +1,6 @@
 from typing import Annotated, Dict
 from .reddit_utils import fetch_top_from_category
+from .chinese_finance_utils import get_chinese_social_sentiment
 from .yfin_utils import *
 from .stockstats_utils import *
 from .googlenews_utils import *

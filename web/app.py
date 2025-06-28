@@ -201,6 +201,7 @@ def main():
                         analysts=form_data['analysts'],
                         research_depth=form_data['research_depth'],
                         llm_provider=config['llm_provider'],
+                        market_type=form_data.get('market_type', '美股'),
                         llm_model=config['llm_model'],
                         progress_callback=progress_callback
                     )
