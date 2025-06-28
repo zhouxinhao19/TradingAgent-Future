@@ -66,7 +66,7 @@ def run_tests():
     
     # 测试通达信API
     print("  📊 测试通达信API...")
-    success, stdout, stderr = run_command("python fast_tdx_test.py")
+    success, stdout, stderr = run_command("python tests/fast_tdx_test.py")
     if success:
         print("  ✅ 通达信API测试通过")
     else:

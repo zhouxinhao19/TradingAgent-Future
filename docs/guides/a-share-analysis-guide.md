@@ -197,7 +197,7 @@ python -m streamlit run web/app.py
 ping 119.97.185.59
 
 # 重新测试服务器
-python fast_tdx_test.py
+python tests/fast_tdx_test.py
 
 # 检查防火墙设置
 ```
