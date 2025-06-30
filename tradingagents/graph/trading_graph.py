@@ -93,6 +93,15 @@ class TradingAgentsGraph:
                 temperature=0.1,
                 max_tokens=2000
             )
+            # 为ReAct Agent创建Tongyi LLM（支持工具调用）
+            from langchain_community.llms import Tongyi
+            self.react_llm = Tongyi()
+            # 确保使用正确的通义千问模型名称
+            quick_model = self.config["quick_think_llm"]
+            if quick_model in ["gpt-4o-mini", "o4-mini"]:  # 如果还是默认的OpenAI模型名
+                quick_model = "qwen-turbo"  # 使用通义千问默认模型
+            self.react_llm.model_name = quick_model
+            print(f"📊 [DEBUG] ReAct LLM模型设置为: {quick_model}")
         else:
             raise ValueError(f"Unsupported LLM provider: {self.config['llm_provider']}")
         
@@ -130,6 +139,8 @@ class TradingAgentsGraph:
             self.invest_judge_memory,
             self.risk_manager_memory,
             self.conditional_logic,
+            self.config,
+            getattr(self, 'react_llm', None),
         )
 
         self.propagator = Propagator()
@@ -152,6 +163,8 @@ class TradingAgentsGraph:
                     # online tools
                     self.toolkit.get_YFin_data_online,
                     self.toolkit.get_stockstats_indicators_report_online,
+                    # 中国股票专用工具
+                    self.toolkit.get_china_stock_data,
                     # offline tools
                     self.toolkit.get_YFin_data,
                     self.toolkit.get_stockstats_indicators_report,
@@ -179,6 +192,9 @@ class TradingAgentsGraph:
                 [
                     # online tools
                     self.toolkit.get_fundamentals_openai,
+                    # 中国股票专用工具
+                    self.toolkit.get_china_stock_data,
+                    self.toolkit.get_china_fundamentals,
                     # offline tools
                     self.toolkit.get_finnhub_company_insider_sentiment,
                     self.toolkit.get_finnhub_company_insider_transactions,
@@ -222,7 +238,7 @@ class TradingAgentsGraph:
         self._log_state(trade_date, final_state)
 
         # Return decision and processed signal
-        return final_state, self.process_signal(final_state["final_trade_decision"])
+        return final_state, self.process_signal(final_state["final_trade_decision"], company_name)
 
     def _log_state(self, trade_date, final_state):
         """Log the final state to a JSON file."""
@@ -284,6 +300,6 @@ class TradingAgentsGraph:
             self.curr_state, returns_losses, self.risk_manager_memory
         )
 
-    def process_signal(self, full_signal):
+    def process_signal(self, full_signal, stock_symbol=None):
         """Process a signal to extract the core decision."""
-        return self.signal_processor.process_signal(full_signal)
+        return self.signal_processor.process_signal(full_signal, stock_symbol)

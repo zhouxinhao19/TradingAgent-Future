@@ -11,7 +11,7 @@
 - 🎨 专业的UI设计和用户体验
 
 ### 🤖 多LLM提供商支持
-- **阿里百炼**: qwen-turbo, qwen-plus, qwen-max
+- **阿里百炼**: qwen-turbo, qwen-plus-latest, qwen-max
 - **Google AI**: gemini-2.0-flash, gemini-1.5-pro, gemini-1.5-flash
 - **智能切换**: 一键切换不同的AI模型
 - **混合嵌入**: Google AI推理 + 阿里百炼嵌入
@@ -70,7 +70,7 @@ python run_web.py
 2. **🧠 AI模型配置**
    - **选择LLM提供商**: 阿里百炼 或 Google AI
    - **选择具体模型**: 
-     - 阿里百炼: qwen-turbo(快速) / qwen-plus(平衡) / qwen-max(最强)
+     - 阿里百炼: qwen-turbo(快速) / qwen-plus-latest(平衡) / qwen-max(最强)
      - Google AI: gemini-2.0-flash(推荐) / gemini-1.5-pro(强大) / gemini-1.5-flash(快速)
 
 3. **⚙️ 高级设置**
@@ -188,7 +188,7 @@ REDDIT_USER_AGENT=TradingAgents-CN/1.0
 
 #### 阿里百炼模型
 - **qwen-turbo**: 快速响应，适合简单分析
-- **qwen-plus**: 平衡性能，推荐日常使用
+- **qwen-plus-latest**: 平衡性能，推荐日常使用
 - **qwen-max**: 最强性能，适合复杂分析
 
 #### Google AI模型  

@@ -31,7 +31,7 @@ def render_results(results):
                 st.text(results['demo_reason'])
 
     # 投资决策摘要
-    render_decision_summary(decision)
+    render_decision_summary(decision, stock_symbol)
 
     # 分析配置信息
     render_analysis_info(results)
@@ -63,6 +63,7 @@ def render_analysis_info(results):
 
         with col2:
             llm_model = results.get('llm_model', 'N/A')
+            print(f"🔍 [DEBUG] llm_model from results: {llm_model}")
             model_display = {
                 'qwen-turbo': 'Qwen Turbo',
                 'qwen-plus': 'Qwen Plus',
@@ -80,6 +81,7 @@ def render_analysis_info(results):
 
         with col3:
             analysts = results.get('analysts', [])
+            print(f"🔍 [DEBUG] analysts from results: {analysts}")
             analysts_count = len(analysts) if analysts else 0
 
             st.metric(
@@ -102,27 +104,27 @@ def render_analysis_info(results):
             analyst_list = [analyst_names.get(analyst, analyst) for analyst in analysts]
             st.write(" • ".join(analyst_list))
 
-def render_decision_summary(decision):
+def render_decision_summary(decision, stock_symbol=None):
     """渲染投资决策摘要"""
-    
+
     st.subheader("🎯 投资决策摘要")
-    
+
     col1, col2, col3, col4 = st.columns(4)
-    
+
     with col1:
         action = decision.get('action', 'N/A')
         action_color = {
             'BUY': 'normal',
-            'SELL': 'inverse', 
+            'SELL': 'inverse',
             'HOLD': 'off'
         }.get(action.upper(), 'normal')
-        
+
         st.metric(
             label="投资建议",
             value=action.upper(),
             help="基于AI分析的投资建议"
         )
-    
+
     with col2:
         confidence = decision.get('confidence', 0)
         if isinstance(confidence, (int, float)):
@@ -131,14 +133,14 @@ def render_decision_summary(decision):
         else:
             confidence_str = str(confidence)
             confidence_delta = None
-        
+
         st.metric(
             label="置信度",
             value=confidence_str,
             delta=confidence_delta,
             help="AI对分析结果的置信度"
         )
-    
+
     with col3:
         risk_score = decision.get('risk_score', 0)
         if isinstance(risk_score, (int, float)):
@@ -147,7 +149,7 @@ def render_decision_summary(decision):
         else:
             risk_str = str(risk_score)
             risk_delta = None
-        
+
         st.metric(
             label="风险评分",
             value=risk_str,
@@ -155,12 +157,28 @@ def render_decision_summary(decision):
             delta_color="inverse",
             help="投资风险评估分数"
         )
-    
+
     with col4:
         target_price = decision.get('target_price', 'N/A')
+        print(f"🔍 [DEBUG] target_price from decision: {target_price}, type: {type(target_price)}")
+        print(f"🔍 [DEBUG] decision keys: {list(decision.keys()) if isinstance(decision, dict) else 'Not a dict'}")
+
+        # 根据股票代码确定货币符号
+        def is_china_stock(ticker_code):
+            import re
+            return re.match(r'^\d{6}$', str(ticker_code)) if ticker_code else False
+
+        is_china = is_china_stock(stock_symbol)
+        currency_symbol = "¥" if is_china else "$"
+
+        if isinstance(target_price, (int, float)):
+            price_display = f"{currency_symbol}{target_price}"
+        else:
+            price_display = str(target_price)
+
         st.metric(
             label="目标价位",
-            value=f"${target_price}" if isinstance(target_price, (int, float)) else str(target_price),
+            value=price_display,
             help="AI预测的目标价位"
         )
     

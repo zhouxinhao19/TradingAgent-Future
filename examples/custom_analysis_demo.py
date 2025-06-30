@@ -49,7 +49,7 @@ def analyze_stock_custom(symbol, analysis_focus="comprehensive"):
         # 初始化阿里百炼模型
         print("\n🤖 正在初始化阿里百炼模型...")
         llm = ChatDashScope(
-            model="qwen-plus",  # 使用平衡性能的模型
+            model="qwen-plus-latest",  # 使用平衡性能的模型
             temperature=0.1,    # 降低随机性，提高分析的一致性
             max_tokens=4000     # 允许更长的分析报告
         )

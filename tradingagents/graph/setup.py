@@ -27,6 +27,8 @@ class GraphSetup:
         invest_judge_memory,
         risk_manager_memory,
         conditional_logic: ConditionalLogic,
+        config: Dict[str, Any] = None,
+        react_llm = None,
     ):
         """Initialize with required components."""
         self.quick_thinking_llm = quick_thinking_llm
@@ -39,6 +41,8 @@ class GraphSetup:
         self.invest_judge_memory = invest_judge_memory
         self.risk_manager_memory = risk_manager_memory
         self.conditional_logic = conditional_logic
+        self.config = config or {}
+        self.react_llm = react_llm
 
     def setup_graph(
         self, selected_analysts=["market", "social", "news", "fundamentals"]
@@ -61,9 +65,22 @@ class GraphSetup:
         tool_nodes = {}
 
         if "market" in selected_analysts:
-            analyst_nodes["market"] = create_market_analyst(
-                self.quick_thinking_llm, self.toolkit
-            )
+            # 根据LLM提供商选择合适的市场分析师
+            if (self.react_llm is not None and
+                ("dashscope" in self.config.get("llm_provider", "").lower() or
+                 "阿里百炼" in self.config.get("llm_provider", ""))):
+                # 阿里百炼使用ReAct Agent
+                from tradingagents.agents.analysts.market_analyst import create_market_analyst_react
+                analyst_nodes["market"] = create_market_analyst_react(
+                    self.react_llm, self.toolkit
+                )
+                print("📈 [DEBUG] 使用ReAct市场分析师（阿里百炼）")
+            else:
+                # 其他LLM使用标准分析师
+                analyst_nodes["market"] = create_market_analyst(
+                    self.quick_thinking_llm, self.toolkit
+                )
+                print("📈 [DEBUG] 使用标准市场分析师")
             delete_nodes["market"] = create_msg_delete()
             tool_nodes["market"] = self.tool_nodes["market"]
 
@@ -82,9 +99,22 @@ class GraphSetup:
             tool_nodes["news"] = self.tool_nodes["news"]
 
         if "fundamentals" in selected_analysts:
-            analyst_nodes["fundamentals"] = create_fundamentals_analyst(
-                self.quick_thinking_llm, self.toolkit
-            )
+            # 根据LLM提供商选择合适的基本面分析师
+            if (self.react_llm is not None and
+                ("dashscope" in self.config.get("llm_provider", "").lower() or
+                 "阿里百炼" in self.config.get("llm_provider", ""))):
+                # 阿里百炼使用ReAct Agent
+                from tradingagents.agents.analysts.fundamentals_analyst import create_fundamentals_analyst_react
+                analyst_nodes["fundamentals"] = create_fundamentals_analyst_react(
+                    self.react_llm, self.toolkit
+                )
+                print("📊 [DEBUG] 使用ReAct基本面分析师（阿里百炼）")
+            else:
+                # 其他LLM使用标准分析师
+                analyst_nodes["fundamentals"] = create_fundamentals_analyst(
+                    self.quick_thinking_llm, self.toolkit
+                )
+                print("📊 [DEBUG] 使用标准基本面分析师")
             delete_nodes["fundamentals"] = create_msg_delete()
             tool_nodes["fundamentals"] = self.tool_nodes["fundamentals"]
 

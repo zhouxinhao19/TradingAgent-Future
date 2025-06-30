@@ -78,7 +78,7 @@ python demo_dashscope.py
 | 模型名称 | 模型ID | 特点 | 适用场景 |
 |---------|--------|------|----------|
 | **通义千问 Turbo** | `qwen-turbo` | 快速响应，成本低 | 快速任务、日常对话 |
-| **通义千问 Plus** | `qwen-plus` | 平衡性能和成本 | 复杂分析、专业任务 |
+| **通义千问 Plus** | `qwen-plus-latest` | 平衡性能和成本 | 复杂分析、专业任务 |
 | **通义千问 Max** | `qwen-max` | 最强性能 | 最复杂任务、高质量输出 |
 | **通义千问 Max 长文本** | `qwen-max-longcontext` | 超长上下文 | 长文档分析、大量数据处理 |
 
@@ -88,7 +88,7 @@ python demo_dashscope.py
 ```python
 config = {
     "llm_provider": "dashscope",
-    "deep_think_llm": "qwen-plus",      # 深度思考使用Plus
+    "deep_think_llm": "qwen-plus-latest",      # 深度思考使用Plus
     "quick_think_llm": "qwen-turbo",    # 快速任务使用Turbo
     "max_debate_rounds": 1,             # 减少辩论轮次
 }
@@ -124,7 +124,7 @@ from tradingagents.default_config import DEFAULT_CONFIG
 # 创建阿里百炼配置
 config = DEFAULT_CONFIG.copy()
 config["llm_provider"] = "dashscope"
-config["deep_think_llm"] = "qwen-plus"
+config["deep_think_llm"] = "qwen-plus-latest"
 config["quick_think_llm"] = "qwen-turbo"
 
 # 初始化
@@ -142,7 +142,7 @@ config = DEFAULT_CONFIG.copy()
 config.update({
     "llm_provider": "dashscope",
     "deep_think_llm": "qwen-max",
-    "quick_think_llm": "qwen-plus",
+    "quick_think_llm": "qwen-plus-latest",
     "max_debate_rounds": 2,
     "max_risk_discuss_rounds": 2,
     "online_tools": True,

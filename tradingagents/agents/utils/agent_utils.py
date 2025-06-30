@@ -160,9 +160,31 @@ class Toolkit:
             str: 包含实时行情、历史数据、技术指标的完整股票分析报告
         """
         try:
+            print(f"📊 [DEBUG] ===== agent_utils.get_china_stock_data 开始调用 =====")
+            print(f"📊 [DEBUG] 参数: stock_code={stock_code}, start_date={start_date}, end_date={end_date}")
+
             from tradingagents.dataflows.tdx_utils import get_china_stock_data
-            return get_china_stock_data(stock_code, start_date, end_date)
+            print(f"📊 [DEBUG] 成功导入 get_china_stock_data 函数")
+
+            print(f"📊 [DEBUG] 正在调用 tdx_utils.get_china_stock_data...")
+            result = get_china_stock_data(stock_code, start_date, end_date)
+
+            print(f"📊 [DEBUG] tdx_utils.get_china_stock_data 调用完成")
+            print(f"📊 [DEBUG] 返回结果类型: {type(result)}")
+            print(f"📊 [DEBUG] 返回结果长度: {len(result) if result else 0}")
+            print(f"📊 [DEBUG] 返回结果前200字符: {str(result)[:200]}...")
+            print(f"📊 [DEBUG] ===== agent_utils.get_china_stock_data 调用结束 =====")
+
+            return result
         except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"❌ [DEBUG] ===== agent_utils.get_china_stock_data 异常 =====")
+            print(f"❌ [DEBUG] 错误类型: {type(e).__name__}")
+            print(f"❌ [DEBUG] 错误信息: {str(e)}")
+            print(f"❌ [DEBUG] 详细堆栈:")
+            print(error_details)
+            print(f"❌ [DEBUG] ===== 异常处理结束 =====")
             return f"中国股票数据获取失败: {str(e)}。建议安装pytdx库: pip install pytdx"
 
     @staticmethod
@@ -498,9 +520,110 @@ class Toolkit:
         Returns:
             str: A formatted string containing the latest fundamental information about the company on the given date.
         """
+        print(f"📊 [DEBUG] get_fundamentals_openai 被调用: ticker={ticker}, date={curr_date}")
 
-        openai_fundamentals_results = interface.get_fundamentals_openai(
-            ticker, curr_date
-        )
+        # 检查是否为中国股票
+        import re
+        if re.match(r'^\d{6}$', str(ticker)):
+            print(f"📊 [DEBUG] 检测到中国A股代码: {ticker}")
+            # 为中国股票添加特殊处理
+            china_stock_names = {
+                '000001': '平安银行',
+                '600036': '招商银行',
+                '600519': '贵州茅台',
+                '000858': '五粮液',
+                '000651': '格力电器',
+                '000333': '美的集团'
+            }
+            company_name = china_stock_names.get(ticker, f"股票代码{ticker}")
+            print(f"📊 [DEBUG] 中国股票名称映射: {ticker} -> {company_name}")
 
-        return openai_fundamentals_results
+            # 修改查询以包含正确的公司名称
+            modified_query = f"{company_name}({ticker})"
+            print(f"📊 [DEBUG] 修改后的查询: {modified_query}")
+        else:
+            print(f"📊 [DEBUG] 检测到非中国股票: {ticker}")
+            modified_query = ticker
+
+        try:
+            openai_fundamentals_results = interface.get_fundamentals_openai(
+                modified_query, curr_date
+            )
+            print(f"📊 [DEBUG] OpenAI基本面分析结果长度: {len(openai_fundamentals_results) if openai_fundamentals_results else 0}")
+            return openai_fundamentals_results
+        except Exception as e:
+            print(f"❌ [DEBUG] OpenAI基本面分析失败: {str(e)}")
+            return f"基本面分析失败: {str(e)}"
+
+    @staticmethod
+    @tool
+    def get_china_fundamentals(
+        ticker: Annotated[str, "中国A股股票代码，如600036"],
+        curr_date: Annotated[str, "当前日期，格式为yyyy-mm-dd"],
+    ):
+        """
+        获取中国A股股票的基本面信息，使用通达信数据源。
+        Args:
+            ticker (str): 中国A股股票代码，如600036, 000001
+            curr_date (str): 当前日期，格式为yyyy-mm-dd
+        Returns:
+            str: 包含股票基本面信息的格式化字符串
+        """
+        print(f"📊 [DEBUG] get_china_fundamentals 被调用: ticker={ticker}, date={curr_date}")
+
+        # 检查是否为中国股票
+        import re
+        if not re.match(r'^\d{6}$', str(ticker)):
+            return f"错误：{ticker} 不是有效的中国A股代码格式"
+
+        try:
+            # 使用通达信获取股票数据
+            from tradingagents.dataflows.tdx_utils import get_china_stock_data
+            print(f"📊 [DEBUG] 正在获取 {ticker} 的通达信数据...")
+
+            # 获取最近30天的数据用于基本面分析
+            from datetime import datetime, timedelta
+            end_date = datetime.strptime(curr_date, '%Y-%m-%d')
+            start_date = end_date - timedelta(days=30)
+
+            stock_data = get_china_stock_data(
+                ticker,
+                start_date.strftime('%Y-%m-%d'),
+                end_date.strftime('%Y-%m-%d')
+            )
+
+            print(f"📊 [DEBUG] 通达信数据获取完成，长度: {len(stock_data) if stock_data else 0}")
+
+            if not stock_data or "获取失败" in stock_data:
+                return f"无法获取股票 {ticker} 的基本面数据：{stock_data}"
+
+            # 解析股票数据，提取基本面信息
+            fundamentals_info = f"""
+# 中国A股基本面分析报告 - {ticker}
+
+## 数据来源
+- 数据源：通达信API
+- 分析日期：{curr_date}
+- 数据时间范围：{start_date.strftime('%Y-%m-%d')} 至 {end_date.strftime('%Y-%m-%d')}
+
+## 股票基本信息
+{stock_data}
+
+## 基本面分析要点
+1. **数据可靠性**：使用通达信官方数据源，确保数据准确性
+2. **实时性**：数据更新至 {curr_date}
+3. **完整性**：包含价格、技术指标、成交量等关键信息
+
+注意：以上数据来自通达信API，为中国A股市场的官方数据源。
+"""
+
+            print(f"📊 [DEBUG] 中国基本面分析报告生成完成")
+            return fundamentals_info
+
+        except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"❌ [DEBUG] get_china_fundamentals 失败:")
+            print(f"❌ [DEBUG] 错误: {str(e)}")
+            print(f"❌ [DEBUG] 堆栈: {error_details}")
+            return f"中国股票基本面分析失败: {str(e)}"

@@ -39,7 +39,7 @@ def analyze_my_stock():
     try:
         # 初始化模型
         llm = ChatDashScope(
-            model="qwen-plus",  # 可选: qwen-turbo, qwen-plus, qwen-max
+            model="qwen-plus-latest",  # 可选: qwen-turbo, qwen-plus-latest, qwen-max
             temperature=0.1,
             max_tokens=4000
         )

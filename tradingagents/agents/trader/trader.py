@@ -12,6 +12,22 @@ def create_trader(llm, memory):
         news_report = state["news_report"]
         fundamentals_report = state["fundamentals_report"]
 
+        # 检查是否为中国股票
+        def is_china_stock(ticker_code):
+            import re
+            return re.match(r'^\d{6}$', str(ticker_code))
+
+        # 根据股票类型确定货币单位
+        is_china = is_china_stock(company_name)
+        currency = "人民币" if is_china else "美元"
+        currency_symbol = "¥" if is_china else "$"
+
+        print(f"💰 [DEBUG] ===== 交易员节点开始 =====")
+        print(f"💰 [DEBUG] 交易员检测股票类型: {company_name} -> 中国A股: {is_china}, 货币: {currency}")
+        print(f"💰 [DEBUG] 货币符号: {currency_symbol}")
+        print(f"💰 [DEBUG] 基本面报告长度: {len(fundamentals_report)}")
+        print(f"💰 [DEBUG] 基本面报告前200字符: {fundamentals_report[:200]}...")
+
         curr_situation = f"{market_research_report}\n\n{sentiment_report}\n\n{news_report}\n\n{fundamentals_report}"
         past_memories = memory.get_memories(curr_situation, n_matches=2)
 
@@ -29,12 +45,25 @@ def create_trader(llm, memory):
                 "role": "system",
                 "content": f"""您是一位专业的交易员，负责分析市场数据并做出投资决策。基于您的分析，请提供具体的买入、卖出或持有建议。
 
+⚠️ 重要提醒：当前分析的股票代码是 {company_name}，请使用正确的货币单位：{currency}（{currency_symbol}）
+
+🔴 严格要求：
+- 股票代码 {company_name} 的公司名称必须严格按照基本面报告中的真实数据
+- 绝对禁止使用错误的公司名称或混淆不同的股票
+- 所有分析必须基于提供的真实数据，不允许假设或编造
+
 请在您的分析中包含以下关键信息：
 1. **投资建议**: 明确的买入/持有/卖出决策
-2. **目标价位**: 基于分析的合理目标价格(美元)
+2. **目标价位**: 基于分析的合理目标价格({currency})
 3. **置信度**: 对决策的信心程度(0-1之间)
 4. **风险评分**: 投资风险等级(0-1之间，0为低风险，1为高风险)
 5. **详细推理**: 支持决策的具体理由
+
+特别注意：
+- 如果是中国A股（6位数字代码），请使用人民币（¥）作为价格单位
+- 如果是美股或港股，请使用美元（$）作为价格单位
+- 目标价位必须与当前股价的货币单位保持一致
+- 必须使用基本面报告中提供的正确公司名称
 
 请用中文撰写分析内容，并始终以'最终交易建议: **买入/持有/卖出**'结束您的回应以确认您的建议。
 
@@ -43,7 +72,15 @@ def create_trader(llm, memory):
             context,
         ]
 
+        print(f"💰 [DEBUG] 准备调用LLM，系统提示包含货币: {currency}")
+        print(f"💰 [DEBUG] 系统提示中的关键部分: 目标价格({currency})")
+
         result = llm.invoke(messages)
+
+        print(f"💰 [DEBUG] LLM调用完成")
+        print(f"💰 [DEBUG] 交易员回复长度: {len(result.content)}")
+        print(f"💰 [DEBUG] 交易员回复前500字符: {result.content[:500]}...")
+        print(f"💰 [DEBUG] ===== 交易员节点结束 =====")
 
         return {
             "messages": [result],

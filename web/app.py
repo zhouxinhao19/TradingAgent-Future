@@ -119,13 +119,48 @@ def initialize_session_state():
 
 def main():
     """主应用程序"""
-    
+
     # 初始化会话状态
     initialize_session_state()
-    
+
     # 渲染页面头部
     render_header()
-    
+
+    # 页面导航
+    st.sidebar.title("🤖 TradingAgents-CN")
+    st.sidebar.markdown("---")
+
+    page = st.sidebar.selectbox(
+        "选择功能",
+        ["📊 股票分析", "⚙️ 配置管理", "💾 缓存管理", "📈 历史记录", "🔧 系统状态"]
+    )
+
+    # 根据选择的页面渲染不同内容
+    if page == "⚙️ 配置管理":
+        try:
+            from pages.config_management import render_config_management
+            render_config_management()
+        except ImportError as e:
+            st.error(f"配置管理模块加载失败: {e}")
+            st.info("请确保已安装所有依赖包")
+        return
+    elif page == "💾 缓存管理":
+        try:
+            from pages.cache_management import main as cache_main
+            cache_main()
+        except ImportError as e:
+            st.error(f"缓存管理页面加载失败: {e}")
+        return
+    elif page == "📈 历史记录":
+        st.header("📈 历史记录")
+        st.info("历史记录功能开发中...")
+        return
+    elif page == "🔧 系统状态":
+        st.header("🔧 系统状态")
+        st.info("系统状态功能开发中...")
+        return
+
+    # 默认显示股票分析页面
     # 检查API密钥
     api_status = check_api_keys()
     

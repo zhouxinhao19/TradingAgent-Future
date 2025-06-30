@@ -160,18 +160,27 @@ def select_shallow_thinking_agent(provider) -> str:
         ]
     }
 
+    # 获取选项列表
+    options = SHALLOW_AGENT_OPTIONS[provider.lower()]
+
+    # 为阿里百炼设置默认选择（通义千问 Turbo）
+    default_choice = None
+    if "阿里百炼" in provider:
+        default_choice = options[0][1]  # 使用value而不是display
+
     choice = questionary.select(
         "选择您的快速思考LLM引擎 | Select Your [Quick-Thinking LLM Engine]:",
         choices=[
             questionary.Choice(display, value=value)
-            for display, value in SHALLOW_AGENT_OPTIONS[provider.lower()]
+            for display, value in options
         ],
+        default=default_choice,
         instruction="\n- 使用方向键导航 | Use arrow keys to navigate\n- 按回车键选择 | Press Enter to select",
         style=questionary.Style(
             [
-                ("selected", "fg:magenta noinherit"),
-                ("highlighted", "fg:magenta noinherit"),
-                ("pointer", "fg:magenta noinherit"),
+                ("selected", "fg:green noinherit"),
+                ("highlighted", "fg:green noinherit"),
+                ("pointer", "fg:green noinherit"),
             ]
         ),
     ).ask()
@@ -228,18 +237,27 @@ def select_deep_thinking_agent(provider) -> str:
         ]
     }
     
+    # 获取选项列表
+    options = DEEP_AGENT_OPTIONS[provider.lower()]
+
+    # 为阿里百炼设置默认选择（通义千问 Turbo）
+    default_choice = None
+    if "阿里百炼" in provider:
+        default_choice = options[0][1]  # 使用value而不是display
+
     choice = questionary.select(
         "选择您的深度思考LLM引擎 | Select Your [Deep-Thinking LLM Engine]:",
         choices=[
             questionary.Choice(display, value=value)
-            for display, value in DEEP_AGENT_OPTIONS[provider.lower()]
+            for display, value in options
         ],
+        default=default_choice,
         instruction="\n- 使用方向键导航 | Use arrow keys to navigate\n- 按回车键选择 | Press Enter to select",
         style=questionary.Style(
             [
-                ("selected", "fg:magenta noinherit"),
-                ("highlighted", "fg:magenta noinherit"),
-                ("pointer", "fg:magenta noinherit"),
+                ("selected", "fg:green noinherit"),
+                ("highlighted", "fg:green noinherit"),
+                ("pointer", "fg:green noinherit"),
             ]
         ),
     ).ask()
@@ -251,13 +269,14 @@ def select_deep_thinking_agent(provider) -> str:
     return choice
 
 def select_llm_provider() -> tuple[str, str]:
-    """Select the OpenAI api url using interactive selection."""
+    """Select the LLM provider using interactive selection."""
     # Define LLM provider options with their corresponding endpoints
+    # 阿里百炼作为默认推荐选项放在第一位
     BASE_URLS = [
+        ("阿里百炼 (DashScope)", "https://dashscope.aliyuncs.com/api/v1"),
         ("OpenAI", "https://api.openai.com/v1"),
         ("Anthropic", "https://api.anthropic.com/"),
         ("Google", "https://generativelanguage.googleapis.com/v1"),
-        ("阿里百炼 (DashScope)", "https://dashscope.aliyuncs.com/api/v1"),
         ("Openrouter", "https://openrouter.ai/api/v1"),
         ("Ollama", "http://localhost:11434/v1"),
     ]
@@ -268,12 +287,13 @@ def select_llm_provider() -> tuple[str, str]:
             questionary.Choice(display, value=(display, value))
             for display, value in BASE_URLS
         ],
-        instruction="\n- 使用方向键导航 | Use arrow keys to navigate\n- 按回车键选择 | Press Enter to select",
+        default=(BASE_URLS[0][0], BASE_URLS[0][1]),  # 默认选择阿里百炼的完整值
+        instruction="\n- 使用方向键导航 | Use arrow keys to navigate\n- 按回车键选择 | Press Enter to select\n- 🇨🇳 推荐使用阿里百炼 (默认选择)",
         style=questionary.Style(
             [
-                ("selected", "fg:magenta noinherit"),
-                ("highlighted", "fg:magenta noinherit"),
-                ("pointer", "fg:magenta noinherit"),
+                ("selected", "fg:green noinherit"),
+                ("highlighted", "fg:green noinherit"),
+                ("pointer", "fg:green noinherit"),
             ]
         ),
     ).ask()

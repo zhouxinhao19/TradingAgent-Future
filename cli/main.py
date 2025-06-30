@@ -37,6 +37,7 @@ app = typer.Typer(
     help="TradingAgents CLI: 多智能体大语言模型金融交易框架 | Multi-Agents LLM Financial Trading Framework",
     add_completion=True,  # Enable shell completion
     rich_markup_mode="rich",  # Enable rich markup
+    no_args_is_help=False,  # 不显示帮助，直接进入分析模式
 )
 
 
@@ -400,8 +401,12 @@ def update_display(layout, spinner_text=None):
 def get_user_selections():
     """Get all user selections before starting the analysis display."""
     # Display ASCII art welcome message
-    with open("./cli/static/welcome.txt", "r") as f:
-        welcome_ascii = f.read()
+    welcome_file = Path(__file__).parent / "static" / "welcome.txt"
+    try:
+        with open(welcome_file, "r", encoding="utf-8") as f:
+            welcome_ascii = f.read()
+    except FileNotFoundError:
+        welcome_ascii = "TradingAgents"
 
     # Create welcome box content
     welcome_content = f"{welcome_ascii}\n"
@@ -432,31 +437,41 @@ def get_user_selections():
             box_content += f"\n[dim]Default: {default}[/dim]"
         return Panel(box_content, border_style="blue", padding=(1, 2))
 
-    # Step 1: Ticker symbol
+    # Step 1: Market selection
     console.print(
         create_question_box(
-            "步骤 1: 股票代码 | Step 1: Ticker Symbol",
-            "请输入要分析的股票代码 | Enter the ticker symbol to analyze",
-            "SPY"
+            "步骤 1: 选择市场 | Step 1: Select Market",
+            "请选择要分析的股票市场 | Please select the stock market to analyze",
+            ""
         )
     )
-    selected_ticker = get_ticker()
+    selected_market = select_market()
 
-    # Step 2: Analysis date
+    # Step 2: Ticker symbol
+    console.print(
+        create_question_box(
+            "步骤 2: 股票代码 | Step 2: Ticker Symbol",
+            f"请输入{selected_market['name']}股票代码 | Enter {selected_market['name']} ticker symbol",
+            selected_market['default']
+        )
+    )
+    selected_ticker = get_ticker(selected_market)
+
+    # Step 3: Analysis date
     default_date = datetime.datetime.now().strftime("%Y-%m-%d")
     console.print(
         create_question_box(
-            "步骤 2: 分析日期 | Step 2: Analysis Date",
+            "步骤 3: 分析日期 | Step 3: Analysis Date",
             "请输入分析日期 (YYYY-MM-DD) | Enter the analysis date (YYYY-MM-DD)",
             default_date,
         )
     )
     analysis_date = get_analysis_date()
 
-    # Step 3: Select analysts
+    # Step 4: Select analysts
     console.print(
         create_question_box(
-            "步骤 3: 分析师团队 | Step 3: Analysts Team",
+            "步骤 4: 分析师团队 | Step 4: Analysts Team",
             "选择您的LLM分析师智能体进行分析 | Select your LLM analyst agents for the analysis"
         )
     )
@@ -465,28 +480,28 @@ def get_user_selections():
         f"[green]已选择的分析师 | Selected analysts:[/green] {', '.join(analyst.value for analyst in selected_analysts)}"
     )
 
-    # Step 4: Research depth
+    # Step 5: Research depth
     console.print(
         create_question_box(
-            "步骤 4: 研究深度 | Step 4: Research Depth",
+            "步骤 5: 研究深度 | Step 5: Research Depth",
             "选择您的研究深度级别 | Select your research depth level"
         )
     )
     selected_research_depth = select_research_depth()
 
-    # Step 5: LLM Provider
+    # Step 6: LLM Provider
     console.print(
         create_question_box(
-            "步骤 5: LLM提供商 | Step 5: LLM Provider",
+            "步骤 6: LLM提供商 | Step 6: LLM Provider",
             "选择要使用的LLM服务 | Select which LLM service to use"
         )
     )
     selected_llm_provider, backend_url = select_llm_provider()
 
-    # Step 6: Thinking agents
+    # Step 7: Thinking agents
     console.print(
         create_question_box(
-            "步骤 6: 思考智能体 | Step 6: Thinking Agents",
+            "步骤 7: 思考智能体 | Step 7: Thinking Agents",
             "选择您的思考智能体进行分析 | Select your thinking agents for analysis"
         )
     )
@@ -495,6 +510,7 @@ def get_user_selections():
 
     return {
         "ticker": selected_ticker,
+        "market": selected_market,
         "analysis_date": analysis_date,
         "analysts": selected_analysts,
         "research_depth": selected_research_depth,
@@ -505,9 +521,81 @@ def get_user_selections():
     }
 
 
-def get_ticker():
-    """Get ticker symbol from user input."""
-    return typer.prompt("请输入股票代码 | Enter ticker", default="SPY")
+def select_market():
+    """选择股票市场"""
+    markets = {
+        "1": {
+            "name": "美股",
+            "name_en": "US Stock",
+            "default": "SPY",
+            "examples": ["SPY", "AAPL", "TSLA", "NVDA", "MSFT"],
+            "format": "直接输入代码 (如: AAPL)",
+            "pattern": r'^[A-Z]{1,5}$',
+            "data_source": "yahoo_finance"
+        },
+        "2": {
+            "name": "A股",
+            "name_en": "China A-Share",
+            "default": "600036",
+            "examples": ["000001 (平安银行)", "600036 (招商银行)", "000858 (五粮液)"],
+            "format": "6位数字代码 (如: 600036, 000001)",
+            "pattern": r'^\d{6}$',
+            "data_source": "tongdaxin"
+        },
+        "3": {
+            "name": "港股",
+            "name_en": "Hong Kong Stock",
+            "default": "0700.HK",
+            "examples": ["0700.HK (腾讯)", "9988.HK (阿里巴巴)", "3690.HK (美团)"],
+            "format": "代码.HK (如: 0700.HK)",
+            "pattern": r'^\d{4}\.HK$',
+            "data_source": "yahoo_finance"
+        }
+    }
+
+    console.print("\n[bold cyan]请选择股票市场 | Please select stock market:[/bold cyan]")
+    for key, market in markets.items():
+        examples_str = ", ".join(market["examples"][:3])
+        console.print(f"[cyan]{key}[/cyan]. 🌍 {market['name']} | {market['name_en']}")
+        console.print(f"   示例 | Examples: {examples_str}")
+
+    while True:
+        choice = typer.prompt("\n请选择市场 | Select market", default="2")
+        if choice in markets:
+            selected_market = markets[choice]
+            console.print(f"[green]✅ 已选择: {selected_market['name']} | Selected: {selected_market['name_en']}[/green]")
+            return selected_market
+        else:
+            console.print("[red]❌ 无效选择，请输入 1、2 或 3 | Invalid choice, please enter 1, 2, or 3[/red]")
+
+
+def get_ticker(market):
+    """根据选定市场获取股票代码"""
+    console.print(f"\n[bold cyan]{market['name']}股票示例 | {market['name_en']} Examples:[/bold cyan]")
+    for example in market['examples']:
+        console.print(f"  • {example}")
+
+    console.print(f"\n[dim]格式要求 | Format: {market['format']}[/dim]")
+
+    while True:
+        ticker = typer.prompt(f"\n请输入{market['name']}股票代码 | Enter {market['name_en']} ticker",
+                             default=market['default'])
+
+        # 验证股票代码格式
+        import re
+        ticker_to_check = ticker.upper() if market['data_source'] != 'tongdaxin' else ticker
+
+        if re.match(market['pattern'], ticker_to_check):
+            # 对于A股，返回纯数字代码
+            if market['data_source'] == 'tongdaxin':
+                console.print(f"[green]✅ A股代码有效: {ticker} (将使用通达信数据源)[/green]")
+                return ticker
+            else:
+                console.print(f"[green]✅ 股票代码有效: {ticker.upper()}[/green]")
+                return ticker.upper()
+        else:
+            console.print(f"[red]❌ 股票代码格式不正确 | Invalid ticker format[/red]")
+            console.print(f"[yellow]请使用正确格式: {market['format']}[/yellow]")
 
 
 def get_analysis_date():
@@ -1148,7 +1236,7 @@ def run_analysis():
 
         # Get final state and decision
         final_state = trace[-1]
-        decision = graph.process_signal(final_state["final_trade_decision"])
+        decision = graph.process_signal(final_state["final_trade_decision"], selections['stock_symbol'])
 
         # Update all agent statuses to completed
         for agent in message_buffer.agent_status:
@@ -1485,5 +1573,16 @@ def help_chinese():
     console.print("• GitHub: https://github.com/TauricResearch/TradingAgents")
 
 
+def main():
+    """主函数 - 默认进入分析模式"""
+    import sys
+
+    # 如果没有参数，直接进入分析模式
+    if len(sys.argv) == 1:
+        run_analysis()
+    else:
+        # 有参数时使用typer处理命令
+        app()
+
 if __name__ == "__main__":
-    app()
+    main()

@@ -90,7 +90,7 @@ def test_signal_processor_chinese():
         建议买入该股票，目标价位200美元。"""
         
         print("处理测试信号...")
-        decision = processor.process_signal(test_signal)
+        decision = processor.process_signal(test_signal, "AAPL")
         
         print(f"✅ 信号处理成功")
         print(f"决策结果: {decision}")

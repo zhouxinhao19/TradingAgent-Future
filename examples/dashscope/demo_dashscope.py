@@ -61,7 +61,7 @@ def main():
     config = DEFAULT_CONFIG.copy()
     config["llm_provider"] = "dashscope"
     config["backend_url"] = "https://dashscope.aliyuncs.com/api/v1"
-    config["deep_think_llm"] = "qwen-plus"  # 使用通义千问Plus进行深度思考
+    config["deep_think_llm"] = "qwen-plus-latest"  # 使用通义千问Plus进行深度思考
     config["quick_think_llm"] = "qwen-turbo"  # 使用通义千问Turbo进行快速任务
     config["max_debate_rounds"] = 1  # 减少辩论轮次以降低成本
     config["online_tools"] = True

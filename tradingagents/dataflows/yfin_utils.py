@@ -8,6 +8,14 @@ from functools import wraps
 
 from .utils import save_output, SavePathType, decorate_all_methods
 
+# 导入缓存管理器
+try:
+    from .cache_manager import get_cache
+    CACHE_AVAILABLE = True
+except ImportError:
+    CACHE_AVAILABLE = False
+    print("⚠️ 缓存管理器不可用，将直接从API获取数据")
+
 
 def init_ticker(func: Callable) -> Callable:
     """Decorator to initialize yf.Ticker and pass it to the function."""

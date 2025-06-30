@@ -5,6 +5,8 @@ import json
 
 def create_bull_researcher(llm, memory):
     def bull_node(state) -> dict:
+        print(f"🐂 [DEBUG] ===== 看涨研究员节点开始 =====")
+
         investment_debate_state = state["investment_debate_state"]
         history = investment_debate_state.get("history", "")
         bull_history = investment_debate_state.get("bull_history", "")
@@ -15,6 +17,24 @@ def create_bull_researcher(llm, memory):
         news_report = state["news_report"]
         fundamentals_report = state["fundamentals_report"]
 
+        # 检查股票类型
+        company_name = state.get('company_of_interest', 'Unknown')
+        def is_china_stock(ticker_code):
+            import re
+            return re.match(r'^\d{6}$', str(ticker_code))
+
+        is_china = is_china_stock(company_name)
+        currency = "人民币" if is_china else "美元"
+        currency_symbol = "¥" if is_china else "$"
+
+        print(f"🐂 [DEBUG] 接收到的报告:")
+        print(f"🐂 [DEBUG] - 市场报告长度: {len(market_research_report)}")
+        print(f"🐂 [DEBUG] - 情绪报告长度: {len(sentiment_report)}")
+        print(f"🐂 [DEBUG] - 新闻报告长度: {len(news_report)}")
+        print(f"🐂 [DEBUG] - 基本面报告长度: {len(fundamentals_report)}")
+        print(f"🐂 [DEBUG] - 基本面报告前200字符: {fundamentals_report[:200]}...")
+        print(f"🐂 [DEBUG] - 股票代码: {company_name}, 类型: {'中国A股' if is_china else '海外股票'}, 货币: {currency}")
+
         curr_situation = f"{market_research_report}\n\n{sentiment_report}\n\n{news_report}\n\n{fundamentals_report}"
         past_memories = memory.get_memories(curr_situation, n_matches=2)
 
@@ -22,7 +42,11 @@ def create_bull_researcher(llm, memory):
         for i, rec in enumerate(past_memories, 1):
             past_memory_str += rec["recommendation"] + "\n\n"
 
-        prompt = f"""你是一位看涨分析师，负责为该股票的投资建立强有力的论证。你的任务是构建基于证据的强有力案例，强调增长潜力、竞争优势和积极的市场指标。利用提供的研究和数据来解决担忧并有效反驳看跌论点。
+        prompt = f"""你是一位看涨分析师，负责为股票 {company_name} 的投资建立强有力的论证。
+
+⚠️ 重要提醒：当前分析的是 {'中国A股' if is_china else '海外股票'}，所有价格和估值请使用 {currency}（{currency_symbol}）作为单位。
+
+你的任务是构建基于证据的强有力案例，强调增长潜力、竞争优势和积极的市场指标。利用提供的研究和数据来解决担忧并有效反驳看跌论点。
 
 请用中文回答，重点关注以下几个方面：
 - 增长潜力：突出公司的市场机会、收入预测和可扩展性

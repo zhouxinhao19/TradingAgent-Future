@@ -4,6 +4,7 @@
 
 import sys
 import os
+import uuid
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
@@ -14,6 +15,14 @@ sys.path.insert(0, str(project_root))
 
 # 确保环境变量正确加载
 load_dotenv(project_root / ".env", override=True)
+
+# 添加配置管理器
+try:
+    from tradingagents.config.config_manager import token_tracker
+    TOKEN_TRACKING_ENABLED = True
+except ImportError:
+    TOKEN_TRACKING_ENABLED = False
+    print("⚠️ Token跟踪功能未启用")
 
 def extract_risk_assessment(state):
     """从分析状态中提取风险评估数据"""
@@ -75,6 +84,17 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         print(f"[进度] {message}")
 
     update_progress("开始股票分析...")
+
+    # 生成会话ID用于Token跟踪
+    session_id = f"analysis_{uuid.uuid4().hex[:8]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+    # 估算Token使用（用于成本预估）
+    if TOKEN_TRACKING_ENABLED:
+        estimated_input = 2000 * len(analysts)  # 估算每个分析师2000个输入token
+        estimated_output = 1000 * len(analysts)  # 估算每个分析师1000个输出token
+        estimated_cost = token_tracker.estimate_cost(llm_provider, llm_model, estimated_input, estimated_output)
+
+        update_progress(f"预估分析成本: ¥{estimated_cost:.4f}")
 
     # 验证环境变量
     update_progress("检查环境变量配置...")
@@ -186,6 +206,10 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         update_progress(f"开始分析 {formatted_symbol} 股票，这可能需要几分钟时间...")
         state, decision = graph.propagate(formatted_symbol, analysis_date)
 
+        # 调试信息
+        print(f"🔍 [DEBUG] 分析完成，decision类型: {type(decision)}")
+        print(f"🔍 [DEBUG] decision内容: {decision}")
+
         # 格式化结果
         update_progress("分析完成，正在整理结果...")
 
@@ -195,6 +219,25 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         # 将风险评估添加到状态中
         if risk_assessment:
             state['risk_assessment'] = risk_assessment
+
+        # 记录Token使用（实际使用量，这里使用估算值）
+        if TOKEN_TRACKING_ENABLED:
+            # 在实际应用中，这些值应该从LLM响应中获取
+            # 这里使用基于分析师数量和研究深度的估算
+            actual_input_tokens = len(analysts) * (1500 if research_depth == "快速" else 2500 if research_depth == "标准" else 4000)
+            actual_output_tokens = len(analysts) * (800 if research_depth == "快速" else 1200 if research_depth == "标准" else 2000)
+
+            usage_record = token_tracker.track_usage(
+                provider=llm_provider,
+                model_name=llm_model,
+                input_tokens=actual_input_tokens,
+                output_tokens=actual_output_tokens,
+                session_id=session_id,
+                analysis_type=f"{market_type}_analysis"
+            )
+
+            if usage_record:
+                update_progress(f"记录使用成本: ¥{usage_record.cost:.4f}")
 
         results = {
             'stock_symbol': stock_symbol,
@@ -206,7 +249,8 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             'state': state,
             'decision': decision,
             'success': True,
-            'error': None
+            'error': None,
+            'session_id': session_id if TOKEN_TRACKING_ENABLED else None
         }
 
         update_progress("✅ 分析成功完成！")

@@ -11,6 +11,14 @@ from typing import List, Dict, Optional, Tuple
 import warnings
 warnings.filterwarnings('ignore')
 
+# 导入缓存管理器
+try:
+    from .cache_manager import get_cache
+    CACHE_AVAILABLE = True
+except ImportError:
+    CACHE_AVAILABLE = False
+    print("⚠️ 缓存管理器不可用，将直接从API获取数据")
+
 try:
     # 通达信Python接口
     import pytdx
@@ -27,33 +35,48 @@ class TongDaXinDataProvider:
     """通达信数据提供器"""
     
     def __init__(self):
+        print(f"🔍 [DEBUG] 初始化通达信数据提供器...")
         self.api = None
         self.exapi = None  # 扩展行情API
         self.connected = False
-        
+
+        print(f"🔍 [DEBUG] 检查pytdx库可用性: {TDX_AVAILABLE}")
         if not TDX_AVAILABLE:
-            raise ImportError("pytdx库未安装，请运行: pip install pytdx")
+            error_msg = "pytdx库未安装，请运行: pip install pytdx"
+            print(f"❌ [DEBUG] {error_msg}")
+            raise ImportError(error_msg)
+        print(f"✅ [DEBUG] pytdx库检查通过")
     
     def connect(self):
         """连接通达信服务器"""
+        print(f"🔍 [DEBUG] 开始连接通达信服务器...")
         try:
             # 尝试从配置文件加载可用服务器
+            print(f"🔍 [DEBUG] 加载服务器配置...")
             working_servers = self._load_working_servers()
 
             # 如果没有配置文件，使用默认服务器列表
             if not working_servers:
+                print(f"🔍 [DEBUG] 未找到配置文件，使用默认服务器列表")
                 working_servers = [
                     {'ip': '115.238.56.198', 'port': 7709},
                     {'ip': '115.238.90.165', 'port': 7709},
                     {'ip': '180.153.18.170', 'port': 7709},
                     {'ip': '119.147.212.81', 'port': 7709},  # 备用
                 ]
+            else:
+                print(f"🔍 [DEBUG] 从配置文件加载了 {len(working_servers)} 个服务器")
 
             # 尝试连接可用服务器
+            print(f"🔍 [DEBUG] 创建通达信API实例...")
             self.api = TdxHq_API()
-            for server in working_servers:
+            print(f"🔍 [DEBUG] 开始尝试连接服务器...")
+
+            for i, server in enumerate(working_servers):
                 try:
+                    print(f"🔍 [DEBUG] 尝试连接服务器 {i+1}/{len(working_servers)}: {server['ip']}:{server['port']}")
                     result = self.api.connect(server['ip'], server['port'])
+                    print(f"🔍 [DEBUG] 连接结果: {result}")
                     if result:
                         print(f"✅ 通达信API连接成功: {server['ip']}:{server['port']}")
                         self.connected = True
@@ -97,6 +120,21 @@ class TongDaXinDataProvider:
             print("✅ 通达信API连接已断开")
         except:
             pass
+
+    def is_connected(self):
+        """检查连接状态"""
+        if not self.connected or not self.api:
+            return False
+
+        # 尝试简单的API调用来验证连接是否有效
+        try:
+            # 获取市场信息作为连接测试
+            result = self.api.get_security_count(0)  # 获取深圳市场股票数量
+            return result is not None and result > 0
+        except Exception as e:
+            print(f"🔍 [DEBUG] 连接测试失败: {e}")
+            self.connected = False
+            return False
     
     def get_stock_realtime_data(self, stock_code: str) -> Dict:
         """
@@ -116,28 +154,46 @@ class TongDaXinDataProvider:
             
             # 获取实时数据
             data = self.api.get_security_quotes([(market, stock_code)])
-            
+
             if not data:
                 return {}
-            
+
             quote = data[0]
             
+            # 安全获取字段，避免KeyError
+            def safe_get(key, default=0):
+                return quote.get(key, default)
+
+            # 股票名称映射
+            stock_names = {
+                '000001': '平安银行',
+                '000002': '万科A',
+                '600036': '招商银行',
+                '600519': '贵州茅台',
+                '000858': '五粮液',
+                '000651': '格力电器',
+                '000333': '美的集团',
+                '600028': '中国石化',
+                '601398': '工商银行',
+                '601318': '中国平安'
+            }
+
             return {
                 'code': stock_code,
-                'name': quote['name'],
-                'price': quote['price'],
-                'last_close': quote['last_close'],
-                'open': quote['open'],
-                'high': quote['high'],
-                'low': quote['low'],
-                'volume': quote['vol'],
-                'amount': quote['amount'],
-                'change': quote['price'] - quote['last_close'],
-                'change_percent': ((quote['price'] - quote['last_close']) / quote['last_close'] * 100) if quote['last_close'] > 0 else 0,
-                'bid_prices': [quote[f'bid{i}'] for i in range(1, 6)],
-                'bid_volumes': [quote[f'bid_vol{i}'] for i in range(1, 6)],
-                'ask_prices': [quote[f'ask{i}'] for i in range(1, 6)],
-                'ask_volumes': [quote[f'ask_vol{i}'] for i in range(1, 6)],
+                'name': stock_names.get(stock_code, safe_get('name', '未知')),
+                'price': safe_get('price'),
+                'last_close': safe_get('last_close'),
+                'open': safe_get('open'),
+                'high': safe_get('high'),
+                'low': safe_get('low'),
+                'volume': safe_get('vol'),
+                'amount': safe_get('amount'),
+                'change': safe_get('price') - safe_get('last_close'),
+                'change_percent': ((safe_get('price') - safe_get('last_close')) / safe_get('last_close') * 100) if safe_get('last_close') > 0 else 0,
+                'bid_prices': [safe_get(f'bid{i}') for i in range(1, 6)],
+                'bid_volumes': [safe_get(f'bid_vol{i}') for i in range(1, 6)],
+                'ask_prices': [safe_get(f'ask{i}') for i in range(1, 6)],
+                'ask_volumes': [safe_get(f'ask_vol{i}') for i in range(1, 6)],
                 'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
             
@@ -387,13 +443,22 @@ def get_tdx_provider() -> TongDaXinDataProvider:
     """获取通达信数据提供器实例"""
     global _tdx_provider
     if _tdx_provider is None:
+        print(f"🔍 [DEBUG] 创建新的通达信数据提供器实例...")
         _tdx_provider = TongDaXinDataProvider()
+        print(f"🔍 [DEBUG] 通达信数据提供器实例创建完成")
+    else:
+        print(f"🔍 [DEBUG] 使用现有的通达信数据提供器实例")
+        # 检查连接状态，如果连接断开则重新创建
+        if not _tdx_provider.is_connected():
+            print(f"🔍 [DEBUG] 检测到连接断开，重新创建通达信数据提供器...")
+            _tdx_provider = TongDaXinDataProvider()
+            print(f"🔍 [DEBUG] 通达信数据提供器重新创建完成")
     return _tdx_provider
 
 
 def get_china_stock_data(stock_code: str, start_date: str, end_date: str) -> str:
     """
-    获取中国股票数据的主要接口函数
+    获取中国股票数据的主要接口函数（支持缓存）
     Args:
         stock_code: 股票代码 (如 '000001')
         start_date: 开始日期 'YYYY-MM-DD'
@@ -401,18 +466,41 @@ def get_china_stock_data(stock_code: str, start_date: str, end_date: str) -> str
     Returns:
         str: 格式化的股票数据
     """
+    print(f"📊 正在获取中国股票数据: {stock_code} ({start_date} 到 {end_date})")
+
+    # 尝试从缓存加载数据
+    if CACHE_AVAILABLE:
+        cache = get_cache()
+        cache_key = cache.find_cached_stock_data(
+            symbol=stock_code,
+            start_date=start_date,
+            end_date=end_date,
+            data_source="tdx",
+            max_age_hours=6  # 6小时内的缓存有效
+        )
+
+        if cache_key:
+            cached_data = cache.load_stock_data(cache_key)
+            if cached_data:
+                print(f"💾 从缓存加载数据: {stock_code} -> {cache_key}")
+                return cached_data
+
+    print(f"🌐 从通达信API获取数据: {stock_code}")
+
     try:
         provider = get_tdx_provider()
-        
+
         # 获取历史数据
         df = provider.get_stock_history_data(stock_code, start_date, end_date)
-        
+
         if df.empty:
-            return f"未能获取股票 {stock_code} 的数据"
+            error_msg = f"❌ 未能获取股票 {stock_code} 的历史数据"
+            print(error_msg)
+            return error_msg
         
         # 获取实时数据
         realtime_data = provider.get_stock_realtime_data(stock_code)
-        
+
         # 获取技术指标
         indicators = provider.get_stock_technical_indicators(stock_code)
         
@@ -446,13 +534,36 @@ def get_china_stock_data(stock_code: str, start_date: str, end_date: str) -> str
 
 数据来源: 通达信API (实时数据)
 """
-        
+
+        # 保存到缓存
+        if CACHE_AVAILABLE:
+            cache = get_cache()
+            cache.save_stock_data(
+                symbol=stock_code,
+                data=result,
+                start_date=start_date,
+                end_date=end_date,
+                data_source="tdx"
+            )
+
         return result
         
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"❌ [DEBUG] 通达信API调用失败:")
+        print(f"❌ [DEBUG] 错误类型: {type(e).__name__}")
+        print(f"❌ [DEBUG] 错误信息: {str(e)}")
+        print(f"❌ [DEBUG] 详细堆栈:")
+        print(error_details)
+
         return f"""
-中国股票数据获取失败 - {stock_code}
+❌ 中国股票数据获取失败 - {stock_code}
+错误类型: {type(e).__name__}
 错误信息: {str(e)}
+
+🔍 调试信息:
+{error_details}
 
 💡 解决建议:
 1. 检查pytdx库是否已安装: pip install pytdx

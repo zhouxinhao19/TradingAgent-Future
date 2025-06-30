@@ -46,7 +46,7 @@ def analyze_stock_with_chinese_output(stock_symbol="AAPL", analysis_date="2024-0
         
         # 创建阿里百炼模型实例
         llm = ChatDashScope(
-            model="qwen-plus",
+            model="qwen-plus-latest",
             temperature=0.1,
             max_tokens=3000
         )
