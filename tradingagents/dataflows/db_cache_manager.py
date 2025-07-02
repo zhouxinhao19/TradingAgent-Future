@@ -35,8 +35,8 @@ class DatabaseCacheManager:
     """MongoDB + Redis 数据库缓存管理器"""
     
     def __init__(self,
-                 mongodb_url: str = None,
-                 redis_url: str = None,
+                 mongodb_url: Optional[str] = None,
+                 redis_url: Optional[str] = None,
                  mongodb_db: str = "tradingagents",
                  redis_db: int = 0):
         """
@@ -91,7 +91,7 @@ class DatabaseCacheManager:
             
             print(f"✅ MongoDB连接成功: {self.mongodb_url}")
             
-        except (ConnectionFailure, ServerSelectionTimeoutError) as e:
+        except Exception as e:
             print(f"❌ MongoDB连接失败: {e}")
             self.mongodb_client = None
             self.mongodb_db = None
@@ -114,7 +114,7 @@ class DatabaseCacheManager:
             
             print(f"✅ Redis连接成功: {self.redis_url}")
             
-        except RedisConnectionError as e:
+        except Exception as e:
             print(f"❌ Redis连接失败: {e}")
             self.redis_client = None
     
@@ -446,8 +446,8 @@ class DatabaseCacheManager:
     def get_cache_stats(self) -> Dict[str, Any]:
         """获取缓存统计信息"""
         stats = {
-            "mongodb": {"available": bool(self.mongodb_db), "collections": {}},
-            "redis": {"available": bool(self.redis_client), "keys": 0, "memory_usage": "N/A"}
+            "mongodb": {"available": self.mongodb_db is not None, "collections": {}},
+            "redis": {"available": self.redis_client is not None, "keys": 0, "memory_usage": "N/A"}
         }
 
         # MongoDB统计

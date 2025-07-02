@@ -59,6 +59,11 @@ def check_api_keys():
     print("✅ API密钥配置完成")
     return True
 
+# 在文件顶部添加导入
+import signal
+import psutil
+
+# 修改 main() 函数中的启动部分
 def main():
     """主函数"""
     
@@ -103,11 +108,39 @@ def main():
     print("⏹️  按 Ctrl+C 停止应用")
     print("=" * 50)
     
+    # 创建进程对象而不是直接运行
+    process = None
+    
+    def signal_handler(signum, frame):
+        """信号处理函数"""
+        print("\n\n⏹️ 接收到停止信号，正在关闭Web应用...")
+        if process:
+            try:
+                # 终止进程及其子进程
+                parent = psutil.Process(process.pid)
+                for child in parent.children(recursive=True):
+                    child.terminate()
+                parent.terminate()
+                
+                # 等待进程结束
+                parent.wait(timeout=5)
+                print("✅ Web应用已成功停止")
+            except (psutil.NoSuchProcess, psutil.TimeoutExpired):
+                print("⚠️ 强制终止进程")
+                if process:
+                    process.kill()
+        sys.exit(0)
+    
+    # 注册信号处理器
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
     try:
-        # 启动Streamlit
-        subprocess.run(cmd, cwd=web_dir)
+        # 启动Streamlit进程
+        process = subprocess.Popen(cmd, cwd=web_dir)
+        process.wait()  # 等待进程结束
     except KeyboardInterrupt:
-        print("\n\n⏹️ Web应用已停止")
+        signal_handler(signal.SIGINT, None)
     except Exception as e:
         print(f"\n❌ 启动失败: {e}")
 

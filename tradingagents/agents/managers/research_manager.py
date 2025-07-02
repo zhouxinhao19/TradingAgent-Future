@@ -28,10 +28,28 @@ Additionally, develop a detailed investment plan for the trader. This should inc
 Your Recommendation: A decisive stance supported by the most convincing arguments.
 Rationale: An explanation of why these arguments lead to your conclusion.
 Strategic Actions: Concrete steps for implementing the recommendation.
+📊 Target Price Analysis: Based on all available reports (fundamentals, news, sentiment), provide a comprehensive target price range and specific price targets. Consider:
+- Fundamental valuation from the fundamentals report
+- News impact on price expectations
+- Sentiment-driven price adjustments
+- Technical support/resistance levels
+- Risk-adjusted price scenarios (conservative, base case, optimistic)
+- Time horizon for price targets (1 month, 3 months, 6 months)
+💰 You MUST provide specific target prices - do not reply with "unable to determine" or "need more information".
+
 Take into account your past mistakes on similar situations. Use these insights to refine your decision-making and ensure you are learning and improving. Present your analysis conversationally, as if speaking naturally, without special formatting. 
 
 Here are your past reflections on mistakes:
 \"{past_memory_str}\"
+
+Here are the comprehensive analysis reports:
+Market Research: {market_research_report}
+
+Sentiment Analysis: {sentiment_report}
+
+News Analysis: {news_report}
+
+Fundamentals Analysis: {fundamentals_report}
 
 Here is the debate:
 Debate History:

@@ -257,18 +257,6 @@ If you have existing data files, you can:
 - ✅ macOS
 - ✅ Python 3.8+
 
-## 🔮 下一步计划 | Next Steps
-
-### v0.1.5 计划功能 | Planned Features for v0.1.5
-
-- 配置文件导入/导出功能 | Configuration file import/export functionality
-- 数据目录备份和恢复 | Data directory backup and restore
-- 更多数据源配置选项 | More data source configuration options
-- 配置模板系统 | Configuration template system
-- 缓存预热策略优化 | Cache warming strategy optimization
-- 智能缓存淘汰算法 | Intelligent cache eviction algorithms
-- 缓存性能实时监控面板 | Real-time cache performance monitoring dashboard
-- 分布式缓存集群管理 | Distributed cache cluster management
 
 ## 🤝 贡献者 | Contributors
 
