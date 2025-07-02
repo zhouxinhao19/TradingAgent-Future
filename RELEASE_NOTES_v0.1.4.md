@@ -57,6 +57,95 @@ python -m cli.main data-config --reset
 - 支持动态配置更新 | Support dynamic configuration updates
 - 集成目录自动创建功能 | Integrated automatic directory creation
 
+### 缓存子系统架构优化 | Cache Subsystem Architecture Optimization
+
+#### 四层缓存架构设计 | Four-Layer Cache Architecture Design
+
+TradingAgents v0.1.4 实现了完整的四层缓存架构，提供从毫秒级到持久化的全方位数据缓存解决方案：
+
+TradingAgents v0.1.4 implements a complete four-layer cache architecture, providing comprehensive data caching solutions from millisecond-level to persistent storage:
+
+- **L1 内存缓存** | **L1 Memory Cache**: Python内存中的快速数据访问（毫秒级响应）| Fast data access in Python memory (millisecond response)
+- **L2 本地文件缓存** | **L2 Local File Cache**: 基于磁盘的持久化缓存（秒级响应）| Disk-based persistent cache (second-level response)
+- **L3 Redis缓存** | **L3 Redis Cache**: 分布式内存数据库缓存（毫秒级响应，支持集群）| Distributed memory database cache (millisecond response, cluster support)
+- **L4 MongoDB缓存** | **L4 MongoDB Cache**: 文档数据库持久化存储（秒级响应，支持复杂查询）| Document database persistent storage (second-level response, complex query support)
+
+#### MongoDB与Redis的分工协作 | MongoDB and Redis Division of Labor
+
+**MongoDB (持久化层)** | **MongoDB (Persistence Layer)**:
+- **作用** | **Role**: 长期数据存储和复杂查询支持 | Long-term data storage and complex query support
+- **数据类型** | **Data Types**: 股票历史数据、新闻数据、基本面分析数据 | Stock historical data, news data, fundamental analysis data
+- **索引优化** | **Index Optimization**: 针对symbol、data_source、时间范围建立复合索引 | Composite indexes for symbol, data_source, and time range
+- **集合设计** | **Collection Design**:
+  - `stock_data`: 股票价格数据 | Stock price data
+  - `news_data`: 新闻和资讯数据 | News and information data
+  - `fundamentals_data`: 基本面分析数据 | Fundamental analysis data
+- **数据格式** | **Data Format**: JSON文档，支持DataFrame序列化存储 | JSON documents with DataFrame serialization support
+
+**Redis (快速缓存层)** | **Redis (Fast Cache Layer)**:
+- **作用** | **Role**: 高频访问数据的快速缓存 | Fast cache for high-frequency access data
+- **TTL策略** | **TTL Strategy**: 
+  - 股票数据 | Stock data: 6小时自动过期 | 6 hours auto-expiration
+  - 新闻数据 | News data: 24小时自动过期 | 24 hours auto-expiration
+  - 基本面数据 | Fundamental data: 24小时自动过期 | 24 hours auto-expiration
+- **数据同步** | **Data Sync**: 从MongoDB加载时自动同步到Redis | Auto-sync to Redis when loading from MongoDB
+- **内存优化** | **Memory Optimization**: JSON序列化存储，支持中文数据 | JSON serialization storage with Chinese data support
+
+#### 与缓存目录的配合机制 | Integration with Cache Directory
+
+**本地文件缓存目录结构** | **Local File Cache Directory Structure**:
+```
+data_cache/
+├── us_stocks/          # 美股数据缓存 | US stock data cache
+├── china_stocks/       # A股数据缓存 | China A-share data cache
+├── us_news/           # 美股新闻缓存 | US stock news cache
+├── china_news/        # A股新闻缓存 | China A-share news cache
+├── us_fundamentals/   # 美股基本面缓存 | US stock fundamentals cache
+├── china_fundamentals/ # A股基本面缓存 | China A-share fundamentals cache
+└── metadata/          # 缓存元数据 | Cache metadata
+```
+
+**智能缓存策略** | **Intelligent Cache Strategy**:
+- **市场分类** | **Market Classification**: 自动识别美股/A股，应用不同TTL策略 | Auto-identify US/China stocks with different TTL strategies
+- **数据源适配** | **Data Source Adaptation**: 支持多数据源（yfinance、finnhub、通达信等）| Support multiple data sources (yfinance, finnhub, TongDaXin, etc.)
+- **缓存键生成** | **Cache Key Generation**: MD5哈希确保唯一性和快速查找 | MD5 hash for uniqueness and fast lookup
+- **元数据管理** | **Metadata Management**: 独立的元数据文件记录缓存信息 | Independent metadata files for cache information
+
+**缓存查找优先级** | **Cache Lookup Priority**:
+1. **Redis查找** | **Redis Lookup** → 最快响应 | Fastest response
+2. **MongoDB查找** | **MongoDB Lookup** → 如果Redis未命中 | If Redis miss
+3. **本地文件查找** | **Local File Lookup** → 如果数据库未连接 | If database not connected
+4. **API重新获取** | **API Re-fetch** → 如果所有缓存都未命中 | If all caches miss
+
+#### 缓存配置增强 | Cache Configuration Enhancement
+
+```python
+# 智能缓存配置 | Intelligent cache configuration
+cache_config = {
+    'us_stock_data': {
+        'ttl_hours': 2,      # 美股2小时TTL | US stocks 2-hour TTL
+        'max_files': 1000,   # 最大文件数 | Max file count
+        'description': '美股历史数据' | 'US stock historical data'
+    },
+    'china_stock_data': {
+        'ttl_hours': 1,      # A股1小时TTL（实时性要求高）| A-shares 1-hour TTL (high real-time requirement)
+        'max_files': 1000,
+        'description': 'A股历史数据' | 'China A-share historical data'
+    },
+    'us_news': {
+        'ttl_hours': 6,      # 新闻6小时TTL | News 6-hour TTL
+        'max_files': 500,
+        'description': '美股新闻数据' | 'US stock news data'
+    }
+}
+```
+
+**缓存性能优化** | **Cache Performance Optimization**:
+- **连接池管理** | **Connection Pool Management**: MongoDB和Redis连接复用 | MongoDB and Redis connection reuse
+- **批量操作** | **Batch Operations**: 支持批量数据写入和查询 | Support batch data write and query
+- **错误容错** | **Error Tolerance**: 单层缓存失败不影响其他层级 | Single-layer cache failure doesn't affect other layers
+- **监控统计** | **Monitoring Statistics**: 实时缓存命中率和性能指标 | Real-time cache hit rate and performance metrics
+
 ## 🐛 问题修复 | Bug Fixes
 
 ### Finnhub新闻数据路径修复 | Finnhub News Data Path Fix
@@ -156,6 +245,10 @@ If you have existing data files, you can:
 - ✅ 跨平台兼容性 | Cross-platform compatibility
 - ✅ 自动目录创建 | Automatic directory creation
 - ✅ 错误处理和用户提示 | Error handling and user prompts
+- ✅ 缓存系统性能优化 | Cache system performance optimization
+- ✅ 多层缓存架构验证 | Multi-layer cache architecture validation
+- ✅ 缓存一致性测试 | Cache consistency testing
+- ✅ 缓存清理机制验证 | Cache cleanup mechanism validation
 
 ### 兼容性测试 | Compatibility Testing
 
@@ -172,6 +265,10 @@ If you have existing data files, you can:
 - 数据目录备份和恢复 | Data directory backup and restore
 - 更多数据源配置选项 | More data source configuration options
 - 配置模板系统 | Configuration template system
+- 缓存预热策略优化 | Cache warming strategy optimization
+- 智能缓存淘汰算法 | Intelligent cache eviction algorithms
+- 缓存性能实时监控面板 | Real-time cache performance monitoring dashboard
+- 分布式缓存集群管理 | Distributed cache cluster management
 
 ## 🤝 贡献者 | Contributors
 
