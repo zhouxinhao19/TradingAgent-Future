@@ -103,6 +103,7 @@
 - **智能缓存**: 多层缓存策略，减少API调用成本
 - **实时分析**: 支持实时市场数据分析
 - **灵活配置**: 高度可定制的智能体行为和模型选择
+- **📁 数据目录配置**: 灵活的数据存储路径配置，支持CLI、环境变量等多种方式
 
 ### 🌐 Web管理界面
 
@@ -271,6 +272,47 @@ python examples/openai/demo_openai.py
 # 集成测试
 python tests/integration/test_dashscope_integration.py
 ```
+
+#### 📁 数据目录配置
+
+**新功能**: 灵活配置数据存储路径，支持多种配置方式：
+
+```bash
+# 查看当前数据目录配置
+python -m cli.main data-config --show
+
+# 设置自定义数据目录
+python -m cli.main data-config --set /path/to/your/data
+
+# 重置为默认配置
+python -m cli.main data-config --reset
+```
+
+**环境变量配置**:
+```bash
+# Windows
+set TRADING_AGENTS_DATA_DIR=C:\MyTradingData
+
+# Linux/macOS
+export TRADING_AGENTS_DATA_DIR=/home/user/trading_data
+```
+
+**程序化配置**:
+```python
+from tradingagents.config_manager import ConfigManager
+
+# 设置数据目录
+config_manager = ConfigManager()
+config_manager.set_data_directory("/path/to/data")
+
+# 获取配置
+data_dir = config_manager.get_data_directory()
+print(f"数据目录: {data_dir}")
+```
+
+**配置优先级**: 程序设置 > 环境变量 > 配置文件 > 默认值
+
+详细说明请参考: [📁 数据目录配置指南](docs/configuration/data-directory-configuration.md)
 
 ### 交互式分析
 
