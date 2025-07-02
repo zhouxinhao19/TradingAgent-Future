@@ -155,6 +155,10 @@ class ConfigManager:
         
         # 默认设置
         if not self.settings_file.exists():
+            # 导入默认数据目录配置
+            import os
+            default_data_dir = os.path.join(os.path.expanduser("~"), "Documents", "TradingAgents", "data")
+            
             default_settings = {
                 "default_provider": "dashscope",
                 "default_model": "qwen-turbo",
@@ -162,7 +166,11 @@ class ConfigManager:
                 "cost_alert_threshold": 100.0,  # 成本警告阈值
                 "currency_preference": "CNY",
                 "auto_save_usage": True,
-                "max_usage_records": 10000
+                "max_usage_records": 10000,
+                "data_dir": default_data_dir,  # 数据目录配置
+                "cache_dir": os.path.join(default_data_dir, "cache"),  # 缓存目录
+                "results_dir": os.path.join(os.path.expanduser("~"), "Documents", "TradingAgents", "results"),  # 结果目录
+                "auto_create_dirs": True  # 自动创建目录
             }
             self.save_settings(default_settings)
     
@@ -292,10 +300,12 @@ class ConfigManager:
             "reddit_client_id": os.getenv("REDDIT_CLIENT_ID", ""),
             "reddit_client_secret": os.getenv("REDDIT_CLIENT_SECRET", ""),
             "reddit_user_agent": os.getenv("REDDIT_USER_AGENT", ""),
-            "results_dir": os.getenv("TRADINGAGENTS_RESULTS_DIR", "./results"),
+            "results_dir": os.getenv("TRADINGAGENTS_RESULTS_DIR", ""),
             "log_level": os.getenv("TRADINGAGENTS_LOG_LEVEL", "INFO"),
             "alpha_vantage_api_key": os.getenv("ALPHA_VANTAGE_API_KEY", ""),
             "newsapi_key": os.getenv("NEWSAPI_KEY", ""),
+            "data_dir": os.getenv("TRADINGAGENTS_DATA_DIR", ""),  # 数据目录环境变量
+            "cache_dir": os.getenv("TRADINGAGENTS_CACHE_DIR", ""),  # 缓存目录环境变量
         }
 
         # 只有当环境变量存在且不为空时才覆盖
@@ -390,6 +400,49 @@ class ConfigManager:
             "provider_stats": provider_stats,
             "records_count": len(recent_records)
         }
+    
+    def get_data_dir(self) -> str:
+        """获取数据目录路径"""
+        settings = self.load_settings()
+        data_dir = settings.get("data_dir")
+        if not data_dir:
+            # 如果没有配置，使用默认路径
+            data_dir = os.path.join(os.path.expanduser("~"), "Documents", "TradingAgents", "data")
+        return data_dir
+
+    def set_data_dir(self, data_dir: str):
+        """设置数据目录路径"""
+        settings = self.load_settings()
+        settings["data_dir"] = data_dir
+        # 同时更新缓存目录
+        settings["cache_dir"] = os.path.join(data_dir, "cache")
+        self.save_settings(settings)
+        
+        # 如果启用自动创建目录，则创建目录
+        if settings.get("auto_create_dirs", True):
+            self.ensure_directories_exist()
+
+    def ensure_directories_exist(self):
+        """确保必要的目录存在"""
+        settings = self.load_settings()
+        
+        directories = [
+            settings.get("data_dir"),
+            settings.get("cache_dir"),
+            settings.get("results_dir"),
+            os.path.join(settings.get("data_dir", ""), "finnhub_data"),
+            os.path.join(settings.get("data_dir", ""), "finnhub_data", "news_data"),
+            os.path.join(settings.get("data_dir", ""), "finnhub_data", "insider_sentiment"),
+            os.path.join(settings.get("data_dir", ""), "finnhub_data", "insider_transactions")
+        ]
+        
+        for directory in directories:
+            if directory and not os.path.exists(directory):
+                try:
+                    os.makedirs(directory, exist_ok=True)
+                    print(f"✅ 创建目录: {directory}")
+                except Exception as e:
+                    print(f"❌ 创建目录失败 {directory}: {e}")
 
 
 class TokenTracker:
@@ -448,6 +501,8 @@ class TokenTracker:
         return self.config_manager.calculate_cost(
             provider, model_name, estimated_input_tokens, estimated_output_tokens
         )
+
+
 
 
 # 全局配置管理器实例
