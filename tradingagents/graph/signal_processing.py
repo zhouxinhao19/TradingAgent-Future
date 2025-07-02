@@ -87,12 +87,14 @@ class SignalProcessor:
 
                 # 处理目标价格，确保正确提取
                 target_price = decision_data.get('target_price')
-                if target_price is None or target_price == "null":
+                if target_price is None or target_price == "null" or target_price == "":
                     # 如果JSON中没有目标价格，尝试从reasoning中提取
                     reasoning = decision_data.get('reasoning', '')
                     price_patterns = [
                         r'目标价[位格]?[：:]?\s*\$?(\d+(?:\.\d+)?)',
                         r'目标价[位格]?[：:]?\s*¥?(\d+(?:\.\d+)?)',
+                        r'价格[：:]?\s*\$?(\d+(?:\.\d+)?)',
+                        r'价位[：:]?\s*\$?(\d+(?:\.\d+)?)',
                         r'\$(\d+(?:\.\d+)?)',
                         r'¥(\d+(?:\.\d+)?)',
                     ]
@@ -100,7 +102,26 @@ class SignalProcessor:
                         price_match = re.search(pattern, reasoning)
                         if price_match:
                             target_price = float(price_match.group(1))
+                            print(f"🔍 [SignalProcessor] 从reasoning中提取到目标价格: {target_price}")
                             break
+
+                    # 如果仍然没有找到价格，保持为None（前端会处理显示）
+                    if target_price is None or target_price == "null" or target_price == "":
+                        target_price = None
+                        print(f"🔍 [SignalProcessor] 未能提取到目标价格，设置为None")
+                else:
+                    # 确保价格是数值类型
+                    try:
+                        if isinstance(target_price, str):
+                            # 清理字符串格式的价格
+                            clean_price = target_price.replace('$', '').replace('¥', '').replace('￥', '').strip()
+                            target_price = float(clean_price) if clean_price and clean_price.lower() != 'none' else None
+                        elif isinstance(target_price, (int, float)):
+                            target_price = float(target_price)
+                        print(f"🔍 [SignalProcessor] 处理后的目标价格: {target_price}")
+                    except (ValueError, TypeError):
+                        target_price = None
+                        print(f"🔍 [SignalProcessor] 价格转换失败，设置为None")
 
                 result = {
                     'action': action,

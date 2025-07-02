@@ -13,11 +13,18 @@ warnings.filterwarnings('ignore')
 
 # 导入缓存管理器
 try:
-    from .cache_manager import get_cache
-    CACHE_AVAILABLE = True
+    from .db_cache_manager import get_db_cache
+    DB_CACHE_AVAILABLE = True
 except ImportError:
-    CACHE_AVAILABLE = False
-    print("⚠️ 缓存管理器不可用，将直接从API获取数据")
+    DB_CACHE_AVAILABLE = False
+    print("⚠️ 数据库缓存管理器不可用，尝试文件缓存")
+
+try:
+    from .cache_manager import get_cache
+    FILE_CACHE_AVAILABLE = True
+except ImportError:
+    FILE_CACHE_AVAILABLE = False
+    print("⚠️ 文件缓存管理器不可用，将直接从API获取数据")
 
 try:
     # 通达信Python接口
@@ -468,8 +475,25 @@ def get_china_stock_data(stock_code: str, start_date: str, end_date: str) -> str
     """
     print(f"📊 正在获取中国股票数据: {stock_code} ({start_date} 到 {end_date})")
 
-    # 尝试从缓存加载数据
-    if CACHE_AVAILABLE:
+    # 优先尝试从数据库缓存加载数据
+    if DB_CACHE_AVAILABLE:
+        db_cache = get_db_cache()
+        cache_key = db_cache.find_cached_stock_data(
+            symbol=stock_code,
+            start_date=start_date,
+            end_date=end_date,
+            data_source="tdx",
+            max_age_hours=6  # 6小时内的缓存有效
+        )
+
+        if cache_key:
+            cached_data = db_cache.load_stock_data(cache_key)
+            if cached_data:
+                print(f"🗄️ 从数据库缓存加载数据: {stock_code} -> {cache_key}")
+                return cached_data
+
+    # 如果数据库缓存不可用，尝试文件缓存
+    elif FILE_CACHE_AVAILABLE:
         cache = get_cache()
         cache_key = cache.find_cached_stock_data(
             symbol=stock_code,
@@ -482,7 +506,7 @@ def get_china_stock_data(stock_code: str, start_date: str, end_date: str) -> str
         if cache_key:
             cached_data = cache.load_stock_data(cache_key)
             if cached_data:
-                print(f"💾 从缓存加载数据: {stock_code} -> {cache_key}")
+                print(f"💾 从文件缓存加载数据: {stock_code} -> {cache_key}")
                 return cached_data
 
     print(f"🌐 从通达信API获取数据: {stock_code}")
@@ -535,8 +559,19 @@ def get_china_stock_data(stock_code: str, start_date: str, end_date: str) -> str
 数据来源: 通达信API (实时数据)
 """
 
-        # 保存到缓存
-        if CACHE_AVAILABLE:
+        # 优先保存到数据库缓存
+        if DB_CACHE_AVAILABLE:
+            db_cache = get_db_cache()
+            db_cache.save_stock_data(
+                symbol=stock_code,
+                data=result,
+                start_date=start_date,
+                end_date=end_date,
+                data_source="tdx"
+            )
+
+        # 同时保存到文件缓存作为备份
+        if FILE_CACHE_AVAILABLE:
             cache = get_cache()
             cache.save_stock_data(
                 symbol=stock_code,
