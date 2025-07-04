@@ -12,6 +12,13 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from dotenv import load_dotenv
 
+try:
+    from .mongodb_storage import MongoDBStorage
+    MONGODB_AVAILABLE = True
+except ImportError:
+    MONGODB_AVAILABLE = False
+    MongoDBStorage = None
+
 
 @dataclass
 class ModelConfig:
@@ -63,6 +70,10 @@ class ConfigManager:
         # 加载.env文件（保持向后兼容）
         self._load_env_file()
 
+        # 初始化MongoDB存储（如果可用）
+        self.mongodb_storage = None
+        self._init_mongodb_storage()
+
         self._init_default_configs()
 
     def _load_env_file(self):
@@ -87,6 +98,35 @@ class ConfigManager:
         if env_key:
             return os.getenv(env_key, "")
         return ""
+    
+    def _init_mongodb_storage(self):
+        """初始化MongoDB存储"""
+        if not MONGODB_AVAILABLE:
+            return
+        
+        # 检查是否启用MongoDB存储
+        use_mongodb = os.getenv("USE_MONGODB_STORAGE", "false").lower() == "true"
+        if not use_mongodb:
+            return
+        
+        try:
+            connection_string = os.getenv("MONGODB_CONNECTION_STRING")
+            database_name = os.getenv("MONGODB_DATABASE_NAME", "tradingagents")
+            
+            self.mongodb_storage = MongoDBStorage(
+                connection_string=connection_string,
+                database_name=database_name
+            )
+            
+            if self.mongodb_storage.is_connected():
+                print("✅ MongoDB存储已启用")
+            else:
+                self.mongodb_storage = None
+                print("⚠️ MongoDB连接失败，将使用JSON文件存储")
+                
+        except Exception as e:
+            print(f"❌ MongoDB初始化失败: {e}")
+            self.mongodb_storage = None
 
     def _init_default_configs(self):
         """初始化默认配置"""
@@ -261,6 +301,15 @@ class ConfigManager:
             analysis_type=analysis_type
         )
         
+        # 优先使用MongoDB存储
+        if self.mongodb_storage and self.mongodb_storage.is_connected():
+            success = self.mongodb_storage.save_usage_record(record)
+            if success:
+                return record
+            else:
+                print("⚠️ MongoDB保存失败，回退到JSON文件存储")
+        
+        # 回退到JSON文件存储
         records = self.load_usage_records()
         records.append(record)
         
@@ -356,6 +405,22 @@ class ConfigManager:
     
     def get_usage_statistics(self, days: int = 30) -> Dict[str, Any]:
         """获取使用统计"""
+        # 优先使用MongoDB获取统计
+        if self.mongodb_storage and self.mongodb_storage.is_connected():
+            try:
+                # 从MongoDB获取基础统计
+                stats = self.mongodb_storage.get_usage_statistics(days)
+                # 获取供应商统计
+                provider_stats = self.mongodb_storage.get_provider_statistics(days)
+                
+                if stats:
+                    stats["provider_stats"] = provider_stats
+                    stats["records_count"] = stats.get("total_requests", 0)
+                    return stats
+            except Exception as e:
+                print(f"⚠️ MongoDB统计获取失败，回退到JSON文件: {e}")
+        
+        # 回退到JSON文件统计
         records = self.load_usage_records()
         
         # 过滤最近N天的记录

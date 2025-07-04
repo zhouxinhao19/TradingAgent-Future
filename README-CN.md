@@ -64,6 +64,28 @@
 - **实时分析**: 支持实时市场数据分析
 - **灵活配置**: 高度可定制的智能体行为和模型选择
 
+### 💰 Token使用统计和成本跟踪 (v0.1.4新增)
+
+- **自动Token统计**: 自动记录所有LLM调用的输入/输出token数量 ✅
+- **实时成本计算**: 基于官方定价自动计算使用成本 ✅
+- **多存储支持**: 支持JSON文件和MongoDB两种存储方式 ✅
+- **成本监控**: 提供会话成本跟踪和成本警告机制 ✅
+- **统计分析**: 按供应商、模型、时间等维度统计使用情况 ✅
+- **成本优化**: 帮助用户优化LLM使用成本和效率 ✅
+
+## 📝 更新日志
+
+### v0.1.4 (2024-12-XX)
+- 💰 **新增Token使用统计和成本跟踪功能**
+  - 自动记录所有LLM调用的Token使用情况
+  - 实时计算和显示使用成本
+  - 支持JSON文件和MongoDB两种存储方式
+  - 提供详细的使用统计和成本分析
+  - 支持成本预警和优化建议
+- 📚 新增Token跟踪配置文档和使用指南
+- 🎯 优化DashScope适配器，增强稳定性
+- 🔧 改进配置管理系统，支持更多自定义选项
+
 ## 🆚 与原版的主要区别
 
 ### ✅ 已完成的增强
@@ -77,6 +99,7 @@
 | 配置说明 | 基础配置 | 详细的配置优化指南     |
 | 故障排除 | 无       | 完整的FAQ和故障排除    |
 | 代码注释 | 英文     | 中文注释和说明         |
+| 成本控制 | 无       | Token统计和成本跟踪    |
 
 ### 🔄 计划中的增强
 
@@ -131,6 +154,12 @@ FINNHUB_API_KEY=your_finnhub_api_key
 REDDIT_CLIENT_ID=your_reddit_client_id
 REDDIT_CLIENT_SECRET=your_reddit_client_secret
 REDDIT_USER_AGENT=your_reddit_user_agent
+
+# Token使用统计配置（可选）
+# 启用MongoDB存储（高性能，适合生产环境）
+USE_MONGODB_STORAGE=false
+MONGODB_CONNECTION_STRING=mongodb://localhost:27017
+MONGODB_DATABASE_NAME=tradingagents
 ```
 
 ### 🌐 Web界面使用 (推荐)
@@ -188,6 +217,23 @@ print(f"推荐动作: {decision['action']}")
 print(f"置信度: {decision['confidence']:.1%}")
 print(f"风险评分: {decision['risk_score']:.1%}")
 print(f"推理过程: {decision['reasoning']}")
+
+# 查看Token使用统计和成本
+from tradingagents.config.config_manager import config_manager, token_tracker
+
+# 获取当前会话成本
+session_cost = token_tracker.get_session_cost()
+print(f"当前会话成本: ¥{session_cost:.4f}")
+
+# 获取使用统计
+stats = config_manager.get_usage_statistics()
+print(f"总成本: ¥{stats['total_cost']:.4f}")
+print(f"总调用次数: {stats['total_requests']}")
+print(f"总Token数: {stats['total_input_tokens'] + stats['total_output_tokens']}")
+
+# 成本估算
+estimated_cost = token_tracker.estimate_cost("dashscope", "qwen-turbo", 1000, 500)
+print(f"预估成本: ¥{estimated_cost:.4f}")
 ```
 
 ## 📚 完整文档
@@ -225,33 +271,76 @@ print(f"推理过程: {decision['reasoning']}")
 
 - [📝 配置指南](docs/configuration/config-guide.md) - 详细的配置选项说明
 - [🧠 LLM配置](docs/configuration/llm-config.md) - 大语言模型配置优化
+- [💰 Token统计配置](docs/configuration/token-tracking-guide.md) - Token使用统计和成本跟踪配置
 
 ### 💡 示例和教程
 
 - [📚 基础示例](docs/examples/basic-examples.md) - 8个实用的基础示例
 - [🚀 高级示例](docs/examples/advanced-examples.md) - 复杂场景和扩展开发
+- [💰 Token统计演示](examples/token_tracking_demo.py) - Token使用统计和成本跟踪功能演示
 
 ### ❓ 帮助文档
 
 - [🆘 常见问题](docs/faq/faq.md) - 详细的FAQ和解决方案
+- [🔧 故障排除](docs/troubleshooting/) - 常见问题的解决方案
+  - [Streamlit文件监控错误修复](docs/troubleshooting/streamlit-file-watcher-fix.md)
 
 ## 💰 成本控制
 
 ### 典型使用成本
 
+**阿里百炼模型** (推荐，性价比高):
+- **经济模式**: ¥0.005-0.02/次分析 (使用 qwen-turbo)
+- **标准模式**: ¥0.02-0.08/次分析 (使用 qwen-plus)
+- **高精度模式**: ¥0.08-0.25/次分析 (使用 qwen-max + 多轮辩论)
+
+**OpenAI模型**:
 - **经济模式**: $0.01-0.05/次分析 (使用 gpt-4o-mini)
 - **标准模式**: $0.05-0.15/次分析 (使用 gpt-4o)
 - **高精度模式**: $0.10-0.30/次分析 (使用 gpt-4o + 多轮辩论)
 
+### 🔍 Token使用统计功能
+
+系统自动记录和分析所有LLM调用的Token使用情况：
+
+```python
+# 查看实时成本统计
+from tradingagents.config.config_manager import config_manager, token_tracker
+
+# 获取详细统计
+stats = config_manager.get_usage_statistics(days=7)  # 最近7天
+print(f"总成本: ¥{stats['total_cost']:.4f}")
+print(f"平均每次调用成本: ¥{stats['total_cost']/stats['total_requests']:.4f}")
+
+# 按供应商查看成本分布
+for provider, data in stats['provider_stats'].items():
+    print(f"{provider}: ¥{data['cost']:.4f} ({data['requests']}次调用)")
+
+# 成本预警设置
+config_manager.save_settings({
+    "cost_alert_threshold": 50.0,  # 日成本超过50元时警告
+    "enable_cost_tracking": True
+})
+```
+
 ### 成本优化建议
 
 ```python
-# 低成本配置示例
+# 低成本配置示例（阿里百炼）
 cost_optimized_config = {
-    "deep_think_llm": "gpt-4o-mini",
-    "quick_think_llm": "gpt-4o-mini", 
+    "llm_provider": "dashscope",
+    "deep_think_llm": "qwen-turbo",    # 最经济的模型
+    "quick_think_llm": "qwen-turbo", 
     "max_debate_rounds": 1,
     "online_tools": False  # 使用缓存数据
+}
+
+# 平衡性价比配置
+balanced_config = {
+    "llm_provider": "dashscope",
+    "deep_think_llm": "qwen-plus",     # 平衡性能和成本
+    "quick_think_llm": "qwen-turbo",   # 快速任务用经济模型
+    "max_debate_rounds": 2
 }
 ```
 

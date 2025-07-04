@@ -13,11 +13,12 @@ import json
 class RedisPerformanceTester:
     """Redis性能测试器"""
     
-    def __init__(self, host='localhost', port=6379, password=None, db=0):
-        self.host = host
-        self.port = port
-        self.password = password
-        self.db = db
+    def __init__(self, host=None, port=None, password=None, db=None):
+        # 从环境变量获取配置，如果没有则使用默认值
+        self.host = host or os.getenv('REDIS_HOST', 'localhost')
+        self.port = port or int(os.getenv('REDIS_PORT', 6379))
+        self.password = password or os.getenv('REDIS_PASSWORD')
+        self.db = db or int(os.getenv('REDIS_DATABASE', 0))
         self.redis_client = None
         
     def connect(self):

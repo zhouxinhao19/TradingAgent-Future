@@ -11,13 +11,22 @@ from typing import List, Dict, Optional, Tuple
 import warnings
 warnings.filterwarnings('ignore')
 
-# 导入缓存管理器
+# 导入数据库管理器
 try:
-    from .db_cache_manager import get_db_cache
-    DB_CACHE_AVAILABLE = True
+    from .database_manager import get_database_manager
+    DB_MANAGER_AVAILABLE = True
 except ImportError:
-    DB_CACHE_AVAILABLE = False
+    DB_MANAGER_AVAILABLE = False
     print("⚠️ 数据库缓存管理器不可用，尝试文件缓存")
+
+# 导入MongoDB股票信息查询
+try:
+    import os
+    from pymongo import MongoClient
+    MONGODB_AVAILABLE = True
+except ImportError:
+    MONGODB_AVAILABLE = False
+    print("⚠️ pymongo未安装，无法从MongoDB获取股票名称")
 
 try:
     from .cache_manager import get_cache
@@ -143,20 +152,81 @@ class TongDaXinDataProvider:
             self.connected = False
             return False
     
-    def get_stock_realtime_data(self, stock_code: str) -> Dict:
+    def _get_stock_name(self, stock_code: str) -> str:
+        """
+        获取股票名称
+        优先级：缓存 -> MongoDB -> 常用股票映射 -> API获取（仅深圳市场） -> 默认格式
+        Args:
+            stock_code: 股票代码
+        Returns:
+            str: 股票名称
+        """
+        global _stock_name_cache
+        
+        # 首先检查缓存
+        if stock_code in _stock_name_cache:
+            return _stock_name_cache[stock_code]
+        
+        # 优先从MongoDB获取
+        mongodb_name = _get_stock_name_from_mongodb(stock_code)
+        if mongodb_name:
+            _stock_name_cache[stock_code] = mongodb_name
+            return mongodb_name
+        
+        # 检查常用股票映射表
+        if stock_code in _common_stock_names:
+            name = _common_stock_names[stock_code]
+            _stock_name_cache[stock_code] = name
+            return name
+        
+        # 如果API不可用，直接返回默认格式
+        if not self.connected:
+            if not self.connect():
+                default_name = f'股票{stock_code}'
+                _stock_name_cache[stock_code] = default_name
+                return default_name
+        
+        try:
+            # 仅对深圳市场尝试从API获取（上海市场的get_security_list不可用）
+            market = self._get_market_code(stock_code)
+            if market == 0:  # 深圳市场
+                try:
+                    for start_pos in range(0, 2000, 1000):  # 分批获取
+                        stock_list = self.api.get_security_list(market, start_pos)
+                        if stock_list:
+                            for stock_info in stock_list:
+                                if stock_info.get('code') == stock_code:
+                                    stock_name = stock_info.get('name', '').strip()
+                                    if stock_name:
+                                        _stock_name_cache[stock_code] = stock_name
+                                        return stock_name
+                except Exception as e:
+                    print(f"⚠️ 获取深圳股票列表失败: {e}")
+            
+            # 如果都失败了，返回默认格式并缓存
+            default_name = f'股票{stock_code}'
+            _stock_name_cache[stock_code] = default_name
+            return default_name
+            
+        except Exception as e:
+            print(f"⚠️ 获取股票名称失败: {e}")
+            default_name = f'股票{stock_code}'
+            _stock_name_cache[stock_code] = default_name
+            return default_name
+    
+    def get_real_time_data(self, stock_code: str) -> Dict:
         """
         获取股票实时数据
         Args:
-            stock_code: 股票代码，如 '000001' (平安银行)
+            stock_code: 股票代码
         Returns:
-            Dict: 实时股票数据
+            Dict: 实时数据
         """
         if not self.connected:
             if not self.connect():
                 return {}
         
         try:
-            # 判断市场
             market = self._get_market_code(stock_code)
             
             # 获取实时数据
@@ -171,23 +241,9 @@ class TongDaXinDataProvider:
             def safe_get(key, default=0):
                 return quote.get(key, default)
 
-            # 股票名称映射
-            stock_names = {
-                '000001': '平安银行',
-                '000002': '万科A',
-                '600036': '招商银行',
-                '600519': '贵州茅台',
-                '000858': '五粮液',
-                '000651': '格力电器',
-                '000333': '美的集团',
-                '600028': '中国石化',
-                '601398': '工商银行',
-                '601318': '中国平安'
-            }
-
             return {
                 'code': stock_code,
-                'name': stock_names.get(stock_code, safe_get('name', '未知')),
+                'name': self._get_stock_name(stock_code),  # 使用独立的股票名称获取方法
                 'price': safe_get('price'),
                 'last_close': safe_get('last_close'),
                 'open': safe_get('open'),
@@ -375,7 +431,7 @@ class TongDaXinDataProvider:
             for name, code in stock_mapping.items():
                 if keyword.lower() in name.lower() or keyword in code:
                     # 获取实时数据
-                    realtime_data = self.get_stock_realtime_data(code)
+                    realtime_data = self.get_real_time_data(code)
                     if realtime_data:
                         results.append({
                             'code': code,
@@ -443,8 +499,107 @@ class TongDaXinDataProvider:
             return {}
 
 
-# 全局实例
+# 全局实例和缓存
 _tdx_provider = None
+_stock_name_cache = {}  # 股票名称缓存，避免重复API调用
+_mongodb_client = None
+_mongodb_db = None
+
+def _get_mongodb_connection():
+    """获取MongoDB连接"""
+    global _mongodb_client, _mongodb_db
+    
+    if not MONGODB_AVAILABLE:
+        return None, None
+    
+    if _mongodb_client is None or _mongodb_db is None:
+        try:
+            # 从环境变量获取MongoDB配置
+            config = {
+                'host': os.getenv('MONGODB_HOST', 'localhost'),
+                'port': int(os.getenv('MONGODB_PORT', 27018)),
+                'username': os.getenv('MONGODB_USERNAME'),
+                'password': os.getenv('MONGODB_PASSWORD'),
+                'database': os.getenv('MONGODB_DATABASE', 'tradingagents'),
+                'auth_source': os.getenv('MONGODB_AUTH_SOURCE', 'admin')
+            }
+            
+            # 构建连接字符串
+            if config.get('username') and config.get('password'):
+                connection_string = f"mongodb://{config['username']}:{config['password']}@{config['host']}:{config['port']}/{config['auth_source']}"
+            else:
+                connection_string = f"mongodb://{config['host']}:{config['port']}/"
+            
+            # 创建客户端
+            _mongodb_client = MongoClient(
+                connection_string,
+                serverSelectionTimeoutMS=3000  # 3秒超时
+            )
+            
+            # 测试连接
+            _mongodb_client.admin.command('ping')
+            
+            # 选择数据库
+            _mongodb_db = _mongodb_client[config['database']]
+            
+        except Exception as e:
+            print(f"⚠️ MongoDB连接失败: {e}")
+            _mongodb_client = None
+            _mongodb_db = None
+    
+    return _mongodb_client, _mongodb_db
+
+def _get_stock_name_from_mongodb(stock_code: str) -> Optional[str]:
+    """从MongoDB获取股票名称"""
+    try:
+        client, db = _get_mongodb_connection()
+        if db is None:
+            return None
+        
+        collection = db['stock_basic_info']
+        stock_info = collection.find_one({'code': stock_code})
+        
+        if stock_info and 'name' in stock_info:
+            return stock_info['name'].strip()
+        
+        return None
+        
+    except Exception as e:
+        print(f"⚠️ 从MongoDB获取股票名称失败: {e}")
+        return None
+
+# 精简的常用股票名称映射（仅包含最常见的股票）
+_common_stock_names = {
+    # 深圳主板
+    '000001': '平安银行',
+    '000002': '万科A',
+    '000858': '五粮液',
+    '000895': '双汇发展',
+    
+    # 深圳中小板
+    '002594': '比亚迪',
+    '002415': '海康威视',
+    '002304': '洋河股份',
+    
+    # 深圳创业板
+    '300059': '东方财富',
+    '300750': '宁德时代',
+    '300015': '爱尔眼科',
+    
+    # 上海主板
+    '600519': '贵州茅台',
+    '600036': '招商银行',
+    '601398': '工商银行',
+    '601127': '小康股份',
+    '600000': '浦发银行',
+    '601318': '中国平安',
+    '600276': '恒瑞医药',
+    '600887': '伊利股份',
+    
+    # 科创板
+    '688981': '中芯国际',
+    '688599': '天合光能',
+}
 
 def get_tdx_provider() -> TongDaXinDataProvider:
     """获取通达信数据提供器实例"""
@@ -475,25 +630,30 @@ def get_china_stock_data(stock_code: str, start_date: str, end_date: str) -> str
     """
     print(f"📊 正在获取中国股票数据: {stock_code} ({start_date} 到 {end_date})")
 
-    # 优先尝试从数据库缓存加载数据
-    if DB_CACHE_AVAILABLE:
-        db_cache = get_db_cache()
-        cache_key = db_cache.find_cached_stock_data(
-            symbol=stock_code,
-            start_date=start_date,
-            end_date=end_date,
-            data_source="tdx",
-            max_age_hours=6  # 6小时内的缓存有效
-        )
-
-        if cache_key:
-            cached_data = db_cache.load_stock_data(cache_key)
+    # 优先尝试从数据库缓存加载数据（使用统一的database_manager）
+    try:
+        from .database_manager import get_database_manager
+        db_manager = get_database_manager()
+        if db_manager.mongodb_db:
+            cached_data = db_manager.get_stock_data(stock_code, "china")
             if cached_data:
-                print(f"🗄️ 从数据库缓存加载数据: {stock_code} -> {cache_key}")
-                return cached_data
+                # 检查缓存是否在有效期内（6小时）
+                from datetime import datetime, timedelta
+                if 'updated_at' in cached_data:
+                    cache_time = cached_data.get('updated_at')
+                    if isinstance(cache_time, str):
+                        cache_time = datetime.fromisoformat(cache_time.replace('Z', '+00:00'))
+                    
+                    if datetime.utcnow() - cache_time < timedelta(hours=6):
+                        formatted_data = cached_data.get('formatted_data')
+                        if formatted_data:
+                            print(f"🗄️ 从MongoDB缓存加载数据: {stock_code}")
+                            return formatted_data
+    except Exception as e:
+        print(f"⚠️ 从MongoDB加载缓存失败: {e}")
 
     # 如果数据库缓存不可用，尝试文件缓存
-    elif FILE_CACHE_AVAILABLE:
+    if FILE_CACHE_AVAILABLE:
         cache = get_cache()
         cache_key = cache.find_cached_stock_data(
             symbol=stock_code,
@@ -523,7 +683,7 @@ def get_china_stock_data(stock_code: str, start_date: str, end_date: str) -> str
             return error_msg
         
         # 获取实时数据
-        realtime_data = provider.get_stock_realtime_data(stock_code)
+        realtime_data = provider.get_real_time_data(stock_code)
 
         # 获取技术指标
         indicators = provider.get_stock_technical_indicators(stock_code)
@@ -559,16 +719,27 @@ def get_china_stock_data(stock_code: str, start_date: str, end_date: str) -> str
 数据来源: 通达信API (实时数据)
 """
 
-        # 优先保存到数据库缓存
-        if DB_CACHE_AVAILABLE:
-            db_cache = get_db_cache()
-            db_cache.save_stock_data(
-                symbol=stock_code,
-                data=result,
-                start_date=start_date,
-                end_date=end_date,
-                data_source="tdx"
-            )
+        # 优先保存到数据库缓存（使用统一的database_manager）
+        try:
+            from .database_manager import get_database_manager
+            db_manager = get_database_manager()
+            if db_manager.mongodb_db:
+                db_manager.save_stock_data(
+                    symbol=stock_code,
+                    data={
+                        'formatted_data': result,
+                        'start_date': start_date,
+                        'end_date': end_date,
+                        'data_source': 'tdx',
+                        'realtime_data': realtime_data,
+                        'indicators': indicators,
+                        'history_count': len(df)
+                    },
+                    market_type="china"
+                )
+                print(f"💾 数据已保存到MongoDB: {stock_code}")
+        except Exception as e:
+            print(f"⚠️ 保存到MongoDB失败: {e}")
 
         # 同时保存到文件缓存作为备份
         if FILE_CACHE_AVAILABLE:
@@ -636,3 +807,31 @@ def get_china_market_overview() -> str:
         
     except Exception as e:
         return f"获取市场概览失败: {str(e)}"
+
+# 在文件末尾添加以下函数
+
+def get_china_stock_data_enhanced(stock_code: str, start_date: str, end_date: str) -> str:
+    """
+    增强版中国股票数据获取函数（完整降级机制）
+    这是get_china_stock_data的增强版本
+    
+    Args:
+        stock_code: 股票代码 (如 '000001')
+        start_date: 开始日期 'YYYY-MM-DD'
+        end_date: 结束日期 'YYYY-MM-DD'
+    Returns:
+        str: 格式化的股票数据
+    """
+    try:
+        from .stock_data_service import get_stock_data_service
+        service = get_stock_data_service()
+        return service.get_stock_data_with_fallback(stock_code, start_date, end_date)
+    except ImportError:
+        # 如果新服务不可用，降级到原有函数
+        print("⚠️ 增强服务不可用，使用原有函数")
+        return get_china_stock_data(stock_code, start_date, end_date)
+    except Exception as e:
+        print(f"⚠️ 增强服务出错，降级到原有函数: {e}")
+        return get_china_stock_data(stock_code, start_date, end_date)
+
+# ... existing code ...

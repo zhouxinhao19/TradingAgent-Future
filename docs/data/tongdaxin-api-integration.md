@@ -308,7 +308,7 @@ provider = get_tdx_provider()  # 全局实例
 # 批量获取数据
 stocks = ['000001', '600519', '000858']
 for stock in stocks:
-    data = provider.get_stock_realtime_data(stock)
+    data = provider.get_real_time_data(stock)
 ```
 
 ### 2. 错误处理

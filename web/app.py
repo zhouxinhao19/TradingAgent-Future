@@ -57,6 +57,69 @@ st.set_page_config(
 # 自定义CSS样式
 st.markdown("""
 <style>
+    /* 隐藏Streamlit顶部工具栏和Deploy按钮 - 多种选择器确保兼容性 */
+    .stAppToolbar {
+        display: none !important;
+    }
+    
+    header[data-testid="stHeader"] {
+        display: none !important;
+    }
+    
+    .stDeployButton {
+        display: none !important;
+    }
+    
+    /* 新版本Streamlit的Deploy按钮选择器 */
+    [data-testid="stToolbar"] {
+        display: none !important;
+    }
+    
+    [data-testid="stDecoration"] {
+        display: none !important;
+    }
+    
+    [data-testid="stStatusWidget"] {
+        display: none !important;
+    }
+    
+    /* 隐藏整个顶部区域 */
+    .stApp > header {
+        display: none !important;
+    }
+    
+    .stApp > div[data-testid="stToolbar"] {
+        display: none !important;
+    }
+    
+    /* 隐藏主菜单按钮 */
+    #MainMenu {
+        visibility: hidden !important;
+        display: none !important;
+    }
+    
+    /* 隐藏页脚 */
+    footer {
+        visibility: hidden !important;
+        display: none !important;
+    }
+    
+    /* 隐藏"Made with Streamlit"标识 */
+    .viewerBadge_container__1QSob {
+        display: none !important;
+    }
+    
+    /* 隐藏所有可能的工具栏元素 */
+    div[data-testid="stToolbar"] {
+        display: none !important;
+    }
+    
+    /* 隐藏右上角的所有按钮 */
+    .stApp > div > div > div > div > section > div {
+        padding-top: 0 !important;
+    }
+    
+    /* 应用样式 */
     .main-header {
         background: linear-gradient(90deg, #1f77b4, #ff7f0e);
         padding: 1rem;
@@ -132,7 +195,7 @@ def main():
 
     page = st.sidebar.selectbox(
         "选择功能",
-        ["📊 股票分析", "⚙️ 配置管理", "💾 缓存管理", "📈 历史记录", "🔧 系统状态"]
+        ["📊 股票分析", "⚙️ 配置管理", "💾 缓存管理", "💰 Token统计", "📈 历史记录", "🔧 系统状态"]
     )
 
     # 根据选择的页面渲染不同内容
@@ -150,6 +213,14 @@ def main():
             cache_main()
         except ImportError as e:
             st.error(f"缓存管理页面加载失败: {e}")
+        return
+    elif page == "💰 Token统计":
+        try:
+            from pages.token_statistics import render_token_statistics
+            render_token_statistics()
+        except ImportError as e:
+            st.error(f"Token统计页面加载失败: {e}")
+            st.info("请确保已安装所有依赖包")
         return
     elif page == "📈 历史记录":
         st.header("📈 历史记录")

@@ -276,7 +276,7 @@ def test_realtime_data():
             print(f"\n📈 测试 {code} ({name}):")
             
             try:
-                data = provider.get_stock_realtime_data(code)
+                data = provider.get_real_time_data(code)
                 
                 if data:
                     print(f"✅ 获取成功")

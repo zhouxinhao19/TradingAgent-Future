@@ -168,7 +168,7 @@ class DatabaseCacheManager:
     
     def save_stock_data(self, symbol: str, data: Union[pd.DataFrame, str],
                        start_date: str = None, end_date: str = None,
-                       data_source: str = "unknown") -> str:
+                       data_source: str = "unknown", market_type: str = None) -> str:
         """
         保存股票数据到MongoDB和Redis
         
@@ -178,6 +178,7 @@ class DatabaseCacheManager:
             start_date: 开始日期
             end_date: 结束日期
             data_source: 数据源
+            market_type: 市场类型 (us/china)
         
         Returns:
             cache_key: 缓存键
@@ -187,10 +188,20 @@ class DatabaseCacheManager:
                                            end_date=end_date,
                                            source=data_source)
         
+        # 自动推断市场类型
+        if market_type is None:
+            # 根据股票代码格式推断市场类型
+            import re
+            if re.match(r'^\d{6}$', symbol):  # 6位数字为A股
+                market_type = "china"
+            else:  # 其他格式为美股
+                market_type = "us"
+        
         # 准备文档数据
         doc = {
             "_id": cache_key,
             "symbol": symbol,
+            "market_type": market_type,
             "data_type": "stock_data",
             "start_date": start_date,
             "end_date": end_date,

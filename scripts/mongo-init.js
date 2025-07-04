@@ -8,7 +8,7 @@ db = db.getSiblingDB('tradingagents');
 db.createCollection('stock_data');
 
 // 创建股票数据索引
-db.stock_data.createIndex({ "symbol": 1, "market_type": 1 }, { unique: true });
+db.stock_data.createIndex({ "symbol": 1, "market_type": 1 });
 db.stock_data.createIndex({ "created_at": -1 });
 db.stock_data.createIndex({ "updated_at": -1 });
 

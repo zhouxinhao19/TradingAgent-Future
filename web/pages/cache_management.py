@@ -13,6 +13,10 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.append(str(project_root))
 
+# 导入UI工具函数
+sys.path.append(str(Path(__file__).parent.parent))
+from utils.ui_utils import apply_hide_deploy_button_css
+
 try:
     from tradingagents.dataflows.cache_manager import get_cache
     from tradingagents.dataflows.optimized_us_data import get_optimized_us_data_provider
@@ -30,6 +34,9 @@ def main():
         page_icon="💾",
         layout="wide"
     )
+    
+    # 应用隐藏Deploy按钮的CSS样式
+    apply_hide_deploy_button_css()
     
     st.title("💾 股票数据缓存管理")
     st.markdown("---")

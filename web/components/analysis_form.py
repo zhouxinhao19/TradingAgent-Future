@@ -19,7 +19,7 @@ def render_analysis_form():
             market_type = st.selectbox(
                 "选择市场 🌍",
                 options=["美股", "A股"],
-                index=0,
+                index=1,
                 help="选择要分析的股票市场"
             )
 

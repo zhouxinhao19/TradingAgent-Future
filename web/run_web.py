@@ -32,6 +32,25 @@ def check_dependencies():
     print("✅ 依赖包检查通过")
     return True
 
+def clean_cache_files():
+    """清理Python缓存文件，避免Streamlit文件监控错误"""
+    
+    project_root = Path(__file__).parent.parent
+    cache_dirs = list(project_root.rglob("__pycache__"))
+    
+    if cache_dirs:
+        print("🧹 清理Python缓存文件...")
+        for cache_dir in cache_dirs:
+            try:
+                import shutil
+                shutil.rmtree(cache_dir)
+                print(f"  ✅ 已清理: {cache_dir.relative_to(project_root)}")
+            except Exception as e:
+                print(f"  ⚠️ 清理失败: {cache_dir.relative_to(project_root)} - {e}")
+        print("✅ 缓存文件清理完成")
+    else:
+        print("✅ 无需清理缓存文件")
+
 def check_api_keys():
     """检查API密钥配置"""
     
@@ -70,6 +89,9 @@ def main():
     print("🚀 TradingAgents-CN Web应用启动器")
     print("=" * 50)
     
+    # 清理缓存文件（避免Streamlit文件监控错误）
+    clean_cache_files()
+    
     # 检查依赖
     print("🔍 检查依赖包...")
     if not check_dependencies():
@@ -94,13 +116,21 @@ def main():
         return
     
     # 构建Streamlit命令
+    config_dir = web_dir.parent / ".streamlit"
     cmd = [
         sys.executable, "-m", "streamlit", "run", 
         str(app_file),
         "--server.port", "8501",
         "--server.address", "localhost",
-        "--browser.gatherUsageStats", "false"
+        "--browser.gatherUsageStats", "false",
+        "--server.fileWatcherType", "auto",
+        "--server.runOnSave", "true"
     ]
+    
+    # 如果配置目录存在，添加配置路径
+    if config_dir.exists():
+        print(f"📁 使用配置目录: {config_dir}")
+        # Streamlit会自动查找.streamlit/config.toml文件
     
     print(f"执行命令: {' '.join(cmd)}")
     print("\n🎉 Web应用启动中...")

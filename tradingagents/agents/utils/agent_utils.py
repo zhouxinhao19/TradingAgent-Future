@@ -526,17 +526,16 @@ class Toolkit:
         import re
         if re.match(r'^\d{6}$', str(ticker)):
             print(f"📊 [DEBUG] 检测到中国A股代码: {ticker}")
-            # 为中国股票添加特殊处理
-            china_stock_names = {
-                '000001': '平安银行',
-                '600036': '招商银行',
-                '600519': '贵州茅台',
-                '000858': '五粮液',
-                '000651': '格力电器',
-                '000333': '美的集团'
-            }
-            company_name = china_stock_names.get(ticker, f"股票代码{ticker}")
-            print(f"📊 [DEBUG] 中国股票名称映射: {ticker} -> {company_name}")
+            # 从MongoDB获取中国股票名称
+            try:
+                from tradingagents.dataflows.tdx_utils import _get_stock_name_from_mongodb
+                company_name = _get_stock_name_from_mongodb(ticker)
+                if not company_name:
+                    company_name = f"股票代码{ticker}"
+                print(f"📊 [DEBUG] 中国股票名称映射: {ticker} -> {company_name}")
+            except Exception as e:
+                print(f"⚠️ [DEBUG] 从MongoDB获取股票名称失败: {e}")
+                company_name = f"股票代码{ticker}"
 
             # 修改查询以包含正确的公司名称
             modified_query = f"{company_name}({ticker})"

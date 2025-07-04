@@ -7,8 +7,13 @@ import redis
 import time
 import sys
 
-def quick_redis_test(host='localhost', port=6379, password=None):
+def quick_redis_test(host=None, port=None, password=None):
     """快速Redis连接和性能测试"""
+    
+    # 从环境变量获取配置
+    host = host or os.getenv('REDIS_HOST', 'localhost')
+    port = port or int(os.getenv('REDIS_PORT', 6379))
+    password = password or os.getenv('REDIS_PASSWORD')
     
     print(f"🔍 测试Redis连接: {host}:{port}")
     

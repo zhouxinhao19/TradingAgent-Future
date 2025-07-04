@@ -15,12 +15,16 @@ from datetime import datetime, timedelta
 project_root = Path(__file__).parent.parent.parent
 sys.path.append(str(project_root))
 
+# 导入UI工具函数
+sys.path.append(str(Path(__file__).parent.parent))
+from utils.ui_utils import apply_hide_deploy_button_css
+
 try:
-    from tradingagents.dataflows.db_cache_manager import get_db_cache
-    DB_CACHE_AVAILABLE = True
+    from tradingagents.dataflows.database_manager import get_database_manager
+    DB_MANAGER_AVAILABLE = True
 except ImportError as e:
-    DB_CACHE_AVAILABLE = False
-    st.error(f"数据库缓存管理器不可用: {e}")
+    DB_MANAGER_AVAILABLE = False
+    st.error(f"数据库管理器不可用: {e}")
 
 def main():
     st.set_page_config(
@@ -29,11 +33,14 @@ def main():
         layout="wide"
     )
     
+    # 应用隐藏Deploy按钮的CSS样式
+    apply_hide_deploy_button_css()
+    
     st.title("🗄️ MongoDB + Redis 数据库管理")
     st.markdown("---")
     
-    if not DB_CACHE_AVAILABLE:
-        st.error("❌ 数据库缓存管理器不可用")
+    if not DB_MANAGER_AVAILABLE:
+        st.error("❌ 数据库管理器不可用")
         st.info("""
         请按以下步骤设置数据库环境：
         
@@ -54,8 +61,8 @@ def main():
         """)
         return
     
-    # 获取数据库缓存实例
-    db_cache = get_db_cache()
+    # 获取数据库管理器实例
+    db_manager = get_database_manager()
     
     # 侧边栏操作
     with st.sidebar:
@@ -63,8 +70,8 @@ def main():
         
         # 连接状态
         st.subheader("📡 连接状态")
-        mongodb_status = "✅ 已连接" if db_cache.mongodb_client else "❌ 未连接"
-        redis_status = "✅ 已连接" if db_cache.redis_client else "❌ 未连接"
+        mongodb_status = "✅ 已连接" if db_manager.mongodb_db else "❌ 未连接"
+        redis_status = "✅ 已连接" if db_manager.redis_client else "❌ 未连接"
         
         st.write(f"**MongoDB**: {mongodb_status}")
         st.write(f"**Redis**: {redis_status}")
@@ -90,7 +97,9 @@ def main():
         
         if st.button("🗑️ 清理过期数据", type="secondary"):
             with st.spinner("正在清理过期数据..."):
-                cleared_count = db_cache.clear_old_cache(max_age_days)
+                # 使用database_manager的缓存清理功能
+                pattern = f"*:{max_age_days}d:*"  # 简化的清理模式
+                cleared_count = db_manager.cache_clear_pattern(pattern)
             st.success(f"✅ 已清理 {cleared_count} 条过期记录")
             st.rerun()
     
@@ -101,35 +110,34 @@ def main():
         st.subheader("📊 MongoDB 统计")
         
         try:
-            stats = db_cache.get_cache_stats()
-            mongodb_stats = stats.get("mongodb", {})
+            stats = db_manager.get_cache_stats()
             
-            if mongodb_stats.get("available"):
-                collections = mongodb_stats.get("collections", {})
+            if db_manager.mongodb_db:
+                # 获取MongoDB集合统计
+                collections_info = {
+                    "stock_data": "📈 股票数据",
+                    "analysis_results": "📊 分析结果", 
+                    "user_sessions": "👤 用户会话",
+                    "configurations": "⚙️ 配置信息"
+                }
                 
-                # 总体统计
-                total_records = sum(col.get("count", 0) for col in collections.values())
-                total_size = sum(col.get("size_mb", 0) for col in collections.values())
+                total_records = 0
+                st.markdown("**集合详情：**")
+                
+                for collection_name, display_name in collections_info.items():
+                    try:
+                        collection = db_manager.mongodb_db[collection_name]
+                        count = collection.count_documents({})
+                        total_records += count
+                        st.write(f"**{display_name}**: {count:,} 条记录")
+                    except Exception as e:
+                        st.write(f"**{display_name}**: 获取失败 ({e})")
                 
                 metric_col1, metric_col2 = st.columns(2)
                 with metric_col1:
                     st.metric("总记录数", f"{total_records:,}")
                 with metric_col2:
-                    st.metric("总大小", f"{total_size:.2f} MB")
-                
-                # 各集合统计
-                st.markdown("**集合详情：**")
-                for collection_name, collection_stats in collections.items():
-                    count = collection_stats.get("count", 0)
-                    size = collection_stats.get("size_mb", 0)
-                    
-                    collection_display = {
-                        "stock_data": "📈 股票数据",
-                        "news_data": "📰 新闻数据",
-                        "fundamentals_data": "💼 基本面数据"
-                    }.get(collection_name, collection_name)
-                    
-                    st.write(f"**{collection_display}**: {count:,} 条记录, {size:.2f} MB")
+                    st.metric("Redis缓存", stats.get('redis_keys', 0))
             else:
                 st.error("MongoDB 未连接")
                 
@@ -140,22 +148,21 @@ def main():
         st.subheader("⚡ Redis 统计")
         
         try:
-            stats = db_cache.get_cache_stats()
-            redis_stats = stats.get("redis", {})
+            stats = db_manager.get_cache_stats()
             
-            if redis_stats.get("available"):
+            if db_manager.redis_client:
                 metric_col1, metric_col2 = st.columns(2)
                 with metric_col1:
-                    st.metric("缓存键数量", redis_stats.get("keys", 0))
+                    st.metric("缓存键数量", stats.get("redis_keys", 0))
                 with metric_col2:
-                    st.metric("内存使用", redis_stats.get("memory_usage", "N/A"))
+                    st.metric("内存使用", stats.get("redis_memory", "N/A"))
                 
                 st.info("""
                 **Redis 缓存策略：**
                 
                 🔹 **股票数据**：6小时自动过期
-                🔹 **新闻数据**：24小时自动过期  
-                🔹 **基本面数据**：24小时自动过期
+                🔹 **分析结果**：24小时自动过期  
+                🔹 **用户会话**：1小时自动过期
                 
                 Redis 主要用于热点数据的快速访问，
                 过期后会自动从 MongoDB 重新加载。
@@ -175,36 +182,43 @@ def main():
     
     with config_col1:
         st.markdown("**MongoDB 配置：**")
+        # 修复硬编码 - 从环境变量或数据库管理器获取实际配置
+        mongodb_url = getattr(db_manager, 'mongodb_url', None) or os.getenv('MONGODB_CONNECTION_STRING', '未配置')
+        mongodb_db_name = getattr(db_manager, 'mongodb_db_name', None) or os.getenv('MONGODB_DATABASE', 'tradingagents')
         st.code(f"""
-连接URL: {db_cache.mongodb_url}
-数据库: {db_cache.mongodb_db_name}
-状态: {mongodb_status}
+    连接URL: {mongodb_url}
+    数据库: {mongodb_db_name}
+    状态: {mongodb_status}
         """)
         
-        if db_cache.mongodb_client:
+        if db_manager.mongodb_db:
             st.markdown("**集合结构：**")
             st.code("""
-📁 tradingagents/
-├── 📊 stock_data        # 股票历史数据
-├── 📰 news_data         # 新闻和市场情绪
-└── 💼 fundamentals_data # 基本面分析数据
-            """)
+    📁 tradingagents/
+    ├── 📊 stock_data        # 股票历史数据
+    ├── 📈 analysis_results  # 分析结果
+    ├── 👤 user_sessions     # 用户会话
+    └── ⚙️ configurations   # 系统配置
+                """)
     
     with config_col2:
         st.markdown("**Redis 配置：**")
+        # 修复硬编码 - 从环境变量或数据库管理器获取实际配置
+        redis_url = getattr(db_manager, 'redis_url', None) or os.getenv('REDIS_CONNECTION_STRING', '未配置')
+        redis_db = getattr(db_manager, 'redis_db', None) or os.getenv('REDIS_DATABASE', '0')
         st.code(f"""
-连接URL: {db_cache.redis_url}
-数据库: {db_cache.redis_db}
-状态: {redis_status}
-        """)
+    连接URL: {redis_url}
+    数据库: {redis_db}
+    状态: {redis_status}
+                """)
         
-        if db_cache.redis_client:
+        if db_manager.redis_client:
             st.markdown("**缓存键格式：**")
             st.code("""
-stock:SYMBOL:HASH     # 股票数据缓存
-news:SYMBOL:HASH      # 新闻数据缓存  
-fundamentals:SYMBOL:HASH # 基本面缓存
-            """)
+    stock:SYMBOL:HASH     # 股票数据缓存
+    analysis:SYMBOL:HASH  # 分析结果缓存  
+    session:USER:HASH     # 用户会话缓存
+                """)
     
     st.markdown("---")
     

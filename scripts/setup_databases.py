@@ -206,26 +206,26 @@ def test_connections():
     print("\n🔍 测试数据库连接...")
     
     try:
-        from tradingagents.dataflows.db_cache_manager import DatabaseCacheManager
+        from tradingagents.dataflows.database_manager import get_database_manager
         
-        db_cache = DatabaseCacheManager()
+        db_manager = get_database_manager()
         
         # 测试基本功能
-        if db_cache.mongodb_client and db_cache.redis_client:
+        if db_manager.mongodb_db and db_manager.redis_client:
             print("🎉 MongoDB + Redis 连接成功！")
             
             # 获取统计信息
-            stats = db_cache.get_cache_stats()
+            stats = db_manager.get_cache_stats()
             print(f"📊 缓存统计: {stats}")
             
-        elif db_cache.mongodb_client:
+        elif db_manager.mongodb_db:
             print("✅ MongoDB 连接成功，Redis 未连接")
-        elif db_cache.redis_client:
+        elif db_manager.redis_client:
             print("✅ Redis 连接成功，MongoDB 未连接")
         else:
             print("❌ 数据库连接失败")
             
-        db_cache.close()
+        db_manager.close()
         
     except ImportError as e:
         print(f"❌ 导入失败: {e}")
