@@ -1675,13 +1675,34 @@ def help_chinese():
 def main():
     """主函数 - 默认进入分析模式"""
     import sys
+    from difflib import get_close_matches
 
     # 如果没有参数，直接进入分析模式
     if len(sys.argv) == 1:
         run_analysis()
     else:
         # 有参数时使用typer处理命令
-        app()
+        try:
+            app()
+        except SystemExit as e:
+            # 只在退出码为2（typer的未知命令错误）时提供智能建议
+            if e.code == 2 and len(sys.argv) > 1:
+                unknown_command = sys.argv[1]
+                available_commands = ['analyze', 'config', 'version', 'data-config', 'examples', 'test', 'help']
+                
+                # 使用difflib找到最相似的命令
+                suggestions = get_close_matches(unknown_command, available_commands, n=3, cutoff=0.6)
+                
+                if suggestions:
+                    console.print(f"\n[red]❌ 未知命令: '{unknown_command}'[/red]")
+                    console.print(f"[yellow]💡 您是否想要使用以下命令之一？[/yellow]")
+                    for suggestion in suggestions:
+                        console.print(f"   • [cyan]python -m cli.main {suggestion}[/cyan]")
+                    console.print(f"\n[dim]使用 [cyan]python -m cli.main help[/cyan] 查看所有可用命令[/dim]")
+                else:
+                    console.print(f"\n[red]❌ 未知命令: '{unknown_command}'[/red]")
+                    console.print(f"[yellow]使用 [cyan]python -m cli.main help[/cyan] 查看所有可用命令[/yellow]")
+            raise e
 
 if __name__ == "__main__":
     main()

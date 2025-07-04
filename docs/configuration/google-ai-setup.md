@@ -82,10 +82,10 @@ GOOGLE_API_KEY=your_google_api_key_here
 
 ```bash
 # 使用Gemini 2.0 Flash模型
-python cli/main.py --llm-provider google --model gemini-2.0-flash --stock AAPL
+python -m cli.main --llm-provider google --model gemini-2.0-flash --stock AAPL
 
-# 使用Gemini 1.5 Pro模型进行深度分析
-python cli/main.py --llm-provider google --model gemini-1.5-pro --stock TSLA --analysts market fundamentals news
+# 使用Gemini 1.5 Pro进行深度分析
+python -m cli.main --llm-provider google --model gemini-1.5-pro --stock TSLA --analysts market fundamentals news
 ```
 
 ### 3. Python API配置
@@ -237,7 +237,7 @@ python tests/test_correct_apis.py
 python -m streamlit run web/app.py
 
 # 或使用CLI
-python cli/main.py --llm-provider google --model gemini-2.0-flash --stock AAPL
+python -m cli.main --llm-provider google --model gemini-2.0-flash --stock AAPL
 ```
 
 祝您投资分析愉快！🚀

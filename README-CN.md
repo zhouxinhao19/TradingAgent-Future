@@ -188,10 +188,10 @@ start_web.bat
 
 ```bash
 # 启动交互式命令行界面
-python cli/main.py
+python -m cli.main
 
-# 直接分析指定股票
-python cli/main.py --stock AAPL --analysts market fundamentals
+# 或者使用参数直接分析
+python -m cli.main --stock AAPL --analysts market fundamentals
 ```
 
 ### 🐍 Python API使用
