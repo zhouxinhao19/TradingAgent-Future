@@ -192,10 +192,6 @@ cp .env.example .env
 DASHSCOPE_API_KEY=your_dashscope_api_key_here
 FINNHUB_API_KEY=your_finnhub_api_key_here
 
-# 可选：减少新闻滞后性的API密钥
-ALPHA_VANTAGE_API_KEY=your_alpha_vantage_api_key_here
-NEWSAPI_KEY=your_newsapi_key_here
-
 # 可选：数据库配置（提升性能）
 MONGODB_HOST=localhost
 MONGODB_PORT=27017

@@ -27,19 +27,19 @@ def demo_database_config_fixes():
     print("  4. ✅ 增强了错误处理和提示")
     
     print("\n🔍 检查配置文件:")
-    
-    # 检查.env.db文件
-    env_db_path = os.path.join(project_root, '.env.db')
-    if os.path.exists(env_db_path):
-        print(f"  ✅ 找到配置文件: {env_db_path}")
-        with open(env_db_path, 'r', encoding='utf-8') as f:
+
+    # 检查.env文件
+    env_path = os.path.join(project_root, '.env')
+    if os.path.exists(env_path):
+        print(f"  ✅ 找到配置文件: {env_path}")
+        with open(env_path, 'r', encoding='utf-8') as f:
             content = f.read()
-            if 'MONGODB_CONNECTION_STRING' in content:
-                print("  ✅ MongoDB连接字符串已配置")
-            if 'REDIS_CONNECTION_STRING' in content:
-                print("  ✅ Redis连接字符串已配置")
+            if 'MONGODB_HOST' in content or 'MONGODB_CONNECTION_STRING' in content:
+                print("  ✅ MongoDB配置已设置")
+            if 'REDIS_HOST' in content or 'REDIS_CONNECTION_STRING' in content:
+                print("  ✅ Redis配置已设置")
     else:
-        print(f"  ⚠️ 配置文件不存在: {env_db_path}")
+        print(f"  ⚠️ 配置文件不存在: {env_path}")
     
     # 检查database_config.py
     config_path = os.path.join(project_root, 'tradingagents', 'config', 'database_config.py')
@@ -232,7 +232,7 @@ def main():
             "tradingagents/api/stock_api.py - 便捷API接口",
             "examples/stock_query_examples.py - 使用示例",
             "tests/test_stock_data_service.py - 测试程序",
-            ".env.db - 数据库配置示例"
+            ".env - 数据库配置文件"
         ]
         
         for file_info in files:

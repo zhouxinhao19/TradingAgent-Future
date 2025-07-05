@@ -12,24 +12,26 @@ def test_database_manager():
     print("🔍 测试数据库管理器...")
     
     try:
-        from tradingagents.dataflows.database_manager import get_database_manager
+        from tradingagents.config.database_manager import get_database_manager
         
         db_manager = get_database_manager()
         print("✅ 数据库管理器导入成功")
         
         # 检查连接状态
-        mongodb_status = "✅ 已连接" if db_manager.mongodb_db is not None else "❌ 未连接"
-        redis_status = "✅ 已连接" if db_manager.redis_client is not None else "❌ 未连接"
-        
+        mongodb_status = "✅ 已连接" if db_manager.is_mongodb_available() else "❌ 未连接"
+        redis_status = "✅ 已连接" if db_manager.is_redis_available() else "❌ 未连接"
+
         print(f"MongoDB: {mongodb_status}")
         print(f"Redis: {redis_status}")
-        
+
         # 如果MongoDB连接成功，测试基本操作
-        if db_manager.mongodb_db is not None:
+        if db_manager.is_mongodb_available():
             print("\n📊 测试MongoDB操作...")
             
             # 检查集合
-            collections = db_manager.mongodb_db.list_collection_names()
+            mongodb_client = db_manager.get_mongodb_client()
+            db = mongodb_client[db_manager.mongodb_config["database"]]
+            collections = db.list_collection_names()
             print(f"可用集合: {collections}")
             
             # 检查stock_data集合的文档数量

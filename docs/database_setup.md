@@ -184,22 +184,24 @@ python scripts/init_database.py
 ### Python代码示例
 
 ```python
-from tradingagents.dataflows.database_manager import get_database_manager
+from tradingagents.config.database_manager import get_database_manager
 
 # 获取数据库管理器
 db_manager = get_database_manager()
 
-# 保存股票数据
-db_manager.save_stock_data("AAPL", {"price": 150.0}, "us")
+# 检查数据库可用性
+if db_manager.is_mongodb_available():
+    print("MongoDB可用")
 
-# 获取股票数据
-data = db_manager.get_stock_data("AAPL", "us")
+if db_manager.is_redis_available():
+    print("Redis可用")
 
-# 设置缓存
-db_manager.cache_set("key", {"data": "value"}, ttl=3600)
+# 获取数据库客户端
+mongodb_client = db_manager.get_mongodb_client()
+redis_client = db_manager.get_redis_client()
 
-# 获取缓存
-cached_data = db_manager.cache_get("key")
+# 获取缓存统计
+stats = db_manager.get_cache_stats()
 ```
 
 ## 🎯 下一步计划

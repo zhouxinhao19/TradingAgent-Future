@@ -91,7 +91,8 @@ class ConfigManager:
             "dashscope": "DASHSCOPE_API_KEY",
             "openai": "OPENAI_API_KEY",
             "google": "GOOGLE_API_KEY",
-            "anthropic": "ANTHROPIC_API_KEY"
+            "anthropic": "ANTHROPIC_API_KEY",
+            "deepseek": "DEEPSEEK_API_KEY"
         }
 
         env_key = env_key_map.get(provider.lower())
@@ -351,8 +352,6 @@ class ConfigManager:
             "reddit_user_agent": os.getenv("REDDIT_USER_AGENT", ""),
             "results_dir": os.getenv("TRADINGAGENTS_RESULTS_DIR", ""),
             "log_level": os.getenv("TRADINGAGENTS_LOG_LEVEL", "INFO"),
-            "alpha_vantage_api_key": os.getenv("ALPHA_VANTAGE_API_KEY", ""),
-            "newsapi_key": os.getenv("NEWSAPI_KEY", ""),
             "data_dir": os.getenv("TRADINGAGENTS_DATA_DIR", ""),  # 数据目录环境变量
             "cache_dir": os.getenv("TRADINGAGENTS_CACHE_DIR", ""),  # 缓存目录环境变量
         }

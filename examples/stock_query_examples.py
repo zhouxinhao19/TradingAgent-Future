@@ -83,7 +83,7 @@ def demo_single_stock_query():
             # 使用传统方式
             print(f"  ⚠️ 使用传统查询方式")
             db_manager = get_database_manager()
-            if db_manager.mongodb_db:
+            if db_manager.is_mongodb_available():
                 try:
                     collection = db_manager.mongodb_db['stock_basic_info']
                     stock = collection.find_one({"code": stock_code})

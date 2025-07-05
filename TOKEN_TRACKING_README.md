@@ -17,7 +17,7 @@
 - `tradingagents/config/token_tracker.py` - Token跟踪器（已集成到config_manager.py）
 
 ### 配置和示例
-- `.env.mongodb.example` - MongoDB配置示例
+- `.env.example` - 环境配置示例（包含MongoDB配置）
 - `examples/token_tracking_demo.py` - 功能演示脚本
 - `tests/test_dashscope_token_tracking.py` - 测试脚本
 

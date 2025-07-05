@@ -181,46 +181,29 @@ def setup_docker_option():
 
 def create_env_template():
     """创建环境变量模板"""
-    env_template = """
-# 数据库配置
-MONGODB_URL=mongodb://localhost:27017
-REDIS_URL=redis://localhost:6379
-
-# MongoDB数据库名
-MONGODB_DATABASE=tradingagents
-
-# Redis数据库编号
-REDIS_DATABASE=0
-"""
-    
-    env_file = Path(".env.db")
-    if not env_file.exists():
-        with open(env_file, 'w', encoding='utf-8') as f:
-            f.write(env_template.strip())
-        print(f"✅ 创建数据库配置文件: {env_file}")
-    else:
-        print(f"📄 数据库配置文件已存在: {env_file}")
+    print("📄 数据库配置已整合到主要的 .env 文件中")
+    print("请参考 .env.example 文件进行配置")
 
 def test_connections():
     """测试数据库连接"""
     print("\n🔍 测试数据库连接...")
     
     try:
-        from tradingagents.dataflows.database_manager import get_database_manager
-        
+        from tradingagents.config.database_manager import get_database_manager
+
         db_manager = get_database_manager()
         
         # 测试基本功能
-        if db_manager.mongodb_db and db_manager.redis_client:
+        if db_manager.is_mongodb_available() and db_manager.is_redis_available():
             print("🎉 MongoDB + Redis 连接成功！")
-            
+
             # 获取统计信息
             stats = db_manager.get_cache_stats()
             print(f"📊 缓存统计: {stats}")
-            
-        elif db_manager.mongodb_db:
+
+        elif db_manager.is_mongodb_available():
             print("✅ MongoDB 连接成功，Redis 未连接")
-        elif db_manager.redis_client:
+        elif db_manager.is_redis_available():
             print("✅ Redis 连接成功，MongoDB 未连接")
         else:
             print("❌ 数据库连接失败")

@@ -11,6 +11,8 @@ __pycache__/
 .env
 .env.local
 .env.*.local
+.env.db
+.env.mongodb*
 
 # 系统文件
 .DS_Store
@@ -45,3 +47,10 @@ htmlcov/
 # 文档构建
 docs/_build/
 site/
+
+# 贡献相关文档 (不纳入版本控制)
+docs/contribution/
+
+# AI工具目录 (不纳入版本控制)
+.trae/
+.augment/

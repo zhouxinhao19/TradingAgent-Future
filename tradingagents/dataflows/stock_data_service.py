@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 import logging
 
 try:
-    from .database_manager import get_database_manager
+    from tradingagents.config.database_manager import get_database_manager
     DATABASE_MANAGER_AVAILABLE = True
 except ImportError:
     DATABASE_MANAGER_AVAILABLE = False
@@ -53,7 +53,7 @@ class StockDataService:
         if DATABASE_MANAGER_AVAILABLE:
             try:
                 self.db_manager = get_database_manager()
-                if self.db_manager.mongodb_db:
+                if self.db_manager.is_mongodb_available():
                     print("✅ MongoDB连接成功")
                 else:
                     print("⚠️ MongoDB连接失败，将使用通达信API")
@@ -83,7 +83,7 @@ class StockDataService:
         print(f"📊 获取股票基础信息: {stock_code or '全部股票'}")
         
         # 1. 优先从MongoDB获取
-        if self.db_manager and self.db_manager.mongodb_db:
+        if self.db_manager and self.db_manager.is_mongodb_available():
             try:
                 result = self._get_from_mongodb(stock_code)
                 if result:
@@ -112,8 +112,13 @@ class StockDataService:
     def _get_from_mongodb(self, stock_code: str = None) -> Optional[Dict[str, Any]]:
         """从MongoDB获取数据"""
         try:
-            collection = self.db_manager.mongodb_db['stock_basic_info']
-            
+            mongodb_client = self.db_manager.get_mongodb_client()
+            if not mongodb_client:
+                return None
+
+            db = mongodb_client[self.db_manager.mongodb_config["database"]]
+            collection = db['stock_basic_info']
+
             if stock_code:
                 # 获取单个股票
                 result = collection.find_one({'code': stock_code})
@@ -123,7 +128,7 @@ class StockDataService:
                 cursor = collection.find({})
                 results = list(cursor)
                 return results if results else None
-                
+
         except Exception as e:
             logger.error(f"MongoDB查询失败: {e}")
             return None

@@ -272,7 +272,7 @@ def main():
     print("\n📚 更多信息请参考:")
     print("   - 文档: docs/configuration/token-tracking-guide.md")
     print("   - 测试: tests/test_dashscope_token_tracking.py")
-    print("   - 配置示例: .env.mongodb.example")
+    print("   - 配置示例: .env.example")
 
 
 if __name__ == "__main__":

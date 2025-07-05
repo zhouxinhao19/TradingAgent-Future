@@ -13,7 +13,7 @@ warnings.filterwarnings('ignore')
 
 # 导入数据库管理器
 try:
-    from .database_manager import get_database_manager
+    from tradingagents.config.database_manager import get_database_manager
     DB_MANAGER_AVAILABLE = True
 except ImportError:
     DB_MANAGER_AVAILABLE = False
@@ -632,23 +632,28 @@ def get_china_stock_data(stock_code: str, start_date: str, end_date: str) -> str
 
     # 优先尝试从数据库缓存加载数据（使用统一的database_manager）
     try:
-        from .database_manager import get_database_manager
+        from tradingagents.config.database_manager import get_database_manager
         db_manager = get_database_manager()
-        if db_manager.mongodb_db:
-            cached_data = db_manager.get_stock_data(stock_code, "china")
-            if cached_data:
-                # 检查缓存是否在有效期内（6小时）
+        if db_manager.is_mongodb_available():
+            # 直接使用MongoDB客户端查询缓存数据
+            mongodb_client = db_manager.get_mongodb_client()
+            if mongodb_client:
+                db = mongodb_client[db_manager.mongodb_config["database"]]
+                collection = db.stock_data
+
+                # 查询最近的缓存数据
                 from datetime import datetime, timedelta
-                if 'updated_at' in cached_data:
-                    cache_time = cached_data.get('updated_at')
-                    if isinstance(cache_time, str):
-                        cache_time = datetime.fromisoformat(cache_time.replace('Z', '+00:00'))
-                    
-                    if datetime.utcnow() - cache_time < timedelta(hours=6):
-                        formatted_data = cached_data.get('formatted_data')
-                        if formatted_data:
-                            print(f"🗄️ 从MongoDB缓存加载数据: {stock_code}")
-                            return formatted_data
+                cutoff_time = datetime.utcnow() - timedelta(hours=6)
+
+                cached_doc = collection.find_one({
+                    "symbol": stock_code,
+                    "market_type": "china",
+                    "created_at": {"$gte": cutoff_time}
+                }, sort=[("created_at", -1)])
+
+                if cached_doc and 'data' in cached_doc:
+                    print(f"🗄️ 从MongoDB缓存加载数据: {stock_code}")
+                    return cached_doc['data']
     except Exception as e:
         print(f"⚠️ 从MongoDB加载缓存失败: {e}")
 
@@ -721,23 +726,37 @@ def get_china_stock_data(stock_code: str, start_date: str, end_date: str) -> str
 
         # 优先保存到数据库缓存（使用统一的database_manager）
         try:
-            from .database_manager import get_database_manager
+            from tradingagents.config.database_manager import get_database_manager
             db_manager = get_database_manager()
-            if db_manager.mongodb_db:
-                db_manager.save_stock_data(
-                    symbol=stock_code,
-                    data={
-                        'formatted_data': result,
-                        'start_date': start_date,
-                        'end_date': end_date,
-                        'data_source': 'tdx',
-                        'realtime_data': realtime_data,
-                        'indicators': indicators,
-                        'history_count': len(df)
-                    },
-                    market_type="china"
-                )
-                print(f"💾 数据已保存到MongoDB: {stock_code}")
+            if db_manager.is_mongodb_available():
+                # 直接使用MongoDB客户端保存数据
+                mongodb_client = db_manager.get_mongodb_client()
+                if mongodb_client:
+                    db = mongodb_client[db_manager.mongodb_config["database"]]
+                    collection = db.stock_data
+
+                    doc = {
+                        "symbol": stock_code,
+                        "market_type": "china",
+                        "data": result,
+                        "metadata": {
+                            'start_date': start_date,
+                            'end_date': end_date,
+                            'data_source': 'tdx',
+                            'realtime_data': realtime_data,
+                            'indicators': indicators,
+                            'history_count': len(df)
+                        },
+                        "created_at": datetime.utcnow(),
+                        "updated_at": datetime.utcnow()
+                    }
+
+                    collection.replace_one(
+                        {"symbol": stock_code, "market_type": "china"},
+                        doc,
+                        upsert=True
+                    )
+                    print(f"💾 数据已保存到MongoDB: {stock_code}")
         except Exception as e:
             print(f"⚠️ 保存到MongoDB失败: {e}")
 

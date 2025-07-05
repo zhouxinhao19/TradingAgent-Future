@@ -17,15 +17,16 @@ def init_mongodb():
     print("📊 初始化MongoDB数据库...")
     
     try:
-        from tradingagents.dataflows.database_manager import get_database_manager
-        
+        from tradingagents.config.database_manager import get_database_manager
+
         db_manager = get_database_manager()
-        
-        if db_manager.mongodb_db is None:
+
+        if not db_manager.is_mongodb_available():
             print("❌ MongoDB未连接，请先启动MongoDB服务")
             return False
 
-        db = db_manager.mongodb_db
+        mongodb_client = db_manager.get_mongodb_client()
+        db = mongodb_client[db_manager.mongodb_config["database"]]
         
         # 创建股票数据集合和索引
         print("📈 创建股票数据集合...")
@@ -133,15 +134,15 @@ def init_redis():
     print("\n📦 初始化Redis缓存...")
     
     try:
-        from tradingagents.dataflows.database_manager import get_database_manager
-        
+        from tradingagents.config.database_manager import get_database_manager
+
         db_manager = get_database_manager()
-        
-        if not db_manager.redis_client:
+
+        if not db_manager.is_redis_available():
             print("❌ Redis未连接，请先启动Redis服务")
             return False
         
-        redis_client = db_manager.redis_client
+        redis_client = db_manager.get_redis_client()
         
         # 清理现有缓存（可选）
         print("🧹 清理现有缓存...")

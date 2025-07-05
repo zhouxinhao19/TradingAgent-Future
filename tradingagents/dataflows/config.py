@@ -43,15 +43,19 @@ def get_config() -> Dict:
     """Get the current configuration."""
     if _config is None:
         initialize_config()
-    
+
     # 动态获取最新的数据目录配置
     current_data_dir = config_manager.get_data_dir()
     if _config["data_dir"] != current_data_dir:
         _config["data_dir"] = current_data_dir
         global DATA_DIR
         DATA_DIR = current_data_dir
-    
-    return _config.copy()
+
+    # 注意：数据库配置现在由 tradingagents.config.database_manager 管理
+    # 这里不再包含数据库配置，避免配置冲突
+    config_copy = _config.copy()
+
+    return config_copy
 
 
 def get_data_dir() -> str:

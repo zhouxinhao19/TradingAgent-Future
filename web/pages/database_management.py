@@ -20,7 +20,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 from utils.ui_utils import apply_hide_deploy_button_css
 
 try:
-    from tradingagents.dataflows.database_manager import get_database_manager
+    from tradingagents.config.database_manager import get_database_manager
     DB_MANAGER_AVAILABLE = True
 except ImportError as e:
     DB_MANAGER_AVAILABLE = False
@@ -70,8 +70,8 @@ def main():
         
         # 连接状态
         st.subheader("📡 连接状态")
-        mongodb_status = "✅ 已连接" if db_manager.mongodb_db else "❌ 未连接"
-        redis_status = "✅ 已连接" if db_manager.redis_client else "❌ 未连接"
+        mongodb_status = "✅ 已连接" if db_manager.is_mongodb_available() else "❌ 未连接"
+        redis_status = "✅ 已连接" if db_manager.is_redis_available() else "❌ 未连接"
         
         st.write(f"**MongoDB**: {mongodb_status}")
         st.write(f"**Redis**: {redis_status}")
@@ -112,26 +112,29 @@ def main():
         try:
             stats = db_manager.get_cache_stats()
             
-            if db_manager.mongodb_db:
+            if db_manager.is_mongodb_available():
                 # 获取MongoDB集合统计
                 collections_info = {
                     "stock_data": "📈 股票数据",
-                    "analysis_results": "📊 分析结果", 
+                    "analysis_results": "📊 分析结果",
                     "user_sessions": "👤 用户会话",
                     "configurations": "⚙️ 配置信息"
                 }
-                
+
                 total_records = 0
                 st.markdown("**集合详情：**")
-                
-                for collection_name, display_name in collections_info.items():
-                    try:
-                        collection = db_manager.mongodb_db[collection_name]
-                        count = collection.count_documents({})
-                        total_records += count
-                        st.write(f"**{display_name}**: {count:,} 条记录")
-                    except Exception as e:
-                        st.write(f"**{display_name}**: 获取失败 ({e})")
+
+                mongodb_client = db_manager.get_mongodb_client()
+                if mongodb_client is not None:
+                    mongodb_db = mongodb_client[db_manager.mongodb_config["database"]]
+                    for collection_name, display_name in collections_info.items():
+                        try:
+                            collection = mongodb_db[collection_name]
+                            count = collection.count_documents({})
+                            total_records += count
+                            st.write(f"**{display_name}**: {count:,} 条记录")
+                        except Exception as e:
+                            st.write(f"**{display_name}**: 获取失败 ({e})")
                 
                 metric_col1, metric_col2 = st.columns(2)
                 with metric_col1:
@@ -150,7 +153,7 @@ def main():
         try:
             stats = db_manager.get_cache_stats()
             
-            if db_manager.redis_client:
+            if db_manager.is_redis_available():
                 metric_col1, metric_col2 = st.columns(2)
                 with metric_col1:
                     st.metric("缓存键数量", stats.get("redis_keys", 0))
@@ -182,16 +185,19 @@ def main():
     
     with config_col1:
         st.markdown("**MongoDB 配置：**")
-        # 修复硬编码 - 从环境变量或数据库管理器获取实际配置
-        mongodb_url = getattr(db_manager, 'mongodb_url', None) or os.getenv('MONGODB_CONNECTION_STRING', '未配置')
-        mongodb_db_name = getattr(db_manager, 'mongodb_db_name', None) or os.getenv('MONGODB_DATABASE', 'tradingagents')
+        # 从数据库管理器获取实际配置
+        mongodb_config = db_manager.mongodb_config
+        mongodb_host = mongodb_config.get('host', 'localhost')
+        mongodb_port = mongodb_config.get('port', 27017)
+        mongodb_db_name = mongodb_config.get('database', 'tradingagents')
         st.code(f"""
-    连接URL: {mongodb_url}
+    主机: {mongodb_host}:{mongodb_port}
     数据库: {mongodb_db_name}
     状态: {mongodb_status}
+    启用: {mongodb_config.get('enabled', False)}
         """)
-        
-        if db_manager.mongodb_db:
+
+        if db_manager.is_mongodb_available():
             st.markdown("**集合结构：**")
             st.code("""
     📁 tradingagents/
@@ -203,16 +209,19 @@ def main():
     
     with config_col2:
         st.markdown("**Redis 配置：**")
-        # 修复硬编码 - 从环境变量或数据库管理器获取实际配置
-        redis_url = getattr(db_manager, 'redis_url', None) or os.getenv('REDIS_CONNECTION_STRING', '未配置')
-        redis_db = getattr(db_manager, 'redis_db', None) or os.getenv('REDIS_DATABASE', '0')
+        # 从数据库管理器获取实际配置
+        redis_config = db_manager.redis_config
+        redis_host = redis_config.get('host', 'localhost')
+        redis_port = redis_config.get('port', 6379)
+        redis_db = redis_config.get('db', 0)
         st.code(f"""
-    连接URL: {redis_url}
+    主机: {redis_host}:{redis_port}
     数据库: {redis_db}
     状态: {redis_status}
+    启用: {redis_config.get('enabled', False)}
                 """)
         
-        if db_manager.redis_client:
+        if db_manager.is_redis_available():
             st.markdown("**缓存键格式：**")
             st.code("""
     stock:SYMBOL:HASH     # 股票数据缓存
