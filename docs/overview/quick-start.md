@@ -15,24 +15,30 @@
 ### API 密钥
 在开始之前，您需要获取以下API密钥：
 
-1. **OpenAI API Key** (必需)
-   - 访问 [OpenAI Platform](https://platform.openai.com/)
-   - 创建账户并获取API密钥
+1. **🇨🇳 阿里百炼 API Key** (推荐)
+   - 访问 [阿里云百炼平台](https://dashscope.aliyun.com/)
+   - 注册账户并获取API密钥
+   - 国产模型，无需科学上网，响应速度快
 
 2. **FinnHub API Key** (必需)
    - 访问 [FinnHub](https://finnhub.io/)
    - 注册免费账户并获取API密钥
 
-3. **其他API密钥** (可选)
-   - Google AI API (如需使用Gemini模型)
-   - Anthropic API (如需使用Claude模型)
+3. **Google AI API Key** (推荐)
+   - 访问 [Google AI Studio](https://aistudio.google.com/)
+   - 获取免费API密钥，支持Gemini模型
+
+4. **其他API密钥** (可选)
+   - OpenAI API (需要科学上网)
+   - Anthropic API (需要科学上网)
 
 ## 快速安装
 
 ### 1. 克隆项目
 ```bash
-git clone https://github.com/TauricResearch/TradingAgents.git
-cd TradingAgents
+# 克隆中文增强版
+git clone https://github.com/hsliuping/TradingAgents-CN.git
+cd TradingAgents-CN
 ```
 
 ### 2. 创建虚拟环境
@@ -53,39 +59,55 @@ pip install -r requirements.txt
 ```
 
 ### 4. 配置环境变量
-```bash
-# Linux/macOS
-export OPENAI_API_KEY="your_openai_api_key"
-export FINNHUB_API_KEY="your_finnhub_api_key"
 
-# Windows
-set OPENAI_API_KEY=your_openai_api_key
-set FINNHUB_API_KEY=your_finnhub_api_key
-```
-
-或者创建 `.env` 文件：
+创建 `.env` 文件（推荐方式）：
 ```bash
-# .env 文件
-OPENAI_API_KEY=your_openai_api_key
-FINNHUB_API_KEY=your_finnhub_api_key
+# 复制配置模板
+cp .env.example .env
+
+# 编辑 .env 文件，配置以下API密钥：
+
+# 🇨🇳 阿里百炼 (推荐)
+DASHSCOPE_API_KEY=your_dashscope_api_key_here
+
+# FinnHub (必需)
+FINNHUB_API_KEY=your_finnhub_api_key_here
+
+# Google AI (可选)
+GOOGLE_API_KEY=your_google_api_key_here
+
+# 数据库配置 (可选，默认禁用)
+MONGODB_ENABLED=false
+REDIS_ENABLED=false
 ```
 
 ## 第一次运行
 
+### 🌐 使用Web界面 (推荐)
+
+最简单的开始方式是使用Web管理界面：
+
+```bash
+# 启动Web界面
+streamlit run web/app.py
+```
+
+然后在浏览器中访问 `http://localhost:8501`
+
+Web界面提供：
+1. 🎛️ 直观的股票分析界面
+2. ⚙️ API密钥和配置管理
+3. 📊 实时分析进度显示
+4. 💰 Token使用统计
+5. 🇨🇳 完整的中文界面
+
 ### 使用命令行界面 (CLI)
 
-最简单的开始方式是使用交互式CLI：
+如果您偏好命令行：
 
 ```bash
 python -m cli.main
 ```
-
-这将启动一个交互式界面，您可以：
-1. 选择要分析的股票代码
-2. 设置分析日期
-3. 选择LLM模型
-4. 配置分析深度
-5. 开始分析
 
 ### 使用 Python API
 

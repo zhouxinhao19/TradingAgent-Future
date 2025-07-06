@@ -1,6 +1,6 @@
-# TradingAgents 文档
+# TradingAgents 文档 (v0.1.4)
 
-欢迎来到 TradingAgents 多智能体金融交易框架的文档中心。
+欢迎来到 TradingAgents 多智能体金融交易框架的文档中心。本文档适用于中文增强版 v0.1.4，包含完整的A股支持、国产LLM集成和Web界面功能。
 
 ## 文档结构
 
@@ -14,6 +14,7 @@
 - [智能体架构](./architecture/agent-architecture.md) - 智能体设计模式
 - [数据流架构](./architecture/data-flow-architecture.md) - 数据处理流程
 - [图结构设计](./architecture/graph-structure.md) - LangGraph 图结构设计
+- [配置优化指南](./architecture/configuration-optimization.md) - v0.1.4架构优化详解 ✨
 
 ### 🤖 智能体文档
 - [分析师团队](./agents/analysts.md) - 各类分析师智能体详解
@@ -23,7 +24,8 @@
 - [管理层](./agents/managers.md) - 管理层智能体
 
 ### 📊 数据处理
-- [数据源集成](./data/data-sources.md) - 支持的数据源和API
+- [数据源集成](./data/data-sources.md) - 支持的数据源和API (含A股支持) ✨
+- [通达信API集成](./data/tongdaxin-api-integration.md) - A股数据源详解 ✨
 - [数据处理流程](./data/data-processing.md) - 数据获取和处理
 - [缓存机制](./data/caching.md) - 数据缓存策略
 
@@ -44,6 +46,11 @@
 - [核心API](./api/core-api.md) - 核心类和方法
 - [智能体API](./api/agents-api.md) - 智能体接口
 - [数据API](./api/data-api.md) - 数据处理接口
+
+### 🌐 使用指南
+- [Web界面指南](./usage/web-interface-guide.md) - Web界面详细使用指南 ✨
+- [投资分析指南](./usage/investment_analysis_guide.md) - 投资分析完整流程
+- [A股分析指南](./guides/a-share-analysis-guide.md) - A股市场分析专项指南 ✨
 
 ### 💡 示例和教程
 - [基础示例](./examples/basic-examples.md) - 基本使用示例

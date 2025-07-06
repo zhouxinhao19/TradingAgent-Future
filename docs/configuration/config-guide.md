@@ -1,34 +1,43 @@
-# 配置指南
+# 配置指南 (v0.1.4)
 
 ## 概述
 
-TradingAgents 提供了灵活的配置系统，允许用户根据需求自定义系统行为。本指南详细介绍了所有可用的配置选项和最佳实践。
+TradingAgents 中文增强版提供了统一的配置系统，所有配置通过 `.env` 文件管理。本指南详细介绍了所有可用的配置选项和最佳实践。
+
+## 🎯 v0.1.4 配置优化
+
+### 统一配置管理
+- ✅ **单一配置源**: 只使用 `.env` 文件
+- ✅ **启用开关生效**: 数据库启用开关完全生效
+- ✅ **智能降级**: 自动检测并降级到可用的数据源
+- ✅ **Web界面管理**: 通过Web界面管理配置
 
 ## 配置文件结构
 
-### 默认配置
-```python
-# tradingagents/default_config.py
-DEFAULT_CONFIG = {
-    # 项目路径配置
-    "project_dir": os.path.abspath(os.path.join(os.path.dirname(__file__), ".")),
-    "results_dir": os.getenv("TRADINGAGENTS_RESULTS_DIR", "./results"),
-    "data_cache_dir": os.path.join(..., "dataflows/data_cache"),
-    
-    # LLM 配置
-    "llm_provider": "openai",
-    "deep_think_llm": "o4-mini",
-    "quick_think_llm": "gpt-4o-mini",
-    "backend_url": "https://api.openai.com/v1",
-    
-    # 辩论和讨论配置
-    "max_debate_rounds": 1,
-    "max_risk_discuss_rounds": 1,
-    "max_recur_limit": 100,
-    
-    # 工具配置
-    "online_tools": True,
-}
+### .env 配置文件 (推荐)
+```bash
+# ===========================================
+# TradingAgents 中文增强版配置文件 (v0.1.4)
+# ===========================================
+
+# 🧠 LLM 配置 (推荐阿里百炼)
+DASHSCOPE_API_KEY=your_dashscope_api_key_here
+GOOGLE_API_KEY=your_google_api_key_here
+
+# 📊 数据源配置
+FINNHUB_API_KEY=your_finnhub_api_key_here
+
+# 🗄️ 数据库配置 (默认禁用)
+MONGODB_ENABLED=false
+REDIS_ENABLED=false
+MONGODB_HOST=localhost
+MONGODB_PORT=27018
+REDIS_HOST=localhost
+REDIS_PORT=6380
+
+# 📁 路径配置
+TRADINGAGENTS_RESULTS_DIR=./results
+TRADINGAGENTS_DATA_DIR=./data
 ```
 
 ## 配置选项详解
