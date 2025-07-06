@@ -2,11 +2,11 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/Version-cn--0.1.1--preview-yellow.svg)](./VERSION)
+[![Version](https://img.shields.io/badge/Version-cn--0.1.4-green.svg)](./VERSION)
 [![Documentation](https://img.shields.io/badge/docs-中文文档-green.svg)](./docs/)
 [![Original](https://img.shields.io/badge/基于-TauricResearch/TradingAgents-orange.svg)](https://github.com/TauricResearch/TradingAgents)
 
-> ⚠️ **预览版本提醒**: 当前版本为 cn-0.1.1 预览版，功能仍在完善中，建议仅在测试环境使用。
+> 🎉 **版本**: 当前版本为 cn-0.1.4 版，已具备完整的Web界面、A股数据支持、数据库集成等核心功能。
 >
 > 📝 **版本说明**: 为避免与源项目版本冲突，中文增强版使用 `cn-` 前缀的独立版本体系。
 
@@ -55,21 +55,61 @@
 为了**更好地在中国推广这个优秀的TradingAgents框架**，我们创建了这个中文增强版本，目标是：
 
 #### 🌉 搭建技术桥梁
+
 - **语言无障碍**: 提供完整的中文文档和用户界面
 - **技术本土化**: 集成国产大模型，适应国内技术环境
 - **社区建设**: 为中文开发者社区提供学习和交流平台
 
 #### 🇨🇳 服务中国市场
+
 - **市场对接**: 支持A股、港股、新三板等中国金融市场
 - **数据源集成**: 整合Tushare、AkShare、Wind等中文金融数据
 - **合规适配**: 符合国内金融监管和数据安全要求
 
 #### 🎓 推动技术普及
+
 - **教育资源**: 为高校和研究机构提供AI金融教学工具
 - **人才培养**: 帮助培养更多AI金融复合型人才
 - **创新应用**: 推动AI技术在中国金融科技领域的创新应用
 
 我们深信，通过这些努力，能够让更多中国用户体验到TradingAgents的强大功能，并为全球开源社区贡献中国智慧。
+
+## 🎯 项目状态概览 (v0.1.4)
+
+### ✅ 已完全实现的功能
+
+
+| 功能模块            | 状态        | 说明                                     |
+| ------------------- | ----------- | ---------------------------------------- |
+| 🌐**Web管理界面**   | ✅ 完整支持 | Streamlit现代化界面，配置管理，Token统计 |
+| 🇨🇳**A股数据支持** | ✅ 完整支持 | 通达信API，实时行情，历史数据，技术指标  |
+| 🧠**国产LLM集成**   | ✅ 完整支持 | 阿里百炼全系列模型，Google AI Gemini     |
+| 🗄️**数据库支持**  | ✅ 完整支持 | MongoDB持久化，Redis缓存，智能降级       |
+| ⚙️**配置管理**    | ✅ 完整支持 | 统一.env配置，启用开关，Web界面管理      |
+| 🏗️**架构优化**    | ✅ 完整支持 | 统一管理器，错误修复，性能优化           |
+| 📚**中文文档**      | ✅ 完整支持 | 详细架构文档，使用指南，故障排除         |
+
+### 🚀 核心优势
+
+- **🎛️ 开箱即用**: 完整的Web界面，无需命令行操作
+- **🇨🇳 中国优化**: A股数据 + 国产LLM + 中文界面
+- **🔧 智能配置**: 自动检测，智能降级，零配置启动
+- **📊 实时监控**: Token使用统计，缓存状态，系统监控
+- **🛡️ 稳定可靠**: 多层数据源，错误恢复，生产就绪
+
+### 🔧 技术栈 (v0.1.4)
+
+
+| 技术领域        | 使用技术                               | 版本要求   |
+| --------------- | -------------------------------------- | ---------- |
+| **🐍 核心语言** | Python                                 | 3.10+      |
+| **🧠 AI框架**   | LangChain, LangGraph                   | 最新版     |
+| **🌐 Web界面**  | Streamlit                              | 1.28+      |
+| **🗄️ 数据库** | MongoDB, Redis                         | 4.4+, 6.0+ |
+| **📊 数据处理** | Pandas, NumPy                          | 最新版     |
+| **🔌 API集成**  | 通达信API, FinnHub, Google News        | -          |
+| **🧠 LLM支持**  | 阿里百炼, Google AI, OpenAI, Anthropic | -          |
+| **📦 包管理**   | pip, requirements.txt                  | -          |
 
 ## ✨ 核心特性
 
@@ -83,21 +123,21 @@
 
 ### 🧠 多LLM模型支持
 
-- **OpenAI**: GPT-4o, GPT-4o-mini, GPT-3.5-turbo
-- **Anthropic**: Claude-3-Opus, Claude-3-Sonnet, Claude-3-Haiku
-- **Google AI**: Gemini-Pro, Gemini-2.0-Flash
-- **🇨🇳 阿里百炼**: 通义千问 Turbo/Plus/Max (已支持)
-- **国产模型** (计划中): 文心一言、DeepSeek等
+- **🇨🇳 阿里百炼**: qwen-turbo, qwen-plus-latest, qwen-max ✅ **已完整支持**
+- **Google AI**: gemini-2.0-flash, gemini-1.5-pro, gemini-1.5-flash ✅ **已完整支持**
+- **OpenAI**: GPT-4o, GPT-4o-mini, GPT-3.5-turbo ⚙️ **配置即用**
+- **Anthropic**: Claude-3-Opus, Claude-3-Sonnet, Claude-3-Haiku ⚙️ **配置即用**
+- **智能混合**: Google AI推理 + 阿里百炼嵌入 ✅ **已优化**
 
 ### 📊 全面数据集成
 
-- **美股数据**: FinnHub、Yahoo Finance 实时行情
-- **🇨🇳 A股数据**: 通达信API 实时行情和历史数据
-- **新闻数据**: Google News、财经新闻、实时新闻API
-- **社交数据**: Reddit、Twitter情绪分析
-- **中文数据**: AkShare、Tushare 金融数据支持
-- **🗄️ 数据库支持**: MongoDB 数据持久化 + Redis 高速缓存
-- **🔄 智能降级**: MongoDB → 通达信API → 本地缓存的多层数据源
+- **🇨🇳 A股数据**: 通达信API 实时行情和历史数据 ✅ **已完整支持**
+- **美股数据**: FinnHub、Yahoo Finance 实时行情 ✅ **已完整支持**
+- **新闻数据**: Google News、财经新闻、实时新闻API ✅ **已完整支持**
+- **社交数据**: Reddit情绪分析 ✅ **已完整支持**
+- **🗄️ 数据库支持**: MongoDB 数据持久化 + Redis 高速缓存 ✅ **已完整支持**
+- **🔄 智能降级**: MongoDB → 通达信API → 本地缓存的多层数据源 ✅ **已完整支持**
+- **⚙️ 统一配置**: .env文件统一管理，启用开关完全生效 ✅ **v0.1.4新增**
 
 ### 🚀 高性能特性
 
@@ -109,44 +149,46 @@
 - **⚡ 数据库加速**: Redis毫秒级缓存 + MongoDB持久化存储
 - **🔄 高可用架构**: 多层数据源降级，确保服务稳定性
 
-### 🌐 Web管理界面
+### 🌐 Web管理界面 ✅ **已完整支持**
 
 - **直观操作**: 基于Streamlit的现代化Web界面
 - **实时进度**: 分析过程可视化，实时显示进度
 - **智能配置**: 5级研究深度，从快速分析(2-4分钟)到全面分析(15-25分钟)
 - **结果展示**: 结构化显示投资建议、目标价位、风险评估等
 - **中文界面**: 完全中文化的用户界面和分析结果
+- **🎛️ 配置管理**: API密钥管理、模型选择、系统配置 ✅ **v0.1.2新增**
+- **💰 Token统计**: 实时Token使用统计和成本追踪 ✅ **v0.1.2新增**
+- **💾 缓存管理**: 数据缓存状态监控和管理 ✅ **v0.1.3新增**
 
 ## 🆚 与原版的主要区别
 
-### ✅ 已完成的增强
+### ✅ 已完成的增强 (v0.1.4)
 
 
-| 功能     | 原版     | 中文增强版             |
-| -------- | -------- | ---------------------- |
-| 文档语言 | 英文     | 完整中文文档体系       |
-| 架构说明 | 基础说明 | 详细的架构设计文档     |
-| 使用指南 | 简单示例 | 从入门到高级的完整指南 |
-| 配置说明 | 基础配置 | 详细的配置优化指南     |
-| 故障排除 | 无       | 完整的FAQ和故障排除    |
-| 代码注释 | 英文     | 中文注释和说明         |
-| 数据存储 | 仅API调用 | MongoDB + Redis 数据库支持 |
-| 缓存机制 | 基础缓存 | 多层智能缓存 + 降级机制 |
+| 功能分类          | 原版状态     | 中文增强版状态                  | 完成度  |
+| ----------------- | ------------ | ------------------------------- | ------- |
+| **📚 文档体系**   | 英文基础文档 | 完整中文文档体系 + 架构设计文档 | ✅ 100% |
+| **🌐 Web界面**    | 无           | Streamlit现代化界面 + 配置管理  | ✅ 100% |
+| **🇨🇳 A股支持**  | 无           | 通达信API + 实时行情 + 历史数据 | ✅ 100% |
+| **🧠 国产LLM**    | 无           | 阿里百炼完整集成 + Google AI    | ✅ 100% |
+| **🗄️ 数据库**   | 无           | MongoDB + Redis + 智能降级      | ✅ 100% |
+| **⚙️ 配置管理** | 基础配置     | 统一.env配置 + Web管理界面      | ✅ 100% |
+| **💰 成本控制**   | 无           | Token统计 + 成本追踪            | ✅ 100% |
+| **🏗️ 架构优化** | 基础架构     | 统一管理器 + 错误修复           | ✅ 100% |
 
-### 🔄 计划中的增强
+### 🚀 v0.1.4 重大更新
 
-- **中国市场支持**: A股、港股、新三板数据集成
-- **中文数据源**: Tushare、AkShare、Wind等数据源
-- **国产LLM**: 文心一言、通义千问、智谱清言等
-- **中文金融术语**: 优化中文金融分析术语和表达
-- **监管合规**: 符合中国金融监管要求的风险提示
-- **本地化部署**: 支持私有化部署和数据安全
+- **🏗️ 架构统一**: 移除重复组件，统一数据库管理器
+- **⚙️ 配置简化**: 只需编辑.env文件，启用开关完全生效
+- **🐛 错误修复**: 修复MongoDB布尔值判断等关键问题
+- **📚 文档完善**: 新增架构优化指南和详细操作文档
 
 ## 🚀 快速开始
 
 ### 🔐 重要安全提醒
 
 > ⚠️ **API密钥安全警告**:
+>
 > - 绝对不要将包含真实API密钥的`.env`文件提交到Git仓库
 > - 使用`.env.example`作为模板，创建您自己的`.env`文件
 > - 详细安全指南请参考: [API密钥安全指南](docs/security/api_keys_security.md)
@@ -184,6 +226,7 @@ pip install -r requirements_db.txt  # MongoDB + Redis 支持
 ### 配置API密钥
 
 #### 🇨🇳 推荐：使用阿里百炼（国产大模型）
+
 ```bash
 # 复制配置模板
 cp .env.example .env
@@ -192,23 +235,26 @@ cp .env.example .env
 DASHSCOPE_API_KEY=your_dashscope_api_key_here
 FINNHUB_API_KEY=your_finnhub_api_key_here
 
-# 可选：数据库配置（提升性能）
+# 可选：Google AI API（支持Gemini模型）
+GOOGLE_API_KEY=your_google_api_key_here
+
+# 可选：数据库配置（提升性能，默认禁用）
+MONGODB_ENABLED=false  # 设为true启用MongoDB
+REDIS_ENABLED=false    # 设为true启用Redis
 MONGODB_HOST=localhost
-MONGODB_PORT=27017
-MONGODB_DATABASE=trading_agents
+MONGODB_PORT=27018     # 使用非标准端口避免冲突
 REDIS_HOST=localhost
-REDIS_PORT=6379
-ENABLE_MONGODB=true
-ENABLE_REDIS=true
+REDIS_PORT=6380        # 使用非标准端口避免冲突
 ```
 
-#### 使用国外模型
-```bash
-# OpenAI
-set OPENAI_API_KEY=your_openai_api_key
-set FINNHUB_API_KEY=your_finnhub_api_key
+#### 🌍 可选：使用国外模型
 
-# 或其他模型...
+```bash
+# OpenAI (需要科学上网)
+OPENAI_API_KEY=your_openai_api_key
+
+# Anthropic (需要科学上网)
+ANTHROPIC_API_KEY=your_anthropic_api_key
 ```
 
 ### 🗄️ 数据库配置（MongoDB + Redis）
@@ -216,6 +262,7 @@ set FINNHUB_API_KEY=your_finnhub_api_key
 #### 新增功能：高性能数据存储支持
 
 本项目现已支持 **MongoDB** 和 **Redis** 数据库，提供：
+
 - **📊 股票数据缓存**: 减少API调用，提升响应速度
 - **🔄 智能降级机制**: MongoDB → 通达信API → 本地缓存的多层数据源
 - **⚡ 高性能缓存**: Redis缓存热点数据，毫秒级响应
@@ -224,6 +271,7 @@ set FINNHUB_API_KEY=your_finnhub_api_key
 #### 快速启动数据库服务
 
 **方式一：Docker Compose（推荐）**
+
 ```bash
 # 启动 MongoDB + Redis 服务
 docker-compose up -d
@@ -236,6 +284,7 @@ docker-compose down
 ```
 
 **方式二：手动安装**
+
 ```bash
 # 安装数据库依赖
 pip install -r requirements_db.txt
@@ -250,6 +299,7 @@ redis-server
 #### 数据库配置选项
 
 **环境变量配置**（推荐）：
+
 ```bash
 # MongoDB 配置
 MONGODB_HOST=localhost
@@ -266,6 +316,7 @@ REDIS_DB=0
 ```
 
 **配置文件方式**：
+
 ```python
 # config/database_config.py
 DATABASE_CONFIG = {
@@ -288,6 +339,7 @@ DATABASE_CONFIG = {
 #### 数据库功能特性
 
 **MongoDB 功能**：
+
 - ✅ 股票基础信息存储
 - ✅ 历史价格数据缓存
 - ✅ 分析结果持久化
@@ -295,6 +347,7 @@ DATABASE_CONFIG = {
 - ✅ 自动数据同步
 
 **Redis 功能**：
+
 - ⚡ 实时价格数据缓存
 - ⚡ API响应结果缓存
 - ⚡ 会话状态管理
@@ -315,6 +368,7 @@ DATABASE_CONFIG = {
 ```
 
 **配置降级策略**：
+
 ```python
 # 在 .env 文件中配置
 ENABLE_MONGODB=true
@@ -329,6 +383,7 @@ MONGODB_CACHE_TTL=3600
 #### 性能优化建议
 
 **生产环境配置**：
+
 ```bash
 # MongoDB 优化
 MONGODB_MAX_POOL_SIZE=50
@@ -362,24 +417,25 @@ python scripts/cleanup_cache.py
 **常见问题解决**：
 
 1. **MongoDB连接失败**
+
    ```bash
    # 检查服务状态
    docker-compose logs mongodb
-   
+
    # 重启服务
    docker-compose restart mongodb
    ```
-
 2. **Redis连接超时**
+
    ```bash
    # 检查Redis状态
    redis-cli ping
-   
+
    # 清理Redis缓存
    redis-cli flushdb
    ```
-
 3. **数据同步问题**
+
    ```bash
    # 手动触发数据同步
    python scripts/manual_sync.py
@@ -389,23 +445,25 @@ python scripts/cleanup_cache.py
 
 > 📚 **详细文档**: 更多数据库配置信息请参考 [数据库架构文档](docs/architecture/database-architecture.md)
 
-### 基本使用
+### 🚀 启动应用
 
-#### 🌐 Web界面（推荐新手）
+#### 🌐 Web界面（推荐）
+
 ```bash
-# 启动Web管理界面
+# 1. 激活虚拟环境
 # Windows
-.\env\Scripts\Activate.ps1
-python -m streamlit run web/app.py
-
+.\env\Scripts\activate
 # Linux/macOS
 source env/bin/activate
-python -m streamlit run web/app.py
+
+# 2. 启动Web管理界面
+streamlit run web/app.py
 ```
 
 然后在浏览器中访问 `http://localhost:8501`
 
 **Web界面特色功能**:
+
 - 🇺🇸 **美股分析**: 支持 AAPL, TSLA, NVDA 等美股代码
 - 🇨🇳 **A股分析**: 支持 000001, 600519, 300750 等A股代码
 - 📊 **实时数据**: 通达信API提供A股实时行情数据
@@ -417,6 +475,7 @@ python -m streamlit run web/app.py
 - 🇨🇳 **完全中文化**: 界面和分析结果全中文显示
 
 **研究深度级别说明**:
+
 - **1级 - 快速分析** (2-4分钟): 日常监控，基础决策
 - **2级 - 基础分析** (4-6分钟): 常规投资，平衡速度
 - **3级 - 标准分析** (6-10分钟): 重要决策，推荐默认
@@ -424,6 +483,7 @@ python -m streamlit run web/app.py
 - **5级 - 全面分析** (15-25分钟): 最重要决策，最全面分析
 
 #### 💻 代码调用（适合开发者）
+
 ```python
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
@@ -448,6 +508,7 @@ print(f"推理过程: {decision['reasoning']}")
 ```
 
 #### 快速启动脚本
+
 ```bash
 # 阿里百炼演示（推荐中文用户）
 python examples/dashscope/demo_dashscope_chinese.py
@@ -481,6 +542,7 @@ python -m cli.main data-config --reset
 ```
 
 **环境变量配置**:
+
 ```bash
 # Windows
 set TRADING_AGENTS_DATA_DIR=C:\MyTradingData
@@ -490,6 +552,7 @@ export TRADING_AGENTS_DATA_DIR=/home/user/trading_data
 ```
 
 **程序化配置**:
+
 ```python
 from tradingagents.config_manager import ConfigManager
 
@@ -515,13 +578,14 @@ python -m cli.main
 
 ## 🎯 **快速导航** - 找到您需要的内容
 
-| 🎯 **我想要...** | 📖 **推荐文档** | ⏱️ **阅读时间** |
-|------------------|----------------|-----------------|
-| **快速上手** | [🚀 快速开始](docs/overview/quick-start.md) | 10分钟 |
-| **了解架构** | [🏛️ 系统架构](docs/architecture/system-architecture.md) | 15分钟 |
-| **看代码示例** | [📚 基础示例](docs/examples/basic-examples.md) | 20分钟 |
-| **解决问题** | [🆘 常见问题](docs/faq/faq.md) | 5分钟 |
-| **深度学习** | [📁 完整文档目录](#-详细文档目录) | 2小时+ |
+
+| 🎯**我想要...** | 📖**推荐文档**                                            | ⏱️**阅读时间** |
+| --------------- | --------------------------------------------------------- | ---------------- |
+| **快速上手**    | [🚀 快速开始](docs/overview/quick-start.md)               | 10分钟           |
+| **了解架构**    | [🏛️ 系统架构](docs/architecture/system-architecture.md) | 15分钟           |
+| **看代码示例**  | [📚 基础示例](docs/examples/basic-examples.md)            | 20分钟           |
+| **解决问题**    | [🆘 常见问题](docs/faq/faq.md)                            | 5分钟            |
+| **深度学习**  | [📁 完整文档目录](#-详细文档目录)                         | 2小时+           |
 
 > 💡 **提示**: 我们的 `docs/` 目录包含了 **50,000+字** 的详细中文文档，这是与原版最大的区别！
 
@@ -531,30 +595,34 @@ python -m cli.main
 
 ### 🎯 为什么选择我们的文档？
 
-| 对比维度 | 原版 TradingAgents | 🚀 **中文增强版** |
-|---------|-------------------|------------------|
-| **文档语言** | 英文基础说明 | **完整中文体系** |
-| **文档深度** | 简单介绍 | **深度技术剖析** |
-| **架构说明** | 概念性描述 | **详细设计文档 + 架构图** |
-| **使用指南** | 基础示例 | **从入门到专家的完整路径** |
-| **故障排除** | 无 | **详细FAQ + 解决方案** |
-| **代码示例** | 少量示例 | **100+ 实用示例** |
+
+| 对比维度     | 原版 TradingAgents | 🚀**中文增强版**           |
+| ------------ | ------------------ | -------------------------- |
+| **文档语言** | 英文基础说明       | **完整中文体系**           |
+| **文档深度** | 简单介绍           | **深度技术剖析**           |
+| **架构说明** | 概念性描述         | **详细设计文档 + 架构图**  |
+| **使用指南** | 基础示例           | **从入门到专家的完整路径** |
+| **故障排除** | 无                 | **详细FAQ + 解决方案**     |
+| **代码示例** | 少量示例           | **100+ 实用示例**          |
 
 ### 📖 文档导航 - 按学习路径组织
 
 #### 🚀 **新手入门路径** (推荐从这里开始)
+
 1. [📋 项目概述](docs/overview/project-overview.md) - **了解项目背景和核心价值**
 2. [⚙️ 详细安装](docs/overview/installation.md) - **各平台详细安装指南**
 3. [🚀 快速开始](docs/overview/quick-start.md) - **10分钟上手指南**
 4. [📚 基础示例](docs/examples/basic-examples.md) - **8个实用的入门示例**
 
 #### 🏗️ **架构理解路径** (深入了解系统设计)
+
 1. [🏛️ 系统架构](docs/architecture/system-architecture.md) - **完整的系统架构设计**
 2. [🤖 智能体架构](docs/architecture/agent-architecture.md) - **多智能体协作机制**
 3. [📊 数据流架构](docs/architecture/data-flow-architecture.md) - **数据处理全流程**
 4. [🔄 图结构设计](docs/architecture/graph-structure.md) - **LangGraph工作流程**
 
 #### 🤖 **智能体深度解析** (了解每个智能体的设计)
+
 1. [📈 分析师团队](docs/agents/analysts.md) - **四类专业分析师详解**
 2. [🔬 研究员团队](docs/agents/researchers.md) - **看涨/看跌辩论机制**
 3. [💼 交易员智能体](docs/agents/trader.md) - **交易决策制定流程**
@@ -562,19 +630,23 @@ python -m cli.main
 5. [👔 管理层智能体](docs/agents/managers.md) - **协调和决策管理**
 
 #### 📊 **数据处理专题** (掌握数据处理技术)
+
 1. [🔌 数据源集成](docs/data/data-sources.md) - **多数据源API集成**
 2. [⚙️ 数据处理流程](docs/data/data-processing.md) - **数据清洗和转换**
 3. [💾 缓存策略](docs/data/caching.md) - **多层缓存优化性能**
 
 #### ⚙️ **配置和优化** (性能调优和定制)
+
 1. [📝 配置指南](docs/configuration/config-guide.md) - **详细配置选项说明**
 2. [🧠 LLM配置](docs/configuration/llm-config.md) - **大语言模型优化**
 
 #### 💡 **高级应用** (扩展开发和实战)
+
 1. [📚 基础示例](docs/examples/basic-examples.md) - **8个实用基础示例**
 2. [🚀 高级示例](docs/examples/advanced-examples.md) - **复杂场景和扩展开发**
 
 #### ❓ **问题解决** (遇到问题时查看)
+
 1. [🆘 常见问题](docs/faq/faq.md) - **详细FAQ和解决方案**
 
 ### 📊 文档统计数据
@@ -639,40 +711,57 @@ docs/
 ### 🎯 **重点推荐文档** (必读精选)
 
 #### 🔥 **最受欢迎的文档**
+
 1. **[📋 项目概述](docs/overview/project-overview.md)** - ⭐⭐⭐⭐⭐
+
    > 了解项目的核心价值和技术特色，5分钟读懂整个框架
-
+   >
 2. **[🏛️ 系统架构](docs/architecture/system-architecture.md)** - ⭐⭐⭐⭐⭐
-   > 深度解析多智能体协作机制，包含详细架构图
 
+   > 深度解析多智能体协作机制，包含详细架构图
+   >
 3. **[📚 基础示例](docs/examples/basic-examples.md)** - ⭐⭐⭐⭐⭐
+
    > 8个实用示例，从股票分析到投资组合优化
+   >
 
 #### 🚀 **技术深度文档**
+
 1. **[🤖 智能体架构](docs/architecture/agent-architecture.md)**
+
    > 多智能体设计模式和协作机制详解
-
+   >
 2. **[📊 数据流架构](docs/architecture/data-flow-architecture.md)**
-   > 数据获取、处理、缓存的完整流程
 
+   > 数据获取、处理、缓存的完整流程
+   >
 3. **[🔬 研究员团队](docs/agents/researchers.md)**
+
    > 看涨/看跌研究员辩论机制的创新设计
+   >
 
 #### 💼 **实用工具文档**
+
 1. **[🌐 Web界面指南](docs/usage/web-interface-guide.md)** - ⭐⭐⭐⭐⭐
+
    > 完整的Web界面使用教程，包含5级研究深度详细说明
-
+   >
 2. **[💰 投资分析指南](docs/usage/investment_analysis_guide.md)**
+
    > 从基础到高级的完整投资分析教程
-
+   >
 3. **[🧠 LLM配置](docs/configuration/llm-config.md)**
+
    > 多LLM模型配置和成本优化策略
-
+   >
 4. **[💾 缓存策略](docs/data/caching.md)**
-   > 多层缓存设计，显著降低API调用成本
 
+   > 多层缓存设计，显著降低API调用成本
+   >
 5. **[🆘 常见问题](docs/faq/faq.md)**
+
    > 详细的FAQ和故障排除指南
+   >
 
 ### 📖 **按模块浏览文档**
 
@@ -823,16 +912,27 @@ cost_optimized_config = {
 ### 🤝 合作共赢
 
 我们承诺：
+
 - **尊重原创**: 始终尊重源项目的知识产权和开源协议
 - **反馈贡献**: 将有价值的改进和创新反馈给源项目和开源社区
 - **持续改进**: 不断完善中文增强版本，提供更好的用户体验
 - **开放合作**: 欢迎与源项目团队和全球开发者进行技术交流与合作
+
+## 📈 版本历史
+
+- **v0.1.4** (2025-07-05): 🏗️ 架构优化与配置管理重构
+- **v0.1.3** (2025-06-28): 🇨🇳 A股市场完整支持
+- **v0.1.2** (2025-06-15): 🌐 Web界面和配置管理
+- **v0.1.1** (2025-06-01): 🧠 国产LLM集成
+
+📋 **详细更新日志**: [CHANGELOG.md](CHANGELOG.md)
 
 ## 📞 联系方式
 
 - **GitHub Issues**: [提交问题和建议](https://github.com/hsliuping/TradingAgents-CN/issues)
 - **邮箱**: hsliup@163.com
 - **原项目**: [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents)
+- **文档**: [完整文档目录](docs/)
 
 ## ⚠️ 风险提示
 
