@@ -75,10 +75,14 @@ class ChatDeepSeek(ChatOpenAI):
         """
         生成聊天响应，并记录token使用量
         """
-        
+
         # 记录开始时间
         start_time = time.time()
-        
+
+        # 提取并移除自定义参数，避免传递给父类
+        session_id = kwargs.pop('session_id', None)
+        analysis_type = kwargs.pop('analysis_type', None)
+
         try:
             # 调用父类方法生成响应
             result = super()._generate(messages, stop, run_manager, **kwargs)
@@ -105,9 +109,11 @@ class ChatDeepSeek(ChatOpenAI):
             # 记录token使用量
             if TOKEN_TRACKING_ENABLED and (input_tokens > 0 or output_tokens > 0):
                 try:
-                    # 生成会话ID
-                    session_id = kwargs.get('session_id', f"deepseek_{hash(str(messages))%10000}")
-                    analysis_type = kwargs.get('analysis_type', 'stock_analysis')
+                    # 使用提取的参数或生成默认值
+                    if session_id is None:
+                        session_id = f"deepseek_{hash(str(messages))%10000}"
+                    if analysis_type is None:
+                        analysis_type = 'stock_analysis'
                     
                     # 记录使用量
                     usage_record = token_tracker.track_usage(
@@ -120,7 +126,10 @@ class ChatDeepSeek(ChatOpenAI):
                     )
                     
                     if usage_record:
-                        print(f"💰 [DeepSeek] 本次调用成本: ¥{usage_record.cost:.4f}")
+                        print(f"💰 [DeepSeek] 本次调用成本: ¥{usage_record.cost:.6f}")
+                        print(f"🔍 [DeepSeek] 调试信息: 输入={input_tokens}, 输出={output_tokens}, 成本={usage_record.cost}")
+                    else:
+                        print(f"⚠️ [DeepSeek] 未创建使用记录")
                     
                 except Exception as track_error:
                     print(f"⚠️ [DeepSeek] Token统计失败: {track_error}")

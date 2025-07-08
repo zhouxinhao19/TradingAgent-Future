@@ -32,6 +32,26 @@ results/
 logs/
 temp/
 
+# 数据缓存目录 (不纳入版本控制)
+cache/
+data/cache/
+data/finnhub_data/
+dataflows/data_cache/
+tradingagents/dataflows/data_cache/
+finnhub_data/
+enhanced_analysis_reports/
+web/finnhub_data/
+web/results/
+web/eval_results/
+
+# 股票数据缓存文件 (不纳入版本控制)
+*_stock_data_*.txt
+*_stock_data_*.json
+*_stock_data_*.csv
+china_stocks/
+us_stocks/
+stock_cache/
+
 # IDE和编辑器文件
 .vscode/
 .idea/
