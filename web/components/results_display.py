@@ -113,15 +113,32 @@ def render_decision_summary(decision, stock_symbol=None):
 
     with col1:
         action = decision.get('action', 'N/A')
+
+        # 将英文投资建议转换为中文
+        action_translation = {
+            'BUY': '买入',
+            'SELL': '卖出',
+            'HOLD': '持有',
+            '买入': '买入',
+            '卖出': '卖出',
+            '持有': '持有'
+        }
+
+        # 获取中文投资建议
+        chinese_action = action_translation.get(action.upper(), action)
+
         action_color = {
             'BUY': 'normal',
             'SELL': 'inverse',
-            'HOLD': 'off'
+            'HOLD': 'off',
+            '买入': 'normal',
+            '卖出': 'inverse',
+            '持有': 'off'
         }.get(action.upper(), 'normal')
 
         st.metric(
             label="投资建议",
-            value=action.upper(),
+            value=chinese_action,
             help="基于AI分析的投资建议"
         )
 

@@ -298,8 +298,19 @@ def format_analysis_results(results):
     # 提取关键信息
     # decision 可能是字符串（如 "BUY", "SELL", "HOLD"）或字典
     if isinstance(decision, str):
+        # 将英文投资建议转换为中文
+        action_translation = {
+            'BUY': '买入',
+            'SELL': '卖出',
+            'HOLD': '持有',
+            'buy': '买入',
+            'sell': '卖出',
+            'hold': '持有'
+        }
+        action = action_translation.get(decision.strip(), decision.strip())
+
         formatted_decision = {
-            'action': decision.strip().upper(),
+            'action': action,
             'confidence': 0.7,  # 默认置信度
             'risk_score': 0.3,  # 默认风险分数
             'target_price': None,  # 字符串格式没有目标价格
@@ -324,8 +335,20 @@ def format_analysis_results(results):
         else:
             target_price = None
 
+        # 将英文投资建议转换为中文
+        action_translation = {
+            'BUY': '买入',
+            'SELL': '卖出',
+            'HOLD': '持有',
+            'buy': '买入',
+            'sell': '卖出',
+            'hold': '持有'
+        }
+        action = decision.get('action', '持有')
+        chinese_action = action_translation.get(action, action)
+
         formatted_decision = {
-            'action': decision.get('action', 'HOLD'),
+            'action': chinese_action,
             'confidence': decision.get('confidence', 0.5),
             'risk_score': decision.get('risk_score', 0.3),
             'target_price': target_price,
@@ -334,7 +357,7 @@ def format_analysis_results(results):
     else:
         # 处理其他类型
         formatted_decision = {
-            'action': 'HOLD',
+            'action': '持有',
             'confidence': 0.5,
             'risk_score': 0.3,
             'target_price': None,
@@ -438,7 +461,7 @@ def generate_demo_results(stock_symbol, analysis_date, analysts, research_depth,
     import random
 
     # 生成模拟决策
-    actions = ['BUY', 'HOLD', 'SELL']
+    actions = ['买入', '持有', '卖出']
     action = random.choice(actions)
 
     demo_decision = {
@@ -452,10 +475,10 @@ def generate_demo_results(stock_symbol, analysis_date, analysts, research_depth,
 **投资建议**: {action}
 
 **主要分析要点**:
-1. **技术面分析**: 当前价格趋势显示{'上涨' if action == 'BUY' else '下跌' if action == 'SELL' else '横盘'}信号
-2. **基本面评估**: 公司财务状况{'良好' if action == 'BUY' else '一般' if action == 'HOLD' else '需关注'}
-3. **市场情绪**: 投资者情绪{'乐观' if action == 'BUY' else '中性' if action == 'HOLD' else '谨慎'}
-4. **风险评估**: 当前风险水平为{'中等' if action == 'HOLD' else '较低' if action == 'BUY' else '较高'}
+1. **技术面分析**: 当前价格趋势显示{'上涨' if action == '买入' else '下跌' if action == '卖出' else '横盘'}信号
+2. **基本面评估**: 公司财务状况{'良好' if action == '买入' else '一般' if action == '持有' else '需关注'}
+3. **市场情绪**: 投资者情绪{'乐观' if action == '买入' else '中性' if action == '持有' else '谨慎'}
+4. **风险评估**: 当前风险水平为{'中等' if action == '持有' else '较低' if action == '买入' else '较高'}
 
 **注意**: 这是演示数据，实际分析需要配置正确的API密钥。
         """
