@@ -72,7 +72,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         analysis_date: 分析日期
         analysts: 分析师列表
         research_depth: 研究深度
-        llm_provider: LLM提供商 (dashscope/google)
+        llm_provider: LLM提供商 (dashscope/deepseek/google)
         llm_model: 大模型名称
         progress_callback: 进度回调函数，用于更新UI状态
     """
@@ -132,6 +132,9 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             if llm_provider == "dashscope":
                 config["quick_think_llm"] = "qwen-turbo"  # 使用最快模型
                 config["deep_think_llm"] = "qwen-plus"
+            elif llm_provider == "deepseek":
+                config["quick_think_llm"] = "deepseek-chat"  # DeepSeek只有一个模型
+                config["deep_think_llm"] = "deepseek-chat"
         elif research_depth == 2:  # 2级 - 基础分析
             config["max_debate_rounds"] = 1
             config["max_risk_discuss_rounds"] = 1
@@ -140,6 +143,9 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             if llm_provider == "dashscope":
                 config["quick_think_llm"] = "qwen-plus"
                 config["deep_think_llm"] = "qwen-plus"
+            elif llm_provider == "deepseek":
+                config["quick_think_llm"] = "deepseek-chat"
+                config["deep_think_llm"] = "deepseek-chat"
         elif research_depth == 3:  # 3级 - 标准分析 (默认)
             config["max_debate_rounds"] = 1
             config["max_risk_discuss_rounds"] = 2
@@ -148,6 +154,9 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             if llm_provider == "dashscope":
                 config["quick_think_llm"] = "qwen-plus"
                 config["deep_think_llm"] = "qwen-max"
+            elif llm_provider == "deepseek":
+                config["quick_think_llm"] = "deepseek-chat"
+                config["deep_think_llm"] = "deepseek-chat"
         elif research_depth == 4:  # 4级 - 深度分析
             config["max_debate_rounds"] = 2
             config["max_risk_discuss_rounds"] = 2
@@ -156,6 +165,9 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             if llm_provider == "dashscope":
                 config["quick_think_llm"] = "qwen-plus"
                 config["deep_think_llm"] = "qwen-max"
+            elif llm_provider == "deepseek":
+                config["quick_think_llm"] = "deepseek-chat"
+                config["deep_think_llm"] = "deepseek-chat"
         else:  # 5级 - 全面分析
             config["max_debate_rounds"] = 3
             config["max_risk_discuss_rounds"] = 3
@@ -164,10 +176,15 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             if llm_provider == "dashscope":
                 config["quick_think_llm"] = "qwen-max"
                 config["deep_think_llm"] = "qwen-max"
+            elif llm_provider == "deepseek":
+                config["quick_think_llm"] = "deepseek-chat"
+                config["deep_think_llm"] = "deepseek-chat"
 
         # 根据LLM提供商设置不同的配置
         if llm_provider == "dashscope":
             config["backend_url"] = "https://dashscope.aliyuncs.com/api/v1"
+        elif llm_provider == "deepseek":
+            config["backend_url"] = "https://api.deepseek.com"
         elif llm_provider == "google":
             # Google AI不需要backend_url，使用默认的OpenAI格式
             config["backend_url"] = "https://api.openai.com/v1"

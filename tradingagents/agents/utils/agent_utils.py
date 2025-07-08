@@ -596,28 +596,19 @@ class Toolkit:
             if not stock_data or "获取失败" in stock_data:
                 return f"无法获取股票 {ticker} 的基本面数据：{stock_data}"
 
-            # 解析股票数据，提取基本面信息
-            fundamentals_info = f"""
-# 中国A股基本面分析报告 - {ticker}
+            # 调用真正的基本面分析
+            from tradingagents.dataflows.optimized_china_data import OptimizedChinaDataProvider
 
-## 数据来源
-- 数据源：通达信API
-- 分析日期：{curr_date}
-- 数据时间范围：{start_date.strftime('%Y-%m-%d')} 至 {end_date.strftime('%Y-%m-%d')}
+            # 创建分析器实例
+            analyzer = OptimizedChinaDataProvider()
 
-## 股票基本信息
-{stock_data}
-
-## 基本面分析要点
-1. **数据可靠性**：使用通达信官方数据源，确保数据准确性
-2. **实时性**：数据更新至 {curr_date}
-3. **完整性**：包含价格、技术指标、成交量等关键信息
-
-注意：以上数据来自通达信API，为中国A股市场的官方数据源。
-"""
+            # 生成真正的基本面分析报告
+            fundamentals_report = analyzer._generate_fundamentals_report(ticker, stock_data)
 
             print(f"📊 [DEBUG] 中国基本面分析报告生成完成")
-            return fundamentals_info
+            print(f"📊 [DEBUG] get_china_fundamentals 结果长度: {len(fundamentals_report)}")
+
+            return fundamentals_report
 
         except Exception as e:
             import traceback
