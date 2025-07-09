@@ -24,6 +24,30 @@ except ImportError:
     TOKEN_TRACKING_ENABLED = False
     print("⚠️ Token跟踪功能未启用")
 
+def translate_analyst_labels(text):
+    """将分析师的英文标签转换为中文"""
+    if not text:
+        return text
+
+    # 分析师标签翻译映射
+    translations = {
+        'Bull Analyst:': '看涨分析师:',
+        'Bear Analyst:': '看跌分析师:',
+        'Risky Analyst:': '激进风险分析师:',
+        'Safe Analyst:': '保守风险分析师:',
+        'Neutral Analyst:': '中性风险分析师:',
+        'Research Manager:': '研究经理:',
+        'Portfolio Manager:': '投资组合经理:',
+        'Risk Judge:': '风险管理委员会:',
+        'Trader:': '交易员:'
+    }
+
+    # 替换所有英文标签
+    for english, chinese in translations.items():
+        text = text.replace(english, chinese)
+
+    return text
+
 def extract_risk_assessment(state):
     """从分析状态中提取风险评估数据"""
     try:
@@ -32,11 +56,11 @@ def extract_risk_assessment(state):
         if not risk_debate_state:
             return None
 
-        # 提取各个风险分析师的观点
-        risky_analysis = risk_debate_state.get('risky_history', '')
-        safe_analysis = risk_debate_state.get('safe_history', '')
-        neutral_analysis = risk_debate_state.get('neutral_history', '')
-        judge_decision = risk_debate_state.get('judge_decision', '')
+        # 提取各个风险分析师的观点并进行中文化
+        risky_analysis = translate_analyst_labels(risk_debate_state.get('risky_history', ''))
+        safe_analysis = translate_analyst_labels(risk_debate_state.get('safe_history', ''))
+        neutral_analysis = translate_analyst_labels(risk_debate_state.get('neutral_history', ''))
+        judge_decision = translate_analyst_labels(risk_debate_state.get('judge_decision', ''))
 
         # 格式化风险评估报告
         risk_assessment = f"""
@@ -379,7 +403,11 @@ def format_analysis_results(results):
     
     for key in analysis_keys:
         if key in state:
-            formatted_state[key] = state[key]
+            # 对文本内容进行中文化处理
+            content = state[key]
+            if isinstance(content, str):
+                content = translate_analyst_labels(content)
+            formatted_state[key] = content
     
     return {
         'stock_symbol': results['stock_symbol'],

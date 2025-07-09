@@ -66,15 +66,20 @@ class GraphSetup:
 
         if "market" in selected_analysts:
             # 根据LLM提供商选择合适的市场分析师
+            llm_provider = self.config.get("llm_provider", "").lower()
+
             if (self.react_llm is not None and
-                ("dashscope" in self.config.get("llm_provider", "").lower() or
-                 "阿里百炼" in self.config.get("llm_provider", ""))):
-                # 阿里百炼使用ReAct Agent
+                ("dashscope" in llm_provider or "阿里百炼" in self.config.get("llm_provider", "") or
+                 "deepseek" in llm_provider)):
+                # 百炼和DeepSeek都使用ReAct Agent（工具调用更稳定）
                 from tradingagents.agents.analysts.market_analyst import create_market_analyst_react
                 analyst_nodes["market"] = create_market_analyst_react(
                     self.react_llm, self.toolkit
                 )
-                print("📈 [DEBUG] 使用ReAct市场分析师（阿里百炼）")
+                if "dashscope" in llm_provider or "阿里百炼" in self.config.get("llm_provider", ""):
+                    print("📈 [DEBUG] 使用ReAct市场分析师（阿里百炼）")
+                elif "deepseek" in llm_provider:
+                    print("📈 [DEBUG] 使用ReAct市场分析师（DeepSeek）")
             else:
                 # 其他LLM使用标准分析师
                 analyst_nodes["market"] = create_market_analyst(
@@ -100,15 +105,20 @@ class GraphSetup:
 
         if "fundamentals" in selected_analysts:
             # 根据LLM提供商选择合适的基本面分析师
+            llm_provider = self.config.get("llm_provider", "").lower()
+
             if (self.react_llm is not None and
-                ("dashscope" in self.config.get("llm_provider", "").lower() or
-                 "阿里百炼" in self.config.get("llm_provider", ""))):
-                # 阿里百炼使用ReAct Agent
+                ("dashscope" in llm_provider or "阿里百炼" in self.config.get("llm_provider", "") or
+                 "deepseek" in llm_provider)):
+                # 百炼和DeepSeek都使用ReAct Agent（工具调用更稳定）
                 from tradingagents.agents.analysts.fundamentals_analyst import create_fundamentals_analyst_react
                 analyst_nodes["fundamentals"] = create_fundamentals_analyst_react(
                     self.react_llm, self.toolkit
                 )
-                print("📊 [DEBUG] 使用ReAct基本面分析师（阿里百炼）")
+                if "dashscope" in llm_provider or "阿里百炼" in self.config.get("llm_provider", ""):
+                    print("📊 [DEBUG] 使用ReAct基本面分析师（阿里百炼）")
+                elif "deepseek" in llm_provider:
+                    print("📊 [DEBUG] 使用ReAct基本面分析师（DeepSeek）")
             else:
                 # 其他LLM使用标准分析师
                 analyst_nodes["fundamentals"] = create_fundamentals_analyst(

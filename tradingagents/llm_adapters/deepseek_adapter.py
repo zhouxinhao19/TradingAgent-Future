@@ -114,7 +114,7 @@ class ChatDeepSeek(ChatOpenAI):
                         session_id = f"deepseek_{hash(str(messages))%10000}"
                     if analysis_type is None:
                         analysis_type = 'stock_analysis'
-                    
+
                     # 记录使用量
                     usage_record = token_tracker.track_usage(
                         provider="deepseek",
@@ -124,15 +124,20 @@ class ChatDeepSeek(ChatOpenAI):
                         session_id=session_id,
                         analysis_type=analysis_type
                     )
-                    
+
                     if usage_record:
-                        print(f"💰 [DeepSeek] 本次调用成本: ¥{usage_record.cost:.6f}")
-                        print(f"🔍 [DeepSeek] 调试信息: 输入={input_tokens}, 输出={output_tokens}, 成本={usage_record.cost}")
+                        if usage_record.cost == 0.0:
+                            print(f"⚠️ [DeepSeek] 成本计算为0，可能配置有问题")
+                        else:
+                            print(f"💰 [DeepSeek] 本次调用成本: ¥{usage_record.cost:.6f}")
+                        print(f"📊 [DeepSeek] 实际token使用: 输入={input_tokens}, 输出={output_tokens}")
                     else:
                         print(f"⚠️ [DeepSeek] 未创建使用记录")
-                    
+
                 except Exception as track_error:
                     print(f"⚠️ [DeepSeek] Token统计失败: {track_error}")
+                    import traceback
+                    traceback.print_exc()
             
             return result
             
