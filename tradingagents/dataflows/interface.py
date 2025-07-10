@@ -1023,11 +1023,49 @@ def get_china_stock_data_tushare(
         data = adapter.get_stock_data(ticker, start_date, end_date)
 
         if data is not None and not data.empty:
-            # 转换为字符串格式
-            result = f"股票代码: {ticker}\n"
-            result += f"数据期间: {start_date} 至 {end_date}\n"
-            result += f"数据条数: {len(data)}条\n\n"
-            result += "最新数据:\n"
+            # 获取股票基本信息
+            stock_info = adapter.get_stock_info(ticker)
+            stock_name = stock_info.get('name', f'股票{ticker}') if stock_info else f'股票{ticker}'
+
+            # 计算最新价格和涨跌幅
+            latest_data = data.iloc[-1]
+            current_price = f"¥{latest_data['close']:.2f}"
+
+            if len(data) > 1:
+                prev_close = data.iloc[-2]['close']
+                change = latest_data['close'] - prev_close
+                change_pct = (change / prev_close) * 100
+                change_pct_str = f"{change_pct:+.2f}%"
+            else:
+                change_pct_str = "N/A"
+
+            # 格式化成交量
+            volume = latest_data.get('vol', 0)
+            if volume > 10000:
+                volume_str = f"{volume/10000:.1f}万手"
+            else:
+                volume_str = f"{volume:.0f}手"
+
+            # 转换为与TDX兼容的字符串格式
+            result = f"# {ticker} 股票数据分析\n\n"
+            result += f"## 📊 实时行情\n"
+            result += f"- 股票名称: {stock_name}\n"
+            result += f"- 股票代码: {ticker}\n"
+            result += f"- 当前价格: {current_price}\n"
+            result += f"- 涨跌幅: {change_pct_str}\n"
+            result += f"- 成交量: {volume_str}\n"
+            result += f"- 数据来源: Tushare\n\n"
+            result += f"## 📈 历史数据概览\n"
+            result += f"- 数据期间: {start_date} 至 {end_date}\n"
+            result += f"- 数据条数: {len(data)}条\n"
+
+            if len(data) > 0:
+                period_high = data['high'].max()
+                period_low = data['low'].min()
+                result += f"- 期间最高: ¥{period_high:.2f}\n"
+                result += f"- 期间最低: ¥{period_low:.2f}\n\n"
+
+            result += "## 📋 最新交易数据\n"
             result += data.tail(5).to_string(index=False)
 
             return result
