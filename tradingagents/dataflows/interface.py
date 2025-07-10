@@ -994,3 +994,153 @@ def get_fundamentals_openai(ticker, curr_date):
         print(f"❌ [DEBUG] OpenAI基本面数据获取失败: {str(e)}")
         print(f"📊 [DEBUG] 回退到Finnhub API...")
         return get_fundamentals_finnhub(ticker, curr_date)
+
+
+# ==================== Tushare数据接口 ====================
+
+def get_china_stock_data_tushare(
+    ticker: Annotated[str, "中国股票代码，如：000001、600036等"],
+    start_date: Annotated[str, "开始日期，格式：YYYY-MM-DD"],
+    end_date: Annotated[str, "结束日期，格式：YYYY-MM-DD"]
+) -> str:
+    """
+    使用Tushare获取中国A股历史数据
+
+    Args:
+        ticker: 股票代码
+        start_date: 开始日期
+        end_date: 结束日期
+
+    Returns:
+        str: 格式化的股票数据报告
+    """
+    try:
+        from .tushare_adapter import get_tushare_adapter
+
+        print(f"📊 [Tushare] 获取{ticker}股票数据...")
+
+        adapter = get_tushare_adapter()
+        data = adapter.get_stock_data(ticker, start_date, end_date)
+
+        if data is not None and not data.empty:
+            # 转换为字符串格式
+            result = f"股票代码: {ticker}\n"
+            result += f"数据期间: {start_date} 至 {end_date}\n"
+            result += f"数据条数: {len(data)}条\n\n"
+            result += "最新数据:\n"
+            result += data.tail(5).to_string(index=False)
+
+            return result
+        else:
+            return f"❌ 未能获取{ticker}的股票数据"
+
+    except Exception as e:
+        print(f"❌ [Tushare] 获取股票数据失败: {e}")
+        return f"❌ 获取{ticker}股票数据失败: {e}"
+
+
+def search_china_stocks_tushare(
+    keyword: Annotated[str, "搜索关键词，可以是股票名称或代码"]
+) -> str:
+    """
+    使用Tushare搜索中国A股股票
+
+    Args:
+        keyword: 搜索关键词
+
+    Returns:
+        str: 搜索结果
+    """
+    try:
+        from .tushare_adapter import get_tushare_adapter
+
+        print(f"🔍 [Tushare] 搜索股票: {keyword}")
+
+        adapter = get_tushare_adapter()
+        results = adapter.search_stocks(keyword)
+
+        if results is not None and not results.empty:
+            result = f"搜索关键词: {keyword}\n"
+            result += f"找到 {len(results)} 只股票:\n\n"
+
+            # 显示前10个结果
+            for idx, row in results.head(10).iterrows():
+                result += f"代码: {row.get('symbol', '')}\n"
+                result += f"名称: {row.get('name', '未知')}\n"
+                result += f"行业: {row.get('industry', '未知')}\n"
+                result += f"地区: {row.get('area', '未知')}\n"
+                result += f"上市日期: {row.get('list_date', '未知')}\n"
+                result += "-" * 30 + "\n"
+
+            return result
+        else:
+            return f"❌ 未找到匹配'{keyword}'的股票"
+
+    except Exception as e:
+        print(f"❌ [Tushare] 搜索股票失败: {e}")
+        return f"❌ 搜索股票失败: {e}"
+
+
+def get_china_stock_fundamentals_tushare(
+    ticker: Annotated[str, "中国股票代码，如：000001、600036等"]
+) -> str:
+    """
+    使用Tushare获取中国A股基本面数据
+
+    Args:
+        ticker: 股票代码
+
+    Returns:
+        str: 基本面分析报告
+    """
+    try:
+        from .tushare_adapter import get_tushare_adapter
+
+        print(f"📊 [Tushare] 获取{ticker}基本面数据...")
+
+        adapter = get_tushare_adapter()
+        fundamentals = adapter.get_fundamentals(ticker)
+
+        return fundamentals
+
+    except Exception as e:
+        print(f"❌ [Tushare] 获取基本面数据失败: {e}")
+        return f"❌ 获取{ticker}基本面数据失败: {e}"
+
+
+def get_china_stock_info_tushare(
+    ticker: Annotated[str, "中国股票代码，如：000001、600036等"]
+) -> str:
+    """
+    使用Tushare获取中国A股基本信息
+
+    Args:
+        ticker: 股票代码
+
+    Returns:
+        str: 股票基本信息
+    """
+    try:
+        from .tushare_adapter import get_tushare_adapter
+
+        print(f"📊 [Tushare] 获取{ticker}基本信息...")
+
+        adapter = get_tushare_adapter()
+        info = adapter.get_stock_info(ticker)
+
+        if info and info.get('name'):
+            result = f"股票代码: {ticker}\n"
+            result += f"股票名称: {info.get('name', '未知')}\n"
+            result += f"所属地区: {info.get('area', '未知')}\n"
+            result += f"所属行业: {info.get('industry', '未知')}\n"
+            result += f"上市市场: {info.get('market', '未知')}\n"
+            result += f"上市日期: {info.get('list_date', '未知')}\n"
+            result += f"数据来源: {info.get('source', 'tushare')}\n"
+
+            return result
+        else:
+            return f"❌ 未能获取{ticker}的基本信息"
+
+    except Exception as e:
+        print(f"❌ [Tushare] 获取股票信息失败: {e}")
+        return f"❌ 获取{ticker}股票信息失败: {e}"

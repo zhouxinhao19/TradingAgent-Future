@@ -23,6 +23,11 @@ from .interface import (
     # Market data functions
     get_YFin_data_window,
     get_YFin_data,
+    # Tushare data functions
+    get_china_stock_data_tushare,
+    search_china_stocks_tushare,
+    get_china_stock_fundamentals_tushare,
+    get_china_stock_info_tushare,
 )
 
 __all__ = [
