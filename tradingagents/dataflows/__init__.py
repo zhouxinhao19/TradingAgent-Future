@@ -28,6 +28,11 @@ from .interface import (
     search_china_stocks_tushare,
     get_china_stock_fundamentals_tushare,
     get_china_stock_info_tushare,
+    # Unified China data functions (recommended)
+    get_china_stock_data_unified,
+    get_china_stock_info_unified,
+    switch_china_data_source,
+    get_current_china_data_source,
 )
 
 __all__ = [

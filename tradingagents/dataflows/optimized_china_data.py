@@ -73,26 +73,26 @@ class OptimizedChinaDataProvider:
             # API限制处理
             self._wait_for_rate_limit()
             
-            # 调用通达信API
-            from .tdx_utils import get_china_stock_data
-            
-            formatted_data = get_china_stock_data(
-                stock_code=symbol,
+            # 调用统一数据源接口（默认Tushare，支持备用数据源）
+            from .data_source_manager import get_china_stock_data_unified
+
+            formatted_data = get_china_stock_data_unified(
+                symbol=symbol,
                 start_date=start_date,
                 end_date=end_date
             )
-            
+
             # 检查是否获取成功
             if "❌" in formatted_data or "错误" in formatted_data:
-                print(f"❌ 通达信API调用失败: {symbol}")
+                print(f"❌ 数据源API调用失败: {symbol}")
                 # 尝试从旧缓存获取数据
                 old_cache = self._try_get_old_cache(symbol, start_date, end_date)
                 if old_cache:
                     print(f"📁 使用过期缓存数据: {symbol}")
                     return old_cache
-                
+
                 # 生成备用数据
-                return self._generate_fallback_data(symbol, start_date, end_date, "通达信API调用失败")
+                return self._generate_fallback_data(symbol, start_date, end_date, "数据源API调用失败")
             
             # 保存到缓存
             self.cache.save_stock_data(
@@ -100,7 +100,7 @@ class OptimizedChinaDataProvider:
                 data=formatted_data,
                 start_date=start_date,
                 end_date=end_date,
-                data_source="tdx"
+                data_source="unified"  # 使用统一数据源标识
             )
             
             print(f"✅ A股数据获取成功: {symbol}")

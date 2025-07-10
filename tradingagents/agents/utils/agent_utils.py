@@ -576,24 +576,24 @@ class Toolkit:
             return f"错误：{ticker} 不是有效的中国A股代码格式"
 
         try:
-            # 使用通达信获取股票数据
-            from tradingagents.dataflows.tdx_utils import get_china_stock_data
-            print(f"📊 [DEBUG] 正在获取 {ticker} 的通达信数据...")
+            # 使用统一数据源接口获取股票数据（默认Tushare，支持备用数据源）
+            from tradingagents.dataflows.interface import get_china_stock_data_unified
+            print(f"📊 [DEBUG] 正在获取 {ticker} 的股票数据...")
 
             # 获取最近30天的数据用于基本面分析
             from datetime import datetime, timedelta
             end_date = datetime.strptime(curr_date, '%Y-%m-%d')
             start_date = end_date - timedelta(days=30)
 
-            stock_data = get_china_stock_data(
+            stock_data = get_china_stock_data_unified(
                 ticker,
                 start_date.strftime('%Y-%m-%d'),
                 end_date.strftime('%Y-%m-%d')
             )
 
-            print(f"📊 [DEBUG] 通达信数据获取完成，长度: {len(stock_data) if stock_data else 0}")
+            print(f"📊 [DEBUG] 股票数据获取完成，长度: {len(stock_data) if stock_data else 0}")
 
-            if not stock_data or "获取失败" in stock_data:
+            if not stock_data or "获取失败" in stock_data or "❌" in stock_data:
                 return f"无法获取股票 {ticker} 的基本面数据：{stock_data}"
 
             # 调用真正的基本面分析

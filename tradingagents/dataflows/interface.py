@@ -1144,3 +1144,137 @@ def get_china_stock_info_tushare(
     except Exception as e:
         print(f"❌ [Tushare] 获取股票信息失败: {e}")
         return f"❌ 获取{ticker}股票信息失败: {e}"
+
+
+# ==================== 统一数据源接口 ====================
+
+def get_china_stock_data_unified(
+    ticker: Annotated[str, "中国股票代码，如：000001、600036等"],
+    start_date: Annotated[str, "开始日期，格式：YYYY-MM-DD"],
+    end_date: Annotated[str, "结束日期，格式：YYYY-MM-DD"]
+) -> str:
+    """
+    统一的中国A股数据获取接口
+    自动使用配置的数据源（默认Tushare），支持备用数据源
+
+    Args:
+        ticker: 股票代码
+        start_date: 开始日期
+        end_date: 结束日期
+
+    Returns:
+        str: 格式化的股票数据报告
+    """
+    try:
+        from .data_source_manager import get_china_stock_data_unified
+
+        print(f"📊 [统一接口] 获取{ticker}股票数据...")
+
+        result = get_china_stock_data_unified(ticker, start_date, end_date)
+        return result
+
+    except Exception as e:
+        print(f"❌ [统一接口] 获取股票数据失败: {e}")
+        return f"❌ 获取{ticker}股票数据失败: {e}"
+
+
+def get_china_stock_info_unified(
+    ticker: Annotated[str, "中国股票代码，如：000001、600036等"]
+) -> str:
+    """
+    统一的中国A股基本信息获取接口
+    自动使用配置的数据源（默认Tushare）
+
+    Args:
+        ticker: 股票代码
+
+    Returns:
+        str: 股票基本信息
+    """
+    try:
+        from .data_source_manager import get_china_stock_info_unified
+
+        print(f"📊 [统一接口] 获取{ticker}基本信息...")
+
+        info = get_china_stock_info_unified(ticker)
+
+        if info and info.get('name'):
+            result = f"股票代码: {ticker}\n"
+            result += f"股票名称: {info.get('name', '未知')}\n"
+            result += f"所属地区: {info.get('area', '未知')}\n"
+            result += f"所属行业: {info.get('industry', '未知')}\n"
+            result += f"上市市场: {info.get('market', '未知')}\n"
+            result += f"上市日期: {info.get('list_date', '未知')}\n"
+            result += f"数据来源: {info.get('source', 'unknown')}\n"
+
+            return result
+        else:
+            return f"❌ 未能获取{ticker}的基本信息"
+
+    except Exception as e:
+        print(f"❌ [统一接口] 获取股票信息失败: {e}")
+        return f"❌ 获取{ticker}股票信息失败: {e}"
+
+
+def switch_china_data_source(
+    source: Annotated[str, "数据源名称：tushare, akshare, baostock"]
+) -> str:
+    """
+    切换中国股票数据源
+
+    Args:
+        source: 数据源名称
+
+    Returns:
+        str: 切换结果
+    """
+    try:
+        from .data_source_manager import get_data_source_manager, ChinaDataSource
+
+        # 映射字符串到枚举
+        source_mapping = {
+            'tushare': ChinaDataSource.TUSHARE,
+            'akshare': ChinaDataSource.AKSHARE,
+            'baostock': ChinaDataSource.BAOSTOCK,
+            'tdx': ChinaDataSource.TDX
+        }
+
+        if source.lower() not in source_mapping:
+            return f"❌ 不支持的数据源: {source}。支持的数据源: {list(source_mapping.keys())}"
+
+        manager = get_data_source_manager()
+        target_source = source_mapping[source.lower()]
+
+        if manager.set_current_source(target_source):
+            return f"✅ 数据源已切换到: {source}"
+        else:
+            return f"❌ 数据源切换失败: {source} 不可用"
+
+    except Exception as e:
+        print(f"❌ 数据源切换失败: {e}")
+        return f"❌ 数据源切换失败: {e}"
+
+
+def get_current_china_data_source() -> str:
+    """
+    获取当前中国股票数据源
+
+    Returns:
+        str: 当前数据源信息
+    """
+    try:
+        from .data_source_manager import get_data_source_manager
+
+        manager = get_data_source_manager()
+        current = manager.get_current_source()
+        available = manager.available_sources
+
+        result = f"当前数据源: {current.value}\n"
+        result += f"可用数据源: {[s.value for s in available]}\n"
+        result += f"默认数据源: {manager.default_source.value}\n"
+
+        return result
+
+    except Exception as e:
+        print(f"❌ 获取数据源信息失败: {e}")
+        return f"❌ 获取数据源信息失败: {e}"
