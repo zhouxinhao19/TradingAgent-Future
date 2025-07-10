@@ -1039,12 +1039,24 @@ def get_china_stock_data_tushare(
             else:
                 change_pct_str = "N/A"
 
-            # 格式化成交量
-            volume = latest_data.get('vol', 0)
+            # 格式化成交量 - 修复成交量显示问题
+            volume = 0
+            if 'vol' in latest_data.index:
+                volume = latest_data['vol']
+            elif 'volume' in latest_data.index:
+                volume = latest_data['volume']
+
+            # 处理NaN值
+            import pandas as pd
+            if pd.isna(volume):
+                volume = 0
+
             if volume > 10000:
                 volume_str = f"{volume/10000:.1f}万手"
-            else:
+            elif volume > 0:
                 volume_str = f"{volume:.0f}手"
+            else:
+                volume_str = "暂无数据"
 
             # 转换为与TDX兼容的字符串格式
             result = f"# {ticker} 股票数据分析\n\n"
