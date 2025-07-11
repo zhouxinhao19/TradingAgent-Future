@@ -16,7 +16,7 @@ class ChinaDataSource(Enum):
     TUSHARE = "tushare"
     AKSHARE = "akshare"
     BAOSTOCK = "baostock"
-    TDX = "tdx"  # 通达信，将被逐步淘汰
+    TDX = "tdx"  # 中国股票数据，将被逐步淘汰
 
 
 class DataSourceManager:

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 优化的A股数据获取工具
-集成缓存策略和通达信API，提高数据获取效率
+集成缓存策略和Tushare数据接口，提高数据获取效率
 """
 
 import os
@@ -14,13 +14,13 @@ from .config import get_config
 
 
 class OptimizedChinaDataProvider:
-    """优化的A股数据提供器 - 集成缓存和通达信API"""
+    """优化的A股数据提供器 - 集成缓存和Tushare数据接口"""
     
     def __init__(self):
         self.cache = get_cache()
         self.config = get_config()
         self.last_api_call = 0
-        self.min_api_interval = 0.5  # 通达信API调用间隔较短
+        self.min_api_interval = 0.5  # Tushare数据接口调用间隔较短
         
         print("📊 优化A股数据提供器初始化完成")
     
@@ -66,8 +66,8 @@ class OptimizedChinaDataProvider:
                     print(f"⚡ 从缓存加载A股数据: {symbol}")
                     return cached_data
         
-        # 缓存未命中，从通达信API获取
-        print(f"🌐 从通达信API获取数据: {symbol}")
+        # 缓存未命中，从Tushare数据接口获取
+        print(f"🌐 从Tushare数据接口获取数据: {symbol}")
         
         try:
             # API限制处理
@@ -107,7 +107,7 @@ class OptimizedChinaDataProvider:
             return formatted_data
             
         except Exception as e:
-            error_msg = f"通达信API调用异常: {str(e)}"
+            error_msg = f"Tushare数据接口调用异常: {str(e)}"
             print(f"❌ {error_msg}")
             
             # 尝试从旧缓存获取数据
@@ -310,7 +310,7 @@ class OptimizedChinaDataProvider:
 **重要声明**: 本报告基于公开数据和模型估算生成，仅供参考，不构成投资建议。
 实际投资决策请结合最新财报数据和专业分析师意见。
 
-**数据来源**: 通达信API + 基本面分析模型
+**数据来源**: Tushare数据接口 + 基本面分析模型
 **生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 """
         
@@ -556,7 +556,7 @@ class OptimizedChinaDataProvider:
 - 模拟涨跌: {random.uniform(-5, 5):+.2f}%
 
 ## ⚠️ 重要提示
-由于通达信API限制或网络问题，无法获取实时数据。
+由于数据接口限制或网络问题，无法获取实时数据。
 建议稍后重试或检查网络连接。
 
 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}

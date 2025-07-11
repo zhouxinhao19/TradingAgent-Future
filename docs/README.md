@@ -25,7 +25,7 @@
 
 ### 📊 数据处理
 - [数据源集成](./data/data-sources.md) - 支持的数据源和API (含A股支持) ✨
-- [通达信API集成](./data/tongdaxin-api-integration.md) - A股数据源详解 ✨
+- [Tushare数据接口集成](./data/china_stock-api-integration.md) - A股数据源详解 ✨
 - [数据处理流程](./data/data-processing.md) - 数据获取和处理
 - [缓存机制](./data/caching.md) - 数据缓存策略
 

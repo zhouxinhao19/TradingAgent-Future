@@ -209,7 +209,7 @@ def create_market_analyst(llm, toolkit):
 
         if toolkit.config["online_tools"]:
             if is_china_stock(ticker):
-                # 中国A股使用通达信数据源
+                # 中国A股使用中国股票数据源
                 tools = [
                     toolkit.get_china_stock_data,
                 ]

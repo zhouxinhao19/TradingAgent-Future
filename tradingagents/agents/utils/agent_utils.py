@@ -592,7 +592,7 @@ class Toolkit:
         curr_date: Annotated[str, "当前日期，格式为yyyy-mm-dd"],
     ):
         """
-        获取中国A股股票的基本面信息，使用通达信数据源。
+        获取中国A股股票的基本面信息，使用中国股票数据源。
         Args:
             ticker (str): 中国A股股票代码，如600036, 000001
             curr_date (str): 当前日期，格式为yyyy-mm-dd

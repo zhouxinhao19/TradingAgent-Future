@@ -113,7 +113,7 @@ def render_sidebar():
         **版本**: 1.0.0
         **框架**: Streamlit + LangGraph
         **AI模型**: {llm_provider.upper()} - {llm_model}
-        **数据源**: FinnHub API + 通达信
+        **数据源**: Tushare + FinnHub API
         """)
         
         # 帮助链接

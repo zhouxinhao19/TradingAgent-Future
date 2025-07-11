@@ -540,7 +540,7 @@ def select_market():
             "examples": ["000001 (平安银行)", "600036 (招商银行)", "000858 (五粮液)"],
             "format": "6位数字代码 (如: 600036, 000001)",
             "pattern": r'^\d{6}$',
-            "data_source": "tongdaxin"
+            "data_source": "china_stock"
         },
         "3": {
             "name": "港股",
@@ -583,12 +583,12 @@ def get_ticker(market):
 
         # 验证股票代码格式
         import re
-        ticker_to_check = ticker.upper() if market['data_source'] != 'tongdaxin' else ticker
+        ticker_to_check = ticker.upper() if market['data_source'] != 'china_stock' else ticker
 
         if re.match(market['pattern'], ticker_to_check):
             # 对于A股，返回纯数字代码
-            if market['data_source'] == 'tongdaxin':
-                console.print(f"[green]✅ A股代码有效: {ticker} (将使用通达信数据源)[/green]")
+            if market['data_source'] == 'china_stock':
+                console.print(f"[green]✅ A股代码有效: {ticker} (将使用中国股票数据源)[/green]")
                 return ticker
             else:
                 console.print(f"[green]✅ 股票代码有效: {ticker.upper()}[/green]")

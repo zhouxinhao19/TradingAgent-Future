@@ -38,7 +38,7 @@ def test_get_china_stock_data_fix():
             if "统一数据源接口" in result or "tushare" in result.lower():
                 print("✅ 已成功使用统一数据源接口")
             elif "通达信" in result:
-                print("⚠️ 警告: 仍在使用通达信数据源")
+                print("⚠️ 警告: 仍在使用中国股票数据源")
             else:
                 print("✅ 数据源已更新")
                 
@@ -81,7 +81,7 @@ def test_get_china_market_overview_fix():
             if "Tushare" in result or "迁移" in result:
                 print("✅ 已更新为Tushare数据源说明")
             elif "通达信" in result and "TDX" not in result:
-                print("⚠️ 警告: 仍在使用通达信数据源")
+                print("⚠️ 警告: 仍在使用中国股票数据源")
             else:
                 print("✅ 市场概览功能已更新")
                 
