@@ -74,3 +74,20 @@ docs/contribution/
 # AI工具目录 (不纳入版本控制)
 .trae/
 .augment/
+
+# 自动清理脚本添加的规则
+# Python包元数据
+tradingagents.egg-info/
+# 临时输出文件
+# Python缓存
+*.py[cod]
+*$py.class
+# IDE文件
+.vscode/settings.json
+# 日志文件
+*.log
+
+# 过时的版本文档
+*_PREVIEW_README.md
+RELEASE_NOTES_PREVIEW.md
+DEEPSEEK_PREVIEW_README.md
