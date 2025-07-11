@@ -1,10 +1,23 @@
 from typing import Annotated, Dict
 from .reddit_utils import fetch_top_from_category
 from .chinese_finance_utils import get_chinese_social_sentiment
-from .yfin_utils import *
-from .stockstats_utils import *
 from .googlenews_utils import *
 from .finnhub_utils import get_data_in_range
+
+# 尝试导入yfinance相关模块，如果失败则跳过
+try:
+    from .yfin_utils import *
+    YFIN_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ yfinance工具不可用: {e}")
+    YFIN_AVAILABLE = False
+
+try:
+    from .stockstats_utils import *
+    STOCKSTATS_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ stockstats工具不可用: {e}")
+    STOCKSTATS_AVAILABLE = False
 from dateutil.relativedelta import relativedelta
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -12,8 +25,16 @@ import json
 import os
 import pandas as pd
 from tqdm import tqdm
-import yfinance as yf
 from openai import OpenAI
+
+# 尝试导入yfinance，如果失败则设置为None
+try:
+    import yfinance as yf
+    YF_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ yfinance库不可用: {e}")
+    yf = None
+    YF_AVAILABLE = False
 from .config import get_config, set_config, DATA_DIR
 
 
@@ -638,6 +659,9 @@ def get_YFin_data_online(
     start_date: Annotated[str, "Start date in yyyy-mm-dd format"],
     end_date: Annotated[str, "End date in yyyy-mm-dd format"],
 ):
+    # 检查yfinance是否可用
+    if not YF_AVAILABLE or yf is None:
+        return "yfinance库不可用，无法获取美股数据"
 
     datetime.strptime(start_date, "%Y-%m-%d")
     datetime.strptime(end_date, "%Y-%m-%d")
