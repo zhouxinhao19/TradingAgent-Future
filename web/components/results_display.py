@@ -8,6 +8,9 @@ import plotly.express as px
 import pandas as pd
 from datetime import datetime
 
+# 导入导出功能
+from utils.report_exporter import render_export_buttons
+
 def render_results(results):
     """渲染分析结果"""
 
@@ -41,6 +44,9 @@ def render_results(results):
 
     # 风险提示
     render_risk_warning(is_demo)
+    
+    # 导出报告功能
+    render_export_buttons(results)
 
 def render_analysis_info(results):
     """渲染分析配置信息"""
