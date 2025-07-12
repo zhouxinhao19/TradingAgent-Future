@@ -7,11 +7,16 @@
 import streamlit as st
 import json
 import os
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
 import tempfile
 import base64
+
+# 配置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # 导入Docker适配器
 try:
@@ -68,8 +73,16 @@ class ReportExporter:
         self.pandoc_available = PANDOC_AVAILABLE
         self.is_docker = DOCKER_ADAPTER_AVAILABLE and is_docker_environment()
 
+        # 记录初始化状态
+        logger.info(f"📋 ReportExporter初始化:")
+        logger.info(f"  - export_available: {self.export_available}")
+        logger.info(f"  - pandoc_available: {self.pandoc_available}")
+        logger.info(f"  - is_docker: {self.is_docker}")
+        logger.info(f"  - docker_adapter_available: {DOCKER_ADAPTER_AVAILABLE}")
+
         # Docker环境初始化
         if self.is_docker:
+            logger.info("🐳 检测到Docker环境，初始化PDF支持...")
             print("🐳 检测到Docker环境，初始化PDF支持...")
             setup_xvfb_display()
     
@@ -171,50 +184,73 @@ class ReportExporter:
     def generate_docx_report(self, results: Dict[str, Any]) -> bytes:
         """生成Word文档格式的报告"""
 
+        logger.info("📄 开始生成Word文档...")
+
         if not self.pandoc_available:
+            logger.error("❌ Pandoc不可用")
             raise Exception("Pandoc不可用，无法生成Word文档。请安装pandoc或使用Markdown格式导出。")
 
         # 首先生成markdown内容
+        logger.info("📝 生成Markdown内容...")
         md_content = self.generate_markdown_report(results)
+        logger.info(f"✅ Markdown内容生成完成，长度: {len(md_content)} 字符")
 
         try:
+            logger.info("📁 创建临时文件用于docx输出...")
             # 创建临时文件用于docx输出
             with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as tmp_file:
                 output_file = tmp_file.name
+            logger.info(f"📁 临时文件路径: {output_file}")
 
+            # 准备转换参数
+            extra_args = [
+                '--toc',
+                '--number-sections',
+                '--highlight-style=tango'
+            ]
+            logger.info(f"🔧 pypandoc参数: {extra_args}")
+
+            logger.info("🔄 使用pypandoc将markdown转换为docx...")
             # 使用pypandoc将markdown转换为docx
             pypandoc.convert_text(
                 md_content,
                 'docx',
                 format='markdown',
                 outputfile=output_file,
-                extra_args=[
-                    '--toc',
-                    '--number-sections',
-                    '--highlight-style=tango'
-                ]
+                extra_args=extra_args
             )
+            logger.info("✅ pypandoc转换完成")
 
+            logger.info("📖 读取生成的docx文件...")
             # 读取生成的docx文件
             with open(output_file, 'rb') as f:
                 docx_content = f.read()
+            logger.info(f"✅ 文件读取完成，大小: {len(docx_content)} 字节")
 
+            logger.info("🗑️ 清理临时文件...")
             # 清理临时文件
             os.unlink(output_file)
+            logger.info("✅ 临时文件清理完成")
 
             return docx_content
         except Exception as e:
+            logger.error(f"❌ Word文档生成失败: {e}", exc_info=True)
             raise Exception(f"生成Word文档失败: {e}")
     
     
     def generate_pdf_report(self, results: Dict[str, Any]) -> bytes:
         """生成PDF格式的报告"""
 
+        logger.info("📊 开始生成PDF文档...")
+
         if not self.pandoc_available:
+            logger.error("❌ Pandoc不可用")
             raise Exception("Pandoc不可用，无法生成PDF文档。请安装pandoc或使用Markdown格式导出。")
 
         # 首先生成markdown内容
+        logger.info("📝 生成Markdown内容...")
         md_content = self.generate_markdown_report(results)
+        logger.info(f"✅ Markdown内容生成完成，长度: {len(md_content)} 字符")
 
         # 简化的PDF引擎列表，优先使用最可能成功的
         pdf_engines = [
@@ -307,23 +343,54 @@ class ReportExporter:
     
     def export_report(self, results: Dict[str, Any], format_type: str) -> Optional[bytes]:
         """导出报告为指定格式"""
-        
+
+        logger.info(f"🚀 开始导出报告: format={format_type}")
+        logger.info(f"📊 导出状态检查:")
+        logger.info(f"  - export_available: {self.export_available}")
+        logger.info(f"  - pandoc_available: {self.pandoc_available}")
+        logger.info(f"  - is_docker: {self.is_docker}")
+
         if not self.export_available:
+            logger.error("❌ 导出功能不可用")
             st.error("❌ 导出功能不可用，请安装必要的依赖包")
             return None
-        
+
         try:
+            logger.info(f"🔄 开始生成{format_type}格式报告...")
+
             if format_type == 'markdown':
+                logger.info("📝 生成Markdown报告...")
                 content = self.generate_markdown_report(results)
+                logger.info(f"✅ Markdown报告生成成功，长度: {len(content)} 字符")
                 return content.encode('utf-8')
+
             elif format_type == 'docx':
-                return self.generate_docx_report(results)
+                logger.info("📄 生成Word文档...")
+                if not self.pandoc_available:
+                    logger.error("❌ pandoc不可用，无法生成Word文档")
+                    st.error("❌ pandoc不可用，无法生成Word文档")
+                    return None
+                content = self.generate_docx_report(results)
+                logger.info(f"✅ Word文档生成成功，大小: {len(content)} 字节")
+                return content
+
             elif format_type == 'pdf':
-                return self.generate_pdf_report(results)
+                logger.info("📊 生成PDF文档...")
+                if not self.pandoc_available:
+                    logger.error("❌ pandoc不可用，无法生成PDF文档")
+                    st.error("❌ pandoc不可用，无法生成PDF文档")
+                    return None
+                content = self.generate_pdf_report(results)
+                logger.info(f"✅ PDF文档生成成功，大小: {len(content)} 字节")
+                return content
+
             else:
+                logger.error(f"❌ 不支持的导出格式: {format_type}")
                 st.error(f"❌ 不支持的导出格式: {format_type}")
                 return None
+
         except Exception as e:
+            logger.error(f"❌ 导出失败: {str(e)}", exc_info=True)
             st.error(f"❌ 导出失败: {str(e)}")
             return None
 
@@ -404,23 +471,30 @@ def render_export_buttons(results: Dict[str, Any]):
     
     with col1:
         if st.button("📄 导出 Markdown", help="导出为Markdown格式"):
+            logger.info(f"🖱️ 用户点击Markdown导出按钮 - 股票: {stock_symbol}")
             content = report_exporter.export_report(results, 'markdown')
             if content:
                 filename = f"{stock_symbol}_analysis_{timestamp}.md"
+                logger.info(f"✅ Markdown导出成功，文件名: {filename}")
                 st.download_button(
                     label="📥 下载 Markdown",
                     data=content,
                     file_name=filename,
                     mime="text/markdown"
                 )
+            else:
+                logger.error("❌ Markdown导出失败，content为空")
     
     with col2:
         if st.button("📝 导出 Word", help="导出为Word文档格式"):
+            logger.info(f"🖱️ 用户点击Word导出按钮 - 股票: {stock_symbol}")
             with st.spinner("正在生成Word文档，请稍候..."):
                 try:
+                    logger.info("🔄 开始Word导出流程...")
                     content = report_exporter.export_report(results, 'docx')
                     if content:
                         filename = f"{stock_symbol}_analysis_{timestamp}.docx"
+                        logger.info(f"✅ Word导出成功，文件名: {filename}, 大小: {len(content)} 字节")
                         st.success("✅ Word文档生成成功！")
                         st.download_button(
                             label="📥 下载 Word",
@@ -429,8 +503,10 @@ def render_export_buttons(results: Dict[str, Any]):
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         )
                     else:
+                        logger.error("❌ Word导出失败，content为空")
                         st.error("❌ Word文档生成失败")
                 except Exception as e:
+                    logger.error(f"❌ Word导出异常: {str(e)}", exc_info=True)
                     st.error(f"❌ Word文档生成失败: {str(e)}")
 
                     # 显示详细错误信息
@@ -460,11 +536,14 @@ def render_export_buttons(results: Dict[str, Any]):
     
     with col3:
         if st.button("📊 导出 PDF", help="导出为PDF格式 (需要额外工具)"):
+            logger.info(f"🖱️ 用户点击PDF导出按钮 - 股票: {stock_symbol}")
             with st.spinner("正在生成PDF，请稍候..."):
                 try:
+                    logger.info("🔄 开始PDF导出流程...")
                     content = report_exporter.export_report(results, 'pdf')
                     if content:
                         filename = f"{stock_symbol}_analysis_{timestamp}.pdf"
+                        logger.info(f"✅ PDF导出成功，文件名: {filename}, 大小: {len(content)} 字节")
                         st.success("✅ PDF生成成功！")
                         st.download_button(
                             label="📥 下载 PDF",
@@ -472,7 +551,11 @@ def render_export_buttons(results: Dict[str, Any]):
                             file_name=filename,
                             mime="application/pdf"
                         )
+                    else:
+                        logger.error("❌ PDF导出失败，content为空")
+                        st.error("❌ PDF生成失败")
                 except Exception as e:
+                    logger.error(f"❌ PDF导出异常: {str(e)}", exc_info=True)
                     st.error(f"❌ PDF生成失败")
 
                     # 显示详细错误信息
