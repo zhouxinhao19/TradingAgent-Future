@@ -91,3 +91,8 @@ tradingagents.egg-info/
 *_PREVIEW_README.md
 RELEASE_NOTES_PREVIEW.md
 DEEPSEEK_PREVIEW_README.md
+
+# 优化计划文档 (内部参考，不纳入版本控制)
+docs/OPTIMIZATION_PLAN.md
+docs/OPTIMIZATION_PLAN_EN.md
+docs/README_OPTIMIZATION.md
