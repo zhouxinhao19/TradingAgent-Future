@@ -416,15 +416,47 @@ def render_export_buttons(results: Dict[str, Any]):
     
     with col2:
         if st.button("📝 导出 Word", help="导出为Word文档格式"):
-            content = report_exporter.export_report(results, 'docx')
-            if content:
-                filename = f"{stock_symbol}_analysis_{timestamp}.docx"
-                st.download_button(
-                    label="📥 下载 Word",
-                    data=content,
-                    file_name=filename,
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                )
+            with st.spinner("正在生成Word文档，请稍候..."):
+                try:
+                    content = report_exporter.export_report(results, 'docx')
+                    if content:
+                        filename = f"{stock_symbol}_analysis_{timestamp}.docx"
+                        st.success("✅ Word文档生成成功！")
+                        st.download_button(
+                            label="📥 下载 Word",
+                            data=content,
+                            file_name=filename,
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        )
+                    else:
+                        st.error("❌ Word文档生成失败")
+                except Exception as e:
+                    st.error(f"❌ Word文档生成失败: {str(e)}")
+
+                    # 显示详细错误信息
+                    with st.expander("🔍 查看详细错误信息"):
+                        st.text(str(e))
+
+                    # 提供解决方案
+                    with st.expander("💡 解决方案"):
+                        st.markdown("""
+                        **Word导出需要pandoc工具，请检查:**
+
+                        1. **Docker环境**: 重新构建镜像确保包含pandoc
+                        2. **本地环境**: 安装pandoc
+                        ```bash
+                        # Windows
+                        choco install pandoc
+
+                        # macOS
+                        brew install pandoc
+
+                        # Linux
+                        sudo apt-get install pandoc
+                        ```
+
+                        3. **替代方案**: 使用Markdown格式导出
+                        """)
     
     with col3:
         if st.button("📊 导出 PDF", help="导出为PDF格式 (需要额外工具)"):
