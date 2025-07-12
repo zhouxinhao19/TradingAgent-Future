@@ -8,6 +8,18 @@ assignees: ''
 
 ## 🐛 问题描述 / Bug Description
 
+**问题类型 / Issue Type:**
+- [ ] 🚀 启动/安装问题 / Startup/Installation Issue
+- [ ] 🌐 Web界面问题 / Web Interface Issue
+- [ ] 💻 CLI工具问题 / CLI Tool Issue
+- [ ] 🤖 LLM调用问题 / LLM API Issue
+- [ ] 📊 数据获取问题 / Data Acquisition Issue
+- [ ] 🐳 Docker部署问题 / Docker Deployment Issue
+- [ ] ⚙️ 配置问题 / Configuration Issue
+- [ ] 🔄 功能异常 / Feature Malfunction
+- [ ] 🐌 性能问题 / Performance Issue
+- [ ] 其他 / Other: ___________
+
 **简要描述问题 / Brief description:**
 清晰简洁地描述遇到的问题。
 
@@ -40,9 +52,14 @@ assignees: ''
 
 **依赖版本 / Dependencies:**
 ```bash
-# 请运行以下命令并粘贴结果
-pip list | grep -E "(streamlit|langchain|openai|requests)"
+# 请运行以下命令并粘贴结果 / Please run the following command and paste the result
+pip list | grep -E "(streamlit|langchain|openai|requests|tushare|akshare|baostock)"
 ```
+
+**浏览器信息 / Browser Info (仅Web界面问题):**
+- 浏览器 / Browser: [例如 Chrome 120, Firefox 121, Safari 17]
+- 浏览器版本 / Version:
+- 是否使用无痕模式 / Incognito mode: [ ] 是 / Yes [ ] 否 / No
 
 ## 📊 配置信息 / Configuration
 
@@ -59,10 +76,29 @@ pip list | grep -E "(streamlit|langchain|openai|requests)"
 
 ## 📝 错误日志 / Error Logs
 
+**控制台错误 / Console Errors:**
 ```
 请粘贴完整的错误信息和堆栈跟踪
 Please paste the complete error message and stack trace
 ```
+
+**日志文件 / Log Files:**
+```bash
+# 如果启用了日志记录，请提供相关日志
+# If logging is enabled, please provide relevant logs
+
+# Web应用日志 / Web app logs
+tail -n 50 logs/tradingagents.log
+
+# Docker日志 / Docker logs
+docker-compose logs web
+```
+
+**网络请求错误 / Network Request Errors:**
+如果是API调用问题，请提供：
+- API响应状态码 / API response status code
+- 错误响应内容 / Error response content
+- 请求参数（隐藏敏感信息）/ Request parameters (hide sensitive info)
 
 ## 📸 截图 / Screenshots
 
