@@ -4,6 +4,27 @@
 
 本指南将帮助您快速上手 TradingAgents 框架，从安装到运行第一个交易分析，只需几分钟时间。
 
+## 🎉 v0.1.6 新特性
+
+### 阿里百炼完全修复
+- ✅ **技术面分析**: 从30字符提升到完整报告
+- ✅ **工具调用**: OpenAI兼容接口，稳定可靠
+- ✅ **统一架构**: 与其他LLM功能完全一致
+
+### 数据源升级
+- ✅ **Tushare主数据源**: 专业的中国股票数据
+- ✅ **用户界面更新**: 所有提示信息准确反映数据来源
+
+### 推荐LLM配置
+```bash
+# 高性价比选择
+DASHSCOPE_API_KEY=your_dashscope_key  # 阿里百炼
+DEEPSEEK_API_KEY=your_deepseek_key    # DeepSeek V3
+
+# 数据源配置
+TUSHARE_TOKEN=your_tushare_token      # Tushare数据
+```
+
 ## 前置要求
 
 ### 系统要求

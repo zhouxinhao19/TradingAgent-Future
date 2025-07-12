@@ -1,6 +1,29 @@
 version: '3.8'
 
 services:
+  # Streamlit Web 应用服务
+  web:
+    image: tradingagents-cn:latest
+    container_name: TradingAgents-web
+    ports:
+      - "8501:8501"
+    volumes:
+      - .env:/app/.env
+    env_file:
+      - .env
+    environment:
+      PYTHONUNBUFFERED: 1
+      PYTHONDONTWRITEBYTECODE: 1
+      # Docker专用数据库配置（覆盖.env中的本地配置）
+      TRADINGAGENTS_MONGODB_URL: mongodb://admin:tradingagents123@mongodb:27017/tradingagents?authSource=admin
+      TRADINGAGENTS_REDIS_URL: redis://:tradingagents123@redis:6379
+      TRADINGAGENTS_CACHE_TYPE: redis
+    command: python -m streamlit run web/app.py --server.address=0.0.0.0 --server.port=8501
+    depends_on:
+      - redis
+    networks:
+      - tradingagents-network
+
   # MongoDB数据库服务
   mongodb:
     image: mongo:4.4

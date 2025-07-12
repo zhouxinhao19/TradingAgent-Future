@@ -2,7 +2,7 @@
 
 ## 🎯 概述
 
-TradingAgents-CN v0.1.3 新增了完整的A股市场支持，通过集成通达信API，为用户提供实时的A股数据分析能力。
+TradingAgents-CN v0.1.3 新增了完整的A股市场支持，通过集成Tushare数据接口，为用户提供实时的A股数据分析能力。
 
 ## 🚀 快速开始
 
@@ -13,7 +13,7 @@ TradingAgents-CN v0.1.3 新增了完整的A股市场支持，通过集成通达�
 .\env\Scripts\Activate.ps1  # Windows
 source env/bin/activate     # Linux/macOS
 
-# 确保已安装通达信API支持
+# 确保已安装Tushare数据接口支持
 pip install pytdx
 ```
 
@@ -74,9 +74,9 @@ python -m streamlit run web/app.py
 
 ## 🔧 数据源说明
 
-### 通达信API优势
+### Tushare数据接口优势
 
-| 特性 | 通达信API | Yahoo Finance | 优势说明 |
+| 特性 | Tushare数据接口 | Yahoo Finance | 优势说明 |
 |------|-----------|---------------|----------|
 | **A股覆盖** | ✅ 完整覆盖 | ❌ 不支持 | 独有的A股数据源 |
 | **实时性** | ✅ 秒级更新 | ⚠️ 15分钟延迟 | 适合日内交易分析 |
@@ -167,7 +167,7 @@ python -m streamlit run web/app.py
 
 ### 1. 网络要求
 
-- 需要稳定的网络连接访问通达信服务器
+- 需要稳定的网络连接访问数据服务器
 - 如果连接失败，系统会自动尝试备用服务器
 - 建议在网络环境良好时进行分析
 
@@ -179,7 +179,7 @@ python -m streamlit run web/app.py
 
 ### 3. 使用限制
 
-- 通达信API为免费服务，可能存在访问限制
+- Tushare数据接口为免费服务，可能存在访问限制
 - 建议合理使用，避免频繁请求
 - 如遇到连接问题，可稍后重试
 
@@ -189,7 +189,7 @@ python -m streamlit run web/app.py
 
 #### 1. 连接失败
 
-**问题**: 显示"通达信API连接失败"
+**问题**: 显示"Tushare数据接口连接失败"
 
 **解决方案**:
 ```bash
