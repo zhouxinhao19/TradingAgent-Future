@@ -22,7 +22,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-wqy-microhei \
     fonts-liberation \
     pandoc \
+    procps \
     && rm -rf /var/lib/apt/lists/*
+
+# 启动Xvfb虚拟显示器
+RUN echo '#!/bin/bash\nXvfb :99 -screen 0 1024x768x24 -ac +extension GLX &\nexport DISPLAY=:99\nexec "$@"' > /usr/local/bin/start-xvfb.sh \
+    && chmod +x /usr/local/bin/start-xvfb.sh
 
 COPY requirements.txt .
 COPY requirements_db.txt .

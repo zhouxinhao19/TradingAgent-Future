@@ -21,7 +21,7 @@ services:
       # Docker环境标识和PDF支持
       DOCKER_CONTAINER: "true"
       DISPLAY: ":99"
-    command: python -m streamlit run web/app.py --server.address=0.0.0.0 --server.port=8501
+    command: /usr/local/bin/start-xvfb.sh python -m streamlit run web/app.py --server.address=0.0.0.0 --server.port=8501
     depends_on:
       - redis
     networks:

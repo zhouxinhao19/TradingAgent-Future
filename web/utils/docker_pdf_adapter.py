@@ -31,34 +31,47 @@ def setup_xvfb_display():
     """设置虚拟显示器 (Docker环境需要)"""
     if not is_docker_environment():
         return True
-    
+
     try:
-        # 启动Xvfb虚拟显示器
-        subprocess.run([
-            'Xvfb', ':99', '-screen', '0', '1024x768x24'
-        ], check=False, timeout=5)
-        
+        # 检查Xvfb是否已经在运行
+        try:
+            result = subprocess.run(['pgrep', 'Xvfb'], capture_output=True, timeout=2)
+            if result.returncode == 0:
+                print("✅ Xvfb已在运行")
+                os.environ['DISPLAY'] = ':99'
+                return True
+        except:
+            pass
+
+        # 启动Xvfb虚拟显示器 (后台运行)
+        subprocess.Popen([
+            'Xvfb', ':99', '-screen', '0', '1024x768x24', '-ac', '+extension', 'GLX'
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        # 等待一下让Xvfb启动
+        import time
+        time.sleep(2)
+
         # 设置DISPLAY环境变量
         os.environ['DISPLAY'] = ':99'
         print("✅ Docker虚拟显示器设置成功")
         return True
     except Exception as e:
         print(f"⚠️ 虚拟显示器设置失败: {e}")
+        # 即使Xvfb失败，也尝试继续，某些情况下wkhtmltopdf可以无头运行
         return False
 
 def get_docker_wkhtmltopdf_args():
     """获取Docker环境下wkhtmltopdf的特殊参数"""
     if not is_docker_environment():
         return []
-    
+
+    # 这些是wkhtmltopdf的参数，不是pandoc的参数
     return [
-        '--disable-gpu',
-        '--no-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-extensions',
-        '--disable-plugins',
-        '--disable-images',
-        '--enable-local-file-access',
+        '--disable-smart-shrinking',
+        '--print-media-type',
+        '--no-background',
+        '--disable-javascript',
         '--quiet'
     ]
 
@@ -91,11 +104,13 @@ def test_docker_pdf_generation() -> bool:
         with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
             output_file = tmp.name
         
-        # Docker环境下的特殊参数
+        # Docker环境下使用简化的参数
         extra_args = [
-            '--pdf-engine=wkhtmltopdf'
-        ] + get_docker_wkhtmltopdf_args()
-        
+            '--pdf-engine=wkhtmltopdf',
+            '--pdf-engine-opt=--disable-smart-shrinking',
+            '--pdf-engine-opt=--quiet'
+        ]
+
         pypandoc.convert_text(
             test_html,
             'pdf',
@@ -125,15 +140,18 @@ def get_docker_pdf_extra_args():
         '-V', 'geometry:margin=2cm',
         '-V', 'documentclass=article'
     ]
-    
+
     if is_docker_environment():
-        # Docker环境下的特殊配置
+        # Docker环境下的特殊配置 - 使用正确的pandoc参数格式
         docker_args = []
-        for arg in get_docker_wkhtmltopdf_args():
-            docker_args.extend(['--pdf-engine-opt', arg])
-        
+        wkhtmltopdf_args = get_docker_wkhtmltopdf_args()
+
+        # 将wkhtmltopdf参数正确传递给pandoc
+        for arg in wkhtmltopdf_args:
+            docker_args.extend(['--pdf-engine-opt=' + arg])
+
         return base_args + docker_args
-    
+
     return base_args
 
 def check_docker_pdf_dependencies():
