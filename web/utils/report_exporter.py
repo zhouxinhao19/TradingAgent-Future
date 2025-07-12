@@ -14,8 +14,14 @@ from typing import Dict, Any, Optional
 import tempfile
 import base64
 
-# 配置日志
-logging.basicConfig(level=logging.INFO)
+# 配置日志 - 确保输出到stdout以便Docker logs可见
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),  # 输出到stdout
+    ]
+)
 logger = logging.getLogger(__name__)
 
 # 导入Docker适配器
@@ -86,10 +92,31 @@ class ReportExporter:
             print("🐳 检测到Docker环境，初始化PDF支持...")
             setup_xvfb_display()
     
+    def _clean_text_for_markdown(self, text: str) -> str:
+        """清理文本中可能导致YAML解析问题的字符"""
+        if not text:
+            return "N/A"
+
+        # 转换为字符串并清理特殊字符
+        text = str(text)
+
+        # 移除可能导致YAML解析问题的字符
+        text = text.replace('&', '&amp;')  # HTML转义
+        text = text.replace('<', '&lt;')
+        text = text.replace('>', '&gt;')
+        text = text.replace('"', '&quot;')
+        text = text.replace("'", '&#39;')
+
+        # 移除可能的YAML特殊字符
+        text = text.replace('---', '—')  # 替换三个连字符
+        text = text.replace('...', '…')  # 替换三个点
+
+        return text
+
     def generate_markdown_report(self, results: Dict[str, Any]) -> str:
         """生成Markdown格式的报告"""
-        
-        stock_symbol = results.get('stock_symbol', 'N/A')
+
+        stock_symbol = self._clean_text_for_markdown(results.get('stock_symbol', 'N/A'))
         decision = results.get('decision', {})
         state = results.get('state', {})
         is_demo = results.get('is_demo', False)
@@ -97,25 +124,28 @@ class ReportExporter:
         # 生成时间戳
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
+        # 清理关键数据
+        action = self._clean_text_for_markdown(decision.get('action', 'N/A')).upper()
+        target_price = self._clean_text_for_markdown(decision.get('target_price', 'N/A'))
+        reasoning = self._clean_text_for_markdown(decision.get('reasoning', '暂无分析推理'))
+
         # 构建Markdown内容
         md_content = f"""# {stock_symbol} 股票分析报告
 
-**生成时间**: {timestamp}  
+**生成时间**: {timestamp}
 **分析状态**: {'演示模式' if is_demo else '正式分析'}
-
----
 
 ## 🎯 投资决策摘要
 
 | 指标 | 数值 |
 |------|------|
-| **投资建议** | {decision.get('action', 'N/A').upper()} |
+| **投资建议** | {action} |
 | **置信度** | {decision.get('confidence', 0):.1%} |
 | **风险评分** | {decision.get('risk_score', 0):.1%} |
-| **目标价位** | {decision.get('target_price', 'N/A')} |
+| **目标价位** | {target_price} |
 
 ### 分析推理
-{decision.get('reasoning', '暂无分析推理')}
+{reasoning}
 
 ---
 
@@ -202,20 +232,17 @@ class ReportExporter:
                 output_file = tmp_file.name
             logger.info(f"📁 临时文件路径: {output_file}")
 
-            # 准备转换参数
-            extra_args = [
-                '--toc',
-                '--number-sections',
-                '--highlight-style=tango'
-            ]
-            logger.info(f"🔧 pypandoc参数: {extra_args}")
+            # 使用测试成功的基础参数
+            extra_args = []  # 基础转换，不添加复杂参数
+            logger.info(f"🔧 pypandoc参数: {extra_args} (基础转换)")
 
             logger.info("🔄 使用pypandoc将markdown转换为docx...")
-            # 使用pypandoc将markdown转换为docx
+
+            # 使用测试成功的参数进行转换
             pypandoc.convert_text(
                 md_content,
                 'docx',
-                format='markdown',
+                format='markdown',  # 基础markdown格式
                 outputfile=output_file,
                 extra_args=extra_args
             )
@@ -268,30 +295,23 @@ class ReportExporter:
                 with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_file:
                     output_file = tmp_file.name
 
-                # 获取基础参数 (Docker环境会有特殊配置)
-                if self.is_docker and DOCKER_ADAPTER_AVAILABLE:
-                    extra_args = get_docker_pdf_extra_args()
-                    print("🐳 使用Docker优化的PDF参数")
-                else:
-                    extra_args = [
-                        '--toc',
-                        '--number-sections',
-                        '-V', 'geometry:margin=2cm',
-                        '-V', 'documentclass=article'
-                    ]
+                # 使用测试成功的基础参数
+                extra_args = []
 
                 # 如果指定了引擎，添加引擎参数
                 if engine:
-                    extra_args.extend(['--pdf-engine=' + engine])
-                    print(f"尝试使用PDF引擎: {engine}")
+                    extra_args.append(f'--pdf-engine={engine}')
+                    print(f"🔧 使用PDF引擎: {engine}")
                 else:
-                    print("尝试使用默认PDF引擎")
+                    print("🔧 使用默认PDF引擎")
 
-                # 使用pypandoc将markdown转换为PDF
+                print(f"🔧 PDF参数: {extra_args}")
+
+                # 使用pypandoc将markdown转换为PDF - 使用普通markdown格式
                 pypandoc.convert_text(
                     md_content,
                     'pdf',
-                    format='markdown',
+                    format='markdown',  # 使用普通markdown格式，不解析YAML
                     outputfile=output_file,
                     extra_args=extra_args
                 )
@@ -448,20 +468,8 @@ def render_export_buttons(results: Dict[str, Any]):
             ```
             """)
 
-        # 只显示Markdown导出按钮
-        if st.button("📄 导出 Markdown", help="导出为Markdown格式"):
-            content = report_exporter.export_report(results, 'markdown')
-            if content:
-                stock_symbol = results.get('stock_symbol', 'analysis')
-                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                filename = f"{stock_symbol}_analysis_{timestamp}.md"
-                st.download_button(
-                    label="📥 下载 Markdown",
-                    data=content,
-                    file_name=filename,
-                    mime="text/markdown"
-                )
-        return
+        # 在Docker环境下，即使pandoc有问题也显示所有按钮，让用户尝试
+        pass
     
     # 生成文件名
     stock_symbol = results.get('stock_symbol', 'analysis')
@@ -471,10 +479,12 @@ def render_export_buttons(results: Dict[str, Any]):
     
     with col1:
         if st.button("📄 导出 Markdown", help="导出为Markdown格式"):
+            print(f"🖱️ [EXPORT] 用户点击Markdown导出按钮 - 股票: {stock_symbol}")
             logger.info(f"🖱️ 用户点击Markdown导出按钮 - 股票: {stock_symbol}")
             content = report_exporter.export_report(results, 'markdown')
             if content:
                 filename = f"{stock_symbol}_analysis_{timestamp}.md"
+                print(f"✅ [EXPORT] Markdown导出成功，文件名: {filename}")
                 logger.info(f"✅ Markdown导出成功，文件名: {filename}")
                 st.download_button(
                     label="📥 下载 Markdown",
@@ -483,17 +493,21 @@ def render_export_buttons(results: Dict[str, Any]):
                     mime="text/markdown"
                 )
             else:
+                print(f"❌ [EXPORT] Markdown导出失败，content为空")
                 logger.error("❌ Markdown导出失败，content为空")
     
     with col2:
         if st.button("📝 导出 Word", help="导出为Word文档格式"):
+            print(f"🖱️ [EXPORT] 用户点击Word导出按钮 - 股票: {stock_symbol}")
             logger.info(f"🖱️ 用户点击Word导出按钮 - 股票: {stock_symbol}")
             with st.spinner("正在生成Word文档，请稍候..."):
                 try:
+                    print(f"🔄 [EXPORT] 开始Word导出流程...")
                     logger.info("🔄 开始Word导出流程...")
                     content = report_exporter.export_report(results, 'docx')
                     if content:
                         filename = f"{stock_symbol}_analysis_{timestamp}.docx"
+                        print(f"✅ [EXPORT] Word导出成功，文件名: {filename}, 大小: {len(content)} 字节")
                         logger.info(f"✅ Word导出成功，文件名: {filename}, 大小: {len(content)} 字节")
                         st.success("✅ Word文档生成成功！")
                         st.download_button(
@@ -503,9 +517,11 @@ def render_export_buttons(results: Dict[str, Any]):
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         )
                     else:
+                        print(f"❌ [EXPORT] Word导出失败，content为空")
                         logger.error("❌ Word导出失败，content为空")
                         st.error("❌ Word文档生成失败")
                 except Exception as e:
+                    print(f"❌ [EXPORT] Word导出异常: {str(e)}")
                     logger.error(f"❌ Word导出异常: {str(e)}", exc_info=True)
                     st.error(f"❌ Word文档生成失败: {str(e)}")
 
