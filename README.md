@@ -278,6 +278,30 @@
 
 ### 安装步骤
 
+#### 🐳 方式一：Docker部署（推荐）
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/hsliuping/TradingAgents-CN.git
+cd TradingAgents-CN
+
+# 2. 配置环境变量
+cp .env.example .env
+# 编辑 .env 文件，配置API密钥和Docker设置
+
+# 3. 启动Docker服务
+docker-compose up -d
+
+# 4. 访问应用
+# Web界面: http://localhost:8501
+# Redis管理: http://localhost:8081
+# MongoDB管理: http://localhost:8082
+```
+
+> 📚 **详细Docker部署指南**: [Docker部署文档](docs/DOCKER_GUIDE.md)
+
+#### 💻 方式二：本地开发环境
+
 ```bash
 # 1. 克隆项目
 git clone https://github.com/hsliuping/TradingAgents-CN.git
@@ -419,6 +443,14 @@ docker-compose ps
 # 停止服务
 docker-compose down
 ```
+
+> 🐳 **Docker环境配置**: 使用Docker时，需要在`.env`文件中设置：
+> ```bash
+> MONGODB_HOST=mongodb
+> REDIS_HOST=redis
+> MONGODB_ENABLED=true
+> REDIS_ENABLED=true
+> ```
 
 **方式二：手动安装**
 
