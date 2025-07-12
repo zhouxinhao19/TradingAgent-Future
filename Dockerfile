@@ -16,6 +16,12 @@ RUN echo 'deb http://mirrors.aliyun.com/debian/ bookworm main' > /etc/apt/source
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    wkhtmltopdf \
+    xvfb \
+    fonts-wqy-zenhei \
+    fonts-wqy-microhei \
+    fonts-liberation \
+    pandoc \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

@@ -13,6 +13,19 @@ from typing import Dict, Any, Optional
 import tempfile
 import base64
 
+# 导入Docker适配器
+try:
+    from .docker_pdf_adapter import (
+        is_docker_environment,
+        get_docker_pdf_extra_args,
+        setup_xvfb_display,
+        get_docker_status_info
+    )
+    DOCKER_ADAPTER_AVAILABLE = True
+except ImportError:
+    DOCKER_ADAPTER_AVAILABLE = False
+    print("⚠️ Docker适配器不可用")
+
 # 导入导出相关库
 try:
     import markdown
@@ -53,6 +66,12 @@ class ReportExporter:
     def __init__(self):
         self.export_available = EXPORT_AVAILABLE
         self.pandoc_available = PANDOC_AVAILABLE
+        self.is_docker = DOCKER_ADAPTER_AVAILABLE and is_docker_environment()
+
+        # Docker环境初始化
+        if self.is_docker:
+            print("🐳 检测到Docker环境，初始化PDF支持...")
+            setup_xvfb_display()
     
     def generate_markdown_report(self, results: Dict[str, Any]) -> str:
         """生成Markdown格式的报告"""
@@ -213,13 +232,17 @@ class ReportExporter:
                 with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_file:
                     output_file = tmp_file.name
 
-                # 基础参数
-                extra_args = [
-                    '--toc',
-                    '--number-sections',
-                    '-V', 'geometry:margin=2cm',
-                    '-V', 'documentclass=article'
-                ]
+                # 获取基础参数 (Docker环境会有特殊配置)
+                if self.is_docker and DOCKER_ADAPTER_AVAILABLE:
+                    extra_args = get_docker_pdf_extra_args()
+                    print("🐳 使用Docker优化的PDF参数")
+                else:
+                    extra_args = [
+                        '--toc',
+                        '--number-sections',
+                        '-V', 'geometry:margin=2cm',
+                        '-V', 'documentclass=article'
+                    ]
 
                 # 如果指定了引擎，添加引擎参数
                 if engine:
@@ -328,6 +351,17 @@ def render_export_buttons(results: Dict[str, Any]):
     if not report_exporter.pandoc_available:
         st.warning("⚠️ Word和PDF导出需要pandoc工具")
         st.info("💡 您仍可以使用Markdown格式导出")
+
+    # 显示Docker环境状态
+    if report_exporter.is_docker:
+        if DOCKER_ADAPTER_AVAILABLE:
+            docker_status = get_docker_status_info()
+            if docker_status['dependencies_ok'] and docker_status['pdf_test_ok']:
+                st.success("🐳 Docker环境PDF支持已启用")
+            else:
+                st.warning(f"🐳 Docker环境PDF支持异常: {docker_status['dependency_message']}")
+        else:
+            st.warning("🐳 Docker环境检测到，但适配器不可用")
 
         with st.expander("📖 如何安装pandoc"):
             st.markdown("""

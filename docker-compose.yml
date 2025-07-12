@@ -18,6 +18,9 @@ services:
       TRADINGAGENTS_MONGODB_URL: mongodb://admin:tradingagents123@mongodb:27017/tradingagents?authSource=admin
       TRADINGAGENTS_REDIS_URL: redis://:tradingagents123@redis:6379
       TRADINGAGENTS_CACHE_TYPE: redis
+      # Docker环境标识和PDF支持
+      DOCKER_CONTAINER: "true"
+      DISPLAY: ":99"
     command: python -m streamlit run web/app.py --server.address=0.0.0.0 --server.port=8501
     depends_on:
       - redis
