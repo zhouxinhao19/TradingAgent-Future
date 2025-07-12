@@ -20,22 +20,39 @@ try:
     import tempfile
     import os
     from pathlib import Path
-    
+
     # 导入pypandoc（用于markdown转docx和pdf）
     import pypandoc
+
+    # 检查pandoc是否可用，如果不可用则尝试下载
+    try:
+        pypandoc.get_pandoc_version()
+        PANDOC_AVAILABLE = True
+    except OSError:
+        print("⚠️ 未找到pandoc，正在尝试自动下载...")
+        try:
+            pypandoc.download_pandoc()
+            PANDOC_AVAILABLE = True
+            print("✅ pandoc下载成功！")
+        except Exception as download_error:
+            print(f"❌ pandoc下载失败: {download_error}")
+            PANDOC_AVAILABLE = False
+
     EXPORT_AVAILABLE = True
-    
+
 except ImportError as e:
     EXPORT_AVAILABLE = False
+    PANDOC_AVAILABLE = False
     print(f"导出功能依赖包缺失: {e}")
     print("请安装: pip install pypandoc markdown")
 
 
 class ReportExporter:
     """报告导出器"""
-    
+
     def __init__(self):
         self.export_available = EXPORT_AVAILABLE
+        self.pandoc_available = PANDOC_AVAILABLE
     
     def generate_markdown_report(self, results: Dict[str, Any]) -> str:
         """生成Markdown格式的报告"""
@@ -134,15 +151,18 @@ class ReportExporter:
     
     def generate_docx_report(self, results: Dict[str, Any]) -> bytes:
         """生成Word文档格式的报告"""
-        
+
+        if not self.pandoc_available:
+            raise Exception("Pandoc不可用，无法生成Word文档。请安装pandoc或使用Markdown格式导出。")
+
         # 首先生成markdown内容
         md_content = self.generate_markdown_report(results)
-        
+
         try:
             # 创建临时文件用于docx输出
             with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as tmp_file:
                 output_file = tmp_file.name
-            
+
             # 使用pypandoc将markdown转换为docx
             pypandoc.convert_text(
                 md_content,
@@ -155,14 +175,14 @@ class ReportExporter:
                     '--highlight-style=tango'
                 ]
             )
-            
+
             # 读取生成的docx文件
             with open(output_file, 'rb') as f:
                 docx_content = f.read()
-            
+
             # 清理临时文件
             os.unlink(output_file)
-            
+
             return docx_content
         except Exception as e:
             raise Exception(f"生成Word文档失败: {e}")
@@ -170,7 +190,10 @@ class ReportExporter:
     
     def generate_pdf_report(self, results: Dict[str, Any]) -> bytes:
         """生成PDF格式的报告"""
-        
+
+        if not self.pandoc_available:
+            raise Exception("Pandoc不可用，无法生成PDF文档。请安装pandoc或使用Markdown格式导出。")
+
         # 首先生成markdown内容
         md_content = self.generate_markdown_report(results)
         
@@ -269,17 +292,55 @@ report_exporter = ReportExporter()
 
 def render_export_buttons(results: Dict[str, Any]):
     """渲染导出按钮"""
-    
+
     if not results:
         return
-    
+
     st.markdown("---")
     st.subheader("📤 导出报告")
-    
+
     # 检查导出功能是否可用
     if not report_exporter.export_available:
         st.warning("⚠️ 导出功能需要安装额外依赖包")
         st.code("pip install pypandoc markdown")
+        return
+
+    # 检查pandoc是否可用
+    if not report_exporter.pandoc_available:
+        st.warning("⚠️ Word和PDF导出需要pandoc工具")
+        st.info("💡 您仍可以使用Markdown格式导出")
+
+        with st.expander("📖 如何安装pandoc"):
+            st.markdown("""
+            **Windows用户:**
+            ```bash
+            # 使用Chocolatey (推荐)
+            choco install pandoc
+
+            # 或下载安装包
+            # https://github.com/jgm/pandoc/releases
+            ```
+
+            **或者使用Python自动下载:**
+            ```python
+            import pypandoc
+            pypandoc.download_pandoc()
+            ```
+            """)
+
+        # 只显示Markdown导出按钮
+        if st.button("📄 导出 Markdown", help="导出为Markdown格式"):
+            content = report_exporter.export_report(results, 'markdown')
+            if content:
+                stock_symbol = results.get('stock_symbol', 'analysis')
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                filename = f"{stock_symbol}_analysis_{timestamp}.md"
+                st.download_button(
+                    label="📥 下载 Markdown",
+                    data=content,
+                    file_name=filename,
+                    mime="text/markdown"
+                )
         return
     
     # 生成文件名
