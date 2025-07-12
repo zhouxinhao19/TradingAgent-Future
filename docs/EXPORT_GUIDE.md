@@ -159,13 +159,26 @@ pip install markdown pypandoc
 
 #### 2. PDF导出失败
 **原因**: 缺少PDF引擎
-**解决**: 安装wkhtmltopdf或LaTeX
+**解决**:
 ```bash
-# 推荐安装wkhtmltopdf
+# 方案1: 自动安装脚本 (推荐)
+python scripts/install_pdf_tools.py
+
+# 方案2: 手动安装wkhtmltopdf
 choco install wkhtmltopdf  # Windows
 brew install wkhtmltopdf   # macOS
 sudo apt-get install wkhtmltopdf  # Linux
+
+# 方案3: 安装LaTeX (备选)
+choco install miktex       # Windows
+brew install mactex        # macOS
+sudo apt-get install texlive-full  # Linux
 ```
+
+**注意**: PDF导出是最复杂的格式，如果遇到问题，建议：
+1. 优先使用Markdown格式导出
+2. 使用Word格式，然后用其他工具转换为PDF
+3. 安装wkhtmltopdf后重试
 
 #### 3. 中文PDF显示异常
 **原因**: 缺少中文字体支持

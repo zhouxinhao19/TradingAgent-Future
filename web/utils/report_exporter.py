@@ -196,48 +196,38 @@ class ReportExporter:
 
         # 首先生成markdown内容
         md_content = self.generate_markdown_report(results)
-        
-        # 尝试多种PDF引擎
+
+        # 简化的PDF引擎列表，优先使用最可能成功的
         pdf_engines = [
-            'wkhtmltopdf',  # 基于HTML的引擎，支持中文
-            'weasyprint',   # 现代HTML转PDF引擎
-            'prince',       # 商业级HTML转PDF引擎
-            'pdflatex',     # 基础LaTeX引擎
-            'xelatex'       # 最后备选
+            ('wkhtmltopdf', 'HTML转PDF引擎，推荐安装'),
+            ('weasyprint', '现代HTML转PDF引擎'),
+            (None, '使用pandoc默认引擎')  # 不指定引擎，让pandoc自己选择
         ]
-        
-        for engine in pdf_engines:
+
+        last_error = None
+
+        for engine_info in pdf_engines:
+            engine, description = engine_info
             try:
                 # 创建临时文件用于PDF输出
                 with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_file:
                     output_file = tmp_file.name
-                
-                # 根据引擎类型设置不同的参数
-                extra_args = ['--toc', '--number-sections', '--highlight-style=tango']
-                
-                if engine in ['wkhtmltopdf', 'weasyprint', 'prince']:
-                    # HTML引擎参数
-                    extra_args.extend([
-                        '--pdf-engine=' + engine,
-                        '-V', 'geometry:margin=2cm'
-                    ])
-                elif engine == 'pdflatex':
-                    # 基础LaTeX引擎参数
-                    extra_args.extend([
-                        '--pdf-engine=pdflatex',
-                        '-V', 'geometry:margin=2cm',
-                        '-V', 'documentclass=article',
-                        '-V', 'fontsize=11pt'
-                    ])
+
+                # 基础参数
+                extra_args = [
+                    '--toc',
+                    '--number-sections',
+                    '-V', 'geometry:margin=2cm',
+                    '-V', 'documentclass=article'
+                ]
+
+                # 如果指定了引擎，添加引擎参数
+                if engine:
+                    extra_args.extend(['--pdf-engine=' + engine])
+                    print(f"尝试使用PDF引擎: {engine}")
                 else:
-                    # xelatex参数（最后备选）
-                    extra_args.extend([
-                        '--pdf-engine=xelatex',
-                        '-V', 'mainfont=SimSun',
-                        '-V', 'CJKmainfont=SimSun',
-                        '-V', 'geometry:margin=2cm'
-                    ])
-                
+                    print("尝试使用默认PDF引擎")
+
                 # 使用pypandoc将markdown转换为PDF
                 pypandoc.convert_text(
                     md_content,
@@ -246,22 +236,51 @@ class ReportExporter:
                     outputfile=output_file,
                     extra_args=extra_args
                 )
-                
-                # 读取生成的PDF文件
-                with open(output_file, 'rb') as f:
-                    pdf_content = f.read()
-                
-                # 清理临时文件
-                os.unlink(output_file)
-                
-                return pdf_content
-                
+
+                # 检查文件是否生成且有内容
+                if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
+                    # 读取生成的PDF文件
+                    with open(output_file, 'rb') as f:
+                        pdf_content = f.read()
+
+                    # 清理临时文件
+                    os.unlink(output_file)
+
+                    print(f"✅ PDF生成成功，使用引擎: {engine or '默认'}")
+                    return pdf_content
+                else:
+                    raise Exception("PDF文件生成失败或为空")
+
             except Exception as e:
-                print(f"PDF引擎 {engine} 失败: {e}")
+                last_error = str(e)
+                print(f"PDF引擎 {engine or '默认'} 失败: {e}")
+
+                # 清理可能存在的临时文件
+                try:
+                    if 'output_file' in locals() and os.path.exists(output_file):
+                        os.unlink(output_file)
+                except:
+                    pass
+
                 continue
-        
-        # 如果所有引擎都失败，抛出异常
-        raise Exception("所有PDF引擎都无法生成PDF，请检查系统是否安装了相关依赖")
+
+        # 如果所有引擎都失败，提供详细的错误信息和解决方案
+        error_msg = f"""PDF生成失败，最后错误: {last_error}
+
+可能的解决方案:
+1. 安装wkhtmltopdf (推荐):
+   Windows: choco install wkhtmltopdf
+   macOS: brew install wkhtmltopdf
+   Linux: sudo apt-get install wkhtmltopdf
+
+2. 安装LaTeX:
+   Windows: choco install miktex
+   macOS: brew install mactex
+   Linux: sudo apt-get install texlive-full
+
+3. 使用Markdown或Word格式导出作为替代方案
+"""
+        raise Exception(error_msg)
     
     def export_report(self, results: Dict[str, Any], format_type: str) -> Optional[bytes]:
         """导出报告为指定格式"""
@@ -374,15 +393,61 @@ def render_export_buttons(results: Dict[str, Any]):
                 )
     
     with col3:
-        if st.button("📊 导出 PDF", help="导出为PDF格式"):
-            content = report_exporter.export_report(results, 'pdf')
-            if content:
-                filename = f"{stock_symbol}_analysis_{timestamp}.pdf"
-                st.download_button(
-                    label="📥 下载 PDF",
-                    data=content,
-                    file_name=filename,
-                    mime="application/pdf"
-                )
+        if st.button("📊 导出 PDF", help="导出为PDF格式 (需要额外工具)"):
+            with st.spinner("正在生成PDF，请稍候..."):
+                try:
+                    content = report_exporter.export_report(results, 'pdf')
+                    if content:
+                        filename = f"{stock_symbol}_analysis_{timestamp}.pdf"
+                        st.success("✅ PDF生成成功！")
+                        st.download_button(
+                            label="📥 下载 PDF",
+                            data=content,
+                            file_name=filename,
+                            mime="application/pdf"
+                        )
+                except Exception as e:
+                    st.error(f"❌ PDF生成失败")
+
+                    # 显示详细错误信息
+                    with st.expander("🔍 查看详细错误信息"):
+                        st.text(str(e))
+
+                    # 提供解决方案
+                    with st.expander("💡 解决方案"):
+                        st.markdown("""
+                        **PDF导出需要额外的工具，请选择以下方案之一:**
+
+                        **方案1: 安装wkhtmltopdf (推荐)**
+                        ```bash
+                        # Windows
+                        choco install wkhtmltopdf
+
+                        # macOS
+                        brew install wkhtmltopdf
+
+                        # Linux
+                        sudo apt-get install wkhtmltopdf
+                        ```
+
+                        **方案2: 安装LaTeX**
+                        ```bash
+                        # Windows
+                        choco install miktex
+
+                        # macOS
+                        brew install mactex
+
+                        # Linux
+                        sudo apt-get install texlive-full
+                        ```
+
+                        **方案3: 使用替代格式**
+                        - 📄 Markdown格式 - 轻量级，兼容性好
+                        - 📝 Word格式 - 适合进一步编辑
+                        """)
+
+                    # 建议使用其他格式
+                    st.info("💡 建议：您可以先使用Markdown或Word格式导出，然后使用其他工具转换为PDF")
     
  
