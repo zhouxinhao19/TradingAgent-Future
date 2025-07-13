@@ -94,6 +94,30 @@ cd TradingAgents-CN
 cat VERSION
 ```
 
+### 📦 关于Docker镜像
+
+**重要说明**: TradingAgents-CN目前不提供预构建的Docker镜像，需要在本地构建。
+
+#### 为什么需要本地构建？
+
+1. **定制化需求**: 不同用户可能需要不同的配置
+2. **安全考虑**: 避免在公共镜像中包含敏感信息
+3. **版本灵活性**: 支持用户自定义修改和扩展
+4. **依赖优化**: 根据实际需求安装依赖
+
+#### 构建过程说明
+
+```bash
+# Docker构建过程包括：
+1. 下载基础镜像 (python:3.10-slim) - 约200MB
+2. 安装系统依赖 (pandoc, wkhtmltopdf, 中文字体) - 约300MB
+3. 安装Python依赖 (requirements.txt) - 约500MB
+4. 复制应用代码 - 约50MB
+5. 配置运行环境
+
+# 总镜像大小约1GB，首次构建需要5-10分钟
+```
+
 ### 步骤2: 配置环境
 
 ```bash
@@ -138,11 +162,21 @@ MONGODB_URL=mongodb://mongodb:27017/tradingagents
 REDIS_URL=redis://redis:6379
 ```
 
-### 步骤3: 启动服务
+### 步骤3: 构建并启动服务
 
 ```bash
-# 启动所有服务
-docker-compose up -d
+# 首次启动：构建镜像并启动所有服务
+docker-compose up -d --build
+
+# 注意：首次运行会自动构建Docker镜像，包含以下步骤：
+# - 下载基础镜像 (python:3.10-slim)
+# - 安装系统依赖 (pandoc, wkhtmltopdf等)
+# - 安装Python依赖
+# - 复制应用代码
+# 整个过程需要5-10分钟，请耐心等待
+
+# 后续启动（镜像已构建）：
+# docker-compose up -d
 
 # 查看服务状态
 docker-compose ps

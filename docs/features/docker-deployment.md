@@ -73,11 +73,49 @@ cd TradingAgents-CN
 cp .env.example .env
 # 编辑 .env 文件，填入API密钥
 
-# 3. 启动所有服务
-docker-compose up -d
+# 3. 构建并启动所有服务
+docker-compose up -d --build
+# 注意：首次运行会构建Docker镜像，需要5-10分钟
 
 # 4. 验证部署
 docker-compose ps
+```
+
+### 📦 Docker镜像构建说明
+
+**重要提醒**: TradingAgents-CN不提供预构建的Docker镜像，需要本地构建。
+
+#### 构建过程详解
+
+```bash
+# 构建过程包括以下步骤：
+1. 📥 下载基础镜像 (python:3.10-slim)
+2. 🔧 安装系统依赖 (pandoc, wkhtmltopdf, 中文字体)
+3. 📦 安装Python依赖包 (requirements.txt)
+4. 📁 复制应用代码到容器
+5. ⚙️ 配置运行环境和权限
+
+# 预期构建时间和资源：
+- ⏱️ 构建时间: 5-10分钟 (取决于网络速度)
+- 💾 镜像大小: 约1GB
+- 🌐 网络需求: 下载约800MB依赖
+- 💻 内存需求: 构建时需要2GB+内存
+```
+
+#### 构建优化建议
+
+```bash
+# 1. 使用国内镜像源加速 (可选)
+# 编辑 Dockerfile，添加：
+# RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 2. 多阶段构建缓存
+# 如果需要频繁重建，可以分步构建：
+docker-compose build --no-cache  # 完全重建
+docker-compose build             # 使用缓存构建
+
+# 3. 查看构建进度
+docker-compose up --build        # 显示详细构建日志
 ```
 
 ### 访问服务

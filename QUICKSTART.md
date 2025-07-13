@@ -18,8 +18,10 @@ cd TradingAgents-CN
 cp .env.example .env
 # 编辑 .env 文件，填入API密钥
 
-# 3. 一键启动
-docker-compose up -d
+# 3. 构建并启动服务
+docker-compose up -d --build
+
+# 注意：首次运行会自动构建Docker镜像，需要几分钟时间
 
 # 4. 访问应用
 # Web界面: http://localhost:8501

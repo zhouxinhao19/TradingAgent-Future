@@ -249,8 +249,8 @@ git pull origin develop
 docker-compose down
 docker build -t tradingagents-cn:latest .
 
-# 3. 启动新版本
-docker-compose up -d
+# 3. 构建并启动新版本
+docker-compose up -d --build
 
 # 4. 验证导出功能
 # 访问Web界面，进行股票分析，测试导出功能
