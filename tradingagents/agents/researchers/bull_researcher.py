@@ -36,7 +36,13 @@ def create_bull_researcher(llm, memory):
         print(f"🐂 [DEBUG] - 股票代码: {company_name}, 类型: {'中国A股' if is_china else '海外股票'}, 货币: {currency}")
 
         curr_situation = f"{market_research_report}\n\n{sentiment_report}\n\n{news_report}\n\n{fundamentals_report}"
-        past_memories = memory.get_memories(curr_situation, n_matches=2)
+
+        # 安全检查：确保memory不为None
+        if memory is not None:
+            past_memories = memory.get_memories(curr_situation, n_matches=2)
+        else:
+            print("⚠️ [DEBUG] memory为None，跳过历史记忆检索")
+            past_memories = []
 
         past_memory_str = ""
         for i, rec in enumerate(past_memories, 1):

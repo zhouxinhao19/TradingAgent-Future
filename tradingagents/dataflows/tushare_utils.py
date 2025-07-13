@@ -96,9 +96,14 @@ class TushareProvider:
                 
                 if cache_key:
                     cached_data = self.cache_manager.load_stock_data(cache_key)
-                    if cached_data is not None and not cached_data.empty:
-                        print(f"📦 从缓存获取股票列表: {len(cached_data)}条")
-                        return cached_data
+                    if cached_data is not None:
+                        # 检查是否为DataFrame且不为空
+                        if hasattr(cached_data, 'empty') and not cached_data.empty:
+                            print(f"📦 从缓存获取股票列表: {len(cached_data)}条")
+                            return cached_data
+                        elif isinstance(cached_data, str) and cached_data.strip():
+                            print(f"📦 从缓存获取股票列表: 字符串格式")
+                            return cached_data
             
             print("🔄 从Tushare获取A股股票列表...")
             

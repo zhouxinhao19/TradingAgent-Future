@@ -113,6 +113,44 @@ class ReportExporter:
 
         return text
 
+    def _clean_markdown_for_pandoc(self, content: str) -> str:
+        """清理Markdown内容避免pandoc YAML解析问题"""
+        if not content:
+            return ""
+
+        # 确保内容不以可能被误认为YAML的字符开头
+        content = content.strip()
+
+        # 如果第一行看起来像YAML分隔符，添加空行
+        lines = content.split('\n')
+        if lines and (lines[0].startswith('---') or lines[0].startswith('...')):
+            content = '\n' + content
+
+        # 替换可能导致YAML解析问题的字符序列，但保护表格分隔符
+        # 先保护表格分隔符
+        content = content.replace('|------|------|', '|TABLESEP|TABLESEP|')
+        content = content.replace('|------|', '|TABLESEP|')
+
+        # 然后替换其他的三连字符
+        content = content.replace('---', '—')  # 替换三个连字符
+        content = content.replace('...', '…')  # 替换三个点
+
+        # 恢复表格分隔符
+        content = content.replace('|TABLESEP|TABLESEP|', '|------|------|')
+        content = content.replace('|TABLESEP|', '|------|')
+
+        # 清理特殊引号
+        content = content.replace('"', '"')  # 左双引号
+        content = content.replace('"', '"')  # 右双引号
+        content = content.replace(''', "'")  # 左单引号
+        content = content.replace(''', "'")  # 右单引号
+
+        # 确保内容以标准Markdown标题开始
+        if not content.startswith('#'):
+            content = '# 分析报告\n\n' + content
+
+        return content
+
     def generate_markdown_report(self, results: Dict[str, Any]) -> str:
         """生成Markdown格式的报告"""
 
@@ -232,15 +270,35 @@ class ReportExporter:
                 output_file = tmp_file.name
             logger.info(f"📁 临时文件路径: {output_file}")
 
-            # 使用测试成功的基础参数
-            extra_args = []  # 基础转换，不添加复杂参数
-            logger.info(f"🔧 pypandoc参数: {extra_args} (基础转换)")
+            # 使用强制禁用YAML的参数
+            extra_args = ['--from=markdown-yaml_metadata_block']  # 禁用YAML解析
+            logger.info(f"🔧 pypandoc参数: {extra_args} (禁用YAML解析)")
 
             logger.info("🔄 使用pypandoc将markdown转换为docx...")
 
+            # 调试：保存实际的Markdown内容
+            debug_file = '/app/debug_markdown.md'
+            try:
+                with open(debug_file, 'w', encoding='utf-8') as f:
+                    f.write(md_content)
+                logger.info(f"🔍 实际Markdown内容已保存到: {debug_file}")
+                logger.info(f"📊 内容长度: {len(md_content)} 字符")
+
+                # 显示前几行内容
+                lines = md_content.split('\n')[:5]
+                logger.info("🔍 前5行内容:")
+                for i, line in enumerate(lines, 1):
+                    logger.info(f"  {i}: {repr(line)}")
+            except Exception as e:
+                logger.error(f"保存调试文件失败: {e}")
+
+            # 清理内容避免YAML解析问题
+            cleaned_content = self._clean_markdown_for_pandoc(md_content)
+            logger.info(f"🧹 内容清理完成，清理后长度: {len(cleaned_content)} 字符")
+
             # 使用测试成功的参数进行转换
             pypandoc.convert_text(
-                md_content,
+                cleaned_content,
                 'docx',
                 format='markdown',  # 基础markdown格式
                 outputfile=output_file,
@@ -295,8 +353,8 @@ class ReportExporter:
                 with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_file:
                     output_file = tmp_file.name
 
-                # 使用测试成功的基础参数
-                extra_args = []
+                # 使用禁用YAML解析的参数（与Word导出一致）
+                extra_args = ['--from=markdown-yaml_metadata_block']
 
                 # 如果指定了引擎，添加引擎参数
                 if engine:
@@ -307,11 +365,14 @@ class ReportExporter:
 
                 print(f"🔧 PDF参数: {extra_args}")
 
-                # 使用pypandoc将markdown转换为PDF - 使用普通markdown格式
+                # 清理内容避免YAML解析问题（与Word导出一致）
+                cleaned_content = self._clean_markdown_for_pandoc(md_content)
+
+                # 使用pypandoc将markdown转换为PDF - 禁用YAML解析
                 pypandoc.convert_text(
-                    md_content,
+                    cleaned_content,
                     'pdf',
-                    format='markdown',  # 使用普通markdown格式，不解析YAML
+                    format='markdown',  # 基础markdown格式
                     outputfile=output_file,
                     extra_args=extra_args
                 )

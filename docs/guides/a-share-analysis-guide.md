@@ -1,33 +1,57 @@
-# A股分析使用指南
+# A股分析使用指南 (v0.1.7)
 
 ## 🎯 概述
 
-TradingAgents-CN v0.1.3 新增了完整的A股市场支持，通过集成Tushare数据接口，为用户提供实时的A股数据分析能力。
+TradingAgents-CN 提供了完整的A股市场支持，通过集成多种数据源（Tushare、AKShare、通达信API），为用户提供实时、准确的A股数据分析能力。v0.1.7版本进一步优化了分析性能和报告质量。
+
+## 🎉 v0.1.7 A股功能亮点
+
+- 🐳 **Docker一键部署**: 简化A股分析环境搭建
+- 📄 **专业报告导出**: 支持Word/PDF格式的A股分析报告
+- 🧠 **DeepSeek优化**: 专为中文A股场景优化的AI模型
+- 📊 **混合数据源**: Tushare历史数据 + AKShare实时数据
+- 💰 **成本优化**: 大幅降低A股分析成本
 
 ## 🚀 快速开始
 
-### 1. 确保环境配置
+### 方式一：Docker部署 (推荐)
 
 ```bash
-# 激活虚拟环境
+# 1. 克隆项目
+git clone https://github.com/hsliuping/TradingAgents-CN.git
+cd TradingAgents-CN
+
+# 2. 配置环境变量
+cp .env.example .env
+# 编辑.env文件，添加API密钥
+
+# 3. 一键启动
+docker-compose up -d
+
+# 4. 访问Web界面
+# http://localhost:8501
+```
+
+### 方式二：本地部署
+
+```bash
+# 1. 激活虚拟环境
 .\env\Scripts\Activate.ps1  # Windows
 source env/bin/activate     # Linux/macOS
 
-# 确保已安装Tushare数据接口支持
-pip install pytdx
+# 2. 安装依赖
+pip install -r requirements.txt
+
+# 3. 启动Web界面
+streamlit run web/app.py
 ```
 
-### 2. 启动Web界面
-
-```bash
-python -m streamlit run web/app.py
-```
-
-### 3. 选择A股市场
+### 开始A股分析
 
 在Web界面中：
-1. 在"选择市场"下拉框中选择 **"A股"**
+1. 选择LLM模型（推荐DeepSeek V3）
 2. 在股票代码输入框中输入A股代码
+3. 选择分析深度和分析师类型
 3. 选择分析师和研究深度
 4. 点击"开始分析"
 

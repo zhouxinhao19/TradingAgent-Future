@@ -155,6 +155,127 @@ docker-compose up -d
 4. **备份重要** - 定期提交代码到Git
 5. **环境隔离** - 开发和生产环境分离
 
+## 🎯 功能开发指南
+
+### 导出功能开发
+
+如果需要修改或扩展导出功能：
+
+1. **核心文件位置**
+   ```
+   web/utils/report_exporter.py     # 主要导出逻辑
+   web/utils/docker_pdf_adapter.py  # Docker环境适配
+   test_conversion.py               # 转换功能测试
+   ```
+
+2. **关键修复点**
+   ```python
+   # YAML解析问题修复
+   extra_args = ['--from=markdown-yaml_metadata_block']
+
+   # 内容清理函数
+   def _clean_markdown_for_pandoc(self, content: str) -> str:
+       # 保护表格分隔符，清理YAML冲突字符
+   ```
+
+3. **测试流程**
+   ```bash
+   # 测试基础转换功能
+   docker exec TradingAgents-web python test_conversion.py
+   ```
+
+### Memory功能开发
+
+如果遇到memory相关错误：
+
+1. **安全检查模式**
+   ```python
+   # 在所有使用memory的地方添加检查
+   if memory is not None:
+       past_memories = memory.get_memories(curr_situation, n_matches=2)
+   else:
+       past_memories = []
+   ```
+
+2. **相关文件**
+   ```
+   tradingagents/agents/researchers/bull_researcher.py
+   tradingagents/agents/researchers/bear_researcher.py
+   tradingagents/agents/managers/research_manager.py
+   tradingagents/agents/managers/risk_manager.py
+   ```
+
+### 缓存功能开发
+
+处理缓存相关错误：
+
+1. **类型安全检查**
+   ```python
+   # 检查数据类型，避免 'str' object has no attribute 'empty'
+   if cached_data is not None:
+       if hasattr(cached_data, 'empty') and not cached_data.empty:
+           # DataFrame处理
+       elif isinstance(cached_data, str) and cached_data.strip():
+           # 字符串处理
+   ```
+
+2. **相关文件**
+   ```
+   tradingagents/dataflows/tushare_adapter.py
+   tradingagents/dataflows/tushare_utils.py
+   tradingagents/dataflows/cache_manager.py
+   ```
+
+## 🚀 部署指南
+
+### 生产环境部署
+
+开发完成后的部署流程：
+
+1. **停止开发环境**
+   ```bash
+   docker-compose down
+   ```
+
+2. **移除volume映射**
+   ```yaml
+   # 编辑 docker-compose.yml，注释掉开发映射
+   # volumes:
+   #   - ./web:/app/web
+   #   - ./tradingagents:/app/tradingagents
+   ```
+
+3. **重新构建镜像**
+   ```bash
+   docker build -t tradingagents-cn:latest .
+   ```
+
+4. **启动生产环境**
+   ```bash
+   docker-compose up -d
+   ```
+
+### 版本发布
+
+1. **更新版本号**
+   ```bash
+   echo "cn-0.1.8" > VERSION
+   ```
+
+2. **提交代码**
+   ```bash
+   git add .
+   git commit -m "🎉 发布 v0.1.8 - 导出功能完善"
+   git tag cn-0.1.8
+   git push origin develop --tags
+   ```
+
+3. **更新文档**
+   - 更新 README.md 中的版本信息
+   - 更新 VERSION_*.md 发布说明
+   - 更新相关功能文档
+
 ---
 
-*更新时间: 2025-01-12*
+*最后更新: 2025-07-13*
+*版本: v0.1.7*

@@ -16,7 +16,13 @@ def create_risk_manager(llm, memory):
         trader_plan = state["investment_plan"]
 
         curr_situation = f"{market_research_report}\n\n{sentiment_report}\n\n{news_report}\n\n{fundamentals_report}"
-        past_memories = memory.get_memories(curr_situation, n_matches=2)
+
+        # 安全检查：确保memory不为None
+        if memory is not None:
+            past_memories = memory.get_memories(curr_situation, n_matches=2)
+        else:
+            print("⚠️ [DEBUG] memory为None，跳过历史记忆检索")
+            past_memories = []
 
         past_memory_str = ""
         for i, rec in enumerate(past_memories, 1):

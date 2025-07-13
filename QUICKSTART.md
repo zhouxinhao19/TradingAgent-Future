@@ -1,216 +1,238 @@
-# 🚀 DeepSeek V3 预览版快速开始
+# 🚀 TradingAgents-CN 快速开始指南
 
-## ⚡ 5分钟快速体验
+> 📋 **版本**: cn-0.1.7 | **更新时间**: 2025-07-13  
+> 🎯 **目标**: 5分钟内完成部署并开始股票分析
 
-### 第一步：获取代码
+## 🎯 选择部署方式
+
+### 🐳 方式一：Docker部署 (推荐)
+
+**适用场景**: 生产环境、快速体验、零配置启动
+
 ```bash
-# 克隆预览分支
-git clone -b feature/deepseek-v3-integration https://github.com/hsliuping/TradingAgents-CN.git
+# 1. 克隆项目
+git clone https://github.com/hsliuping/TradingAgents-CN.git
 cd TradingAgents-CN
 
-# 创建虚拟环境
+# 2. 配置环境变量
+cp .env.example .env
+# 编辑 .env 文件，填入API密钥
+
+# 3. 一键启动
+docker-compose up -d
+
+# 4. 访问应用
+# Web界面: http://localhost:8501
+# 数据库管理: http://localhost:8081
+# 缓存管理: http://localhost:8082
+```
+
+### 💻 方式二：本地部署
+
+**适用场景**: 开发环境、自定义配置、离线使用
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/hsliuping/TradingAgents-CN.git
+cd TradingAgents-CN
+
+# 2. 创建虚拟环境
 python -m venv env
 env\Scripts\activate  # Windows
 # source env/bin/activate  # Linux/macOS
 
-# 安装依赖
+# 3. 安装依赖
 pip install -r requirements.txt
-```
 
-### 第二步：配置API密钥
-```bash
-# 复制配置文件
+# 4. 配置环境变量
 cp .env.example .env
+# 编辑 .env 文件
 
-# 编辑.env文件，添加以下内容：
-# DEEPSEEK_API_KEY=sk-your_deepseek_api_key_here
-# DEEPSEEK_ENABLED=true
-```
-
-**获取DeepSeek API密钥**：
-1. 访问 [DeepSeek平台](https://platform.deepseek.com/)
-2. 注册账号 → 控制台 → API Keys → 创建新密钥
-
-### 第三步：快速测试
-```bash
-# 测试连接
-python -c "
-from tradingagents.llm_adapters.deepseek_adapter import ChatDeepSeek
-llm = ChatDeepSeek()
-print('✅ DeepSeek连接成功')
-"
-
-# 启动Web界面
+# 5. 启动应用
 streamlit run web/app.py
 ```
 
-### 第四步：开始分析
-1. 打开浏览器访问 http://localhost:8501
-2. 在左侧选择"DeepSeek V3"模型
-3. 输入股票代码（如：000001、AAPL）
-4. 点击"开始分析"
+## 🔧 环境配置
 
-## 🎯 核心功能演示
+### 📋 必需配置
 
-### 1. 基本面分析（推荐）
-```python
-from tradingagents.graph.trading_graph import TradingAgentsGraph
-from tradingagents.default_config import DEFAULT_CONFIG
+创建 `.env` 文件并配置以下内容：
 
-# 配置DeepSeek
-config = DEFAULT_CONFIG.copy()
-config.update({
-    "llm_provider": "deepseek",
-    "llm_model": "deepseek-chat"
-})
-
-# 创建分析器
-ta = TradingAgentsGraph(
-    selected_analysts=["fundamentals"],
-    config=config
-)
-
-# 分析平安银行
-result = ta.run_analysis("000001", "2025-01-08")
-print("投资建议:", result["decision"]["action"])
-print("基本面评分:", result["analysis"]["fundamental_score"])
-```
-
-### 2. 成本统计
-```python
-from tradingagents.config.config_manager import config_manager
-
-# 查看使用统计
-stats = config_manager.get_usage_statistics(1)
-print(f"今日成本: ¥{stats['total_cost']:.4f}")
-print(f"Token使用: {stats['total_tokens']}")
-```
-
-## 💡 推荐测试股票
-
-### A股（中国股票）
-- **000001** - 平安银行（银行业）
-- **600519** - 贵州茅台（白酒业）
-- **000858** - 五粮液（白酒业）
-- **002594** - 比亚迪（新能源汽车）
-- **300750** - 宁德时代（电池）
-
-### 美股
-- **AAPL** - 苹果公司
-- **MSFT** - 微软
-- **GOOGL** - 谷歌
-- **TSLA** - 特斯拉
-
-## 🔍 预期结果示例
-
-### 基本面分析输出
-```
-## 💰 财务数据分析
-
-### 估值指标
-- 市盈率(PE): 5.2倍（银行业平均水平）
-- 市净率(PB): 0.65倍（破净状态，银行业常见）
-- 股息收益率: 4.2%（银行业分红较高）
-
-### 盈利能力指标
-- 净资产收益率(ROE): 12.5%（银行业平均）
-- 总资产收益率(ROA): 0.95%
-
-## 💡 投资建议
-**投资建议**: 🟢 **买入**
-- 基本面良好，估值合理，具有较好的投资价值
-- 建议分批建仓，长期持有
-
-## 📊 评分系统
-- 基本面评分: 7.5/10
-- 估值吸引力: 8.0/10
-- 成长潜力: 6.5/10
-- 风险等级: 中等
-```
-
-### 成本统计示例
-```
-📊 Token使用统计:
-- 输入Token: 2,156
-- 输出Token: 1,847
-- 总成本: ¥0.0058
-- 会话ID: analysis_20250108_001
-```
-
-## ⚠️ 注意事项
-
-### 预览版限制
-- 🧪 **实验性功能**：可能存在未知问题
-- 📊 **数据估算**：基本面分析基于估算，非实时财务数据
-- ⏱️ **响应时间**：首次调用可能较慢（5-15秒）
-- 🔄 **Token精度**：统计可能有轻微误差
-
-### 使用建议
-- 💰 **成本控制**：监控每日使用量，避免超支
-- 🔍 **结果验证**：分析结果仅供参考，请结合其他信息
-- 🐛 **问题反馈**：发现问题请及时反馈
-- 📚 **文档参考**：详细使用方法请查看完整文档
-
-## 🆘 遇到问题？
-
-### 常见问题快速解决
-
-#### 1. API密钥错误
 ```bash
-# 检查配置
-python -c "
-import os
-from dotenv import load_dotenv
-load_dotenv()
-print('API Key:', '✅ 已配置' if os.getenv('DEEPSEEK_API_KEY') else '❌ 未配置')
-"
+# === LLM模型配置 (至少选择一个) ===
+
+# 🇨🇳 DeepSeek (推荐 - 成本低，中文优化)
+DEEPSEEK_API_KEY=sk-your_deepseek_api_key_here
+DEEPSEEK_ENABLED=true
+
+# 🇨🇳 阿里百炼通义千问 (推荐 - 中文理解好)
+QWEN_API_KEY=your_qwen_api_key
+QWEN_ENABLED=true
+
+# 🌍 Google AI Gemini (推荐 - 推理能力强)
+GOOGLE_API_KEY=your_google_api_key
+GOOGLE_ENABLED=true
+
+# 🤖 OpenAI (可选 - 通用能力强，成本较高)
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_ENABLED=true
 ```
 
-#### 2. 依赖安装问题
+### 🔑 API密钥获取
+
+| 提供商 | 获取地址 | 特色 | 成本 |
+|-------|---------|------|------|
+| **DeepSeek** | [platform.deepseek.com](https://platform.deepseek.com/) | 工具调用，中文优化 | 💰 极低 |
+| **阿里百炼** | [dashscope.aliyun.com](https://dashscope.aliyun.com/) | 中文理解，响应快 | 💰 低 |
+| **Google AI** | [aistudio.google.com](https://aistudio.google.com/) | 推理能力，多模态 | 💰💰 中等 |
+| **OpenAI** | [platform.openai.com](https://platform.openai.com/) | 通用能力强 | 💰💰💰 高 |
+
+### 📊 可选配置
+
 ```bash
-# 重新安装依赖
-pip install --upgrade -r requirements.txt
+# === 数据源配置 (可选) ===
+TUSHARE_TOKEN=your_tushare_token          # A股数据增强
+FINNHUB_API_KEY=your_finnhub_key          # 美股数据
+
+# === 数据库配置 (Docker自动配置) ===
+MONGODB_URL=mongodb://mongodb:27017/tradingagents  # Docker环境
+REDIS_URL=redis://redis:6379                       # Docker环境
+
+# === 导出功能配置 ===
+EXPORT_ENABLED=true                       # 启用报告导出
+EXPORT_DEFAULT_FORMAT=word,pdf            # 默认导出格式
 ```
 
-#### 3. 网络连接问题
+## 🚀 开始使用
+
+### 1️⃣ 访问Web界面
+
 ```bash
-# 测试网络连接
-python -c "
-import requests
-try:
-    response = requests.get('https://api.deepseek.com', timeout=10)
-    print('✅ 网络连接正常')
-except:
-    print('❌ 网络连接失败')
-"
+# 打开浏览器访问
+http://localhost:8501
 ```
 
-### 获取帮助
-- 📖 **详细文档**：查看 [完整使用指南](docs/usage/deepseek-usage-guide.md)
-- 🧪 **测试指南**：查看 [测试指南](TESTING_GUIDE.md)
-- 🐛 **问题反馈**：[GitHub Issues](https://github.com/hsliuping/TradingAgents-CN/issues)
-- 💬 **社区讨论**：[GitHub Discussions](https://github.com/hsliuping/TradingAgents-CN/discussions)
+### 2️⃣ 配置分析参数
+
+- **🧠 选择LLM模型**: DeepSeek V3 / 通义千问 / Gemini
+- **📊 选择分析深度**: 快速 / 标准 / 深度
+- **🎯 选择分析师**: 市场分析 / 基本面分析 / 新闻分析
+
+### 3️⃣ 输入股票代码
+
+```bash
+# 🇨🇳 A股示例
+000001  # 平安银行
+600519  # 贵州茅台
+000858  # 五粮液
+
+# 🇺🇸 美股示例  
+AAPL    # 苹果公司
+TSLA    # 特斯拉
+MSFT    # 微软
+```
+
+### 4️⃣ 开始分析
+
+1. 点击"🚀 开始分析"按钮
+2. 等待分析完成（2-10分钟，取决于分析深度）
+3. 查看详细的投资建议和分析报告
+4. 可选择导出为Word/PDF/Markdown格式
+
+## 📄 报告导出功能
+
+### 支持格式
+
+| 格式 | 用途 | 特点 |
+|------|------|------|
+| **📝 Markdown** | 在线查看，版本控制 | 轻量级，可编辑 |
+| **📄 Word** | 商业报告，编辑修改 | 专业格式，易编辑 |
+| **📊 PDF** | 正式发布，打印存档 | 固定格式，专业外观 |
+
+### 导出步骤
+
+1. 完成股票分析
+2. 在结果页面点击导出按钮
+3. 选择导出格式
+4. 自动下载到本地
+
+## 🎯 功能特色
+
+### 🤖 多智能体协作
+
+- **📈 市场分析师**: 技术指标，趋势分析
+- **💰 基本面分析师**: 财务数据，估值模型  
+- **📰 新闻分析师**: 新闻情绪，事件影响
+- **🐂🐻 研究员**: 看涨看跌辩论
+- **🎯 交易决策员**: 综合决策制定
+
+### 🧠 智能模型选择
+
+- **DeepSeek V3**: 成本低，工具调用强，中文优化
+- **通义千问**: 中文理解好，响应快，阿里云
+- **Gemini**: 推理能力强，多模态，Google
+- **GPT-4**: 通用能力最强，成本较高
+
+### 📊 全面数据支持
+
+- **🇨🇳 A股**: 实时行情，历史数据，财务指标
+- **🇺🇸 美股**: NYSE/NASDAQ，实时数据
+- **📰 新闻**: 实时财经新闻，情绪分析
+- **💬 社交**: Reddit情绪，市场热度
+
+## 🚨 常见问题
+
+### ❓ 分析失败怎么办？
+
+1. **检查API密钥**: 确认密钥正确且有余额
+2. **网络连接**: 确保网络稳定，可访问API
+3. **模型切换**: 尝试切换其他LLM模型
+4. **查看日志**: 检查控制台错误信息
+
+### ❓ 如何提高分析速度？
+
+1. **选择快速模型**: DeepSeek V3 响应最快
+2. **启用缓存**: 使用Redis缓存重复数据
+3. **快速模式**: 选择快速分析深度
+4. **网络优化**: 确保网络环境稳定
+
+### ❓ Docker部署问题？
+
+```bash
+# 检查服务状态
+docker-compose ps
+
+# 查看日志
+docker logs TradingAgents-web
+
+# 重启服务
+docker-compose restart
+```
 
 ## 📚 下一步
 
-### 深入学习
-1. **阅读完整文档**：[DeepSeek使用指南](docs/usage/deepseek-usage-guide.md)
-2. **查看配置选项**：[DeepSeek配置指南](docs/configuration/deepseek-config.md)
-3. **学习最佳实践**：[投资分析指南](docs/usage/investment_analysis_guide.md)
+### 🎯 深入使用
 
-### 参与贡献
-1. **测试反馈**：使用不同股票进行测试，反馈问题和建议
-2. **文档改进**：帮助完善文档和示例
-3. **代码贡献**：修复Bug或添加新功能
+1. **📖 阅读文档**: [完整文档](./docs/)
+2. **🔧 开发环境**: [开发指南](./docs/DEVELOPMENT_SETUP.md)
+3. **🚨 故障排除**: [问题解决](./docs/troubleshooting/)
+4. **🏗️ 架构了解**: [技术架构](./docs/architecture/)
+
+### 🤝 参与贡献
+
+- 🐛 [报告问题](https://github.com/hsliuping/TradingAgents-CN/issues)
+- 💡 [功能建议](https://github.com/hsliuping/TradingAgents-CN/discussions)  
+- 🔧 [提交代码](https://github.com/hsliuping/TradingAgents-CN/pulls)
+- 📚 [完善文档](https://github.com/hsliuping/TradingAgents-CN/tree/develop/docs)
 
 ---
 
-**🎉 欢迎体验DeepSeek V3预览版！您的反馈对我们非常宝贵。**
+## 🎉 恭喜完成快速开始！
+
+**💡 提示**: 建议先用熟悉的股票代码进行测试，体验完整的分析流程。
+
+**📞 技术支持**: [GitHub Issues](https://github.com/hsliuping/TradingAgents-CN/issues)
 
 ---
 
-**快速链接**：
-- 📖 [预览版说明](DEEPSEEK_PREVIEW_README.md)
-- 🧪 [测试指南](TESTING_GUIDE.md)
-- 📋 [发布说明](RELEASE_NOTES_PREVIEW.md)
-- 🔧 [配置指南](docs/configuration/deepseek-config.md)
+*最后更新: 2025-07-13 | 版本: cn-0.1.7*
