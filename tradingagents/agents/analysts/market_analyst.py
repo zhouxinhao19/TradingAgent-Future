@@ -201,20 +201,29 @@ def create_market_analyst(llm, toolkit):
         print(f"📈 [DEBUG] 现有市场报告: {state.get('market_report', 'None')[:100]}...")
 
         # 根据股票代码格式选择数据源
-        def is_china_stock(ticker_code):
-            """判断是否为中国A股代码"""
-            import re
-            # A股代码格式：6位数字
-            return re.match(r'^\d{6}$', str(ticker_code))
+        from tradingagents.utils.stock_utils import StockUtils
+
+        market_info = StockUtils.get_market_info(ticker)
+        is_china = market_info['is_china']
+        is_hk = market_info['is_hk']
+        is_us = market_info['is_us']
+
+        print(f"📈 [DEBUG] 股票类型检查: {ticker} -> {market_info['market_name']} ({market_info['currency_name']})")
 
         if toolkit.config["online_tools"]:
-            if is_china_stock(ticker):
+            if is_china:
                 # 中国A股使用中国股票数据源
                 tools = [
                     toolkit.get_china_stock_data,
                 ]
+            elif is_hk:
+                # 港股优先使用AKShare数据源
+                tools = [
+                    toolkit.get_hk_stock_data_unified,  # 优先AKShare，备用Yahoo Finance
+                    toolkit.get_stockstats_indicators_report_online,
+                ]
             else:
-                # 美股和港股使用Yahoo Finance
+                # 美股使用Yahoo Finance
                 tools = [
                     toolkit.get_YFin_data_online,
                     toolkit.get_stockstats_indicators_report_online,
@@ -224,9 +233,6 @@ def create_market_analyst(llm, toolkit):
                 toolkit.get_YFin_data,
                 toolkit.get_stockstats_indicators_report,
             ]
-
-        # 检测股票类型以优化提示词
-        is_china = is_china_stock(ticker)
 
         if is_china:
             # 中国A股专用提示词 - 针对DeepSeek优化
@@ -251,8 +257,31 @@ def create_market_analyst(llm, toolkit):
 
 请使用中文，基于真实数据进行分析。"""
             )
+        elif is_hk:
+            # 港股专用提示词
+            system_message = (
+                f"""你是一位专业的港股技术分析师。你必须对港股{ticker}进行详细的技术分析。
+
+**工具调用指令：**
+你有工具可以获取港股{ticker}的数据，请立即调用相关工具获取数据。
+
+**分析要求：**
+1. 基于获取的真实港股数据进行技术分析
+2. 分析移动平均线、MACD、RSI、布林带等技术指标
+3. 考虑港股市场特点（如T+0交易、港币计价等）
+4. 提供具体的数值和专业分析
+5. 给出明确的投资建议
+
+**输出格式：**
+## 🇭🇰 港股基本信息
+## 📈 技术指标分析
+## 📉 价格趋势分析
+## 💭 投资建议
+
+请使用中文，价格以港币(HK$)计价，基于真实数据进行分析。"""
+            )
         else:
-            # 美股/港股提示词
+            # 美股提示词
             system_message = (
                 """你是一位专业的交易助手，负责分析金融市场。你的角色是从以下列表中选择**最相关的指标**来分析给定的市场条件或交易策略。目标是选择最多**8个指标**，提供互补的见解而不重复。各类别及其指标如下：
 

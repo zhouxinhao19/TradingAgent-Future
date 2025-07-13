@@ -4,6 +4,22 @@ from .chinese_finance_utils import get_chinese_social_sentiment
 from .googlenews_utils import *
 from .finnhub_utils import get_data_in_range
 
+# 导入港股工具
+try:
+    from .hk_stock_utils import get_hk_stock_data, get_hk_stock_info
+    HK_STOCK_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ 港股工具不可用: {e}")
+    HK_STOCK_AVAILABLE = False
+
+# 导入AKShare港股工具
+try:
+    from .akshare_utils import get_hk_stock_data_akshare, get_hk_stock_info_akshare
+    AKSHARE_HK_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ AKShare港股工具不可用: {e}")
+    AKSHARE_HK_AVAILABLE = False
+
 # 尝试导入yfinance相关模块，如果失败则跳过
 try:
     from .yfin_utils import *
@@ -1352,3 +1368,140 @@ def get_current_china_data_source() -> str:
     except Exception as e:
         print(f"❌ 获取数据源信息失败: {e}")
         return f"❌ 获取数据源信息失败: {e}"
+
+
+# ==================== 港股数据接口 ====================
+
+def get_hk_stock_data_unified(symbol: str, start_date: str = None, end_date: str = None) -> str:
+    """
+    获取港股数据的统一接口
+
+    Args:
+        symbol: 港股代码 (如: 0700.HK)
+        start_date: 开始日期 (YYYY-MM-DD)
+        end_date: 结束日期 (YYYY-MM-DD)
+
+    Returns:
+        str: 格式化的港股数据
+    """
+    try:
+        print(f"🇭🇰 获取港股数据: {symbol}")
+
+        # 优先使用AKShare港股数据（国内数据源，更稳定）
+        if AKSHARE_HK_AVAILABLE:
+            try:
+                print(f"🔄 使用AKShare获取港股数据: {symbol}")
+                result = get_hk_stock_data_akshare(symbol, start_date, end_date)
+                if result and "❌" not in result:
+                    return result
+            except Exception as e:
+                print(f"⚠️ AKShare港股数据获取失败: {e}")
+
+        # 备用方案1：使用专用港股工具（Yahoo Finance）
+        if HK_STOCK_AVAILABLE:
+            try:
+                print(f"🔄 使用Yahoo Finance获取港股数据: {symbol}")
+                result = get_hk_stock_data(symbol, start_date, end_date)
+                if result and "❌" not in result:
+                    return result
+            except Exception as e:
+                print(f"⚠️ Yahoo Finance港股数据获取失败: {e}")
+
+        # 备用方案2：使用FINNHUB（付费用户可用）
+        try:
+            from .optimized_us_data import get_us_stock_data_cached
+            print(f"🔄 使用FINNHUB获取港股数据: {symbol}")
+            result = get_us_stock_data_cached(symbol, start_date, end_date)
+            if result and "❌" not in result:
+                return result
+        except Exception as e:
+            print(f"⚠️ FINNHUB港股数据获取失败: {e}")
+
+        # 所有数据源都失败
+        error_msg = f"❌ 无法获取港股{symbol}数据 - 所有数据源都不可用"
+        print(error_msg)
+        return error_msg
+
+    except Exception as e:
+        print(f"❌ 获取港股数据失败: {e}")
+        return f"❌ 获取港股{symbol}数据失败: {e}"
+
+
+def get_hk_stock_info_unified(symbol: str) -> Dict:
+    """
+    获取港股信息的统一接口
+
+    Args:
+        symbol: 港股代码
+
+    Returns:
+        Dict: 港股信息
+    """
+    try:
+        # 优先使用专用港股工具
+        if HK_STOCK_AVAILABLE:
+            result = get_hk_stock_info(symbol)
+            if result and 'error' not in result:
+                return result
+
+        # 备用方案1：使用AKShare
+        if AKSHARE_HK_AVAILABLE:
+            try:
+                result = get_hk_stock_info_akshare(symbol)
+                if result and 'error' not in result:
+                    return result
+            except Exception as e:
+                print(f"⚠️ AKShare港股信息获取失败: {e}")
+
+        # 备用方案2：返回基本信息
+        return {
+            'symbol': symbol,
+            'name': f'港股{symbol}',
+            'currency': 'HKD',
+            'exchange': 'HKG',
+            'source': 'fallback'
+        }
+
+    except Exception as e:
+        print(f"❌ 获取港股信息失败: {e}")
+        return {
+            'symbol': symbol,
+            'name': f'港股{symbol}',
+            'currency': 'HKD',
+            'exchange': 'HKG',
+            'source': 'error',
+            'error': str(e)
+        }
+
+
+def get_stock_data_by_market(symbol: str, start_date: str = None, end_date: str = None) -> str:
+    """
+    根据股票市场类型自动选择数据源获取数据
+
+    Args:
+        symbol: 股票代码
+        start_date: 开始日期
+        end_date: 结束日期
+
+    Returns:
+        str: 格式化的股票数据
+    """
+    try:
+        from .utils.stock_utils import StockUtils
+
+        market_info = StockUtils.get_market_info(symbol)
+
+        if market_info['is_china']:
+            # 中国A股
+            return get_china_stock_data_unified(symbol, start_date, end_date)
+        elif market_info['is_hk']:
+            # 港股
+            return get_hk_stock_data_unified(symbol, start_date, end_date)
+        else:
+            # 美股或其他
+            from .optimized_us_data import get_us_stock_data_cached
+            return get_us_stock_data_cached(symbol, start_date, end_date)
+
+    except Exception as e:
+        print(f"❌ 获取股票数据失败: {e}")
+        return f"❌ 获取股票{symbol}数据失败: {e}"

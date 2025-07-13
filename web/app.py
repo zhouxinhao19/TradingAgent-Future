@@ -186,6 +186,12 @@ def main():
     # 初始化会话状态
     initialize_session_state()
 
+    # 添加调试按钮（仅在调试模式下显示）
+    if os.getenv('DEBUG_MODE') == 'true':
+        if st.button("🔄 清除会话状态"):
+            st.session_state.clear()
+            st.experimental_rerun()
+
     # 渲染页面头部
     render_header()
 
@@ -281,16 +287,41 @@ def main():
     
     with col1:
         st.header("📊 股票分析")
-        
+
         # 渲染分析表单
-        form_data = render_analysis_form()
+        try:
+            form_data = render_analysis_form()
+
+            # 验证表单数据格式
+            if not isinstance(form_data, dict):
+                st.error(f"⚠️ 表单数据格式异常: {type(form_data)}")
+                form_data = {'submitted': False}
+
+        except Exception as e:
+            st.error(f"❌ 表单渲染失败: {e}")
+            form_data = {'submitted': False}
+
+        # 避免显示调试信息
+        if form_data and form_data != {'submitted': False}:
+            # 只在调试模式下显示表单数据
+            if os.getenv('DEBUG_MODE') == 'true':
+                st.write("Debug - Form data:", form_data)
 
         # 检查是否提交了表单
         if form_data.get('submitted', False):
-            if not form_data['stock_symbol']:
-                st.error("请输入股票代码")
-            elif not form_data['analysts']:
-                st.error("请至少选择一个分析师")
+            # 验证分析参数
+            is_valid, validation_errors = validate_analysis_params(
+                stock_symbol=form_data['stock_symbol'],
+                analysis_date=form_data['analysis_date'],
+                analysts=form_data['analysts'],
+                research_depth=form_data['research_depth'],
+                market_type=form_data.get('market_type', '美股')
+            )
+
+            if not is_valid:
+                # 显示验证错误
+                for error in validation_errors:
+                    st.error(error)
             else:
                 # 执行分析
                 st.session_state.analysis_running = True
@@ -301,6 +332,9 @@ def main():
                 progress_callback = create_progress_callback(progress_display)
 
                 try:
+                    # 显示分析参数
+                    st.info(f"🔍 开始分析: {form_data.get('market_type', '美股')} {form_data['stock_symbol']}")
+
                     results = run_stock_analysis(
                         stock_symbol=form_data['stock_symbol'],
                         analysis_date=form_data['analysis_date'],
@@ -327,6 +361,12 @@ def main():
                     progress_display.clear()
 
                     st.error(f"❌ 分析失败: {str(e)}")
+
+                    # 显示详细错误信息
+                    with st.expander("🔍 详细错误信息"):
+                        import traceback
+                        st.code(traceback.format_exc())
+
                     st.markdown("""
                     **可能的解决方案:**
                     1. 检查API密钥是否正确配置

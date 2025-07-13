@@ -48,6 +48,10 @@ from .interface import (
     get_china_stock_info_unified,
     switch_china_data_source,
     get_current_china_data_source,
+    # Hong Kong stock functions
+    get_hk_stock_data_unified,
+    get_hk_stock_info_unified,
+    get_stock_data_by_market,
 )
 
 __all__ = [
@@ -68,4 +72,18 @@ __all__ = [
     # Market data functions
     "get_YFin_data_window",
     "get_YFin_data",
+    # Tushare data functions
+    "get_china_stock_data_tushare",
+    "search_china_stocks_tushare",
+    "get_china_stock_fundamentals_tushare",
+    "get_china_stock_info_tushare",
+    # Unified China data functions
+    "get_china_stock_data_unified",
+    "get_china_stock_info_unified",
+    "switch_china_data_source",
+    "get_current_china_data_source",
+    # Hong Kong stock functions
+    "get_hk_stock_data_unified",
+    "get_hk_stock_info_unified",
+    "get_stock_data_by_market",
 ]

@@ -3,6 +3,7 @@ from langchain.agents import create_react_agent, AgentExecutor
 from langchain import hub
 import time
 import json
+from tradingagents.utils.stock_utils import is_china_stock
 
 
 def create_fundamentals_analyst_react(llm, toolkit):
@@ -34,13 +35,15 @@ def create_fundamentals_analyst_react(llm, toolkit):
                 ]
             }
 
-        # 检查是否为中国股票
-        def is_china_stock(ticker_code):
-            import re
-            return re.match(r'^\d{6}$', str(ticker_code))
+        # 检查股票市场类型
+        from tradingagents.utils.stock_utils import StockUtils
 
-        is_china = is_china_stock(ticker)
-        print(f"📊 [DEBUG] 股票类型检查: {ticker} -> 中国A股: {is_china}")
+        market_info = StockUtils.get_market_info(ticker)
+        is_china = market_info['is_china']
+        is_hk = market_info['is_hk']
+        is_us = market_info['is_us']
+
+        print(f"📊 [DEBUG] 股票类型检查: {ticker} -> {market_info['market_name']} ({market_info['currency_name']})")
 
         if toolkit.config["online_tools"]:
             # 在线模式，使用ReAct Agent
@@ -267,18 +270,17 @@ def create_fundamentals_analyst(llm, toolkit):
         print(f"📊 [DEBUG] 现有基本面报告: {state.get('fundamentals_report', 'None')[:100]}...")
 
         # 根据股票代码格式选择数据源
-        def is_china_stock(ticker_code):
-            """判断是否为中国A股代码"""
-            import re
-            # A股代码格式：6位数字
-            return re.match(r'^\d{6}$', str(ticker_code))
+        from tradingagents.utils.stock_utils import StockUtils
 
         print(f"📊 [基本面分析师] 正在分析股票: {ticker}")
 
         # 检查股票类型
-        is_china = is_china_stock(ticker)
-        print(f"📊 [DEBUG] 股票类型检查: {ticker} -> 中国A股: {is_china}")
+        market_info = StockUtils.get_market_info(ticker)
+        is_china = market_info['is_china']
+        is_hk = market_info['is_hk']
+        is_us = market_info['is_us']
 
+        print(f"📊 [DEBUG] 股票类型检查: {ticker} -> {market_info['market_name']} ({market_info['currency_name']})")
         print(f"📊 [DEBUG] 工具配置检查: online_tools={toolkit.config['online_tools']}")
 
         if toolkit.config["online_tools"]:
@@ -290,9 +292,14 @@ def create_fundamentals_analyst(llm, toolkit):
                     toolkit.get_china_fundamentals
                 ]
                 print(f"📊 [DEBUG] 选择的工具: {[tool.name for tool in tools]}")
+            elif is_hk:
+                # 港股优先使用AKShare数据源
+                print(f"📊 [基本面分析师] 检测到港股代码，使用港股专用数据源（优先AKShare）")
+                tools = [toolkit.get_hk_stock_data_unified]  # 优先AKShare，备用Yahoo Finance
+                print(f"📊 [DEBUG] 选择的工具: {[tool.name for tool in tools]}")
             else:
-                # 美股和港股使用OpenAI基本面分析
-                print(f"📊 [基本面分析师] 检测到非A股代码，使用OpenAI数据源")
+                # 美股使用OpenAI基本面分析
+                print(f"📊 [基本面分析师] 检测到美股代码，使用OpenAI数据源")
                 tools = [toolkit.get_fundamentals_openai]
                 print(f"📊 [DEBUG] 选择的工具: {[tool.name for tool in tools]}")
         else:

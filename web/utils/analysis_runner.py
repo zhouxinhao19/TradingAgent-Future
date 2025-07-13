@@ -234,6 +234,14 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             # A股代码不需要特殊处理，保持原样
             formatted_symbol = stock_symbol
             update_progress(f"准备分析A股: {formatted_symbol}")
+        elif market_type == "港股":
+            # 港股代码转为大写，确保.HK后缀
+            formatted_symbol = stock_symbol.upper()
+            if not formatted_symbol.endswith('.HK'):
+                # 如果是纯数字，添加.HK后缀
+                if formatted_symbol.isdigit():
+                    formatted_symbol = f"{formatted_symbol.zfill(4)}.HK"
+            update_progress(f"准备分析港股: {formatted_symbol}")
         else:
             # 美股代码转为大写
             formatted_symbol = stock_symbol.upper()
@@ -305,7 +313,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         print(f"完整错误堆栈: {traceback.format_exc()}")
 
         # 如果真实分析失败，返回模拟数据用于演示
-        return generate_demo_results(stock_symbol, analysis_date, analysts, research_depth, llm_provider, llm_model, str(e))
+        return generate_demo_results(stock_symbol, analysis_date, analysts, research_depth, llm_provider, llm_model, str(e), market_type)
 
 def format_analysis_results(results):
     """格式化分析结果用于显示"""
@@ -429,16 +437,40 @@ def format_analysis_results(results):
         }
     }
 
-def validate_analysis_params(stock_symbol, analysis_date, analysts, research_depth):
+def validate_analysis_params(stock_symbol, analysis_date, analysts, research_depth, market_type="美股"):
     """验证分析参数"""
-    
+
     errors = []
-    
+
     # 验证股票代码
     if not stock_symbol or len(stock_symbol.strip()) == 0:
         errors.append("股票代码不能为空")
     elif len(stock_symbol.strip()) > 10:
         errors.append("股票代码长度不能超过10个字符")
+    else:
+        # 根据市场类型验证代码格式
+        symbol = stock_symbol.strip()
+        if market_type == "A股":
+            # A股：6位数字
+            import re
+            if not re.match(r'^\d{6}$', symbol):
+                errors.append("A股代码格式错误，应为6位数字（如：000001）")
+        elif market_type == "港股":
+            # 港股：4位数字.HK 或 纯4位数字
+            import re
+            symbol_upper = symbol.upper()
+            # 检查是否为 XXXX.HK 格式
+            hk_format = re.match(r'^\d{4}\.HK$', symbol_upper)
+            # 检查是否为纯4位数字格式
+            digit_format = re.match(r'^\d{4}$', symbol)
+
+            if not (hk_format or digit_format):
+                errors.append("港股代码格式错误，应为4位数字.HK（如：0700.HK）或4位数字（如：0700）")
+        elif market_type == "美股":
+            # 美股：1-5位字母
+            import re
+            if not re.match(r'^[A-Z]{1,5}$', symbol.upper()):
+                errors.append("美股代码格式错误，应为1-5位字母（如：AAPL）")
     
     # 验证分析师列表
     if not analysts or len(analysts) == 0:
@@ -483,10 +515,24 @@ def get_supported_stocks():
     
     return popular_stocks
 
-def generate_demo_results(stock_symbol, analysis_date, analysts, research_depth, llm_provider, llm_model, error_msg):
+def generate_demo_results(stock_symbol, analysis_date, analysts, research_depth, llm_provider, llm_model, error_msg, market_type="美股"):
     """生成演示分析结果"""
 
     import random
+
+    # 根据市场类型设置货币符号和价格范围
+    if market_type == "港股":
+        currency_symbol = "HK$"
+        price_range = (50, 500)  # 港股价格范围
+        market_name = "港股"
+    elif market_type == "A股":
+        currency_symbol = "¥"
+        price_range = (5, 100)   # A股价格范围
+        market_name = "A股"
+    else:  # 美股
+        currency_symbol = "$"
+        price_range = (50, 300)  # 美股价格范围
+        market_name = "美股"
 
     # 生成模拟决策
     actions = ['买入', '持有', '卖出']
@@ -496,11 +542,12 @@ def generate_demo_results(stock_symbol, analysis_date, analysts, research_depth,
         'action': action,
         'confidence': round(random.uniform(0.6, 0.9), 2),
         'risk_score': round(random.uniform(0.2, 0.7), 2),
-        'target_price': round(random.uniform(100, 300), 2),
+        'target_price': round(random.uniform(*price_range), 2),
         'reasoning': f"""
-基于对{stock_symbol}的综合分析，我们的AI分析团队得出以下结论：
+基于对{market_name}{stock_symbol}的综合分析，我们的AI分析团队得出以下结论：
 
 **投资建议**: {action}
+**目标价格**: {currency_symbol}{round(random.uniform(*price_range), 2)}
 
 **主要分析要点**:
 1. **技术面分析**: 当前价格趋势显示{'上涨' if action == '买入' else '下跌' if action == '卖出' else '横盘'}信号
@@ -516,14 +563,18 @@ def generate_demo_results(stock_symbol, analysis_date, analysts, research_depth,
     demo_state = {}
 
     if 'market' in analysts:
+        current_price = round(random.uniform(*price_range), 2)
+        high_price = round(current_price * random.uniform(1.2, 1.8), 2)
+        low_price = round(current_price * random.uniform(0.5, 0.8), 2)
+
         demo_state['market_report'] = f"""
-## 📈 {stock_symbol} 技术面分析报告
+## 📈 {market_name}{stock_symbol} 技术面分析报告
 
 ### 价格趋势分析
-- **当前价格**: ${round(random.uniform(100, 300), 2)}
+- **当前价格**: {currency_symbol}{current_price}
 - **日内变化**: {random.choice(['+', '-'])}{round(random.uniform(0.5, 5), 2)}%
-- **52周高点**: ${round(random.uniform(200, 400), 2)}
-- **52周低点**: ${round(random.uniform(50, 150), 2)}
+- **52周高点**: {currency_symbol}{high_price}
+- **52周低点**: {currency_symbol}{low_price}
 
 ### 技术指标
 - **RSI (14日)**: {round(random.uniform(30, 70), 1)}

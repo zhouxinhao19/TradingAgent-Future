@@ -648,3 +648,40 @@ class Toolkit:
             print(f"❌ [DEBUG] 错误: {str(e)}")
             print(f"❌ [DEBUG] 堆栈: {error_details}")
             return f"中国股票基本面分析失败: {str(e)}"
+
+    @staticmethod
+    @tool
+    def get_hk_stock_data_unified(
+        symbol: Annotated[str, "港股代码，如：0700.HK、9988.HK等"],
+        start_date: Annotated[str, "开始日期，格式：YYYY-MM-DD"],
+        end_date: Annotated[str, "结束日期，格式：YYYY-MM-DD"]
+    ) -> str:
+        """
+        获取港股数据的统一接口，优先使用AKShare数据源，备用Yahoo Finance
+
+        Args:
+            symbol: 港股代码 (如: 0700.HK)
+            start_date: 开始日期 (YYYY-MM-DD)
+            end_date: 结束日期 (YYYY-MM-DD)
+
+        Returns:
+            str: 格式化的港股数据
+        """
+        print(f"🇭🇰 [DEBUG] get_hk_stock_data_unified 被调用: symbol={symbol}, start_date={start_date}, end_date={end_date}")
+
+        try:
+            from tradingagents.dataflows.interface import get_hk_stock_data_unified
+
+            result = get_hk_stock_data_unified(symbol, start_date, end_date)
+
+            print(f"🇭🇰 [DEBUG] 港股数据获取完成，长度: {len(result) if result else 0}")
+
+            return result
+
+        except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"❌ [DEBUG] get_hk_stock_data_unified 失败:")
+            print(f"❌ [DEBUG] 错误: {str(e)}")
+            print(f"❌ [DEBUG] 堆栈: {error_details}")
+            return f"港股数据获取失败: {str(e)}"

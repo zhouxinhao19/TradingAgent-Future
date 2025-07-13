@@ -23,15 +23,15 @@ class SignalProcessor:
         """
 
         # 检测股票类型和货币
-        def is_china_stock(ticker_code):
-            import re
-            return re.match(r'^\d{6}$', str(ticker_code)) if ticker_code else False
+        from tradingagents.utils.stock_utils import StockUtils
 
-        is_china = is_china_stock(stock_symbol)
-        currency = "人民币" if is_china else "美元"
-        currency_symbol = "¥" if is_china else "$"
+        market_info = StockUtils.get_market_info(stock_symbol)
+        is_china = market_info['is_china']
+        is_hk = market_info['is_hk']
+        currency = market_info['currency_name']
+        currency_symbol = market_info['currency_symbol']
 
-        print(f"🔍 [SignalProcessor] 处理信号: 股票={stock_symbol}, 中国A股={is_china}, 货币={currency}")
+        print(f"🔍 [SignalProcessor] 处理信号: 股票={stock_symbol}, 市场={market_info['market_name']}, 货币={currency}")
 
         messages = [
             (
@@ -56,8 +56,8 @@ class SignalProcessor:
 5. 所有内容必须使用中文，不允许任何英文投资建议
 
 特别注意：
-- 股票代码 {stock_symbol or '未知'} {'是中国A股，使用人民币计价' if is_china else '是美股/港股，使用美元计价'}
-- 目标价格必须与股票的交易货币一致
+- 股票代码 {stock_symbol or '未知'} 是{market_info['market_name']}，使用{currency}计价
+- 目标价格必须与股票的交易货币一致（{currency_symbol}）
 
 如果某些信息在报告中没有明确提及，请使用合理的默认值。""",
             ),
