@@ -127,8 +127,8 @@ class OptimizedUSDataProvider:
                         print(f"🔄 使用Yahoo Finance备用方案获取港股数据: {symbol}")
 
                         self._wait_for_rate_limit()
-                        ticker = yf.Ticker(symbol)
-                        data = ticker.history(start=start_date, end=end_date, timeout=30)
+                        ticker = yf.Ticker(symbol)  # 港股代码保持原格式
+                        data = ticker.history(start=start_date, end=end_date)
 
                         if not data.empty:
                             formatted_data = self._format_stock_data(symbol, data, start_date, end_date)
@@ -139,10 +139,11 @@ class OptimizedUSDataProvider:
                 else:
                     # 美股使用Yahoo Finance
                     print(f"🇺🇸 从Yahoo Finance API获取美股数据: {symbol}")
-
                     self._wait_for_rate_limit()
+
+                    # 获取数据
                     ticker = yf.Ticker(symbol.upper())
-                    data = ticker.history(start=start_date, end=end_date, timeout=30)
+                    data = ticker.history(start=start_date, end=end_date)
 
                     if data.empty:
                         error_msg = f"未找到股票 '{symbol}' 在 {start_date} 到 {end_date} 期间的数据"
@@ -205,32 +206,25 @@ class OptimizedUSDataProvider:
         rs = gain / loss
         rsi = 100 - (100 / (1 + rs))
         
-        # 检测股票类型以确定货币符号
-        from tradingagents.utils.stock_utils import StockUtils
-        market_info = StockUtils.get_market_info(symbol)
-        currency_symbol = market_info['currency_symbol']
-        market_name = market_info['market_name']
-
         # 格式化输出
-        result = f"""# {symbol} {market_name}数据分析
+        result = f"""# {symbol} 美股数据分析
 
 ## 📊 基本信息
 - 股票代码: {symbol}
-- 市场类型: {market_name}
 - 数据期间: {start_date} 至 {end_date}
 - 数据条数: {len(data)}条
-- 最新价格: {currency_symbol}{latest_price:.2f}
-- 期间涨跌: {currency_symbol}{price_change:+.2f} ({price_change_pct:+.2f}%)
+- 最新价格: ${latest_price:.2f}
+- 期间涨跌: ${price_change:+.2f} ({price_change_pct:+.2f}%)
 
 ## 📈 价格统计
-- 期间最高: {currency_symbol}{data['High'].max():.2f}
-- 期间最低: {currency_symbol}{data['Low'].min():.2f}
+- 期间最高: ${data['High'].max():.2f}
+- 期间最低: ${data['Low'].min():.2f}
 - 平均成交量: {data['Volume'].mean():,.0f}
 
 ## 🔍 技术指标
-- MA5: {currency_symbol}{data['MA5'].iloc[-1]:.2f}
-- MA10: {currency_symbol}{data['MA10'].iloc[-1]:.2f}
-- MA20: {currency_symbol}{data['MA20'].iloc[-1]:.2f}
+- MA5: ${data['MA5'].iloc[-1]:.2f}
+- MA10: ${data['MA10'].iloc[-1]:.2f}
+- MA20: ${data['MA20'].iloc[-1]:.2f}
 - RSI: {rsi.iloc[-1]:.2f}
 
 ## 📋 最近5日数据
@@ -268,12 +262,11 @@ class OptimizedUSDataProvider:
         return None
 
     def _get_data_from_finnhub(self, symbol: str, start_date: str, end_date: str) -> str:
-        """从FINNHUB API获取股票数据（支持美股和港股）"""
+        """从FINNHUB API获取股票数据"""
         try:
             import finnhub
             import os
             from datetime import datetime, timedelta
-            from tradingagents.utils.stock_utils import StockUtils
 
             # 获取API密钥
             api_key = os.getenv('FINNHUB_API_KEY')
@@ -282,42 +275,26 @@ class OptimizedUSDataProvider:
 
             client = finnhub.Client(api_key=api_key)
 
-            # 检测股票市场类型
-            market_info = StockUtils.get_market_info(symbol)
-
-            # 标准化股票代码为FINNHUB格式
-            finnhub_symbol = self._normalize_symbol_for_finnhub(symbol, market_info)
-
-            print(f"📊 FINNHUB获取数据: {symbol} -> {finnhub_symbol} ({market_info['market_name']})")
-
             # 获取实时报价
-            quote = client.quote(finnhub_symbol)
+            quote = client.quote(symbol.upper())
             if not quote or 'c' not in quote:
-                print(f"⚠️ FINNHUB无法获取{finnhub_symbol}的报价数据")
                 return None
 
             # 获取公司信息
-            try:
-                profile = client.company_profile2(symbol=finnhub_symbol)
-                company_name = profile.get('name', symbol) if profile else symbol
-            except:
-                company_name = symbol
+            profile = client.company_profile2(symbol=symbol.upper())
+            company_name = profile.get('name', symbol.upper()) if profile else symbol.upper()
 
             # 格式化数据
             current_price = quote.get('c', 0)
             change = quote.get('d', 0)
             change_percent = quote.get('dp', 0)
 
-            # 根据市场类型设置货币符号
-            currency_symbol = market_info['currency_symbol']
-            market_name = market_info['market_name']
-
-            formatted_data = f"""# {symbol.upper()} {market_name}数据分析
+            formatted_data = f"""# {symbol.upper()} 美股数据分析
 
 ## 📊 实时行情
 - 股票名称: {company_name}
-- 当前价格: {currency_symbol}{current_price:.2f}
-- 涨跌额: {currency_symbol}{change:+.2f}
+- 当前价格: ${current_price:.2f}
+- 涨跌额: ${change:+.2f}
 - 涨跌幅: {change_percent:+.2f}%
 - 开盘价: ${quote.get('o', 0):.2f}
 - 最高价: ${quote.get('h', 0):.2f}
@@ -339,34 +316,6 @@ class OptimizedUSDataProvider:
         except Exception as e:
             print(f"❌ FINNHUB数据获取失败: {e}")
             return None
-
-    def _normalize_symbol_for_finnhub(self, symbol: str, market_info: dict) -> str:
-        """
-        标准化股票代码为FINNHUB格式
-
-        Args:
-            symbol: 原始股票代码
-            market_info: 市场信息
-
-        Returns:
-            str: FINNHUB格式的股票代码
-        """
-        if market_info['is_hk']:
-            # 港股：FINNHUB使用 XXXX.HK 格式
-            if '.HK' in symbol.upper():
-                return symbol.upper()
-            else:
-                # 如果是纯数字，添加.HK后缀
-                clean_symbol = symbol.replace('.hk', '').replace('.HK', '')
-                if clean_symbol.isdigit():
-                    return f"{clean_symbol.zfill(4)}.HK"
-                return symbol.upper()
-        elif market_info['is_china']:
-            # A股：FINNHUB可能不支持，但尝试使用原格式
-            return symbol.upper()
-        else:
-            # 美股：直接使用大写
-            return symbol.upper()
 
     def _generate_fallback_data(self, symbol: str, start_date: str, end_date: str, error_msg: str) -> str:
         """生成备用数据"""

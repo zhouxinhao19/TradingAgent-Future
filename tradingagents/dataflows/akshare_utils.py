@@ -296,10 +296,16 @@ def format_hk_stock_data_akshare(symbol: str, data: pd.DataFrame, start_date: st
         return f"❌ 无法获取港股 {symbol} 的AKShare数据"
 
     try:
-        # 获取股票基本信息
-        provider = get_akshare_provider()
-        stock_info = provider.get_hk_stock_info(symbol)
-        stock_name = stock_info.get('name', f'港股{symbol}')
+        # 获取股票基本信息（允许失败）
+        stock_name = f'港股{symbol}'  # 默认名称
+        try:
+            provider = get_akshare_provider()
+            stock_info = provider.get_hk_stock_info(symbol)
+            stock_name = stock_info.get('name', f'港股{symbol}')
+            print(f"✅ 港股信息获取成功: {stock_name}")
+        except Exception as info_error:
+            print(f"⚠️ 港股信息获取失败，使用默认信息: {info_error}")
+            # 继续处理，使用默认信息
 
         # 计算统计信息
         latest_price = data['Close'].iloc[-1]

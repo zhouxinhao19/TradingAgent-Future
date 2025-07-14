@@ -103,20 +103,18 @@ def create_fundamentals_analyst(llm, toolkit):
         if hasattr(llm, '__class__') and 'DashScope' in llm.__class__.__name__:
             print(f"📊 [DEBUG] 检测到阿里百炼模型，创建新实例以避免工具缓存")
             from tradingagents.llm_adapters import ChatDashScopeOpenAI
-            fresh_llm = ChatDashScopeOpenAI(
+            llm = ChatDashScopeOpenAI(
                 model=llm.model_name,
                 temperature=llm.temperature,
                 max_tokens=getattr(llm, 'max_tokens', 2000)
             )
-        else:
-            fresh_llm = llm
 
         print(f"📊 [DEBUG] 创建LLM链，工具数量: {len(tools)}")
         print(f"📊 [DEBUG] 绑定的工具列表: {[tool.name for tool in tools]}")
         print(f"📊 [DEBUG] 创建工具链，让模型自主决定是否调用工具")
 
         try:
-            chain = prompt | fresh_llm.bind_tools(tools)
+            chain = prompt | llm.bind_tools(tools)
             print(f"📊 [DEBUG] ✅ 工具绑定成功，绑定了 {len(tools)} 个工具")
         except Exception as e:
             print(f"📊 [DEBUG] ❌ 工具绑定失败: {e}")
@@ -200,7 +198,7 @@ def create_fundamentals_analyst(llm, toolkit):
                     ("human", "{analysis_request}")
                 ])
                 
-                analysis_chain = analysis_prompt_template | fresh_llm
+                analysis_chain = analysis_prompt_template | llm
                 analysis_result = analysis_chain.invoke({"analysis_request": analysis_prompt})
                 
                 if hasattr(analysis_result, 'content'):

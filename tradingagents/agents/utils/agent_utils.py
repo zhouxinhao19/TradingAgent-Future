@@ -143,7 +143,7 @@ class Toolkit:
             return interface.get_reddit_company_news(ticker, curr_date, 7, 5)
 
     @staticmethod
-    @tool
+    # @tool  # 已移除：请使用 get_stock_fundamentals_unified 或 get_stock_market_data_unified
     def get_china_stock_data(
         stock_code: Annotated[str, "中国股票代码，如 000001(平安银行), 600519(贵州茅台)"],
         start_date: Annotated[str, "开始日期，格式 yyyy-mm-dd"],
@@ -533,7 +533,7 @@ class Toolkit:
         return openai_news_results
 
     @staticmethod
-    @tool
+    # @tool  # 已移除：请使用 get_stock_fundamentals_unified
     def get_fundamentals_openai(
         ticker: Annotated[str, "the company's ticker"],
         curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
@@ -586,7 +586,7 @@ class Toolkit:
             return f"基本面分析失败: {str(e)}"
 
     @staticmethod
-    @tool
+    # @tool  # 已移除：请使用 get_stock_fundamentals_unified
     def get_china_fundamentals(
         ticker: Annotated[str, "中国A股股票代码，如600036"],
         curr_date: Annotated[str, "当前日期，格式为yyyy-mm-dd"],
@@ -650,7 +650,7 @@ class Toolkit:
             return f"中国股票基本面分析失败: {str(e)}"
 
     @staticmethod
-    @tool
+    # @tool  # 已移除：请使用 get_stock_fundamentals_unified 或 get_stock_market_data_unified
     def get_hk_stock_data_unified(
         symbol: Annotated[str, "港股代码，如：0700.HK、9988.HK等"],
         start_date: Annotated[str, "开始日期，格式：YYYY-MM-DD"],
@@ -685,3 +685,438 @@ class Toolkit:
             print(f"❌ [DEBUG] 错误: {str(e)}")
             print(f"❌ [DEBUG] 堆栈: {error_details}")
             return f"港股数据获取失败: {str(e)}"
+
+    @staticmethod
+    @tool
+    def get_stock_fundamentals_unified(
+        ticker: Annotated[str, "股票代码（支持A股、港股、美股）"],
+        start_date: Annotated[str, "开始日期，格式：YYYY-MM-DD"] = None,
+        end_date: Annotated[str, "结束日期，格式：YYYY-MM-DD"] = None,
+        curr_date: Annotated[str, "当前日期，格式：YYYY-MM-DD"] = None
+    ) -> str:
+        """
+        统一的股票基本面分析工具
+        自动识别股票类型（A股、港股、美股）并调用相应的数据源
+
+        Args:
+            ticker: 股票代码（如：000001、0700.HK、AAPL）
+            start_date: 开始日期（可选，格式：YYYY-MM-DD）
+            end_date: 结束日期（可选，格式：YYYY-MM-DD）
+            curr_date: 当前日期（可选，格式：YYYY-MM-DD）
+
+        Returns:
+            str: 基本面分析数据和报告
+        """
+        print(f"📊 [统一基本面工具] 分析股票: {ticker}")
+
+        try:
+            from tradingagents.utils.stock_utils import StockUtils
+            from datetime import datetime, timedelta
+
+            # 自动识别股票类型
+            market_info = StockUtils.get_market_info(ticker)
+            is_china = market_info['is_china']
+            is_hk = market_info['is_hk']
+            is_us = market_info['is_us']
+
+            print(f"📊 [统一基本面工具] 股票类型: {market_info['market_name']}")
+            print(f"📊 [统一基本面工具] 货币: {market_info['currency_name']} ({market_info['currency_symbol']})")
+
+            # 设置默认日期
+            if not curr_date:
+                curr_date = datetime.now().strftime('%Y-%m-%d')
+            if not start_date:
+                start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+            if not end_date:
+                end_date = curr_date
+
+            result_data = []
+
+            if is_china:
+                # 中国A股：获取股票数据 + 基本面数据
+                print(f"🇨🇳 [统一基本面工具] 处理A股数据...")
+
+                try:
+                    # 获取股票价格数据
+                    from tradingagents.dataflows.interface import get_china_stock_data_unified
+                    stock_data = get_china_stock_data_unified(ticker, start_date, end_date)
+                    result_data.append(f"## A股价格数据\n{stock_data}")
+                except Exception as e:
+                    result_data.append(f"## A股价格数据\n获取失败: {e}")
+
+                try:
+                    # 获取基本面数据
+                    from tradingagents.dataflows.optimized_china_data import OptimizedChinaDataProvider
+                    analyzer = OptimizedChinaDataProvider()
+                    fundamentals_data = analyzer._generate_fundamentals_report(ticker, stock_data if 'stock_data' in locals() else "")
+                    result_data.append(f"## A股基本面数据\n{fundamentals_data}")
+                except Exception as e:
+                    result_data.append(f"## A股基本面数据\n获取失败: {e}")
+
+            elif is_hk:
+                # 港股：使用AKShare数据源，支持多重备用方案
+                print(f"🇭🇰 [统一基本面工具] 处理港股数据...")
+
+                hk_data_success = False
+
+                # 主要数据源：AKShare
+                try:
+                    from tradingagents.dataflows.interface import get_hk_stock_data_unified
+                    hk_data = get_hk_stock_data_unified(ticker, start_date, end_date)
+
+                    # 检查数据质量
+                    if hk_data and len(hk_data) > 100 and "❌" not in hk_data:
+                        result_data.append(f"## 港股数据\n{hk_data}")
+                        hk_data_success = True
+                        print(f"✅ [统一基本面工具] 港股主要数据源成功")
+                    else:
+                        print(f"⚠️ [统一基本面工具] 港股主要数据源质量不佳")
+
+                except Exception as e:
+                    print(f"⚠️ [统一基本面工具] 港股主要数据源失败: {e}")
+
+                # 备用方案：基础港股信息
+                if not hk_data_success:
+                    try:
+                        from tradingagents.dataflows.interface import get_hk_stock_info_unified
+                        hk_info = get_hk_stock_info_unified(ticker)
+
+                        basic_info = f"""## 港股基础信息
+
+**股票代码**: {ticker}
+**股票名称**: {hk_info.get('name', f'港股{ticker}')}
+**交易货币**: 港币 (HK$)
+**交易所**: 香港交易所 (HKG)
+**数据源**: {hk_info.get('source', '基础信息')}
+
+⚠️ 注意：详细的价格和财务数据暂时无法获取，建议稍后重试或使用其他数据源。
+
+**基本面分析建议**：
+- 建议查看公司最新财报
+- 关注港股市场整体走势
+- 考虑汇率因素对投资的影响
+"""
+                        result_data.append(basic_info)
+                        print(f"✅ [统一基本面工具] 港股备用信息成功")
+
+                    except Exception as e2:
+                        # 最终备用方案
+                        fallback_info = f"""## 港股信息（备用）
+
+**股票代码**: {ticker}
+**股票类型**: 港股
+**交易货币**: 港币 (HK$)
+**交易所**: 香港交易所 (HKG)
+
+❌ 数据获取遇到问题: {str(e2)}
+
+**建议**：
+1. 检查网络连接
+2. 稍后重试分析
+3. 使用其他港股数据源
+4. 查看公司官方财报
+"""
+                        result_data.append(fallback_info)
+                        print(f"⚠️ [统一基本面工具] 港股使用最终备用方案")
+
+            else:
+                # 美股：使用OpenAI/Finnhub数据源
+                print(f"🇺🇸 [统一基本面工具] 处理美股数据...")
+
+                try:
+                    from tradingagents.dataflows.interface import get_fundamentals_openai
+                    us_data = get_fundamentals_openai(ticker, curr_date)
+                    result_data.append(f"## 美股基本面数据\n{us_data}")
+                except Exception as e:
+                    result_data.append(f"## 美股基本面数据\n获取失败: {e}")
+
+            # 组合所有数据
+            combined_result = f"""# {ticker} 基本面分析数据
+
+**股票类型**: {market_info['market_name']}
+**货币**: {market_info['currency_name']} ({market_info['currency_symbol']})
+**分析日期**: {curr_date}
+
+{chr(10).join(result_data)}
+
+---
+*数据来源: 根据股票类型自动选择最适合的数据源*
+"""
+
+            print(f"📊 [统一基本面工具] 数据获取完成，总长度: {len(combined_result)}")
+            return combined_result
+
+        except Exception as e:
+            error_msg = f"统一基本面分析工具执行失败: {str(e)}"
+            print(f"❌ [统一基本面工具] {error_msg}")
+            return error_msg
+
+    @staticmethod
+    @tool
+    def get_stock_market_data_unified(
+        ticker: Annotated[str, "股票代码（支持A股、港股、美股）"],
+        start_date: Annotated[str, "开始日期，格式：YYYY-MM-DD"],
+        end_date: Annotated[str, "结束日期，格式：YYYY-MM-DD"]
+    ) -> str:
+        """
+        统一的股票市场数据工具
+        自动识别股票类型（A股、港股、美股）并调用相应的数据源获取价格和技术指标数据
+
+        Args:
+            ticker: 股票代码（如：000001、0700.HK、AAPL）
+            start_date: 开始日期（格式：YYYY-MM-DD）
+            end_date: 结束日期（格式：YYYY-MM-DD）
+
+        Returns:
+            str: 市场数据和技术分析报告
+        """
+        print(f"📈 [统一市场工具] 分析股票: {ticker}")
+
+        try:
+            from tradingagents.utils.stock_utils import StockUtils
+
+            # 自动识别股票类型
+            market_info = StockUtils.get_market_info(ticker)
+            is_china = market_info['is_china']
+            is_hk = market_info['is_hk']
+            is_us = market_info['is_us']
+
+            print(f"📈 [统一市场工具] 股票类型: {market_info['market_name']}")
+            print(f"📈 [统一市场工具] 货币: {market_info['currency_name']} ({market_info['currency_symbol']})")
+
+            result_data = []
+
+            if is_china:
+                # 中国A股：使用中国股票数据源
+                print(f"🇨🇳 [统一市场工具] 处理A股市场数据...")
+
+                try:
+                    from tradingagents.dataflows.interface import get_china_stock_data_unified
+                    stock_data = get_china_stock_data_unified(ticker, start_date, end_date)
+                    result_data.append(f"## A股市场数据\n{stock_data}")
+                except Exception as e:
+                    result_data.append(f"## A股市场数据\n获取失败: {e}")
+
+            elif is_hk:
+                # 港股：使用AKShare数据源
+                print(f"🇭🇰 [统一市场工具] 处理港股市场数据...")
+
+                try:
+                    from tradingagents.dataflows.interface import get_hk_stock_data_unified
+                    hk_data = get_hk_stock_data_unified(ticker, start_date, end_date)
+                    result_data.append(f"## 港股市场数据\n{hk_data}")
+                except Exception as e:
+                    result_data.append(f"## 港股市场数据\n获取失败: {e}")
+
+            else:
+                # 美股：使用Yahoo Finance数据源
+                print(f"🇺🇸 [统一市场工具] 处理美股市场数据...")
+
+                try:
+                    from tradingagents.dataflows.interface import get_YFin_data_online
+                    us_data = get_YFin_data_online(ticker, start_date, end_date)
+                    result_data.append(f"## 美股市场数据\n{us_data}")
+                except Exception as e:
+                    result_data.append(f"## 美股市场数据\n获取失败: {e}")
+
+            # 组合所有数据
+            combined_result = f"""# {ticker} 市场数据分析
+
+**股票类型**: {market_info['market_name']}
+**货币**: {market_info['currency_name']} ({market_info['currency_symbol']})
+**分析期间**: {start_date} 至 {end_date}
+
+{chr(10).join(result_data)}
+
+---
+*数据来源: 根据股票类型自动选择最适合的数据源*
+"""
+
+            print(f"📈 [统一市场工具] 数据获取完成，总长度: {len(combined_result)}")
+            return combined_result
+
+        except Exception as e:
+            error_msg = f"统一市场数据工具执行失败: {str(e)}"
+            print(f"❌ [统一市场工具] {error_msg}")
+            return error_msg
+
+    @staticmethod
+    @tool
+    def get_stock_news_unified(
+        ticker: Annotated[str, "股票代码（支持A股、港股、美股）"],
+        curr_date: Annotated[str, "当前日期，格式：YYYY-MM-DD"]
+    ) -> str:
+        """
+        统一的股票新闻工具
+        自动识别股票类型（A股、港股、美股）并调用相应的新闻数据源
+
+        Args:
+            ticker: 股票代码（如：000001、0700.HK、AAPL）
+            curr_date: 当前日期（格式：YYYY-MM-DD）
+
+        Returns:
+            str: 新闻分析报告
+        """
+        print(f"📰 [统一新闻工具] 分析股票: {ticker}")
+
+        try:
+            from tradingagents.utils.stock_utils import StockUtils
+            from datetime import datetime, timedelta
+
+            # 自动识别股票类型
+            market_info = StockUtils.get_market_info(ticker)
+            is_china = market_info['is_china']
+            is_hk = market_info['is_hk']
+            is_us = market_info['is_us']
+
+            print(f"📰 [统一新闻工具] 股票类型: {market_info['market_name']}")
+
+            # 计算新闻查询的日期范围
+            end_date = datetime.strptime(curr_date, '%Y-%m-%d')
+            start_date = end_date - timedelta(days=7)
+            start_date_str = start_date.strftime('%Y-%m-%d')
+
+            result_data = []
+
+            if is_china or is_hk:
+                # 中国A股和港股：使用Google新闻（中文搜索）
+                print(f"🇨🇳🇭🇰 [统一新闻工具] 处理中文新闻...")
+
+                try:
+                    # 获取公司中文名称用于搜索
+                    if is_china:
+                        # A股使用股票代码搜索
+                        search_query = f"{ticker} 股票"
+                    else:
+                        # 港股使用代码搜索
+                        search_query = f"{ticker} 港股"
+
+                    from tradingagents.dataflows.interface import get_google_news
+                    news_data = get_google_news(search_query, curr_date)
+                    result_data.append(f"## 中文新闻\n{news_data}")
+                except Exception as e:
+                    result_data.append(f"## 中文新闻\n获取失败: {e}")
+
+            else:
+                # 美股：使用Finnhub新闻
+                print(f"🇺🇸 [统一新闻工具] 处理美股新闻...")
+
+                try:
+                    from tradingagents.dataflows.interface import get_finnhub_news
+                    news_data = get_finnhub_news(ticker, start_date_str, curr_date)
+                    result_data.append(f"## 美股新闻\n{news_data}")
+                except Exception as e:
+                    result_data.append(f"## 美股新闻\n获取失败: {e}")
+
+            # 组合所有数据
+            combined_result = f"""# {ticker} 新闻分析
+
+**股票类型**: {market_info['market_name']}
+**分析日期**: {curr_date}
+**新闻时间范围**: {start_date_str} 至 {curr_date}
+
+{chr(10).join(result_data)}
+
+---
+*数据来源: 根据股票类型自动选择最适合的新闻源*
+"""
+
+            print(f"📰 [统一新闻工具] 数据获取完成，总长度: {len(combined_result)}")
+            return combined_result
+
+        except Exception as e:
+            error_msg = f"统一新闻工具执行失败: {str(e)}"
+            print(f"❌ [统一新闻工具] {error_msg}")
+            return error_msg
+
+    @staticmethod
+    @tool
+    def get_stock_sentiment_unified(
+        ticker: Annotated[str, "股票代码（支持A股、港股、美股）"],
+        curr_date: Annotated[str, "当前日期，格式：YYYY-MM-DD"]
+    ) -> str:
+        """
+        统一的股票情绪分析工具
+        自动识别股票类型（A股、港股、美股）并调用相应的情绪数据源
+
+        Args:
+            ticker: 股票代码（如：000001、0700.HK、AAPL）
+            curr_date: 当前日期（格式：YYYY-MM-DD）
+
+        Returns:
+            str: 情绪分析报告
+        """
+        print(f"😊 [统一情绪工具] 分析股票: {ticker}")
+
+        try:
+            from tradingagents.utils.stock_utils import StockUtils
+
+            # 自动识别股票类型
+            market_info = StockUtils.get_market_info(ticker)
+            is_china = market_info['is_china']
+            is_hk = market_info['is_hk']
+            is_us = market_info['is_us']
+
+            print(f"😊 [统一情绪工具] 股票类型: {market_info['market_name']}")
+
+            result_data = []
+
+            if is_china or is_hk:
+                # 中国A股和港股：使用社交媒体情绪分析
+                print(f"🇨🇳🇭🇰 [统一情绪工具] 处理中文市场情绪...")
+
+                try:
+                    # 可以集成微博、雪球、东方财富等中文社交媒体情绪
+                    # 目前使用基础的情绪分析
+                    sentiment_summary = f"""
+## 中文市场情绪分析
+
+**股票**: {ticker} ({market_info['market_name']})
+**分析日期**: {curr_date}
+
+### 市场情绪概况
+- 由于中文社交媒体情绪数据源暂未完全集成，当前提供基础分析
+- 建议关注雪球、东方财富、同花顺等平台的讨论热度
+- 港股市场还需关注香港本地财经媒体情绪
+
+### 情绪指标
+- 整体情绪: 中性
+- 讨论热度: 待分析
+- 投资者信心: 待评估
+
+*注：完整的中文社交媒体情绪分析功能正在开发中*
+"""
+                    result_data.append(sentiment_summary)
+                except Exception as e:
+                    result_data.append(f"## 中文市场情绪\n获取失败: {e}")
+
+            else:
+                # 美股：使用Reddit情绪分析
+                print(f"🇺🇸 [统一情绪工具] 处理美股情绪...")
+
+                try:
+                    from tradingagents.dataflows.interface import get_reddit_sentiment
+                    sentiment_data = get_reddit_sentiment(ticker, curr_date)
+                    result_data.append(f"## 美股Reddit情绪\n{sentiment_data}")
+                except Exception as e:
+                    result_data.append(f"## 美股Reddit情绪\n获取失败: {e}")
+
+            # 组合所有数据
+            combined_result = f"""# {ticker} 情绪分析
+
+**股票类型**: {market_info['market_name']}
+**分析日期**: {curr_date}
+
+{chr(10).join(result_data)}
+
+---
+*数据来源: 根据股票类型自动选择最适合的情绪数据源*
+"""
+
+            print(f"😊 [统一情绪工具] 数据获取完成，总长度: {len(combined_result)}")
+            return combined_result
+
+        except Exception as e:
+            error_msg = f"统一情绪分析工具执行失败: {str(e)}"
+            print(f"❌ [统一情绪工具] {error_msg}")
+            return error_msg

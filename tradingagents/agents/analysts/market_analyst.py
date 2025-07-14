@@ -211,43 +211,32 @@ def create_market_analyst(llm, toolkit):
         print(f"📈 [DEBUG] 股票类型检查: {ticker} -> {market_info['market_name']} ({market_info['currency_name']})")
 
         if toolkit.config["online_tools"]:
-            if is_china:
-                # 中国A股使用中国股票数据源
-                tools = [
-                    toolkit.get_china_stock_data,
-                ]
-            elif is_hk:
-                # 港股优先使用AKShare数据源
-                tools = [
-                    toolkit.get_hk_stock_data_unified,  # 优先AKShare，备用Yahoo Finance
-                    toolkit.get_stockstats_indicators_report_online,
-                ]
-            else:
-                # 美股使用Yahoo Finance
-                tools = [
-                    toolkit.get_YFin_data_online,
-                    toolkit.get_stockstats_indicators_report_online,
-                ]
+            # 使用统一的市场数据工具，工具内部会自动识别股票类型
+            print(f"📊 [市场分析师] 使用统一市场数据工具，自动识别股票类型")
+            tools = [toolkit.get_stock_market_data_unified]
+            print(f"📊 [DEBUG] 选择的工具: {[tool.name for tool in tools]}")
+            print(f"📊 [DEBUG] 🔧 统一工具将自动处理: {market_info['market_name']}")
         else:
             tools = [
                 toolkit.get_YFin_data,
                 toolkit.get_stockstats_indicators_report,
             ]
 
-        if is_china:
-            # 中国A股专用提示词 - 针对DeepSeek优化
-            system_message = (
-                f"""你是一位专业的中国A股技术分析师。你必须对股票{ticker}进行详细的技术分析。
+        # 统一的系统提示，适用于所有股票类型
+        system_message = (
+            f"""你是一位专业的股票技术分析师。你必须对股票{ticker} ({market_info['market_name']})进行详细的技术分析。
 
 **工具调用指令：**
-你有一个工具叫做get_china_stock_data，你必须立即调用这个工具来获取股票{ticker}的数据。
+你有一个工具叫做get_stock_market_data_unified，你必须立即调用这个工具来获取股票{ticker}的数据。
 不要说你将要调用工具，直接调用工具。
 
 **分析要求：**
 1. 调用工具后，基于获取的真实数据进行技术分析
 2. 分析移动平均线、MACD、RSI、布林带等技术指标
-3. 提供具体的数值和专业分析
-4. 给出明确的投资建议
+3. 考虑市场特点进行分析
+4. 提供具体的数值和专业分析
+5. 给出明确的投资建议
+6. 价格使用{market_info['currency_name']}（{market_info['currency_symbol']}）
 
 **输出格式：**
 ## 📊 股票基本信息
@@ -256,61 +245,8 @@ def create_market_analyst(llm, toolkit):
 ## 💭 投资建议
 
 请使用中文，基于真实数据进行分析。"""
-            )
-        elif is_hk:
-            # 港股专用提示词
-            system_message = (
-                f"""你是一位专业的港股技术分析师。你必须对港股{ticker}进行详细的技术分析。
-
-**工具调用指令：**
-你有工具可以获取港股{ticker}的数据，请立即调用相关工具获取数据。
-
-**分析要求：**
-1. 基于获取的真实港股数据进行技术分析
-2. 分析移动平均线、MACD、RSI、布林带等技术指标
-3. 考虑港股市场特点（如T+0交易、港币计价等）
-4. 提供具体的数值和专业分析
-5. 给出明确的投资建议
-
-**输出格式：**
-## 🇭🇰 港股基本信息
-## 📈 技术指标分析
-## 📉 价格趋势分析
-## 💭 投资建议
-
-请使用中文，价格以港币(HK$)计价，基于真实数据进行分析。"""
-            )
-        else:
-            # 美股提示词
-            system_message = (
-                """你是一位专业的交易助手，负责分析金融市场。你的角色是从以下列表中选择**最相关的指标**来分析给定的市场条件或交易策略。目标是选择最多**8个指标**，提供互补的见解而不重复。各类别及其指标如下：
-
-移动平均线：
-- close_50_sma: 50日简单移动平均线：中期趋势指标。用途：识别趋势方向并作为动态支撑/阻力。提示：滞后于价格；结合更快的指标获得及时信号。
-- close_200_sma: 200日简单移动平均线：长期趋势基准。用途：确认整体市场趋势并识别金叉/死叉设置。提示：反应缓慢；最适合战略趋势确认而非频繁交易入场。
-- close_10_ema: 10日指数移动平均线：响应迅速的短期平均线。用途：捕捉动量快速变化和潜在入场点。提示：在震荡市场中容易产生噪音；与较长平均线结合使用以过滤虚假信号。
-
-MACD相关指标：
-- macd: MACD：通过EMA差值计算动量。用途：寻找交叉和背离作为趋势变化信号。提示：在低波动或横盘市场中需要其他指标确认。
-- macds: MACD信号线：MACD线的EMA平滑。用途：使用与MACD线的交叉来触发交易。提示：应作为更广泛策略的一部分以避免虚假信号。
-- macdh: MACD柱状图：显示MACD线与其信号线之间的差距。用途：可视化动量强度并及早发现背离。提示：可能波动较大；在快速移动市场中需要额外过滤器。
-
-动量指标：
-- rsi: RSI：测量动量以标记超买/超卖条件。用途：应用70/30阈值并观察背离以信号反转。提示：在强趋势中，RSI可能保持极端值；始终与趋势分析交叉验证。
-
-波动性指标：
-- boll: 布林带中轨：作为布林带基础的20日SMA。用途：作为价格运动的动态基准。提示：与上下轨结合使用以有效发现突破或反转。
-- boll_ub: 布林带上轨：通常是中线上方2个标准差。用途：信号潜在超买条件和突破区域。提示：用其他工具确认信号；在强趋势中价格可能沿着轨道运行。
-- boll_lb: 布林带下轨：通常是中线下方2个标准差。用途：指示潜在超卖条件。提示：使用额外分析以避免虚假反转信号。
-- atr: ATR：平均真实范围以测量波动性。用途：根据当前市场波动性设置止损水平和调整仓位大小。提示：这是一个反应性指标，应作为更广泛风险管理策略的一部分。
-
-成交量指标：
-- vwma: VWMA：按成交量加权的移动平均线。用途：通过整合价格行为和成交量数据来确认趋势。提示：注意成交量激增造成的偏斜结果；与其他成交量分析结合使用。
-
-- 选择提供多样化和互补信息的指标。避免冗余（例如，不要同时选择rsi和stochrsi）。还要简要解释为什么它们适合给定的市场环境。当你调用工具时，请使用上面提供的指标的确切名称，因为它们是定义的参数，否则你的调用将失败。请确保首先调用get_YFin_data来检索生成指标所需的CSV。写一份非常详细和细致的趋势观察报告。不要简单地说趋势是混合的，提供详细和细粒度的分析和见解，可能帮助交易者做出决策。
-
-请确保所有分析都使用中文，并在报告末尾附加一个Markdown表格来组织报告中的要点，使其有组织且易于阅读。"""
         )
+
 
         prompt = ChatPromptTemplate.from_messages(
             [
