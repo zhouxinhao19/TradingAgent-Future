@@ -25,10 +25,9 @@ def render_analysis_form():
 
             # 根据市场类型显示不同的输入提示
             if market_type == "美股":
-                # 使用简单的默认值，不依赖session state
+                # 不设置默认值，让用户自己输入
                 stock_symbol = st.text_input(
                     "股票代码 📈",
-                    value="AAPL",  # 简单的默认值
                     placeholder="输入美股代码，如 AAPL, TSLA, MSFT",
                     help="输入要分析的美股代码",
                     key="us_stock_input"
@@ -39,7 +38,6 @@ def render_analysis_form():
             else:  # A股
                 stock_symbol = st.text_input(
                     "股票代码 📈",
-                    value="000001",  # 简单的默认值
                     placeholder="输入A股代码，如 000001, 600519",
                     help="输入要分析的A股代码，如 000001(平安银行), 600519(贵州茅台)",
                     key="cn_stock_input"
@@ -138,15 +136,20 @@ def render_analysis_form():
                 help="可以输入特定的分析要求，AI会在分析中重点关注"
             )
 
+        # 验证股票代码是否为空
+        if not stock_symbol:
+            st.warning("⚠️ 请输入股票代码")
+
         # 提交按钮
         submitted = st.form_submit_button(
             "🚀 开始分析",
             type="primary",
-            use_container_width=True
+            use_container_width=True,
+            disabled=not stock_symbol
         )
 
     # 只有在提交时才返回数据
-    if submitted:
+    if submitted and stock_symbol:  # 确保有股票代码才提交
         # 添加详细日志
         print(f"🔍 [FORM DEBUG] ===== 分析表单提交 =====")
         print(f"🔍 [FORM DEBUG] 用户输入的股票代码: '{stock_symbol}'")
@@ -171,5 +174,10 @@ def render_analysis_form():
         print(f"🔍 [FORM DEBUG] ===== 表单提交结束 =====")
 
         return form_data
+    elif submitted and not stock_symbol:
+        # 用户点击了提交但没有输入股票代码
+        print(f"🔍 [FORM DEBUG] 提交失败：股票代码为空")
+        st.error("❌ 请输入股票代码后再提交")
+        return {'submitted': False}
     else:
         return {'submitted': False}
