@@ -24,8 +24,12 @@ def create_fundamentals_analyst(llm, toolkit):
         print(f"📊 [基本面分析师] 正在分析股票: {ticker}")
 
         market_info = StockUtils.get_market_info(ticker)
+        is_china = market_info['is_china']
+        is_hk = market_info['is_hk']
+        is_us = market_info['is_us']
+
         print(f"📊 [DEBUG] 股票类型检查: {ticker} -> {market_info['market_name']} ({market_info['currency_name']})")
-        print(f"📊 [DEBUG] 详细市场信息: is_china={market_info['is_china']}, is_hk={market_info['is_hk']}, is_us={market_info['is_us']}")
+        print(f"📊 [DEBUG] 详细市场信息: is_china={is_china}, is_hk={is_hk}, is_us={is_us}")
         print(f"📊 [DEBUG] 工具配置检查: online_tools={toolkit.config['online_tools']}")
 
         # 选择工具
