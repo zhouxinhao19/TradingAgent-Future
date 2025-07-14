@@ -28,9 +28,10 @@ def render_analysis_form():
                 # 不设置默认值，让用户自己输入
                 stock_symbol = st.text_input(
                     "股票代码 📈",
-                    placeholder="输入美股代码，如 AAPL, TSLA, MSFT",
-                    help="输入要分析的美股代码",
-                    key="us_stock_input"
+                    placeholder="输入美股代码，如 AAPL, TSLA, MSFT，然后按回车确认",
+                    help="输入要分析的美股代码，输入完成后请按回车键确认",
+                    key="us_stock_input",
+                    autocomplete="off"  # 修复autocomplete警告
                 ).upper().strip()
 
                 print(f"🔍 [FORM DEBUG] 美股text_input返回值: '{stock_symbol}'")
@@ -38,9 +39,10 @@ def render_analysis_form():
             else:  # A股
                 stock_symbol = st.text_input(
                     "股票代码 📈",
-                    placeholder="输入A股代码，如 000001, 600519",
-                    help="输入要分析的A股代码，如 000001(平安银行), 600519(贵州茅台)",
-                    key="cn_stock_input"
+                    placeholder="输入A股代码，如 000001, 600519，然后按回车确认",
+                    help="输入要分析的A股代码，如 000001(平安银行), 600519(贵州茅台)，输入完成后请按回车键确认",
+                    key="cn_stock_input",
+                    autocomplete="off"  # 修复autocomplete警告
                 ).strip()
 
                 print(f"🔍 [FORM DEBUG] A股text_input返回值: '{stock_symbol}'")
@@ -136,16 +138,38 @@ def render_analysis_form():
                 help="可以输入特定的分析要求，AI会在分析中重点关注"
             )
 
-        # 验证股票代码是否为空
+        # 显示输入状态提示
         if not stock_symbol:
-            st.warning("⚠️ 请输入股票代码")
+            st.info("💡 请在上方输入股票代码，输入完成后按回车键确认")
+        else:
+            st.success(f"✅ 已输入股票代码: {stock_symbol}")
 
-        # 提交按钮
+        # 添加JavaScript来改善用户体验
+        st.markdown("""
+        <script>
+        // 监听输入框的变化，提供更好的用户反馈
+        document.addEventListener('DOMContentLoaded', function() {
+            const inputs = document.querySelectorAll('input[type="text"]');
+            inputs.forEach(input => {
+                input.addEventListener('input', function() {
+                    if (this.value.trim()) {
+                        this.style.borderColor = '#00ff00';
+                        this.title = '按回车键确认输入';
+                    } else {
+                        this.style.borderColor = '';
+                        this.title = '';
+                    }
+                });
+            });
+        });
+        </script>
+        """, unsafe_allow_html=True)
+
+        # 提交按钮（不禁用，让用户可以点击）
         submitted = st.form_submit_button(
             "🚀 开始分析",
             type="primary",
-            use_container_width=True,
-            disabled=not stock_symbol
+            use_container_width=True
         )
 
     # 只有在提交时才返回数据
