@@ -4,6 +4,73 @@ from openai import OpenAI
 import dashscope
 from dashscope import TextEmbedding
 import os
+import threading
+from typing import Dict, Optional
+
+
+class ChromaDBManager:
+    """单例ChromaDB管理器，避免并发创建集合的冲突"""
+
+    _instance = None
+    _lock = threading.Lock()
+    _collections: Dict[str, any] = {}
+    _client = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super(ChromaDBManager, cls).__new__(cls)
+                    cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self):
+        if not self._initialized:
+            try:
+                # 使用更兼容的ChromaDB配置
+                settings = Settings(
+                    allow_reset=True,
+                    anonymized_telemetry=False,
+                    is_persistent=False
+                )
+                self._client = chromadb.Client(settings)
+                self._initialized = True
+                print("📚 [ChromaDB] 单例管理器初始化完成")
+            except Exception as e:
+                print(f"❌ [ChromaDB] 初始化失败: {e}")
+                # 使用最简单的配置作为备用
+                self._client = chromadb.Client()
+                self._initialized = True
+                print("📚 [ChromaDB] 使用备用配置初始化完成")
+
+    def get_or_create_collection(self, name: str):
+        """线程安全地获取或创建集合"""
+        with self._lock:
+            if name in self._collections:
+                print(f"📚 [ChromaDB] 使用缓存集合: {name}")
+                return self._collections[name]
+
+            try:
+                # 尝试获取现有集合
+                collection = self._client.get_collection(name=name)
+                print(f"📚 [ChromaDB] 获取现有集合: {name}")
+            except Exception:
+                try:
+                    # 创建新集合
+                    collection = self._client.create_collection(name=name)
+                    print(f"📚 [ChromaDB] 创建新集合: {name}")
+                except Exception as e:
+                    # 可能是并发创建，再次尝试获取
+                    try:
+                        collection = self._client.get_collection(name=name)
+                        print(f"📚 [ChromaDB] 并发创建后获取集合: {name}")
+                    except Exception as final_error:
+                        print(f"❌ [ChromaDB] 集合操作失败: {name}, 错误: {final_error}")
+                        raise final_error
+
+            # 缓存集合
+            self._collections[name] = collection
+            return collection
 
 
 class FinancialSituationMemory:
@@ -89,14 +156,9 @@ class FinancialSituationMemory:
             self.embedding = "text-embedding-3-small"
             self.client = OpenAI(base_url=config["backend_url"])
 
-        self.chroma_client = chromadb.Client(Settings(allow_reset=True))
-
-        # 尝试获取现有集合，如果不存在则创建新的
-        try:
-            self.situation_collection = self.chroma_client.get_collection(name=name)
-        except Exception:
-            # 集合不存在，创建新的
-            self.situation_collection = self.chroma_client.create_collection(name=name)
+        # 使用单例ChromaDB管理器
+        self.chroma_manager = ChromaDBManager()
+        self.situation_collection = self.chroma_manager.get_or_create_collection(name)
 
     def get_embedding(self, text):
         """Get embedding for a text using the configured provider"""

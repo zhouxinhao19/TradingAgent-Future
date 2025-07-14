@@ -131,6 +131,7 @@ class TradingAgentsGraph:
         # Initialize memories (如果启用)
         memory_enabled = self.config.get("memory_enabled", True)
         if memory_enabled:
+            # 使用单例ChromaDB管理器，避免并发创建冲突
             self.bull_memory = FinancialSituationMemory("bull_memory", self.config)
             self.bear_memory = FinancialSituationMemory("bear_memory", self.config)
             self.trader_memory = FinancialSituationMemory("trader_memory", self.config)
