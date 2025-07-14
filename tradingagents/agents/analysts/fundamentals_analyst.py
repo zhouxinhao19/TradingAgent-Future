@@ -296,13 +296,23 @@ def create_fundamentals_analyst(llm, toolkit):
                 tools = [toolkit.get_fundamentals_openai]
                 print(f"📊 [DEBUG] 选择的工具: {[tool.name for tool in tools]}")
         else:
-            tools = [
-                toolkit.get_finnhub_company_insider_sentiment,
-                toolkit.get_finnhub_company_insider_transactions,
-                toolkit.get_simfin_balance_sheet,
-                toolkit.get_simfin_cashflow,
-                toolkit.get_simfin_income_stmt,
-            ]
+            # 离线模式：优先使用FinnHub数据，SimFin作为补充
+            if is_china:
+                # A股使用本地缓存数据
+                tools = [
+                    toolkit.get_china_stock_data,
+                    toolkit.get_china_fundamentals
+                ]
+            else:
+                # 美股/港股：优先FinnHub，SimFin作为补充
+                tools = [
+                    toolkit.get_fundamentals_finnhub,  # 优先使用FinnHub基本面数据
+                    toolkit.get_finnhub_company_insider_sentiment,
+                    toolkit.get_finnhub_company_insider_transactions,
+                    toolkit.get_simfin_balance_sheet,
+                    toolkit.get_simfin_cashflow,
+                    toolkit.get_simfin_income_stmt,
+                ]
 
         # 根据股票类型调整系统提示
         if is_china_stock(ticker):

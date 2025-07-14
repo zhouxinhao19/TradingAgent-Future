@@ -29,11 +29,18 @@ def create_trader(llm, memory):
         print(f"💰 [DEBUG] 基本面报告前200字符: {fundamentals_report[:200]}...")
 
         curr_situation = f"{market_research_report}\n\n{sentiment_report}\n\n{news_report}\n\n{fundamentals_report}"
-        past_memories = memory.get_memories(curr_situation, n_matches=2)
 
-        past_memory_str = ""
-        for i, rec in enumerate(past_memories, 1):
-            past_memory_str += rec["recommendation"] + "\n\n"
+        # 检查memory是否可用
+        if memory is not None:
+            print(f"⚠️ [DEBUG] memory可用，获取历史记忆")
+            past_memories = memory.get_memories(curr_situation, n_matches=2)
+            past_memory_str = ""
+            for i, rec in enumerate(past_memories, 1):
+                past_memory_str += rec["recommendation"] + "\n\n"
+        else:
+            print(f"⚠️ [DEBUG] memory为None，跳过历史记忆检索")
+            past_memories = []
+            past_memory_str = "暂无历史记忆数据可参考。"
 
         context = {
             "role": "user",
