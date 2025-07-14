@@ -161,8 +161,12 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         if research_depth == 1:  # 1级 - 快速分析
             config["max_debate_rounds"] = 1
             config["max_risk_discuss_rounds"] = 1
-            config["memory_enabled"] = False  # 禁用记忆功能加速
-            config["online_tools"] = False  # 使用缓存数据加速
+            # 保持内存功能启用，因为内存操作开销很小但能显著提升分析质量
+            config["memory_enabled"] = True
+
+            # 统一使用在线工具，避免离线工具的各种问题
+            config["online_tools"] = True  # 所有市场都使用统一工具
+            print(f"🔧 [快速分析] {market_type}使用统一工具，确保数据源正确和稳定性")
             if llm_provider == "dashscope":
                 config["quick_think_llm"] = "qwen-turbo"  # 使用最快模型
                 config["deep_think_llm"] = "qwen-plus"

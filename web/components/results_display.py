@@ -18,6 +18,28 @@ def render_results(results):
         st.warning("暂无分析结果")
         return
 
+    # 添加CSS确保结果内容不被右侧遮挡
+    st.markdown("""
+    <style>
+    /* 确保分析结果内容有足够的右边距 */
+    .element-container, .stMarkdown, .stExpander {
+        margin-right: 1.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+
+    /* 特别处理展开组件 */
+    .streamlit-expanderHeader {
+        margin-right: 1rem !important;
+    }
+
+    /* 确保文本内容不被截断 */
+    .stMarkdown p, .stMarkdown div {
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     stock_symbol = results.get('stock_symbol', 'N/A')
     decision = results.get('decision', {})
     state = results.get('state', {})

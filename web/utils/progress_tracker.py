@@ -35,24 +35,30 @@ class AnalysisProgressTracker:
         """更新进度"""
         current_time = time.time()
         elapsed_time = current_time - self.start_time
-        
+
         # 记录步骤
         self.steps.append({
             'message': message,
             'timestamp': current_time,
             'elapsed': elapsed_time
         })
-        
+
         # 根据消息内容自动判断当前步骤
         if step is None:
             step = self._detect_step_from_message(message)
-        
+
         if step is not None:
             self.current_step = step
-        
+
+        # 如果是完成消息，确保进度为100%
+        if "完成" in message or "成功" in message or step == len(self.analysis_steps) - 1:
+            self.current_step = len(self.analysis_steps) - 1
+
         # 调用回调函数
         if self.callback:
-            progress = self.current_step / len(self.analysis_steps) if len(self.analysis_steps) > 0 else 0
+            progress = self.current_step / (len(self.analysis_steps) - 1) if len(self.analysis_steps) > 1 else 1.0
+            # 确保进度不超过1.0
+            progress = min(progress, 1.0)
             self.callback(message, self.current_step, len(self.analysis_steps), progress, elapsed_time)
     
     def _detect_step_from_message(self, message: str) -> Optional[int]:
@@ -92,7 +98,10 @@ class AnalysisProgressTracker:
     
     def get_progress_percentage(self) -> float:
         """获取进度百分比"""
-        return (self.current_step / len(self.analysis_steps)) * 100 if len(self.analysis_steps) > 0 else 0
+        if len(self.analysis_steps) <= 1:
+            return 100.0
+        progress = (self.current_step / (len(self.analysis_steps) - 1)) * 100
+        return min(progress, 100.0)
     
     def get_elapsed_time(self) -> float:
         """获取已用时间"""
@@ -168,15 +177,23 @@ class StreamlitProgressDisplay:
 def create_progress_callback(display: StreamlitProgressDisplay) -> Callable:
     """创建进度回调函数"""
     tracker = AnalysisProgressTracker()
-    
+
     def callback(message: str, step: Optional[int] = None, total_steps: Optional[int] = None):
-        tracker.update(message, step, total_steps)
-        
-        current_step = tracker.current_step
-        total_steps = len(tracker.analysis_steps)
-        progress = tracker.get_progress_percentage() / 100
-        elapsed_time = tracker.get_elapsed_time()
-        
-        display.update(message, current_step, total_steps, progress, elapsed_time)
-    
+        # 如果明确指定了步骤和总步骤，直接使用
+        if step is not None and total_steps is not None:
+            current_step = step
+            total_steps_count = total_steps
+            progress = step / max(total_steps - 1, 1) if total_steps > 1 else 1.0
+            progress = min(progress, 1.0)
+            elapsed_time = tracker.get_elapsed_time()
+        else:
+            # 否则使用跟踪器的自动检测
+            tracker.update(message, step, total_steps)
+            current_step = tracker.current_step
+            total_steps_count = len(tracker.analysis_steps)
+            progress = tracker.get_progress_percentage() / 100
+            elapsed_time = tracker.get_elapsed_time()
+
+        display.update(message, current_step, total_steps_count, progress, elapsed_time)
+
     return callback

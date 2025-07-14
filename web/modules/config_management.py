@@ -54,13 +54,13 @@ def render_config_management():
 
 def render_model_config():
     """渲染模型配置页面"""
-    st.header("🤖 模型配置")
-    
+    st.markdown("**🤖 模型配置**")
+
     # 加载现有配置
     models = config_manager.load_models()
-    
+
     # 显示当前配置
-    st.subheader("当前模型配置")
+    st.markdown("**当前模型配置**")
     
     if models:
         # 创建DataFrame显示
@@ -88,7 +88,7 @@ def render_model_config():
         st.dataframe(df, use_container_width=True)
         
         # 编辑模型配置
-        st.subheader("编辑模型配置")
+        st.markdown("**编辑模型配置**")
         
         # 选择要编辑的模型
         model_options = [f"{m.provider} - {m.model_name}" for m in models]
@@ -137,7 +137,7 @@ def render_model_config():
         st.warning("没有找到模型配置")
     
     # 添加新模型
-    st.subheader("添加新模型")
+    st.markdown("**添加新模型**")
     
     col1, col2 = st.columns(2)
     
@@ -172,13 +172,13 @@ def render_model_config():
 
 def render_pricing_config():
     """渲染定价配置页面"""
-    st.header("💰 定价设置")
-    
+    st.markdown("**💰 定价设置**")
+
     # 加载现有定价
     pricing_configs = config_manager.load_pricing()
-    
+
     # 显示当前定价
-    st.subheader("当前定价配置")
+    st.markdown("**当前定价配置**")
     
     if pricing_configs:
         pricing_data = []
@@ -196,7 +196,7 @@ def render_pricing_config():
         st.dataframe(df, use_container_width=True)
         
         # 编辑定价
-        st.subheader("编辑定价")
+        st.markdown("**编辑定价**")
         
         pricing_options = [f"{p.provider} - {p.model_name}" for p in pricing_configs]
         selected_pricing_idx = st.selectbox("选择要编辑的定价", range(len(pricing_options)),
@@ -239,7 +239,7 @@ def render_pricing_config():
                 st.rerun()
     
     # 添加新定价
-    st.subheader("添加新定价")
+    st.markdown("**添加新定价**")
     
     col1, col2 = st.columns(2)
     
@@ -272,24 +272,24 @@ def render_pricing_config():
 
 def render_usage_statistics():
     """渲染使用统计页面"""
-    st.header("📊 使用统计")
-    
+    st.markdown("**📊 使用统计**")
+
     # 时间范围选择
     col1, col2 = st.columns(2)
     with col1:
         days = st.selectbox("统计时间范围", [7, 30, 90, 365], index=1, key="stats_time_range")
     with col2:
         st.metric("统计周期", f"最近 {days} 天")
-    
+
     # 获取统计数据
     stats = config_manager.get_usage_statistics(days)
-    
+
     if stats["total_requests"] == 0:
         st.info("📝 暂无使用记录")
         return
-    
+
     # 总体统计
-    st.subheader("📈 总体统计")
+    st.markdown("**📈 总体统计**")
     
     col1, col2, col3, col4 = st.columns(4)
     
@@ -307,7 +307,7 @@ def render_usage_statistics():
     
     # 按供应商统计
     if stats["provider_stats"]:
-        st.subheader("🏢 按供应商统计")
+        st.markdown("**🏢 按供应商统计**")
         
         provider_data = []
         for provider, data in stats["provider_stats"].items():
@@ -333,7 +333,7 @@ def render_usage_statistics():
             st.plotly_chart(fig, use_container_width=True)
     
     # 使用趋势
-    st.subheader("📈 使用趋势")
+    st.markdown("**📈 使用趋势**")
     
     records = config_manager.load_usage_records()
     if records:
@@ -384,12 +384,12 @@ def render_usage_statistics():
 
 def render_system_settings():
     """渲染系统设置页面"""
-    st.header("🔧 系统设置")
-    
+    st.markdown("**🔧 系统设置**")
+
     # 加载当前设置
     settings = config_manager.load_settings()
-    
-    st.subheader("基本设置")
+
+    st.markdown("**基本设置**")
     
     col1, col2 = st.columns(2)
     
@@ -464,7 +464,7 @@ def render_system_settings():
         st.rerun()
     
     # 数据管理
-    st.subheader("数据管理")
+    st.markdown("**数据管理**")
     
     col1, col2, col3 = st.columns(3)
     
@@ -502,7 +502,7 @@ def render_system_settings():
 
 def render_env_status():
     """显示.env配置状态"""
-    st.subheader("📋 配置状态概览")
+    st.markdown("**📋 配置状态概览**")
 
     # 获取.env配置状态
     env_status = config_manager.get_env_config_status()

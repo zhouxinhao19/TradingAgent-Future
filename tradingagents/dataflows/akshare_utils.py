@@ -18,11 +18,48 @@ class AKShareProvider:
             import akshare as ak
             self.ak = ak
             self.connected = True
+
+            # 设置更长的超时时间
+            self._configure_timeout()
+
             print("✅ AKShare初始化成功")
         except ImportError:
             self.ak = None
             self.connected = False
             print("❌ AKShare未安装")
+
+    def _configure_timeout(self):
+        """配置AKShare的超时设置"""
+        try:
+            import requests
+            import socket
+
+            # 设置更长的超时时间
+            socket.setdefaulttimeout(60)  # 60秒超时
+
+            # 如果AKShare使用requests，设置默认超时
+            if hasattr(requests, 'adapters'):
+                from requests.adapters import HTTPAdapter
+                from urllib3.util.retry import Retry
+
+                # 创建重试策略
+                retry_strategy = Retry(
+                    total=3,
+                    backoff_factor=1,
+                    status_forcelist=[429, 500, 502, 503, 504],
+                )
+
+                # 设置适配器
+                adapter = HTTPAdapter(max_retries=retry_strategy)
+                session = requests.Session()
+                session.mount("http://", adapter)
+                session.mount("https://", adapter)
+
+                print("🔧 AKShare超时配置完成: 60秒超时，3次重试")
+
+        except Exception as e:
+            print(f"⚠️ AKShare超时配置失败: {e}")
+            print("🔧 使用默认超时设置")
     
     def get_stock_data(self, symbol: str, start_date: str = None, end_date: str = None) -> Optional[pd.DataFrame]:
         """获取股票历史数据"""
@@ -100,14 +137,42 @@ class AKShareProvider:
             start_date_formatted = start_date.replace('-', '') if start_date else "20240101"
             end_date_formatted = end_date.replace('-', '') if end_date else "20241231"
 
-            # 使用AKShare获取港股历史数据
-            data = self.ak.stock_hk_hist(
-                symbol=hk_symbol,
-                period="daily",
-                start_date=start_date_formatted,
-                end_date=end_date_formatted,
-                adjust=""
-            )
+            # 使用AKShare获取港股历史数据（带超时保护）
+            import threading
+
+            result = [None]
+            exception = [None]
+
+            def fetch_hist_data():
+                try:
+                    result[0] = self.ak.stock_hk_hist(
+                        symbol=hk_symbol,
+                        period="daily",
+                        start_date=start_date_formatted,
+                        end_date=end_date_formatted,
+                        adjust=""
+                    )
+                except Exception as e:
+                    exception[0] = e
+
+            # 启动线程
+            thread = threading.Thread(target=fetch_hist_data)
+            thread.daemon = True
+            thread.start()
+
+            # 等待60秒
+            thread.join(timeout=60)
+
+            if thread.is_alive():
+                # 超时了
+                print(f"⚠️ AKShare港股历史数据获取超时（60秒）: {symbol}")
+                raise Exception(f"AKShare港股历史数据获取超时（60秒）: {symbol}")
+            elif exception[0]:
+                # 有异常
+                raise exception[0]
+            else:
+                # 成功
+                data = result[0]
 
             if not data.empty:
                 # 数据预处理
@@ -164,7 +229,37 @@ class AKShareProvider:
             print(f"🇭🇰 AKShare获取港股信息: {hk_symbol}")
 
             # 尝试获取港股实时行情数据来获取基本信息
-            spot_data = self.ak.stock_hk_spot_em()
+            # 使用线程超时包装（兼容Windows）
+            import threading
+            import time
+
+            result = [None]
+            exception = [None]
+
+            def fetch_data():
+                try:
+                    result[0] = self.ak.stock_hk_spot_em()
+                except Exception as e:
+                    exception[0] = e
+
+            # 启动线程
+            thread = threading.Thread(target=fetch_data)
+            thread.daemon = True
+            thread.start()
+
+            # 等待60秒
+            thread.join(timeout=60)
+
+            if thread.is_alive():
+                # 超时了
+                print("⚠️ AKShare港股信息获取超时（60秒），使用备用方案")
+                raise Exception("AKShare港股信息获取超时（60秒）")
+            elif exception[0]:
+                # 有异常
+                raise exception[0]
+            else:
+                # 成功
+                spot_data = result[0]
 
             # 查找对应的股票信息
             if not spot_data.empty:

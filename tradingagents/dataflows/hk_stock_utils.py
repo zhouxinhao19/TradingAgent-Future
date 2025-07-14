@@ -18,8 +18,8 @@ class HKStockProvider:
         """初始化港股数据提供器"""
         self.last_request_time = 0
         self.min_request_interval = 2.0  # 增加请求间隔到2秒
-        self.timeout = 30  # 请求超时时间
-        self.max_retries = 2  # 减少重试次数
+        self.timeout = 60  # 请求超时时间（增加到60秒）
+        self.max_retries = 3  # 增加重试次数
         self.rate_limit_wait = 60  # 遇到限制时等待时间
 
         print("🇭🇰 港股数据提供器初始化完成")

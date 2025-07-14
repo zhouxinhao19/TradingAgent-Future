@@ -37,7 +37,16 @@ def create_fundamentals_analyst(llm, toolkit):
             # 使用统一的基本面分析工具，工具内部会自动识别股票类型
             print(f"📊 [基本面分析师] 使用统一基本面分析工具，自动识别股票类型")
             tools = [toolkit.get_stock_fundamentals_unified]
-            print(f"📊 [DEBUG] 选择的工具: {[tool.name for tool in tools]}")
+            # 安全地获取工具名称用于调试
+            tool_names_debug = []
+            for tool in tools:
+                if hasattr(tool, 'name'):
+                    tool_names_debug.append(tool.name)
+                elif hasattr(tool, '__name__'):
+                    tool_names_debug.append(tool.__name__)
+                else:
+                    tool_names_debug.append(str(tool))
+            print(f"📊 [DEBUG] 选择的工具: {tool_names_debug}")
             print(f"📊 [DEBUG] 🔧 统一工具将自动处理: {market_info['market_name']}")
         else:
             # 离线模式：优先使用FinnHub数据，SimFin作为补充
@@ -109,7 +118,17 @@ def create_fundamentals_analyst(llm, toolkit):
         ])
 
         prompt = prompt.partial(system_message=system_message)
-        prompt = prompt.partial(tool_names=", ".join([tool.name for tool in tools]))
+        # 安全地获取工具名称，处理函数和工具对象
+        tool_names = []
+        for tool in tools:
+            if hasattr(tool, 'name'):
+                tool_names.append(tool.name)
+            elif hasattr(tool, '__name__'):
+                tool_names.append(tool.__name__)
+            else:
+                tool_names.append(str(tool))
+
+        prompt = prompt.partial(tool_names=", ".join(tool_names))
         prompt = prompt.partial(current_date=current_date)
         prompt = prompt.partial(ticker=ticker)
 
@@ -126,7 +145,16 @@ def create_fundamentals_analyst(llm, toolkit):
             fresh_llm = llm
 
         print(f"📊 [DEBUG] 创建LLM链，工具数量: {len(tools)}")
-        print(f"📊 [DEBUG] 绑定的工具列表: {[tool.name for tool in tools]}")
+        # 安全地获取工具名称用于调试
+        debug_tool_names = []
+        for tool in tools:
+            if hasattr(tool, 'name'):
+                debug_tool_names.append(tool.name)
+            elif hasattr(tool, '__name__'):
+                debug_tool_names.append(tool.__name__)
+            else:
+                debug_tool_names.append(str(tool))
+        print(f"📊 [DEBUG] 绑定的工具列表: {debug_tool_names}")
         print(f"📊 [DEBUG] 创建工具链，让模型自主决定是否调用工具")
 
         try:
@@ -144,10 +172,18 @@ def create_fundamentals_analyst(llm, toolkit):
         print(f"📊 [DEBUG] 工具调用数量: {len(result.tool_calls) if hasattr(result, 'tool_calls') else 0}")
         print(f"📊 [DEBUG] 内容长度: {len(result.content) if hasattr(result, 'content') else 0}")
 
-        # 检查工具调用
-        expected_tools = [tool.name for tool in tools]
+        # 检查工具调用 - 安全地获取工具名称
+        expected_tools = []
+        for tool in tools:
+            if hasattr(tool, 'name'):
+                expected_tools.append(tool.name)
+            elif hasattr(tool, '__name__'):
+                expected_tools.append(tool.__name__)
+            else:
+                expected_tools.append(str(tool))
+
         actual_tools = [tc['name'] for tc in result.tool_calls] if hasattr(result, 'tool_calls') and result.tool_calls else []
-        
+
         print(f"📊 [DEBUG] 期望的工具: {expected_tools}")
         print(f"📊 [DEBUG] 实际调用的工具: {actual_tools}")
 
@@ -171,7 +207,18 @@ def create_fundamentals_analyst(llm, toolkit):
             # 强制调用统一基本面分析工具
             try:
                 print(f"📊 [DEBUG] 强制调用 get_stock_fundamentals_unified...")
-                unified_tool = next((tool for tool in tools if tool.name == 'get_stock_fundamentals_unified'), None)
+                # 安全地查找统一基本面分析工具
+                unified_tool = None
+                for tool in tools:
+                    tool_name = None
+                    if hasattr(tool, 'name'):
+                        tool_name = tool.name
+                    elif hasattr(tool, '__name__'):
+                        tool_name = tool.__name__
+
+                    if tool_name == 'get_stock_fundamentals_unified':
+                        unified_tool = tool
+                        break
                 if unified_tool:
                     combined_data = unified_tool.invoke({
                         'ticker': ticker,

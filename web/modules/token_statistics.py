@@ -33,7 +33,7 @@ def render_token_statistics():
     # 应用隐藏Deploy按钮的CSS样式
     apply_hide_deploy_button_css()
     
-    st.header("💰 Token使用统计与成本分析")
+    st.markdown("**💰 Token使用统计与成本分析**")
     
     # 侧边栏控制
     with st.sidebar:
@@ -105,7 +105,7 @@ def render_token_statistics():
 
 def render_overview_metrics(stats: Dict[str, Any], time_range: str):
     """渲染概览指标"""
-    st.subheader(f"📈 {time_range}概览")
+    st.markdown(f"**📈 {time_range}概览**")
     
     # 创建指标卡片
     col1, col2, col3, col4 = st.columns(4)
@@ -159,13 +159,13 @@ def render_overview_metrics(stats: Dict[str, Any], time_range: str):
 
 def render_detailed_charts(records: List[UsageRecord], stats: Dict[str, Any]):
     """渲染详细图表"""
-    st.subheader("📊 详细分析图表")
+    st.markdown("**📊 详细分析图表**")
     
     # Token使用分布饼图
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("🥧 Token使用分布")
+        st.markdown("**🥧 Token使用分布**")
         
         # 创建饼图数据
         token_data = {
@@ -183,7 +183,7 @@ def render_detailed_charts(records: List[UsageRecord], stats: Dict[str, Any]):
         st.plotly_chart(fig_pie, use_container_width=True)
     
     with col2:
-        st.subheader("📈 成本vs Token关系")
+        st.markdown("**📈 成本vs Token关系**")
         
         # 创建散点图
         df_records = pd.DataFrame([
@@ -210,7 +210,7 @@ def render_detailed_charts(records: List[UsageRecord], stats: Dict[str, Any]):
 
 def render_provider_statistics(stats: Dict[str, Any]):
     """渲染供应商统计"""
-    st.subheader("🏢 供应商统计")
+    st.markdown("**🏢 供应商统计**")
     
     provider_stats = stats.get('provider_stats', {})
     
@@ -264,7 +264,7 @@ def render_provider_statistics(stats: Dict[str, Any]):
 
 def render_cost_trends(records: List[UsageRecord]):
     """渲染成本趋势图"""
-    st.subheader("📈 成本趋势分析")
+    st.markdown("**📈 成本趋势分析**")
     
     # 按日期聚合数据
     df_records = pd.DataFrame([
@@ -327,7 +327,7 @@ def render_cost_trends(records: List[UsageRecord]):
 
 def render_detailed_records_table(records: List[UsageRecord]):
     """渲染详细记录表"""
-    st.subheader("📋 详细使用记录")
+    st.markdown("**📋 详细使用记录**")
     
     if not records:
         st.info("暂无详细记录")

@@ -214,7 +214,16 @@ def create_market_analyst(llm, toolkit):
             # 使用统一的市场数据工具，工具内部会自动识别股票类型
             print(f"📊 [市场分析师] 使用统一市场数据工具，自动识别股票类型")
             tools = [toolkit.get_stock_market_data_unified]
-            print(f"📊 [DEBUG] 选择的工具: {[tool.name for tool in tools]}")
+            # 安全地获取工具名称用于调试
+            tool_names_debug = []
+            for tool in tools:
+                if hasattr(tool, 'name'):
+                    tool_names_debug.append(tool.name)
+                elif hasattr(tool, '__name__'):
+                    tool_names_debug.append(tool.__name__)
+                else:
+                    tool_names_debug.append(str(tool))
+            print(f"📊 [DEBUG] 选择的工具: {tool_names_debug}")
             print(f"📊 [DEBUG] 🔧 统一工具将自动处理: {market_info['market_name']}")
         else:
             tools = [
@@ -266,7 +275,17 @@ def create_market_analyst(llm, toolkit):
         )
 
         prompt = prompt.partial(system_message=system_message)
-        prompt = prompt.partial(tool_names=", ".join([tool.name for tool in tools]))
+        # 安全地获取工具名称，处理函数和工具对象
+        tool_names = []
+        for tool in tools:
+            if hasattr(tool, 'name'):
+                tool_names.append(tool.name)
+            elif hasattr(tool, '__name__'):
+                tool_names.append(tool.__name__)
+            else:
+                tool_names.append(str(tool))
+
+        prompt = prompt.partial(tool_names=", ".join(tool_names))
         prompt = prompt.partial(current_date=current_date)
         prompt = prompt.partial(ticker=ticker)
 
@@ -298,7 +317,14 @@ def create_market_analyst(llm, toolkit):
                     # 找到对应的工具并执行
                     tool_result = None
                     for tool in tools:
-                        if tool.name == tool_name:
+                        # 安全地获取工具名称进行比较
+                        current_tool_name = None
+                        if hasattr(tool, 'name'):
+                            current_tool_name = tool.name
+                        elif hasattr(tool, '__name__'):
+                            current_tool_name = tool.__name__
+
+                        if current_tool_name == tool_name:
                             try:
                                 if tool_name == "get_china_stock_data":
                                     # 中国股票数据工具
