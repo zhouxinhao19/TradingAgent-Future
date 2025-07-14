@@ -107,8 +107,8 @@ def test_regex_patterns():
     try:
         import re
         
-        # 测试港股正则模式
-        hk_pattern = r'^\d{4}\.HK$'
+        # 测试港股正则模式（支持4-5位数字）
+        hk_pattern = r'^\d{4,5}\.HK$'
         digit_pattern = r'^\d{4}$'
         
         test_symbols = [

@@ -210,17 +210,18 @@ class HKStockProvider:
             
         symbol = str(symbol).strip().upper()
         
-        # 如果是纯4位数字，添加.HK后缀
-        if symbol.isdigit() and len(symbol) == 4:
+        # 如果是纯4-5位数字，添加.HK后缀
+        if symbol.isdigit() and 4 <= len(symbol) <= 5:
             return f"{symbol}.HK"
-            
+
         # 如果已经是正确格式，直接返回
-        if symbol.endswith('.HK') and len(symbol) == 7:
+        if symbol.endswith('.HK') and 7 <= len(symbol) <= 8:
             return symbol
-            
+
         # 处理其他可能的格式
         if '.' not in symbol and symbol.isdigit():
-            return f"{symbol.zfill(4)}.HK"
+            # 保持原有位数，不强制填充到4位
+            return f"{symbol}.HK"
             
         return symbol
 

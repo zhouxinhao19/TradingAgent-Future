@@ -546,9 +546,9 @@ def select_market():
             "name": "港股",
             "name_en": "Hong Kong Stock",
             "default": "0700.HK",
-            "examples": ["0700.HK (腾讯)", "9988.HK (阿里巴巴)", "3690.HK (美团)"],
-            "format": "代码.HK (如: 0700.HK)",
-            "pattern": r'^\d{4}\.HK$',
+            "examples": ["0700.HK (腾讯)", "09988.HK (阿里巴巴)", "03690.HK (美团)"],
+            "format": "代码.HK (如: 0700.HK, 09988.HK)",
+            "pattern": r'^\d{4,5}\.HK$',
             "data_source": "yahoo_finance"
         }
     }
