@@ -24,20 +24,40 @@ def render_analysis_form():
             )
 
             # 根据市场类型显示不同的输入提示
+            # 使用session state保持用户输入的股票代码
             if market_type == "美股":
+                # 初始化session state
+                if 'us_stock_symbol' not in st.session_state:
+                    st.session_state.us_stock_symbol = "AAPL"
+
                 stock_symbol = st.text_input(
                     "股票代码 📈",
-                    value="AAPL",
+                    value=st.session_state.us_stock_symbol,
                     placeholder="输入美股代码，如 AAPL, TSLA, MSFT",
-                    help="输入要分析的美股代码"
+                    help="输入要分析的美股代码",
+                    key="us_stock_input"
                 ).upper().strip()
+
+                # 更新session state
+                if stock_symbol:
+                    st.session_state.us_stock_symbol = stock_symbol
+
             else:  # A股
+                # 初始化session state
+                if 'cn_stock_symbol' not in st.session_state:
+                    st.session_state.cn_stock_symbol = "000001"
+
                 stock_symbol = st.text_input(
                     "股票代码 📈",
-                    value="000001",
+                    value=st.session_state.cn_stock_symbol,
                     placeholder="输入A股代码，如 000001, 600519",
-                    help="输入要分析的A股代码，如 000001(平安银行), 600519(贵州茅台)"
+                    help="输入要分析的A股代码，如 000001(平安银行), 600519(贵州茅台)",
+                    key="cn_stock_input"
                 ).strip()
+
+                # 更新session state
+                if stock_symbol:
+                    st.session_state.cn_stock_symbol = stock_symbol
             
             # 分析日期
             analysis_date = st.date_input(
