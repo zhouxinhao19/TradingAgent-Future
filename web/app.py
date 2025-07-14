@@ -285,6 +285,13 @@ def main():
         # 渲染分析表单
         form_data = render_analysis_form()
 
+        # 添加接收日志
+        if form_data.get('submitted', False):
+            print(f"🔍 [APP DEBUG] ===== 主应用接收表单数据 =====")
+            print(f"🔍 [APP DEBUG] 接收到的form_data: {form_data}")
+            print(f"🔍 [APP DEBUG] 股票代码: '{form_data['stock_symbol']}'")
+            print(f"🔍 [APP DEBUG] 市场类型: '{form_data['market_type']}'")
+
         # 检查是否提交了表单
         if form_data.get('submitted', False):
             if not form_data['stock_symbol']:

@@ -159,7 +159,15 @@ def render_analysis_form():
 
     # 只有在提交时才返回数据
     if submitted:
-        return {
+        # 添加详细日志
+        print(f"🔍 [FORM DEBUG] ===== 分析表单提交 =====")
+        print(f"🔍 [FORM DEBUG] 用户输入的股票代码: '{stock_symbol}'")
+        print(f"🔍 [FORM DEBUG] 市场类型: '{market_type}'")
+        print(f"🔍 [FORM DEBUG] 分析日期: '{analysis_date}'")
+        print(f"🔍 [FORM DEBUG] 选择的分析师: {[a[0] for a in selected_analysts]}")
+        print(f"🔍 [FORM DEBUG] 研究深度: {research_depth}")
+
+        form_data = {
             'submitted': True,
             'stock_symbol': stock_symbol,
             'market_type': market_type,
@@ -170,5 +178,10 @@ def render_analysis_form():
             'include_risk_assessment': include_risk_assessment,
             'custom_prompt': custom_prompt
         }
+
+        print(f"🔍 [FORM DEBUG] 返回的表单数据: {form_data}")
+        print(f"🔍 [FORM DEBUG] ===== 表单提交结束 =====")
+
+        return form_data
     else:
         return {'submitted': False}

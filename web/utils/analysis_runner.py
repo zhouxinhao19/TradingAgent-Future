@@ -107,6 +107,16 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             progress_callback(message, step, total_steps)
         print(f"[进度] {message}")
 
+    # 添加详细的参数接收日志
+    print(f"🔍 [RUNNER DEBUG] ===== 分析运行器接收参数 =====")
+    print(f"🔍 [RUNNER DEBUG] 接收到的股票代码: '{stock_symbol}' (类型: {type(stock_symbol)})")
+    print(f"🔍 [RUNNER DEBUG] 分析日期: '{analysis_date}'")
+    print(f"🔍 [RUNNER DEBUG] 分析师列表: {analysts}")
+    print(f"🔍 [RUNNER DEBUG] 市场类型: '{market_type}'")
+    print(f"🔍 [RUNNER DEBUG] LLM提供商: '{llm_provider}'")
+    print(f"🔍 [RUNNER DEBUG] LLM模型: '{llm_model}'")
+    print(f"🔍 [RUNNER DEBUG] 研究深度: {research_depth}")
+
     update_progress("开始股票分析...")
 
     # 生成会话ID用于Token跟踪
@@ -230,14 +240,22 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         print(f"分析日期: {analysis_date}")
 
         # 根据市场类型调整股票代码格式
+        print(f"🔍 [RUNNER DEBUG] ===== 股票代码格式化 =====")
+        print(f"🔍 [RUNNER DEBUG] 原始股票代码: '{stock_symbol}'")
+        print(f"🔍 [RUNNER DEBUG] 市场类型: '{market_type}'")
+
         if market_type == "A股":
             # A股代码不需要特殊处理，保持原样
             formatted_symbol = stock_symbol
+            print(f"🔍 [RUNNER DEBUG] A股代码保持原样: '{formatted_symbol}'")
             update_progress(f"准备分析A股: {formatted_symbol}")
         else:
             # 美股代码转为大写
             formatted_symbol = stock_symbol.upper()
+            print(f"🔍 [RUNNER DEBUG] 美股代码转大写: '{stock_symbol}' -> '{formatted_symbol}'")
             update_progress(f"准备分析美股: {formatted_symbol}")
+
+        print(f"🔍 [RUNNER DEBUG] 最终传递给分析引擎的股票代码: '{formatted_symbol}'")
 
         # 初始化交易图
         update_progress("初始化分析引擎...")
@@ -245,6 +263,11 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
 
         # 执行分析
         update_progress(f"开始分析 {formatted_symbol} 股票，这可能需要几分钟时间...")
+        print(f"🔍 [RUNNER DEBUG] ===== 调用graph.propagate =====")
+        print(f"🔍 [RUNNER DEBUG] 传递给graph.propagate的参数:")
+        print(f"🔍 [RUNNER DEBUG]   symbol: '{formatted_symbol}'")
+        print(f"🔍 [RUNNER DEBUG]   date: '{analysis_date}'")
+
         state, decision = graph.propagate(formatted_symbol, analysis_date)
 
         # 调试信息
