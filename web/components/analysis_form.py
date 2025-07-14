@@ -18,7 +18,7 @@ def render_analysis_form():
             # 市场选择
             market_type = st.selectbox(
                 "选择市场 🌍",
-                options=["美股", "A股"],
+                options=["美股", "A股", "港股"],
                 index=1,
                 help="选择要分析的股票市场"
             )
@@ -35,6 +35,18 @@ def render_analysis_form():
                 ).upper().strip()
 
                 print(f"🔍 [FORM DEBUG] 美股text_input返回值: '{stock_symbol}'")
+
+            elif market_type == "港股":
+                # 应用与美股相同的修复：移除默认值，添加回车提示
+                stock_symbol = st.text_input(
+                    "股票代码 📈",
+                    placeholder="输入港股代码，如 0700.HK, 9988.HK, 3690.HK，然后按回车确认",
+                    help="输入要分析的港股代码，如 0700.HK(腾讯控股), 9988.HK(阿里巴巴), 3690.HK(美团)，输入完成后请按回车键确认",
+                    key="hk_stock_input",
+                    autocomplete="off"  # 修复autocomplete警告
+                ).upper().strip()
+
+                print(f"🔍 [FORM DEBUG] 港股text_input返回值: '{stock_symbol}'")
 
             else:  # A股
                 stock_symbol = st.text_input(

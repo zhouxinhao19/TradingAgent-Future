@@ -100,27 +100,62 @@ class OptimizedUSDataProvider:
             print(f"❌ FINNHUB API调用失败: {e}")
             formatted_data = None
 
-        # 备用方案：Yahoo Finance API
+        # 备用方案：根据股票类型选择合适的数据源
         if not formatted_data:
             try:
-                print(f"🌐 从Yahoo Finance API获取数据: {symbol}")
-                self._wait_for_rate_limit()
+                # 检测股票类型
+                from tradingagents.utils.stock_utils import StockUtils
+                market_info = StockUtils.get_market_info(symbol)
 
-                # 获取数据
-                ticker = yf.Ticker(symbol.upper())
-                data = ticker.history(start=start_date, end=end_date)
+                if market_info['is_hk']:
+                    # 港股优先使用AKShare数据源
+                    print(f"🇭🇰 尝试使用AKShare获取港股数据: {symbol}")
+                    try:
+                        from tradingagents.dataflows.interface import get_hk_stock_data_unified
+                        hk_data_text = get_hk_stock_data_unified(symbol, start_date, end_date)
 
-                if data.empty:
-                    error_msg = f"未找到股票 '{symbol}' 在 {start_date} 到 {end_date} 期间的数据"
-                    print(f"❌ {error_msg}")
+                        if hk_data_text and "❌" not in hk_data_text:
+                            formatted_data = hk_data_text
+                            data_source = "akshare_hk"
+                            print(f"✅ AKShare港股数据获取成功: {symbol}")
+                        else:
+                            raise Exception("AKShare港股数据获取失败")
+
+                    except Exception as e:
+                        print(f"⚠️ AKShare港股数据获取失败: {e}")
+                        # 备用方案：Yahoo Finance
+                        print(f"🔄 使用Yahoo Finance备用方案获取港股数据: {symbol}")
+
+                        self._wait_for_rate_limit()
+                        ticker = yf.Ticker(symbol)  # 港股代码保持原格式
+                        data = ticker.history(start=start_date, end=end_date)
+
+                        if not data.empty:
+                            formatted_data = self._format_stock_data(symbol, data, start_date, end_date)
+                            data_source = "yfinance_hk"
+                            print(f"✅ Yahoo Finance港股数据获取成功: {symbol}")
+                        else:
+                            print(f"❌ Yahoo Finance港股数据为空: {symbol}")
                 else:
-                    # 格式化数据
-                    formatted_data = self._format_stock_data(symbol, data, start_date, end_date)
-                    data_source = "yfinance"
-                    print(f"✅ Yahoo Finance数据获取成功: {symbol}")
+                    # 美股使用Yahoo Finance
+                    print(f"🇺🇸 从Yahoo Finance API获取美股数据: {symbol}")
+                    self._wait_for_rate_limit()
+
+                    # 获取数据
+                    ticker = yf.Ticker(symbol.upper())
+                    data = ticker.history(start=start_date, end=end_date)
+
+                    if data.empty:
+                        error_msg = f"未找到股票 '{symbol}' 在 {start_date} 到 {end_date} 期间的数据"
+                        print(f"❌ {error_msg}")
+                    else:
+                        # 格式化数据
+                        formatted_data = self._format_stock_data(symbol, data, start_date, end_date)
+                        data_source = "yfinance"
+                        print(f"✅ Yahoo Finance美股数据获取成功: {symbol}")
 
             except Exception as e:
-                print(f"❌ Yahoo Finance API调用失败: {e}")
+                print(f"❌ 数据获取失败: {e}")
                 formatted_data = None
 
         # 如果所有API都失败，生成备用数据

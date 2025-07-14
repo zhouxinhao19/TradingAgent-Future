@@ -12,19 +12,22 @@ def create_trader(llm, memory):
         news_report = state["news_report"]
         fundamentals_report = state["fundamentals_report"]
 
-        # 检查是否为中国股票
-        def is_china_stock(ticker_code):
-            import re
-            return re.match(r'^\d{6}$', str(ticker_code))
+        # 使用统一的股票类型检测
+        from tradingagents.utils.stock_utils import StockUtils
+
+        market_info = StockUtils.get_market_info(company_name)
+        is_china = market_info['is_china']
+        is_hk = market_info['is_hk']
+        is_us = market_info['is_us']
 
         # 根据股票类型确定货币单位
-        is_china = is_china_stock(company_name)
-        currency = "人民币" if is_china else "美元"
-        currency_symbol = "¥" if is_china else "$"
+        currency = market_info['currency_name']
+        currency_symbol = market_info['currency_symbol']
 
         print(f"💰 [DEBUG] ===== 交易员节点开始 =====")
-        print(f"💰 [DEBUG] 交易员检测股票类型: {company_name} -> 中国A股: {is_china}, 货币: {currency}")
+        print(f"💰 [DEBUG] 交易员检测股票类型: {company_name} -> {market_info['market_name']}, 货币: {currency}")
         print(f"💰 [DEBUG] 货币符号: {currency_symbol}")
+        print(f"💰 [DEBUG] 市场详情: 中国A股={is_china}, 港股={is_hk}, 美股={is_us}")
         print(f"💰 [DEBUG] 基本面报告长度: {len(fundamentals_report)}")
         print(f"💰 [DEBUG] 基本面报告前200字符: {fundamentals_report[:200]}...")
 

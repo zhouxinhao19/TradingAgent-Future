@@ -181,11 +181,11 @@ class TradingAgentsGraph:
         return {
             "market": ToolNode(
                 [
+                    # 统一工具
+                    self.toolkit.get_stock_market_data_unified,
                     # online tools
                     self.toolkit.get_YFin_data_online,
                     self.toolkit.get_stockstats_indicators_report_online,
-                    # 中国股票专用工具
-                    self.toolkit.get_china_stock_data,
                     # offline tools
                     self.toolkit.get_YFin_data,
                     self.toolkit.get_stockstats_indicators_report,
@@ -211,11 +211,8 @@ class TradingAgentsGraph:
             ),
             "fundamentals": ToolNode(
                 [
-                    # online tools
-                    self.toolkit.get_fundamentals_openai,
-                    # 中国股票专用工具
-                    self.toolkit.get_china_stock_data,
-                    self.toolkit.get_china_fundamentals,
+                    # 统一工具
+                    self.toolkit.get_stock_fundamentals_unified,
                     # offline tools
                     self.toolkit.get_finnhub_company_insider_sentiment,
                     self.toolkit.get_finnhub_company_insider_transactions,

@@ -36,23 +36,13 @@ def create_fundamentals_analyst(llm, toolkit):
             print(f"📊 [DEBUG] 选择的工具: {[tool.name for tool in tools]}")
             print(f"📊 [DEBUG] 🔧 统一工具将自动处理: {market_info['market_name']}")
         else:
-            # 离线模式：优先使用FinnHub数据，SimFin作为补充
-            if is_china:
-                # A股使用本地缓存数据
-                tools = [
-                    toolkit.get_china_stock_data,
-                    toolkit.get_china_fundamentals
-                ]
-            else:
-                # 美股/港股：优先FinnHub，SimFin作为补充
-                tools = [
-                    toolkit.get_fundamentals_openai,  # 使用现有的OpenAI基本面数据工具
-                    toolkit.get_finnhub_company_insider_sentiment,
-                    toolkit.get_finnhub_company_insider_transactions,
-                    toolkit.get_simfin_balance_sheet,
-                    toolkit.get_simfin_cashflow,
-                    toolkit.get_simfin_income_stmt,
-                ]
+            tools = [
+                toolkit.get_finnhub_company_insider_sentiment,
+                toolkit.get_finnhub_company_insider_transactions,
+                toolkit.get_simfin_balance_sheet,
+                toolkit.get_simfin_cashflow,
+                toolkit.get_simfin_income_stmt,
+            ]
 
         # 统一的系统提示，适用于所有股票类型
         system_message = (
@@ -113,20 +103,18 @@ def create_fundamentals_analyst(llm, toolkit):
         if hasattr(llm, '__class__') and 'DashScope' in llm.__class__.__name__:
             print(f"📊 [DEBUG] 检测到阿里百炼模型，创建新实例以避免工具缓存")
             from tradingagents.llm_adapters import ChatDashScopeOpenAI
-            fresh_llm = ChatDashScopeOpenAI(
+            llm = ChatDashScopeOpenAI(
                 model=llm.model_name,
                 temperature=llm.temperature,
                 max_tokens=getattr(llm, 'max_tokens', 2000)
             )
-        else:
-            fresh_llm = llm
 
         print(f"📊 [DEBUG] 创建LLM链，工具数量: {len(tools)}")
         print(f"📊 [DEBUG] 绑定的工具列表: {[tool.name for tool in tools]}")
         print(f"📊 [DEBUG] 创建工具链，让模型自主决定是否调用工具")
 
         try:
-            chain = prompt | fresh_llm.bind_tools(tools)
+            chain = prompt | llm.bind_tools(tools)
             print(f"📊 [DEBUG] ✅ 工具绑定成功，绑定了 {len(tools)} 个工具")
         except Exception as e:
             print(f"📊 [DEBUG] ❌ 工具绑定失败: {e}")
@@ -210,7 +198,7 @@ def create_fundamentals_analyst(llm, toolkit):
                     ("human", "{analysis_request}")
                 ])
                 
-                analysis_chain = analysis_prompt_template | fresh_llm
+                analysis_chain = analysis_prompt_template | llm
                 analysis_result = analysis_chain.invoke({"analysis_request": analysis_prompt})
                 
                 if hasattr(analysis_result, 'content'):
