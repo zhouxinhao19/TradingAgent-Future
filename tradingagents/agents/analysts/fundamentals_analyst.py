@@ -306,7 +306,7 @@ def create_fundamentals_analyst(llm, toolkit):
             else:
                 # 美股/港股：优先FinnHub，SimFin作为补充
                 tools = [
-                    toolkit.get_fundamentals_finnhub,  # 优先使用FinnHub基本面数据
+                    toolkit.get_fundamentals_openai,  # 使用现有的OpenAI基本面数据工具
                     toolkit.get_finnhub_company_insider_sentiment,
                     toolkit.get_finnhub_company_insider_transactions,
                     toolkit.get_simfin_balance_sheet,
