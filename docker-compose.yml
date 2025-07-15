@@ -14,7 +14,6 @@ services:
       - ./web:/app/web
       - ./tradingagents:/app/tradingagents
       - ./scripts:/app/scripts
-      - ./test_conversion.py:/app/test_conversion.py
     env_file:
       - .env
     environment:
