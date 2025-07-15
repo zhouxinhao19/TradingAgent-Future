@@ -17,29 +17,58 @@ def check_system_status():
     print("🔍 TradingAgents 系统状态检查")
     print("=" * 50)
     
-    # 检查配置文件
-    print("\n📁 检查配置文件...")
-    config_file = project_root / "config" / "database_config.json"
-    if config_file.exists():
-        print(f"✅ 配置文件存在: {config_file}")
-        
+    # 检查环境配置文件
+    print("\n📁 检查环境配置...")
+    env_file = project_root / ".env"
+    env_example_file = project_root / ".env.example"
+
+    if env_file.exists():
+        print(f"✅ 环境配置文件存在: {env_file}")
+
         try:
-            import json
-            with open(config_file, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-            
-            print("📊 配置内容:")
-            print(f"  数据库启用: {config['database']['enabled']}")
-            print(f"  自动检测: {config['database']['auto_detect']}")
-            print(f"  MongoDB启用: {config['database']['mongodb']['enabled']}")
-            print(f"  Redis启用: {config['database']['redis']['enabled']}")
-            print(f"  主要缓存后端: {config['cache']['primary_backend']}")
-            print(f"  降级支持: {config['cache']['fallback_enabled']}")
-            
+            import os
+            from dotenv import load_dotenv
+
+            # 加载环境变量
+            load_dotenv(env_file)
+
+            print("📊 数据库配置状态:")
+            mongodb_enabled = os.getenv('MONGODB_ENABLED', 'false').lower() == 'true'
+            redis_enabled = os.getenv('REDIS_ENABLED', 'false').lower() == 'true'
+            mongodb_host = os.getenv('MONGODB_HOST', 'localhost')
+            mongodb_port = os.getenv('MONGODB_PORT', '27017')
+            redis_host = os.getenv('REDIS_HOST', 'localhost')
+            redis_port = os.getenv('REDIS_PORT', '6379')
+
+            print(f"  MongoDB启用: {'✅ 是' if mongodb_enabled else '❌ 否'}")
+            print(f"  MongoDB地址: {mongodb_host}:{mongodb_port}")
+            print(f"  Redis启用: {'✅ 是' if redis_enabled else '❌ 否'}")
+            print(f"  Redis地址: {redis_host}:{redis_port}")
+
+            print("\n📊 API密钥配置状态:")
+            api_keys = {
+                'DASHSCOPE_API_KEY': '阿里百炼',
+                'FINNHUB_API_KEY': 'FinnHub',
+                'TUSHARE_TOKEN': 'Tushare',
+                'GOOGLE_API_KEY': 'Google AI',
+                'DEEPSEEK_API_KEY': 'DeepSeek'
+            }
+
+            for key, name in api_keys.items():
+                value = os.getenv(key, '')
+                if value and value != f'your_{key.lower()}_here':
+                    print(f"  {name}: ✅ 已配置")
+                else:
+                    print(f"  {name}: ❌ 未配置")
+
+        except ImportError:
+            print("⚠️ python-dotenv未安装，无法解析.env文件")
         except Exception as e:
-            print(f"❌ 配置文件解析失败: {e}")
+            print(f"❌ 环境配置解析失败: {e}")
     else:
-        print(f"❌ 配置文件不存在: {config_file}")
+        print(f"❌ 环境配置文件不存在: {env_file}")
+        if env_example_file.exists():
+            print(f"💡 请复制 {env_example_file} 为 {env_file} 并配置API密钥")
     
     # 检查数据库管理器
     print("\n🔧 检查数据库管理器...")
@@ -187,10 +216,13 @@ def check_system_status():
             print("✅ 数据库可用，系统运行在最佳性能模式")
         else:
             print("ℹ️ 数据库不可用，系统使用文件缓存模式")
-            print("💡 建议:")
-            print("  1. 安装MongoDB和Redis以获得更好的性能")
-            print("  2. 运行: pip install pymongo redis")
-            print("  3. 启动数据库服务:")
+            print("💡 提升性能建议:")
+            print("  1. 配置环境变量启用数据库:")
+            print("     MONGODB_ENABLED=true")
+            print("     REDIS_ENABLED=true")
+            print("  2. 启动数据库服务:")
+            print("     docker-compose up -d  # 推荐方式")
+            print("     或手动启动:")
             print("     - MongoDB: docker run -d -p 27017:27017 mongo:4.4")
             print("     - Redis: docker run -d -p 6379:6379 redis:alpine")
         

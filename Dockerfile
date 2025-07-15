@@ -30,11 +30,8 @@ RUN echo '#!/bin/bash\nXvfb :99 -screen 0 1024x768x24 -ac +extension GLX &\nexpo
     && chmod +x /usr/local/bin/start-xvfb.sh
 
 COPY requirements.txt .
-COPY requirements_db.txt .
 
-RUN pip install --no-cache-dir -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple && \
-    pip install --no-cache-dir pytdx -i https://mirrors.aliyun.com/pypi/simple && \
-    pip install --no-cache-dir -r requirements_db.txt -i https://mirrors.aliyun.com/pypi/simple
+RUN pip install --no-cache-dir -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
 
 COPY . .
 

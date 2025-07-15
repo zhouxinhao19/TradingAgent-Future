@@ -2,11 +2,11 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/Version-cn--0.1.7-green.svg)](./VERSION)
+[![Version](https://img.shields.io/badge/Version-cn--0.1.8-green.svg)](./VERSION)
 [![Documentation](https://img.shields.io/badge/docs-中文文档-green.svg)](./docs/)
 [![Original](https://img.shields.io/badge/基于-TauricResearch/TradingAgents-orange.svg)](https://github.com/TauricResearch/TradingAgents)
 
-> 🎉 **版本**: 当前版本为 cn-0.1.7 版，已具备Docker容器化部署、专业报告导出、DeepSeek V3集成、完整的A股数据支持等核心功能。
+> 🎉 **版本**: 当前版本为 cn-0.1.8 版，已具备Web界面全面优化、Docker容器化部署、专业报告导出、DeepSeek V3集成、完整的A股数据支持等核心功能。
 >
 > 📝 **版本说明**: 为避免与源项目版本冲突，中文增强版使用 `cn-` 前缀的独立版本体系。
 
@@ -74,7 +74,7 @@
 
 我们深信，通过这些努力，能够让更多中国用户体验到TradingAgents的强大功能，并为全球开源社区贡献中国智慧。
 
-## 🎯 详细功能列表 (v0.1.7)
+## 🎯 详细功能列表 (v0.1.8)
 
 ### 🌐 Web界面与用户体验
 
@@ -82,7 +82,7 @@
 | -------------------------------- | ----------- | ------------------------------------------ |
 | **🖥️ Streamlit Web界面** | ✅ 完整支持 | 现代化响应式界面，支持实时交互和数据可视化 |
 | **📱 移动端适配**          | ✅ 完整支持 | 响应式设计，支持平板设备访问               |
-| **🎨 主题定制**            | ✅ 完整支持 | 深色/浅色主题切换，自定义配色方案          |
+| **🎨 界面样式**            | ✅ 完整支持 | 统一简洁设计，专业配色方案                |
 | **⚙️ 配置管理界面**      | ✅ 完整支持 | Web端API密钥管理，模型选择，参数配置       |
 | **📊 实时监控面板**        | ✅ 完整支持 | Token使用统计，缓存情况                    |
 | **🔔 消息通知**            | ✅ 完整支持 | 分析进度提示，错误警告，成功通知           |
@@ -273,7 +273,7 @@
 
 ## 🆚 与原版的主要区别
 
-### ✅ 已完成的增强 (v0.1.7)
+### ✅ 已完成的增强 (v0.1.8)
 
 | 功能分类                | 原版状态     | 中文增强版状态                   | 完成度  |
 | ----------------------- | ------------ | -------------------------------- | ------- |
@@ -287,6 +287,15 @@
 | **⚙️ 配置管理** | 基础配置     | 统一.env配置 + Web管理界面       | ✅ 100% |
 | **💰 成本控制**   | 无           | 智能路由 + 成本优化              | ✅ 100% |
 | **🏗️ 架构优化** | 基础架构     | 容器化架构 + 微服务设计          | ✅ 100% |
+
+### 🚀 v0.1.8 重大更新
+
+- **🎨 Web界面全面优化**: 样式统一、布局改进、用户体验提升
+- **📋 使用指南增强**: 默认显示、A股示例、详细操作指引
+- **🔧 进度显示修复**: 分析进度正确显示100%完成状态
+- **🌏 港股美股Bug修复**: 修复港股代码识别、美股数据获取等关键问题
+- **🔗 统一数据工具链**: 实现统一工具架构，自动路由到最优数据源
+- **📁 项目结构优化**: 模块重组、代码组织更清晰
 
 ### 🚀 v0.1.7 重大更新
 
@@ -364,14 +373,13 @@ env\Scripts\activate
 # Linux/macOS
 source env/bin/activate
 
-# 3. 安装基础依赖
+# 3. 安装所有依赖
 pip install -r requirements.txt
 
-# 4. 安装A股数据支持（可选）
-pip install pytdx  # 通达信API，用于A股实时数据
-
-# 5. 安装数据库支持（可选，推荐）
-pip install -r requirements_db.txt  # MongoDB + Redis 支持
+# 注意：requirements.txt已包含所有必需依赖：
+# - 数据库支持 (MongoDB + Redis)
+# - 多市场数据源 (Tushare, AKShare, FinnHub等)
+# - Web界面和报告导出功能
 ```
 
 ### 配置API密钥
@@ -386,17 +394,56 @@ cp .env.example .env
 DASHSCOPE_API_KEY=your_dashscope_api_key_here
 FINNHUB_API_KEY=your_finnhub_api_key_here
 
-# 可选：Google AI API（支持Gemini模型）
-GOOGLE_API_KEY=your_google_api_key_here
+# 推荐：Tushare API（专业A股数据）
+TUSHARE_TOKEN=your_tushare_token_here
+TUSHARE_ENABLED=true
 
-# 可选：数据库配置（提升性能，默认禁用）
+# 可选：其他AI模型API
+GOOGLE_API_KEY=your_google_api_key_here
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
+
+# 数据库配置（可选，提升性能）
+# 本地部署使用标准端口
 MONGODB_ENABLED=false  # 设为true启用MongoDB
 REDIS_ENABLED=false    # 设为true启用Redis
 MONGODB_HOST=localhost
-MONGODB_PORT=27018     # 使用非标准端口避免冲突
+MONGODB_PORT=27017     # 标准MongoDB端口
 REDIS_HOST=localhost
-REDIS_PORT=6380        # 使用非标准端口避免冲突
+REDIS_PORT=6379        # 标准Redis端口
+
+# Docker部署时需要修改主机名
+# MONGODB_HOST=mongodb
+# REDIS_HOST=redis
 ```
+
+#### 📋 部署模式配置说明
+
+**本地部署模式**：
+```bash
+# 数据库配置（本地部署）
+MONGODB_ENABLED=true
+REDIS_ENABLED=true
+MONGODB_HOST=localhost      # 本地主机
+MONGODB_PORT=27017         # 标准端口
+REDIS_HOST=localhost       # 本地主机
+REDIS_PORT=6379           # 标准端口
+```
+
+**Docker部署模式**：
+```bash
+# 数据库配置（Docker部署）
+MONGODB_ENABLED=true
+REDIS_ENABLED=true
+MONGODB_HOST=mongodb       # Docker容器服务名
+MONGODB_PORT=27017        # 标准端口
+REDIS_HOST=redis          # Docker容器服务名
+REDIS_PORT=6379          # 标准端口
+```
+
+> 💡 **配置提示**：
+> - 本地部署：需要手动启动MongoDB和Redis服务
+> - Docker部署：数据库服务通过docker-compose自动启动
+> - 端口冲突：如果本地已有数据库服务，可修改docker-compose.yml中的端口映射
 
 #### 🌍 可选：使用国外模型
 
@@ -454,8 +501,7 @@ docker-compose down
 **方式二：完全本地安装**
 
 ```bash
-# 安装数据库依赖
-pip install -r requirements_db.txt
+# 数据库依赖已包含在requirements.txt中，无需额外安装
 
 # 启动 MongoDB (默认端口 27017)
 mongod --dbpath ./data/mongodb
@@ -574,16 +620,13 @@ REDIS_SOCKET_TIMEOUT=5
 
 ```bash
 # 初始化数据库
-python scripts/init_database.py
+python scripts/setup/init_database.py
 
-# 数据库状态检查
-python scripts/check_database_status.py
+# 系统状态检查
+python scripts/validation/check_system_status.py
 
-# 数据同步工具
-python scripts/sync_stock_data.py
-
-# 清理过期缓存
-python scripts/cleanup_cache.py
+# 清理缓存工具
+python scripts/maintenance/cleanup_cache.py --days 7
 ```
 
 #### 故障排除
@@ -621,11 +664,14 @@ python scripts/cleanup_cache.py
    # 清理Redis缓存
    redis-cli flushdb
    ```
-3. **数据同步问题**
+3. **缓存问题**
 
    ```bash
-   # 手动触发数据同步
-   python scripts/manual_sync.py
+   # 检查系统状态和缓存
+   python scripts/validation/check_system_status.py
+
+   # 清理过期缓存
+   python scripts/maintenance/cleanup_cache.py --days 7
    ```
 
 > 💡 **提示**: 即使不配置数据库，系统仍可正常运行，会自动降级到API直接调用模式。数据库配置是可选的性能优化功能。
@@ -1182,7 +1228,8 @@ cost_optimized_config = {
 
 ## 📈 版本历史
 
-- **v0.1.7** (2025-07-13): 🐳 容器化部署与专业报告导出 ✨ **最新版本**
+- **v0.1.8** (2025-07-15): 🎨 Web界面全面优化与用户体验提升 ✨ **最新版本**
+- **v0.1.7** (2025-07-13): 🐳 容器化部署与专业报告导出
 - **v0.1.6** (2025-07-11): 🔧 阿里百炼修复与数据源升级
 - **v0.1.5** (2025-07-08): 📊 添加Deepseek模型支持
 - **v0.1.4** (2025-07-05): 🏗️ 架构优化与配置管理重构
