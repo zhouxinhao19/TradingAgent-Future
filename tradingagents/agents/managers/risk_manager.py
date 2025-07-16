@@ -1,6 +1,10 @@
 import time
 import json
 
+# 导入统一日志系统
+from tradingagents.utils.logging_init import get_logger
+logger = get_logger("default")
+
 
 def create_risk_manager(llm, memory):
     def risk_manager_node(state) -> dict:
@@ -21,7 +25,7 @@ def create_risk_manager(llm, memory):
         if memory is not None:
             past_memories = memory.get_memories(curr_situation, n_matches=2)
         else:
-            print("⚠️ [DEBUG] memory为None，跳过历史记忆检索")
+            logger.warning(f"⚠️ [DEBUG] memory为None，跳过历史记忆检索")
             past_memories = []
 
         past_memory_str = ""

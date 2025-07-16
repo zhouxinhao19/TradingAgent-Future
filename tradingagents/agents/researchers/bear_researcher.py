@@ -2,6 +2,10 @@ from langchain_core.messages import AIMessage
 import time
 import json
 
+# 导入统一日志系统
+from tradingagents.utils.logging_init import get_logger
+logger = get_logger("default")
+
 
 def create_bear_researcher(llm, memory):
     def bear_node(state) -> dict:
@@ -18,7 +22,6 @@ def create_bear_researcher(llm, memory):
         # 使用统一的股票类型检测
         company_name = state.get('company_of_interest', 'Unknown')
         from tradingagents.utils.stock_utils import StockUtils
-
         market_info = StockUtils.get_market_info(company_name)
         is_china = market_info['is_china']
         is_hk = market_info['is_hk']
@@ -33,7 +36,7 @@ def create_bear_researcher(llm, memory):
         if memory is not None:
             past_memories = memory.get_memories(curr_situation, n_matches=2)
         else:
-            print("⚠️ [DEBUG] memory为None，跳过历史记忆检索")
+            logger.warning(f"⚠️ [DEBUG] memory为None，跳过历史记忆检索")
             past_memories = []
 
         past_memory_str = ""

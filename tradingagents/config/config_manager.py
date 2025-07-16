@@ -12,6 +12,10 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from dotenv import load_dotenv
 
+# 导入统一日志系统
+from tradingagents.utils.logging_init import get_logger
+logger = get_logger("config")
+
 try:
     from .mongodb_storage import MongoDBStorage
     MONGODB_AVAILABLE = True
@@ -120,13 +124,13 @@ class ConfigManager:
             )
             
             if self.mongodb_storage.is_connected():
-                print("✅ MongoDB存储已启用")
+                logger.info("✅ MongoDB存储已启用")
             else:
                 self.mongodb_storage = None
-                print("⚠️ MongoDB连接失败，将使用JSON文件存储")
-                
+                logger.warning("⚠️ MongoDB连接失败，将使用JSON文件存储")
+
         except Exception as e:
-            print(f"❌ MongoDB初始化失败: {e}")
+            logger.error(f"❌ MongoDB初始化失败: {e}", exc_info=True)
             self.mongodb_storage = None
 
     def _init_default_configs(self):
@@ -347,10 +351,10 @@ class ConfigManager:
                 return round(total_cost, 6)
 
         # 只在找不到配置时输出调试信息
-        print(f"⚠️ [calculate_cost] 未找到匹配的定价配置: {provider}/{model_name}")
-        print(f"⚠️ [calculate_cost] 可用的配置:")
+        logger.warning(f"⚠️ [calculate_cost] 未找到匹配的定价配置: {provider}/{model_name}")
+        logger.debug(f"⚠️ [calculate_cost] 可用的配置:")
         for pricing in pricing_configs:
-            print(f"⚠️ [calculate_cost]   - {pricing.provider}/{pricing.model_name}")
+            logger.debug(f"⚠️ [calculate_cost]   - {pricing.provider}/{pricing.model_name}")
 
         return 0.0
     
@@ -573,7 +577,8 @@ class TokenTracker:
         total_today = today_stats["total_cost"]
 
         if total_today >= threshold:
-            print(f"⚠️ 成本警告: 今日成本已达到 ¥{total_today:.4f}，超过阈值 ¥{threshold}")
+            logger.warning(f"⚠️ 成本警告: 今日成本已达到 ¥{total_today:.4f}，超过阈值 ¥{threshold}",
+                          extra={'cost': total_today, 'threshold': threshold, 'event_type': 'cost_alert'})
 
     def get_session_cost(self, session_id: str) -> float:
         """获取会话成本"""

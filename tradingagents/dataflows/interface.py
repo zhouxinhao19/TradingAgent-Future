@@ -1,8 +1,13 @@
 from typing import Annotated, Dict
+import time
 from .reddit_utils import fetch_top_from_category
 from .chinese_finance_utils import get_chinese_social_sentiment
 from .googlenews_utils import *
 from .finnhub_utils import get_data_in_range
+
+# 导入统一日志系统
+from tradingagents.utils.logging_init import setup_dataflow_logging
+logger = setup_dataflow_logging()
 
 # 导入港股工具
 try:
@@ -1057,10 +1062,17 @@ def get_china_stock_data_tushare(
     try:
         from .tushare_adapter import get_tushare_adapter
 
-        print(f"📊 [Tushare] 获取{ticker}股票数据...")
+        logger.debug(f"📊 [Tushare] 获取{ticker}股票数据...")
+
+        # 添加详细的股票代码追踪日志
+        logger.info(f"🔍 [股票代码追踪] get_china_stock_data_tushare 接收到的股票代码: '{ticker}' (类型: {type(ticker)})")
+        logger.info(f"🔍 [股票代码追踪] 股票代码长度: {len(str(ticker))}")
+        logger.info(f"🔍 [股票代码追踪] 股票代码字符: {list(str(ticker))}")
 
         adapter = get_tushare_adapter()
+        logger.info(f"🔍 [股票代码追踪] 调用 adapter.get_stock_data，传入参数: ticker='{ticker}'")
         data = adapter.get_stock_data(ticker, start_date, end_date)
+        logger.info(f"🔍 [股票代码追踪] adapter.get_stock_data 返回数据形状: {data.shape if data is not None and hasattr(data, 'shape') else 'None'}")
 
         if data is not None and not data.empty:
             # 获取股票基本信息
@@ -1125,7 +1137,7 @@ def get_china_stock_data_tushare(
             return f"❌ 未能获取{ticker}的股票数据"
 
     except Exception as e:
-        print(f"❌ [Tushare] 获取股票数据失败: {e}")
+        logger.error(f"❌ [Tushare] 获取股票数据失败: {e}")
         return f"❌ 获取{ticker}股票数据失败: {e}"
 
 
@@ -1144,7 +1156,7 @@ def search_china_stocks_tushare(
     try:
         from .tushare_adapter import get_tushare_adapter
 
-        print(f"🔍 [Tushare] 搜索股票: {keyword}")
+        logger.debug(f"🔍 [Tushare] 搜索股票: {keyword}")
 
         adapter = get_tushare_adapter()
         results = adapter.search_stocks(keyword)
@@ -1167,7 +1179,7 @@ def search_china_stocks_tushare(
             return f"❌ 未找到匹配'{keyword}'的股票"
 
     except Exception as e:
-        print(f"❌ [Tushare] 搜索股票失败: {e}")
+        logger.error(f"❌ [Tushare] 搜索股票失败: {e}")
         return f"❌ 搜索股票失败: {e}"
 
 
@@ -1186,7 +1198,7 @@ def get_china_stock_fundamentals_tushare(
     try:
         from .tushare_adapter import get_tushare_adapter
 
-        print(f"📊 [Tushare] 获取{ticker}基本面数据...")
+        logger.debug(f"📊 [Tushare] 获取{ticker}基本面数据...")
 
         adapter = get_tushare_adapter()
         fundamentals = adapter.get_fundamentals(ticker)
@@ -1194,7 +1206,7 @@ def get_china_stock_fundamentals_tushare(
         return fundamentals
 
     except Exception as e:
-        print(f"❌ [Tushare] 获取基本面数据失败: {e}")
+        logger.error(f"❌ [Tushare] 获取基本面数据失败: {e}")
         return f"❌ 获取{ticker}基本面数据失败: {e}"
 
 
@@ -1213,7 +1225,7 @@ def get_china_stock_info_tushare(
     try:
         from .tushare_adapter import get_tushare_adapter
 
-        print(f"📊 [Tushare] 获取{ticker}基本信息...")
+        logger.debug(f"📊 [Tushare] 获取{ticker}基本信息...")
 
         adapter = get_tushare_adapter()
         info = adapter.get_stock_info(ticker)
@@ -1232,7 +1244,7 @@ def get_china_stock_info_tushare(
             return f"❌ 未能获取{ticker}的基本信息"
 
     except Exception as e:
-        print(f"❌ [Tushare] 获取股票信息失败: {e}")
+        logger.error(f"❌ [Tushare] 获取股票信息失败: {e}", exc_info=True)
         return f"❌ 获取{ticker}股票信息失败: {e}"
 
 
@@ -1255,16 +1267,72 @@ def get_china_stock_data_unified(
     Returns:
         str: 格式化的股票数据报告
     """
+    # 记录详细的输入参数
+    logger.info(f"📊 [统一接口] 开始获取中国股票数据",
+               extra={
+                   'function': 'get_china_stock_data_unified',
+                   'ticker': ticker,
+                   'start_date': start_date,
+                   'end_date': end_date,
+                   'event_type': 'unified_data_call_start'
+               })
+
+    # 添加详细的股票代码追踪日志
+    logger.info(f"🔍 [股票代码追踪] get_china_stock_data_unified 接收到的原始股票代码: '{ticker}' (类型: {type(ticker)})")
+    logger.info(f"🔍 [股票代码追踪] 股票代码长度: {len(str(ticker))}")
+    logger.info(f"🔍 [股票代码追踪] 股票代码字符: {list(str(ticker))}")
+
+    start_time = time.time()
+
     try:
         from .data_source_manager import get_china_stock_data_unified
 
-        print(f"📊 [统一接口] 获取{ticker}股票数据...")
-
         result = get_china_stock_data_unified(ticker, start_date, end_date)
+
+        # 记录详细的输出结果
+        duration = time.time() - start_time
+        result_length = len(result) if result else 0
+        is_success = result and "❌" not in result and "错误" not in result
+
+        if is_success:
+            logger.info(f"✅ [统一接口] 中国股票数据获取成功",
+                       extra={
+                           'function': 'get_china_stock_data_unified',
+                           'ticker': ticker,
+                           'start_date': start_date,
+                           'end_date': end_date,
+                           'duration': duration,
+                           'result_length': result_length,
+                           'result_preview': result[:300] + '...' if result_length > 300 else result,
+                           'event_type': 'unified_data_call_success'
+                       })
+        else:
+            logger.warning(f"⚠️ [统一接口] 中国股票数据质量异常",
+                          extra={
+                              'function': 'get_china_stock_data_unified',
+                              'ticker': ticker,
+                              'start_date': start_date,
+                              'end_date': end_date,
+                              'duration': duration,
+                              'result_length': result_length,
+                              'result_preview': result[:300] + '...' if result_length > 300 else result,
+                              'event_type': 'unified_data_call_warning'
+                          })
+
         return result
 
     except Exception as e:
-        print(f"❌ [统一接口] 获取股票数据失败: {e}")
+        duration = time.time() - start_time
+        logger.error(f"❌ [统一接口] 获取股票数据失败: {e}",
+                    extra={
+                        'function': 'get_china_stock_data_unified',
+                        'ticker': ticker,
+                        'start_date': start_date,
+                        'end_date': end_date,
+                        'duration': duration,
+                        'error': str(e),
+                        'event_type': 'unified_data_call_error'
+                    }, exc_info=True)
         return f"❌ 获取{ticker}股票数据失败: {e}"
 
 
@@ -1387,23 +1455,29 @@ def get_hk_stock_data_unified(symbol: str, start_date: str = None, end_date: str
     try:
         print(f"🇭🇰 获取港股数据: {symbol}")
 
-        # 优先使用AKShare港股数据（国内数据源，更稳定）
+        # 优先使用AKShare港股数据（国内数据源，港股支持更好，更稳定）
         if AKSHARE_HK_AVAILABLE:
             try:
-                print(f"🔄 使用AKShare获取港股数据: {symbol}")
+                print(f"🔄 优先使用AKShare获取港股数据: {symbol}")
                 result = get_hk_stock_data_akshare(symbol, start_date, end_date)
                 if result and "❌" not in result:
+                    print(f"✅ AKShare港股数据获取成功: {symbol}")
                     return result
+                else:
+                    print(f"⚠️ AKShare返回错误结果，尝试备用方案")
             except Exception as e:
                 print(f"⚠️ AKShare港股数据获取失败: {e}")
 
-        # 备用方案1：使用专用港股工具（Yahoo Finance）
+        # 备用方案1：使用Yahoo Finance港股工具
         if HK_STOCK_AVAILABLE:
             try:
-                print(f"🔄 使用Yahoo Finance获取港股数据: {symbol}")
+                print(f"🔄 使用Yahoo Finance备用方案获取港股数据: {symbol}")
                 result = get_hk_stock_data(symbol, start_date, end_date)
                 if result and "❌" not in result:
+                    print(f"✅ Yahoo Finance港股数据获取成功: {symbol}")
                     return result
+                else:
+                    print(f"⚠️ Yahoo Finance返回错误结果")
             except Exception as e:
                 print(f"⚠️ Yahoo Finance港股数据获取失败: {e}")
 
@@ -1438,22 +1512,34 @@ def get_hk_stock_info_unified(symbol: str) -> Dict:
         Dict: 港股信息
     """
     try:
-        # 优先使用专用港股工具
-        if HK_STOCK_AVAILABLE:
-            result = get_hk_stock_info(symbol)
-            if result and 'error' not in result:
-                return result
-
-        # 备用方案1：使用AKShare
+        # 优先使用AKShare（国内数据源，港股支持更好）
         if AKSHARE_HK_AVAILABLE:
             try:
+                print(f"🔄 优先使用AKShare获取港股信息: {symbol}")
                 result = get_hk_stock_info_akshare(symbol)
-                if result and 'error' not in result:
+                if result and 'error' not in result and not result.get('name', '').startswith('港股'):
+                    print(f"✅ AKShare成功获取港股信息: {symbol} -> {result.get('name', 'N/A')}")
                     return result
+                else:
+                    print(f"⚠️ AKShare返回默认信息，尝试备用方案")
             except Exception as e:
                 print(f"⚠️ AKShare港股信息获取失败: {e}")
 
+        # 备用方案1：使用Yahoo Finance港股工具
+        if HK_STOCK_AVAILABLE:
+            try:
+                print(f"🔄 使用Yahoo Finance备用方案获取港股信息: {symbol}")
+                result = get_hk_stock_info(symbol)
+                if result and 'error' not in result and not result.get('name', '').startswith('港股'):
+                    print(f"✅ Yahoo Finance成功获取港股信息: {symbol} -> {result.get('name', 'N/A')}")
+                    return result
+                else:
+                    print(f"⚠️ Yahoo Finance返回默认信息")
+            except Exception as e:
+                print(f"⚠️ Yahoo Finance港股信息获取失败: {e}")
+
         # 备用方案2：返回基本信息
+        print(f"🔄 使用默认信息: {symbol}")
         return {
             'symbol': symbol,
             'name': f'港股{symbol}',

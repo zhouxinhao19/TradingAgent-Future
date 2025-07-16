@@ -19,6 +19,11 @@ services:
     environment:
       PYTHONUNBUFFERED: 1
       PYTHONDONTWRITEBYTECODE: 1
+      # 时区配置
+      TZ: "Asia/Shanghai"
+      # 日志配置
+      TRADINGAGENTS_LOG_LEVEL: "INFO"
+      TRADINGAGENTS_LOG_DIR: "/app/logs"
       # Docker专用数据库配置（覆盖.env中的本地配置）
       TRADINGAGENTS_MONGODB_URL: mongodb://admin:tradingagents123@mongodb:27017/tradingagents?authSource=admin
       TRADINGAGENTS_REDIS_URL: redis://:tradingagents123@redis:6379

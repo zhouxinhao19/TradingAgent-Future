@@ -2,6 +2,10 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 import time
 import json
 
+# 导入统一日志系统
+from tradingagents.utils.logging_init import get_logger
+logger = get_logger("default")
+
 
 def create_china_market_analyst(llm, toolkit):
     """创建中国市场分析师"""

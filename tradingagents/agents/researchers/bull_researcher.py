@@ -2,10 +2,14 @@ from langchain_core.messages import AIMessage
 import time
 import json
 
+# 导入统一日志系统
+from tradingagents.utils.logging_init import get_logger
+logger = get_logger("default")
+
 
 def create_bull_researcher(llm, memory):
     def bull_node(state) -> dict:
-        print(f"🐂 [DEBUG] ===== 看涨研究员节点开始 =====")
+        logger.debug(f"🐂 [DEBUG] ===== 看涨研究员节点开始 =====")
 
         investment_debate_state = state["investment_debate_state"]
         history = investment_debate_state.get("history", "")
@@ -20,7 +24,6 @@ def create_bull_researcher(llm, memory):
         # 使用统一的股票类型检测
         company_name = state.get('company_of_interest', 'Unknown')
         from tradingagents.utils.stock_utils import StockUtils
-
         market_info = StockUtils.get_market_info(company_name)
         is_china = market_info['is_china']
         is_hk = market_info['is_hk']
@@ -29,14 +32,14 @@ def create_bull_researcher(llm, memory):
         currency = market_info['currency_name']
         currency_symbol = market_info['currency_symbol']
 
-        print(f"🐂 [DEBUG] 接收到的报告:")
-        print(f"🐂 [DEBUG] - 市场报告长度: {len(market_research_report)}")
-        print(f"🐂 [DEBUG] - 情绪报告长度: {len(sentiment_report)}")
-        print(f"🐂 [DEBUG] - 新闻报告长度: {len(news_report)}")
-        print(f"🐂 [DEBUG] - 基本面报告长度: {len(fundamentals_report)}")
-        print(f"🐂 [DEBUG] - 基本面报告前200字符: {fundamentals_report[:200]}...")
-        print(f"🐂 [DEBUG] - 股票代码: {company_name}, 类型: {market_info['market_name']}, 货币: {currency}")
-        print(f"🐂 [DEBUG] - 市场详情: 中国A股={is_china}, 港股={is_hk}, 美股={is_us}")
+        logger.debug(f"🐂 [DEBUG] 接收到的报告:")
+        logger.debug(f"🐂 [DEBUG] - 市场报告长度: {len(market_research_report)}")
+        logger.debug(f"🐂 [DEBUG] - 情绪报告长度: {len(sentiment_report)}")
+        logger.debug(f"🐂 [DEBUG] - 新闻报告长度: {len(news_report)}")
+        logger.debug(f"🐂 [DEBUG] - 基本面报告长度: {len(fundamentals_report)}")
+        logger.debug(f"🐂 [DEBUG] - 基本面报告前200字符: {fundamentals_report[:200]}...")
+        logger.debug(f"🐂 [DEBUG] - 股票代码: {company_name}, 类型: {market_info['market_name']}, 货币: {currency}")
+        logger.debug(f"🐂 [DEBUG] - 市场详情: 中国A股={is_china}, 港股={is_hk}, 美股={is_us}")
 
         curr_situation = f"{market_research_report}\n\n{sentiment_report}\n\n{news_report}\n\n{fundamentals_report}"
 
@@ -44,7 +47,7 @@ def create_bull_researcher(llm, memory):
         if memory is not None:
             past_memories = memory.get_memories(curr_situation, n_matches=2)
         else:
-            print("⚠️ [DEBUG] memory为None，跳过历史记忆检索")
+            logger.warning(f"⚠️ [DEBUG] memory为None，跳过历史记忆检索")
             past_memories = []
 
         past_memory_str = ""

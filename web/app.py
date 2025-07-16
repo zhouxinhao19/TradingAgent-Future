@@ -19,6 +19,10 @@ sys.path.insert(0, str(project_root))
 # 加载环境变量
 load_dotenv(project_root / ".env", override=True)
 
+# 初始化日志系统
+from tradingagents.utils.logging_init import setup_web_logging
+logger = setup_web_logging()
+
 # 导入自定义组件
 from components.sidebar import render_sidebar
 from components.header import render_header

@@ -13,13 +13,17 @@ import warnings
 import time
 warnings.filterwarnings('ignore')
 
+# 导入统一日志系统
+from tradingagents.utils.logging_init import get_logger
+logger = get_logger("default")
+
 # 导入缓存管理器
 try:
     from .cache_manager import get_cache
     CACHE_AVAILABLE = True
 except ImportError:
     CACHE_AVAILABLE = False
-    print("⚠️ 缓存管理器不可用")
+    logger.warning("⚠️ 缓存管理器不可用")
 
 # 导入Tushare
 try:
@@ -27,7 +31,7 @@ try:
     TUSHARE_AVAILABLE = True
 except ImportError:
     TUSHARE_AVAILABLE = False
-    print("❌ Tushare库未安装，请运行: pip install tushare")
+    logger.error("❌ Tushare库未安装，请运行: pip install tushare")
 
 
 class TushareProvider:
@@ -52,28 +56,28 @@ class TushareProvider:
                 from .cache_manager import get_cache
                 self.cache_manager = get_cache()
             except Exception as e:
-                print(f"⚠️ 缓存管理器初始化失败: {e}")
+                logger.warning(f"⚠️ 缓存管理器初始化失败: {e}")
                 self.enable_cache = False
-        
+
         # 获取API token
         if not token:
             token = os.getenv('TUSHARE_TOKEN')
-        
+
         if not token:
-            print("⚠️ 未找到Tushare API token，请设置TUSHARE_TOKEN环境变量")
+            logger.warning("⚠️ 未找到Tushare API token，请设置TUSHARE_TOKEN环境变量")
             return
-        
+
         # 初始化Tushare API
         if TUSHARE_AVAILABLE:
             try:
                 ts.set_token(token)
                 self.api = ts.pro_api()
                 self.connected = True
-                print("✅ Tushare API连接成功")
+                logger.info("✅ Tushare API连接成功")
             except Exception as e:
-                print(f"❌ Tushare API连接失败: {e}")
+                logger.error(f"❌ Tushare API连接失败: {e}")
         else:
-            print("❌ Tushare库不可用")
+            logger.error("❌ Tushare库不可用")
     
     def get_stock_list(self) -> pd.DataFrame:
         """
@@ -156,27 +160,35 @@ class TushareProvider:
         
         try:
             # 标准化股票代码
+            logger.info(f"🔍 [股票代码追踪] get_stock_daily 调用 _normalize_symbol，传入参数: '{symbol}'")
             ts_code = self._normalize_symbol(symbol)
-            
+            logger.info(f"🔍 [股票代码追踪] _normalize_symbol 返回结果: '{ts_code}'")
+
             # 设置默认日期
             if end_date is None:
                 end_date = datetime.now().strftime('%Y%m%d')
             else:
                 end_date = end_date.replace('-', '')
-            
+
             if start_date is None:
                 start_date = (datetime.now() - timedelta(days=365)).strftime('%Y%m%d')
             else:
                 start_date = start_date.replace('-', '')
-            
+
             print(f"🔄 从Tushare获取{ts_code}数据 ({start_date} 到 {end_date})...")
-            
+            logger.info(f"🔍 [股票代码追踪] 调用 Tushare API daily，传入参数: ts_code='{ts_code}', start_date='{start_date}', end_date='{end_date}'")
+
             # 获取日线数据
             data = self.api.daily(
                 ts_code=ts_code,
                 start_date=start_date,
                 end_date=end_date
             )
+
+            logger.info(f"🔍 [股票代码追踪] Tushare API daily 返回数据形状: {data.shape if data is not None and hasattr(data, 'shape') else 'None'}")
+            if data is not None and not data.empty and 'ts_code' in data.columns:
+                unique_codes = data['ts_code'].unique()
+                logger.info(f"🔍 [股票代码追踪] 返回数据中的ts_code: {unique_codes}")
             
             if data is not None and not data.empty:
                 # 数据预处理
@@ -220,13 +232,20 @@ class TushareProvider:
             return {'symbol': symbol, 'name': f'股票{symbol}', 'source': 'unknown'}
         
         try:
+            logger.info(f"🔍 [股票代码追踪] get_stock_info 调用 _normalize_symbol，传入参数: '{symbol}'")
             ts_code = self._normalize_symbol(symbol)
-            
+            logger.info(f"🔍 [股票代码追踪] _normalize_symbol 返回结果: '{ts_code}'")
+
             # 获取股票基本信息
+            logger.info(f"🔍 [股票代码追踪] 调用 Tushare API stock_basic，传入参数: ts_code='{ts_code}'")
             basic_info = self.api.stock_basic(
                 ts_code=ts_code,
                 fields='ts_code,symbol,name,area,industry,market,list_date'
             )
+
+            logger.info(f"🔍 [股票代码追踪] Tushare API stock_basic 返回数据形状: {basic_info.shape if basic_info is not None and hasattr(basic_info, 'shape') else 'None'}")
+            if basic_info is not None and not basic_info.empty:
+                logger.info(f"🔍 [股票代码追踪] 返回数据内容: {basic_info.to_dict('records')}")
             
             if basic_info is not None and not basic_info.empty:
                 info = basic_info.iloc[0]
@@ -311,30 +330,48 @@ class TushareProvider:
     def _normalize_symbol(self, symbol: str) -> str:
         """
         标准化股票代码为Tushare格式
-        
+
         Args:
             symbol: 原始股票代码
-            
+
         Returns:
             str: Tushare格式的股票代码
         """
+        # 添加详细的股票代码追踪日志
+        logger.info(f"🔍 [股票代码追踪] _normalize_symbol 接收到的原始股票代码: '{symbol}' (类型: {type(symbol)})")
+        logger.info(f"🔍 [股票代码追踪] 股票代码长度: {len(str(symbol))}")
+        logger.info(f"🔍 [股票代码追踪] 股票代码字符: {list(str(symbol))}")
+
+        original_symbol = symbol
+
         # 移除可能的前缀
         symbol = symbol.replace('sh.', '').replace('sz.', '')
-        
+        if symbol != original_symbol:
+            logger.info(f"🔍 [股票代码追踪] 移除前缀后: '{original_symbol}' -> '{symbol}'")
+
         # 如果已经是Tushare格式，直接返回
         if '.' in symbol:
+            logger.info(f"🔍 [股票代码追踪] 已经是Tushare格式，直接返回: '{symbol}'")
             return symbol
-        
+
         # 根据代码判断交易所
         if symbol.startswith('6'):
-            return f"{symbol}.SH"  # 上海证券交易所
+            result = f"{symbol}.SH"  # 上海证券交易所
+            logger.info(f"🔍 [股票代码追踪] 上海证券交易所: '{symbol}' -> '{result}'")
+            return result
         elif symbol.startswith(('0', '3')):
-            return f"{symbol}.SZ"  # 深圳证券交易所
+            result = f"{symbol}.SZ"  # 深圳证券交易所
+            logger.info(f"🔍 [股票代码追踪] 深圳证券交易所: '{symbol}' -> '{result}'")
+            return result
         elif symbol.startswith('8'):
-            return f"{symbol}.BJ"  # 北京证券交易所
+            result = f"{symbol}.BJ"  # 北京证券交易所
+            logger.info(f"🔍 [股票代码追踪] 北京证券交易所: '{symbol}' -> '{result}'")
+            return result
         else:
             # 默认深圳
-            return f"{symbol}.SZ"
+            result = f"{symbol}.SZ"
+            logger.info(f"🔍 [股票代码追踪] 默认深圳证券交易所: '{symbol}' -> '{result}'")
+            return result
     
     def search_stocks(self, keyword: str) -> pd.DataFrame:
         """

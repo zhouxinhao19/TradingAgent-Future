@@ -185,6 +185,12 @@ class OptimizedChinaDataProvider:
     def _generate_fundamentals_report(self, symbol: str, stock_data: str) -> str:
         """基于股票数据生成真实的基本面分析报告"""
 
+        # 添加详细的股票代码追踪日志
+        print(f"🔍 [股票代码追踪] _generate_fundamentals_report 接收到的股票代码: '{symbol}' (类型: {type(symbol)})")
+        print(f"🔍 [股票代码追踪] 股票代码长度: {len(str(symbol))}")
+        print(f"🔍 [股票代码追踪] 股票代码字符: {list(str(symbol))}")
+        print(f"🔍 [股票代码追踪] 接收到的股票数据前200字符: {stock_data[:200] if stock_data else 'None'}")
+
         # 从股票数据中提取信息
         company_name = "未知公司"
         current_price = "N/A"
@@ -204,9 +210,15 @@ class OptimizedChinaDataProvider:
                     volume = line.split(':')[1].strip()
 
         # 根据股票代码判断行业和基本信息
+        print(f"🔍 [股票代码追踪] 调用 _get_industry_info，传入参数: '{symbol}'")
         industry_info = self._get_industry_info(symbol)
+        print(f"🔍 [股票代码追踪] _get_industry_info 返回结果: {industry_info}")
+
+        print(f"🔍 [股票代码追踪] 调用 _estimate_financial_metrics，传入参数: '{symbol}'")
         financial_estimates = self._estimate_financial_metrics(symbol, current_price)
-        
+        print(f"🔍 [股票代码追踪] _estimate_financial_metrics 返回结果: {financial_estimates}")
+
+        print(f"🔍 [股票代码追踪] 开始生成报告，使用股票代码: '{symbol}'")
         report = f"""# 中国A股基本面分析报告 - {symbol}
 
 ## 📊 股票基本信息
@@ -319,8 +331,14 @@ class OptimizedChinaDataProvider:
     def _get_industry_info(self, symbol: str) -> dict:
         """根据股票代码获取行业信息"""
 
+        # 添加详细的股票代码追踪日志
+        print(f"🔍 [股票代码追踪] _get_industry_info 接收到的股票代码: '{symbol}' (类型: {type(symbol)})")
+        print(f"🔍 [股票代码追踪] 股票代码长度: {len(str(symbol))}")
+        print(f"🔍 [股票代码追踪] 股票代码字符: {list(str(symbol))}")
+
         # 根据股票代码前缀判断行业（简化版）
         code_prefix = symbol[:3]
+        print(f"🔍 [股票代码追踪] 提取的代码前缀: '{code_prefix}'")
 
         industry_map = {
             "000": {"industry": "深市主板", "market": "深圳证券交易所", "type": "综合"},

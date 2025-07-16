@@ -7,6 +7,10 @@ import os
 import threading
 from typing import Dict, Optional
 
+# 导入统一日志系统
+from tradingagents.utils.logging_init import get_logger
+logger = get_logger("agents.utils.memory")
+
 
 class ChromaDBManager:
     """单例ChromaDB管理器，避免并发创建集合的冲突"""
@@ -35,37 +39,37 @@ class ChromaDBManager:
                 )
                 self._client = chromadb.Client(settings)
                 self._initialized = True
-                print("📚 [ChromaDB] 单例管理器初始化完成")
+                logger.info(f"📚 [ChromaDB] 单例管理器初始化完成")
             except Exception as e:
-                print(f"❌ [ChromaDB] 初始化失败: {e}")
+                logger.error(f"❌ [ChromaDB] 初始化失败: {e}")
                 # 使用最简单的配置作为备用
                 self._client = chromadb.Client()
                 self._initialized = True
-                print("📚 [ChromaDB] 使用备用配置初始化完成")
+                logger.info(f"📚 [ChromaDB] 使用备用配置初始化完成")
 
     def get_or_create_collection(self, name: str):
         """线程安全地获取或创建集合"""
         with self._lock:
             if name in self._collections:
-                print(f"📚 [ChromaDB] 使用缓存集合: {name}")
+                logger.info(f"📚 [ChromaDB] 使用缓存集合: {name}")
                 return self._collections[name]
 
             try:
                 # 尝试获取现有集合
                 collection = self._client.get_collection(name=name)
-                print(f"📚 [ChromaDB] 获取现有集合: {name}")
+                logger.info(f"📚 [ChromaDB] 获取现有集合: {name}")
             except Exception:
                 try:
                     # 创建新集合
                     collection = self._client.create_collection(name=name)
-                    print(f"📚 [ChromaDB] 创建新集合: {name}")
+                    logger.info(f"📚 [ChromaDB] 创建新集合: {name}")
                 except Exception as e:
                     # 可能是并发创建，再次尝试获取
                     try:
                         collection = self._client.get_collection(name=name)
-                        print(f"📚 [ChromaDB] 并发创建后获取集合: {name}")
+                        logger.info(f"📚 [ChromaDB] 并发创建后获取集合: {name}")
                     except Exception as final_error:
-                        print(f"❌ [ChromaDB] 集合操作失败: {name}, 错误: {final_error}")
+                        logger.error(f"❌ [ChromaDB] 集合操作失败: {name}, 错误: {final_error}")
                         raise final_error
 
             # 缓存集合
@@ -101,9 +105,9 @@ class FinancialSituationMemory:
                         from dashscope import TextEmbedding
                         self.embedding = "text-embedding-v3"
                         self.client = None
-                        print("💡 DeepSeek使用阿里百炼嵌入服务")
+                        logger.info(f"💡 DeepSeek使用阿里百炼嵌入服务")
                     except Exception as e:
-                        print(f"⚠️ 阿里百炼嵌入初始化失败: {e}")
+                        logger.error(f"⚠️ 阿里百炼嵌入初始化失败: {e}")
                         dashscope_key = None  # 强制降级
             else:
                 dashscope_key = None  # 跳过阿里百炼
@@ -117,7 +121,7 @@ class FinancialSituationMemory:
                         api_key=openai_key,
                         base_url=config.get("backend_url", "https://api.openai.com/v1")
                     )
-                    print("⚠️ DeepSeek回退到OpenAI嵌入服务")
+                    logger.warning(f"⚠️ DeepSeek回退到OpenAI嵌入服务")
                 else:
                     # 最后尝试DeepSeek自己的嵌入
                     deepseek_key = os.getenv('DEEPSEEK_API_KEY')
@@ -127,16 +131,16 @@ class FinancialSituationMemory:
                                 api_key=deepseek_key,
                                 base_url="https://api.deepseek.com"
                             )
-                            print("💡 DeepSeek使用自己的嵌入服务")
+                            logger.info(f"💡 DeepSeek使用自己的嵌入服务")
                         except Exception as e:
-                            print(f"❌ DeepSeek嵌入服务不可用: {e}")
+                            logger.error(f"❌ DeepSeek嵌入服务不可用: {e}")
                             # 禁用内存功能
                             self.client = "DISABLED"
-                            print("🚨 内存功能已禁用，系统将继续运行但不保存历史记忆")
+                            logger.info(f"🚨 内存功能已禁用，系统将继续运行但不保存历史记忆")
                     else:
                         # 禁用内存功能而不是抛出异常
                         self.client = "DISABLED"
-                        print("🚨 未找到可用的嵌入服务，内存功能已禁用")
+                        logger.info(f"🚨 未找到可用的嵌入服务，内存功能已禁用")
         elif self.llm_provider == "google":
             # Google AI使用阿里百炼嵌入（如果可用），否则使用OpenAI
             dashscope_key = os.getenv('DASHSCOPE_API_KEY')
@@ -144,11 +148,11 @@ class FinancialSituationMemory:
                 self.embedding = "text-embedding-v3"
                 self.client = None
                 dashscope.api_key = dashscope_key
-                print("💡 Google AI使用阿里百炼嵌入服务")
+                logger.info(f"💡 Google AI使用阿里百炼嵌入服务")
             else:
                 self.embedding = "text-embedding-3-small"
                 self.client = OpenAI(base_url=config["backend_url"])
-                print("⚠️ Google AI回退到OpenAI嵌入服务")
+                logger.warning(f"⚠️ Google AI回退到OpenAI嵌入服务")
         elif config["backend_url"] == "http://localhost:11434/v1":
             self.embedding = "nomic-embed-text"
             self.client = OpenAI(base_url=config["backend_url"])
@@ -185,7 +189,7 @@ class FinancialSituationMemory:
                 raise Exception("嵌入客户端未初始化，请检查配置")
             elif self.client == "DISABLED":
                 # 内存功能已禁用，返回空向量
-                print("⚠️ 内存功能已禁用，返回空向量")
+                logger.warning(f"⚠️ 内存功能已禁用，返回空向量")
                 return [0.0] * 1024  # 返回1024维的零向量
 
             response = self.client.embeddings.create(
@@ -276,10 +280,10 @@ if __name__ == "__main__":
         recommendations = matcher.get_memories(current_situation, n_matches=2)
 
         for i, rec in enumerate(recommendations, 1):
-            print(f"\nMatch {i}:")
-            print(f"Similarity Score: {rec['similarity_score']:.2f}")
-            print(f"Matched Situation: {rec['matched_situation']}")
-            print(f"Recommendation: {rec['recommendation']}")
+            logger.info(f"\nMatch {i}:")
+            logger.info(f"Similarity Score: {rec['similarity_score']:.2f}")
+            logger.info(f"Matched Situation: {rec['matched_situation']}")
+            logger.info(f"Recommendation: {rec['recommendation']}")
 
     except Exception as e:
-        print(f"Error during recommendation: {str(e)}")
+        logger.error(f"Error during recommendation: {str(e)}")

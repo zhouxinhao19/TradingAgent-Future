@@ -1,0 +1,66 @@
+# Docker环境专用日志配置
+# 优化容器环境的日志输出
+
+[logging]
+level = "INFO"
+
+[logging.format]
+# Docker环境使用简洁格式，便于日志聚合
+console = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+structured = "json"
+
+[logging.handlers]
+
+# Docker环境只使用控制台输出
+[logging.handlers.console]
+enabled = true
+colored = false  # Docker环境不使用颜色
+level = "INFO"
+
+# 禁用文件处理器
+[logging.handlers.file]
+enabled = false
+
+# 启用结构化日志便于日志聚合
+[logging.handlers.structured]
+enabled = true
+level = "INFO"
+directory = "/app/logs"
+
+[logging.loggers]
+[logging.loggers.tradingagents]
+level = "INFO"
+
+[logging.loggers.web]
+level = "INFO"
+
+[logging.loggers.streamlit]
+level = "ERROR"  # Docker环境进一步减少Streamlit日志
+
+[logging.loggers.urllib3]
+level = "ERROR"
+
+[logging.loggers.requests]
+level = "ERROR"
+
+[logging.docker]
+enabled = true
+stdout_only = true
+disable_file_logging = true
+
+[logging.performance]
+enabled = true
+log_slow_operations = true
+slow_threshold_seconds = 10.0  # Docker环境阈值稍高
+
+[logging.security]
+enabled = true
+log_api_calls = true
+log_token_usage = true
+mask_sensitive_data = true
+
+[logging.business]
+enabled = true
+log_analysis_events = true
+log_user_actions = true
+log_export_events = true

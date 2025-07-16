@@ -33,6 +33,9 @@ COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
 
+# 复制日志配置文件
+COPY config/ ./config/
+
 COPY . .
 
 EXPOSE 8501

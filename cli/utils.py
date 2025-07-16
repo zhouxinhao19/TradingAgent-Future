@@ -25,7 +25,7 @@ def get_ticker() -> str:
     ).ask()
 
     if not ticker:
-        console.print("\n[red]未提供股票代码，退出程序... | No ticker symbol provided. Exiting...[/red]")
+        logger.info(f"\n[red]未提供股票代码，退出程序... | No ticker symbol provided. Exiting...[/red]")
         exit(1)
 
     return ticker.strip().upper()
@@ -35,6 +35,10 @@ def get_analysis_date() -> str:
     """Prompt the user to enter a date in YYYY-MM-DD format."""
     import re
     from datetime import datetime
+
+# 导入统一日志系统
+from tradingagents.utils.logging_init import get_logger
+logger = get_logger("cli")
 
     def validate_date(date_str: str) -> bool:
         if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_str):
@@ -58,7 +62,7 @@ def get_analysis_date() -> str:
     ).ask()
 
     if not date:
-        console.print("\n[red]未提供日期，退出程序... | No date provided. Exiting...[/red]")
+        logger.info(f"\n[red]未提供日期，退出程序... | No date provided. Exiting...[/red]")
         exit(1)
 
     return date.strip()
@@ -84,7 +88,7 @@ def select_analysts() -> List[AnalystType]:
     ).ask()
 
     if not choices:
-        console.print("\n[red]未选择分析师，退出程序... | No analysts selected. Exiting...[/red]")
+        logger.info(f"\n[red]未选择分析师，退出程序... | No analysts selected. Exiting...[/red]")
         exit(1)
 
     return choices
@@ -116,7 +120,7 @@ def select_research_depth() -> int:
     ).ask()
 
     if choice is None:
-        console.print("\n[red]未选择研究深度，退出程序... | No research depth selected. Exiting...[/red]")
+        logger.info(f"\n[red]未选择研究深度，退出程序... | No research depth selected. Exiting...[/red]")
         exit(1)
 
     return choice
@@ -273,7 +277,7 @@ def select_deep_thinking_agent(provider) -> str:
     ).ask()
 
     if choice is None:
-        console.print("\n[red]未选择深度思考LLM引擎，退出程序... | No deep thinking llm engine selected. Exiting...[/red]")
+        logger.info(f"\n[red]未选择深度思考LLM引擎，退出程序... | No deep thinking llm engine selected. Exiting...[/red]")
         exit(1)
 
     return choice
@@ -310,10 +314,10 @@ def select_llm_provider() -> tuple[str, str]:
     ).ask()
     
     if choice is None:
-        console.print("\n[red]未选择LLM提供商，退出程序... | No LLM provider selected. Exiting...[/red]")
+        logger.info(f"\n[red]未选择LLM提供商，退出程序... | No LLM provider selected. Exiting...[/red]")
         exit(1)
     
     display_name, url = choice
-    print(f"您选择了 | You selected: {display_name}\tURL: {url}")
+    logger.info(f"您选择了 | You selected: {display_name}\tURL: {url}")
 
     return display_name, url
