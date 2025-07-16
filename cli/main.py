@@ -40,7 +40,88 @@ load_dotenv()
 # 初始化日志系统
 logger = get_logger("cli")
 
+# CLI专用日志配置：禁用控制台输出，只保留文件日志
+def setup_cli_logging():
+    """CLI模式下的日志配置：移除控制台输出，保持界面清爽"""
+    import logging
+    from tradingagents.utils.logging_manager import get_logger_manager
+
+    logger_manager = get_logger_manager()
+
+    # 获取根日志器
+    root_logger = logging.getLogger()
+
+    # 移除所有控制台处理器，只保留文件日志
+    for handler in root_logger.handlers[:]:
+        if isinstance(handler, logging.StreamHandler) and hasattr(handler, 'stream'):
+            if handler.stream.name in ['<stderr>', '<stdout>']:
+                root_logger.removeHandler(handler)
+
+    # 同时移除tradingagents日志器的控制台处理器
+    tradingagents_logger = logging.getLogger('tradingagents')
+    for handler in tradingagents_logger.handlers[:]:
+        if isinstance(handler, logging.StreamHandler) and hasattr(handler, 'stream'):
+            if handler.stream.name in ['<stderr>', '<stdout>']:
+                tradingagents_logger.removeHandler(handler)
+
+    # 记录CLI启动日志（只写入文件）
+    logger.info("🚀 CLI模式启动，控制台日志已禁用，保持界面清爽")
+
+# 设置CLI日志配置
+setup_cli_logging()
+
 console = Console()
+
+# CLI用户界面管理器
+class CLIUserInterface:
+    """CLI用户界面管理器：处理用户显示和进度提示"""
+
+    def __init__(self):
+        self.console = Console()
+        self.logger = get_logger("cli")
+
+    def show_user_message(self, message: str, style: str = ""):
+        """显示用户消息"""
+        if style:
+            self.console.print(f"[{style}]{message}[/{style}]")
+        else:
+            self.console.print(message)
+
+    def show_progress(self, message: str):
+        """显示进度信息"""
+        self.console.print(f"🔄 {message}")
+        # 同时记录到日志文件
+        self.logger.info(f"进度: {message}")
+
+    def show_success(self, message: str):
+        """显示成功信息"""
+        self.console.print(f"[green]✅ {message}[/green]")
+        self.logger.info(f"成功: {message}")
+
+    def show_error(self, message: str):
+        """显示错误信息"""
+        self.console.print(f"[red]❌ {message}[/red]")
+        self.logger.error(f"错误: {message}")
+
+    def show_warning(self, message: str):
+        """显示警告信息"""
+        self.console.print(f"[yellow]⚠️ {message}[/yellow]")
+        self.logger.warning(f"警告: {message}")
+
+    def show_step_header(self, step_num: int, title: str):
+        """显示步骤标题"""
+        self.console.print(f"\n[bold cyan]步骤 {step_num}: {title}[/bold cyan]")
+        self.console.print("─" * 60)
+
+    def show_data_info(self, data_type: str, symbol: str, details: str = ""):
+        """显示数据获取信息"""
+        if details:
+            self.console.print(f"📊 {data_type}: {symbol} - {details}")
+        else:
+            self.console.print(f"📊 {data_type}: {symbol}")
+
+# 创建全局UI管理器
+ui = CLIUserInterface()
 
 app = typer.Typer(
     name="TradingAgents",
@@ -563,33 +644,39 @@ def select_market():
         }
     }
 
-    logger.info(f"\n[bold cyan]请选择股票市场 | Please select stock market:[/bold cyan]")
+    console.print(f"\n[bold cyan]请选择股票市场 | Please select stock market:[/bold cyan]")
     for key, market in markets.items():
         examples_str = ", ".join(market["examples"][:3])
-        logger.info(f"[cyan]{key}[/cyan]. 🌍 {market['name']} | {market['name_en']}")
-        logger.info(f"   示例 | Examples: {examples_str}")
+        console.print(f"[cyan]{key}[/cyan]. 🌍 {market['name']} | {market['name_en']}")
+        console.print(f"   示例 | Examples: {examples_str}")
 
     while True:
         choice = typer.prompt("\n请选择市场 | Select market", default="2")
         if choice in markets:
             selected_market = markets[choice]
-            logger.info(f"[green]✅ 已选择: {selected_market['name']} | Selected: {selected_market['name_en']}[/green]")
+            console.print(f"[green]✅ 已选择: {selected_market['name']} | Selected: {selected_market['name_en']}[/green]")
+            # 记录系统日志（只写入文件）
+            logger.info(f"用户选择市场: {selected_market['name']} ({selected_market['name_en']})")
             return selected_market
         else:
-            logger.error(f"[red]❌ 无效选择，请输入 1、2 或 3 | Invalid choice, please enter 1, 2, or 3[/red]")
+            console.print(f"[red]❌ 无效选择，请输入 1、2 或 3 | Invalid choice, please enter 1, 2, or 3[/red]")
+            logger.warning(f"用户输入无效选择: {choice}")
 
 
 def get_ticker(market):
     """根据选定市场获取股票代码"""
-    logger.info(f"\n[bold cyan]{market['name']}股票示例 | {market['name_en']} Examples:[/bold cyan]")
+    console.print(f"\n[bold cyan]{market['name']}股票示例 | {market['name_en']} Examples:[/bold cyan]")
     for example in market['examples']:
-        logger.info(f"  • {example}")
+        console.print(f"  • {example}")
 
-    logger.info(f"\n[dim]格式要求 | Format: {market['format']}[/dim]")
+    console.print(f"\n[dim]格式要求 | Format: {market['format']}[/dim]")
 
     while True:
         ticker = typer.prompt(f"\n请输入{market['name']}股票代码 | Enter {market['name_en']} ticker",
                              default=market['default'])
+
+        # 记录用户输入（只写入文件）
+        logger.info(f"用户输入股票代码: {ticker}")
 
         # 验证股票代码格式
         import re
@@ -598,14 +685,17 @@ def get_ticker(market):
         if re.match(market['pattern'], ticker_to_check):
             # 对于A股，返回纯数字代码
             if market['data_source'] == 'china_stock':
-                logger.info(f"[green]✅ A股代码有效: {ticker} (将使用中国股票数据源)[/green]")
+                console.print(f"[green]✅ A股代码有效: {ticker} (将使用中国股票数据源)[/green]")
+                logger.info(f"A股代码验证成功: {ticker}")
                 return ticker
             else:
-                logger.info(f"[green]✅ 股票代码有效: {ticker.upper()}[/green]")
+                console.print(f"[green]✅ 股票代码有效: {ticker.upper()}[/green]")
+                logger.info(f"股票代码验证成功: {ticker.upper()}")
                 return ticker.upper()
         else:
-            logger.error(f"[red]❌ 股票代码格式不正确 | Invalid ticker format[/red]")
-            logger.info(f"[yellow]请使用正确格式: {market['format']}[/yellow]")
+            console.print(f"[red]❌ 股票代码格式不正确 | Invalid ticker format[/red]")
+            console.print(f"[yellow]请使用正确格式: {market['format']}[/yellow]")
+            logger.warning(f"股票代码格式验证失败: {ticker}")
 
 
 def get_analysis_date():
@@ -618,7 +708,8 @@ def get_analysis_date():
             # Validate date format and ensure it's not in the future
             analysis_date = datetime.datetime.strptime(date_str, "%Y-%m-%d")
             if analysis_date.date() > datetime.datetime.now().date():
-                logger.error(f"[red]错误：分析日期不能是未来日期 | Error: Analysis date cannot be in the future[/red]")
+                console.print(f"[red]错误：分析日期不能是未来日期 | Error: Analysis date cannot be in the future[/red]")
+                logger.warning(f"用户输入未来日期: {date_str}")
                 continue
             return date_str
         except ValueError:
@@ -887,8 +978,14 @@ def run_analysis():
 
     # Check API keys before proceeding
     if not check_api_keys(selections["llm_provider"]):
-        logger.info(f"\n[red]分析终止 | Analysis terminated[/red]")
+        ui.show_error("分析终止 | Analysis terminated")
         return
+
+    # 显示分析开始信息
+    ui.show_step_header(1, "准备分析环境 | Preparing Analysis Environment")
+    ui.show_progress(f"正在分析股票: {selections['ticker']}")
+    ui.show_progress(f"分析日期: {selections['analysis_date']}")
+    ui.show_progress(f"选择的分析师: {', '.join(analyst.value for analyst in selections['analysts'])}")
 
     # Create config with selected research depth
     config = DEFAULT_CONFIG.copy()
@@ -913,13 +1010,15 @@ def run_analysis():
         config["llm_provider"] = llm_provider
 
     # Initialize the graph
+    ui.show_progress("正在初始化分析系统...")
     try:
         graph = TradingAgentsGraph(
             [analyst.value for analyst in selections["analysts"]], config=config, debug=True
         )
+        ui.show_success("分析系统初始化完成")
     except Exception as e:
-        logger.error(f"\n[red]❌ 初始化失败 | Initialization failed: {str(e)}[/red]")
-        logger.info(f"\n[yellow]💡 请检查API密钥配置 | Please check API key configuration[/yellow]")
+        ui.show_error(f"初始化失败 | Initialization failed: {str(e)}")
+        ui.show_warning("💡 请检查API密钥配置 | Please check API key configuration")
         return
 
     # Create result directory
@@ -1008,14 +1107,36 @@ def run_analysis():
         )
         update_display(layout, spinner_text)
 
+        # 显示数据获取阶段
+        ui.show_step_header(2, "数据获取阶段 | Data Collection Phase")
+        ui.show_progress("正在获取股票基本信息...")
+
         # Initialize state and get graph args
         init_agent_state = graph.propagator.create_initial_state(
             selections["ticker"], selections["analysis_date"]
         )
         args = graph.propagator.get_graph_args()
 
+        ui.show_success("数据获取准备完成")
+
+        # 显示分析阶段
+        ui.show_step_header(3, "智能分析阶段 | AI Analysis Phase")
+        ui.show_progress("启动分析师团队...")
+
         # Stream the analysis
         trace = []
+        current_analyst = None
+        analysis_steps = {
+            "market_report": "📈 市场分析师",
+            "fundamentals_report": "📊 基本面分析师",
+            "technical_report": "🔍 技术分析师",
+            "sentiment_report": "💭 情感分析师",
+            "final_report": "🤖 信号处理器"
+        }
+
+        # 跟踪已完成的分析师，避免重复提示
+        completed_analysts = set()
+
         for chunk in graph.graph.stream(init_agent_state, **args):
             if len(chunk["messages"]) > 0:
                 # Get the last message from the chunk
@@ -1046,6 +1167,16 @@ def run_analysis():
                 # Update reports and agent status based on chunk content
                 # Analyst Team Reports
                 if "market_report" in chunk and chunk["market_report"]:
+                    # 只在第一次完成时显示提示
+                    if "market_report" not in completed_analysts:
+                        ui.show_success("📈 市场分析完成")
+                        completed_analysts.add("market_report")
+                        # 调试信息（写入日志文件）
+                        logger.info(f"首次显示市场分析完成提示，已完成分析师: {completed_analysts}")
+                    else:
+                        # 调试信息（写入日志文件）
+                        logger.debug(f"跳过重复的市场分析完成提示，已完成分析师: {completed_analysts}")
+
                     message_buffer.update_report_section(
                         "market_report", chunk["market_report"]
                     )
@@ -1057,6 +1188,11 @@ def run_analysis():
                         )
 
                 if "sentiment_report" in chunk and chunk["sentiment_report"]:
+                    # 只在第一次完成时显示提示
+                    if "sentiment_report" not in completed_analysts:
+                        ui.show_success("💭 情感分析完成")
+                        completed_analysts.add("sentiment_report")
+
                     message_buffer.update_report_section(
                         "sentiment_report", chunk["sentiment_report"]
                     )
@@ -1079,6 +1215,16 @@ def run_analysis():
                         )
 
                 if "fundamentals_report" in chunk and chunk["fundamentals_report"]:
+                    # 只在第一次完成时显示提示
+                    if "fundamentals_report" not in completed_analysts:
+                        ui.show_success("📊 基本面分析完成")
+                        completed_analysts.add("fundamentals_report")
+                        # 调试信息（写入日志文件）
+                        logger.info(f"首次显示基本面分析完成提示，已完成分析师: {completed_analysts}")
+                    else:
+                        # 调试信息（写入日志文件）
+                        logger.debug(f"跳过重复的基本面分析完成提示，已完成分析师: {completed_analysts}")
+
                     message_buffer.update_report_section(
                         "fundamentals_report", chunk["fundamentals_report"]
                     )
@@ -1097,6 +1243,11 @@ def run_analysis():
 
                     # Update Bull Researcher status and report
                     if "bull_history" in debate_state and debate_state["bull_history"]:
+                        # 显示研究团队开始工作
+                        if "research_team_started" not in completed_analysts:
+                            ui.show_progress("🔬 研究团队开始深度分析...")
+                            completed_analysts.add("research_team_started")
+
                         # Keep all research team members in progress
                         update_research_team_status("in_progress")
                         # Extract latest bull response
@@ -1130,6 +1281,11 @@ def run_analysis():
                         "judge_decision" in debate_state
                         and debate_state["judge_decision"]
                     ):
+                        # 显示研究团队完成
+                        if "research_team" not in completed_analysts:
+                            ui.show_success("🔬 研究团队分析完成")
+                            completed_analysts.add("research_team")
+
                         # Keep all research team members in progress until final decision
                         update_research_team_status("in_progress")
                         message_buffer.add_message(
@@ -1153,6 +1309,16 @@ def run_analysis():
                     "trader_investment_plan" in chunk
                     and chunk["trader_investment_plan"]
                 ):
+                    # 显示交易团队开始工作
+                    if "trading_team_started" not in completed_analysts:
+                        ui.show_progress("💼 交易团队制定投资计划...")
+                        completed_analysts.add("trading_team_started")
+
+                    # 显示交易团队完成
+                    if "trading_team" not in completed_analysts:
+                        ui.show_success("💼 交易团队计划完成")
+                        completed_analysts.add("trading_team")
+
                     message_buffer.update_report_section(
                         "trader_investment_plan", chunk["trader_investment_plan"]
                     )
@@ -1168,6 +1334,11 @@ def run_analysis():
                         "current_risky_response" in risk_state
                         and risk_state["current_risky_response"]
                     ):
+                        # 显示风险管理团队开始工作
+                        if "risk_team_started" not in completed_analysts:
+                            ui.show_progress("⚖️ 风险管理团队评估投资风险...")
+                            completed_analysts.add("risk_team_started")
+
                         message_buffer.update_agent_status(
                             "Risky Analyst", "in_progress"
                         )
@@ -1219,6 +1390,11 @@ def run_analysis():
 
                     # Update Portfolio Manager status and final decision
                     if "judge_decision" in risk_state and risk_state["judge_decision"]:
+                        # 显示风险管理团队完成
+                        if "risk_management" not in completed_analysts:
+                            ui.show_success("⚖️ 风险管理团队分析完成")
+                            completed_analysts.add("risk_management")
+
                         message_buffer.update_agent_status(
                             "Portfolio Manager", "in_progress"
                         )
@@ -1246,9 +1422,15 @@ def run_analysis():
 
             trace.append(chunk)
 
+        # 显示最终决策阶段
+        ui.show_step_header(4, "投资决策生成 | Investment Decision Generation")
+        ui.show_progress("正在处理投资信号...")
+
         # Get final state and decision
         final_state = trace[-1]
         decision = graph.process_signal(final_state["final_trade_decision"], selections['ticker'])
+
+        ui.show_success("🤖 投资信号处理完成")
 
         # Update all agent statuses to completed
         for agent in message_buffer.agent_status:
@@ -1263,8 +1445,15 @@ def run_analysis():
             if section in final_state:
                 message_buffer.update_report_section(section, final_state[section])
 
+        # 显示报告生成完成
+        ui.show_step_header(5, "分析报告生成 | Analysis Report Generation")
+        ui.show_progress("正在生成最终报告...")
+
         # Display the complete final report
         display_complete_report(final_state)
+
+        ui.show_success("📋 分析报告生成完成")
+        ui.show_success(f"🎉 {selections['ticker']} 股票分析全部完成！")
 
         update_display(layout)
 
