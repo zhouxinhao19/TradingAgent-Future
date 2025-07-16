@@ -314,14 +314,23 @@ def log_analysis_module(module_name: str, session_id: str = None):
         def wrapper(*args, **kwargs):
             # 尝试从参数中提取股票代码
             symbol = None
-            if args:
-                # 检查第一个参数是否是state字典（分析师节点的情况）
-                first_arg = args[0]
-                if isinstance(first_arg, dict) and 'company_of_interest' in first_arg:
-                    symbol = str(first_arg['company_of_interest'])
-                # 检查第一个参数是否是股票代码
-                elif isinstance(first_arg, str) and len(first_arg) <= 10:
-                    symbol = first_arg
+
+            # 特殊处理：信号处理模块的参数结构
+            if module_name == "graph_signal_processing":
+                # 信号处理模块：process_signal(self, full_signal, stock_symbol=None)
+                if len(args) >= 3:  # self, full_signal, stock_symbol
+                    symbol = str(args[2]) if args[2] else None
+                elif 'stock_symbol' in kwargs:
+                    symbol = str(kwargs['stock_symbol']) if kwargs['stock_symbol'] else None
+            else:
+                if args:
+                    # 检查第一个参数是否是state字典（分析师节点的情况）
+                    first_arg = args[0]
+                    if isinstance(first_arg, dict) and 'company_of_interest' in first_arg:
+                        symbol = str(first_arg['company_of_interest'])
+                    # 检查第一个参数是否是股票代码
+                    elif isinstance(first_arg, str) and len(first_arg) <= 10:
+                        symbol = first_arg
 
             # 从kwargs中查找股票代码
             if not symbol:

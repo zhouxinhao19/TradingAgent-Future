@@ -1,5 +1,6 @@
 from typing import Annotated, Dict
 import time
+import os
 from .reddit_utils import fetch_top_from_category
 from .chinese_finance_utils import get_chinese_social_sentiment
 from .googlenews_utils import *
@@ -992,10 +993,22 @@ def get_fundamentals_openai(ticker, curr_date):
                 return cached_data
         
         config = get_config()
-        
+
+        # 检查是否配置了OpenAI API Key（这是最关键的检查）
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+        if not openai_api_key:
+            logger.debug(f"📊 [DEBUG] 未配置OPENAI_API_KEY，跳过OpenAI API，直接使用Finnhub")
+            return get_fundamentals_finnhub(ticker, curr_date)
+
         # 检查是否配置了OpenAI相关设置
         if not config.get("backend_url") or not config.get("quick_think_llm"):
             logger.debug(f"📊 [DEBUG] OpenAI配置不完整，直接使用Finnhub API")
+            return get_fundamentals_finnhub(ticker, curr_date)
+
+        # 检查backend_url是否是OpenAI的URL
+        backend_url = config.get("backend_url", "")
+        if "openai.com" not in backend_url:
+            logger.debug(f"📊 [DEBUG] backend_url不是OpenAI API ({backend_url})，跳过OpenAI，使用Finnhub")
             return get_fundamentals_finnhub(ticker, curr_date)
         
         logger.debug(f"📊 [DEBUG] 尝试使用OpenAI获取 {ticker} 的基本面数据...")
