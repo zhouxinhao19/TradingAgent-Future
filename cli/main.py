@@ -1120,8 +1120,9 @@ def run_analysis():
         ui.show_success("数据获取准备完成")
 
         # 显示分析阶段
-        ui.show_step_header(3, "智能分析阶段 | AI Analysis Phase")
+        ui.show_step_header(3, "智能分析阶段 | AI Analysis Phase (预计耗时约10分钟)")
         ui.show_progress("启动分析师团队...")
+        ui.show_user_message("💡 提示：智能分析包含多个团队协作，请耐心等待约10分钟", "dim")
 
         # Stream the analysis
         trace = []
