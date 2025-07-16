@@ -10,6 +10,11 @@ from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 import os
 
+# 导入日志模块
+from tradingagents.utils.logging_manager import get_logger
+logger = get_logger('agents')
+
+
 
 class HKStockProvider:
     """港股数据提供器"""
@@ -22,7 +27,7 @@ class HKStockProvider:
         self.max_retries = 3  # 增加重试次数
         self.rate_limit_wait = 60  # 遇到限制时等待时间
 
-        print("🇭🇰 港股数据提供器初始化完成")
+        logger.info(f"🇭🇰 港股数据提供器初始化完成")
     
     def _wait_for_rate_limit(self):
         """等待速率限制"""
@@ -57,7 +62,7 @@ class HKStockProvider:
             if not start_date:
                 start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
             
-            print(f"🇭🇰 获取港股数据: {symbol} ({start_date} 到 {end_date})")
+            logger.info(f"🇭🇰 获取港股数据: {symbol} ({start_date} 到 {end_date})")
             
             # 多次重试获取数据
             for attempt in range(self.max_retries):
@@ -77,32 +82,32 @@ class HKStockProvider:
                         data = data.reset_index()
                         data['Symbol'] = symbol
                         
-                        print(f"✅ 港股数据获取成功: {symbol}, {len(data)}条记录")
+                        logger.info(f"✅ 港股数据获取成功: {symbol}, {len(data)}条记录")
                         return data
                     else:
-                        print(f"⚠️ 港股数据为空: {symbol} (尝试 {attempt + 1}/{self.max_retries})")
+                        logger.warning(f"⚠️ 港股数据为空: {symbol} (尝试 {attempt + 1}/{self.max_retries})")
                         
                 except Exception as e:
                     error_msg = str(e)
-                    print(f"❌ 港股数据获取失败 (尝试 {attempt + 1}/{self.max_retries}): {error_msg}")
+                    logger.error(f"❌ 港股数据获取失败 (尝试 {attempt + 1}/{self.max_retries}): {error_msg}")
 
                     # 检查是否是频率限制错误
                     if "Rate limited" in error_msg or "Too Many Requests" in error_msg:
                         if attempt < self.max_retries - 1:
-                            print(f"⏳ 检测到频率限制，等待{self.rate_limit_wait}秒...")
+                            logger.info(f"⏳ 检测到频率限制，等待{self.rate_limit_wait}秒...")
                             time.sleep(self.rate_limit_wait)
                         else:
-                            print("❌ 频率限制，跳过重试")
+                            logger.error(f"❌ 频率限制，跳过重试")
                             break
                     else:
                         if attempt < self.max_retries - 1:
                             time.sleep(2 ** attempt)  # 指数退避
                     
-            print(f"❌ 港股数据获取最终失败: {symbol}")
+            logger.error(f"❌ 港股数据获取最终失败: {symbol}")
             return None
 
         except Exception as e:
-            print(f"❌ 港股数据获取异常: {e}")
+            logger.error(f"❌ 港股数据获取异常: {e}")
             return None
     
     def get_stock_info(self, symbol: str) -> Dict[str, Any]:
@@ -118,7 +123,7 @@ class HKStockProvider:
         try:
             symbol = self._normalize_hk_symbol(symbol)
             
-            print(f"🇭🇰 获取港股信息: {symbol}")
+            logger.info(f"🇭🇰 获取港股信息: {symbol}")
             
             self._wait_for_rate_limit()
             
@@ -146,7 +151,7 @@ class HKStockProvider:
                 }
                 
         except Exception as e:
-            print(f"❌ 获取港股信息失败: {e}")
+            logger.error(f"❌ 获取港股信息失败: {e}")
             return {
                 'symbol': symbol,
                 'name': f'港股{symbol}',
@@ -192,7 +197,7 @@ class HKStockProvider:
                 return None
                 
         except Exception as e:
-            print(f"❌ 获取港股实时价格失败: {e}")
+            logger.error(f"❌ 获取港股实时价格失败: {e}")
             return None
     
     def _normalize_hk_symbol(self, symbol: str) -> str:
@@ -291,7 +296,7 @@ class HKStockProvider:
             return formatted_text
             
         except Exception as e:
-            print(f"❌ 格式化港股数据失败: {e}")
+            logger.error(f"❌ 格式化港股数据失败: {e}")
             return f"❌ 港股数据格式化失败: {symbol}"
 
 

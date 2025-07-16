@@ -7,6 +7,10 @@ AKShare数据源工具
 import pandas as pd
 from typing import Optional, Dict, Any
 import warnings
+
+# 导入日志模块
+from tradingagents.utils.logging_manager import get_logger
+logger = get_logger('agents')
 warnings.filterwarnings('ignore')
 
 class AKShareProvider:
@@ -22,11 +26,11 @@ class AKShareProvider:
             # 设置更长的超时时间
             self._configure_timeout()
 
-            print("✅ AKShare初始化成功")
+            logger.info(f"✅ AKShare初始化成功")
         except ImportError:
             self.ak = None
             self.connected = False
-            print("❌ AKShare未安装")
+            logger.error(f"❌ AKShare未安装")
 
     def _configure_timeout(self):
         """配置AKShare的超时设置"""
@@ -55,11 +59,11 @@ class AKShareProvider:
                 session.mount("http://", adapter)
                 session.mount("https://", adapter)
 
-                print("🔧 AKShare超时配置完成: 60秒超时，3次重试")
+                logger.info(f"🔧 AKShare超时配置完成: 60秒超时，3次重试")
 
         except Exception as e:
-            print(f"⚠️ AKShare超时配置失败: {e}")
-            print("🔧 使用默认超时设置")
+            logger.error(f"⚠️ AKShare超时配置失败: {e}")
+            logger.info(f"🔧 使用默认超时设置")
     
     def get_stock_data(self, symbol: str, start_date: str = None, end_date: str = None) -> Optional[pd.DataFrame]:
         """获取股票历史数据"""
@@ -85,7 +89,7 @@ class AKShareProvider:
             return data
             
         except Exception as e:
-            print(f"❌ AKShare获取股票数据失败: {e}")
+            logger.error(f"❌ AKShare获取股票数据失败: {e}")
             return None
     
     def get_stock_info(self, symbol: str) -> Dict[str, Any]:
@@ -108,7 +112,7 @@ class AKShareProvider:
                 return {'symbol': symbol, 'name': f'股票{symbol}', 'source': 'akshare'}
                 
         except Exception as e:
-            print(f"❌ AKShare获取股票信息失败: {e}")
+            logger.error(f"❌ AKShare获取股票信息失败: {e}")
             return {'symbol': symbol, 'name': f'股票{symbol}', 'source': 'akshare'}
 
     def get_hk_stock_data(self, symbol: str, start_date: str = None, end_date: str = None) -> Optional[pd.DataFrame]:
@@ -124,14 +128,14 @@ class AKShareProvider:
             DataFrame: 港股历史数据
         """
         if not self.connected:
-            print("❌ AKShare未连接")
+            logger.error(f"❌ AKShare未连接")
             return None
 
         try:
             # 标准化港股代码 - AKShare使用5位数字格式
             hk_symbol = self._normalize_hk_symbol_for_akshare(symbol)
 
-            print(f"🇭🇰 AKShare获取港股数据: {hk_symbol} ({start_date} 到 {end_date})")
+            logger.info(f"🇭🇰 AKShare获取港股数据: {hk_symbol} ({start_date} 到 {end_date})")
 
             # 格式化日期为AKShare需要的格式
             start_date_formatted = start_date.replace('-', '') if start_date else "20240101"
@@ -165,7 +169,7 @@ class AKShareProvider:
 
             if thread.is_alive():
                 # 超时了
-                print(f"⚠️ AKShare港股历史数据获取超时（60秒）: {symbol}")
+                logger.warning(f"⚠️ AKShare港股历史数据获取超时（60秒）: {symbol}")
                 raise Exception(f"AKShare港股历史数据获取超时（60秒）: {symbol}")
             elif exception[0]:
                 # 有异常
@@ -194,14 +198,14 @@ class AKShareProvider:
                     if old_col in data.columns:
                         data = data.rename(columns={old_col: new_col})
 
-                print(f"✅ AKShare港股数据获取成功: {symbol}, {len(data)}条记录")
+                logger.info(f"✅ AKShare港股数据获取成功: {symbol}, {len(data)}条记录")
                 return data
             else:
-                print(f"⚠️ AKShare港股数据为空: {symbol}")
+                logger.warning(f"⚠️ AKShare港股数据为空: {symbol}")
                 return None
 
         except Exception as e:
-            print(f"❌ AKShare获取港股数据失败: {e}")
+            logger.error(f"❌ AKShare获取港股数据失败: {e}")
             return None
 
     def get_hk_stock_info(self, symbol: str) -> Dict[str, Any]:
@@ -226,12 +230,13 @@ class AKShareProvider:
         try:
             hk_symbol = self._normalize_hk_symbol_for_akshare(symbol)
 
-            print(f"🇭🇰 AKShare获取港股信息: {hk_symbol}")
+            logger.info(f"🇭🇰 AKShare获取港股信息: {hk_symbol}")
 
             # 尝试获取港股实时行情数据来获取基本信息
             # 使用线程超时包装（兼容Windows）
             import threading
             import time
+
 
             result = [None]
             exception = [None]
@@ -252,7 +257,7 @@ class AKShareProvider:
 
             if thread.is_alive():
                 # 超时了
-                print("⚠️ AKShare港股信息获取超时（60秒），使用备用方案")
+                logger.warning(f"⚠️ AKShare港股信息获取超时（60秒），使用备用方案")
                 raise Exception("AKShare港股信息获取超时（60秒）")
             elif exception[0]:
                 # 有异常
@@ -287,7 +292,7 @@ class AKShareProvider:
             }
 
         except Exception as e:
-            print(f"❌ AKShare获取港股信息失败: {e}")
+            logger.error(f"❌ AKShare获取港股信息失败: {e}")
             return {
                 'symbol': symbol,
                 'name': f'港股{symbol}',
@@ -397,9 +402,9 @@ def format_hk_stock_data_akshare(symbol: str, data: pd.DataFrame, start_date: st
             provider = get_akshare_provider()
             stock_info = provider.get_hk_stock_info(symbol)
             stock_name = stock_info.get('name', f'港股{symbol}')
-            print(f"✅ 港股信息获取成功: {stock_name}")
+            logger.info(f"✅ 港股信息获取成功: {stock_name}")
         except Exception as info_error:
-            print(f"⚠️ 港股信息获取失败，使用默认信息: {info_error}")
+            logger.error(f"⚠️ 港股信息获取失败，使用默认信息: {info_error}")
             # 继续处理，使用默认信息
 
         # 计算统计信息
@@ -448,5 +453,5 @@ def format_hk_stock_data_akshare(symbol: str, data: pd.DataFrame, start_date: st
         return formatted_text
 
     except Exception as e:
-        print(f"❌ 格式化AKShare港股数据失败: {e}")
+        logger.error(f"❌ 格式化AKShare港股数据失败: {e}")
         return f"❌ AKShare港股数据格式化失败: {symbol}"

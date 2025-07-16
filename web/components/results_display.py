@@ -11,6 +11,10 @@ from datetime import datetime
 # 导入导出功能
 from utils.report_exporter import render_export_buttons
 
+# 导入日志模块
+from tradingagents.utils.logging_manager import get_logger
+logger = get_logger('web')
+
 def render_results(results):
     """渲染分析结果"""
 
@@ -91,7 +95,7 @@ def render_analysis_info(results):
 
         with col2:
             llm_model = results.get('llm_model', 'N/A')
-            print(f"🔍 [DEBUG] llm_model from results: {llm_model}")
+            logger.debug(f"🔍 [DEBUG] llm_model from results: {llm_model}")
             model_display = {
                 'qwen-turbo': 'Qwen Turbo',
                 'qwen-plus': 'Qwen Plus',
@@ -109,7 +113,7 @@ def render_analysis_info(results):
 
         with col3:
             analysts = results.get('analysts', [])
-            print(f"🔍 [DEBUG] analysts from results: {analysts}")
+            logger.debug(f"🔍 [DEBUG] analysts from results: {analysts}")
             analysts_count = len(analysts) if analysts else 0
 
             st.metric(
@@ -205,12 +209,13 @@ def render_decision_summary(decision, stock_symbol=None):
 
     with col4:
         target_price = decision.get('target_price')
-        print(f"🔍 [DEBUG] target_price from decision: {target_price}, type: {type(target_price)}")
-        print(f"🔍 [DEBUG] decision keys: {list(decision.keys()) if isinstance(decision, dict) else 'Not a dict'}")
+        logger.debug(f"🔍 [DEBUG] target_price from decision: {target_price}, type: {type(target_price)}")
+        logger.debug(f"🔍 [DEBUG] decision keys: {list(decision.keys()) if isinstance(decision, dict) else 'Not a dict'}")
 
         # 根据股票代码确定货币符号
         def is_china_stock(ticker_code):
             import re
+
             return re.match(r'^\d{6}$', str(ticker_code)) if ticker_code else False
 
         is_china = is_china_stock(stock_symbol)

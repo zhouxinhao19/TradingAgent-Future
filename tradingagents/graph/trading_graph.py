@@ -19,7 +19,10 @@ from tradingagents.agents.utils.memory import FinancialSituationMemory
 
 # 导入统一日志系统
 from tradingagents.utils.logging_init import get_logger
-logger = get_logger("graph.trading_graph")
+
+# 导入日志模块
+from tradingagents.utils.logging_manager import get_logger
+logger = get_logger('agents')
 from tradingagents.agents.utils.agent_states import (
     AgentState,
     InvestDebateState,
@@ -103,6 +106,7 @@ class TradingAgentsGraph:
               "deepseek" in self.config["llm_provider"].lower()):
             # DeepSeek V3配置 - 使用支持token统计的适配器
             from tradingagents.llm_adapters.deepseek_adapter import ChatDeepSeek
+
 
             deepseek_api_key = os.getenv('DEEPSEEK_API_KEY')
             if not deepseek_api_key:

@@ -14,7 +14,10 @@ from dotenv import load_dotenv
 
 # 导入统一日志系统
 from tradingagents.utils.logging_init import get_logger
-logger = get_logger("config")
+
+# 导入日志模块
+from tradingagents.utils.logging_manager import get_logger
+logger = get_logger('agents')
 
 try:
     from .mongodb_storage import MongoDBStorage
@@ -249,7 +252,7 @@ class ConfigManager:
 
                 return models
         except Exception as e:
-            print(f"加载模型配置失败: {e}")
+            logger.error(f"加载模型配置失败: {e}")
             return []
     
     def save_models(self, models: List[ModelConfig]):
@@ -259,7 +262,7 @@ class ConfigManager:
             with open(self.models_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"保存模型配置失败: {e}")
+            logger.error(f"保存模型配置失败: {e}")
     
     def load_pricing(self) -> List[PricingConfig]:
         """加载定价配置"""
@@ -268,7 +271,7 @@ class ConfigManager:
                 data = json.load(f)
             return [PricingConfig(**item) for item in data]
         except Exception as e:
-            print(f"加载定价配置失败: {e}")
+            logger.error(f"加载定价配置失败: {e}")
             return []
     
     def save_pricing(self, pricing: List[PricingConfig]):
@@ -278,7 +281,7 @@ class ConfigManager:
             with open(self.pricing_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"保存定价配置失败: {e}")
+            logger.error(f"保存定价配置失败: {e}")
     
     def load_usage_records(self) -> List[UsageRecord]:
         """加载使用记录"""
@@ -289,7 +292,7 @@ class ConfigManager:
                 data = json.load(f)
                 return [UsageRecord(**item) for item in data]
         except Exception as e:
-            print(f"加载使用记录失败: {e}")
+            logger.error(f"加载使用记录失败: {e}")
             return []
     
     def save_usage_records(self, records: List[UsageRecord]):
@@ -299,7 +302,7 @@ class ConfigManager:
             with open(self.usage_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"保存使用记录失败: {e}")
+            logger.error(f"保存使用记录失败: {e}")
     
     def add_usage_record(self, provider: str, model_name: str, input_tokens: int,
                         output_tokens: int, session_id: str, analysis_type: str = "stock_analysis"):
@@ -324,7 +327,7 @@ class ConfigManager:
             if success:
                 return record
             else:
-                print("⚠️ MongoDB保存失败，回退到JSON文件存储")
+                logger.error(f"⚠️ MongoDB保存失败，回退到JSON文件存储")
         
         # 回退到JSON文件存储
         records = self.load_usage_records()
@@ -364,7 +367,7 @@ class ConfigManager:
             with open(self.settings_file, 'r', encoding='utf-8') as f:
                 settings = json.load(f)
         except Exception as e:
-            print(f"加载设置失败: {e}")
+            logger.error(f"加载设置失败: {e}")
             settings = {}
 
         # 合并.env中的其他配置
@@ -410,7 +413,7 @@ class ConfigManager:
             with open(self.settings_file, 'w', encoding='utf-8') as f:
                 json.dump(settings, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"保存设置失败: {e}")
+            logger.error(f"保存设置失败: {e}")
     
     def get_enabled_models(self) -> List[ModelConfig]:
         """获取启用的模型"""
@@ -440,13 +443,14 @@ class ConfigManager:
                     stats["records_count"] = stats.get("total_requests", 0)
                     return stats
             except Exception as e:
-                print(f"⚠️ MongoDB统计获取失败，回退到JSON文件: {e}")
+                logger.error(f"⚠️ MongoDB统计获取失败，回退到JSON文件: {e}")
         
         # 回退到JSON文件统计
         records = self.load_usage_records()
         
         # 过滤最近N天的记录
         from datetime import datetime, timedelta
+
         cutoff_date = datetime.now() - timedelta(days=days)
         
         recent_records = []
@@ -527,9 +531,9 @@ class ConfigManager:
             if directory and not os.path.exists(directory):
                 try:
                     os.makedirs(directory, exist_ok=True)
-                    print(f"✅ 创建目录: {directory}")
+                    logger.info(f"✅ 创建目录: {directory}")
                 except Exception as e:
-                    print(f"❌ 创建目录失败 {directory}: {e}")
+                    logger.error(f"❌ 创建目录失败 {directory}: {e}")
 
 
 class TokenTracker:

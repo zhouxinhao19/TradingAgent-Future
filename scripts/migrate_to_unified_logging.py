@@ -11,6 +11,11 @@ from pathlib import Path
 from typing import List, Dict, Tuple
 import argparse
 
+# 导入日志模块
+from tradingagents.utils.logging_manager import get_logger
+logger = get_logger('scripts')
+
+
 
 class LoggingMigrator:
     """日志系统迁移器"""
@@ -36,7 +41,7 @@ class LoggingMigrator:
     def migrate_file(self, file_path: Path) -> bool:
         """迁移单个文件"""
         try:
-            print(f"🔄 迁移文件: {file_path}")
+            logger.info(f"🔄 迁移文件: {file_path}")
             
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
@@ -61,10 +66,10 @@ class LoggingMigrator:
                     f.write(content)
                 
                 self.migrated_files.append(str(file_path))
-                print(f"✅ 迁移完成: {file_path}")
+                logger.info(f"✅ 迁移完成: {file_path}")
                 return True
             else:
-                print(f"⏭️  无需修改: {file_path}")
+                logger.info(f"⏭️  无需修改: {file_path}")
                 return False
                 
         except Exception as e:
@@ -274,24 +279,24 @@ def main():
     else:
         target_path = project_root / 'tradingagents'
     
-    print(f"🎯 开始迁移: {target_path}")
-    print("=" * 60)
+    logger.info(f"🎯 开始迁移: {target_path}")
+    logger.info(f"=")
     
     # 执行迁移
     if target_path.is_file():
         migrator.migrate_file(target_path)
     else:
         stats = migrator.migrate_directory(target_path, args.recursive)
-        print(f"\n📊 迁移统计: 成功={stats['migrated']}, 跳过={stats['skipped']}, 错误={stats['errors']}")
+        logger.error(f"\n📊 迁移统计: 成功={stats['migrated']}, 跳过={stats['skipped']}, 错误={stats['errors']}")
     
     # 生成报告
     if args.report:
         report = migrator.generate_report()
         with open(args.report, 'w', encoding='utf-8') as f:
             f.write(report)
-        print(f"📄 报告已保存到: {args.report}")
+        logger.info(f"📄 报告已保存到: {args.report}")
     
-    print("\n✅ 迁移完成!")
+    logger.info(f"\n✅ 迁移完成!")
 
 
 if __name__ == "__main__":

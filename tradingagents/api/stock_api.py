@@ -10,6 +10,10 @@ import os
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 
+# 导入日志模块
+from tradingagents.utils.logging_manager import get_logger
+logger = get_logger('agents')
+
 # 添加dataflows目录到路径
 dataflows_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'dataflows')
 if dataflows_path not in sys.path:
@@ -17,10 +21,10 @@ if dataflows_path not in sys.path:
 
 # 导入统一日志系统
 from tradingagents.utils.logging_init import get_logger
-logger = get_logger("default")
 
 try:
     from stock_data_service import get_stock_data_service
+
     SERVICE_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"⚠️ 股票数据服务不可用: {e}")

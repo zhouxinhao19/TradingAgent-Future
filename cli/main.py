@@ -1,34 +1,44 @@
-from typing import Optional
+# 标准库导入
 import datetime
-import typer
 import os
-from pathlib import Path
-from functools import wraps
-from rich.console import Console
-from rich.panel import Panel
-from rich.spinner import Spinner
-from rich.live import Live
-from rich.columns import Columns
-from rich.markdown import Markdown
-from rich.layout import Layout
-from rich.text import Text
-from rich.live import Live
-from rich.table import Table
-from collections import deque
+import subprocess
+import sys
 import time
-from rich.tree import Tree
+from collections import deque
+from difflib import get_close_matches
+from functools import wraps
+from pathlib import Path
+from typing import Optional
+
+# 第三方库导入
+import typer
+from dotenv import load_dotenv
 from rich import box
 from rich.align import Align
+from rich.columns import Columns
+from rich.console import Console
+from rich.layout import Layout
+from rich.live import Live
+from rich.markdown import Markdown
+from rich.panel import Panel
 from rich.rule import Rule
+from rich.spinner import Spinner
+from rich.table import Table
+from rich.text import Text
+from rich.tree import Tree
 
-# 加载环境变量
-from dotenv import load_dotenv
-load_dotenv()
-
-from tradingagents.graph.trading_graph import TradingAgentsGraph
-from tradingagents.default_config import DEFAULT_CONFIG
+# 项目内部导入
 from cli.models import AnalystType
 from cli.utils import *
+from tradingagents.default_config import DEFAULT_CONFIG
+from tradingagents.graph.trading_graph import TradingAgentsGraph
+from tradingagents.utils.logging_manager import get_logger
+
+# 加载环境变量
+load_dotenv()
+
+# 初始化日志系统
+logger = get_logger("cli")
 
 console = Console()
 
@@ -556,14 +566,14 @@ def select_market():
     logger.info(f"\n[bold cyan]请选择股票市场 | Please select stock market:[/bold cyan]")
     for key, market in markets.items():
         examples_str = ", ".join(market["examples"][:3])
-        logger.info(f"[cyan]{key}[/cyan]. 🌍 {market["name']} | {market['name_en']}")
+        logger.info(f"[cyan]{key}[/cyan]. 🌍 {market['name']} | {market['name_en']}")
         logger.info(f"   示例 | Examples: {examples_str}")
 
     while True:
         choice = typer.prompt("\n请选择市场 | Select market", default="2")
         if choice in markets:
             selected_market = markets[choice]
-            logger.info(f"[green]✅ 已选择: {selected_market["name']} | Selected: {selected_market['name_en']}[/green]")
+            logger.info(f"[green]✅ 已选择: {selected_market['name']} | Selected: {selected_market['name_en']}[/green]")
             return selected_market
         else:
             logger.error(f"[red]❌ 无效选择，请输入 1、2 或 3 | Invalid choice, please enter 1, 2, or 3[/red]")
@@ -571,11 +581,11 @@ def select_market():
 
 def get_ticker(market):
     """根据选定市场获取股票代码"""
-    logger.info(f"\n[bold cyan]{market["name']}股票示例 | {market['name_en']} Examples:[/bold cyan]")
+    logger.info(f"\n[bold cyan]{market['name']}股票示例 | {market['name_en']} Examples:[/bold cyan]")
     for example in market['examples']:
         logger.info(f"  • {example}")
 
-    logger.info(f"\n[dim]格式要求 | Format: {market["format']}[/dim]")
+    logger.info(f"\n[dim]格式要求 | Format: {market['format']}[/dim]")
 
     while True:
         ticker = typer.prompt(f"\n请输入{market['name']}股票代码 | Enter {market['name_en']} ticker",
@@ -595,7 +605,7 @@ def get_ticker(market):
                 return ticker.upper()
         else:
             logger.error(f"[red]❌ 股票代码格式不正确 | Invalid ticker format[/red]")
-            logger.info(f"[yellow]请使用正确格式: {market["format']}[/yellow]")
+            logger.info(f"[yellow]请使用正确格式: {market['format']}[/yellow]")
 
 
 def get_analysis_date():
@@ -865,7 +875,7 @@ def check_api_keys(llm_provider: str) -> bool:
         logger.info(f"   DASHSCOPE_API_KEY=your_dashscope_key")
         logger.info(f"   FINNHUB_API_KEY=your_finnhub_key")
         logger.info(f"\n2. 或设置环境变量 | Or set environment variables")
-        logger.info(f"\n3. 运行 "python -m cli.main config' 查看详细配置说明")
+        logger.info(f"\n3. 运行 'python -m cli.main config' 查看详细配置说明")
 
         return False
 
@@ -1585,9 +1595,6 @@ def test():
     """
     logger.info(f"\n[bold blue]🧪 TradingAgents 测试 | Tests[/bold blue]")
 
-    import subprocess
-    import sys
-
     logger.info(f"[yellow]正在运行集成测试... | Running integration tests...[/yellow]")
 
     try:
@@ -1676,12 +1683,6 @@ def help_chinese():
 
 def main():
     """主函数 - 默认进入分析模式"""
-    import sys
-    from difflib import get_close_matches
-
-# 导入统一日志系统
-from tradingagents.utils.logging_init import get_logger
-logger = get_logger("cli")
 
     # 如果没有参数，直接进入分析模式
     if len(sys.argv) == 1:
@@ -1700,13 +1701,13 @@ logger = get_logger("cli")
                 suggestions = get_close_matches(unknown_command, available_commands, n=3, cutoff=0.6)
                 
                 if suggestions:
-                    logger.error(f"\n[red]❌ 未知命令: "{unknown_command}'[/red]")
+                    logger.error(f"\n[red]❌ 未知命令: '{unknown_command}'[/red]")
                     logger.info(f"[yellow]💡 您是否想要使用以下命令之一？[/yellow]")
                     for suggestion in suggestions:
                         logger.info(f"   • [cyan]python -m cli.main {suggestion}[/cyan]")
                     logger.info(f"\n[dim]使用 [cyan]python -m cli.main help[/cyan] 查看所有可用命令[/dim]")
                 else:
-                    logger.error(f"\n[red]❌ 未知命令: "{unknown_command}'[/red]")
+                    logger.error(f"\n[red]❌ 未知命令: '{unknown_command}'[/red]")
                     logger.info(f"[yellow]使用 [cyan]python -m cli.main help[/cyan] 查看所有可用命令[/yellow]")
             raise e
 

@@ -5,6 +5,11 @@
 import streamlit as st
 import datetime
 
+# 导入日志模块
+from tradingagents.utils.logging_manager import get_logger
+logger = get_logger('web')
+
+
 def render_analysis_form():
     """渲染股票分析表单"""
     
@@ -34,7 +39,7 @@ def render_analysis_form():
                     autocomplete="off"  # 修复autocomplete警告
                 ).upper().strip()
 
-                print(f"🔍 [FORM DEBUG] 美股text_input返回值: '{stock_symbol}'")
+                logger.debug(f"🔍 [FORM DEBUG] 美股text_input返回值: '{stock_symbol}'")
 
             elif market_type == "港股":
                 # 应用与美股相同的修复：移除默认值，添加回车提示
@@ -46,7 +51,7 @@ def render_analysis_form():
                     autocomplete="off"  # 修复autocomplete警告
                 ).upper().strip()
 
-                print(f"🔍 [FORM DEBUG] 港股text_input返回值: '{stock_symbol}'")
+                logger.debug(f"🔍 [FORM DEBUG] 港股text_input返回值: '{stock_symbol}'")
 
             else:  # A股
                 stock_symbol = st.text_input(
@@ -57,7 +62,7 @@ def render_analysis_form():
                     autocomplete="off"  # 修复autocomplete警告
                 ).strip()
 
-                print(f"🔍 [FORM DEBUG] A股text_input返回值: '{stock_symbol}'")
+                logger.debug(f"🔍 [FORM DEBUG] A股text_input返回值: '{stock_symbol}'")
             
             # 分析日期
             analysis_date = st.date_input(
@@ -187,12 +192,12 @@ def render_analysis_form():
     # 只有在提交时才返回数据
     if submitted and stock_symbol:  # 确保有股票代码才提交
         # 添加详细日志
-        print(f"🔍 [FORM DEBUG] ===== 分析表单提交 =====")
-        print(f"🔍 [FORM DEBUG] 用户输入的股票代码: '{stock_symbol}'")
-        print(f"🔍 [FORM DEBUG] 市场类型: '{market_type}'")
-        print(f"🔍 [FORM DEBUG] 分析日期: '{analysis_date}'")
-        print(f"🔍 [FORM DEBUG] 选择的分析师: {[a[0] for a in selected_analysts]}")
-        print(f"🔍 [FORM DEBUG] 研究深度: {research_depth}")
+        logger.debug(f"🔍 [FORM DEBUG] ===== 分析表单提交 =====")
+        logger.debug(f"🔍 [FORM DEBUG] 用户输入的股票代码: '{stock_symbol}'")
+        logger.debug(f"🔍 [FORM DEBUG] 市场类型: '{market_type}'")
+        logger.debug(f"🔍 [FORM DEBUG] 分析日期: '{analysis_date}'")
+        logger.debug(f"🔍 [FORM DEBUG] 选择的分析师: {[a[0] for a in selected_analysts]}")
+        logger.debug(f"🔍 [FORM DEBUG] 研究深度: {research_depth}")
 
         form_data = {
             'submitted': True,
@@ -206,13 +211,13 @@ def render_analysis_form():
             'custom_prompt': custom_prompt
         }
 
-        print(f"🔍 [FORM DEBUG] 返回的表单数据: {form_data}")
-        print(f"🔍 [FORM DEBUG] ===== 表单提交结束 =====")
+        logger.debug(f"🔍 [FORM DEBUG] 返回的表单数据: {form_data}")
+        logger.debug(f"🔍 [FORM DEBUG] ===== 表单提交结束 =====")
 
         return form_data
     elif submitted and not stock_symbol:
         # 用户点击了提交但没有输入股票代码
-        print(f"🔍 [FORM DEBUG] 提交失败：股票代码为空")
+        logger.error(f"🔍 [FORM DEBUG] 提交失败：股票代码为空")
         st.error("❌ 请输入股票代码后再提交")
         return {'submitted': False}
     else:

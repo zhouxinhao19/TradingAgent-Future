@@ -13,6 +13,11 @@ from typing import Dict, List, Any, Optional
 from collections import defaultdict, Counter
 import argparse
 
+# 导入日志模块
+from tradingagents.utils.logging_manager import get_logger
+logger = get_logger('scripts')
+
+
 
 class DataCallAnalyzer:
     """数据获取调用分析器"""
@@ -26,10 +31,10 @@ class DataCallAnalyzer:
     def parse_logs(self):
         """解析日志文件"""
         if not self.log_file.exists():
-            print(f"❌ 日志文件不存在: {self.log_file}")
+            logger.error(f"❌ 日志文件不存在: {self.log_file}")
             return
             
-        print(f"📖 解析数据获取日志: {self.log_file}")
+        logger.info(f"📖 解析数据获取日志: {self.log_file}")
         
         with open(self.log_file, 'r', encoding='utf-8') as f:
             for line_num, line in enumerate(f, 1):
@@ -49,7 +54,7 @@ class DataCallAnalyzer:
                 # 解析普通日志
                 self._process_regular_log(line, line_num)
         
-        print(f"✅ 解析完成: {len(self.data_calls)} 条数据调用, {len(self.tool_calls)} 条工具调用, {len(self.data_source_calls)} 条数据源调用")
+        logger.info(f"✅ 解析完成: {len(self.data_calls)} 条数据调用, {len(self.tool_calls)} 条工具调用, {len(self.data_source_calls)} 条数据源调用")
     
     def _process_structured_entry(self, entry: Dict[str, Any], line_num: int):
         """处理结构化日志条目"""
@@ -151,8 +156,8 @@ class DataCallAnalyzer:
     
     def analyze_data_calls(self) -> Dict[str, Any]:
         """分析数据获取调用"""
-        print("\n📊 数据获取调用分析")
-        print("=" * 50)
+        logger.info(f"\n📊 数据获取调用分析")
+        logger.info(f"=")
         
         analysis = {
             'total_calls': len(self.data_calls),
@@ -230,38 +235,38 @@ class DataCallAnalyzer:
             analysis['performance']['avg_duration'] = sum(durations) / len(durations)
         
         # 输出分析结果
-        print(f"📈 总调用次数: {analysis['total_calls']}")
+        logger.info(f"📈 总调用次数: {analysis['total_calls']}")
         
         if analysis['by_symbol']:
-            print(f"\n📊 按股票代码统计 (前10):")
+            logger.info(f"\n📊 按股票代码统计 (前10):")
             for symbol, count in Counter(analysis['by_symbol']).most_common(10):
-                print(f"  - {symbol}: {count} 次")
+                logger.info(f"  - {symbol}: {count} 次")
         
         if analysis['by_data_source']:
-            print(f"\n🔧 按数据源统计:")
+            logger.info(f"\n🔧 按数据源统计:")
             for source, count in Counter(analysis['by_data_source']).most_common():
-                print(f"  - {source}: {count} 次")
+                logger.info(f"  - {source}: {count} 次")
         
         if durations:
-            print(f"\n⏱️  性能统计:")
-            print(f"  - 总耗时: {analysis['performance']['total_duration']:.2f}s")
-            print(f"  - 平均耗时: {analysis['performance']['avg_duration']:.2f}s")
-            print(f"  - 慢调用 (>5s): {len(analysis['performance']['slow_calls'])} 次")
-            print(f"  - 快调用 (<1s): {len(analysis['performance']['fast_calls'])} 次")
+            logger.info(f"\n⏱️  性能统计:")
+            logger.info(f"  - 总耗时: {analysis['performance']['total_duration']:.2f}s")
+            logger.info(f"  - 平均耗时: {analysis['performance']['avg_duration']:.2f}s")
+            logger.info(f"  - 慢调用 (>5s): {len(analysis['performance']['slow_calls'])} 次")
+            logger.info(f"  - 快调用 (<1s): {len(analysis['performance']['fast_calls'])} 次")
         
         if analysis['success_rate']['total'] > 0:
             success_pct = (analysis['success_rate']['success'] / analysis['success_rate']['total']) * 100
-            print(f"\n✅ 成功率统计:")
-            print(f"  - 成功: {analysis['success_rate']['success']} ({success_pct:.1f}%)")
-            print(f"  - 警告: {analysis['success_rate']['warning']}")
-            print(f"  - 错误: {analysis['success_rate']['error']}")
+            logger.info(f"\n✅ 成功率统计:")
+            logger.info(f"  - 成功: {analysis['success_rate']['success']} ({success_pct:.1f}%)")
+            logger.warning(f"  - 警告: {analysis['success_rate']['warning']}")
+            logger.error(f"  - 错误: {analysis['success_rate']['error']}")
         
         return analysis
     
     def analyze_tool_calls(self) -> Dict[str, Any]:
         """分析工具调用"""
-        print("\n🔧 工具调用分析")
-        print("=" * 50)
+        logger.info(f"\n🔧 工具调用分析")
+        logger.info(f"=")
         
         analysis = {
             'total_calls': len(self.tool_calls),
@@ -285,25 +290,25 @@ class DataCallAnalyzer:
                 analysis['success_rate'][f"{tool_name}_error"] += 1
         
         # 输出结果
-        print(f"🔧 总工具调用: {analysis['total_calls']}")
+        logger.info(f"🔧 总工具调用: {analysis['total_calls']}")
         
         if analysis['by_tool']:
-            print(f"\n📊 按工具统计:")
+            logger.info(f"\n📊 按工具统计:")
             for tool, count in Counter(analysis['by_tool']).most_common():
-                print(f"  - {tool}: {count} 次")
+                logger.info(f"  - {tool}: {count} 次")
                 
                 # 性能统计
                 if tool in analysis['performance']:
                     durations = analysis['performance'][tool]
                     avg_duration = sum(durations) / len(durations)
-                    print(f"    平均耗时: {avg_duration:.2f}s")
+                    logger.info(f"    平均耗时: {avg_duration:.2f}s")
         
         return analysis
     
     def generate_report(self) -> str:
         """生成分析报告"""
-        print("\n📋 生成数据获取分析报告")
-        print("=" * 50)
+        logger.info(f"\n📋 生成数据获取分析报告")
+        logger.info(f"=")
         
         data_analysis = self.analyze_data_calls()
         tool_analysis = self.analyze_tool_calls()
@@ -363,12 +368,12 @@ def main():
         if args.output:
             with open(args.output, 'w', encoding='utf-8') as f:
                 f.write(report)
-            print(f"📄 报告已保存到: {args.output}")
+            logger.info(f"📄 报告已保存到: {args.output}")
         else:
             print(report)
             
     except Exception as e:
-        print(f"❌ 分析失败: {e}")
+        logger.error(f"❌ 分析失败: {e}")
         sys.exit(1)
 
 

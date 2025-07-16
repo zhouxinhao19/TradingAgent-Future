@@ -12,16 +12,16 @@ import datetime
 import time
 from dotenv import load_dotenv
 
+# 导入日志模块
+from tradingagents.utils.logging_manager import get_logger
+logger = get_logger('web')
+
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 # 加载环境变量
 load_dotenv(project_root / ".env", override=True)
-
-# 初始化日志系统
-from tradingagents.utils.logging_init import setup_web_logging
-logger = setup_web_logging()
 
 # 导入自定义组件
 from components.sidebar import render_sidebar
@@ -573,10 +573,10 @@ def main():
 
         # 添加接收日志
         if form_data.get('submitted', False):
-            print(f"🔍 [APP DEBUG] ===== 主应用接收表单数据 =====")
-            print(f"🔍 [APP DEBUG] 接收到的form_data: {form_data}")
-            print(f"🔍 [APP DEBUG] 股票代码: '{form_data['stock_symbol']}'")
-            print(f"🔍 [APP DEBUG] 市场类型: '{form_data['market_type']}'")
+            logger.debug(f"🔍 [APP DEBUG] ===== 主应用接收表单数据 =====")
+            logger.debug(f"🔍 [APP DEBUG] 接收到的form_data: {form_data}")
+            logger.debug(f"🔍 [APP DEBUG] 股票代码: '{form_data['stock_symbol']}'")
+            logger.debug(f"🔍 [APP DEBUG] 市场类型: '{form_data['market_type']}'")
 
         # 检查是否提交了表单
         if form_data.get('submitted', False):

@@ -94,7 +94,6 @@ def test_unified_tool_direct():
     try:
         # 设置日志级别
         from tradingagents.utils.logging_init import get_logger
-        logger = get_logger("default")
         logger.setLevel("INFO")
         
         # 导入工具包

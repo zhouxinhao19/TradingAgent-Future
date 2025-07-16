@@ -9,6 +9,10 @@ import time
 from typing import Dict, List, Optional, Any
 from enum import Enum
 import warnings
+
+# 导入日志模块
+from tradingagents.utils.logging_manager import get_logger
+logger = get_logger('agents')
 warnings.filterwarnings('ignore')
 
 # 导入统一日志系统
@@ -80,17 +84,17 @@ class DataSourceManager:
         try:
             import baostock as bs
             available.append(ChinaDataSource.BAOSTOCK)
-            print("✅ BaoStock数据源可用")
+            logger.info(f"✅ BaoStock数据源可用")
         except ImportError:
-            print("⚠️ BaoStock数据源不可用: 库未安装")
+            logger.warning(f"⚠️ BaoStock数据源不可用: 库未安装")
         
         # 检查TDX (通达信)
         try:
             import pytdx
             available.append(ChinaDataSource.TDX)
-            print("⚠️ TDX数据源可用 (将被淘汰)")
+            logger.warning(f"⚠️ TDX数据源可用 (将被淘汰)")
         except ImportError:
-            print("ℹ️ TDX数据源不可用: 库未安装")
+            logger.info(f"ℹ️ TDX数据源不可用: 库未安装")
         
         return available
     
@@ -102,10 +106,10 @@ class DataSourceManager:
         """设置当前数据源"""
         if source in self.available_sources:
             self.current_source = source
-            print(f"✅ 数据源已切换到: {source.value}")
+            logger.info(f"✅ 数据源已切换到: {source.value}")
             return True
         else:
-            print(f"❌ 数据源不可用: {source.value}")
+            logger.error(f"❌ 数据源不可用: {source.value}")
             return False
     
     def get_data_adapter(self):
@@ -127,7 +131,7 @@ class DataSourceManager:
             from .tushare_adapter import get_tushare_adapter
             return get_tushare_adapter()
         except ImportError as e:
-            print(f"❌ Tushare适配器导入失败: {e}")
+            logger.error(f"❌ Tushare适配器导入失败: {e}")
             return None
     
     def _get_akshare_adapter(self):
@@ -136,7 +140,7 @@ class DataSourceManager:
             from .akshare_utils import get_akshare_provider
             return get_akshare_provider()
         except ImportError as e:
-            print(f"❌ AKShare适配器导入失败: {e}")
+            logger.error(f"❌ AKShare适配器导入失败: {e}")
             return None
     
     def _get_baostock_adapter(self):
@@ -145,17 +149,17 @@ class DataSourceManager:
             from .baostock_utils import get_baostock_provider
             return get_baostock_provider()
         except ImportError as e:
-            print(f"❌ BaoStock适配器导入失败: {e}")
+            logger.error(f"❌ BaoStock适配器导入失败: {e}")
             return None
     
     def _get_tdx_adapter(self):
         """获取TDX适配器 (已弃用)"""
-        print("⚠️ 警告: TDX数据源已弃用，建议使用Tushare")
+        logger.warning(f"⚠️ 警告: TDX数据源已弃用，建议使用Tushare")
         try:
             from .tdx_utils import get_tdx_provider
             return get_tdx_provider()
         except ImportError as e:
-            print(f"❌ TDX适配器导入失败: {e}")
+            logger.error(f"❌ TDX适配器导入失败: {e}")
             return None
     
     def get_stock_data(self, symbol: str, start_date: str = None, end_date: str = None) -> str:
@@ -324,13 +328,13 @@ class DataSourceManager:
     
     def _get_tdx_data(self, symbol: str, start_date: str, end_date: str) -> str:
         """使用TDX获取数据 (已弃用)"""
-        print("⚠️ 警告: 正在使用已弃用的TDX数据源")
+        logger.warning(f"⚠️ 警告: 正在使用已弃用的TDX数据源")
         from .tdx_utils import get_china_stock_data
         return get_china_stock_data(symbol, start_date, end_date)
     
     def _try_fallback_sources(self, symbol: str, start_date: str, end_date: str) -> str:
         """尝试备用数据源"""
-        print(f"🔄 {self.current_source.value}失败，尝试备用数据源...")
+        logger.error(f"🔄 {self.current_source.value}失败，尝试备用数据源...")
         
         # 备用数据源优先级: Tushare > AKShare > BaoStock > TDX
         fallback_order = [
@@ -343,7 +347,7 @@ class DataSourceManager:
         for source in fallback_order:
             if source != self.current_source and source in self.available_sources:
                 try:
-                    print(f"🔄 尝试备用数据源: {source.value}")
+                    logger.info(f"🔄 尝试备用数据源: {source.value}")
                     original_source = self.current_source
                     self.current_source = source
                     
@@ -353,11 +357,11 @@ class DataSourceManager:
                     self.current_source = original_source
                     
                     if "❌" not in result:
-                        print(f"✅ 备用数据源{source.value}获取成功")
+                        logger.info(f"✅ 备用数据源{source.value}获取成功")
                         return result
                         
                 except Exception as e:
-                    print(f"❌ 备用数据源{source.value}也失败: {e}")
+                    logger.error(f"❌ 备用数据源{source.value}也失败: {e}")
                     continue
         
         return f"❌ 所有数据源都无法获取{symbol}的数据"
@@ -378,7 +382,7 @@ class DataSourceManager:
                     return {'symbol': symbol, 'name': f'股票{symbol}', 'source': self.current_source.value}
                     
         except Exception as e:
-            print(f"❌ 获取股票信息失败: {e}")
+            logger.error(f"❌ 获取股票信息失败: {e}")
             return {'symbol': symbol, 'name': f'股票{symbol}', 'source': 'unknown', 'error': str(e)}
     
     def _parse_stock_info_string(self, info_str: str, symbol: str) -> Dict:
@@ -407,7 +411,7 @@ class DataSourceManager:
             return info
             
         except Exception as e:
-            print(f"⚠️ 解析股票信息失败: {e}")
+            logger.error(f"⚠️ 解析股票信息失败: {e}")
             return {'symbol': symbol, 'name': f'股票{symbol}', 'source': self.current_source.value}
 
 
@@ -436,7 +440,7 @@ def get_china_stock_data_unified(symbol: str, start_date: str, end_date: str) ->
         str: 格式化的股票数据
     """
     from tradingagents.utils.logging_init import get_logger
-    logger = get_logger("default")
+
 
     # 添加详细的股票代码追踪日志
     logger.info(f"🔍 [股票代码追踪] data_source_manager.get_china_stock_data_unified 接收到的股票代码: '{symbol}' (类型: {type(symbol)})")

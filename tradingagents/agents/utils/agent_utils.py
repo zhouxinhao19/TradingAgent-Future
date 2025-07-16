@@ -17,7 +17,10 @@ from langchain_core.messages import HumanMessage
 # 导入统一日志系统和工具日志装饰器
 from tradingagents.utils.logging_init import get_logger
 from tradingagents.utils.tool_logging import log_tool_call, log_analysis_step
-logger = get_logger("agents.utils")
+
+# 导入日志模块
+from tradingagents.utils.logging_manager import get_logger
+logger = get_logger('agents')
 
 
 def create_msg_delete():
@@ -1125,6 +1128,7 @@ class Toolkit:
 
                 try:
                     from tradingagents.dataflows.interface import get_reddit_sentiment
+
                     sentiment_data = get_reddit_sentiment(ticker, curr_date)
                     result_data.append(f"## 美股Reddit情绪\n{sentiment_data}")
                 except Exception as e:

@@ -14,6 +14,10 @@ from typing import Dict, Any, Optional, Union
 import json
 import toml
 
+# 注意：这里不能导入自己，会造成循环导入
+# logger将在类定义后创建
+
+
 
 class ColoredFormatter(logging.Formatter):
     """彩色日志格式化器"""
@@ -142,7 +146,7 @@ class TradingAgentsLogger:
                     # 转换配置格式
                     return self._convert_toml_config(config_data)
                 except Exception as e:
-                    print(f"警告: 无法加载配置文件 {config_path}: {e}")
+                    logger.warning(f"警告: 无法加载配置文件 {config_path}: {e}")
                     continue
 
         return None

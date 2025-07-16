@@ -1,7 +1,12 @@
 import questionary
 from typing import List, Optional, Tuple, Dict
+from rich.console import Console
 
 from cli.models import AnalystType
+from tradingagents.utils.logging_manager import get_logger
+
+logger = get_logger('cli')
+console = Console()
 
 ANALYST_ORDER = [
     ("市场分析师 | Market Analyst", AnalystType.MARKET),
@@ -35,10 +40,6 @@ def get_analysis_date() -> str:
     """Prompt the user to enter a date in YYYY-MM-DD format."""
     import re
     from datetime import datetime
-
-# 导入统一日志系统
-from tradingagents.utils.logging_init import get_logger
-logger = get_logger("cli")
 
     def validate_date(date_str: str) -> bool:
         if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_str):
