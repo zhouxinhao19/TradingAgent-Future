@@ -56,7 +56,6 @@ def get_session_logger(session_id: str, module_name: str = 'session') -> 'loggin
         配置好的日志器
     """
     logger_name = f"{module_name}.{session_id[:8]}"  # 使用前8位会话ID
-    logger = get_logger(logger_name)
     
     # 添加会话ID到所有日志记录
     class SessionAdapter:

@@ -9,6 +9,10 @@ from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
 
+# 导入日志模块
+from tradingagents.utils.logging_manager import get_logger, get_logger_manager
+logger = get_logger('web')
+
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
@@ -18,7 +22,6 @@ load_dotenv(project_root / ".env", override=True)
 
 # 导入统一日志系统
 from tradingagents.utils.logging_init import setup_web_logging
-from tradingagents.utils.logging_manager import get_logger_manager
 logger = setup_web_logging()
 
 # 添加配置管理器
@@ -91,7 +94,7 @@ def extract_risk_assessment(state):
         return risk_assessment
 
     except Exception as e:
-        print(f"提取风险评估数据时出错: {e}")
+        logger.info(f"提取风险评估数据时出错: {e}")
         return None
 
 def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, llm_provider, llm_model, market_type="美股", progress_callback=None):
@@ -111,7 +114,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         """更新进度"""
         if progress_callback:
             progress_callback(message, step, total_steps)
-        print(f"[进度] {message}")
+        logger.info(f"[进度] {message}")
 
     # 生成会话ID用于Token跟踪和日志关联
     session_id = f"analysis_{uuid.uuid4().hex[:8]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -153,9 +156,9 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
     dashscope_key = os.getenv("DASHSCOPE_API_KEY")
     finnhub_key = os.getenv("FINNHUB_API_KEY")
 
-    print(f"环境变量检查:")
-    print(f"  DASHSCOPE_API_KEY: {'已设置' if dashscope_key else '未设置'}")
-    print(f"  FINNHUB_API_KEY: {'已设置' if finnhub_key else '未设置'}")
+    logger.info(f"环境变量检查:")
+    logger.info(f"  DASHSCOPE_API_KEY: {'已设置' if dashscope_key else '未设置'}")
+    logger.info(f"  FINNHUB_API_KEY: {'已设置' if finnhub_key else '未设置'}")
 
     if not dashscope_key:
         raise ValueError("DASHSCOPE_API_KEY 环境变量未设置")
@@ -184,7 +187,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
 
             # 统一使用在线工具，避免离线工具的各种问题
             config["online_tools"] = True  # 所有市场都使用统一工具
-            print(f"🔧 [快速分析] {market_type}使用统一工具，确保数据源正确和稳定性")
+            logger.info(f"🔧 [快速分析] {market_type}使用统一工具，确保数据源正确和稳定性")
             if llm_provider == "dashscope":
                 config["quick_think_llm"] = "qwen-turbo"  # 使用最快模型
                 config["deep_think_llm"] = "qwen-plus"
@@ -256,20 +259,20 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         os.makedirs(config["results_dir"], exist_ok=True)
         os.makedirs(config["data_cache_dir"], exist_ok=True)
 
-        print(f"使用配置: {config}")
-        print(f"分析师列表: {analysts}")
-        print(f"股票代码: {stock_symbol}")
-        print(f"分析日期: {analysis_date}")
+        logger.info(f"使用配置: {config}")
+        logger.info(f"分析师列表: {analysts}")
+        logger.info(f"股票代码: {stock_symbol}")
+        logger.info(f"分析日期: {analysis_date}")
 
         # 根据市场类型调整股票代码格式
-        print(f"🔍 [RUNNER DEBUG] ===== 股票代码格式化 =====")
-        print(f"🔍 [RUNNER DEBUG] 原始股票代码: '{stock_symbol}'")
-        print(f"🔍 [RUNNER DEBUG] 市场类型: '{market_type}'")
+        logger.debug(f"🔍 [RUNNER DEBUG] ===== 股票代码格式化 =====")
+        logger.debug(f"🔍 [RUNNER DEBUG] 原始股票代码: '{stock_symbol}'")
+        logger.debug(f"🔍 [RUNNER DEBUG] 市场类型: '{market_type}'")
 
         if market_type == "A股":
             # A股代码不需要特殊处理，保持原样
             formatted_symbol = stock_symbol
-            print(f"🔍 [RUNNER DEBUG] A股代码保持原样: '{formatted_symbol}'")
+            logger.debug(f"🔍 [RUNNER DEBUG] A股代码保持原样: '{formatted_symbol}'")
             update_progress(f"准备分析A股: {formatted_symbol}")
         elif market_type == "港股":
             # 港股代码转为大写，确保.HK后缀
@@ -282,10 +285,10 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         else:
             # 美股代码转为大写
             formatted_symbol = stock_symbol.upper()
-            print(f"🔍 [RUNNER DEBUG] 美股代码转大写: '{stock_symbol}' -> '{formatted_symbol}'")
+            logger.debug(f"🔍 [RUNNER DEBUG] 美股代码转大写: '{stock_symbol}' -> '{formatted_symbol}'")
             update_progress(f"准备分析美股: {formatted_symbol}")
 
-        print(f"🔍 [RUNNER DEBUG] 最终传递给分析引擎的股票代码: '{formatted_symbol}'")
+        logger.debug(f"🔍 [RUNNER DEBUG] 最终传递给分析引擎的股票代码: '{formatted_symbol}'")
 
         # 初始化交易图
         update_progress("初始化分析引擎...")
@@ -293,16 +296,16 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
 
         # 执行分析
         update_progress(f"开始分析 {formatted_symbol} 股票，这可能需要几分钟时间...")
-        print(f"🔍 [RUNNER DEBUG] ===== 调用graph.propagate =====")
-        print(f"🔍 [RUNNER DEBUG] 传递给graph.propagate的参数:")
-        print(f"🔍 [RUNNER DEBUG]   symbol: '{formatted_symbol}'")
-        print(f"🔍 [RUNNER DEBUG]   date: '{analysis_date}'")
+        logger.debug(f"🔍 [RUNNER DEBUG] ===== 调用graph.propagate =====")
+        logger.debug(f"🔍 [RUNNER DEBUG] 传递给graph.propagate的参数:")
+        logger.debug(f"🔍 [RUNNER DEBUG]   symbol: '{formatted_symbol}'")
+        logger.debug(f"🔍 [RUNNER DEBUG]   date: '{analysis_date}'")
 
         state, decision = graph.propagate(formatted_symbol, analysis_date)
 
         # 调试信息
-        print(f"🔍 [DEBUG] 分析完成，decision类型: {type(decision)}")
-        print(f"🔍 [DEBUG] decision内容: {decision}")
+        logger.debug(f"🔍 [DEBUG] 分析完成，decision类型: {type(decision)}")
+        logger.debug(f"🔍 [DEBUG] decision内容: {decision}")
 
         # 格式化结果
         update_progress("分析完成，正在整理结果...")

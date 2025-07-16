@@ -11,6 +11,10 @@ from datetime import datetime
 
 from tradingagents.utils.logging_init import get_logger
 
+# 导入日志模块
+from tradingagents.utils.logging_manager import get_logger, get_logger_manager
+logger = get_logger('agents')
+
 # 工具调用日志器
 tool_logger = get_logger("tools")
 
@@ -334,7 +338,6 @@ def log_analysis_module(module_name: str, session_id: str = None):
             actual_session_id = session_id or f"session_{int(time.time())}"
 
             # 记录模块开始
-            from tradingagents.utils.logging_manager import get_logger_manager
             logger_manager = get_logger_manager()
 
             start_time = time.time()

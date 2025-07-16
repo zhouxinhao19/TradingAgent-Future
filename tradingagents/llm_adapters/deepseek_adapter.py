@@ -12,6 +12,10 @@ from langchain_core.callbacks import CallbackManagerForLLMRun
 
 # 导入统一日志系统
 from tradingagents.utils.logging_init import setup_llm_logging
+
+# 导入日志模块
+from tradingagents.utils.logging_manager import get_logger, get_logger_manager
+logger = get_logger('agents')
 logger = setup_llm_logging()
 
 # 导入token跟踪器
@@ -137,7 +141,6 @@ class ChatDeepSeek(ChatOpenAI):
                             logger.info(f"💰 [DeepSeek] 本次调用成本: ¥{usage_record.cost:.6f}")
 
                         # 使用统一日志管理器的Token记录方法
-                        from tradingagents.utils.logging_manager import get_logger_manager
                         logger_manager = get_logger_manager()
                         logger_manager.log_token_usage(
                             logger, "deepseek", self.model_name,
