@@ -268,21 +268,33 @@ class DataSourceManager:
         logger.info(f"🔍 [股票代码追踪] _get_tushare_data 接收到的股票代码: '{symbol}' (类型: {type(symbol)})")
         logger.info(f"🔍 [股票代码追踪] 股票代码长度: {len(str(symbol))}")
         logger.info(f"🔍 [股票代码追踪] 股票代码字符: {list(str(symbol))}")
+        logger.info(f"🔍 [DataSourceManager详细日志] _get_tushare_data 开始执行")
+        logger.info(f"🔍 [DataSourceManager详细日志] 当前数据源: {self.current_source.value}")
 
         start_time = time.time()
         try:
             from .interface import get_china_stock_data_tushare
             logger.info(f"🔍 [股票代码追踪] 调用 get_china_stock_data_tushare，传入参数: symbol='{symbol}'")
+            logger.info(f"🔍 [DataSourceManager详细日志] 开始调用interface.get_china_stock_data_tushare...")
+
             result = get_china_stock_data_tushare(symbol, start_date, end_date)
-            logger.info(f"🔍 [股票代码追踪] get_china_stock_data_tushare 返回结果前200字符: {result[:200] if result else 'None'}")
 
             duration = time.time() - start_time
+            logger.info(f"🔍 [DataSourceManager详细日志] interface调用完成，耗时: {duration:.3f}秒")
+            logger.info(f"🔍 [股票代码追踪] get_china_stock_data_tushare 返回结果前200字符: {result[:200] if result else 'None'}")
+            logger.info(f"🔍 [DataSourceManager详细日志] 返回结果类型: {type(result)}")
+            logger.info(f"🔍 [DataSourceManager详细日志] 返回结果长度: {len(result) if result else 0}")
+
             logger.debug(f"📊 [Tushare] 调用完成: 耗时={duration:.2f}s, 结果长度={len(result) if result else 0}")
 
             return result
         except Exception as e:
             duration = time.time() - start_time
             logger.error(f"❌ [Tushare] 调用失败: {e}, 耗时={duration:.2f}s", exc_info=True)
+            logger.error(f"❌ [DataSourceManager详细日志] 异常类型: {type(e).__name__}")
+            logger.error(f"❌ [DataSourceManager详细日志] 异常信息: {str(e)}")
+            import traceback
+            logger.error(f"❌ [DataSourceManager详细日志] 异常堆栈: {traceback.format_exc()}")
             raise
     
     def _get_akshare_data(self, symbol: str, start_date: str, end_date: str) -> str:
