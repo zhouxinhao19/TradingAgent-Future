@@ -14,6 +14,8 @@ services:
       - ./web:/app/web
       - ./tradingagents:/app/tradingagents
       - ./scripts:/app/scripts
+      # 日志目录映射 - 重要：将容器内日志映射到当前项目的logs目录
+      - ./logs:/app/logs
     env_file:
       - .env
     environment:
@@ -24,6 +26,9 @@ services:
       # 日志配置
       TRADINGAGENTS_LOG_LEVEL: "INFO"
       TRADINGAGENTS_LOG_DIR: "/app/logs"
+      TRADINGAGENTS_LOG_FILE: "/app/logs/tradingagents.log"
+      TRADINGAGENTS_LOG_MAX_SIZE: "100MB"
+      TRADINGAGENTS_LOG_BACKUP_COUNT: "5"
       # Docker专用数据库配置（覆盖.env中的本地配置）
       TRADINGAGENTS_MONGODB_URL: mongodb://admin:tradingagents123@mongodb:27017/tradingagents?authSource=admin
       TRADINGAGENTS_REDIS_URL: redis://:tradingagents123@redis:6379
@@ -33,9 +38,25 @@ services:
       DISPLAY: ":99"
     command: /usr/local/bin/start-xvfb.sh python -m streamlit run web/app.py --server.address=0.0.0.0 --server.port=8501
     depends_on:
+      - mongodb
       - redis
     networks:
       - tradingagents-network
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    # 重启策略
+    restart: unless-stopped
+    # 日志配置
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
 
   # MongoDB数据库服务
   mongodb:

@@ -1,4 +1,8 @@
-FROM ghcr.io/astral-sh/uv:python3.10-bookworm
+# 使用官方Python镜像替代GitHub Container Registry
+FROM python:3.10-slim-bookworm
+
+# 安装uv包管理器
+RUN pip install uv
 
 WORKDIR /app
 

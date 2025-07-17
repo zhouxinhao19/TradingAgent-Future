@@ -1,27 +1,32 @@
-# Docker环境专用日志配置
-# 优化容器环境的日志输出
+# Docker环境专用日志配置 - 完整修复版
+# 解决KeyError: 'file'错误
 
 [logging]
 level = "INFO"
 
 [logging.format]
-# Docker环境使用简洁格式，便于日志聚合
+# 必须包含所有格式配置
 console = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+file = "%(asctime)s | %(name)-20s | %(levelname)-8s | %(module)s:%(funcName)s:%(lineno)d | %(message)s"
 structured = "json"
 
 [logging.handlers]
 
-# Docker环境只使用控制台输出
+# 控制台输出
 [logging.handlers.console]
 enabled = true
-colored = false  # Docker环境不使用颜色
+colored = false
 level = "INFO"
 
-# 禁用文件处理器
+# 文件输出 - 完整配置
 [logging.handlers.file]
-enabled = false
+enabled = true
+level = "DEBUG"
+max_size = "100MB"
+backup_count = 5
+directory = "/app/logs"
 
-# 启用结构化日志便于日志聚合
+# 结构化日志
 [logging.handlers.structured]
 enabled = true
 level = "INFO"
@@ -34,24 +39,49 @@ level = "INFO"
 [logging.loggers.web]
 level = "INFO"
 
+[logging.loggers.dataflows]
+level = "INFO"
+
+[logging.loggers.llm_adapters]
+level = "INFO"
+
 [logging.loggers.streamlit]
-level = "ERROR"  # Docker环境进一步减少Streamlit日志
+level = "WARNING"
 
 [logging.loggers.urllib3]
-level = "ERROR"
+level = "WARNING"
 
 [logging.loggers.requests]
-level = "ERROR"
+level = "WARNING"
 
+[logging.loggers.matplotlib]
+level = "WARNING"
+
+[logging.loggers.pandas]
+level = "WARNING"
+
+# Docker配置 - 修复版
 [logging.docker]
 enabled = true
-stdout_only = true
-disable_file_logging = true
+stdout_only = false  # 同时输出到文件和stdout
+disable_file_logging = false  # 启用文件日志
+
+[logging.development]
+enabled = false
+debug_modules = ["tradingagents.graph", "tradingagents.llm_adapters"]
+save_debug_files = true
+
+[logging.production]
+enabled = false
+structured_only = false
+error_notification = true
+max_log_size = "100MB"
 
 [logging.performance]
 enabled = true
 log_slow_operations = true
-slow_threshold_seconds = 10.0  # Docker环境阈值稍高
+slow_threshold_seconds = 10.0
+log_memory_usage = false
 
 [logging.security]
 enabled = true
