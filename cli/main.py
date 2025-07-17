@@ -1,6 +1,7 @@
 # 标准库导入
 import datetime
 import os
+import re
 import subprocess
 import sys
 import time
@@ -1107,8 +1108,64 @@ def run_analysis():
         )
         update_display(layout, spinner_text)
 
+        # 显示数据预获取和验证阶段
+        ui.show_step_header(2, "数据验证阶段 | Data Validation Phase")
+        ui.show_progress("🔍 验证股票代码并预获取数据...")
+
+        try:
+            from tradingagents.utils.stock_validator import prepare_stock_data
+
+            # 确定市场类型
+            market_type_map = {
+                "china_stock": "A股",
+                "yahoo_finance": "港股" if ".HK" in selections["ticker"] else "美股"
+            }
+
+            # 获取选定市场的数据源类型
+            selected_market = None
+            for choice, market in {
+                "1": {"data_source": "yahoo_finance"},
+                "2": {"data_source": "china_stock"},
+                "3": {"data_source": "yahoo_finance"}
+            }.items():
+                # 这里需要从用户选择中获取市场类型，暂时使用代码推断
+                pass
+
+            # 根据股票代码推断市场类型
+            if re.match(r'^\d{6}$', selections["ticker"]):
+                market_type = "A股"
+            elif ".HK" in selections["ticker"].upper():
+                market_type = "港股"
+            else:
+                market_type = "美股"
+
+            # 预获取股票数据（默认30天历史数据）
+            preparation_result = prepare_stock_data(
+                stock_code=selections["ticker"],
+                market_type=market_type,
+                period_days=30,
+                analysis_date=selections["analysis_date"]
+            )
+
+            if not preparation_result.is_valid:
+                ui.show_error(f"❌ 股票数据验证失败: {preparation_result.error_message}")
+                ui.show_warning(f"💡 建议: {preparation_result.suggestion}")
+                logger.error(f"股票数据验证失败: {preparation_result.error_message}")
+                return
+
+            # 数据预获取成功
+            ui.show_success(f"✅ 数据准备完成: {preparation_result.stock_name} ({preparation_result.market_type})")
+            ui.show_user_message(f"📊 缓存状态: {preparation_result.cache_status}", "dim")
+            logger.info(f"股票数据预获取成功: {preparation_result.stock_name}")
+
+        except Exception as e:
+            ui.show_error(f"❌ 数据预获取过程中发生错误: {str(e)}")
+            ui.show_warning("💡 请检查网络连接或稍后重试")
+            logger.error(f"数据预获取异常: {str(e)}")
+            return
+
         # 显示数据获取阶段
-        ui.show_step_header(2, "数据获取阶段 | Data Collection Phase")
+        ui.show_step_header(3, "数据获取阶段 | Data Collection Phase")
         ui.show_progress("正在获取股票基本信息...")
 
         # Initialize state and get graph args
@@ -1120,7 +1177,7 @@ def run_analysis():
         ui.show_success("数据获取准备完成")
 
         # 显示分析阶段
-        ui.show_step_header(3, "智能分析阶段 | AI Analysis Phase (预计耗时约10分钟)")
+        ui.show_step_header(4, "智能分析阶段 | AI Analysis Phase (预计耗时约10分钟)")
         ui.show_progress("启动分析师团队...")
         ui.show_user_message("💡 提示：智能分析包含多个团队协作，请耐心等待约10分钟", "dim")
 
@@ -1424,7 +1481,7 @@ def run_analysis():
             trace.append(chunk)
 
         # 显示最终决策阶段
-        ui.show_step_header(4, "投资决策生成 | Investment Decision Generation")
+        ui.show_step_header(5, "投资决策生成 | Investment Decision Generation")
         ui.show_progress("正在处理投资信号...")
 
         # Get final state and decision
@@ -1447,7 +1504,7 @@ def run_analysis():
                 message_buffer.update_report_section(section, final_state[section])
 
         # 显示报告生成完成
-        ui.show_step_header(5, "分析报告生成 | Analysis Report Generation")
+        ui.show_step_header(6, "分析报告生成 | Analysis Report Generation")
         ui.show_progress("正在生成最终报告...")
 
         # Display the complete final report
