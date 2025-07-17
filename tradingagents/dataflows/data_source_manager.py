@@ -223,8 +223,9 @@ class DataSourceManager:
                                'result_preview': result[:200] + '...' if result_length > 200 else result,
                                'event_type': 'data_fetch_success'
                            })
+                return result
             else:
-                logger.warning(f"⚠️ [数据获取] 数据质量异常",
+                logger.warning(f"⚠️ [数据获取] 数据质量异常，尝试降级到其他数据源",
                               extra={
                                   'symbol': symbol,
                                   'start_date': start_date,
@@ -236,7 +237,14 @@ class DataSourceManager:
                                   'event_type': 'data_fetch_warning'
                               })
 
-            return result
+                # 数据质量异常时也尝试降级到其他数据源
+                fallback_result = self._try_fallback_sources(symbol, start_date, end_date)
+                if fallback_result and "❌" not in fallback_result and "错误" not in fallback_result:
+                    logger.info(f"✅ [数据获取] 降级成功获取数据")
+                    return fallback_result
+                else:
+                    logger.error(f"❌ [数据获取] 所有数据源都无法获取有效数据")
+                    return result  # 返回原始结果（包含错误信息）
 
         except Exception as e:
             duration = time.time() - start_time
