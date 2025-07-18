@@ -30,7 +30,10 @@ from components.analysis_form import render_analysis_form
 from components.results_display import render_results
 from utils.api_checker import check_api_keys
 from utils.analysis_runner import run_stock_analysis, validate_analysis_params, format_analysis_results
-from utils.progress_tracker import StreamlitProgressDisplay, create_progress_callback
+from utils.progress_tracker import SmartStreamlitProgressDisplay, create_smart_progress_callback
+from utils.async_progress_tracker import AsyncProgressTracker
+from components.async_progress_display import display_unified_progress
+from utils.smart_session_manager import get_persistent_analysis_id, set_persistent_analysis_id
 
 # 设置页面配置
 st.set_page_config(
@@ -166,6 +169,69 @@ def initialize_session_state():
         st.session_state.analysis_running = False
     if 'last_analysis_time' not in st.session_state:
         st.session_state.last_analysis_time = None
+    if 'current_analysis_id' not in st.session_state:
+        st.session_state.current_analysis_id = None
+    if 'form_config' not in st.session_state:
+        st.session_state.form_config = None
+
+    # 尝试从最新完成的分析中恢复结果
+    if not st.session_state.analysis_results:
+        try:
+            from utils.async_progress_tracker import get_latest_analysis_id, get_progress_by_id
+            from utils.analysis_runner import format_analysis_results
+
+            latest_id = get_latest_analysis_id()
+            if latest_id:
+                progress_data = get_progress_by_id(latest_id)
+                if (progress_data and
+                    progress_data.get('status') == 'completed' and
+                    'raw_results' in progress_data):
+
+                    # 恢复分析结果
+                    raw_results = progress_data['raw_results']
+                    formatted_results = format_analysis_results(raw_results)
+
+                    if formatted_results:
+                        st.session_state.analysis_results = formatted_results
+                        st.session_state.current_analysis_id = latest_id
+                        # 检查分析状态
+                        analysis_status = progress_data.get('status', 'completed')
+                        st.session_state.analysis_running = (analysis_status == 'running')
+                        # 恢复股票信息
+                        if 'stock_symbol' in raw_results:
+                            st.session_state.last_stock_symbol = raw_results.get('stock_symbol', '')
+                        if 'market_type' in raw_results:
+                            st.session_state.last_market_type = raw_results.get('market_type', '')
+                        logger.info(f"📊 [结果恢复] 从分析 {latest_id} 恢复结果，状态: {analysis_status}")
+
+        except Exception as e:
+            logger.warning(f"⚠️ [结果恢复] 恢复失败: {e}")
+
+    # 使用cookie管理器恢复分析ID（优先级：session state > cookie > Redis/文件）
+    try:
+        persistent_analysis_id = get_persistent_analysis_id()
+        if persistent_analysis_id:
+            # 检查分析状态
+            from utils.async_progress_tracker import get_progress_by_id
+            progress_data = get_progress_by_id(persistent_analysis_id)
+            if progress_data:
+                status = progress_data.get('status', 'completed')
+                st.session_state.analysis_running = (status == 'running')
+            else:
+                st.session_state.analysis_running = False
+    except Exception as e:
+        # 如果恢复失败，保持默认值
+        pass
+
+    # 恢复表单配置
+    try:
+        from utils.smart_session_manager import smart_session_manager
+        session_data = smart_session_manager.load_analysis_state()
+        if session_data and 'form_config' in session_data:
+            st.session_state.form_config = session_data['form_config']
+            logger.info("📊 [配置恢复] 表单配置已恢复")
+    except Exception as e:
+        logger.warning(f"⚠️ [配置恢复] 表单配置恢复失败: {e}")
 
 def main():
     """主应用程序"""
@@ -201,10 +267,11 @@ def main():
         pointer-events: none !important;
     }
 
-    /* 隐藏侧边栏顶部区域的所有按钮 */
-    section[data-testid="stSidebar"] > div:first-child button,
-    section[data-testid="stSidebar"] .css-1lcbmhc button,
-    section[data-testid="stSidebar"] .css-1y4p8pa button {
+    /* 隐藏侧边栏顶部区域的特定按钮（更精确的选择器，避免影响表单按钮） */
+    section[data-testid="stSidebar"] > div:first-child > button[kind="header"],
+    section[data-testid="stSidebar"] > div:first-child > div > button[kind="header"],
+    section[data-testid="stSidebar"] .css-1lcbmhc > button[kind="header"],
+    section[data-testid="stSidebar"] .css-1y4p8pa > button[kind="header"] {
         display: none !important;
         visibility: hidden !important;
     }
@@ -550,7 +617,8 @@ def main():
         col2 = None
     
     with col1:
-        st.header("📊 股票分析")
+        # 1. 分析配置区域
+        st.header("⚙️ 分析配置")
 
         # 渲染分析表单
         try:
@@ -597,74 +665,223 @@ def main():
                 # 执行分析
                 st.session_state.analysis_running = True
 
-                # 创建进度显示
-                progress_container = st.container()
-                progress_display = StreamlitProgressDisplay(progress_container)
-                progress_callback = create_progress_callback(progress_display)
+                # 清空旧的分析结果
+                st.session_state.analysis_results = None
+                logger.info("🧹 [新分析] 清空旧的分析结果")
 
-                try:
-                    # 显示分析参数
-                    st.info(f"🔍 开始分析: {form_data.get('market_type', '美股')} {form_data['stock_symbol']}")
+                # 生成分析ID
+                import uuid
+                analysis_id = f"analysis_{uuid.uuid4().hex[:8]}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-                    results = run_stock_analysis(
-                        stock_symbol=form_data['stock_symbol'],
-                        analysis_date=form_data['analysis_date'],
-                        analysts=form_data['analysts'],
-                        research_depth=form_data['research_depth'],
-                        llm_provider=config['llm_provider'],
-                        market_type=form_data.get('market_type', '美股'),
-                        llm_model=config['llm_model'],
-                        progress_callback=progress_callback
-                    )
+                # 保存分析ID和表单配置到session state和cookie
+                form_config = st.session_state.get('form_config', {})
+                set_persistent_analysis_id(
+                    analysis_id=analysis_id,
+                    status="running",
+                    stock_symbol=form_data['stock_symbol'],
+                    market_type=form_data.get('market_type', '美股'),
+                    form_config=form_config
+                )
 
-                    # 确保进度条显示100%完成
-                    progress_callback("✅ 分析成功完成！", step=10, total_steps=10)
+                # 创建异步进度跟踪器
+                async_tracker = AsyncProgressTracker(
+                    analysis_id=analysis_id,
+                    analysts=form_data['analysts'],
+                    research_depth=form_data['research_depth'],
+                    llm_provider=config['llm_provider']
+                )
 
-                    # 短暂延迟让用户看到100%完成状态
+                # 创建进度回调函数
+                def progress_callback(message: str, step: int = None, total_steps: int = None):
+                    async_tracker.update_progress(message, step)
+
+                # 显示启动成功消息和加载动效
+                st.success(f"🚀 分析已启动！分析ID: {analysis_id}")
+
+                # 添加加载动效
+                with st.spinner("🔄 正在初始化分析..."):
                     import time
+                    time.sleep(1.5)  # 让用户看到反馈
+
+                st.info(f"📊 正在分析: {form_data.get('market_type', '美股')} {form_data['stock_symbol']}")
+                st.info("⏱️ 页面将在3秒后自动刷新显示进度...")
+
+                # 确保AsyncProgressTracker已经保存初始状态
+                time.sleep(0.1)  # 等待100毫秒确保数据已写入
+
+                # 设置分析状态
+                st.session_state.analysis_running = True
+                st.session_state.current_analysis_id = analysis_id
+                st.session_state.last_stock_symbol = form_data['stock_symbol']
+                st.session_state.last_market_type = form_data.get('market_type', '美股')
+
+                # 自动启用自动刷新选项（设置所有可能的key）
+                auto_refresh_keys = [
+                    f"auto_refresh_unified_{analysis_id}",
+                    f"auto_refresh_unified_default_{analysis_id}",
+                    f"auto_refresh_static_{analysis_id}",
+                    f"auto_refresh_streamlit_{analysis_id}"
+                ]
+                for key in auto_refresh_keys:
+                    st.session_state[key] = True
+
+                # 使用meta refresh标签实现自动刷新，并定位到股票分析模块
+                st.markdown("""
+                <meta http-equiv="refresh" content="3; url=#stock-analysis">
+                """, unsafe_allow_html=True)
+
+                # 显示倒计时
+                countdown_placeholder = st.empty()
+                for i in range(3, 0, -1):
+                    countdown_placeholder.info(f"⏱️ 页面将在 {i} 秒后自动刷新...")
                     time.sleep(1)
+                countdown_placeholder.info("🔄 正在刷新页面...")
 
-                    # 清除进度显示
-                    progress_display.clear()
+                # 在后台线程中运行分析
+                import threading
 
-                    # 格式化结果
-                    formatted_results = format_analysis_results(results)
+                def run_analysis_in_background():
+                    try:
+                        results = run_stock_analysis(
+                            stock_symbol=form_data['stock_symbol'],
+                            analysis_date=form_data['analysis_date'],
+                            analysts=form_data['analysts'],
+                            research_depth=form_data['research_depth'],
+                            llm_provider=config['llm_provider'],
+                            market_type=form_data.get('market_type', '美股'),
+                            llm_model=config['llm_model'],
+                            progress_callback=progress_callback
+                        )
 
-                    st.session_state.analysis_results = formatted_results
-                    st.session_state.last_analysis_time = datetime.datetime.now()
-                    st.success("✅ 分析完成！")
+                        # 标记分析完成并保存结果（不访问session state）
+                        async_tracker.mark_completed("✅ 分析成功完成！", results=results)
 
-                except Exception as e:
-                    # 显示分析失败状态
-                    progress_callback("❌ 分析失败", step=10, total_steps=10)
+                        logger.info(f"✅ [分析完成] 股票分析成功完成: {analysis_id}")
 
-                    # 短暂延迟让用户看到失败状态
-                    import time
-                    time.sleep(1)
+                    except Exception as e:
+                        # 标记分析失败（不访问session state）
+                        async_tracker.mark_failed(str(e))
+                        logger.error(f"❌ [分析失败] {analysis_id}: {e}")
 
-                    # 清除进度显示
-                    progress_display.clear()
+                # 启动后台分析线程
+                analysis_thread = threading.Thread(target=run_analysis_in_background)
+                analysis_thread.daemon = True  # 设置为守护线程，这样主程序退出时线程也会退出
+                analysis_thread.start()
 
-                    st.error(f"❌ 分析失败: {str(e)}")
+                logger.info(f"🧵 [后台分析] 分析线程已启动: {analysis_id}")
 
-                    # 显示详细错误信息
-                    with st.expander("🔍 详细错误信息"):
-                        import traceback
-                        st.code(traceback.format_exc())
+                # 分析已在后台线程中启动，页面将自动刷新显示进度
 
-                    st.markdown("""
-                    **可能的解决方案:**
-                    1. 检查API密钥是否正确配置
-                    2. 确认网络连接正常
-                    3. 验证股票代码是否有效
-                    4. 尝试减少研究深度或更换模型
-                    """)
-                finally:
+        # 2. 股票分析区域（只有在有分析ID时才显示）
+        current_analysis_id = st.session_state.get('current_analysis_id')
+        if current_analysis_id:
+            st.markdown("---")
+            # 添加锚点标记
+            st.markdown('<div id="stock-analysis"></div>', unsafe_allow_html=True)
+            st.header("📊 股票分析")
+
+            from utils.async_progress_tracker import get_progress_by_id
+            progress_data = get_progress_by_id(current_analysis_id)
+
+            if progress_data:
+                status = progress_data.get('status', 'unknown')
+                is_running = (status == 'running')
+
+                # 同步session state状态
+                if st.session_state.get('analysis_running', False) != is_running:
+                    st.session_state.analysis_running = is_running
+                    logger.info(f"🔄 [状态同步] 更新分析状态: {is_running}")
+
+                # 显示分析信息
+                if is_running:
+                    st.info(f"🔄 正在分析: {current_analysis_id}")
+                else:
+                    st.success(f"✅ 分析完成: {current_analysis_id}")
+
+                # 显示进度（根据状态决定是否显示刷新控件）
+                progress_col1, progress_col2 = st.columns([4, 1])
+                with progress_col1:
+                    st.markdown("### 📊 分析进度")
+
+                is_completed = display_unified_progress(current_analysis_id, show_refresh_controls=is_running)
+
+                # 如果分析正在进行，显示提示信息（不添加额外的自动刷新）
+                if is_running:
+                    st.info("⏱️ 分析正在进行中，可以使用下方的自动刷新功能查看进度更新...")
+
+                # 如果分析刚完成，尝试恢复结果
+                if is_completed and not st.session_state.get('analysis_results'):
+                    if 'raw_results' in progress_data:
+                        try:
+                            from utils.analysis_runner import format_analysis_results
+                            raw_results = progress_data['raw_results']
+                            formatted_results = format_analysis_results(raw_results)
+                            if formatted_results:
+                                st.session_state.analysis_results = formatted_results
+                                st.session_state.analysis_running = False
+                                logger.info(f"📊 [结果同步] 恢复分析结果: {current_analysis_id}")
+
+                                # 检查是否已经刷新过，避免重复刷新
+                                refresh_key = f"results_refreshed_{current_analysis_id}"
+                                if not st.session_state.get(refresh_key, False):
+                                    st.session_state[refresh_key] = True
+                                    st.success("📊 分析结果已恢复，正在刷新页面...")
+                                    # 使用meta refresh标签实现自动刷新，并定位到分析报告模块
+                                    st.markdown("""
+                                    <meta http-equiv="refresh" content="2; url=#analysis-report">
+                                    """, unsafe_allow_html=True)
+                                else:
+                                    # 已经刷新过，不再刷新
+                                    st.success("📊 分析结果已恢复！")
+                        except Exception as e:
+                            logger.warning(f"⚠️ [结果同步] 恢复失败: {e}")
+
+                if is_completed and st.session_state.get('analysis_running', False):
+                    # 分析刚完成，更新状态
                     st.session_state.analysis_running = False
-        
-        # 显示分析结果
-        if st.session_state.analysis_results:
-            render_results(st.session_state.analysis_results)
+                    st.success("🎉 分析完成！正在刷新页面显示报告...")
+
+                    # 使用meta refresh标签实现自动刷新，并定位到分析报告模块
+                    st.markdown("""
+                    <meta http-equiv="refresh" content="2; url=#analysis-report">
+                    """, unsafe_allow_html=True)
+
+
+
+        # 3. 分析报告区域（只有在有结果且分析完成时才显示）
+        # 添加锚点标记
+        st.markdown('<div id="analysis-report"></div>', unsafe_allow_html=True)
+        current_analysis_id = st.session_state.get('current_analysis_id')
+        analysis_results = st.session_state.get('analysis_results')
+        analysis_running = st.session_state.get('analysis_running', False)
+
+        # 检查是否应该显示分析报告
+        # 1. 有分析结果且不在运行中
+        # 2. 或者用户点击了"查看报告"按钮
+        show_results_button_clicked = st.session_state.get('show_analysis_results', False)
+
+        should_show_results = (
+            (analysis_results and not analysis_running and current_analysis_id) or
+            (show_results_button_clicked and analysis_results)
+        )
+
+        # 调试日志
+        logger.info(f"🔍 [布局调试] 分析报告显示检查:")
+        logger.info(f"  - analysis_results存在: {bool(analysis_results)}")
+        logger.info(f"  - analysis_running: {analysis_running}")
+        logger.info(f"  - current_analysis_id: {current_analysis_id}")
+        logger.info(f"  - show_results_button_clicked: {show_results_button_clicked}")
+        logger.info(f"  - should_show_results: {should_show_results}")
+
+        if should_show_results:
+            st.markdown("---")
+            st.header("📋 分析报告")
+            render_results(analysis_results)
+            logger.info(f"✅ [布局] 分析报告已显示")
+
+            # 清除查看报告按钮状态，避免重复触发
+            if show_results_button_clicked:
+                st.session_state.show_analysis_results = False
     
     # 只有在显示指南时才渲染右侧内容
     if show_guide and col2 is not None:

@@ -280,7 +280,7 @@ def main():
     if mongodb_success and redis_success:
         logger.info(f"\n🎉 数据库初始化完成！")
         logger.info(f"\n💡 下一步:")
-        logger.info(f"1. 启动Web应用: cd web && python -m streamlit run app.py")
+        logger.info(f"1. 启动Web应用: python start_web.py")
         logger.info(f"2. 访问缓存管理: http://localhost:8501 -> 缓存管理")
         logger.info(f"3. 访问Redis管理界面: http://localhost:8081")
         return True

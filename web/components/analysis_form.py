@@ -12,27 +12,45 @@ logger = get_logger('web')
 
 def render_analysis_form():
     """渲染股票分析表单"""
-    
+
     st.subheader("📋 分析配置")
-    
+
+    # 获取缓存的表单配置（确保不为None）
+    cached_config = st.session_state.get('form_config') or {}
+
+    # 调试信息
+    if cached_config:
+        logger.info(f"📊 [配置恢复] 使用缓存配置: {cached_config}")
+    else:
+        logger.info("📊 [配置恢复] 使用默认配置")
+
     # 创建表单
     with st.form("analysis_form", clear_on_submit=False):
         col1, col2 = st.columns(2)
         
         with col1:
-            # 市场选择
+            # 市场选择（使用缓存的值）
+            market_options = ["美股", "A股", "港股"]
+            cached_market = cached_config.get('market_type', 'A股') if cached_config else 'A股'
+            try:
+                market_index = market_options.index(cached_market)
+            except (ValueError, TypeError):
+                market_index = 1  # 默认A股
+
             market_type = st.selectbox(
                 "选择市场 🌍",
-                options=["美股", "A股", "港股"],
-                index=1,
+                options=market_options,
+                index=market_index,
                 help="选择要分析的股票市场"
             )
 
             # 根据市场类型显示不同的输入提示
+            cached_stock = cached_config.get('stock_symbol', '') if cached_config else ''
+
             if market_type == "美股":
-                # 不设置默认值，让用户自己输入
                 stock_symbol = st.text_input(
                     "股票代码 📈",
+                    value=cached_stock if (cached_config and cached_config.get('market_type') == '美股') else '',
                     placeholder="输入美股代码，如 AAPL, TSLA, MSFT，然后按回车确认",
                     help="输入要分析的美股代码，输入完成后请按回车键确认",
                     key="us_stock_input",
@@ -42,9 +60,9 @@ def render_analysis_form():
                 logger.debug(f"🔍 [FORM DEBUG] 美股text_input返回值: '{stock_symbol}'")
 
             elif market_type == "港股":
-                # 应用与美股相同的修复：移除默认值，添加回车提示
                 stock_symbol = st.text_input(
                     "股票代码 📈",
+                    value=cached_stock if (cached_config and cached_config.get('market_type') == '港股') else '',
                     placeholder="输入港股代码，如 0700.HK, 9988.HK, 3690.HK，然后按回车确认",
                     help="输入要分析的港股代码，如 0700.HK(腾讯控股), 9988.HK(阿里巴巴), 3690.HK(美团)，输入完成后请按回车键确认",
                     key="hk_stock_input",
@@ -56,6 +74,7 @@ def render_analysis_form():
             else:  # A股
                 stock_symbol = st.text_input(
                     "股票代码 📈",
+                    value=cached_stock if (cached_config and cached_config.get('market_type') == 'A股') else '',
                     placeholder="输入A股代码，如 000001, 600519，然后按回车确认",
                     help="输入要分析的A股代码，如 000001(平安银行), 600519(贵州茅台)，输入完成后请按回车键确认",
                     key="cn_stock_input",
@@ -72,11 +91,12 @@ def render_analysis_form():
             )
         
         with col2:
-            # 研究深度
+            # 研究深度（使用缓存的值）
+            cached_depth = cached_config.get('research_depth', 3) if cached_config else 3
             research_depth = st.select_slider(
                 "研究深度 🔍",
                 options=[1, 2, 3, 4, 5],
-                value=3,
+                value=cached_depth,
                 format_func=lambda x: {
                     1: "1级 - 快速分析",
                     2: "2级 - 基础分析",
@@ -92,29 +112,32 @@ def render_analysis_form():
         
         col1, col2 = st.columns(2)
         
+        # 获取缓存的分析师选择
+        cached_analysts = cached_config.get('selected_analysts', ['market', 'fundamentals']) if cached_config else ['market', 'fundamentals']
+
         with col1:
             market_analyst = st.checkbox(
                 "📈 市场分析师",
-                value=True,
+                value='market' in cached_analysts,
                 help="专注于技术面分析、价格趋势、技术指标"
             )
-            
+
             social_analyst = st.checkbox(
                 "💭 社交媒体分析师",
-                value=False,
+                value='social' in cached_analysts,
                 help="分析社交媒体情绪、投资者情绪指标"
             )
-        
+
         with col2:
             news_analyst = st.checkbox(
                 "📰 新闻分析师",
-                value=False,
+                value='news' in cached_analysts,
                 help="分析相关新闻事件、市场动态影响"
             )
-            
+
             fundamentals_analyst = st.checkbox(
                 "💰 基本面分析师",
-                value=True,
+                value='fundamentals' in cached_analysts,
                 help="分析财务数据、公司基本面、估值水平"
             )
         
@@ -210,6 +233,19 @@ def render_analysis_form():
             'include_risk_assessment': include_risk_assessment,
             'custom_prompt': custom_prompt
         }
+
+        # 保存表单配置到缓存
+        form_config = {
+            'stock_symbol': stock_symbol,
+            'market_type': market_type,
+            'research_depth': research_depth,
+            'selected_analysts': [a[0] for a in selected_analysts],
+            'include_sentiment': include_sentiment,
+            'include_risk_assessment': include_risk_assessment,
+            'custom_prompt': custom_prompt
+        }
+        st.session_state.form_config = form_config
+        logger.info(f"📊 [配置缓存] 表单配置已保存: {form_config}")
 
         logger.debug(f"🔍 [FORM DEBUG] 返回的表单数据: {form_data}")
         logger.debug(f"🔍 [FORM DEBUG] ===== 表单提交结束 =====")

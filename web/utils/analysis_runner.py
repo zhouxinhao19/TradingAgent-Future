@@ -149,7 +149,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
 
         # 数据预获取成功
         success_msg = f"✅ 数据准备完成: {preparation_result.stock_name} ({preparation_result.market_type})"
-        update_progress(success_msg, 2, 10)
+        update_progress(success_msg)  # 使用智能检测，不再硬编码步骤
         logger.info(f"[{session_id}] {success_msg}")
         logger.info(f"[{session_id}] 缓存状态: {preparation_result.cache_status}")
 
@@ -189,7 +189,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
                    'event_type': 'web_analysis_start'
                })
 
-    update_progress("🚀 开始股票分析...", 3, 10)
+    update_progress("🚀 开始股票分析...")
 
     # 估算Token使用（用于成本预估）
     if TOKEN_TRACKING_ENABLED:
@@ -197,7 +197,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         estimated_output = 1000 * len(analysts)  # 估算每个分析师1000个输出token
         estimated_cost = token_tracker.estimate_cost(llm_provider, llm_model, estimated_input, estimated_output)
 
-        update_progress(f"💰 预估分析成本: ¥{estimated_cost:.4f}", 4, 10)
+        update_progress(f"💰 预估分析成本: ¥{estimated_cost:.4f}")
 
     # 验证环境变量
     update_progress("检查环境变量配置...")
@@ -302,7 +302,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         config["data_cache_dir"] = str(project_root / "tradingagents" / "dataflows" / "data_cache")
 
         # 确保目录存在
-        update_progress("📁 创建必要的目录...", 5, 10)
+        update_progress("📁 创建必要的目录...")
         os.makedirs(config["data_dir"], exist_ok=True)
         os.makedirs(config["results_dir"], exist_ok=True)
         os.makedirs(config["data_cache_dir"], exist_ok=True)
@@ -321,7 +321,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             # A股代码不需要特殊处理，保持原样
             formatted_symbol = stock_symbol
             logger.debug(f"🔍 [RUNNER DEBUG] A股代码保持原样: '{formatted_symbol}'")
-            update_progress(f"🇨🇳 准备分析A股: {formatted_symbol}", 6, 10)
+            update_progress(f"🇨🇳 准备分析A股: {formatted_symbol}")
         elif market_type == "港股":
             # 港股代码转为大写，确保.HK后缀
             formatted_symbol = stock_symbol.upper()
@@ -329,21 +329,21 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
                 # 如果是纯数字，添加.HK后缀
                 if formatted_symbol.isdigit():
                     formatted_symbol = f"{formatted_symbol.zfill(4)}.HK"
-            update_progress(f"🇭🇰 准备分析港股: {formatted_symbol}", 6, 10)
+            update_progress(f"🇭🇰 准备分析港股: {formatted_symbol}")
         else:
             # 美股代码转为大写
             formatted_symbol = stock_symbol.upper()
             logger.debug(f"🔍 [RUNNER DEBUG] 美股代码转大写: '{stock_symbol}' -> '{formatted_symbol}'")
-            update_progress(f"🇺🇸 准备分析美股: {formatted_symbol}", 6, 10)
+            update_progress(f"🇺🇸 准备分析美股: {formatted_symbol}")
 
         logger.debug(f"🔍 [RUNNER DEBUG] 最终传递给分析引擎的股票代码: '{formatted_symbol}'")
 
         # 初始化交易图
-        update_progress("🔧 初始化分析引擎...", 7, 10)
+        update_progress("🔧 初始化分析引擎...")
         graph = TradingAgentsGraph(analysts, config=config, debug=False)
 
         # 执行分析
-        update_progress(f"📊 开始分析 {formatted_symbol} 股票，这可能需要几分钟时间...", 8, 10)
+        update_progress(f"📊 开始分析 {formatted_symbol} 股票，这可能需要几分钟时间...")
         logger.debug(f"🔍 [RUNNER DEBUG] ===== 调用graph.propagate =====")
         logger.debug(f"🔍 [RUNNER DEBUG] 传递给graph.propagate的参数:")
         logger.debug(f"🔍 [RUNNER DEBUG]   symbol: '{formatted_symbol}'")
@@ -356,7 +356,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         logger.debug(f"🔍 [DEBUG] decision内容: {decision}")
 
         # 格式化结果
-        update_progress("📋 分析完成，正在整理结果...", 9, 10)
+        update_progress("📋 分析完成，正在整理结果...")
 
         # 提取风险评估数据
         risk_assessment = extract_risk_assessment(state)
@@ -425,7 +425,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
                        'event_type': 'web_analysis_complete'
                    })
 
-        update_progress("✅ 分析成功完成！", 10, 10)
+        update_progress("✅ 分析成功完成！")
         return results
 
     except Exception as e:

@@ -67,11 +67,21 @@ env\Scripts\activate  # Windows
 # 3. 安装依赖
 pip install -r requirements.txt
 
-# 4. 配置环境变量
+# 4. 安装项目到虚拟环境（重要！）
+pip install -e .
+
+# 5. 配置环境变量
 cp .env.example .env
 # 编辑 .env 文件
 
-# 5. 启动应用
+# 6. 启动应用
+# 方法1: 使用简化启动脚本（推荐）
+python start_web.py
+
+# 方法2: 使用项目启动脚本
+python web/run_web.py
+
+# 方法3: 直接使用streamlit（需要先安装项目）
 streamlit run web/app.py
 ```
 
