@@ -55,7 +55,7 @@ git clone https://github.com/hsliuping/TradingAgents-CN.git
 cd TradingAgents-CN
 
 # 2. 复制环境配置
-cp .env_example .env
+cp .env.example .env
 
 # 3. 编辑API密钥（必须）
 # Windows: notepad .env
@@ -88,7 +88,7 @@ source env/bin/activate
 pip install -r requirements.txt
 
 # 5. 复制环境配置
-cp .env_example .env
+cp .env.example .env
 
 # 6. 编辑API密钥（必须）
 # Windows: notepad .env
@@ -169,7 +169,7 @@ ls -la
 
 ```bash
 # 复制环境配置模板
-cp .env_example .env
+cp .env.example .env
 
 # 编辑环境配置文件
 # Windows: notepad .env
@@ -282,7 +282,7 @@ python -c "import akshare; print('AKShare安装成功')"
 
 ```bash
 # 复制环境配置
-cp .env_example .env
+cp .env.example .env
 
 # 编辑配置文件
 # Windows: notepad .env

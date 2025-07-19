@@ -111,11 +111,11 @@ def docker_install():
     # 检查.env文件
     if not Path('.env').exists():
         print_colored("📝 创建环境配置文件...", Colors.BLUE)
-        if Path('.env_example').exists():
-            shutil.copy('.env_example', '.env')
+        if Path('.env.example').exists():
+            shutil.copy('.env.example', '.env')
             print_colored("✅ 已创建.env文件", Colors.GREEN)
         else:
-            print_colored("❌ 未找到.env_example文件", Colors.RED)
+            print_colored("❌ 未找到.env.example文件", Colors.RED)
             return False
     
     # 提示配置API密钥
@@ -192,11 +192,11 @@ def local_install():
     # 创建.env文件
     if not Path('.env').exists():
         print_colored("📝 创建环境配置文件...", Colors.BLUE)
-        if Path('.env_example').exists():
-            shutil.copy('.env_example', '.env')
+        if Path('.env.example').exists():
+            shutil.copy('.env.example', '.env')
             print_colored("✅ 已创建.env文件", Colors.GREEN)
         else:
-            print_colored("❌ 未找到.env_example文件", Colors.RED)
+            print_colored("❌ 未找到.env.example文件", Colors.RED)
             return False
     
     # 提示配置API密钥

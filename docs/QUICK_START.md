@@ -14,7 +14,7 @@ git clone https://github.com/hsliuping/TradingAgents-CN.git
 cd TradingAgents-CN
 
 # 2. 配置API密钥
-cp .env_example .env
+cp .env.example .env
 # 编辑.env文件，添加您的API密钥
 
 # 3. 启动服务
@@ -44,7 +44,7 @@ python -m venv env
 pip install -r requirements.txt
 
 # 5. 配置API密钥
-cp .env_example .env
+cp .env.example .env
 # 编辑.env文件，添加您的API密钥
 
 # 6. 启动应用
