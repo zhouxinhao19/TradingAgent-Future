@@ -618,6 +618,9 @@ def main():
     
     with col1:
         # 1. 分析配置区域
+        # 添加测试锚点
+        st.markdown('<div id="test-anchor"></div>', unsafe_allow_html=True)
+        st.text("🧪 测试锚点位置")
         st.header("⚙️ 分析配置")
 
         # 渲染分析表单
@@ -725,9 +728,9 @@ def main():
                 for key in auto_refresh_keys:
                     st.session_state[key] = True
 
-                # 使用meta refresh标签实现自动刷新，并定位到股票分析模块
+                # 使用meta refresh标签实现自动刷新，并定位到测试锚点
                 st.markdown("""
-                <meta http-equiv="refresh" content="3; url=#stock-analysis">
+                <meta http-equiv="refresh" content="3; url=#test-anchor">
                 """, unsafe_allow_html=True)
 
                 # 显示倒计时
