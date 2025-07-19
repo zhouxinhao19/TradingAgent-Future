@@ -590,22 +590,22 @@ def get_progress_by_id(analysis_id: str) -> Optional[Dict[str, Any]]:
                 redis_password = os.getenv('REDIS_PASSWORD', None)
                 redis_db = int(os.getenv('REDIS_DB', 0))
 
-            # 创建Redis连接
-            if redis_password:
-                redis_client = redis.Redis(
-                    host=redis_host,
-                    port=redis_port,
-                    password=redis_password,
-                    db=redis_db,
-                    decode_responses=True
-                )
-            else:
-                redis_client = redis.Redis(
-                    host=redis_host,
-                    port=redis_port,
-                    db=redis_db,
-                    decode_responses=True
-                )
+                # 创建Redis连接
+                if redis_password:
+                    redis_client = redis.Redis(
+                        host=redis_host,
+                        port=redis_port,
+                        password=redis_password,
+                        db=redis_db,
+                        decode_responses=True
+                    )
+                else:
+                    redis_client = redis.Redis(
+                        host=redis_host,
+                        port=redis_port,
+                        db=redis_db,
+                        decode_responses=True
+                    )
 
                 key = f"progress:{analysis_id}"
                 data = redis_client.get(key)
@@ -654,44 +654,44 @@ def get_latest_analysis_id() -> Optional[str]:
                 redis_password = os.getenv('REDIS_PASSWORD', None)
                 redis_db = int(os.getenv('REDIS_DB', 0))
 
-            # 创建Redis连接
-            if redis_password:
-                redis_client = redis.Redis(
-                    host=redis_host,
-                    port=redis_port,
-                    password=redis_password,
-                    db=redis_db,
-                    decode_responses=True
-                )
-            else:
-                redis_client = redis.Redis(
-                    host=redis_host,
-                    port=redis_port,
-                    db=redis_db,
-                    decode_responses=True
-                )
+                # 创建Redis连接
+                if redis_password:
+                    redis_client = redis.Redis(
+                        host=redis_host,
+                        port=redis_port,
+                        password=redis_password,
+                        db=redis_db,
+                        decode_responses=True
+                    )
+                else:
+                    redis_client = redis.Redis(
+                        host=redis_host,
+                        port=redis_port,
+                        db=redis_db,
+                        decode_responses=True
+                    )
 
-            # 获取所有progress键
-            keys = redis_client.keys("progress:*")
-            if not keys:
-                return None
+                # 获取所有progress键
+                keys = redis_client.keys("progress:*")
+                if not keys:
+                    return None
 
-            # 获取每个键的数据，找到最新的
-            latest_time = 0
-            latest_id = None
+                # 获取每个键的数据，找到最新的
+                latest_time = 0
+                latest_id = None
 
-            for key in keys:
-                try:
-                    data = redis_client.get(key)
-                    if data:
-                        progress_data = json.loads(data)
-                        last_update = progress_data.get('last_update', 0)
-                        if last_update > latest_time:
-                            latest_time = last_update
-                            # 从键名中提取analysis_id (去掉"progress:"前缀)
-                            latest_id = key.replace('progress:', '')
-                except Exception:
-                    continue
+                for key in keys:
+                    try:
+                        data = redis_client.get(key)
+                        if data:
+                            progress_data = json.loads(data)
+                            last_update = progress_data.get('last_update', 0)
+                            if last_update > latest_time:
+                                latest_time = last_update
+                                # 从键名中提取analysis_id (去掉"progress:"前缀)
+                                latest_id = key.replace('progress:', '')
+                    except Exception:
+                        continue
 
                 if latest_id:
                     logger.info(f"📊 [恢复分析] 找到最新分析ID: {latest_id}")
