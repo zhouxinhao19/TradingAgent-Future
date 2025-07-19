@@ -860,46 +860,46 @@ def main():
 
             is_completed = display_unified_progress(current_analysis_id, show_refresh_controls=is_running)
 
-                # 如果分析正在进行，显示提示信息（不添加额外的自动刷新）
-                if is_running:
-                    st.info("⏱️ 分析正在进行中，可以使用下方的自动刷新功能查看进度更新...")
+            # 如果分析正在进行，显示提示信息（不添加额外的自动刷新）
+            if is_running:
+                st.info("⏱️ 分析正在进行中，可以使用下方的自动刷新功能查看进度更新...")
 
-                # 如果分析刚完成，尝试恢复结果
-                if is_completed and not st.session_state.get('analysis_results'):
-                    if 'raw_results' in progress_data:
-                        try:
-                            from utils.analysis_runner import format_analysis_results
-                            raw_results = progress_data['raw_results']
-                            formatted_results = format_analysis_results(raw_results)
-                            if formatted_results:
-                                st.session_state.analysis_results = formatted_results
-                                st.session_state.analysis_running = False
-                                logger.info(f"📊 [结果同步] 恢复分析结果: {current_analysis_id}")
+            # 如果分析刚完成，尝试恢复结果
+            if is_completed and not st.session_state.get('analysis_results') and progress_data:
+                if 'raw_results' in progress_data:
+                    try:
+                        from utils.analysis_runner import format_analysis_results
+                        raw_results = progress_data['raw_results']
+                        formatted_results = format_analysis_results(raw_results)
+                        if formatted_results:
+                            st.session_state.analysis_results = formatted_results
+                            st.session_state.analysis_running = False
+                            logger.info(f"📊 [结果同步] 恢复分析结果: {current_analysis_id}")
 
-                                # 检查是否已经刷新过，避免重复刷新
-                                refresh_key = f"results_refreshed_{current_analysis_id}"
-                                if not st.session_state.get(refresh_key, False):
-                                    st.session_state[refresh_key] = True
-                                    st.success("📊 分析结果已恢复，正在刷新页面...")
-                                    # 使用meta refresh标签实现自动刷新，并定位到分析报告模块
-                                    st.markdown("""
-                                    <meta http-equiv="refresh" content="2; url=#analysis-report">
-                                    """, unsafe_allow_html=True)
-                                else:
-                                    # 已经刷新过，不再刷新
-                                    st.success("📊 分析结果已恢复！")
-                        except Exception as e:
-                            logger.warning(f"⚠️ [结果同步] 恢复失败: {e}")
+                            # 检查是否已经刷新过，避免重复刷新
+                            refresh_key = f"results_refreshed_{current_analysis_id}"
+                            if not st.session_state.get(refresh_key, False):
+                                st.session_state[refresh_key] = True
+                                st.success("📊 分析结果已恢复，正在刷新页面...")
+                                # 使用meta refresh标签实现自动刷新，并定位到分析报告模块
+                                st.markdown("""
+                                <meta http-equiv="refresh" content="2; url=#analysis-report">
+                                """, unsafe_allow_html=True)
+                            else:
+                                # 已经刷新过，不再刷新
+                                st.success("📊 分析结果已恢复！")
+                    except Exception as e:
+                        logger.warning(f"⚠️ [结果同步] 恢复失败: {e}")
 
-                if is_completed and st.session_state.get('analysis_running', False):
-                    # 分析刚完成，更新状态
-                    st.session_state.analysis_running = False
-                    st.success("🎉 分析完成！正在刷新页面显示报告...")
+            if is_completed and st.session_state.get('analysis_running', False):
+                # 分析刚完成，更新状态
+                st.session_state.analysis_running = False
+                st.success("🎉 分析完成！正在刷新页面显示报告...")
 
-                    # 使用meta refresh标签实现自动刷新，并定位到分析报告模块
-                    st.markdown("""
-                    <meta http-equiv="refresh" content="2; url=#analysis-report">
-                    """, unsafe_allow_html=True)
+                # 使用meta refresh标签实现自动刷新，并定位到分析报告模块
+                st.markdown("""
+                <meta http-equiv="refresh" content="2; url=#analysis-report">
+                """, unsafe_allow_html=True)
 
 
 
