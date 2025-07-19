@@ -766,19 +766,7 @@ def main():
                 for key in auto_refresh_keys:
                     st.session_state[key] = True
 
-                # 使用meta refresh标签实现自动刷新
-                st.markdown("""
-                <meta http-equiv="refresh" content="3">
-                """, unsafe_allow_html=True)
-
-                # 显示倒计时
-                countdown_placeholder = st.empty()
-                for i in range(3, 0, -1):
-                    countdown_placeholder.info(f"⏱️ 页面将在 {i} 秒后自动刷新，请向下滚动查看分析进度...")
-                    time.sleep(1)
-                countdown_placeholder.info("🔄 正在刷新页面...")
-
-                # 在后台线程中运行分析
+                # 在后台线程中运行分析（立即启动，不等待倒计时）
                 import threading
 
                 def run_analysis_in_background():
@@ -821,7 +809,20 @@ def main():
 
                 logger.info(f"🧵 [后台分析] 分析线程已启动: {analysis_id}")
 
-                # 分析已在后台线程中启动，页面将自动刷新显示进度
+                # 分析已在后台线程中启动，显示倒计时并自动刷新页面
+                st.success("🚀 分析已启动！正在后台运行...")
+
+                # 使用meta refresh标签实现自动刷新
+                st.markdown("""
+                <meta http-equiv="refresh" content="6">
+                """, unsafe_allow_html=True)
+
+                # 显示倒计时
+                countdown_placeholder = st.empty()
+                for i in range(6, 0, -1):
+                    countdown_placeholder.info(f"⏱️ 页面将在 {i} 秒后自动刷新，请向下滚动查看分析进度...")
+                    time.sleep(1)
+                countdown_placeholder.info("🔄 正在刷新页面...")
 
         # 2. 股票分析区域（只有在有分析ID时才显示）
         current_analysis_id = st.session_state.get('current_analysis_id')
