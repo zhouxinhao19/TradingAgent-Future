@@ -740,7 +740,12 @@ def main():
                     time.sleep(1.5)  # 让用户看到反馈
 
                 st.info(f"📊 正在分析: {form_data.get('market_type', '美股')} {form_data['stock_symbol']}")
-                st.info("⏱️ 页面将在3秒后自动刷新并跳转到分析进度...")
+                st.info("""
+                ⏱️ 页面将在3秒后自动刷新...
+
+                📋 **查看分析进度：**
+                刷新后请向下滚动到 "📊 股票分析" 部分查看实时进度
+                """)
 
                 # 确保AsyncProgressTracker已经保存初始状态
                 time.sleep(0.1)  # 等待100毫秒确保数据已写入
@@ -769,7 +774,7 @@ def main():
                 # 显示倒计时
                 countdown_placeholder = st.empty()
                 for i in range(3, 0, -1):
-                    countdown_placeholder.info(f"⏱️ 页面将在 {i} 秒后自动刷新并跳转到分析进度...")
+                    countdown_placeholder.info(f"⏱️ 页面将在 {i} 秒后自动刷新，请向下滚动查看分析进度...")
                     time.sleep(1)
                 countdown_placeholder.info("🔄 正在刷新页面...")
 
@@ -845,31 +850,6 @@ def main():
             else:
                 if actual_status == 'completed':
                     st.success(f"✅ 分析完成: {current_analysis_id}")
-
-                    # 提示用户如何查看结果
-                    st.info("""
-                    📋 **查看分析结果：**
-                    1. 点击左侧菜单的 "📊 分析结果"
-                    2. 或者刷新页面后，向下滚动到 "分析结果" 部分查看
-                    """)
-
-                    # 创建简单的查看结果按钮
-                    result_url = f"?page=results&analysis_id={current_analysis_id}"
-                    st.markdown(f"""
-                    <div style="text-align: center; margin: 20px 0;">
-                        <a href="{result_url}"
-                           style="background: linear-gradient(45deg, #1f77b4, #ff7f0e);
-                                  color: white;
-                                  padding: 12px 24px;
-                                  text-decoration: none;
-                                  border-radius: 8px;
-                                  font-weight: bold;
-                                  display: inline-block;
-                                  box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
-                            🎯 查看分析结果
-                        </a>
-                    </div>
-                    """, unsafe_allow_html=True)
 
                 elif actual_status == 'failed':
                     st.error(f"❌ 分析失败: {current_analysis_id}")
