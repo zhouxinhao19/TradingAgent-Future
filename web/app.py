@@ -747,7 +747,7 @@ def main():
 
                 st.info(f"📊 正在分析: {form_data.get('market_type', '美股')} {form_data['stock_symbol']}")
                 st.info("""
-                ⏱️ 页面将在3秒后自动刷新...
+                ⏱️ 页面将在6秒后自动刷新...
 
                 📋 **查看分析进度：**
                 刷新后请向下滚动到 "📊 股票分析" 部分查看实时进度
@@ -815,20 +815,15 @@ def main():
 
                 logger.info(f"🧵 [后台分析] 分析线程已启动: {analysis_id}")
 
-                # 分析已在后台线程中启动，显示倒计时并自动刷新页面
+                # 分析已在后台线程中启动，显示启动信息并刷新页面
                 st.success("🚀 分析已启动！正在后台运行...")
 
-                # 使用meta refresh标签实现自动刷新
-                st.markdown("""
-                <meta http-equiv="refresh" content="6">
-                """, unsafe_allow_html=True)
+                # 显示启动信息
+                st.info("⏱️ 页面将自动刷新显示分析进度...")
 
-                # 显示倒计时
-                countdown_placeholder = st.empty()
-                for i in range(6, 0, -1):
-                    countdown_placeholder.info(f"⏱️ 页面将在 {i} 秒后自动刷新，请向下滚动查看分析进度...")
-                    time.sleep(1)
-                countdown_placeholder.info("🔄 正在刷新页面...")
+                # 等待2秒让用户看到启动信息，然后刷新页面
+                time.sleep(2)
+                st.rerun()
 
         # 2. 股票分析区域（只有在有分析ID时才显示）
         current_analysis_id = st.session_state.get('current_analysis_id')
@@ -891,10 +886,9 @@ def main():
                             if not st.session_state.get(refresh_key, False):
                                 st.session_state[refresh_key] = True
                                 st.success("📊 分析结果已恢复，正在刷新页面...")
-                                # 使用meta refresh标签实现自动刷新
-                                st.markdown("""
-                                <meta http-equiv="refresh" content="2">
-                                """, unsafe_allow_html=True)
+                                # 使用st.rerun()代替meta refresh，保持侧边栏状态
+                                time.sleep(1)
+                                st.rerun()
                             else:
                                 # 已经刷新过，不再刷新
                                 st.success("📊 分析结果已恢复！")
@@ -906,10 +900,9 @@ def main():
                 st.session_state.analysis_running = False
                 st.success("🎉 分析完成！正在刷新页面显示报告...")
 
-                # 使用meta refresh标签实现自动刷新
-                st.markdown("""
-                <meta http-equiv="refresh" content="2">
-                """, unsafe_allow_html=True)
+                # 使用st.rerun()代替meta refresh，保持侧边栏状态
+                time.sleep(1)
+                st.rerun()
 
 
 
