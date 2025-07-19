@@ -23,34 +23,43 @@ class FileSessionManager:
     def _get_browser_fingerprint(self) -> str:
         """生成浏览器指纹"""
         try:
-            # 方法1：尝试从Streamlit获取session信息
-            if hasattr(st, 'session_state'):
-                # 使用Streamlit内部的session信息
-                session_info = str(st.session_state)
-                if session_info and len(session_info) > 10:
-                    fingerprint = hashlib.md5(session_info.encode()).hexdigest()[:16]
-                    return f"st_{fingerprint}"
-            
-            # 方法2：使用时间窗口 + 随机数（按小时分组）
-            hour_window = int(time.time() / 3600)  # 按小时分组
-            
-            # 检查是否已经有这个时间窗口的session文件
-            pattern = f"time_{hour_window}_*.json"
-            existing_files = list(self.data_dir.glob(pattern))
-            
-            if existing_files:
-                # 使用现有的session文件
-                filename = existing_files[0].stem
-                return filename.replace('.json', '')
-            else:
-                # 创建新的session
-                random_id = uuid.uuid4().hex[:8]
-                return f"time_{hour_window}_{random_id}"
-                
+            # 方法1：使用固定的session标识符
+            # 检查是否已经有session标识符保存在session_state中
+            if hasattr(st.session_state, 'file_session_fingerprint'):
+                return st.session_state.file_session_fingerprint
+
+            # 方法2：查找最近的session文件（24小时内）
+            current_time = time.time()
+            recent_files = []
+
+            for session_file in self.data_dir.glob("*.json"):
+                try:
+                    file_age = current_time - session_file.stat().st_mtime
+                    if file_age < (24 * 3600):  # 24小时内的文件
+                        recent_files.append((session_file, file_age))
+                except:
+                    continue
+
+            if recent_files:
+                # 使用最新的session文件
+                recent_files.sort(key=lambda x: x[1])  # 按文件年龄排序
+                newest_file = recent_files[0][0]
+                fingerprint = newest_file.stem
+                # 保存到session_state以便后续使用
+                st.session_state.file_session_fingerprint = fingerprint
+                return fingerprint
+
+            # 方法3：创建新的session
+            fingerprint = f"session_{uuid.uuid4().hex[:12]}"
+            st.session_state.file_session_fingerprint = fingerprint
+            return fingerprint
+
         except Exception:
-            # 方法3：最后的fallback
-            timestamp = int(time.time() / 1800)  # 30分钟窗口
-            return f"fallback_{timestamp}"
+            # 方法4：最后的fallback
+            fingerprint = f"fallback_{uuid.uuid4().hex[:8]}"
+            if hasattr(st, 'session_state'):
+                st.session_state.file_session_fingerprint = fingerprint
+            return fingerprint
     
     def _get_session_file_path(self, fingerprint: str) -> Path:
         """获取会话文件路径"""
@@ -102,14 +111,19 @@ class FileSessionManager:
             # 保存到文件
             with open(session_file, 'w', encoding='utf-8') as f:
                 json.dump(session_data, f, ensure_ascii=False, indent=2)
-            
+
+            print(f"📁 [文件会话] 配置已保存到: {session_file}")
+            print(f"📁 [文件会话] 指纹: {fingerprint}")
+            if form_config:
+                print(f"📁 [文件会话] 表单配置: {form_config}")
+
             # 同时保存到session state
             st.session_state.current_analysis_id = analysis_id
             st.session_state.analysis_running = (status == 'running')
             st.session_state.last_stock_symbol = stock_symbol
             st.session_state.last_market_type = market_type
             st.session_state.session_fingerprint = fingerprint
-            
+
             return True
             
         except Exception as e:
@@ -121,22 +135,29 @@ class FileSessionManager:
         try:
             fingerprint = self._get_browser_fingerprint()
             session_file = self._get_session_file_path(fingerprint)
-            
+
+            print(f"📁 [文件会话] 尝试加载: {session_file}")
+            print(f"📁 [文件会话] 指纹: {fingerprint}")
+
             # 检查文件是否存在
             if not session_file.exists():
+                print(f"📁 [文件会话] 文件不存在")
                 return None
-            
+
             # 读取会话数据
             with open(session_file, 'r', encoding='utf-8') as f:
                 session_data = json.load(f)
-            
+
+            print(f"📁 [文件会话] 加载的数据: {session_data}")
+
             # 检查是否过期
             timestamp = session_data.get("timestamp", 0)
             if time.time() - timestamp > (self.max_age_hours * 3600):
                 # 过期了，删除文件
                 session_file.unlink()
+                print(f"📁 [文件会话] 文件已过期，已删除")
                 return None
-            
+
             return session_data
             
         except Exception as e:
