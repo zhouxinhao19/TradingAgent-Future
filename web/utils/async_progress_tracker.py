@@ -120,8 +120,9 @@ class AsyncProgressTracker:
         """初始化Redis连接"""
         try:
             # 首先检查REDIS_ENABLED环境变量
-            redis_enabled = os.getenv('REDIS_ENABLED', 'false').lower()
-            logger.info(f"🔍 [Redis检查] REDIS_ENABLED='{os.getenv('REDIS_ENABLED', 'false')}' -> '{redis_enabled}'")
+            redis_enabled_raw = os.getenv('REDIS_ENABLED', 'false')
+            redis_enabled = redis_enabled_raw.lower()
+            logger.info(f"🔍 [Redis检查] REDIS_ENABLED原值='{redis_enabled_raw}' -> 处理后='{redis_enabled}'")
 
             if redis_enabled != 'true':
                 logger.info(f"📊 [异步进度] Redis已禁用，使用文件存储")
