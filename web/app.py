@@ -684,7 +684,8 @@ def main():
             logger.debug(f"🔍 [APP DEBUG] 市场类型: '{form_data['market_type']}'")
 
         # 检查是否提交了表单
-        if form_data.get('submitted', False):
+        if form_data.get('submitted', False) and not st.session_state.get('analysis_running', False):
+            # 只有在没有分析运行时才处理新的提交
             # 验证分析参数
             is_valid, validation_errors = validate_analysis_params(
                 stock_symbol=form_data['stock_symbol'],
