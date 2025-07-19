@@ -742,7 +742,6 @@ def main():
 
                 # 添加加载动效
                 with st.spinner("🔄 正在初始化分析..."):
-                    import time
                     time.sleep(1.5)  # 让用户看到反馈
 
                 st.info(f"📊 正在分析: {form_data.get('market_type', '美股')} {form_data['stock_symbol']}")
