@@ -652,9 +652,7 @@ def main():
     
     with col1:
         # 1. 分析配置区域
-        # 添加测试锚点
-        st.markdown('<div id="test-anchor"></div>', unsafe_allow_html=True)
-        st.text("🧪 测试锚点位置")
+
         st.header("⚙️ 分析配置")
 
         # 渲染分析表单
@@ -742,7 +740,7 @@ def main():
                     time.sleep(1.5)  # 让用户看到反馈
 
                 st.info(f"📊 正在分析: {form_data.get('market_type', '美股')} {form_data['stock_symbol']}")
-                st.info("⏱️ 页面将在3秒后自动刷新显示进度...")
+                st.info("⏱️ 页面将在3秒后自动刷新并跳转到分析进度...")
 
                 # 确保AsyncProgressTracker已经保存初始状态
                 time.sleep(0.1)  # 等待100毫秒确保数据已写入
@@ -763,15 +761,15 @@ def main():
                 for key in auto_refresh_keys:
                     st.session_state[key] = True
 
-                # 使用meta refresh标签实现自动刷新，并定位到股票分析模块
+                # 使用meta refresh标签实现自动刷新
                 st.markdown("""
-                <meta http-equiv="refresh" content="3; url=#stock-analysis">
+                <meta http-equiv="refresh" content="3">
                 """, unsafe_allow_html=True)
 
                 # 显示倒计时
                 countdown_placeholder = st.empty()
                 for i in range(3, 0, -1):
-                    countdown_placeholder.info(f"⏱️ 页面将在 {i} 秒后自动刷新...")
+                    countdown_placeholder.info(f"⏱️ 页面将在 {i} 秒后自动刷新并跳转到分析进度...")
                     time.sleep(1)
                 countdown_placeholder.info("🔄 正在刷新页面...")
 
@@ -824,8 +822,7 @@ def main():
         current_analysis_id = st.session_state.get('current_analysis_id')
         if current_analysis_id:
             st.markdown("---")
-            # 添加锚点标记
-            st.markdown('<div id="stock-analysis"></div>', unsafe_allow_html=True)
+
             st.header("📊 股票分析")
 
             # 使用线程检测来获取真实状态
@@ -848,6 +845,32 @@ def main():
             else:
                 if actual_status == 'completed':
                     st.success(f"✅ 分析完成: {current_analysis_id}")
+
+                    # 提示用户如何查看结果
+                    st.info("""
+                    📋 **查看分析结果：**
+                    1. 点击左侧菜单的 "📊 分析结果"
+                    2. 或者刷新页面后，向下滚动到 "分析结果" 部分查看
+                    """)
+
+                    # 创建简单的查看结果按钮
+                    result_url = f"?page=results&analysis_id={current_analysis_id}"
+                    st.markdown(f"""
+                    <div style="text-align: center; margin: 20px 0;">
+                        <a href="{result_url}"
+                           style="background: linear-gradient(45deg, #1f77b4, #ff7f0e);
+                                  color: white;
+                                  padding: 12px 24px;
+                                  text-decoration: none;
+                                  border-radius: 8px;
+                                  font-weight: bold;
+                                  display: inline-block;
+                                  box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+                            🎯 查看分析结果
+                        </a>
+                    </div>
+                    """, unsafe_allow_html=True)
+
                 elif actual_status == 'failed':
                     st.error(f"❌ 分析失败: {current_analysis_id}")
                 else:
@@ -881,9 +904,9 @@ def main():
                             if not st.session_state.get(refresh_key, False):
                                 st.session_state[refresh_key] = True
                                 st.success("📊 分析结果已恢复，正在刷新页面...")
-                                # 使用meta refresh标签实现自动刷新，并定位到分析报告模块
+                                # 使用meta refresh标签实现自动刷新
                                 st.markdown("""
-                                <meta http-equiv="refresh" content="2; url=#analysis-report">
+                                <meta http-equiv="refresh" content="2">
                                 """, unsafe_allow_html=True)
                             else:
                                 # 已经刷新过，不再刷新
@@ -896,16 +919,15 @@ def main():
                 st.session_state.analysis_running = False
                 st.success("🎉 分析完成！正在刷新页面显示报告...")
 
-                # 使用meta refresh标签实现自动刷新，并定位到分析报告模块
+                # 使用meta refresh标签实现自动刷新
                 st.markdown("""
-                <meta http-equiv="refresh" content="2; url=#analysis-report">
+                <meta http-equiv="refresh" content="2">
                 """, unsafe_allow_html=True)
 
 
 
         # 3. 分析报告区域（只有在有结果且分析完成时才显示）
-        # 添加锚点标记
-        st.markdown('<div id="analysis-report"></div>', unsafe_allow_html=True)
+
         current_analysis_id = st.session_state.get('current_analysis_id')
         analysis_results = st.session_state.get('analysis_results')
         analysis_running = st.session_state.get('analysis_running', False)
