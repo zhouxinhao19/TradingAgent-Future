@@ -828,30 +828,37 @@ def main():
             st.markdown('<div id="stock-analysis"></div>', unsafe_allow_html=True)
             st.header("📊 股票分析")
 
+            # 使用线程检测来获取真实状态
+            from utils.thread_tracker import check_analysis_status
+            actual_status = check_analysis_status(current_analysis_id)
+            is_running = (actual_status == 'running')
+
+            # 同步session state状态
+            if st.session_state.get('analysis_running', False) != is_running:
+                st.session_state.analysis_running = is_running
+                logger.info(f"🔄 [状态同步] 更新分析状态: {is_running} (基于线程检测: {actual_status})")
+
+            # 获取进度数据用于显示
             from utils.async_progress_tracker import get_progress_by_id
             progress_data = get_progress_by_id(current_analysis_id)
 
-            if progress_data:
-                status = progress_data.get('status', 'unknown')
-                is_running = (status == 'running')
-
-                # 同步session state状态
-                if st.session_state.get('analysis_running', False) != is_running:
-                    st.session_state.analysis_running = is_running
-                    logger.info(f"🔄 [状态同步] 更新分析状态: {is_running}")
-
-                # 显示分析信息
-                if is_running:
-                    st.info(f"🔄 正在分析: {current_analysis_id}")
-                else:
+            # 显示分析信息
+            if is_running:
+                st.info(f"🔄 正在分析: {current_analysis_id}")
+            else:
+                if actual_status == 'completed':
                     st.success(f"✅ 分析完成: {current_analysis_id}")
+                elif actual_status == 'failed':
+                    st.error(f"❌ 分析失败: {current_analysis_id}")
+                else:
+                    st.warning(f"⚠️ 分析状态未知: {current_analysis_id}")
 
-                # 显示进度（根据状态决定是否显示刷新控件）
-                progress_col1, progress_col2 = st.columns([4, 1])
-                with progress_col1:
-                    st.markdown("### 📊 分析进度")
+            # 显示进度（根据状态决定是否显示刷新控件）
+            progress_col1, progress_col2 = st.columns([4, 1])
+            with progress_col1:
+                st.markdown("### 📊 分析进度")
 
-                is_completed = display_unified_progress(current_analysis_id, show_refresh_controls=is_running)
+            is_completed = display_unified_progress(current_analysis_id, show_refresh_controls=is_running)
 
                 # 如果分析正在进行，显示提示信息（不添加额外的自动刷新）
                 if is_running:
