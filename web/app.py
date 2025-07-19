@@ -211,17 +211,27 @@ def initialize_session_state():
     try:
         persistent_analysis_id = get_persistent_analysis_id()
         if persistent_analysis_id:
-            # 检查分析状态
-            from utils.async_progress_tracker import get_progress_by_id
-            progress_data = get_progress_by_id(persistent_analysis_id)
-            if progress_data:
-                status = progress_data.get('status', 'completed')
-                st.session_state.analysis_running = (status == 'running')
-            else:
+            # 使用线程检测来检查分析状态
+            from utils.thread_tracker import check_analysis_status
+            actual_status = check_analysis_status(persistent_analysis_id)
+
+            logger.info(f"📊 [状态检查] 分析 {persistent_analysis_id} 实际状态: {actual_status}")
+
+            if actual_status == 'running':
+                st.session_state.analysis_running = True
+                st.session_state.current_analysis_id = persistent_analysis_id
+            elif actual_status in ['completed', 'failed']:
                 st.session_state.analysis_running = False
+                st.session_state.current_analysis_id = persistent_analysis_id
+            else:  # not_found
+                logger.warning(f"📊 [状态检查] 分析 {persistent_analysis_id} 未找到，清理状态")
+                st.session_state.analysis_running = False
+                st.session_state.current_analysis_id = None
     except Exception as e:
         # 如果恢复失败，保持默认值
-        pass
+        logger.warning(f"⚠️ [状态恢复] 恢复分析状态失败: {e}")
+        st.session_state.analysis_running = False
+        st.session_state.current_analysis_id = None
 
     # 恢复表单配置
     try:
@@ -609,6 +619,30 @@ def main():
     # 添加使用指南显示切换
     show_guide = st.sidebar.checkbox("📖 显示使用指南", value=True, help="显示/隐藏右侧使用指南")
 
+    # 添加状态清理按钮
+    st.sidebar.markdown("---")
+    if st.sidebar.button("🧹 清理分析状态", help="清理僵尸分析状态，解决页面持续刷新问题"):
+        # 清理session state
+        st.session_state.analysis_running = False
+        st.session_state.current_analysis_id = None
+        st.session_state.analysis_results = None
+
+        # 清理所有自动刷新状态
+        keys_to_remove = []
+        for key in st.session_state.keys():
+            if 'auto_refresh' in key:
+                keys_to_remove.append(key)
+
+        for key in keys_to_remove:
+            del st.session_state[key]
+
+        # 清理死亡线程
+        from utils.thread_tracker import cleanup_dead_analysis_threads
+        cleanup_dead_analysis_threads()
+
+        st.sidebar.success("✅ 分析状态已清理")
+        st.rerun()
+
     # 主内容区域 - 根据是否显示指南调整布局
     if show_guide:
         col1, col2 = st.columns([2, 1])  # 2:1比例，使用指南占三分之一
@@ -728,9 +762,9 @@ def main():
                 for key in auto_refresh_keys:
                     st.session_state[key] = True
 
-                # 使用meta refresh标签实现自动刷新，并定位到测试锚点
+                # 使用meta refresh标签实现自动刷新，并定位到股票分析模块
                 st.markdown("""
-                <meta http-equiv="refresh" content="3; url=#test-anchor">
+                <meta http-equiv="refresh" content="3; url=#stock-analysis">
                 """, unsafe_allow_html=True)
 
                 # 显示倒计时
@@ -766,10 +800,20 @@ def main():
                         async_tracker.mark_failed(str(e))
                         logger.error(f"❌ [分析失败] {analysis_id}: {e}")
 
+                    finally:
+                        # 分析结束后注销线程
+                        from utils.thread_tracker import unregister_analysis_thread
+                        unregister_analysis_thread(analysis_id)
+                        logger.info(f"🧵 [线程清理] 分析线程已注销: {analysis_id}")
+
                 # 启动后台分析线程
                 analysis_thread = threading.Thread(target=run_analysis_in_background)
                 analysis_thread.daemon = True  # 设置为守护线程，这样主程序退出时线程也会退出
                 analysis_thread.start()
+
+                # 注册线程到跟踪器
+                from utils.thread_tracker import register_analysis_thread
+                register_analysis_thread(analysis_id, analysis_thread)
 
                 logger.info(f"🧵 [后台分析] 分析线程已启动: {analysis_id}")
 
