@@ -27,6 +27,9 @@ def render_analysis_form():
 
     # 创建表单
     with st.form("analysis_form", clear_on_submit=False):
+
+        # 在表单开始时保存当前配置（用于检测变化）
+        initial_config = cached_config.copy() if cached_config else {}
         col1, col2 = st.columns(2)
         
         with col1:
@@ -205,6 +208,34 @@ def render_analysis_form():
         });
         </script>
         """, unsafe_allow_html=True)
+
+        # 在提交按钮前检测配置变化并保存
+        current_config = {
+            'stock_symbol': stock_symbol,
+            'market_type': market_type,
+            'research_depth': research_depth,
+            'selected_analysts': [a[0] for a in selected_analysts],
+            'include_sentiment': include_sentiment,
+            'include_risk_assessment': include_risk_assessment,
+            'custom_prompt': custom_prompt
+        }
+
+        # 如果配置发生变化，立即保存（即使没有提交）
+        if current_config != initial_config:
+            st.session_state.form_config = current_config
+            try:
+                from utils.smart_session_manager import smart_session_manager
+                current_analysis_id = st.session_state.get('current_analysis_id', 'form_config_only')
+                smart_session_manager.save_analysis_state(
+                    analysis_id=current_analysis_id,
+                    status=st.session_state.get('analysis_running', False) and 'running' or 'idle',
+                    stock_symbol=stock_symbol,
+                    market_type=market_type,
+                    form_config=current_config
+                )
+                logger.debug(f"📊 [配置自动保存] 表单配置已更新")
+            except Exception as e:
+                logger.warning(f"⚠️ [配置自动保存] 保存失败: {e}")
 
         # 提交按钮（不禁用，让用户可以点击）
         submitted = st.form_submit_button(
