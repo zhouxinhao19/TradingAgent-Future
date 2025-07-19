@@ -235,7 +235,7 @@ def render_analysis_form():
             'custom_prompt': custom_prompt
         }
 
-        # 保存表单配置到缓存
+        # 保存表单配置到缓存和持久化存储
         form_config = {
             'stock_symbol': stock_symbol,
             'market_type': market_type,
@@ -246,6 +246,22 @@ def render_analysis_form():
             'custom_prompt': custom_prompt
         }
         st.session_state.form_config = form_config
+
+        # 保存到持久化存储
+        try:
+            from utils.smart_session_manager import smart_session_manager
+            # 获取当前分析ID（如果有的话）
+            current_analysis_id = st.session_state.get('current_analysis_id', 'form_config_only')
+            smart_session_manager.save_analysis_state(
+                analysis_id=current_analysis_id,
+                status=st.session_state.get('analysis_running', False) and 'running' or 'idle',
+                stock_symbol=stock_symbol,
+                market_type=market_type,
+                form_config=form_config
+            )
+        except Exception as e:
+            logger.warning(f"⚠️ [配置持久化] 保存失败: {e}")
+
         logger.info(f"📊 [配置缓存] 表单配置已保存: {form_config}")
 
         logger.debug(f"🔍 [FORM DEBUG] 返回的表单数据: {form_data}")

@@ -216,6 +216,11 @@ def get_persistent_analysis_id() -> Optional[str]:
                 st.session_state.last_stock_symbol = session_data.get('stock_symbol', '')
                 st.session_state.last_market_type = session_data.get('market_type', '')
                 st.session_state.session_fingerprint = session_data.get('fingerprint', '')
+
+                # 恢复表单配置
+                if 'form_config' in session_data:
+                    st.session_state.form_config = session_data['form_config']
+
                 return analysis_id
         
         # 3. 最后从Redis/文件恢复最新分析
@@ -234,18 +239,23 @@ def get_persistent_analysis_id() -> Optional[str]:
         st.warning(f"⚠️ 获取持久化分析ID失败: {e}")
         return None
 
-def set_persistent_analysis_id(analysis_id: str, status: str = "running", 
-                              stock_symbol: str = "", market_type: str = ""):
-    """设置持久化的分析ID"""
+def set_persistent_analysis_id(analysis_id: str, status: str = "running",
+                              stock_symbol: str = "", market_type: str = "",
+                              form_config: Dict[str, Any] = None):
+    """设置持久化的分析ID和表单配置"""
     try:
         # 设置到session state
         st.session_state.current_analysis_id = analysis_id
         st.session_state.analysis_running = (status == 'running')
         st.session_state.last_stock_symbol = stock_symbol
         st.session_state.last_market_type = market_type
-        
+
+        # 保存表单配置到session state
+        if form_config:
+            st.session_state.form_config = form_config
+
         # 保存到文件会话
-        file_session_manager.save_analysis_state(analysis_id, status, stock_symbol, market_type)
+        file_session_manager.save_analysis_state(analysis_id, status, stock_symbol, market_type, form_config)
         
     except Exception as e:
         st.warning(f"⚠️ 设置持久化分析ID失败: {e}")
