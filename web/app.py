@@ -241,6 +241,7 @@ def initialize_session_state():
     try:
         from utils.smart_session_manager import smart_session_manager
         session_data = smart_session_manager.load_analysis_state()
+
         if session_data and 'form_config' in session_data:
             st.session_state.form_config = session_data['form_config']
             # 只在没有分析运行时记录日志，避免重复

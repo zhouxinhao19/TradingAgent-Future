@@ -112,11 +112,6 @@ class FileSessionManager:
             with open(session_file, 'w', encoding='utf-8') as f:
                 json.dump(session_data, f, ensure_ascii=False, indent=2)
 
-            print(f"📁 [文件会话] 配置已保存到: {session_file}")
-            print(f"📁 [文件会话] 指纹: {fingerprint}")
-            if form_config:
-                print(f"📁 [文件会话] 表单配置: {form_config}")
-
             # 同时保存到session state
             st.session_state.current_analysis_id = analysis_id
             st.session_state.analysis_running = (status == 'running')
@@ -136,26 +131,19 @@ class FileSessionManager:
             fingerprint = self._get_browser_fingerprint()
             session_file = self._get_session_file_path(fingerprint)
 
-            print(f"📁 [文件会话] 尝试加载: {session_file}")
-            print(f"📁 [文件会话] 指纹: {fingerprint}")
-
             # 检查文件是否存在
             if not session_file.exists():
-                print(f"📁 [文件会话] 文件不存在")
                 return None
 
             # 读取会话数据
             with open(session_file, 'r', encoding='utf-8') as f:
                 session_data = json.load(f)
 
-            print(f"📁 [文件会话] 加载的数据: {session_data}")
-
             # 检查是否过期
             timestamp = session_data.get("timestamp", 0)
             if time.time() - timestamp > (self.max_age_hours * 3600):
                 # 过期了，删除文件
                 session_file.unlink()
-                print(f"📁 [文件会话] 文件已过期，已删除")
                 return None
 
             return session_data
