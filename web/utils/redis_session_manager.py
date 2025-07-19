@@ -21,8 +21,13 @@ class RedisSessionManager:
     def _init_redis(self) -> bool:
         """初始化Redis连接"""
         try:
+            # 首先检查REDIS_ENABLED环境变量
+            redis_enabled = os.getenv('REDIS_ENABLED', 'false').lower()
+            if redis_enabled != 'true':
+                return False
+
             import redis
-            
+
             # 从环境变量获取Redis配置
             redis_host = os.getenv('REDIS_HOST', 'localhost')
             redis_port = int(os.getenv('REDIS_PORT', 6379))
@@ -45,7 +50,10 @@ class RedisSessionManager:
             return True
             
         except Exception as e:
-            st.warning(f"⚠️ Redis连接失败，使用文件存储: {e}")
+            # 只有在Redis启用时才显示连接失败警告
+            redis_enabled = os.getenv('REDIS_ENABLED', 'false').lower()
+            if redis_enabled == 'true':
+                st.warning(f"⚠️ Redis连接失败，使用文件存储: {e}")
             return False
     
     def _get_session_key(self) -> str:
