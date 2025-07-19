@@ -711,7 +711,7 @@ def get_latest_analysis_id() -> Optional[str]:
                 filename = latest_file.name
                 if filename.startswith("progress_") and filename.endswith(".json"):
                     analysis_id = filename[9:-5]  # 去掉前缀和后缀
-                    logger.info(f"📊 [恢复分析] 从文件找到最新分析ID: {analysis_id}")
+                    logger.debug(f"📊 [恢复分析] 从文件找到最新分析ID: {analysis_id}")
                     return analysis_id
 
         return None

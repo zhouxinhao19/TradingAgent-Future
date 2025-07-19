@@ -18,11 +18,12 @@ def render_analysis_form():
     # 获取缓存的表单配置（确保不为None）
     cached_config = st.session_state.get('form_config') or {}
 
-    # 调试信息
-    if cached_config:
-        logger.info(f"📊 [配置恢复] 使用缓存配置: {cached_config}")
-    else:
-        logger.info("📊 [配置恢复] 使用默认配置")
+    # 调试信息（只在没有分析运行时记录，避免重复）
+    if not st.session_state.get('analysis_running', False):
+        if cached_config:
+            logger.info(f"📊 [配置恢复] 使用缓存配置: {cached_config}")
+        else:
+            logger.info("📊 [配置恢复] 使用默认配置")
 
     # 创建表单
     with st.form("analysis_form", clear_on_submit=False):

@@ -215,7 +215,11 @@ def initialize_session_state():
             from utils.thread_tracker import check_analysis_status
             actual_status = check_analysis_status(persistent_analysis_id)
 
-            logger.info(f"📊 [状态检查] 分析 {persistent_analysis_id} 实际状态: {actual_status}")
+            # 只在状态变化时记录日志，避免重复
+            current_session_status = st.session_state.get('last_logged_status')
+            if current_session_status != actual_status:
+                logger.info(f"📊 [状态检查] 分析 {persistent_analysis_id} 实际状态: {actual_status}")
+                st.session_state.last_logged_status = actual_status
 
             if actual_status == 'running':
                 st.session_state.analysis_running = True
@@ -239,7 +243,9 @@ def initialize_session_state():
         session_data = smart_session_manager.load_analysis_state()
         if session_data and 'form_config' in session_data:
             st.session_state.form_config = session_data['form_config']
-            logger.info("📊 [配置恢复] 表单配置已恢复")
+            # 只在没有分析运行时记录日志，避免重复
+            if not st.session_state.get('analysis_running', False):
+                logger.info("📊 [配置恢复] 表单配置已恢复")
     except Exception as e:
         logger.warning(f"⚠️ [配置恢复] 表单配置恢复失败: {e}")
 
