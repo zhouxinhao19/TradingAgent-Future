@@ -119,6 +119,14 @@ class AsyncProgressTracker:
     def _init_redis(self) -> bool:
         """初始化Redis连接"""
         try:
+            # 首先检查REDIS_ENABLED环境变量
+            redis_enabled = os.getenv('REDIS_ENABLED', 'false').lower()
+            logger.info(f"🔍 [Redis检查] REDIS_ENABLED='{os.getenv('REDIS_ENABLED', 'false')}' -> '{redis_enabled}'")
+
+            if redis_enabled != 'true':
+                logger.info(f"📊 [异步进度] Redis已禁用，使用文件存储")
+                return False
+
             import redis
 
             # 从环境变量获取Redis配置
@@ -568,15 +576,19 @@ class AsyncProgressTracker:
 def get_progress_by_id(analysis_id: str) -> Optional[Dict[str, Any]]:
     """根据分析ID获取进度"""
     try:
-        # 先尝试Redis
-        try:
-            import redis
+        # 检查REDIS_ENABLED环境变量
+        redis_enabled = os.getenv('REDIS_ENABLED', 'false').lower() == 'true'
 
-            # 从环境变量获取Redis配置
-            redis_host = os.getenv('REDIS_HOST', 'localhost')
-            redis_port = int(os.getenv('REDIS_PORT', 6379))
-            redis_password = os.getenv('REDIS_PASSWORD', None)
-            redis_db = int(os.getenv('REDIS_DB', 0))
+        # 如果Redis启用，先尝试Redis
+        if redis_enabled:
+            try:
+                import redis
+
+                # 从环境变量获取Redis配置
+                redis_host = os.getenv('REDIS_HOST', 'localhost')
+                redis_port = int(os.getenv('REDIS_PORT', 6379))
+                redis_password = os.getenv('REDIS_PASSWORD', None)
+                redis_db = int(os.getenv('REDIS_DB', 0))
 
             # 创建Redis连接
             if redis_password:
@@ -595,12 +607,12 @@ def get_progress_by_id(analysis_id: str) -> Optional[Dict[str, Any]]:
                     decode_responses=True
                 )
 
-            key = f"progress:{analysis_id}"
-            data = redis_client.get(key)
-            if data:
-                return json.loads(data)
-        except Exception as e:
-            logger.debug(f"📊 [异步进度] Redis读取失败: {e}")
+                key = f"progress:{analysis_id}"
+                data = redis_client.get(key)
+                if data:
+                    return json.loads(data)
+            except Exception as e:
+                logger.debug(f"📊 [异步进度] Redis读取失败: {e}")
 
         # 尝试文件
         progress_file = f"./data/progress_{analysis_id}.json"
@@ -628,15 +640,19 @@ def format_time(seconds: float) -> str:
 def get_latest_analysis_id() -> Optional[str]:
     """获取最新的分析ID"""
     try:
-        # 先尝试从Redis获取
-        try:
-            import redis
+        # 检查REDIS_ENABLED环境变量
+        redis_enabled = os.getenv('REDIS_ENABLED', 'false').lower() == 'true'
 
-            # 从环境变量获取Redis配置
-            redis_host = os.getenv('REDIS_HOST', 'localhost')
-            redis_port = int(os.getenv('REDIS_PORT', 6379))
-            redis_password = os.getenv('REDIS_PASSWORD', None)
-            redis_db = int(os.getenv('REDIS_DB', 0))
+        # 如果Redis启用，先尝试从Redis获取
+        if redis_enabled:
+            try:
+                import redis
+
+                # 从环境变量获取Redis配置
+                redis_host = os.getenv('REDIS_HOST', 'localhost')
+                redis_port = int(os.getenv('REDIS_PORT', 6379))
+                redis_password = os.getenv('REDIS_PASSWORD', None)
+                redis_db = int(os.getenv('REDIS_DB', 0))
 
             # 创建Redis连接
             if redis_password:
@@ -677,14 +693,14 @@ def get_latest_analysis_id() -> Optional[str]:
                 except Exception:
                     continue
 
-            if latest_id:
-                logger.info(f"📊 [恢复分析] 找到最新分析ID: {latest_id}")
-                return latest_id
+                if latest_id:
+                    logger.info(f"📊 [恢复分析] 找到最新分析ID: {latest_id}")
+                    return latest_id
 
-        except Exception as e:
-            logger.debug(f"📊 [恢复分析] Redis查找失败: {e}")
+            except Exception as e:
+                logger.debug(f"📊 [恢复分析] Redis查找失败: {e}")
 
-        # 如果Redis失败，尝试从文件查找
+        # 如果Redis失败或未启用，尝试从文件查找
         data_dir = Path("data")
         if data_dir.exists():
             progress_files = list(data_dir.glob("progress_*.json"))
