@@ -1067,6 +1067,7 @@ def get_china_stock_data_tushare(
 ) -> str:
     """
     使用Tushare获取中国A股历史数据
+    重定向到data_source_manager，避免循环调用
 
     Args:
         ticker: 股票代码
@@ -1077,81 +1078,16 @@ def get_china_stock_data_tushare(
         str: 格式化的股票数据报告
     """
     try:
-        from .tushare_adapter import get_tushare_adapter
+        from .data_source_manager import get_data_source_manager
 
         logger.debug(f"📊 [Tushare] 获取{ticker}股票数据...")
 
         # 添加详细的股票代码追踪日志
         logger.info(f"🔍 [股票代码追踪] get_china_stock_data_tushare 接收到的股票代码: '{ticker}' (类型: {type(ticker)})")
-        logger.info(f"🔍 [股票代码追踪] 股票代码长度: {len(str(ticker))}")
-        logger.info(f"🔍 [股票代码追踪] 股票代码字符: {list(str(ticker))}")
+        logger.info(f"🔍 [股票代码追踪] 重定向到data_source_manager")
 
-        adapter = get_tushare_adapter()
-        logger.info(f"🔍 [股票代码追踪] 调用 adapter.get_stock_data，传入参数: ticker='{ticker}'")
-        data = adapter.get_stock_data(ticker, start_date, end_date)
-        logger.info(f"🔍 [股票代码追踪] adapter.get_stock_data 返回数据形状: {data.shape if data is not None and hasattr(data, 'shape') else 'None'}")
-
-        if data is not None and not data.empty:
-            # 获取股票基本信息
-            stock_info = adapter.get_stock_info(ticker)
-            stock_name = stock_info.get('name', f'股票{ticker}') if stock_info else f'股票{ticker}'
-
-            # 计算最新价格和涨跌幅
-            latest_data = data.iloc[-1]
-            current_price = f"¥{latest_data['close']:.2f}"
-
-            if len(data) > 1:
-                prev_close = data.iloc[-2]['close']
-                change = latest_data['close'] - prev_close
-                change_pct = (change / prev_close) * 100
-                change_pct_str = f"{change_pct:+.2f}%"
-            else:
-                change_pct_str = "N/A"
-
-            # 格式化成交量 - 修复成交量显示问题
-            volume = 0
-            if 'vol' in latest_data.index:
-                volume = latest_data['vol']
-            elif 'volume' in latest_data.index:
-                volume = latest_data['volume']
-
-            # 处理NaN值
-            import pandas as pd
-            if pd.isna(volume):
-                volume = 0
-
-            if volume > 10000:
-                volume_str = f"{volume/10000:.1f}万手"
-            elif volume > 0:
-                volume_str = f"{volume:.0f}手"
-            else:
-                volume_str = "暂无数据"
-
-            # 转换为与TDX兼容的字符串格式
-            result = f"# {ticker} 股票数据分析\n\n"
-            result += f"## 📊 实时行情\n"
-            result += f"- 股票名称: {stock_name}\n"
-            result += f"- 股票代码: {ticker}\n"
-            result += f"- 当前价格: {current_price}\n"
-            result += f"- 涨跌幅: {change_pct_str}\n"
-            result += f"- 成交量: {volume_str}\n"
-            result += f"- 数据来源: Tushare\n\n"
-            result += f"## 📈 历史数据概览\n"
-            result += f"- 数据期间: {start_date} 至 {end_date}\n"
-            result += f"- 数据条数: {len(data)}条\n"
-
-            if len(data) > 0:
-                period_high = data['high'].max()
-                period_low = data['low'].min()
-                result += f"- 期间最高: ¥{period_high:.2f}\n"
-                result += f"- 期间最低: ¥{period_low:.2f}\n\n"
-
-            result += "## 📋 最新交易数据\n"
-            result += data.tail(5).to_string(index=False)
-
-            return result
-        else:
-            return f"❌ 未能获取{ticker}的股票数据"
+        manager = get_data_source_manager()
+        return manager.get_china_stock_data_tushare(ticker, start_date, end_date)
 
     except Exception as e:
         logger.error(f"❌ [Tushare] 获取股票数据失败: {e}")
@@ -1163,6 +1099,7 @@ def search_china_stocks_tushare(
 ) -> str:
     """
     使用Tushare搜索中国A股股票
+    重定向到data_source_manager，避免循环调用
 
     Args:
         keyword: 搜索关键词
@@ -1171,29 +1108,13 @@ def search_china_stocks_tushare(
         str: 搜索结果
     """
     try:
-        from .tushare_adapter import get_tushare_adapter
+        from .data_source_manager import get_data_source_manager
 
         logger.debug(f"🔍 [Tushare] 搜索股票: {keyword}")
+        logger.info(f"🔍 [股票代码追踪] 重定向到data_source_manager")
 
-        adapter = get_tushare_adapter()
-        results = adapter.search_stocks(keyword)
-
-        if results is not None and not results.empty:
-            result = f"搜索关键词: {keyword}\n"
-            result += f"找到 {len(results)} 只股票:\n\n"
-
-            # 显示前10个结果
-            for idx, row in results.head(10).iterrows():
-                result += f"代码: {row.get('symbol', '')}\n"
-                result += f"名称: {row.get('name', '未知')}\n"
-                result += f"行业: {row.get('industry', '未知')}\n"
-                result += f"地区: {row.get('area', '未知')}\n"
-                result += f"上市日期: {row.get('list_date', '未知')}\n"
-                result += "-" * 30 + "\n"
-
-            return result
-        else:
-            return f"❌ 未找到匹配'{keyword}'的股票"
+        manager = get_data_source_manager()
+        return manager.search_china_stocks_tushare(keyword)
 
     except Exception as e:
         logger.error(f"❌ [Tushare] 搜索股票失败: {e}")
@@ -1205,6 +1126,7 @@ def get_china_stock_fundamentals_tushare(
 ) -> str:
     """
     使用Tushare获取中国A股基本面数据
+    重定向到data_source_manager，避免循环调用
 
     Args:
         ticker: 股票代码
@@ -1213,14 +1135,13 @@ def get_china_stock_fundamentals_tushare(
         str: 基本面分析报告
     """
     try:
-        from .tushare_adapter import get_tushare_adapter
+        from .data_source_manager import get_data_source_manager
 
         logger.debug(f"📊 [Tushare] 获取{ticker}基本面数据...")
+        logger.info(f"🔍 [股票代码追踪] 重定向到data_source_manager")
 
-        adapter = get_tushare_adapter()
-        fundamentals = adapter.get_fundamentals(ticker)
-
-        return fundamentals
+        manager = get_data_source_manager()
+        return manager.get_china_stock_fundamentals_tushare(ticker)
 
     except Exception as e:
         logger.error(f"❌ [Tushare] 获取基本面数据失败: {e}")
@@ -1232,6 +1153,7 @@ def get_china_stock_info_tushare(
 ) -> str:
     """
     使用Tushare获取中国A股基本信息
+    重定向到data_source_manager，避免循环调用
 
     Args:
         ticker: 股票代码
@@ -1240,25 +1162,13 @@ def get_china_stock_info_tushare(
         str: 股票基本信息
     """
     try:
-        from .tushare_adapter import get_tushare_adapter
+        from .data_source_manager import get_data_source_manager
 
         logger.debug(f"📊 [Tushare] 获取{ticker}基本信息...")
+        logger.info(f"🔍 [股票代码追踪] 重定向到data_source_manager")
 
-        adapter = get_tushare_adapter()
-        info = adapter.get_stock_info(ticker)
-
-        if info and info.get('name'):
-            result = f"股票代码: {ticker}\n"
-            result += f"股票名称: {info.get('name', '未知')}\n"
-            result += f"所属地区: {info.get('area', '未知')}\n"
-            result += f"所属行业: {info.get('industry', '未知')}\n"
-            result += f"上市市场: {info.get('market', '未知')}\n"
-            result += f"上市日期: {info.get('list_date', '未知')}\n"
-            result += f"数据来源: {info.get('source', 'tushare')}\n"
-
-            return result
-        else:
-            return f"❌ 未能获取{ticker}的基本信息"
+        manager = get_data_source_manager()
+        return manager.get_china_stock_info_tushare(ticker)
 
     except Exception as e:
         logger.error(f"❌ [Tushare] 获取股票信息失败: {e}", exc_info=True)

@@ -28,24 +28,27 @@ class ChinaDataSource(Enum):
     TDX = "tdx"  # 中国股票数据，将被逐步淘汰
 
 
+
+
+
 class DataSourceManager:
     """数据源管理器"""
-    
+
     def __init__(self):
         """初始化数据源管理器"""
         self.default_source = self._get_default_source()
         self.available_sources = self._check_available_sources()
         self.current_source = self.default_source
-        
+
         logger.info(f"📊 数据源管理器初始化完成")
         logger.info(f"   默认数据源: {self.default_source.value}")
         logger.info(f"   可用数据源: {[s.value for s in self.available_sources]}")
-    
+
     def _get_default_source(self) -> ChinaDataSource:
         """获取默认数据源"""
         # 从环境变量获取
         env_source = os.getenv('DEFAULT_CHINA_DATA_SOURCE', 'tushare').lower()
-        
+
         # 映射到枚举
         source_mapping = {
             'tushare': ChinaDataSource.TUSHARE,
@@ -53,8 +56,136 @@ class DataSourceManager:
             'baostock': ChinaDataSource.BAOSTOCK,
             'tdx': ChinaDataSource.TDX
         }
-        
+
         return source_mapping.get(env_source, ChinaDataSource.TUSHARE)
+
+    # ==================== Tushare数据接口 ====================
+
+    def get_china_stock_data_tushare(self, symbol: str, start_date: str, end_date: str) -> str:
+        """
+        使用Tushare获取中国A股历史数据
+
+        Args:
+            symbol: 股票代码
+            start_date: 开始日期
+            end_date: 结束日期
+
+        Returns:
+            str: 格式化的股票数据报告
+        """
+        # 临时切换到Tushare数据源
+        original_source = self.current_source
+        self.current_source = ChinaDataSource.TUSHARE
+
+        try:
+            result = self._get_tushare_data(symbol, start_date, end_date)
+            return result
+        finally:
+            # 恢复原始数据源
+            self.current_source = original_source
+
+    def search_china_stocks_tushare(self, keyword: str) -> str:
+        """
+        使用Tushare搜索中国股票
+
+        Args:
+            keyword: 搜索关键词
+
+        Returns:
+            str: 搜索结果
+        """
+        try:
+            from .tushare_adapter import get_tushare_adapter
+
+            logger.debug(f"🔍 [Tushare] 搜索股票: {keyword}")
+
+            adapter = get_tushare_adapter()
+            results = adapter.search_stocks(keyword)
+
+            if results is not None and not results.empty:
+                result = f"搜索关键词: {keyword}\n"
+                result += f"找到 {len(results)} 只股票:\n\n"
+
+                # 显示前10个结果
+                for idx, row in results.head(10).iterrows():
+                    result += f"代码: {row.get('symbol', '')}\n"
+                    result += f"名称: {row.get('name', '未知')}\n"
+                    result += f"行业: {row.get('industry', '未知')}\n"
+                    result += f"地区: {row.get('area', '未知')}\n"
+                    result += f"上市日期: {row.get('list_date', '未知')}\n"
+                    result += "-" * 30 + "\n"
+
+                return result
+            else:
+                return f"❌ 未找到匹配'{keyword}'的股票"
+
+        except Exception as e:
+            logger.error(f"❌ [Tushare] 搜索股票失败: {e}")
+            return f"❌ 搜索股票失败: {e}"
+
+    def get_china_stock_fundamentals_tushare(self, symbol: str) -> str:
+        """
+        使用Tushare获取中国股票基本面数据
+
+        Args:
+            symbol: 股票代码
+
+        Returns:
+            str: 基本面分析报告
+        """
+        try:
+            from .tushare_adapter import get_tushare_adapter
+
+            logger.debug(f"📊 [Tushare] 获取{symbol}基本面数据...")
+
+            adapter = get_tushare_adapter()
+            fundamentals = adapter.get_fundamentals(symbol)
+
+            if fundamentals:
+                return fundamentals
+            else:
+                return f"❌ 未获取到{symbol}的基本面数据"
+
+        except Exception as e:
+            logger.error(f"❌ [Tushare] 获取基本面数据失败: {e}")
+            return f"❌ 获取{symbol}基本面数据失败: {e}"
+
+    def get_china_stock_info_tushare(self, symbol: str) -> str:
+        """
+        使用Tushare获取中国股票基本信息
+
+        Args:
+            symbol: 股票代码
+
+        Returns:
+            str: 股票基本信息
+        """
+        try:
+            from .tushare_adapter import get_tushare_adapter
+
+            logger.debug(f"📊 [Tushare] 获取{symbol}股票信息...")
+
+            adapter = get_tushare_adapter()
+            stock_info = adapter.get_stock_info(symbol)
+
+            if stock_info:
+                result = f"📊 {stock_info.get('name', '未知')}({symbol}) - 股票信息\n"
+                result += f"股票代码: {stock_info.get('symbol', symbol)}\n"
+                result += f"股票名称: {stock_info.get('name', '未知')}\n"
+                result += f"所属行业: {stock_info.get('industry', '未知')}\n"
+                result += f"所属地区: {stock_info.get('area', '未知')}\n"
+                result += f"上市日期: {stock_info.get('list_date', '未知')}\n"
+                result += f"市场类型: {stock_info.get('market', '未知')}\n"
+                result += f"交易所: {stock_info.get('exchange', '未知')}\n"
+                result += f"货币单位: {stock_info.get('curr_type', 'CNY')}\n"
+
+                return result
+            else:
+                return f"❌ 未获取到{symbol}的股票信息"
+
+        except Exception as e:
+            logger.error(f"❌ [Tushare] 获取股票信息失败: {e}", exc_info=True)
+            return f"❌ 获取{symbol}股票信息失败: {e}"
     
     def _check_available_sources(self) -> List[ChinaDataSource]:
         """检查可用的数据源"""
@@ -261,7 +392,7 @@ class DataSourceManager:
             return self._try_fallback_sources(symbol, start_date, end_date)
     
     def _get_tushare_data(self, symbol: str, start_date: str, end_date: str) -> str:
-        """使用Tushare获取数据"""
+        """使用Tushare获取数据 - 直接调用适配器，避免循环调用"""
         logger.debug(f"📊 [Tushare] 调用参数: symbol={symbol}, start_date={start_date}, end_date={end_date}")
 
         # 添加详细的股票代码追踪日志
@@ -273,11 +404,44 @@ class DataSourceManager:
 
         start_time = time.time()
         try:
-            from .interface import get_china_stock_data_tushare
-            logger.info(f"🔍 [股票代码追踪] 调用 get_china_stock_data_tushare，传入参数: symbol='{symbol}'")
-            logger.info(f"🔍 [DataSourceManager详细日志] 开始调用interface.get_china_stock_data_tushare...")
+            # 直接调用适配器，避免循环调用interface
+            from .tushare_adapter import get_tushare_adapter
+            logger.info(f"🔍 [股票代码追踪] 调用 tushare_adapter，传入参数: symbol='{symbol}'")
+            logger.info(f"🔍 [DataSourceManager详细日志] 开始调用tushare_adapter...")
 
-            result = get_china_stock_data_tushare(symbol, start_date, end_date)
+            adapter = get_tushare_adapter()
+            data = adapter.get_stock_data(symbol, start_date, end_date)
+
+            if data is not None and not data.empty:
+                # 获取股票基本信息
+                stock_info = adapter.get_stock_info(symbol)
+                stock_name = stock_info.get('name', f'股票{symbol}') if stock_info else f'股票{symbol}'
+
+                # 计算最新价格和涨跌幅
+                latest_data = data.iloc[-1]
+                latest_price = latest_data.get('close', 0)
+                prev_close = data.iloc[-2].get('close', latest_price) if len(data) > 1 else latest_price
+                change = latest_price - prev_close
+                change_pct = (change / prev_close * 100) if prev_close != 0 else 0
+
+                # 格式化数据报告
+                result = f"📊 {stock_name}({symbol}) - Tushare数据\n"
+                result += f"数据期间: {start_date} 至 {end_date}\n"
+                result += f"数据条数: {len(data)}条\n\n"
+
+                result += f"💰 最新价格: ¥{latest_price:.2f}\n"
+                result += f"📈 涨跌额: {change:+.2f} ({change_pct:+.2f}%)\n\n"
+
+                # 添加统计信息
+                result += f"📊 价格统计:\n"
+                result += f"   最高价: ¥{data['high'].max():.2f}\n"
+                result += f"   最低价: ¥{data['low'].min():.2f}\n"
+                result += f"   平均价: ¥{data['close'].mean():.2f}\n"
+                result += f"   成交量: {data['volume'].sum():,.0f}股\n"
+
+                return result
+            else:
+                result = f"❌ 未获取到{symbol}的有效数据"
 
             duration = time.time() - start_time
             logger.info(f"🔍 [DataSourceManager详细日志] interface调用完成，耗时: {duration:.3f}秒")
@@ -647,3 +811,14 @@ def get_china_stock_info_unified(symbol: str) -> Dict:
     """
     manager = get_data_source_manager()
     return manager.get_stock_info(symbol)
+
+
+# 全局数据源管理器实例
+_data_source_manager = None
+
+def get_data_source_manager() -> DataSourceManager:
+    """获取全局数据源管理器实例"""
+    global _data_source_manager
+    if _data_source_manager is None:
+        _data_source_manager = DataSourceManager()
+    return _data_source_manager
