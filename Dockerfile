@@ -35,7 +35,17 @@ RUN echo '#!/bin/bash\nXvfb :99 -screen 0 1024x768x24 -ac +extension GLX &\nexpo
 
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
+#多源轮询安装依赖
+RUN set -e; \
+    for src in \
+        https://mirrors.aliyun.com/pypi/simple \
+        https://pypi.tuna.tsinghua.edu.cn/simple \
+        https://pypi.doubanio.com/simple \
+        https://pypi.org/simple; do \
+      echo "Try installing from $src"; \
+      pip install --no-cache-dir -r requirements.txt -i $src && break; \
+      echo "Failed at $src, try next"; \
+    done
 
 # 复制日志配置文件
 COPY config/ ./config/
