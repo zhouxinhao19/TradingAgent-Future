@@ -13,6 +13,8 @@ __pycache__/
 .env.*.local
 .env.db
 .env.mongodb*
+frontend
+backend
 
 # 系统文件
 .DS_Store
