@@ -46,8 +46,8 @@ class DataSourceManager:
 
     def _get_default_source(self) -> ChinaDataSource:
         """获取默认数据源"""
-        # 从环境变量获取
-        env_source = os.getenv('DEFAULT_CHINA_DATA_SOURCE', 'tushare').lower()
+        # 从环境变量获取，默认使用AKShare作为第一优先级数据源
+        env_source = os.getenv('DEFAULT_CHINA_DATA_SOURCE', 'akshare').lower()
 
         # 映射到枚举
         source_mapping = {
@@ -57,7 +57,7 @@ class DataSourceManager:
             'tdx': ChinaDataSource.TDX
         }
 
-        return source_mapping.get(env_source, ChinaDataSource.TUSHARE)
+        return source_mapping.get(env_source, ChinaDataSource.AKSHARE)
 
     # ==================== Tushare数据接口 ====================
 
@@ -520,10 +520,10 @@ class DataSourceManager:
         """尝试备用数据源 - 避免递归调用"""
         logger.error(f"🔄 {self.current_source.value}失败，尝试备用数据源...")
 
-        # 备用数据源优先级: Tushare > AKShare > BaoStock > TDX
+        # 备用数据源优先级: AKShare > Tushare > BaoStock > TDX
         fallback_order = [
-            ChinaDataSource.TUSHARE,
             ChinaDataSource.AKSHARE,
+            ChinaDataSource.TUSHARE,
             ChinaDataSource.BAOSTOCK,
             ChinaDataSource.TDX
         ]

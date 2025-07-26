@@ -108,8 +108,8 @@ DEFAULT_CONFIG = {
     # ===== 数据源配置 =====
     "data_sources": {
         "china": {
-            "primary": "tushare",
-            "fallback": ["akshare", "baostock"],
+            "primary": "akshare",
+            "fallback": ["tushare", "baostock"],
             "timeout": 30,
             "retry_count": 3
         },
