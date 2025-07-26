@@ -437,7 +437,9 @@ class DataSourceManager:
                 result += f"   最高价: ¥{data['high'].max():.2f}\n"
                 result += f"   最低价: ¥{data['low'].min():.2f}\n"
                 result += f"   平均价: ¥{data['close'].mean():.2f}\n"
-                result += f"   成交量: {data['volume'].sum():,.0f}股\n"
+                # 防御性获取成交量数据
+                volume_value = self._get_volume_safely(data)
+                result += f"   成交量: {volume_value:,.0f}股\n"
 
                 return result
             else:
@@ -516,6 +518,25 @@ class DataSourceManager:
         from .tdx_utils import get_china_stock_data
         return get_china_stock_data(symbol, start_date, end_date)
     
+    def _get_volume_safely(self, data) -> float:
+        """安全地获取成交量数据，支持多种列名"""
+        try:
+            # 支持多种可能的成交量列名
+            volume_columns = ['volume', 'vol', 'turnover', 'trade_volume']
+
+            for col in volume_columns:
+                if col in data.columns:
+                    logger.info(f"✅ 找到成交量列: {col}")
+                    return data[col].sum()
+
+            # 如果都没找到，记录警告并返回0
+            logger.warning(f"⚠️ 未找到成交量列，可用列: {list(data.columns)}")
+            return 0
+
+        except Exception as e:
+            logger.error(f"❌ 获取成交量失败: {e}")
+            return 0
+
     def _try_fallback_sources(self, symbol: str, start_date: str, end_date: str) -> str:
         """尝试备用数据源 - 避免递归调用"""
         logger.error(f"🔄 {self.current_source.value}失败，尝试备用数据源...")
