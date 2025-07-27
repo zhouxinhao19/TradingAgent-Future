@@ -764,7 +764,7 @@ def render_sidebar():
         st.info(f"""
         **版本**: cn-0.1.11
         **框架**: Streamlit + LangGraph
-        **AI模型**: {final_provider.upper()} - {final_model}
+        **AI模型**: {st.session_state.llm_provider.upper()} - {st.session_state.llm_model}
         **数据源**: Tushare + FinnHub API
         """)
         
