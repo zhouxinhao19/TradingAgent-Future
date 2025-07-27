@@ -762,9 +762,9 @@ def render_sidebar():
         st.markdown("**ℹ️ 系统信息**")
         
         st.info(f"""
-        **版本**: 1.0.0
+        **版本**: cn-0.1.11
         **框架**: Streamlit + LangGraph
-        **AI模型**: {llm_provider.upper()} - {llm_model}
+        **AI模型**: {final_provider.upper()} - {final_model}
         **数据源**: Tushare + FinnHub API
         """)
         
