@@ -4,6 +4,122 @@
 
 本指南提供TradingAgents-CN各版本之间的升级方法，确保用户能够安全、顺利地升级到最新版本。
 
+## 🚀 v0.1.12 升级指南 (2025-07-29)
+
+### 🎯 升级亮点
+
+- **智能新闻分析模块**: AI驱动的新闻过滤、质量评估、相关性分析
+- **多层次新闻过滤**: 智能过滤器、增强过滤器、统一新闻工具
+- **技术修复优化**: DashScope适配器修复、DeepSeek死循环修复
+- **项目结构优化**: 文档分类整理、测试文件统一、根目录整洁
+
+### 📋 升级步骤
+
+#### 1. 从v0.1.11升级
+
+```bash
+# 1. 备份当前配置
+cp .env .env.backup.v0111
+
+# 2. 拉取最新代码
+git pull origin main
+
+# 3. 检查新的配置选项
+diff .env.example .env
+
+# 4. 重新启动应用
+streamlit run web/app.py
+```
+
+#### 2. 新增配置项
+
+v0.1.12新增以下可选配置，添加到您的`.env`文件：
+
+```env
+# 🧠 新闻过滤配置
+NEWS_FILTER_ENABLED=true
+NEWS_RELEVANCE_THRESHOLD=0.6
+NEWS_QUALITY_THRESHOLD=0.7
+NEWS_ENHANCED_FILTER_ENABLED=true
+NEWS_SENTIMENT_ANALYSIS_ENABLED=true
+NEWS_CACHE_ENABLED=true
+NEWS_CACHE_TTL=3600
+
+# 🔧 工具调用优化
+TOOL_CALL_RETRY_ENABLED=true
+TOOL_CALL_MAX_RETRIES=3
+TOOL_CALL_TIMEOUT=30
+
+# 📊 性能监控
+PERFORMANCE_MONITORING_ENABLED=true
+DEBUG_LOGGING_ENABLED=false
+```
+
+#### 3. 功能验证
+
+升级完成后，请验证以下功能：
+
+```bash
+# 1. 检查新闻过滤功能
+✅ 新闻分析模块正常工作
+
+# 2. 测试智能新闻过滤器
+✅ 新闻相关性评分功能
+
+# 3. 验证增强新闻过滤器
+✅ 情感分析和关键词提取
+
+# 4. 测试统一新闻工具
+✅ 多源新闻整合功能
+
+# 5. 验证技术修复
+✅ DashScope适配器工具调用正常
+✅ DeepSeek新闻分析师无死循环
+```
+
+#### 4. 兼容性说明
+
+- ✅ **完全向后兼容**: v0.1.11的所有配置继续有效
+- ✅ **无需数据迁移**: 现有数据和缓存无需处理
+- ✅ **API密钥复用**: 现有的API密钥继续使用
+- ✅ **配置保持**: 所有现有设置保持不变
+- ✅ **新功能可选**: 新闻分析功能默认启用，可通过配置关闭
+
+#### 5. 新功能使用示例
+
+##### 智能新闻过滤
+```python
+from tradingagents.utils.news_filter import NewsFilter
+
+# 创建新闻过滤器
+filter = NewsFilter()
+
+# 过滤新闻
+filtered_news = filter.filter_news(
+    news_list=news_data,
+    stock_symbol="AAPL",
+    relevance_threshold=0.6,
+    quality_threshold=0.7
+)
+```
+
+##### 统一新闻工具
+```python
+from tradingagents.tools.unified_news_tool import UnifiedNewsTool
+
+# 创建新闻工具
+news_tool = UnifiedNewsTool()
+
+# 获取新闻
+news = news_tool.get_news(
+    symbol="000001",
+    limit=10,
+    days_back=7
+)
+```
+
+---
+
 ## 🚀 v0.1.11 升级指南 (2025-07-27)
 
 ### 🎯 升级亮点
