@@ -340,14 +340,36 @@ def get_simfin_income_statements(
 def get_google_news(
     query: Annotated[str, "Query to search with"],
     curr_date: Annotated[str, "Curr date in yyyy-mm-dd format"],
-    look_back_days: Annotated[int, "how many days to look back"],
+    look_back_days: Annotated[int, "how many days to look back"] = 7,
 ) -> str:
+    # 判断是否为A股查询
+    is_china_stock = False
+    if any(code in query for code in ['SH', 'SZ', 'XSHE', 'XSHG']) or query.isdigit() or (len(query) == 6 and query[:6].isdigit()):
+        is_china_stock = True
+    
+    # 尝试使用StockUtils判断
+    try:
+        from tradingagents.utils.stock_utils import StockUtils
+        market_info = StockUtils.get_market_info(query.split()[0])
+        if market_info['is_china']:
+            is_china_stock = True
+    except Exception:
+        # 如果StockUtils判断失败，使用上面的简单判断
+        pass
+    
+    # 对A股查询添加中文关键词
+    if is_china_stock:
+        logger.info(f"[Google新闻] 检测到A股查询: {query}，使用中文搜索")
+        if '股票' not in query and '股价' not in query and '公司' not in query:
+            query = f"{query} 股票 公司 财报 新闻"
+    
     query = query.replace(" ", "+")
 
     start_date = datetime.strptime(curr_date, "%Y-%m-%d")
     before = start_date - relativedelta(days=look_back_days)
     before = before.strftime("%Y-%m-%d")
 
+    logger.info(f"[Google新闻] 开始获取新闻，查询: {query}, 时间范围: {before} 至 {curr_date}")
     news_results = getNewsData(query, before, curr_date)
 
     news_str = ""
@@ -358,9 +380,11 @@ def get_google_news(
         )
 
     if len(news_results) == 0:
+        logger.warning(f"[Google新闻] 未找到相关新闻，查询: {query}")
         return ""
 
-    return f"## {query} Google News, from {before} to {curr_date}:\n\n{news_str}"
+    logger.info(f"[Google新闻] 成功获取 {len(news_results)} 条新闻，查询: {query}")
+    return f"## {query.replace('+', ' ')} Google News, from {before} to {curr_date}:\n\n{news_str}"
 
 
 def get_reddit_global_news(

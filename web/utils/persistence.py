@@ -34,7 +34,7 @@ class ModelPersistence:
                 'category': category,
                 'model': model
             })
-            logger.info(f"💾 [Persistence] 配置已保存: {config}")
+            logger.debug(f"💾 [Persistence] 配置已保存: {config}")
         except Exception as e:
             logger.warning(f"⚠️ [Persistence] URL参数保存失败: {e}")
     
@@ -49,7 +49,7 @@ class ModelPersistence:
                     'category': query_params.get('category', 'openai'),
                     'model': query_params.get('model', '')
                 }
-                logger.info(f"📥 [Persistence] 从URL加载配置: {config}")
+                logger.debug(f"📥 [Persistence] 从URL加载配置: {config}")
                 return config
         except Exception as e:
             logger.warning(f"⚠️ [Persistence] URL参数加载失败: {e}")
@@ -57,7 +57,7 @@ class ModelPersistence:
         # 然后尝试从session state加载
         if self.storage_key in st.session_state:
             config = st.session_state[self.storage_key]
-            logger.info(f"📥 [Persistence] 从Session State加载配置: {config}")
+            logger.debug(f"📥 [Persistence] 从Session State加载配置: {config}")
             return config
         
         # 返回默认配置
@@ -66,7 +66,7 @@ class ModelPersistence:
             'category': 'openai',
             'model': ''
         }
-        logger.info(f"📥 [Persistence] 使用默认配置: {default_config}")
+        logger.debug(f"📥 [Persistence] 使用默认配置: {default_config}")
         return default_config
     
     def clear_config(self):

@@ -7,6 +7,7 @@ AKShare数据源工具
 import pandas as pd
 from typing import Optional, Dict, Any
 import warnings
+from datetime import datetime
 
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
@@ -455,3 +456,87 @@ def format_hk_stock_data_akshare(symbol: str, data: pd.DataFrame, start_date: st
     except Exception as e:
         logger.error(f"❌ 格式化AKShare港股数据失败: {e}")
         return f"❌ AKShare港股数据格式化失败: {symbol}"
+
+
+def get_stock_news_em(symbol: str) -> pd.DataFrame:
+    """
+    使用AKShare获取东方财富个股新闻
+
+    Args:
+        symbol: 股票代码，如 "600000" 或 "300059"
+
+    Returns:
+        pd.DataFrame: 包含新闻标题、内容、日期和链接的DataFrame
+    """
+    start_time = datetime.now()
+    logger.info(f"[东方财富新闻] 开始获取股票 {symbol} 的东方财富新闻数据")
+    
+    try:
+        provider = get_akshare_provider()
+        if not provider.connected:
+            logger.error(f"[东方财富新闻] ❌ AKShare未连接，无法获取东方财富新闻")
+            return pd.DataFrame()
+
+        logger.info(f"[东方财富新闻] 📰 准备调用AKShare API获取个股新闻: {symbol}")
+
+        # 使用线程超时包装（兼容Windows）
+        import threading
+        import time
+
+        result = [None]
+        exception = [None]
+
+        def fetch_news():
+            try:
+                logger.debug(f"[东方财富新闻] 线程开始执行 stock_news_em API调用: {symbol}")
+                thread_start = time.time()
+                result[0] = provider.ak.stock_news_em(symbol=symbol)
+                thread_end = time.time()
+                logger.debug(f"[东方财富新闻] 线程执行完成，耗时: {thread_end - thread_start:.2f}秒")
+            except Exception as e:
+                logger.error(f"[东方财富新闻] 线程执行异常: {e}")
+                exception[0] = e
+
+        # 启动线程
+        thread = threading.Thread(target=fetch_news)
+        thread.daemon = True
+        logger.debug(f"[东方财富新闻] 启动线程获取新闻数据")
+        thread.start()
+
+        # 等待30秒
+        logger.debug(f"[东方财富新闻] 等待线程完成，最长等待30秒")
+        thread.join(timeout=30)
+
+        if thread.is_alive():
+            # 超时了
+            elapsed_time = (datetime.now() - start_time).total_seconds()
+            logger.warning(f"[东方财富新闻] ⚠️ 获取超时（30秒）: {symbol}，总耗时: {elapsed_time:.2f}秒")
+            raise Exception(f"东方财富个股新闻获取超时（30秒）: {symbol}")
+        elif exception[0]:
+            # 有异常
+            elapsed_time = (datetime.now() - start_time).total_seconds()
+            logger.error(f"[东方财富新闻] ❌ API调用异常: {exception[0]}，总耗时: {elapsed_time:.2f}秒")
+            raise exception[0]
+        else:
+            # 成功
+            news_df = result[0]
+
+        if news_df is not None and not news_df.empty:
+            news_count = len(news_df)
+            elapsed_time = (datetime.now() - start_time).total_seconds()
+            
+            # 记录一些新闻标题示例
+            sample_titles = [row.get('标题', '无标题') for _, row in news_df.head(3).iterrows()]
+            logger.info(f"[东方财富新闻] 新闻标题示例: {', '.join(sample_titles)}")
+            
+            logger.info(f"[东方财富新闻] ✅ 获取成功: {symbol}, 共{news_count}条记录，耗时: {elapsed_time:.2f}秒")
+            return news_df
+        else:
+            elapsed_time = (datetime.now() - start_time).total_seconds()
+            logger.warning(f"[东方财富新闻] ⚠️ 数据为空: {symbol}，API返回成功但无数据，耗时: {elapsed_time:.2f}秒")
+            return pd.DataFrame()
+
+    except Exception as e:
+        elapsed_time = (datetime.now() - start_time).total_seconds()
+        logger.error(f"[东方财富新闻] ❌ 获取失败: {symbol}, 错误: {e}, 耗时: {elapsed_time:.2f}秒")
+        return pd.DataFrame()

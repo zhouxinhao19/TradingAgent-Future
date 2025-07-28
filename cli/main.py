@@ -1313,6 +1313,11 @@ def run_analysis():
                     if "sentiment_report" not in completed_analysts:
                         ui.show_success("💭 情感分析完成")
                         completed_analysts.add("sentiment_report")
+                        # 调试信息（写入日志文件）
+                        logger.info(f"首次显示情感分析完成提示，已完成分析师: {completed_analysts}")
+                    else:
+                        # 调试信息（写入日志文件）
+                        logger.debug(f"跳过重复的情感分析完成提示，已完成分析师: {completed_analysts}")
 
                     message_buffer.update_report_section(
                         "sentiment_report", chunk["sentiment_report"]
@@ -1325,6 +1330,16 @@ def run_analysis():
                         )
 
                 if "news_report" in chunk and chunk["news_report"]:
+                    # 只在第一次完成时显示提示
+                    if "news_report" not in completed_analysts:
+                        ui.show_success("📰 新闻分析完成")
+                        completed_analysts.add("news_report")
+                        # 调试信息（写入日志文件）
+                        logger.info(f"首次显示新闻分析完成提示，已完成分析师: {completed_analysts}")
+                    else:
+                        # 调试信息（写入日志文件）
+                        logger.debug(f"跳过重复的新闻分析完成提示，已完成分析师: {completed_analysts}")
+
                     message_buffer.update_report_section(
                         "news_report", chunk["news_report"]
                     )

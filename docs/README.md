@@ -47,6 +47,7 @@
 - [💾 模型选择持久化](./features/model-persistence.md) - URL参数存储，配置保持 (v0.1.11新增) ✨
 - [📄 报告导出功能](./features/report-export.md) - Word/PDF/Markdown多格式导出 (v0.1.7) ✨
 - [🐳 Docker容器化部署](./features/docker-deployment.md) - 一键部署完整环境 (v0.1.7) ✨
+- [📰 新闻分析系统](./features/news-analysis-system.md) - 多源实时新闻聚合与分析 ✨
 
 ### ⚙️ 配置与部署
 - [配置说明](./configuration/config-guide.md) - 配置文件详解 (v0.1.11更新) ✨
@@ -89,6 +90,7 @@
 - [Docker部署指南](./guides/docker-deployment-guide.md) - Docker容器化部署详细指南 (v0.1.7) ✨
 - [报告导出指南](./guides/report-export-guide.md) - 专业报告导出使用指南 (v0.1.7) ✨
 - [DeepSeek使用指南](./guides/deepseek-usage-guide.md) - DeepSeek V3模型使用指南 (v0.1.7) ✨
+- [新闻分析系统使用指南](./guides/news-analysis-guide.md) - 实时新闻获取与分析指南 ✨
 
 ### 💡 示例和教程
 - [基础示例](./examples/basic-examples.md) - 基本使用示例

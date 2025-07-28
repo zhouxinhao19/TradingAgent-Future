@@ -21,9 +21,9 @@ def render_analysis_form():
     # 调试信息（只在没有分析运行时记录，避免重复）
     if not st.session_state.get('analysis_running', False):
         if cached_config:
-            logger.info(f"📊 [配置恢复] 使用缓存配置: {cached_config}")
+            logger.debug(f"📊 [配置恢复] 使用缓存配置: {cached_config}")
         else:
-            logger.info("📊 [配置恢复] 使用默认配置")
+            logger.debug("📊 [配置恢复] 使用默认配置")
 
     # 创建表单
     with st.form("analysis_form", clear_on_submit=False):

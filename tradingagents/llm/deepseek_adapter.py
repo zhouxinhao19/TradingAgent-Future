@@ -143,6 +143,18 @@ class DeepSeekAdapter:
             logger.error(f"创建智能体失败: {e}")
             raise
     
+    def bind_tools(self, tools):
+        """
+        绑定工具到LLM
+        
+        Args:
+            tools: 工具列表
+            
+        Returns:
+            绑定了工具的LLM实例
+        """
+        return self.llm.bind_tools(tools)
+    
     def chat(
         self, 
         messages: List[BaseMessage], 
