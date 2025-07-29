@@ -579,14 +579,19 @@ def format_analysis_results(results):
     # 格式化状态信息
     formatted_state = {}
     
-    # 处理各个分析模块的结果
+    # 处理各个分析模块的结果 - 包含完整的智能体团队分析
     analysis_keys = [
         'market_report',
-        'fundamentals_report', 
+        'fundamentals_report',
         'sentiment_report',
         'news_report',
         'risk_assessment',
-        'investment_plan'
+        'investment_plan',
+        # 添加缺失的团队决策数据，确保与CLI端一致
+        'investment_debate_state',  # 研究团队辩论（多头/空头研究员）
+        'trader_investment_plan',   # 交易团队计划
+        'risk_debate_state',        # 风险管理团队决策
+        'final_trade_decision'      # 最终交易决策
     ]
     
     for key in analysis_keys:
