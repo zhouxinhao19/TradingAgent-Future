@@ -325,33 +325,48 @@ def render_detailed_analysis(state):
         }
     ]
     
-    # 创建标签页
-    tabs = st.tabs([f"{module['icon']} {module['title']}" for module in analysis_modules])
-    
-    for i, (tab, module) in enumerate(zip(tabs, analysis_modules)):
-        with tab:
-            if module['key'] in state and state[module['key']]:
-                st.markdown(f"*{module['description']}*")
-                
-                # 格式化显示内容
-                content = state[module['key']]
-                if isinstance(content, str):
-                    st.markdown(content)
-                elif isinstance(content, dict):
-                    # 特殊处理团队决策报告的字典结构
-                    if module['key'] == 'investment_debate_state':
-                        render_investment_debate_content(content)
-                    elif module['key'] == 'risk_debate_state':
-                        render_risk_debate_content(content)
-                    else:
-                        # 普通字典格式化显示
-                        for key, value in content.items():
-                            st.subheader(key.replace('_', ' ').title())
-                            st.write(value)
-                else:
-                    st.write(content)
+    # 过滤出有数据的模块
+    available_modules = []
+    for module in analysis_modules:
+        if module['key'] in state and state[module['key']]:
+            # 检查字典类型的数据是否有实际内容
+            if isinstance(state[module['key']], dict):
+                # 对于字典，检查是否有非空的值
+                has_content = any(v for v in state[module['key']].values() if v)
+                if has_content:
+                    available_modules.append(module)
             else:
-                st.info(f"暂无{module['title']}数据")
+                # 对于字符串或其他类型，直接添加
+                available_modules.append(module)
+
+    if not available_modules:
+        st.info("📋 暂无详细分析数据")
+        return
+
+    # 只为有数据的模块创建标签页
+    tabs = st.tabs([f"{module['icon']} {module['title']}" for module in available_modules])
+
+    for i, (tab, module) in enumerate(zip(tabs, available_modules)):
+        with tab:
+            st.markdown(f"*{module['description']}*")
+
+            # 格式化显示内容
+            content = state[module['key']]
+            if isinstance(content, str):
+                st.markdown(content)
+            elif isinstance(content, dict):
+                # 特殊处理团队决策报告的字典结构
+                if module['key'] == 'investment_debate_state':
+                    render_investment_debate_content(content)
+                elif module['key'] == 'risk_debate_state':
+                    render_risk_debate_content(content)
+                else:
+                    # 普通字典格式化显示
+                    for key, value in content.items():
+                        st.subheader(key.replace('_', ' ').title())
+                        st.write(value)
+            else:
+                st.write(content)
 
 def render_investment_debate_content(content):
     """渲染研究团队决策内容"""
