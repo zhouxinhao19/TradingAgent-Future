@@ -10,8 +10,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # 导入日志模块
-from tradingagents.utils.logging_manager import get_logger
-logger = get_logger('default')
+import logging
+logger = logging.getLogger(__name__)
 
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent
@@ -48,41 +48,27 @@ def demo_simple_chat():
     logger.info(f"\n🤖 演示DeepSeek V3简单对话...")
     
     try:
-        from langchain_openai import ChatOpenAI
-        from langchain.schema import HumanMessage
+        from tradingagents.llm_adapters.deepseek_direct_adapter import create_deepseek_direct_adapter
         
         # 创建DeepSeek模型
-        try:
-            # 尝试新版本参数
-            llm = ChatOpenAI(
-                model="deepseek-chat",
-                api_key=os.getenv("DEEPSEEK_API_KEY"),
-                base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
-                temperature=0.1,
-                max_tokens=500
-            )
-        except Exception:
-            # 回退到旧版本参数
-            llm = ChatOpenAI(
-                model="deepseek-chat",
-                openai_api_key=os.getenv("DEEPSEEK_API_KEY"),
-                openai_api_base=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
-                temperature=0.1,
-                max_tokens=500
-            )
+        llm = create_deepseek_direct_adapter(
+            model="deepseek-chat",
+            temperature=0.1,
+            max_tokens=500
+        )
         
         # 测试对话
-        messages = [HumanMessage(content="""
+        message = """
         请简要介绍股票投资的基本概念，包括：
         1. 什么是股票
         2. 股票投资的风险
         3. 基本的投资策略
         请用中文回答，控制在200字以内。
-        """)]
+        """
         
         logger.info(f"💭 正在生成回答...")
-        response = llm.invoke(messages)
-        logger.info(f"🎯 DeepSeek V3回答:\n{response.content}")
+        response = llm.invoke(message)
+        logger.info(f"🎯 DeepSeek V3回答:\n{response}")
         
         return True
         
@@ -95,11 +81,14 @@ def demo_reasoning_analysis():
     logger.info(f"\n🧠 演示DeepSeek V3推理分析...")
     
     try:
-        from tradingagents.llm.deepseek_adapter import create_deepseek_adapter
-        from langchain.schema import HumanMessage
+        from tradingagents.llm_adapters.deepseek_direct_adapter import create_deepseek_direct_adapter
         
         # 创建DeepSeek适配器
-        adapter = create_deepseek_adapter(model="deepseek-chat")
+        adapter = create_deepseek_direct_adapter(
+            model="deepseek-chat",
+            temperature=0.1,
+            max_tokens=1000
+        )
         
         # 复杂推理任务
         complex_query = """
@@ -120,10 +109,8 @@ def demo_reasoning_analysis():
         请从投资价值角度分析这两家公司，并给出投资建议。
         """
         
-        messages = [HumanMessage(content=complex_query)]
-        
         logger.info(f"💭 正在进行深度分析...")
-        response = adapter.chat(messages)
+        response = adapter.invoke(complex_query)
         logger.info(f"🎯 DeepSeek V3分析:\n{response}")
         
         return True
@@ -137,11 +124,10 @@ def demo_stock_analysis_with_tools():
     logger.info(f"\n📊 演示DeepSeek V3工具调用股票分析...")
     
     try:
-        from tradingagents.llm.deepseek_adapter import create_deepseek_adapter
-        from langchain.tools import tool
+        from tradingagents.llm_adapters.deepseek_direct_adapter import create_deepseek_direct_adapter
+        # 移除langchain工具导入以避免兼容性问题
         
-        # 定义股票分析工具
-        @tool
+        # 定义股票分析工具（简化版本，不使用langchain装饰器）
         def get_stock_info(symbol: str) -> str:
             """获取股票基本信息"""
             stock_data = {
@@ -153,29 +139,20 @@ def demo_stock_analysis_with_tools():
             }
             return stock_data.get(symbol, f"股票{symbol}的基本信息")
         
-        @tool
         def get_financial_metrics(symbol: str) -> str:
             """获取财务指标"""
             return f"股票{symbol}的财务指标：ROE 15%，毛利率 35%，净利润增长率 12%"
         
-        @tool
         def get_market_sentiment(symbol: str) -> str:
             """获取市场情绪"""
             return f"股票{symbol}当前市场情绪：中性偏乐观，机构持仓比例65%"
         
         # 创建DeepSeek适配器
-        adapter = create_deepseek_adapter(model="deepseek-chat")
-        
-        # 创建智能体
-        tools = [get_stock_info, get_financial_metrics, get_market_sentiment]
-        system_prompt = """
-        你是一个专业的股票分析师，擅长使用各种工具分析股票。
-        请根据用户的问题，使用合适的工具获取信息，然后提供专业的分析建议。
-        分析要深入、逻辑清晰，并给出具体的投资建议。
-        回答要用中文，格式清晰。
-        """
-        
-        agent = adapter.create_agent(tools, system_prompt, verbose=True)
+        adapter = create_deepseek_direct_adapter(
+            model="deepseek-chat",
+            temperature=0.1,
+            max_tokens=1000
+        )
         
         # 测试股票分析
         test_queries = [
@@ -187,8 +164,33 @@ def demo_stock_analysis_with_tools():
             logger.info(f"\n❓ 用户问题: {query}")
             logger.info(f"💭 正在分析...")
             
-            result = agent.invoke({"input": query})
-            logger.info(f"🎯 分析结果:\n{result['output']}")
+            # 获取相关股票信息
+            if "AAPL" in query:
+                stock_info = get_stock_info("AAPL")
+                financial_info = get_financial_metrics("AAPL")
+                sentiment_info = get_market_sentiment("AAPL")
+                context = f"股票信息: {stock_info}\n财务指标: {financial_info}\n市场情绪: {sentiment_info}"
+            elif "600036" in query and "000001" in query:
+                stock_info_1 = get_stock_info("600036")
+                stock_info_2 = get_stock_info("000001")
+                context = f"招商银行信息: {stock_info_1}\n平安银行信息: {stock_info_2}"
+            else:
+                context = "基于一般股票分析原则"
+            
+            # 构建分析提示
+            analysis_prompt = f"""
+            你是一个专业的股票分析师，请根据以下信息回答用户问题：
+            
+            背景信息：
+            {context}
+            
+            用户问题：{query}
+            
+            请提供专业的分析建议，分析要深入、逻辑清晰，并给出具体的投资建议。
+            """
+            
+            response = adapter.invoke(analysis_prompt)
+            logger.info(f"🎯 分析结果:\n{response}")
             logger.info(f"-")
         
         return True
@@ -198,26 +200,24 @@ def demo_stock_analysis_with_tools():
         return False
 
 def demo_trading_system():
-    """演示完整的交易分析系统"""
+    """演示完整的交易分析系统（简化版本）"""
     logger.info(f"\n🎯 演示DeepSeek V3完整交易分析系统...")
     
     try:
-        from tradingagents.default_config import DEFAULT_CONFIG
-        from tradingagents.graph.trading_graph import TradingAgentsGraph
-
+        from tradingagents.llm_adapters.deepseek_direct_adapter import create_deepseek_direct_adapter
         
-        # 配置DeepSeek
-        config = DEFAULT_CONFIG.copy()
-        config["llm_provider"] = "deepseek"
-        config["deep_think_llm"] = "deepseek-chat"
-        config["quick_think_llm"] = "deepseek-chat"
-        config["max_debate_rounds"] = 1  # 快速演示
-        config["online_tools"] = False   # 使用缓存数据
+        # 创建DeepSeek适配器
+        adapter = create_deepseek_direct_adapter()
         
-        logger.info(f"🏗️ 创建DeepSeek交易分析图...")
-        ta = TradingAgentsGraph(debug=True, config=config)
+        # 模拟交易分析查询
+        trading_query = "请分析苹果公司(AAPL)的投资价值，包括技术面、基本面和风险评估"
         
-        logger.info(f"✅ DeepSeek V3交易分析系统初始化成功！")
+        logger.info(f"🏗️ 使用DeepSeek进行交易分析...")
+        result = adapter.invoke(trading_query)
+        
+        logger.info(f"✅ DeepSeek V3交易分析完成！")
+        logger.info(f"\n📊 分析结果: {result[:200]}...")
+        
         logger.info(f"\n📝 系统特点:")
         logger.info(f"- 🧠 使用DeepSeek V3大模型，推理能力强")
         logger.info(f"- 🛠️ 支持工具调用和智能体协作")

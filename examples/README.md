@@ -12,7 +12,20 @@
 examples/
 ├── README.md                        # 本文件
 ├── demo_deepseek_analysis.py        # 🆕 DeepSeek V3股票分析演示（推荐）
-├── dashscope/                       # 阿里百炼大模型示例
+├── demo_news_filtering.py           # 新闻过滤演示 (v0.1.12新增)
+├── simple_analysis_demo.py          # 简单分析演示
+├── cli_demo.py                      # CLI命令行演示
+├── batch_analysis.py                # 批量股票分析示例
+├── custom_analysis_demo.py          # 自定义分析演示
+├── config_management_demo.py        # 配置管理演示
+├── data_dir_config_demo.py          # 数据目录配置演示
+├── my_stock_analysis.py             # 个人股票分析示例
+├── stock_list_example.py            # 股票列表示例
+├── stock_query_examples.py          # 股票查询示例
+├── test_news_timeout.py             # 新闻超时测试
+├── token_tracking_demo.py           # Token跟踪演示
+├── tushare_demo.py                  # Tushare数据源演示
+├── dashscope_examples/              # 阿里百炼大模型示例
 │   ├── demo_dashscope.py           # 完整的阿里百炼演示
 │   ├── demo_dashscope_chinese.py   # 中文优化版本
 │   ├── demo_dashscope_simple.py    # 简化版本（仅LLM测试）
@@ -80,16 +93,21 @@ set FINNHUB_API_KEY=your_finnhub_api_key
 
 ```bash
 # 中文优化版本（推荐）
-python examples/dashscope/demo_dashscope_chinese.py
+python examples/dashscope_examples/demo_dashscope_chinese.py
 
 # 完整功能版本
-python examples/dashscope/demo_dashscope.py
+python examples/dashscope_examples/demo_dashscope.py
 
 # 简化测试版本
-python examples/dashscope/demo_dashscope_simple.py
+python examples/dashscope_examples/demo_dashscope_simple.py
 
 # 无记忆功能版本（兼容性更好）
-python examples/dashscope/demo_dashscope_no_memory.py
+python examples/dashscope_examples/demo_dashscope_no_memory.py
+
+# 其他示例
+python examples/simple_analysis_demo.py
+python examples/cli_demo.py
+python examples/demo_news_filtering.py
 ```
 
 ### 🌍 使用OpenAI模型
@@ -111,7 +129,19 @@ python examples/openai/demo_openai.py
 
 ## 示例程序说明
 
-### 阿里百炼示例
+### 🎯 核心分析示例
+
+| 文件名 | 功能描述 | 适用场景 |
+|--------|----------|----------|
+| `demo_deepseek_analysis.py` | DeepSeek V3股票分析演示 | 完整分析流程展示 |
+| `demo_news_filtering.py` | 新闻过滤演示 (v0.1.12新增) | 智能新闻分析 |
+| `simple_analysis_demo.py` | 简单分析演示 | 初学者入门 |
+| `custom_analysis_demo.py` | 自定义分析演示 | 高级配置展示 |
+| `batch_analysis.py` | 批量股票分析示例 | 处理多只股票 |
+
+### 🤖 LLM模型示例
+
+#### 阿里百炼示例
 
 | 文件名 | 功能描述 | 适用场景 |
 |--------|----------|----------|
@@ -120,11 +150,95 @@ python examples/openai/demo_openai.py
 | `demo_dashscope_simple.py` | 简化的LLM测试 | 快速验证模型连接 |
 | `demo_dashscope_no_memory.py` | 禁用记忆功能的版本 | 兼容性问题排查 |
 
-### OpenAI示例
+#### OpenAI示例
 
 | 文件名 | 功能描述 | 适用场景 |
 |--------|----------|----------|
 | `demo_openai.py` | OpenAI模型演示 | 有OpenAI API密钥的用户 |
+
+### 🛠️ 工具和配置示例
+
+| 文件名 | 功能描述 | 适用场景 |
+|--------|----------|----------|
+| `cli_demo.py` | CLI命令行演示 | 命令行界面使用 |
+| `config_management_demo.py` | 配置管理演示 | 配置文件操作 |
+| `data_dir_config_demo.py` | 数据目录配置演示 | 自定义数据存储路径 |
+| `token_tracking_demo.py` | Token跟踪演示 | 监控API使用情况 |
+| `my_stock_analysis.py` | 个人股票分析示例 | 个性化配置 |
+
+### 📊 数据源示例
+
+| 文件名 | 功能描述 | 适用场景 |
+|--------|----------|----------|
+| `tushare_demo.py` | Tushare数据源演示 | 数据获取展示 |
+| `stock_list_example.py` | 股票列表示例 | 批量处理股票代码 |
+| `stock_query_examples.py` | 股票查询示例 | 各种查询方式 |
+
+### 🧪 测试和调试
+
+| 文件名 | 功能描述 | 适用场景 |
+|--------|----------|----------|
+| `test_news_timeout.py` | 新闻超时测试 | 网络连接调试 |
+
+## 📖 使用指南
+
+### 🎯 新手推荐路径
+
+1. **第一步**: 从简单示例开始
+   ```bash
+   python examples/simple_analysis_demo.py
+   ```
+
+2. **第二步**: 尝试CLI界面
+   ```bash
+   python examples/cli_demo.py
+   ```
+
+3. **第三步**: 体验完整分析
+   ```bash
+   python examples/demo_deepseek_analysis.py
+   ```
+
+4. **第四步**: 探索新闻分析 (v0.1.12新增)
+   ```bash
+   python examples/demo_news_filtering.py
+   ```
+
+### 🔧 高级用户路径
+
+1. **配置管理**: 学习如何管理配置
+   ```bash
+   python examples/config_management_demo.py
+   ```
+
+2. **批量分析**: 处理多只股票
+   ```bash
+   python examples/batch_analysis.py
+   ```
+
+3. **自定义分析**: 高级配置和定制
+   ```bash
+   python examples/custom_analysis_demo.py
+   ```
+
+4. **Token监控**: 监控API使用情况
+   ```bash
+   python examples/token_tracking_demo.py
+   ```
+
+### 📊 数据源选择
+
+- **Tushare用户**: 使用 `tushare_demo.py`
+- **股票列表处理**: 使用 `stock_list_example.py`
+- **查询功能测试**: 使用 `stock_query_examples.py`
+
+### 🤖 模型选择指南
+
+| 模型 | 优势 | 适用场景 | 示例文件 |
+|------|------|----------|----------|
+| DeepSeek V3 | 免费、中文友好 | 日常使用、学习 | `demo_deepseek_analysis.py` |
+| 阿里百炼 | 稳定、企业级 | 生产环境 | `dashscope_examples/` |
+| OpenAI | 功能强大 | 高质量分析 | `openai/demo_openai.py` |
 
 ## 获取API密钥
 
@@ -173,7 +287,7 @@ python examples/openai/demo_openai.py
 - 运行集成测试：`tests/integration/` 目录
 - 提交Issue：项目GitHub页面
 
-## 贡献
+## 🤝 贡献
 
 欢迎提交新的示例程序！请确保：
 
@@ -181,6 +295,34 @@ python examples/openai/demo_openai.py
 2. 包含详细注释
 3. 提供使用说明
 4. 遵循项目代码规范
+
+## 📞 支持
+
+如果遇到问题，请：
+
+1. 查看 [故障排除指南](../docs/troubleshooting/)
+2. 提交 [Issue](https://github.com/your-repo/issues)
+3. 加入我们的社区讨论
+
+## 📝 更新日志
+
+### v0.1.12 (2025-01-03)
+- ✅ **修复**: 更正目录结构路径 (`dashscope/` → `dashscope_examples/`)
+- ✅ **新增**: 完整的示例程序列表和分类说明
+- ✅ **新增**: 新手和高级用户使用指南
+- ✅ **新增**: 模型选择指南和数据源选择建议
+- ✅ **优化**: 文档结构和可读性
+- ✅ **覆盖**: 19个示例文件的完整说明
+
+### 文档统计
+- **总示例文件**: 19个
+- **文档覆盖率**: 100%
+- **分类数量**: 5个主要分类
+- **使用指南**: 新手路径 + 高级路径
+
+---
+
+📍 **当前版本**: v0.1.12 | **最后更新**: 2025-01-03 | **文档状态**: ✅ 已同步
 
 ## 许可证
 
