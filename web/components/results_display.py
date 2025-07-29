@@ -245,7 +245,7 @@ def render_detailed_analysis(state):
     
     st.subheader("📋 详细分析报告")
     
-    # 定义分析模块
+    # 定义分析模块 - 包含完整的团队决策报告，与CLI端保持一致
     analysis_modules = [
         {
             'key': 'market_report',
@@ -254,21 +254,21 @@ def render_detailed_analysis(state):
             'description': '技术指标、价格趋势、支撑阻力位分析'
         },
         {
-            'key': 'fundamentals_report', 
+            'key': 'fundamentals_report',
             'title': '💰 基本面分析',
             'icon': '💰',
             'description': '财务数据、估值水平、盈利能力分析'
         },
         {
             'key': 'sentiment_report',
-            'title': '💭 市场情绪分析', 
+            'title': '💭 市场情绪分析',
             'icon': '💭',
             'description': '投资者情绪、社交媒体情绪指标'
         },
         {
             'key': 'news_report',
             'title': '📰 新闻事件分析',
-            'icon': '📰', 
+            'icon': '📰',
             'description': '相关新闻事件、市场动态影响分析'
         },
         {
@@ -282,6 +282,31 @@ def render_detailed_analysis(state):
             'title': '📋 投资建议',
             'icon': '📋',
             'description': '具体投资策略、仓位管理建议'
+        },
+        # 添加团队决策报告模块
+        {
+            'key': 'investment_debate_state',
+            'title': '🔬 研究团队决策',
+            'icon': '🔬',
+            'description': '多头/空头研究员辩论分析，研究经理综合决策'
+        },
+        {
+            'key': 'trader_investment_plan',
+            'title': '💼 交易团队计划',
+            'icon': '💼',
+            'description': '专业交易员制定的具体交易执行计划'
+        },
+        {
+            'key': 'risk_debate_state',
+            'title': '⚖️ 风险管理团队',
+            'icon': '⚖️',
+            'description': '激进/保守/中性分析师风险评估，投资组合经理最终决策'
+        },
+        {
+            'key': 'final_trade_decision',
+            'title': '🎯 最终交易决策',
+            'icon': '🎯',
+            'description': '综合所有团队分析后的最终投资决策'
         }
     ]
     
@@ -298,14 +323,57 @@ def render_detailed_analysis(state):
                 if isinstance(content, str):
                     st.markdown(content)
                 elif isinstance(content, dict):
-                    # 如果是字典，格式化显示
-                    for key, value in content.items():
-                        st.subheader(key.replace('_', ' ').title())
-                        st.write(value)
+                    # 特殊处理团队决策报告的字典结构
+                    if module['key'] == 'investment_debate_state':
+                        render_investment_debate_content(content)
+                    elif module['key'] == 'risk_debate_state':
+                        render_risk_debate_content(content)
+                    else:
+                        # 普通字典格式化显示
+                        for key, value in content.items():
+                            st.subheader(key.replace('_', ' ').title())
+                            st.write(value)
                 else:
                     st.write(content)
             else:
                 st.info(f"暂无{module['title']}数据")
+
+def render_investment_debate_content(content):
+    """渲染研究团队决策内容"""
+    if content.get('bull_history'):
+        st.subheader("📈 多头研究员分析")
+        st.markdown(content['bull_history'])
+        st.markdown("---")
+
+    if content.get('bear_history'):
+        st.subheader("📉 空头研究员分析")
+        st.markdown(content['bear_history'])
+        st.markdown("---")
+
+    if content.get('judge_decision'):
+        st.subheader("🎯 研究经理综合决策")
+        st.markdown(content['judge_decision'])
+
+def render_risk_debate_content(content):
+    """渲染风险管理团队决策内容"""
+    if content.get('risky_history'):
+        st.subheader("🚀 激进分析师评估")
+        st.markdown(content['risky_history'])
+        st.markdown("---")
+
+    if content.get('safe_history'):
+        st.subheader("🛡️ 保守分析师评估")
+        st.markdown(content['safe_history'])
+        st.markdown("---")
+
+    if content.get('neutral_history'):
+        st.subheader("⚖️ 中性分析师评估")
+        st.markdown(content['neutral_history'])
+        st.markdown("---")
+
+    if content.get('judge_decision'):
+        st.subheader("🎯 投资组合经理最终决策")
+        st.markdown(content['judge_decision'])
 
 def render_risk_warning(is_demo=False):
     """渲染风险提示"""
