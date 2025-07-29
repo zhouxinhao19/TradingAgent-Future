@@ -65,7 +65,7 @@ def render_sidebar():
     .css-1d391kg,
     .css-1lcbmhc,
     .css-1cypcdb {
-        padding-top: 0.75rem !important;
+        padding-top: 0.2rem !important;
         padding-left: 0.5rem !important;
         padding-right: 0.5rem !important;
         padding-bottom: 0.75rem !important;
@@ -117,7 +117,7 @@ def render_sidebar():
     section[data-testid="stSidebar"] h3 {
         font-size: 1rem !important;
         margin-bottom: 0.5rem !important;
-        margin-top: 0.3rem !important;
+        margin-top: 0rem !important;
         padding: 0 !important;
     }
 
@@ -161,6 +161,26 @@ def render_sidebar():
     .css-1d391kg .element-container {
         padding-left: 0.5rem !important;
         padding-right: 0.5rem !important;
+    }
+
+    /* 减少侧边栏顶部空白 */
+    section[data-testid="stSidebar"] > div:first-child {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+
+    /* 减少第一个元素的顶部边距 */
+    section[data-testid="stSidebar"] .element-container:first-child {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+
+    /* 减少标题的顶部边距 */
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3 {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
     }
     </style>
     """, unsafe_allow_html=True)

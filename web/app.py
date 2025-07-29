@@ -12,13 +12,13 @@ import datetime
 import time
 from dotenv import load_dotenv
 
-# 导入日志模块
-from tradingagents.utils.logging_manager import get_logger
-logger = get_logger('web')
-
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
+
+# 导入日志模块
+from tradingagents.utils.logging_manager import get_logger
+logger = get_logger('web')
 
 # 加载环境变量
 load_dotenv(project_root / ".env", override=True)
@@ -28,12 +28,14 @@ from components.sidebar import render_sidebar
 from components.header import render_header
 from components.analysis_form import render_analysis_form
 from components.results_display import render_results
+from components.login import render_login_form, check_authentication, render_user_info, render_sidebar_user_info, render_sidebar_logout, require_permission
 from utils.api_checker import check_api_keys
 from utils.analysis_runner import run_stock_analysis, validate_analysis_params, format_analysis_results
 from utils.progress_tracker import SmartStreamlitProgressDisplay, create_smart_progress_callback
 from utils.async_progress_tracker import AsyncProgressTracker
 from components.async_progress_display import display_unified_progress
 from utils.smart_session_manager import get_persistent_analysis_id, set_persistent_analysis_id
+from utils.auth_manager import auth_manager
 
 # 设置页面配置
 st.set_page_config(
@@ -47,6 +49,8 @@ st.set_page_config(
 # 自定义CSS样式
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
     /* 隐藏Streamlit顶部工具栏和Deploy按钮 - 多种选择器确保兼容性 */
     .stAppToolbar {
         display: none !important;
@@ -109,54 +113,196 @@ st.markdown("""
         padding-top: 0 !important;
     }
     
-    /* 应用样式 */
+    /* 全局样式 */
+    .stApp {
+        font-family: 'Inter', sans-serif;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    }
+    
+    /* 主容器样式 */
+    .main .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        max-width: 1200px;
+    }
+    
+    /* 主标题样式 */
     .main-header {
-        background: linear-gradient(90deg, #1f77b4, #ff7f0e);
-        padding: 1rem;
-        border-radius: 10px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem;
+        border-radius: 20px;
         margin-bottom: 2rem;
         color: white;
         text-align: center;
+        box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.2);
     }
     
+    .main-title {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .main-subtitle {
+        font-size: 1.2rem;
+        opacity: 0.9;
+        font-weight: 400;
+    }
+    
+    /* 卡片样式 */
     .metric-card {
-        background: #f0f2f6;
-        padding: 1rem;
-        border-radius: 10px;
-        border-left: 4px solid #1f77b4;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 1.5rem;
+        border-radius: 15px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
         margin: 0.5rem 0;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(20px);
+        transition: all 0.3s ease;
+        text-align: center;
+    }
+    
+    .metric-card h4 {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-bottom: 0.5rem;
+        font-size: 1rem;
+    }
+    
+    .metric-card p {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin: 0;
+        font-size: 0.9rem;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
     }
     
     .analysis-section {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin: 1rem 0;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 2rem;
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        margin: 1.5rem 0;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        backdrop-filter: blur(20px);
     }
     
+    /* 按钮样式 */
+    .stButton > button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        padding: 0.75rem 2rem;
+        font-size: 1rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    }
+    
+    /* 输入框样式 */
+    .stTextInput > div > div > input,
+    .stSelectbox > div > div > select,
+    .stTextArea > div > div > textarea {
+        background: rgba(255, 255, 255, 0.9);
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .stTextInput > div > div > input:focus,
+    .stSelectbox > div > div > select:focus,
+    .stTextArea > div > div > textarea:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        background: white;
+    }
+    
+    /* 侧边栏样式 */
+    .css-1d391kg {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+    }
+    
+    /* 状态框样式 */
     .success-box {
-        background: #d4edda;
-        border: 1px solid #c3e6cb;
-        border-radius: 5px;
-        padding: 1rem;
+        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+        border: 1px solid #9ae6b4;
+        border-radius: 12px;
+        padding: 1.5rem;
         margin: 1rem 0;
+        box-shadow: 0 4px 15px rgba(154, 230, 180, 0.3);
     }
     
     .warning-box {
-        background: #fff3cd;
-        border: 1px solid #ffeaa7;
-        border-radius: 5px;
-        padding: 1rem;
+        background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+        border: 1px solid #f6d55c;
+        border-radius: 12px;
+        padding: 1.5rem;
         margin: 1rem 0;
+        box-shadow: 0 4px 15px rgba(255, 234, 167, 0.3);
     }
     
     .error-box {
-        background: #f8d7da;
-        border: 1px solid #f5c6cb;
-        border-radius: 5px;
-        padding: 1rem;
+        background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+        border: 1px solid #f1556c;
+        border-radius: 12px;
+        padding: 1.5rem;
         margin: 1rem 0;
+        box-shadow: 0 4px 15px rgba(245, 198, 203, 0.3);
+    }
+    
+    /* 进度条样式 */
+    .stProgress > div > div > div > div {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 10px;
+    }
+    
+    /* 标签页样式 */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        background: rgba(255, 255, 255, 0.7);
+        border-radius: 12px;
+        padding: 0.5rem 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        transition: all 0.3s ease;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    /* 数据框样式 */
+    .dataframe {
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* 图表容器样式 */
+    .js-plotly-plot {
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -255,6 +401,12 @@ def main():
 
     # 初始化会话状态
     initialize_session_state()
+
+    # 检查用户认证状态
+    if not check_authentication():
+        # 显示登录页面
+        render_login_form()
+        return
 
     # 自定义CSS - 调整侧边栏宽度
     st.markdown("""
@@ -529,8 +681,14 @@ def main():
     # 渲染页面头部
     render_header()
 
-    # 页面导航
+    # 侧边栏布局 - 标题在最顶部
     st.sidebar.title("🤖 TradingAgents-CN")
+    st.sidebar.markdown("---")
+    
+    # 页面导航 - 在标题下方显示用户信息
+    render_sidebar_user_info()
+
+    # 在用户信息和功能导航之间添加分隔线
     st.sidebar.markdown("---")
 
     # 添加功能切换标题
@@ -547,6 +705,9 @@ def main():
 
     # 根据选择的页面渲染不同内容
     if page == "⚙️ 配置管理":
+        # 检查配置权限
+        if not require_permission("config"):
+            return
         try:
             from modules.config_management import render_config_management
             render_config_management()
@@ -555,6 +716,9 @@ def main():
             st.info("请确保已安装所有依赖包")
         return
     elif page == "💾 缓存管理":
+        # 检查管理员权限
+        if not require_permission("admin"):
+            return
         try:
             from modules.cache_management import main as cache_main
             cache_main()
@@ -562,6 +726,9 @@ def main():
             st.error(f"缓存管理页面加载失败: {e}")
         return
     elif page == "💰 Token统计":
+        # 检查配置权限
+        if not require_permission("config"):
+            return
         try:
             from modules.token_statistics import render_token_statistics
             render_token_statistics()
@@ -570,15 +737,25 @@ def main():
             st.info("请确保已安装所有依赖包")
         return
     elif page == "📈 历史记录":
+        # 检查分析权限
+        if not require_permission("analysis"):
+            return
         st.header("📈 历史记录")
         st.info("历史记录功能开发中...")
         return
     elif page == "🔧 系统状态":
+        # 检查管理员权限
+        if not require_permission("admin"):
+            return
         st.header("🔧 系统状态")
         st.info("系统状态功能开发中...")
         return
 
     # 默认显示股票分析页面
+    # 检查分析权限
+    if not require_permission("analysis"):
+        return
+        
     # 检查API密钥
     api_status = check_api_keys()
     
@@ -649,6 +826,9 @@ def main():
 
         st.sidebar.success("✅ 分析状态已清理")
         st.rerun()
+
+    # 在侧边栏底部添加退出按钮
+    render_sidebar_logout()
 
     # 主内容区域 - 根据是否显示指南调整布局
     if show_guide:
