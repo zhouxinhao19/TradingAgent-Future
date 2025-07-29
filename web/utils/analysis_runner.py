@@ -492,8 +492,21 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
                         'event_type': 'web_analysis_error'
                     }, exc_info=True)
 
-        # 如果真实分析失败，返回模拟数据用于演示
-        return generate_demo_results(stock_symbol, analysis_date, analysts, research_depth, llm_provider, llm_model, str(e), market_type)
+        # 如果真实分析失败，返回错误信息而不是误导性演示数据
+        return {
+            'stock_symbol': stock_symbol,
+            'analysis_date': analysis_date,
+            'analysts': analysts,
+            'research_depth': research_depth,
+            'llm_provider': llm_provider,
+            'llm_model': llm_model,
+            'state': {},  # 空状态，将显示占位符
+            'decision': {},  # 空决策
+            'success': False,
+            'error': str(e),
+            'is_demo': False,
+            'error_reason': f"分析失败: {str(e)}"
+        }
 
 def format_analysis_results(results):
     """格式化分析结果用于显示"""
@@ -705,8 +718,13 @@ def get_supported_stocks():
     
     return popular_stocks
 
-def generate_demo_results(stock_symbol, analysis_date, analysts, research_depth, llm_provider, llm_model, error_msg, market_type="美股"):
-    """生成演示分析结果"""
+def generate_demo_results_deprecated(stock_symbol, analysis_date, analysts, research_depth, llm_provider, llm_model, error_msg, market_type="美股"):
+    """
+    已弃用：生成演示分析结果
+
+    注意：此函数已弃用，因为演示数据会误导用户。
+    现在我们使用占位符来代替演示数据。
+    """
 
     import random
 
