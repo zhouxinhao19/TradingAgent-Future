@@ -601,6 +601,11 @@ def format_analysis_results(results):
             if isinstance(content, str):
                 content = translate_analyst_labels(content)
             formatted_state[key] = content
+        elif key == 'risk_assessment':
+            # 特殊处理：从 risk_debate_state 生成 risk_assessment
+            risk_assessment = extract_risk_assessment(state)
+            if risk_assessment:
+                formatted_state[key] = risk_assessment
     
     return {
         'stock_symbol': results['stock_symbol'],

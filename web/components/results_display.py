@@ -242,8 +242,23 @@ def render_decision_summary(decision, stock_symbol=None):
 
 def render_detailed_analysis(state):
     """渲染详细分析报告"""
-    
+
     st.subheader("📋 详细分析报告")
+
+    # 调试信息：显示实际的状态键
+    if st.checkbox("🔍 显示调试信息", key="debug_state_keys"):
+        st.write("**实际状态中的键：**")
+        st.write(list(state.keys()))
+        st.write("**各键的数据类型和内容预览：**")
+        for key, value in state.items():
+            if isinstance(value, str):
+                preview = value[:100] + "..." if len(value) > 100 else value
+                st.write(f"- `{key}`: {type(value).__name__} ({len(value)} 字符) - {preview}")
+            elif isinstance(value, dict):
+                st.write(f"- `{key}`: {type(value).__name__} - 包含键: {list(value.keys())}")
+            else:
+                st.write(f"- `{key}`: {type(value).__name__} - {str(value)[:100]}")
+        st.markdown("---")
     
     # 定义分析模块 - 包含完整的团队决策报告，与CLI端保持一致
     analysis_modules = [
