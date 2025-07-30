@@ -155,7 +155,14 @@ cp .env.example .env
 # 编辑 .env 文件，填入API密钥
 
 # 3. 启动服务
+# 首次启动或代码变更时（需要构建镜像）
 docker-compose up -d --build
+
+# 日常启动（镜像已存在，无代码变更）
+docker-compose up -d
+
+# 智能启动（自动判断是否需要构建）
+powershell -ExecutionPolicy Bypass -File scripts\smart_start.ps1
 
 # 4. 访问应用
 # Web界面: http://localhost:8501
