@@ -143,10 +143,10 @@ services:
 # 数据卷定义
 volumes:
   mongodb_data:
-    external: true
+    driver: local
     name: tradingagents_mongodb_data
   redis_data:
-    external: true
+    driver: local
     name: tradingagents_redis_data
 
 # 网络定义
