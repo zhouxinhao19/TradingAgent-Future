@@ -162,7 +162,11 @@ docker-compose up -d --build
 docker-compose up -d
 
 # 智能启动（自动判断是否需要构建）
+# Windows环境
 powershell -ExecutionPolicy Bypass -File scripts\smart_start.ps1
+
+# Linux/Mac环境
+chmod +x scripts/smart_start.sh && ./scripts/smart_start.sh
 
 # 4. 访问应用
 # Web界面: http://localhost:8501
