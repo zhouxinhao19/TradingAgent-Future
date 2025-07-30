@@ -122,10 +122,10 @@ Write-Host "已创建Windows 10兼容配置文件: $configPath" -ForegroundColor
 # 7. 测试ChromaDB初始化
 Write-Host "`n7. 测试ChromaDB初始化..." -ForegroundColor Yellow
 
-$testScript = @'
+$testScript = @"
 import sys
 import os
-sys.path.insert(0, ".")
+sys.path.insert(0, '.')
 
 try:
     import chromadb
@@ -139,10 +139,10 @@ try:
     )
     
     client = chromadb.Client(settings)
-    print("基本初始化成功")
+    print('基本初始化成功')
     
     # 测试集合操作
-    collection_name = "test_win10_collection"
+    collection_name = 'test_win10_collection'
     try:
         # 删除可能存在的集合
         try:
@@ -152,19 +152,19 @@ try:
             
         # 创建新集合
         collection = client.create_collection(name=collection_name)
-        print("集合创建成功")
+        print('集合创建成功')
         
         # 清理测试集合
         client.delete_collection(name=collection_name)
-        print("ChromaDB Windows 10 测试完成")
+        print('ChromaDB Windows 10 测试完成')
         
     except Exception as e:
-        print(f"集合操作失败: {e}")
+        print(f'集合操作失败: {e}')
         
 except Exception as e:
-    print(f"ChromaDB测试失败: {e}")
+    print(f'ChromaDB测试失败: {e}')
     sys.exit(1)
-'@
+"@
 
 try {
     $testResult = python -c $testScript 2>&1
