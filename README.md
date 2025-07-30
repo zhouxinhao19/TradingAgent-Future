@@ -525,7 +525,27 @@ python scripts/maintenance/cleanup_cache.py --days 7
 
 **常见问题解决**：
 
-1. **MongoDB连接失败**
+1. **🪟 Windows 10 ChromaDB兼容性问题**
+
+   **问题现象**：在Windows 10上出现 `Configuration error: An instance of Chroma already exists for ephemeral with different settings` 错误，而Windows 11正常。
+
+   **快速解决方案**：
+
+   ```bash
+   # 方案1：禁用内存功能（推荐）
+   # 在 .env 文件中添加：
+   MEMORY_ENABLED=false
+   
+   # 方案2：使用专用修复脚本
+   powershell -ExecutionPolicy Bypass -File scripts\fix_chromadb_win10.ps1
+   
+   # 方案3：管理员权限运行
+   # 右键PowerShell -> "以管理员身份运行"
+   ```
+
+   **详细解决方案**：参考 [Windows 10兼容性指南](docs/troubleshooting/windows10-chromadb-fix.md)
+
+2. **MongoDB连接失败**
 
    **Docker部署**：
 
