@@ -7,6 +7,13 @@ import datetime
 
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
+
+# 导入用户活动记录器
+try:
+    from ..utils.user_activity_logger import user_activity_logger
+except ImportError:
+    user_activity_logger = None
+
 logger = get_logger('web')
 
 
@@ -292,6 +299,26 @@ def render_analysis_form():
             )
         except Exception as e:
             logger.warning(f"⚠️ [配置持久化] 保存失败: {e}")
+
+        # 记录用户分析请求活动
+        if user_activity_logger:
+            try:
+                user_activity_logger.log_analysis_request(
+                    symbol=stock_symbol,
+                    market=market_type,
+                    analysis_date=str(analysis_date),
+                    research_depth=research_depth,
+                    analyst_team=[a[0] for a in selected_analysts],
+                    details={
+                        'include_sentiment': include_sentiment,
+                        'include_risk_assessment': include_risk_assessment,
+                        'has_custom_prompt': bool(custom_prompt),
+                        'form_source': 'analysis_form'
+                    }
+                )
+                logger.debug(f"📊 [用户活动] 已记录分析请求: {stock_symbol}")
+            except Exception as e:
+                logger.warning(f"⚠️ [用户活动] 记录失败: {e}")
 
         logger.info(f"📊 [配置缓存] 表单配置已保存: {form_config}")
 

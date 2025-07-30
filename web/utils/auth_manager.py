@@ -15,6 +15,13 @@ import time
 from tradingagents.utils.logging_manager import get_logger
 logger = get_logger('auth')
 
+# 导入用户活动记录器
+try:
+    from .user_activity_logger import user_activity_logger
+except ImportError:
+    user_activity_logger = None
+    logger.warning("⚠️ 用户活动记录器导入失败")
+
 class AuthManager:
     """用户认证管理器"""
     
@@ -78,6 +85,9 @@ class AuthManager:
         
         if username not in users:
             logger.warning(f"⚠️ 用户不存在: {username}")
+            # 记录登录失败
+            if user_activity_logger:
+                user_activity_logger.log_login(username, False, "用户不存在")
             return False, None
         
         user_info = users[username]
@@ -85,6 +95,9 @@ class AuthManager:
         
         if password_hash == user_info["password_hash"]:
             logger.info(f"✅ 用户登录成功: {username}")
+            # 记录登录成功
+            if user_activity_logger:
+                user_activity_logger.log_login(username, True)
             return True, {
                 "username": username,
                 "role": user_info["role"],
@@ -92,6 +105,9 @@ class AuthManager:
             }
         else:
             logger.warning(f"⚠️ 密码错误: {username}")
+            # 记录登录失败
+            if user_activity_logger:
+                user_activity_logger.log_login(username, False, "密码错误")
             return False, None
     
     def check_permission(self, permission: str) -> bool:
@@ -159,6 +175,10 @@ class AuthManager:
         st.session_state.user_info = None
         st.session_state.login_time = None
         logger.info(f"✅ 用户 {username} 登出")
+        
+        # 记录登出活动
+        if user_activity_logger:
+            user_activity_logger.log_logout(username)
     
     def get_current_user(self) -> Optional[Dict]:
         """获取当前用户信息"""

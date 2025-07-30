@@ -29,6 +29,7 @@ from components.header import render_header
 from components.analysis_form import render_analysis_form
 from components.results_display import render_results
 from components.login import render_login_form, check_authentication, render_user_info, render_sidebar_user_info, render_sidebar_logout, require_permission
+from components.user_activity_dashboard import render_user_activity_dashboard, render_activity_summary_widget
 from utils.api_checker import check_api_keys
 from utils.analysis_runner import run_stock_analysis, validate_analysis_params, format_analysis_results
 from utils.progress_tracker import SmartStreamlitProgressDisplay, create_smart_progress_callback
@@ -699,6 +700,19 @@ def main():
         ["📊 股票分析", "⚙️ 配置管理", "💾 缓存管理", "💰 Token统计", "📈 历史记录", "🔧 系统状态"],
         label_visibility="collapsed"
     )
+    
+    # 记录页面访问活动
+    try:
+        user_activity_logger.log_page_access(
+            page_name=page,
+            page_url=f"/app?page={page.split(' ')[1] if ' ' in page else page}",
+            details={
+                "page_type": "main_navigation",
+                "access_method": "sidebar_selectbox"
+            }
+        )
+    except Exception as e:
+        logger.warning(f"记录页面访问活动失败: {e}")
 
     # 在功能选择和AI模型配置之间添加分隔线
     st.sidebar.markdown("---")
@@ -740,8 +754,7 @@ def main():
         # 检查分析权限
         if not require_permission("analysis"):
             return
-        st.header("📈 历史记录")
-        st.info("历史记录功能开发中...")
+        render_user_activity_dashboard()
         return
     elif page == "🔧 系统状态":
         # 检查管理员权限

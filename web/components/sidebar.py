@@ -788,6 +788,17 @@ def render_sidebar():
         **数据源**: Tushare + FinnHub API
         """)
         
+        # 管理员功能
+        if auth_manager and auth_manager.check_permission("admin"):
+            st.markdown("---")
+            st.markdown("### 🔧 管理功能")
+            
+            if st.button("📊 用户活动记录", key="user_activity_btn", use_container_width=True):
+                st.session_state.page = "user_activity"
+            
+            if st.button("⚙️ 系统设置", key="system_settings_btn", use_container_width=True):
+                st.session_state.page = "system_settings"
+        
         # 帮助链接
         st.markdown("**📚 帮助资源**")
         
