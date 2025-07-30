@@ -253,6 +253,21 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             elif llm_provider == "deepseek":
                 config["quick_think_llm"] = "deepseek-chat"
                 config["deep_think_llm"] = "deepseek-chat"
+            elif llm_provider == "openai":
+                config["quick_think_llm"] = llm_model
+                config["deep_think_llm"] = llm_model
+            elif llm_provider == "openai":
+                config["quick_think_llm"] = llm_model
+                config["deep_think_llm"] = llm_model
+            elif llm_provider == "openai":
+                config["quick_think_llm"] = llm_model
+                config["deep_think_llm"] = llm_model
+            elif llm_provider == "openai":
+                config["quick_think_llm"] = llm_model
+                config["deep_think_llm"] = llm_model
+            elif llm_provider == "openai":
+                config["quick_think_llm"] = llm_model
+                config["deep_think_llm"] = llm_model
         elif research_depth == 3:  # 3级 - 标准分析 (默认)
             config["max_debate_rounds"] = 1
             config["max_risk_discuss_rounds"] = 2
@@ -295,6 +310,11 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         elif llm_provider == "google":
             # Google AI不需要backend_url，使用默认的OpenAI格式
             config["backend_url"] = "https://api.openai.com/v1"
+        elif llm_provider == "openai":
+            # OpenAI官方API
+            config["backend_url"] = "https://api.openai.com/v1"
+            logger.info(f"🤖 [OpenAI] 使用模型: {llm_model}")
+            logger.info(f"🤖 [OpenAI] API端点: https://api.openai.com/v1")
         elif llm_provider == "openrouter":
             # OpenRouter使用OpenAI兼容API
             config["backend_url"] = "https://openrouter.ai/api/v1"

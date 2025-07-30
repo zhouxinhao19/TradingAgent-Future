@@ -209,12 +209,13 @@ def render_sidebar():
         # LLM提供商选择
         llm_provider = st.selectbox(
             "LLM提供商",
-            options=["dashscope", "deepseek", "google", "openrouter"],
-            index=["dashscope", "deepseek", "google", "openrouter"].index(st.session_state.llm_provider) if st.session_state.llm_provider in ["dashscope", "deepseek", "google", "openrouter"] else 0,
+            options=["dashscope", "deepseek", "google", "openai", "openrouter"],
+            index=["dashscope", "deepseek", "google", "openai", "openrouter"].index(st.session_state.llm_provider) if st.session_state.llm_provider in ["dashscope", "deepseek", "google", "openai", "openrouter"] else 0,
             format_func=lambda x: {
                 "dashscope": "🇨🇳 阿里百炼",
                 "deepseek": "🚀 DeepSeek V3",
                 "google": "🌟 Google AI",
+                "openai": "🤖 OpenAI",
                 "openrouter": "🌐 OpenRouter"
             }[x],
             help="选择AI模型提供商",
@@ -322,6 +323,66 @@ def render_sidebar():
 
             # 保存到持久化存储
             save_model_selection(st.session_state.llm_provider, st.session_state.model_category, llm_model)
+        elif llm_provider == "openai":
+             openai_options = [
+                 "gpt-4o",
+                 "gpt-4o-mini",
+                 "gpt-4-turbo",
+                 "gpt-4",
+                 "gpt-3.5-turbo"
+             ]
+ 
+             # 获取当前选择的索引
+             current_index = 0
+             if st.session_state.llm_model in openai_options:
+                 current_index = openai_options.index(st.session_state.llm_model)
+ 
+             llm_model = st.selectbox(
+                 "选择OpenAI模型",
+                 options=openai_options,
+                 index=current_index,
+                 format_func=lambda x: {
+                     "gpt-4o": "GPT-4o - 最新旗舰模型",
+                     "gpt-4o-mini": "GPT-4o Mini - 轻量旗舰",
+                     "gpt-4-turbo": "GPT-4 Turbo - 强化版",
+                     "gpt-4": "GPT-4 - 经典版",
+                     "gpt-3.5-turbo": "GPT-3.5 Turbo - 经济版"
+                 }[x],
+                 help="选择用于分析的OpenAI模型",
+                 key="openai_model_select"
+             )
+
+             # 快速选择按钮
+             st.markdown("**快速选择:**")
+             
+             col1, col2 = st.columns(2)
+             with col1:
+                 if st.button("🚀 GPT-4o", key="quick_gpt4o", use_container_width=True):
+                     model_id = "gpt-4o"
+                     st.session_state.llm_model = model_id
+                     save_model_selection(st.session_state.llm_provider, st.session_state.model_category, model_id)
+                     logger.debug(f"💾 [Persistence] 快速选择GPT-4o: {model_id}")
+                     st.rerun()
+             
+             with col2:
+                 if st.button("⚡ GPT-4o Mini", key="quick_gpt4o_mini", use_container_width=True):
+                     model_id = "gpt-4o-mini"
+                     st.session_state.llm_model = model_id
+                     save_model_selection(st.session_state.llm_provider, st.session_state.model_category, model_id)
+                     logger.debug(f"💾 [Persistence] 快速选择GPT-4o Mini: {model_id}")
+                     st.rerun()
+ 
+             # 更新session state和持久化存储
+             if st.session_state.llm_model != llm_model:
+                 logger.debug(f"🔄 [Persistence] OpenAI模型变更: {st.session_state.llm_model} → {llm_model}")
+             st.session_state.llm_model = llm_model
+             logger.debug(f"💾 [Persistence] OpenAI模型已保存: {llm_model}")
+ 
+             # 保存到持久化存储
+             save_model_selection(st.session_state.llm_provider, st.session_state.model_category, llm_model)
+
+             # OpenAI特殊提示
+             st.info("💡 **OpenAI配置**: 在.env文件中设置OPENAI_API_KEY")
         else:  # openrouter
             # OpenRouter模型分类选择
             model_category = st.selectbox(
