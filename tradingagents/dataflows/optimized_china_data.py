@@ -265,6 +265,14 @@ class OptimizedChinaDataProvider:
         logger.debug(f"🔍 [股票代码追踪] _estimate_financial_metrics 返回结果: {financial_estimates}")
 
         logger.debug(f"🔍 [股票代码追踪] 开始生成报告，使用股票代码: '{symbol}'")
+        
+        # 检查是否使用了真实财务数据
+        data_source_note = ""
+        if any("（估算值）" in str(v) for v in financial_estimates.values() if isinstance(v, str)):
+            data_source_note = "\n⚠️ **数据说明**: 部分财务指标为估算值，建议结合最新财报数据进行分析"
+        else:
+            data_source_note = "\n✅ **数据说明**: 财务指标基于Tushare真实财务数据计算"
+        
         report = f"""# 中国A股基本面分析报告 - {symbol}
 
 ## 📊 股票基本信息
@@ -275,7 +283,7 @@ class OptimizedChinaDataProvider:
 - **当前股价**: {current_price}
 - **涨跌幅**: {change_pct}
 - **成交量**: {volume}
-- **分析日期**: {datetime.now().strftime('%Y年%m月%d日')}
+- **分析日期**: {datetime.now().strftime('%Y年%m月%d日')}{data_source_note}
 
 ## 💰 财务数据分析
 
@@ -442,7 +450,7 @@ class OptimizedChinaDataProvider:
         return info
 
     def _estimate_financial_metrics(self, symbol: str, current_price: str) -> dict:
-        """估算财务指标（基于行业平均值和股票特征）"""
+        """获取真实财务指标（优先使用Tushare真实数据，失败时使用估算）"""
 
         # 提取价格数值
         try:
@@ -450,6 +458,266 @@ class OptimizedChinaDataProvider:
         except:
             price_value = 10.0  # 默认值
 
+        # 尝试获取真实财务数据
+        real_metrics = self._get_real_financial_metrics(symbol, price_value)
+        if real_metrics:
+            logger.debug(f"✅ 使用真实财务数据: {symbol}")
+            return real_metrics
+        
+        # 如果无法获取真实数据，使用估算数据并标注
+        logger.warning(f"⚠️ 无法获取真实财务数据，使用估算数据: {symbol}")
+        estimated_metrics = self._get_estimated_financial_metrics(symbol, price_value)
+        
+        # 在所有指标后添加估算标注
+        for key in estimated_metrics:
+            if isinstance(estimated_metrics[key], str) and key not in ['fundamental_score', 'valuation_score', 'growth_score', 'risk_level']:
+                if "（" not in estimated_metrics[key]:
+                    estimated_metrics[key] += "（估算值）"
+        
+        return estimated_metrics
+
+    def _get_real_financial_metrics(self, symbol: str, price_value: float) -> dict:
+        """获取真实财务指标"""
+        try:
+            from .tushare_utils import get_tushare_provider
+            
+            provider = get_tushare_provider()
+            if not provider.connected:
+                logger.debug(f"Tushare未连接，无法获取{symbol}真实财务数据")
+                return None
+            
+            # 获取财务数据
+            financial_data = provider.get_financial_data(symbol)
+            if not financial_data:
+                logger.debug(f"未获取到{symbol}的财务数据")
+                return None
+            
+            # 获取股票基本信息
+            stock_info = provider.get_stock_info(symbol)
+            
+            # 解析财务数据
+            metrics = self._parse_financial_data(financial_data, stock_info, price_value)
+            if metrics:
+                return metrics
+                
+        except Exception as e:
+            logger.debug(f"获取{symbol}真实财务数据失败: {e}")
+        
+        return None
+
+    def _parse_financial_data(self, financial_data: dict, stock_info: dict, price_value: float) -> dict:
+        """解析财务数据为指标"""
+        try:
+            # 获取最新的财务数据
+            balance_sheet = financial_data.get('balance_sheet', [])
+            income_statement = financial_data.get('income_statement', [])
+            cash_flow = financial_data.get('cash_flow', [])
+            
+            if not (balance_sheet or income_statement):
+                return None
+            
+            latest_balance = balance_sheet[0] if balance_sheet else {}
+            latest_income = income_statement[0] if income_statement else {}
+            latest_cash = cash_flow[0] if cash_flow else {}
+            
+            # 计算财务指标
+            metrics = {}
+            
+            # 基础数据
+            total_assets = latest_balance.get('total_assets', 0) or 0
+            total_liab = latest_balance.get('total_liab', 0) or 0
+            total_equity = latest_balance.get('total_hldr_eqy_exc_min_int', 0) or 0
+            total_revenue = latest_income.get('total_revenue', 0) or 0
+            net_income = latest_income.get('n_income', 0) or 0
+            operate_profit = latest_income.get('operate_profit', 0) or 0
+            
+            # 估算市值（简化计算）
+            market_cap = price_value * 1000000000  # 假设10亿股本
+            
+            # 计算各项指标
+            # PE比率
+            if net_income > 0:
+                pe_ratio = market_cap / (net_income * 10000)  # 转换单位
+                metrics["pe"] = f"{pe_ratio:.1f}倍"
+            else:
+                metrics["pe"] = "N/A（亏损）"
+            
+            # PB比率
+            if total_equity > 0:
+                pb_ratio = market_cap / (total_equity * 10000)
+                metrics["pb"] = f"{pb_ratio:.2f}倍"
+            else:
+                metrics["pb"] = "N/A"
+            
+            # PS比率
+            if total_revenue > 0:
+                ps_ratio = market_cap / (total_revenue * 10000)
+                metrics["ps"] = f"{ps_ratio:.1f}倍"
+            else:
+                metrics["ps"] = "N/A"
+            
+            # ROE
+            if total_equity > 0 and net_income > 0:
+                roe = (net_income / total_equity) * 100
+                metrics["roe"] = f"{roe:.1f}%"
+            else:
+                metrics["roe"] = "N/A"
+            
+            # ROA
+            if total_assets > 0 and net_income > 0:
+                roa = (net_income / total_assets) * 100
+                metrics["roa"] = f"{roa:.1f}%"
+            else:
+                metrics["roa"] = "N/A"
+            
+            # 净利率
+            if total_revenue > 0 and net_income > 0:
+                net_margin = (net_income / total_revenue) * 100
+                metrics["net_margin"] = f"{net_margin:.1f}%"
+            else:
+                metrics["net_margin"] = "N/A"
+            
+            # 资产负债率
+            if total_assets > 0:
+                debt_ratio = (total_liab / total_assets) * 100
+                metrics["debt_ratio"] = f"{debt_ratio:.1f}%"
+            else:
+                metrics["debt_ratio"] = "N/A"
+            
+            # 其他指标设为默认值
+            metrics.update({
+                "dividend_yield": "待查询",
+                "gross_margin": "待计算",
+                "current_ratio": "待计算",
+                "quick_ratio": "待计算",
+                "cash_ratio": "待分析"
+            })
+            
+            # 评分（基于真实数据的简化评分）
+            fundamental_score = self._calculate_fundamental_score(metrics, stock_info)
+            valuation_score = self._calculate_valuation_score(metrics)
+            growth_score = self._calculate_growth_score(metrics, stock_info)
+            risk_level = self._calculate_risk_level(metrics, stock_info)
+            
+            metrics.update({
+                "fundamental_score": fundamental_score,
+                "valuation_score": valuation_score,
+                "growth_score": growth_score,
+                "risk_level": risk_level
+            })
+            
+            return metrics
+            
+        except Exception as e:
+            logger.error(f"解析财务数据失败: {e}")
+            return None
+
+    def _calculate_fundamental_score(self, metrics: dict, stock_info: dict) -> float:
+        """计算基本面评分"""
+        score = 5.0  # 基础分
+        
+        # ROE评分
+        roe_str = metrics.get("roe", "N/A")
+        if roe_str != "N/A":
+            try:
+                roe = float(roe_str.replace("%", ""))
+                if roe > 15:
+                    score += 1.5
+                elif roe > 10:
+                    score += 1.0
+                elif roe > 5:
+                    score += 0.5
+            except:
+                pass
+        
+        # 净利率评分
+        net_margin_str = metrics.get("net_margin", "N/A")
+        if net_margin_str != "N/A":
+            try:
+                net_margin = float(net_margin_str.replace("%", ""))
+                if net_margin > 20:
+                    score += 1.0
+                elif net_margin > 10:
+                    score += 0.5
+            except:
+                pass
+        
+        return min(score, 10.0)
+
+    def _calculate_valuation_score(self, metrics: dict) -> float:
+        """计算估值评分"""
+        score = 5.0  # 基础分
+        
+        # PE评分
+        pe_str = metrics.get("pe", "N/A")
+        if pe_str != "N/A" and "亏损" not in pe_str:
+            try:
+                pe = float(pe_str.replace("倍", ""))
+                if pe < 15:
+                    score += 2.0
+                elif pe < 25:
+                    score += 1.0
+                elif pe > 50:
+                    score -= 1.0
+            except:
+                pass
+        
+        # PB评分
+        pb_str = metrics.get("pb", "N/A")
+        if pb_str != "N/A":
+            try:
+                pb = float(pb_str.replace("倍", ""))
+                if pb < 1.5:
+                    score += 1.0
+                elif pb < 3:
+                    score += 0.5
+                elif pb > 5:
+                    score -= 0.5
+            except:
+                pass
+        
+        return min(max(score, 1.0), 10.0)
+
+    def _calculate_growth_score(self, metrics: dict, stock_info: dict) -> float:
+        """计算成长性评分"""
+        score = 6.0  # 基础分
+        
+        # 根据行业调整
+        industry = stock_info.get('industry', '')
+        if '科技' in industry or '软件' in industry or '互联网' in industry:
+            score += 1.0
+        elif '银行' in industry or '保险' in industry:
+            score -= 0.5
+        
+        return min(max(score, 1.0), 10.0)
+
+    def _calculate_risk_level(self, metrics: dict, stock_info: dict) -> str:
+        """计算风险等级"""
+        # 资产负债率
+        debt_ratio_str = metrics.get("debt_ratio", "N/A")
+        if debt_ratio_str != "N/A":
+            try:
+                debt_ratio = float(debt_ratio_str.replace("%", ""))
+                if debt_ratio > 70:
+                    return "较高"
+                elif debt_ratio > 50:
+                    return "中等"
+                else:
+                    return "较低"
+            except:
+                pass
+        
+        # 根据行业判断
+        industry = stock_info.get('industry', '')
+        if '银行' in industry:
+            return "中等"
+        elif '科技' in industry or '创业板' in industry:
+            return "较高"
+        
+        return "中等"
+
+    def _get_estimated_financial_metrics(self, symbol: str, price_value: float) -> dict:
+        """获取估算财务指标（原有的分类方法）"""
         # 根据股票代码和价格估算指标
         if symbol.startswith(('000001', '600036')):  # 银行股
             return {
