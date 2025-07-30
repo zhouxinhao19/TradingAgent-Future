@@ -13,6 +13,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from web.utils.persistence import load_model_selection, save_model_selection
+from web.utils.auth_manager import auth_manager
 
 logger = logging.getLogger(__name__)
 

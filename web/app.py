@@ -17,8 +17,14 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 # 导入日志模块
-from tradingagents.utils.logging_manager import get_logger
-logger = get_logger('web')
+try:
+    from tradingagents.utils.logging_manager import get_logger
+    logger = get_logger('web')
+except ImportError:
+    # 如果无法导入，使用标准logging
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger('web')
 
 # 加载环境变量
 load_dotenv(project_root / ".env", override=True)
@@ -37,6 +43,7 @@ from utils.async_progress_tracker import AsyncProgressTracker
 from components.async_progress_display import display_unified_progress
 from utils.smart_session_manager import get_persistent_analysis_id, set_persistent_analysis_id
 from utils.auth_manager import auth_manager
+from utils.user_activity_logger import user_activity_logger
 
 # 设置页面配置
 st.set_page_config(
@@ -697,16 +704,16 @@ def main():
 
     page = st.sidebar.selectbox(
         "切换功能模块",
-        ["📊 股票分析", "⚙️ 配置管理", "💾 缓存管理", "💰 Token统计", "📈 历史记录", "🔧 系统状态"],
+        ["📊 股票分析", "⚙️ 配置管理", "💾 缓存管理", "💰 Token统计", "📋 操作日志", "📈 分析结果", "🔧 系统状态"],
         label_visibility="collapsed"
     )
     
     # 记录页面访问活动
     try:
-        user_activity_logger.log_page_access(
+        user_activity_logger.log_page_visit(
             page_name=page,
-            page_url=f"/app?page={page.split(' ')[1] if ' ' in page else page}",
-            details={
+            page_params={
+                "page_url": f"/app?page={page.split(' ')[1] if ' ' in page else page}",
                 "page_type": "main_navigation",
                 "access_method": "sidebar_selectbox"
             }
@@ -750,11 +757,27 @@ def main():
             st.error(f"Token统计页面加载失败: {e}")
             st.info("请确保已安装所有依赖包")
         return
-    elif page == "📈 历史记录":
+    elif page == "📋 操作日志":
+        # 检查管理员权限
+        if not require_permission("admin"):
+            return
+        try:
+            from components.operation_logs import render_operation_logs
+            render_operation_logs()
+        except ImportError as e:
+            st.error(f"操作日志模块加载失败: {e}")
+            st.info("请确保已安装所有依赖包")
+        return
+    elif page == "📈 分析结果":
         # 检查分析权限
         if not require_permission("analysis"):
             return
-        render_user_activity_dashboard()
+        try:
+            from components.analysis_results import render_analysis_results
+            render_analysis_results()
+        except ImportError as e:
+            st.error(f"分析结果模块加载失败: {e}")
+            st.info("请确保已安装所有依赖包")
         return
     elif page == "🔧 系统状态":
         # 检查管理员权限
@@ -984,11 +1007,50 @@ def main():
                         # 标记分析完成并保存结果（不访问session state）
                         async_tracker.mark_completed("✅ 分析成功完成！", results=results)
 
+                        # 自动保存分析结果到历史记录
+                        try:
+                            from components.analysis_results import save_analysis_result
+                            
+                            save_success = save_analysis_result(
+                                analysis_id=analysis_id,
+                                stock_symbol=form_data['stock_symbol'],
+                                analysts=form_data['analysts'],
+                                research_depth=form_data['research_depth'],
+                                result_data=results,
+                                status="completed"
+                            )
+                            
+                            if save_success:
+                                logger.info(f"💾 [后台保存] 分析结果已保存到历史记录: {analysis_id}")
+                            else:
+                                logger.warning(f"⚠️ [后台保存] 保存失败: {analysis_id}")
+                                
+                        except Exception as save_error:
+                            logger.error(f"❌ [后台保存] 保存异常: {save_error}")
+
                         logger.info(f"✅ [分析完成] 股票分析成功完成: {analysis_id}")
 
                     except Exception as e:
                         # 标记分析失败（不访问session state）
                         async_tracker.mark_failed(str(e))
+                        
+                        # 保存失败的分析记录
+                        try:
+                            from components.analysis_results import save_analysis_result
+                            
+                            save_analysis_result(
+                                analysis_id=analysis_id,
+                                stock_symbol=form_data['stock_symbol'],
+                                analysts=form_data['analysts'],
+                                research_depth=form_data['research_depth'],
+                                result_data={"error": str(e)},
+                                status="failed"
+                            )
+                            logger.info(f"💾 [失败记录] 分析失败记录已保存: {analysis_id}")
+                            
+                        except Exception as save_error:
+                            logger.error(f"❌ [失败记录] 保存异常: {save_error}")
+                        
                         logger.error(f"❌ [分析失败] {analysis_id}: {e}")
 
                     finally:
@@ -1074,17 +1136,44 @@ def main():
                             st.session_state.analysis_running = False
                             logger.info(f"📊 [结果同步] 恢复分析结果: {current_analysis_id}")
 
+                            # 自动保存分析结果到历史记录
+                            try:
+                                from components.analysis_results import save_analysis_result
+                                
+                                # 从进度数据中获取分析参数
+                                stock_symbol = progress_data.get('stock_symbol', st.session_state.get('last_stock_symbol', 'unknown'))
+                                analysts = progress_data.get('analysts', [])
+                                research_depth = progress_data.get('research_depth', 3)
+                                
+                                # 保存分析结果
+                                save_success = save_analysis_result(
+                                    analysis_id=current_analysis_id,
+                                    stock_symbol=stock_symbol,
+                                    analysts=analysts,
+                                    research_depth=research_depth,
+                                    result_data=raw_results,
+                                    status="completed"
+                                )
+                                
+                                if save_success:
+                                    logger.info(f"💾 [结果保存] 分析结果已保存到历史记录: {current_analysis_id}")
+                                else:
+                                    logger.warning(f"⚠️ [结果保存] 保存失败: {current_analysis_id}")
+                                    
+                            except Exception as save_error:
+                                logger.error(f"❌ [结果保存] 保存异常: {save_error}")
+
                             # 检查是否已经刷新过，避免重复刷新
                             refresh_key = f"results_refreshed_{current_analysis_id}"
                             if not st.session_state.get(refresh_key, False):
                                 st.session_state[refresh_key] = True
-                                st.success("📊 分析结果已恢复，正在刷新页面...")
+                                st.success("📊 分析结果已恢复并保存，正在刷新页面...")
                                 # 使用st.rerun()代替meta refresh，保持侧边栏状态
                                 time.sleep(1)
                                 st.rerun()
                             else:
                                 # 已经刷新过，不再刷新
-                                st.success("📊 分析结果已恢复！")
+                                st.success("📊 分析结果已恢复并保存！")
                     except Exception as e:
                         logger.warning(f"⚠️ [结果同步] 恢复失败: {e}")
 
