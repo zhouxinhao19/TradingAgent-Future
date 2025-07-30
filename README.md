@@ -164,13 +164,16 @@ docker-compose up -d --build
 ### 💻 本地部署
 
 ```bash
-# 1. 安装依赖
-pip install -r requirements.txt
+# 1. 升级pip (重要！避免安装错误)
+python -m pip install --upgrade pip
 
-# 2. 启动应用
+# 2. 安装依赖
+pip install -e .
+
+# 3. 启动应用
 python start_web.py
 
-# 3. 访问 http://localhost:8501
+# 4. 访问 http://localhost:8501
 ```
 
 ### 📊 开始分析
@@ -248,8 +251,13 @@ env\Scripts\activate
 # Linux/macOS
 source env/bin/activate
 
-# 3. 安装所有依赖
+# 3. 升级pip
+python -m pip install --upgrade pip
+
+# 4. 安装所有依赖
 pip install -r requirements.txt
+#或者使用pip install -e .
+pip install -e .
 
 # 注意：requirements.txt已包含所有必需依赖：
 # - 数据库支持 (MongoDB + Redis)
