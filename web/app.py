@@ -416,14 +416,44 @@ def main():
         render_login_form()
         return
 
-    # 自定义CSS - 调整侧边栏宽度
+    # 全局侧边栏CSS样式 - 确保所有页面一致
     st.markdown("""
     <style>
-    /* 调整侧边栏宽度为260px，避免标题挤压 */
+    /* 统一侧边栏宽度为320px */
     section[data-testid="stSidebar"] {
-        width: 260px !important;
+        width: 320px !important;
+        min-width: 320px !important;
+        max-width: 320px !important;
+    }
+
+    /* 侧边栏内容容器 */
+    section[data-testid="stSidebar"] > div {
+        width: 320px !important;
+        min-width: 320px !important;
+        max-width: 320px !important;
+    }
+
+    /* 主内容区域适配320px侧边栏 */
+    .main .block-container {
+        width: calc(100vw - 336px) !important;
+        max-width: calc(100vw - 336px) !important;
+    }
+
+    /* 选择框宽度适配320px侧边栏 */
+    section[data-testid="stSidebar"] .stSelectbox > div > div,
+    section[data-testid="stSidebar"] .stSelectbox [data-baseweb="select"] {
+        width: 100% !important;
         min-width: 260px !important;
-        max-width: 260px !important;
+        max-width: 280px !important;
+    }
+
+    /* 侧边栏标题样式 */
+    section[data-testid="stSidebar"] h1 {
+        font-size: 1.2rem !important;
+        line-height: 1.3 !important;
+        margin-bottom: 1rem !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
     }
 
     /* 隐藏侧边栏的隐藏按钮 - 更全面的选择器 */
@@ -498,43 +528,13 @@ def main():
         margin: 0.8rem 0 !important;
     }
 
-    /* 确保侧边栏标题不被挤压 */
-    section[data-testid="stSidebar"] h1 {
-        font-size: 1.2rem !important;
-        line-height: 1.3 !important;
-        margin-bottom: 1rem !important;
-        word-wrap: break-word !important;
-        overflow-wrap: break-word !important;
-    }
-
     /* 简化功能选择区域样式 */
     section[data-testid="stSidebar"] .stSelectbox > div > div {
         font-size: 1.1rem !important;
         font-weight: 500 !important;
     }
 
-    /* 调整选择框等组件的宽度 */
-    section[data-testid="stSidebar"] .stSelectbox > div > div {
-        min-width: 220px !important;
-        width: 100% !important;
-    }
-
-    /* 修复右侧内容被遮挡的问题 */
-    .main {
-        padding-right: 8px !important;
-    }
-
-    /* 确保页面内容有足够的右边距 */
-    .stApp {
-        margin-right: 0 !important;
-        padding-right: 8px !important;
-    }
-
-    /* 特别处理展开的分析报告 */
-    .streamlit-expanderContent {
-        padding-right: 8px !important;
-        margin-right: 8px !important;
-    }
+    /* 这些样式已在global_sidebar.css中定义 */
 
     /* 防止水平滚动条出现 */
     .main .block-container {
@@ -570,11 +570,7 @@ def main():
         margin-right: 0px !important;
     }
 
-    /* 强制设置容器宽度 */
-    .main .block-container {
-        width: calc(100vw - 276px) !important;
-        max-width: calc(100vw - 276px) !important;
-    }
+    /* 容器宽度已在global_sidebar.css中定义 */
 
     /* 优化使用指南区域的样式 */
     div[data-testid="column"]:last-child {
@@ -667,8 +663,8 @@ def main():
         // 特别处理主容器宽度
         const mainContainer = document.querySelector('.main .block-container');
         if (mainContainer) {
-            mainContainer.style.width = 'calc(100vw - 276px)';
-            mainContainer.style.maxWidth = 'calc(100vw - 276px)';
+            mainContainer.style.width = 'calc(100vw - 336px)';
+            mainContainer.style.maxWidth = 'calc(100vw - 336px)';
         }
     }
 

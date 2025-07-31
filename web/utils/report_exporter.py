@@ -728,7 +728,11 @@ def save_modular_reports_to_results_dir(results: Dict[str, Any], stock_symbol: s
             if content:
                 # 生成模块报告内容
                 if isinstance(content, str):
-                    report_content = f"# {module_info['title']}\n\n{content}"
+                    # 检查内容是否已经包含标题，避免重复添加
+                    if content.strip().startswith('#'):
+                        report_content = content
+                    else:
+                        report_content = f"# {module_info['title']}\n\n{content}"
                 elif isinstance(content, dict):
                     report_content = f"# {module_info['title']}\n\n"
                     # 特殊处理团队决策报告的字典结构
@@ -770,6 +774,23 @@ def save_modular_reports_to_results_dir(results: Dict[str, Any], stock_symbol: s
             saved_files['final_trade_decision'] = str(decision_file)
             logger.info(f"✅ 保存最终决策: {decision_file}")
 
+        # 保存分析元数据文件，包含研究深度等信息
+        metadata = {
+            'stock_symbol': stock_symbol,
+            'analysis_date': analysis_date,
+            'timestamp': datetime.now().isoformat(),
+            'research_depth': results.get('research_depth', 1),
+            'analysts': results.get('analysts', []),
+            'status': 'completed',
+            'reports_count': len(saved_files),
+            'report_types': list(saved_files.keys())
+        }
+
+        metadata_file = reports_dir.parent / "analysis_metadata.json"
+        with open(metadata_file, 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, ensure_ascii=False, indent=2)
+
+        logger.info(f"✅ 保存分析元数据: {metadata_file}")
         logger.info(f"✅ 分模块报告保存完成，共保存 {len(saved_files)} 个文件")
         logger.info(f"📁 保存目录: {reports_dir}")
 

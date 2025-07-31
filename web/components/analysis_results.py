@@ -243,12 +243,36 @@ def load_analysis_results(start_date=None, end_date=None, stock_symbol=None, ana
                         # 创建分析结果条目
                         analysis_id = f"{stock_code}_{date_str}_{int(timestamp)}"
 
+                        # 尝试从元数据文件中读取真实的研究深度和分析师信息
+                        research_depth = 1
+                        analysts = ['market', 'fundamentals', 'trader']  # 默认值
+
+                        metadata_file = date_dir / "analysis_metadata.json"
+                        if metadata_file.exists():
+                            try:
+                                with open(metadata_file, 'r', encoding='utf-8') as f:
+                                    metadata = json.load(f)
+                                    research_depth = metadata.get('research_depth', 1)
+                                    analysts = metadata.get('analysts', analysts)
+                            except Exception as e:
+                                # 如果读取元数据失败，使用推断逻辑
+                                if len(reports) >= 5:
+                                    research_depth = 3
+                                elif len(reports) >= 3:
+                                    research_depth = 2
+                        else:
+                            # 如果没有元数据文件，使用推断逻辑
+                            if len(reports) >= 5:
+                                research_depth = 3
+                            elif len(reports) >= 3:
+                                research_depth = 2
+
                         result = {
                             'analysis_id': analysis_id,
                             'timestamp': timestamp,
                             'stock_symbol': stock_code,
-                            'analysts': ['market', 'fundamentals', 'trader'],  # 根据报告类型推断
-                            'research_depth': len(reports),
+                            'analysts': analysts,
+                            'research_depth': research_depth,
                             'status': 'completed',
                             'summary': summary_content,
                             'performance': {},
@@ -300,8 +324,8 @@ def load_analysis_results(start_date=None, end_date=None, stock_symbol=None, ana
         
         filtered_results.append(result)
     
-    # 按时间倒序排列
-    filtered_results.sort(key=lambda x: x.get('timestamp', 0), reverse=True)
+    # 按时间倒序排列 - 使用安全的时间戳转换函数确保类型一致
+    filtered_results.sort(key=lambda x: safe_timestamp_to_datetime(x.get('timestamp', 0)), reverse=True)
     
     # 限制数量
     return filtered_results[:limit]
@@ -358,7 +382,8 @@ def render_analysis_results():
         # 分析师类型过滤
         analyst_filter = st.selectbox(
             "👥 分析师类型",
-            ["全部", "market_analyst", "social_media_analyst", "news_analyst", "fundamental_analyst"]
+            ["全部", "market_analyst", "social_media_analyst", "news_analyst", "fundamental_analyst"],
+            help="注意：社交媒体分析师仅适用于美股和港股，A股分析中不包含此类型"
         )
         
         if analyst_filter == "全部":
@@ -448,7 +473,7 @@ def render_results_list(results: List[Dict[str, Any]]):
     
     # 排序结果
     if sort_by == "时间正序":
-        results.sort(key=lambda x: x.get('timestamp', 0))
+        results.sort(key=lambda x: safe_timestamp_to_datetime(x.get('timestamp', 0)))
     elif sort_by == "股票代码":
         results.sort(key=lambda x: x.get('stock_symbol', ''))
     elif sort_by == "成功率":
@@ -517,9 +542,19 @@ def render_results_cards(results: List[Dict[str, Any]]):
             
             with col3:
                 # 查看详情按钮
-                if st.button("👁️ 详情", key=f"view_{start_idx + i}"):
-                    st.session_state['selected_result_for_modal'] = result
-                    st.session_state['show_detail_modal'] = True
+                result_id = result.get('_id') or result.get('analysis_id') or f"result_{start_idx + i}"
+                current_expanded = st.session_state.get('expanded_result_id') == result_id
+                button_text = "🔼 收起" if current_expanded else "👁️ 详情"
+
+                if st.button(button_text, key=f"view_{start_idx + i}"):
+                    if current_expanded:
+                        # 如果当前已展开，则收起
+                        st.session_state['expanded_result_id'] = None
+                    else:
+                        # 展开当前结果的详情
+                        st.session_state['expanded_result_id'] = result_id
+                        st.session_state['selected_result_for_detail'] = result
+                    st.rerun()
             
             with col4:
                 # 状态显示
@@ -532,7 +567,7 @@ def render_results_cards(results: List[Dict[str, Any]]):
             with col1:
                 st.write(f"**分析师**: {', '.join(result.get('analysts', []))}")
                 st.write(f"**研究深度**: {result.get('research_depth', 'unknown')}")
-                
+
                 # 显示分析摘要
                 if result.get('summary'):
                     summary = result['summary'][:150] + "..." if len(result['summary']) > 150 else result['summary']
@@ -547,100 +582,21 @@ def render_results_cards(results: List[Dict[str, Any]]):
                         st.markdown(f"`{tag}`")
                     if len(tags) > 3:
                         st.caption(f"还有 {len(tags) - 3} 个标签...")
-            
+
+            # 显示折叠详情
+            result_id = result.get('_id') or result.get('analysis_id') or f"result_{start_idx + i}"
+            if st.session_state.get('expanded_result_id') == result_id:
+                show_expanded_detail(result)
+
             st.divider()
     
     # 显示分页信息
     if total_pages > 1:
         st.info(f"第 {page + 1} 页，共 {total_pages} 页，总计 {len(results)} 条记录")
     
-    # 处理详情弹窗
-    if st.session_state.get('show_detail_modal', False):
-        show_detail_modal()
+    # 注意：详情现在以折叠方式显示在每个结果下方
 
-@st.dialog("📊 分析结果详情", width="large")
-def show_detail_modal():
-    """显示详情弹窗"""
-    selected_result = st.session_state.get('selected_result_for_modal')
-
-    if not selected_result:
-        st.error("未找到分析结果数据")
-        return
-
-    # 检查是否有报告数据
-    if 'reports' not in selected_result or not selected_result['reports']:
-        st.warning("该分析结果没有可用的报告内容")
-
-        # 显示基本信息作为备选
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("📈 股票代码", selected_result.get('stock_symbol', 'unknown'))
-        with col2:
-            analysis_time = safe_timestamp_to_datetime(selected_result.get('timestamp', 0))
-            st.metric("⏰ 分析时间", analysis_time.strftime('%Y-%m-%d %H:%M'))
-        with col3:
-            status = "✅ 完成" if selected_result.get('status') == 'completed' else "❌ 失败"
-            st.metric("📊 状态", status)
-
-        if selected_result.get('summary'):
-            st.subheader("📝 分析摘要")
-            st.markdown(selected_result['summary'])
-
-        return
-
-    # 获取报告数据
-    reports = selected_result['reports']
-
-    # 调试信息
-    print(f"🔍 [弹窗调试] 数据来源: {selected_result.get('source', '未知')}")
-    print(f"🔍 [弹窗调试] 可用报告数量: {len(reports)}")
-    print(f"🔍 [弹窗调试] 报告类型: {list(reports.keys())}")
-
-    # 为报告名称添加中文标题和图标
-    report_display_names = {
-        'final_trade_decision': '🎯 最终交易决策',
-        'fundamentals_report': '💰 基本面分析',
-        'technical_report': '📈 技术面分析',
-        'market_sentiment_report': '💭 市场情绪分析',
-        'risk_assessment_report': '⚠️ 风险评估',
-        'price_target_report': '🎯 目标价格分析',
-        'summary_report': '📋 分析摘要',
-        'news_analysis_report': '📰 新闻分析',
-        'news_report': '📰 新闻分析',
-        'market_report': '📈 市场分析',
-        'social_media_report': '📱 社交媒体分析',
-        'bull_state': '🐂 多头观点',
-        'bear_state': '🐻 空头观点',
-        'trader_state': '💼 交易员分析',
-        'invest_judge_state': '⚖️ 投资判断',
-        'research_team_state': '🔬 研究团队观点',
-        'risk_debate_state': '⚠️ 风险管理讨论',
-        'research_team_decision': '🔬 研究团队决策',
-        'risk_management_decision': '🛡️ 风险管理决策'
-    }
-
-    # 创建标签页显示不同的报告
-    report_tabs = list(reports.keys())
-    tab_names = []
-    for report_key in report_tabs:
-        display_name = report_display_names.get(report_key, f"📄 {report_key.replace('_', ' ').title()}")
-        tab_names.append(display_name)
-        print(f"🔍 [弹窗调试] 添加标签: {display_name}")
-
-    print(f"🔍 [弹窗调试] 总标签数: {len(tab_names)}")
-
-    if len(tab_names) == 1:
-        # 只有一个报告，直接显示
-        st.markdown(f"### {tab_names[0]}")
-        st.markdown("---")
-        st.markdown(reports[report_tabs[0]])
-    else:
-        # 多个报告，使用标签页
-        tabs = st.tabs(tab_names)
-
-        for i, (tab, report_key) in enumerate(zip(tabs, report_tabs)):
-            with tab:
-                st.markdown(reports[report_key])
+# 弹窗功能已移除，详情现在以折叠方式显示
 
 def toggle_favorite(analysis_id):
     """切换收藏状态"""
@@ -1676,17 +1632,59 @@ def save_analysis_result(analysis_id: str, stock_symbol: str, analysts: List[str
                 print(f"💾 [MongoDB保存] 开始保存分析结果: {analysis_id}")
                 mongodb_manager = MongoDBReportManager()
 
-                # 准备MongoDB格式的数据
-                mongodb_data = result_entry.copy()
+                # 使用标准的save_analysis_report方法，确保数据结构一致
+                analysis_results = {
+                    'stock_symbol': result_entry.get('stock_symbol', ''),
+                    'analysts': result_entry.get('analysts', []),
+                    'research_depth': result_entry.get('research_depth', 1),
+                    'summary': result_entry.get('summary', '')
+                }
 
-                # 如果有报告数据，也保存到MongoDB
-                if 'reports' in result_data:
-                    mongodb_data['reports'] = result_data['reports']
+                # 尝试从文件系统读取报告内容
+                reports = {}
+                try:
+                    # 构建报告目录路径
+                    from pathlib import Path
+                    import os
 
-                # 保存到MongoDB
-                success = mongodb_manager.save_report(mongodb_data)
+                    # 获取当前日期
+                    current_date = datetime.now().strftime('%Y-%m-%d')
+
+                    # 构建报告路径
+                    project_root = Path(__file__).parent.parent.parent
+                    reports_dir = project_root / "data" / "analysis_results" / stock_symbol / current_date / "reports"
+
+                    print(f"🔍 [MongoDB保存] 查找报告目录: {reports_dir}")
+
+                    if reports_dir.exists():
+                        # 读取所有报告文件
+                        for report_file in reports_dir.glob("*.md"):
+                            try:
+                                with open(report_file, 'r', encoding='utf-8') as f:
+                                    content = f.read()
+                                    report_name = report_file.stem
+                                    reports[report_name] = content
+                                    print(f"✅ [MongoDB保存] 读取报告: {report_name} ({len(content)} 字符)")
+                            except Exception as e:
+                                print(f"⚠️ [MongoDB保存] 读取报告文件失败 {report_file}: {e}")
+
+                        print(f"📊 [MongoDB保存] 共读取 {len(reports)} 个报告文件")
+                    else:
+                        print(f"⚠️ [MongoDB保存] 报告目录不存在: {reports_dir}")
+
+                except Exception as e:
+                    print(f"⚠️ [MongoDB保存] 读取报告文件异常: {e}")
+                    reports = {}
+
+                # 使用标准保存方法，确保字段结构一致
+                success = mongodb_manager.save_analysis_report(
+                    stock_symbol=result_entry.get('stock_symbol', ''),
+                    analysis_results=analysis_results,
+                    reports=reports
+                )
+
                 if success:
-                    print(f"✅ [MongoDB保存] 分析结果已保存到MongoDB: {analysis_id}")
+                    print(f"✅ [MongoDB保存] 分析结果已保存到MongoDB: {analysis_id} (包含 {len(reports)} 个报告)")
                 else:
                     print(f"❌ [MongoDB保存] 保存失败: {analysis_id}")
 
@@ -1697,5 +1695,119 @@ def save_analysis_result(analysis_id: str, stock_symbol: str, analysts: List[str
         return True
 
     except Exception as e:
-        print(f"保存分析结果失败: {e}")
+        print(f"❌ [保存分析结果] 保存失败: {e}")
+        logger.error(f"保存分析结果异常: {e}")
         return False
+
+def show_expanded_detail(result):
+    """显示展开的详情内容"""
+
+    # 创建详情容器
+    with st.container():
+        st.markdown("---")
+        st.markdown("### 📊 详细分析报告")
+
+        # 检查是否有报告数据
+        if 'reports' not in result or not result['reports']:
+            # 如果没有reports字段，检查是否有其他分析数据
+            if result.get('summary'):
+                st.subheader("📝 分析摘要")
+                st.markdown(result['summary'])
+
+            # 检查是否有full_data中的报告
+            if 'full_data' in result and result['full_data']:
+                full_data = result['full_data']
+                if isinstance(full_data, dict):
+                    # 显示full_data中的分析内容
+                    analysis_fields = [
+                        ('market_report', '📈 市场分析'),
+                        ('fundamentals_report', '💰 基本面分析'),
+                        ('sentiment_report', '💭 情感分析'),
+                        ('news_report', '📰 新闻分析'),
+                        ('risk_assessment', '⚠️ 风险评估'),
+                        ('investment_plan', '📋 投资建议'),
+                        ('final_trade_decision', '🎯 最终决策')
+                    ]
+
+                    available_reports = []
+                    for field_key, field_name in analysis_fields:
+                        if field_key in full_data and full_data[field_key]:
+                            available_reports.append((field_key, field_name, full_data[field_key]))
+
+                    if available_reports:
+                        # 创建标签页显示分析内容
+                        tab_names = [name for _, name, _ in available_reports]
+                        tabs = st.tabs(tab_names)
+
+                        for i, (tab, (field_key, field_name, content)) in enumerate(zip(tabs, available_reports)):
+                            with tab:
+                                if isinstance(content, str):
+                                    st.markdown(content)
+                                elif isinstance(content, dict):
+                                    for key, value in content.items():
+                                        if value:
+                                            st.subheader(key.replace('_', ' ').title())
+                                            st.markdown(str(value))
+                                else:
+                                    st.write(content)
+                    else:
+                        st.info("暂无详细分析报告")
+                else:
+                    st.info("暂无详细分析报告")
+            else:
+                st.info("暂无详细分析报告")
+            return
+
+        # 获取报告数据
+        reports = result['reports']
+
+        # 为报告名称添加中文标题和图标
+        report_display_names = {
+            'final_trade_decision': '🎯 最终交易决策',
+            'fundamentals_report': '💰 基本面分析',
+            'technical_report': '📈 技术面分析',
+            'market_sentiment_report': '💭 市场情绪分析',
+            'risk_assessment_report': '⚠️ 风险评估',
+            'price_target_report': '🎯 目标价格分析',
+            'summary_report': '📋 分析摘要',
+            'news_analysis_report': '📰 新闻分析',
+            'news_report': '📰 新闻分析',
+            'market_report': '📈 市场分析',
+            'social_media_report': '📱 社交媒体分析',
+            'bull_state': '🐂 多头观点',
+            'bear_state': '🐻 空头观点',
+            'trader_state': '💼 交易员分析',
+            'invest_judge_state': '⚖️ 投资判断',
+            'research_team_state': '🔬 研究团队观点',
+            'risk_debate_state': '⚠️ 风险管理讨论',
+            'research_team_decision': '🔬 研究团队决策',
+            'risk_management_decision': '🛡️ 风险管理决策',
+            'investment_plan': '📋 投资计划',
+            'trader_investment_plan': '💼 交易员投资计划',
+            'investment_debate_state': '💬 投资讨论状态'
+        }
+
+        # 创建标签页显示不同的报告
+        report_tabs = list(reports.keys())
+        tab_names = []
+        for report_key in report_tabs:
+            display_name = report_display_names.get(report_key, f"📄 {report_key.replace('_', ' ').title()}")
+            tab_names.append(display_name)
+
+        if len(tab_names) == 1:
+            # 只有一个报告，直接显示内容（不添加额外标题，避免重复）
+            report_content = reports[report_tabs[0]]
+            # 如果报告内容已经包含标题，直接显示；否则添加标题
+            if not report_content.strip().startswith('#'):
+                st.markdown(f"### {tab_names[0]}")
+                st.markdown("---")
+            st.markdown(report_content)
+        else:
+            # 多个报告，使用标签页
+            tabs = st.tabs(tab_names)
+
+            for i, (tab, report_key) in enumerate(zip(tabs, report_tabs)):
+                with tab:
+                    st.markdown(reports[report_key])
+
+        st.markdown("---")

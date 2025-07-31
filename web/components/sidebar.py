@@ -43,24 +43,12 @@ def render_sidebar():
     </script>
     """, unsafe_allow_html=True)
 
-    # 优化侧边栏样式
+    # 侧边栏特定样式（全局样式在global_sidebar.css中）
     st.markdown("""
     <style>
-    /* 优化侧边栏宽度 - 调整为320px */
-    section[data-testid="stSidebar"] {
-        width: 320px !important;
-        min-width: 320px !important;
-        max-width: 320px !important;
-    }
+    /* 侧边栏宽度和基础样式已在global_sidebar.css中定义 */
 
-    /* 优化侧边栏内容容器 */
-    section[data-testid="stSidebar"] > div {
-        width: 320px !important;
-        min-width: 320px !important;
-        max-width: 320px !important;
-    }
-
-    /* 强制减少侧边栏内边距 - 多种选择器确保生效 */
+    /* 侧边栏特定的内边距和组件样式 */
     section[data-testid="stSidebar"] .block-container,
     section[data-testid="stSidebar"] > div > div,
     .css-1d391kg,
@@ -72,23 +60,10 @@ def render_sidebar():
         padding-bottom: 0.75rem !important;
     }
 
-    /* 侧边栏内所有元素的边距控制 */
-    section[data-testid="stSidebar"] * {
-        box-sizing: border-box !important;
-    }
-
     /* 优化selectbox容器 */
     section[data-testid="stSidebar"] .stSelectbox {
         margin-bottom: 0.4rem !important;
         width: 100% !important;
-    }
-
-    /* 优化selectbox下拉框 - 调整为适合320px */
-    section[data-testid="stSidebar"] .stSelectbox > div > div,
-    section[data-testid="stSidebar"] .stSelectbox [data-baseweb="select"] {
-        width: 100% !important;
-        min-width: 260px !important;
-        max-width: 280px !important;
     }
 
     /* 优化下拉框选项文本 */
