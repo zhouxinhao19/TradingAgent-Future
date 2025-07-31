@@ -255,6 +255,61 @@ class MongoDBReportManager:
             logger.error(f"❌ 删除分析报告失败: {e}")
             return False
 
+    def get_all_reports(self, limit: int = 1000) -> List[Dict[str, Any]]:
+        """获取所有分析报告"""
+        if not self.connected:
+            return []
+
+        try:
+            # 获取所有报告，按时间戳降序排列
+            cursor = self.collection.find().sort("timestamp", -1).limit(limit)
+            reports = list(cursor)
+
+            # 转换ObjectId为字符串
+            for report in reports:
+                if '_id' in report:
+                    report['_id'] = str(report['_id'])
+
+            logger.info(f"✅ 从MongoDB获取了 {len(reports)} 个分析报告")
+            return reports
+
+        except Exception as e:
+            logger.error(f"❌ 从MongoDB获取所有报告失败: {e}")
+            return []
+
+    def save_report(self, report_data: Dict[str, Any]) -> bool:
+        """保存报告数据（通用方法）"""
+        if not self.connected:
+            logger.warning("MongoDB未连接，跳过保存")
+            return False
+
+        try:
+            # 确保有必要的字段
+            if 'analysis_id' not in report_data:
+                logger.error("报告数据缺少analysis_id字段")
+                return False
+
+            # 添加保存时间戳
+            report_data['saved_at'] = datetime.now()
+
+            # 使用upsert操作，如果存在则更新，不存在则插入
+            result = self.collection.replace_one(
+                {"analysis_id": report_data['analysis_id']},
+                report_data,
+                upsert=True
+            )
+
+            if result.upserted_id or result.modified_count > 0:
+                logger.info(f"✅ 报告保存成功: {report_data['analysis_id']}")
+                return True
+            else:
+                logger.warning(f"⚠️ 报告保存无变化: {report_data['analysis_id']}")
+                return True
+
+        except Exception as e:
+            logger.error(f"❌ 保存报告到MongoDB失败: {e}")
+            return False
+
 
 # 创建全局实例
 mongodb_report_manager = MongoDBReportManager()

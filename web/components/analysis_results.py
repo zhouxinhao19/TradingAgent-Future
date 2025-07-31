@@ -108,12 +108,13 @@ def get_analysis_tags(analysis_id):
 
 def load_analysis_results(start_date=None, end_date=None, stock_symbol=None, analyst_type=None,
                          limit=100, search_text=None, tags_filter=None, favorites_only=False):
-    """加载分析结果"""
+    """加载分析结果 - 优先从MongoDB加载"""
     all_results = []
     favorites = load_favorites() if favorites_only else []
     tags_data = load_tags()
+    mongodb_loaded = False
 
-    # 首先尝试从MongoDB加载数据
+    # 优先从MongoDB加载数据
     if MONGODB_AVAILABLE:
         try:
             print("🔍 [数据加载] 从MongoDB加载分析结果")
@@ -139,102 +140,110 @@ def load_analysis_results(start_date=None, end_date=None, stock_symbol=None, ana
                 }
                 all_results.append(result)
 
+            mongodb_loaded = True
             print(f"✅ 从MongoDB加载了 {len(mongodb_results)} 个分析结果")
 
         except Exception as e:
             print(f"❌ MongoDB加载失败: {e}")
             logger.error(f"MongoDB加载失败: {e}")
+            mongodb_loaded = False
     else:
-        print("⚠️ MongoDB不可用，跳过MongoDB数据加载")
-    
-    # 首先尝试从Web界面的保存位置读取
-    web_results_dir = get_analysis_results_dir()
-    for result_file in web_results_dir.glob("*.json"):
-        if result_file.name in ['favorites.json', 'tags.json']:
-            continue
-            
-        try:
-            with open(result_file, 'r', encoding='utf-8') as f:
-                result = json.load(f)
-                
-                # 添加标签信息
-                result['tags'] = tags_data.get(result.get('analysis_id', ''), [])
-                result['is_favorite'] = result.get('analysis_id', '') in favorites
-                
-                all_results.append(result)
-        except Exception as e:
-            st.warning(f"读取分析结果文件 {result_file.name} 失败: {e}")
-    
-    # 然后从实际的分析结果保存位置读取
-    project_results_dir = Path(__file__).parent.parent.parent / "data" / "analysis_results" / "detailed"
-    
-    if project_results_dir.exists():
-        # 遍历股票代码目录
-        for stock_dir in project_results_dir.iterdir():
-            if not stock_dir.is_dir():
+        print("⚠️ MongoDB不可用，将使用文件系统数据")
+
+    # 只有在MongoDB加载失败或不可用时才从文件系统加载
+    if not mongodb_loaded:
+        print("🔄 [备用数据源] 从文件系统加载分析结果")
+
+        # 首先尝试从Web界面的保存位置读取
+        web_results_dir = get_analysis_results_dir()
+        for result_file in web_results_dir.glob("*.json"):
+            if result_file.name in ['favorites.json', 'tags.json']:
                 continue
-                
-            stock_code = stock_dir.name
-            
-            # 遍历日期目录
-            for date_dir in stock_dir.iterdir():
-                if not date_dir.is_dir():
-                    continue
-                    
-                date_str = date_dir.name
-                reports_dir = date_dir / "reports"
-                
-                if not reports_dir.exists():
-                    continue
-                
-                # 读取所有报告文件
-                reports = {}
-                summary_content = ""
-                
-                for report_file in reports_dir.glob("*.md"):
-                    try:
-                        with open(report_file, 'r', encoding='utf-8') as f:
-                            content = f.read()
-                            report_name = report_file.stem
-                            reports[report_name] = content
-                            
-                            # 如果是最终决策报告，提取摘要
-                            if report_name == "final_trade_decision":
-                                # 提取前200个字符作为摘要
-                                summary_content = content[:200].replace('#', '').replace('*', '').strip()
-                                if len(content) > 200:
-                                    summary_content += "..."
-                                    
-                    except Exception as e:
-                        continue
-                
-                if reports:
-                    # 解析日期
-                    try:
-                        analysis_date = datetime.strptime(date_str, '%Y-%m-%d')
-                        timestamp = analysis_date.timestamp()
-                    except:
-                        timestamp = datetime.now().timestamp()
-                    
-                    # 创建分析结果条目
-                    analysis_id = f"{stock_code}_{date_str}_{int(timestamp)}"
-                    
-                    result = {
-                        'analysis_id': analysis_id,
-                        'timestamp': timestamp,
-                        'stock_symbol': stock_code,
-                        'analysts': ['market', 'fundamentals', 'trader'],  # 根据报告类型推断
-                        'research_depth': len(reports),
-                        'status': 'completed',
-                        'summary': summary_content,
-                        'performance': {},
-                        'tags': tags_data.get(analysis_id, []),
-                        'is_favorite': analysis_id in favorites,
-                        'reports': reports,  # 保存所有报告内容
-                        'source': 'file_system'  # 标记数据来源
-                    }
-                    
+
+            try:
+                with open(result_file, 'r', encoding='utf-8') as f:
+                    result = json.load(f)
+
+                    # 添加标签信息
+                    result['tags'] = tags_data.get(result.get('analysis_id', ''), [])
+                    result['is_favorite'] = result.get('analysis_id', '') in favorites
+                    result['source'] = 'file_system'  # 标记数据来源
+
                     all_results.append(result)
+            except Exception as e:
+                st.warning(f"读取分析结果文件 {result_file.name} 失败: {e}")
+
+        # 然后从实际的分析结果保存位置读取
+        project_results_dir = Path(__file__).parent.parent.parent / "data" / "analysis_results" / "detailed"
+
+            # 遍历股票代码目录
+            for stock_dir in project_results_dir.iterdir():
+                if not stock_dir.is_dir():
+                    continue
+
+                stock_code = stock_dir.name
+
+                # 遍历日期目录
+                for date_dir in stock_dir.iterdir():
+                    if not date_dir.is_dir():
+                        continue
+
+                    date_str = date_dir.name
+                    reports_dir = date_dir / "reports"
+
+                    if not reports_dir.exists():
+                        continue
+
+                    # 读取所有报告文件
+                    reports = {}
+                    summary_content = ""
+
+                    for report_file in reports_dir.glob("*.md"):
+                        try:
+                            with open(report_file, 'r', encoding='utf-8') as f:
+                                content = f.read()
+                                report_name = report_file.stem
+                                reports[report_name] = content
+
+                                # 如果是最终决策报告，提取摘要
+                                if report_name == "final_trade_decision":
+                                    # 提取前200个字符作为摘要
+                                    summary_content = content[:200].replace('#', '').replace('*', '').strip()
+                                    if len(content) > 200:
+                                        summary_content += "..."
+
+                        except Exception as e:
+                            continue
+
+                    if reports:
+                        # 解析日期
+                        try:
+                            analysis_date = datetime.strptime(date_str, '%Y-%m-%d')
+                            timestamp = analysis_date.timestamp()
+                        except:
+                            timestamp = datetime.now().timestamp()
+
+                        # 创建分析结果条目
+                        analysis_id = f"{stock_code}_{date_str}_{int(timestamp)}"
+
+                        result = {
+                            'analysis_id': analysis_id,
+                            'timestamp': timestamp,
+                            'stock_symbol': stock_code,
+                            'analysts': ['market', 'fundamentals', 'trader'],  # 根据报告类型推断
+                            'research_depth': len(reports),
+                            'status': 'completed',
+                            'summary': summary_content,
+                            'performance': {},
+                            'tags': tags_data.get(analysis_id, []),
+                            'is_favorite': analysis_id in favorites,
+                            'reports': reports,  # 保存所有报告内容
+                            'source': 'file_system'  # 标记数据来源
+                        }
+
+                        all_results.append(result)
+
+        print(f"🔄 [备用数据源] 从文件系统加载了 {len(all_results)} 个分析结果")
     
     # 过滤结果
     filtered_results = []
@@ -532,70 +541,89 @@ def render_results_cards(results: List[Dict[str, Any]]):
     if st.session_state.get('show_detail_modal', False):
         show_detail_modal()
 
-@st.dialog("📊 分析结果详情")
+@st.dialog("📊 分析结果详情", width="large")
 def show_detail_modal():
     """显示详情弹窗"""
     selected_result = st.session_state.get('selected_result_for_modal')
-    
-    if selected_result:
-        # 基本信息
+
+    if not selected_result:
+        st.error("未找到分析结果数据")
+        return
+
+    # 检查是否有报告数据
+    if 'reports' not in selected_result or not selected_result['reports']:
+        st.warning("该分析结果没有可用的报告内容")
+
+        # 显示基本信息作为备选
         col1, col2, col3 = st.columns(3)
-        
         with col1:
             st.metric("📈 股票代码", selected_result.get('stock_symbol', 'unknown'))
-            st.metric("👥 分析师数量", len(selected_result.get('analysts', [])))
-        
         with col2:
             analysis_time = datetime.fromtimestamp(selected_result.get('timestamp', 0))
             st.metric("⏰ 分析时间", analysis_time.strftime('%Y-%m-%d %H:%M'))
+        with col3:
             status = "✅ 完成" if selected_result.get('status') == 'completed' else "❌ 失败"
             st.metric("📊 状态", status)
-        
-        with col3:
-            st.metric("🔬 研究深度", selected_result.get('research_depth', 'unknown'))
-            tags = selected_result.get('tags', [])
-            st.metric("🏷️ 标签数量", len(tags))
-        
-        # 显示标签
-        if tags:
-            st.write("**🏷️ 标签**:")
-            tag_cols = st.columns(min(len(tags), 5))
-            for i, tag in enumerate(tags):
-                with tag_cols[i % 5]:
-                    st.markdown(f"`{tag}`")
-        
-        # 显示分析师列表
-        if selected_result.get('analysts'):
-            st.write("**👥 分析师**:")
-            st.write(", ".join(selected_result.get('analysts', [])))
-        
-        # 显示分析摘要
+
         if selected_result.get('summary'):
             st.subheader("📝 分析摘要")
             st.markdown(selected_result['summary'])
-        
-        # 显示性能指标
-        performance = selected_result.get('performance', {})
-        if performance:
-            st.subheader("⚡ 性能指标")
-            perf_cols = st.columns(len(performance))
-            for i, (key, value) in enumerate(performance.items()):
-                with perf_cols[i]:
-                    display_value = f"{value:.2f}" if isinstance(value, (int, float)) else str(value)
-                    st.metric(key.replace('_', ' ').title(), display_value)
-        
-        # 显示完整分析结果（默认展开）
+
+        return
+
+    # 获取报告数据
+    reports = selected_result['reports']
+
+    # 调试信息
+    print(f"🔍 [弹窗调试] 数据来源: {selected_result.get('source', '未知')}")
+    print(f"🔍 [弹窗调试] 可用报告数量: {len(reports)}")
+    print(f"🔍 [弹窗调试] 报告类型: {list(reports.keys())}")
+
+    # 为报告名称添加中文标题和图标
+    report_display_names = {
+        'final_trade_decision': '🎯 最终交易决策',
+        'fundamentals_report': '💰 基本面分析',
+        'technical_report': '📈 技术面分析',
+        'market_sentiment_report': '💭 市场情绪分析',
+        'risk_assessment_report': '⚠️ 风险评估',
+        'price_target_report': '🎯 目标价格分析',
+        'summary_report': '📋 分析摘要',
+        'news_analysis_report': '📰 新闻分析',
+        'news_report': '📰 新闻分析',
+        'market_report': '📈 市场分析',
+        'social_media_report': '📱 社交媒体分析',
+        'bull_state': '🐂 多头观点',
+        'bear_state': '🐻 空头观点',
+        'trader_state': '💼 交易员分析',
+        'invest_judge_state': '⚖️ 投资判断',
+        'research_team_state': '🔬 研究团队观点',
+        'risk_debate_state': '⚠️ 风险管理讨论',
+        'research_team_decision': '🔬 研究团队决策',
+        'risk_management_decision': '🛡️ 风险管理决策'
+    }
+
+    # 创建标签页显示不同的报告
+    report_tabs = list(reports.keys())
+    tab_names = []
+    for report_key in report_tabs:
+        display_name = report_display_names.get(report_key, f"📄 {report_key.replace('_', ' ').title()}")
+        tab_names.append(display_name)
+        print(f"🔍 [弹窗调试] 添加标签: {display_name}")
+
+    print(f"🔍 [弹窗调试] 总标签数: {len(tab_names)}")
+
+    if len(tab_names) == 1:
+        # 只有一个报告，直接显示
+        st.markdown(f"### {tab_names[0]}")
         st.markdown("---")
-        render_detailed_analysis_content(selected_result)
-        
-        # 关闭按钮
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col2:
-            if st.button("关闭", key="close_modal", use_container_width=True):
-                st.session_state['show_detail_modal'] = False
-                if 'selected_result_for_modal' in st.session_state:
-                    del st.session_state['selected_result_for_modal']
-                st.rerun()
+        st.markdown(reports[report_tabs[0]])
+    else:
+        # 多个报告，使用标签页
+        tabs = st.tabs(tab_names)
+
+        for i, (tab, report_key) in enumerate(zip(tabs, report_tabs)):
+            with tab:
+                st.markdown(reports[report_key])
 
 def toggle_favorite(analysis_id):
     """切换收藏状态"""
