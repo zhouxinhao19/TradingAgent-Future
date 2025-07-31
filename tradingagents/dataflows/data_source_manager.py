@@ -850,7 +850,16 @@ def get_china_stock_data_unified(symbol: str, start_date: str, end_date: str) ->
     manager = get_data_source_manager()
     logger.info(f"🔍 [股票代码追踪] 调用 manager.get_stock_data，传入参数: symbol='{symbol}', start_date='{start_date}', end_date='{end_date}'")
     result = manager.get_stock_data(symbol, start_date, end_date)
-    logger.info(f"🔍 [股票代码追踪] manager.get_stock_data 返回结果前200字符: {result[:200] if result else 'None'}")
+    # 分析返回结果的详细信息
+    if result:
+        lines = result.split('\n')
+        data_lines = [line for line in lines if '2025-' in line and symbol in line]
+        logger.info(f"🔍 [股票代码追踪] 返回结果统计: 总行数={len(lines)}, 数据行数={len(data_lines)}, 结果长度={len(result)}字符")
+        logger.info(f"🔍 [股票代码追踪] 返回结果前500字符: {result[:500]}")
+        if len(data_lines) > 0:
+            logger.info(f"🔍 [股票代码追踪] 数据行示例: 第1行='{data_lines[0][:100]}', 最后1行='{data_lines[-1][:100]}'")
+    else:
+        logger.info(f"🔍 [股票代码追踪] 返回结果: None")
     return result
 
 
