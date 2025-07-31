@@ -27,6 +27,22 @@ except ImportError as e:
 # 设置日志
 logger = logging.getLogger(__name__)
 
+def safe_timestamp_to_datetime(timestamp_value):
+    """安全地将时间戳转换为datetime对象"""
+    if isinstance(timestamp_value, datetime):
+        # 如果已经是datetime对象（来自MongoDB）
+        return timestamp_value
+    elif isinstance(timestamp_value, (int, float)):
+        # 如果是时间戳数字（来自文件系统）
+        try:
+            return datetime.fromtimestamp(timestamp_value)
+        except (ValueError, OSError):
+            # 时间戳无效，使用当前时间
+            return datetime.now()
+    else:
+        # 其他情况，使用当前时间
+        return datetime.now()
+
 def get_analysis_results_dir():
     """获取分析结果目录"""
     results_dir = Path(__file__).parent.parent / "data" / "analysis_results"
@@ -176,6 +192,7 @@ def load_analysis_results(start_date=None, end_date=None, stock_symbol=None, ana
         # 然后从实际的分析结果保存位置读取
         project_results_dir = Path(__file__).parent.parent.parent / "data" / "analysis_results" / "detailed"
 
+        if project_results_dir.exists():
             # 遍历股票代码目录
             for stock_dir in project_results_dir.iterdir():
                 if not stock_dir.is_dir():
@@ -254,7 +271,7 @@ def load_analysis_results(start_date=None, end_date=None, stock_symbol=None, ana
             
         # 时间过滤
         if start_date or end_date:
-            result_time = datetime.fromtimestamp(result.get('timestamp', 0))
+            result_time = safe_timestamp_to_datetime(result.get('timestamp', 0))
             if start_date and result_time.date() < start_date:
                 continue
             if end_date and result_time.date() > end_date:
@@ -449,7 +466,7 @@ def render_results_table(results: List[Dict[str, Any]]):
     table_data = []
     for result in results:
         table_data.append({
-            '时间': datetime.fromtimestamp(result.get('timestamp', 0)).strftime('%m-%d %H:%M'),
+            '时间': safe_timestamp_to_datetime(result.get('timestamp', 0)).strftime('%m-%d %H:%M'),
             '股票': result.get('stock_symbol', 'unknown'),
             '分析师': ', '.join(result.get('analysts', [])[:2]) + ('...' if len(result.get('analysts', [])) > 2 else ''),
             '状态': '✅' if result.get('status') == 'completed' else '❌',
@@ -489,7 +506,7 @@ def render_results_cards(results: List[Dict[str, Any]]):
             
             with col1:
                 st.markdown(f"### 📊 {result.get('stock_symbol', 'unknown')}")
-                st.caption(f"🕐 {datetime.fromtimestamp(result.get('timestamp', 0)).strftime('%Y-%m-%d %H:%M:%S')}")
+                st.caption(f"🕐 {safe_timestamp_to_datetime(result.get('timestamp', 0)).strftime('%Y-%m-%d %H:%M:%S')}")
             
             with col2:
                 # 收藏按钮
@@ -559,7 +576,7 @@ def show_detail_modal():
         with col1:
             st.metric("📈 股票代码", selected_result.get('stock_symbol', 'unknown'))
         with col2:
-            analysis_time = datetime.fromtimestamp(selected_result.get('timestamp', 0))
+            analysis_time = safe_timestamp_to_datetime(selected_result.get('timestamp', 0))
             st.metric("⏰ 分析时间", analysis_time.strftime('%Y-%m-%d %H:%M'))
         with col3:
             status = "✅ 完成" if selected_result.get('status') == 'completed' else "❌ 失败"
@@ -648,7 +665,7 @@ def render_results_comparison(results: List[Dict[str, Any]]):
     
     result_options = []
     for i, result in enumerate(results[:20]):  # 限制选项数量
-        option = f"{result.get('stock_symbol', 'unknown')} - {datetime.fromtimestamp(result.get('timestamp', 0)).strftime('%m-%d %H:%M')}"
+        option = f"{result.get('stock_symbol', 'unknown')} - {safe_timestamp_to_datetime(result.get('timestamp', 0)).strftime('%m-%d %H:%M')}"
         result_options.append((option, i))
     
     with col1:
@@ -675,14 +692,14 @@ def render_results_comparison(results: List[Dict[str, Any]]):
         '项目': ['股票代码', '分析时间', '分析师', '研究深度', '状态'],
         '结果A': [
             result_a.get('stock_symbol', 'unknown'),
-            datetime.fromtimestamp(result_a.get('timestamp', 0)).strftime('%Y-%m-%d %H:%M'),
+            safe_timestamp_to_datetime(result_a.get('timestamp', 0)).strftime('%Y-%m-%d %H:%M'),
             ', '.join(result_a.get('analysts', [])),
             str(result_a.get('research_depth', 'unknown')),
             '完成' if result_a.get('status') == 'completed' else '失败'
         ],
         '结果B': [
             result_b.get('stock_symbol', 'unknown'),
-            datetime.fromtimestamp(result_b.get('timestamp', 0)).strftime('%Y-%m-%d %H:%M'),
+            safe_timestamp_to_datetime(result_b.get('timestamp', 0)).strftime('%Y-%m-%d %H:%M'),
             ', '.join(result_b.get('analysts', [])),
             str(result_b.get('research_depth', 'unknown')),
             '完成' if result_b.get('status') == 'completed' else '失败'
@@ -761,7 +778,7 @@ def render_results_charts(results: List[Dict[str, Any]]):
     st.subheader("📅 每日分析趋势")
     daily_results = {}
     for result in results:
-        date_str = datetime.fromtimestamp(result.get('timestamp', 0)).strftime('%Y-%m-%d')
+        date_str = safe_timestamp_to_datetime(result.get('timestamp', 0)).strftime('%Y-%m-%d')
         daily_results[date_str] = daily_results.get(date_str, 0) + 1
     
     if daily_results:
@@ -894,7 +911,7 @@ def render_tags_management(results: List[Dict[str, Any]]):
         selected_results = st.multiselect(
             "选择分析结果",
             options=range(len(results)),
-            format_func=lambda i: f"{results[i].get('stock_symbol', 'unknown')} - {datetime.fromtimestamp(results[i].get('timestamp', 0)).strftime('%m-%d %H:%M')}",
+            format_func=lambda i: f"{results[i].get('stock_symbol', 'unknown')} - {safe_timestamp_to_datetime(results[i].get('timestamp', 0)).strftime('%m-%d %H:%M')}",
             max_selections=10
         )
         
@@ -944,7 +961,7 @@ def render_results_export(results: List[Dict[str, Any]]):
                 summary_data = []
                 for result in results:
                     summary_data.append({
-                        '分析时间': datetime.fromtimestamp(result.get('timestamp', 0)).strftime('%Y-%m-%d %H:%M:%S'),
+                        '分析时间': safe_timestamp_to_datetime(result.get('timestamp', 0)).strftime('%Y-%m-%d %H:%M:%S'),
                         '股票代码': result.get('stock_symbol', 'unknown'),
                         '分析师': ', '.join(result.get('analysts', [])),
                         '研究深度': result.get('research_depth', 'unknown'),
@@ -1025,7 +1042,7 @@ def render_results_comparison(results: List[Dict[str, Any]]):
     # 准备选项
     result_options = []
     for i, result in enumerate(results[:20]):  # 限制前20个
-        option = f"{result.get('stock_symbol', 'unknown')} - {datetime.fromtimestamp(result.get('timestamp', 0)).strftime('%m-%d %H:%M')}"
+        option = f"{result.get('stock_symbol', 'unknown')} - {safe_timestamp_to_datetime(result.get('timestamp', 0)).strftime('%m-%d %H:%M')}"
         result_options.append((option, i))
     
     with col1:
@@ -1059,7 +1076,7 @@ def render_results_comparison(results: List[Dict[str, Any]]):
         "项目": ["股票代码", "分析时间", "分析师数量", "研究深度", "状态", "标签数量"],
         "分析结果 A": [
             result_a.get('stock_symbol', 'unknown'),
-            datetime.fromtimestamp(result_a.get('timestamp', 0)).strftime('%Y-%m-%d %H:%M'),
+            safe_timestamp_to_datetime(result_a.get('timestamp', 0)).strftime('%Y-%m-%d %H:%M'),
             len(result_a.get('analysts', [])),
             result_a.get('research_depth', 'unknown'),
             "✅ 完成" if result_a.get('status') == 'completed' else "❌ 失败",
@@ -1067,7 +1084,7 @@ def render_results_comparison(results: List[Dict[str, Any]]):
         ],
         "分析结果 B": [
             result_b.get('stock_symbol', 'unknown'),
-            datetime.fromtimestamp(result_b.get('timestamp', 0)).strftime('%Y-%m-%d %H:%M'),
+            safe_timestamp_to_datetime(result_b.get('timestamp', 0)).strftime('%Y-%m-%d %H:%M'),
             len(result_b.get('analysts', [])),
             result_b.get('research_depth', 'unknown'),
             "✅ 完成" if result_b.get('status') == 'completed' else "❌ 失败",
@@ -1219,7 +1236,7 @@ def render_detailed_analysis(results: List[Dict[str, Any]]):
     # 选择要查看的分析结果
     result_options = []
     for i, result in enumerate(results[:50]):  # 显示前50个
-        option = f"{result.get('stock_symbol', 'unknown')} - {datetime.fromtimestamp(result.get('timestamp', 0)).strftime('%m-%d %H:%M')}"
+        option = f"{result.get('stock_symbol', 'unknown')} - {safe_timestamp_to_datetime(result.get('timestamp', 0)).strftime('%m-%d %H:%M')}"
         result_options.append((option, i))
     
     if result_options:
@@ -1238,7 +1255,7 @@ def render_detailed_analysis(results: List[Dict[str, Any]]):
             st.metric("分析师数量", len(selected_result.get('analysts', [])))
         
         with col2:
-            analysis_time = datetime.fromtimestamp(selected_result.get('timestamp', 0))
+            analysis_time = safe_timestamp_to_datetime(selected_result.get('timestamp', 0))
             st.metric("分析时间", analysis_time.strftime('%m-%d %H:%M'))
             status = "✅ 完成" if selected_result.get('status') == 'completed' else "❌ 失败"
             st.metric("状态", status)
