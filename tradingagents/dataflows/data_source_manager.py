@@ -482,8 +482,8 @@ class DataSourceManager:
                 result += f"数据期间: {start_date} 至 {end_date}\n"
                 result += f"数据条数: {len(data)}条\n\n"
 
-                # 显示更多数据：最近10天或全部数据（如果少于10天）
-                display_rows = min(10, len(data))
+                # 显示最新3天数据，确保在各种显示环境下都能完整显示
+                display_rows = min(3, len(data))
                 result += f"最新{display_rows}天数据:\n"
 
                 # 使用pandas选项确保显示完整数据
@@ -493,8 +493,8 @@ class DataSourceManager:
                                      'display.max_colwidth', None):
                     result += data.tail(display_rows).to_string(index=False)
 
-                # 如果数据超过10天，也显示一些统计信息
-                if len(data) > 10:
+                # 如果数据超过3天，也显示一些统计信息
+                if len(data) > 3:
                     latest_price = data.iloc[-1]['收盘'] if '收盘' in data.columns else data.iloc[-1].get('close', 'N/A')
                     first_price = data.iloc[0]['收盘'] if '收盘' in data.columns else data.iloc[0].get('close', 'N/A')
                     if latest_price != 'N/A' and first_price != 'N/A':
@@ -532,8 +532,8 @@ class DataSourceManager:
             result += f"数据期间: {start_date} 至 {end_date}\n"
             result += f"数据条数: {len(data)}条\n\n"
 
-            # 显示更多数据：最近10天或全部数据（如果少于10天）
-            display_rows = min(10, len(data))
+            # 显示最新3天数据，确保在各种显示环境下都能完整显示
+            display_rows = min(3, len(data))
             result += f"最新{display_rows}天数据:\n"
 
             # 使用pandas选项确保显示完整数据
