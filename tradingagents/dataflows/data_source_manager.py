@@ -9,6 +9,7 @@ import time
 from typing import Dict, List, Optional, Any
 from enum import Enum
 import warnings
+import pandas as pd
 
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
@@ -480,8 +481,26 @@ class DataSourceManager:
                 result = f"股票代码: {symbol}\n"
                 result += f"数据期间: {start_date} 至 {end_date}\n"
                 result += f"数据条数: {len(data)}条\n\n"
-                result += "最新数据:\n"
-                result += data.tail(5).to_string(index=False)
+
+                # 显示更多数据：最近10天或全部数据（如果少于10天）
+                display_rows = min(10, len(data))
+                result += f"最新{display_rows}天数据:\n"
+                result += data.tail(display_rows).to_string(index=False)
+
+                # 如果数据超过10天，也显示一些统计信息
+                if len(data) > 10:
+                    latest_price = data.iloc[-1]['收盘'] if '收盘' in data.columns else data.iloc[-1].get('close', 'N/A')
+                    first_price = data.iloc[0]['收盘'] if '收盘' in data.columns else data.iloc[0].get('close', 'N/A')
+                    if latest_price != 'N/A' and first_price != 'N/A':
+                        try:
+                            change = float(latest_price) - float(first_price)
+                            change_pct = (change / float(first_price)) * 100
+                            result += f"\n\n📊 期间统计:\n"
+                            result += f"期间涨跌: {change:+.2f} ({change_pct:+.2f}%)\n"
+                            result += f"最高价: {data['最高'].max() if '最高' in data.columns else data.get('high', pd.Series()).max():.2f}\n"
+                            result += f"最低价: {data['最低'].min() if '最低' in data.columns else data.get('low', pd.Series()).min():.2f}"
+                        except (ValueError, TypeError):
+                            pass
 
                 logger.debug(f"📊 [AKShare] 调用成功: 耗时={duration:.2f}s, 数据条数={len(data)}, 结果长度={len(result)}")
                 return result
@@ -506,8 +525,11 @@ class DataSourceManager:
             result = f"股票代码: {symbol}\n"
             result += f"数据期间: {start_date} 至 {end_date}\n"
             result += f"数据条数: {len(data)}条\n\n"
-            result += "最新数据:\n"
-            result += data.tail(5).to_string(index=False)
+
+            # 显示更多数据：最近10天或全部数据（如果少于10天）
+            display_rows = min(10, len(data))
+            result += f"最新{display_rows}天数据:\n"
+            result += data.tail(display_rows).to_string(index=False)
             return result
         else:
             return f"❌ 未能获取{symbol}的股票数据"
