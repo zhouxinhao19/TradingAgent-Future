@@ -485,7 +485,13 @@ class DataSourceManager:
                 # 显示更多数据：最近10天或全部数据（如果少于10天）
                 display_rows = min(10, len(data))
                 result += f"最新{display_rows}天数据:\n"
-                result += data.tail(display_rows).to_string(index=False)
+
+                # 使用pandas选项确保显示完整数据
+                with pd.option_context('display.max_rows', None,
+                                     'display.max_columns', None,
+                                     'display.width', None,
+                                     'display.max_colwidth', None):
+                    result += data.tail(display_rows).to_string(index=False)
 
                 # 如果数据超过10天，也显示一些统计信息
                 if len(data) > 10:
@@ -529,7 +535,13 @@ class DataSourceManager:
             # 显示更多数据：最近10天或全部数据（如果少于10天）
             display_rows = min(10, len(data))
             result += f"最新{display_rows}天数据:\n"
-            result += data.tail(display_rows).to_string(index=False)
+
+            # 使用pandas选项确保显示完整数据
+            with pd.option_context('display.max_rows', None,
+                                 'display.max_columns', None,
+                                 'display.width', None,
+                                 'display.max_colwidth', None):
+                result += data.tail(display_rows).to_string(index=False)
             return result
         else:
             return f"❌ 未能获取{symbol}的股票数据"
