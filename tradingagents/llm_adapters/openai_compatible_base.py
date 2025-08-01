@@ -215,6 +215,34 @@ class ChatDashScopeOpenAIUnified(OpenAICompatibleBase):
         )
 
 
+class ChatCustomOpenAI(OpenAICompatibleBase):
+    """自定义OpenAI端点适配器"""
+    
+    def __init__(
+        self,
+        model: str = "gpt-3.5-turbo",
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        temperature: float = 0.1,
+        max_tokens: Optional[int] = None,
+        **kwargs
+    ):
+        # 如果没有提供base_url，使用默认的OpenAI端点
+        if base_url is None:
+            base_url = "https://api.openai.com/v1"
+        
+        super().__init__(
+            provider_name="custom_openai",
+            model=model,
+            api_key_env_var="CUSTOM_OPENAI_API_KEY",
+            base_url=base_url,
+            api_key=api_key,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            **kwargs
+        )
+
+
 # 支持的OpenAI兼容模型配置
 OPENAI_COMPATIBLE_PROVIDERS = {
     "deepseek": {
@@ -237,6 +265,28 @@ OPENAI_COMPATIBLE_PROVIDERS = {
             "qwen-max": {"context_length": 32768, "supports_function_calling": True},
             "qwen-max-latest": {"context_length": 32768, "supports_function_calling": True}
         }
+    },
+    "custom_openai": {
+        "adapter_class": ChatCustomOpenAI,
+        "base_url": None,  # 将由用户配置
+        "api_key_env": "CUSTOM_OPENAI_API_KEY",
+        "models": {
+            "gpt-3.5-turbo": {"context_length": 16384, "supports_function_calling": True},
+            "gpt-4": {"context_length": 8192, "supports_function_calling": True},
+            "gpt-4-turbo": {"context_length": 128000, "supports_function_calling": True},
+            "gpt-4o": {"context_length": 128000, "supports_function_calling": True},
+            "gpt-4o-mini": {"context_length": 128000, "supports_function_calling": True},
+            "claude-3-haiku": {"context_length": 200000, "supports_function_calling": True},
+            "claude-3-sonnet": {"context_length": 200000, "supports_function_calling": True},
+            "claude-3-opus": {"context_length": 200000, "supports_function_calling": True},
+            "claude-3.5-sonnet": {"context_length": 200000, "supports_function_calling": True},
+            "gemini-pro": {"context_length": 32768, "supports_function_calling": True},
+            "gemini-1.5-pro": {"context_length": 1000000, "supports_function_calling": True},
+            "llama-3.1-8b": {"context_length": 128000, "supports_function_calling": True},
+            "llama-3.1-70b": {"context_length": 128000, "supports_function_calling": True},
+            "llama-3.1-405b": {"context_length": 128000, "supports_function_calling": True},
+            "custom-model": {"context_length": 32768, "supports_function_calling": True}
+        }
     }
 }
 
@@ -247,17 +297,19 @@ def create_openai_compatible_llm(
     api_key: Optional[str] = None,
     temperature: float = 0.1,
     max_tokens: Optional[int] = None,
+    base_url: Optional[str] = None,
     **kwargs
 ) -> OpenAICompatibleBase:
     """
     创建OpenAI兼容LLM实例的统一工厂函数
     
     Args:
-        provider: 提供商名称 ("deepseek", "dashscope")
+        provider: 提供商名称 ("deepseek", "dashscope", "custom_openai")
         model: 模型名称
         api_key: API密钥
         temperature: 温度参数
         max_tokens: 最大token数
+        base_url: 自定义API端点URL（仅对custom_openai有效）
         **kwargs: 其他参数
     
     Returns:
@@ -269,6 +321,10 @@ def create_openai_compatible_llm(
     
     provider_config = OPENAI_COMPATIBLE_PROVIDERS[provider]
     adapter_class = provider_config["adapter_class"]
+    
+    # 对于自定义OpenAI端点，传递base_url参数
+    if provider == "custom_openai" and base_url:
+        kwargs["base_url"] = base_url
     
     return adapter_class(
         model=model,

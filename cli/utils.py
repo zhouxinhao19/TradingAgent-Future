@@ -165,6 +165,15 @@ def select_shallow_thinking_agent(provider) -> str:
         ],
         "deepseek v3": [
             ("DeepSeek Chat - 通用对话模型，适合股票投资分析", "deepseek-chat"),
+        ],
+        "🔧 自定义openai端点": [
+            ("GPT-4o-mini - Fast and efficient for quick tasks", "gpt-4o-mini"),
+            ("GPT-4o - Standard model with solid capabilities", "gpt-4o"),
+            ("GPT-3.5-turbo - Cost-effective option", "gpt-3.5-turbo"),
+            ("Claude-3-haiku - Fast Anthropic model", "claude-3-haiku-20240307"),
+            ("Llama-3.1-8B - Open source model", "meta-llama/llama-3.1-8b-instruct"),
+            ("Qwen2.5-7B - Chinese optimized model", "qwen/qwen-2.5-7b-instruct"),
+            ("自定义模型 - 手动输入模型名称", "custom"),
         ]
     }
 
@@ -247,6 +256,17 @@ def select_deep_thinking_agent(provider) -> str:
         ],
         "deepseek v3": [
             ("DeepSeek Chat - 通用对话模型，适合股票投资分析", "deepseek-chat"),
+        ],
+        "🔧 自定义openai端点": [
+            ("GPT-4o - Standard model with solid capabilities", "gpt-4o"),
+            ("GPT-4o-mini - Fast and efficient for quick tasks", "gpt-4o-mini"),
+            ("o1-preview - Advanced reasoning model", "o1-preview"),
+            ("o1-mini - Compact reasoning model", "o1-mini"),
+            ("Claude-3-sonnet - Balanced Anthropic model", "claude-3-sonnet-20240229"),
+            ("Claude-3-opus - Most capable Anthropic model", "claude-3-opus-20240229"),
+            ("Llama-3.1-70B - Large open source model", "meta-llama/llama-3.1-70b-instruct"),
+            ("Qwen2.5-72B - Chinese optimized model", "qwen/qwen-2.5-72b-instruct"),
+            ("自定义模型 - 手动输入模型名称", "custom"),
         ]
     }
     
@@ -291,6 +311,7 @@ def select_llm_provider() -> tuple[str, str]:
         ("阿里百炼 (DashScope)", "https://dashscope.aliyuncs.com/api/v1"),
         ("DeepSeek V3", "https://api.deepseek.com"),
         ("OpenAI", "https://api.openai.com/v1"),
+        ("🔧 自定义OpenAI端点", "custom"),
         ("Anthropic", "https://api.anthropic.com/"),
         ("Google", "https://generativelanguage.googleapis.com/v1"),
         ("Openrouter", "https://openrouter.ai/api/v1"),
@@ -319,6 +340,25 @@ def select_llm_provider() -> tuple[str, str]:
         exit(1)
     
     display_name, url = choice
-    logger.info(f"您选择了 | You selected: {display_name}\tURL: {url}")
+    
+    # 如果选择了自定义OpenAI端点，询问用户输入URL
+    if url == "custom":
+        custom_url = questionary.text(
+            "请输入自定义OpenAI端点URL | Please enter custom OpenAI endpoint URL:",
+            default="https://api.openai.com/v1",
+            instruction="例如: https://api.openai.com/v1 或 http://localhost:8000/v1"
+        ).ask()
+        
+        if custom_url is None:
+            logger.info(f"\n[red]未输入自定义URL，退出程序... | No custom URL entered. Exiting...[/red]")
+            exit(1)
+            
+        url = custom_url
+        logger.info(f"您选择了 | You selected: {display_name}\tURL: {url}")
+        
+        # 设置环境变量以便后续使用
+        os.environ['CUSTOM_OPENAI_BASE_URL'] = url
+    else:
+        logger.info(f"您选择了 | You selected: {display_name}\tURL: {url}")
 
     return display_name, url

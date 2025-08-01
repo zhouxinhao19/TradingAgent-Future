@@ -209,14 +209,15 @@ def render_sidebar():
         # LLM提供商选择
         llm_provider = st.selectbox(
             "LLM提供商",
-            options=["dashscope", "deepseek", "google", "openai", "openrouter"],
-            index=["dashscope", "deepseek", "google", "openai", "openrouter"].index(st.session_state.llm_provider) if st.session_state.llm_provider in ["dashscope", "deepseek", "google", "openai", "openrouter"] else 0,
+            options=["dashscope", "deepseek", "google", "openai", "openrouter", "custom_openai"],
+            index=["dashscope", "deepseek", "google", "openai", "openrouter", "custom_openai"].index(st.session_state.llm_provider) if st.session_state.llm_provider in ["dashscope", "deepseek", "google", "openai", "openrouter", "custom_openai"] else 0,
             format_func=lambda x: {
                 "dashscope": "🇨🇳 阿里百炼",
                 "deepseek": "🚀 DeepSeek V3",
                 "google": "🌟 Google AI",
                 "openai": "🤖 OpenAI",
-                "openrouter": "🌐 OpenRouter"
+                "openrouter": "🌐 OpenRouter",
+                "custom_openai": "🔧 自定义OpenAI端点"
             }[x],
             help="选择AI模型提供商",
             key="llm_provider_select"
@@ -383,6 +384,155 @@ def render_sidebar():
 
              # OpenAI特殊提示
              st.info("💡 **OpenAI配置**: 在.env文件中设置OPENAI_API_KEY")
+        elif llm_provider == "custom_openai":
+            st.markdown("### 🔧 自定义OpenAI端点配置")
+            
+            # 初始化session state
+            if 'custom_openai_base_url' not in st.session_state:
+                st.session_state.custom_openai_base_url = "https://api.openai.com/v1"
+            if 'custom_openai_api_key' not in st.session_state:
+                st.session_state.custom_openai_api_key = ""
+            
+            # API端点URL配置
+            base_url = st.text_input(
+                "API端点URL",
+                value=st.session_state.custom_openai_base_url,
+                placeholder="https://api.openai.com/v1",
+                help="输入OpenAI兼容的API端点URL，例如中转服务或本地部署的API",
+                key="custom_openai_base_url_input"
+            )
+            
+            # 更新session state
+            st.session_state.custom_openai_base_url = base_url
+            
+            # API密钥配置
+            api_key = st.text_input(
+                "API密钥",
+                value=st.session_state.custom_openai_api_key,
+                type="password",
+                placeholder="sk-...",
+                help="输入API密钥，也可以在.env文件中设置CUSTOM_OPENAI_API_KEY",
+                key="custom_openai_api_key_input"
+            )
+            
+            # 更新session state
+            st.session_state.custom_openai_api_key = api_key
+            
+            # 模型选择
+            custom_openai_options = [
+                "gpt-4o",
+                "gpt-4o-mini", 
+                "gpt-4-turbo",
+                "gpt-4",
+                "gpt-3.5-turbo",
+                "claude-3.5-sonnet",
+                "claude-3-opus",
+                "claude-3-sonnet",
+                "claude-3-haiku",
+                "gemini-pro",
+                "gemini-1.5-pro",
+                "llama-3.1-8b",
+                "llama-3.1-70b",
+                "llama-3.1-405b",
+                "custom-model"
+            ]
+            
+            # 获取当前选择的索引
+            current_index = 0
+            if st.session_state.llm_model in custom_openai_options:
+                current_index = custom_openai_options.index(st.session_state.llm_model)
+            
+            llm_model = st.selectbox(
+                "选择模型",
+                options=custom_openai_options,
+                index=current_index,
+                format_func=lambda x: {
+                    "gpt-4o": "GPT-4o - OpenAI最新旗舰",
+                    "gpt-4o-mini": "GPT-4o Mini - 轻量旗舰",
+                    "gpt-4-turbo": "GPT-4 Turbo - 强化版",
+                    "gpt-4": "GPT-4 - 经典版",
+                    "gpt-3.5-turbo": "GPT-3.5 Turbo - 经济版",
+                    "claude-3.5-sonnet": "Claude 3.5 Sonnet - Anthropic旗舰",
+                    "claude-3-opus": "Claude 3 Opus - 强大性能",
+                    "claude-3-sonnet": "Claude 3 Sonnet - 平衡版",
+                    "claude-3-haiku": "Claude 3 Haiku - 快速版",
+                    "gemini-pro": "Gemini Pro - Google AI",
+                    "gemini-1.5-pro": "Gemini 1.5 Pro - 增强版",
+                    "llama-3.1-8b": "Llama 3.1 8B - Meta开源",
+                    "llama-3.1-70b": "Llama 3.1 70B - 大型开源",
+                    "llama-3.1-405b": "Llama 3.1 405B - 超大开源",
+                    "custom-model": "自定义模型名称"
+                }[x],
+                help="选择要使用的模型，支持各种OpenAI兼容的模型",
+                key="custom_openai_model_select"
+            )
+            
+            # 如果选择了自定义模型，显示输入框
+            if llm_model == "custom-model":
+                custom_model_name = st.text_input(
+                    "自定义模型名称",
+                    value="",
+                    placeholder="例如: gpt-4-custom, claude-3.5-sonnet-custom",
+                    help="输入自定义的模型名称",
+                    key="custom_model_name_input"
+                )
+                if custom_model_name:
+                    llm_model = custom_model_name
+            
+            # 更新session state和持久化存储
+            if st.session_state.llm_model != llm_model:
+                logger.debug(f"🔄 [Persistence] 自定义OpenAI模型变更: {st.session_state.llm_model} → {llm_model}")
+            st.session_state.llm_model = llm_model
+            logger.debug(f"💾 [Persistence] 自定义OpenAI模型已保存: {llm_model}")
+            
+            # 保存到持久化存储
+            save_model_selection(st.session_state.llm_provider, st.session_state.model_category, llm_model)
+            
+            # 常用端点快速配置
+            st.markdown("**🚀 常用端点快速配置:**")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("🌐 OpenAI官方", key="quick_openai_official", use_container_width=True):
+                    st.session_state.custom_openai_base_url = "https://api.openai.com/v1"
+                    st.rerun()
+                
+                if st.button("🇨🇳 OpenAI中转1", key="quick_openai_relay1", use_container_width=True):
+                    st.session_state.custom_openai_base_url = "https://api.openai-proxy.com/v1"
+                    st.rerun()
+            
+            with col2:
+                if st.button("🏠 本地部署", key="quick_local_deploy", use_container_width=True):
+                    st.session_state.custom_openai_base_url = "http://localhost:8000/v1"
+                    st.rerun()
+                
+                if st.button("🇨🇳 OpenAI中转2", key="quick_openai_relay2", use_container_width=True):
+                    st.session_state.custom_openai_base_url = "https://api.openai-sb.com/v1"
+                    st.rerun()
+            
+            # 配置验证
+            if base_url and api_key:
+                st.success(f"✅ 配置完成")
+                st.info(f"**端点**: `{base_url}`")
+                st.info(f"**模型**: `{llm_model}`")
+            elif base_url:
+                st.warning("⚠️ 请输入API密钥")
+            else:
+                st.warning("⚠️ 请配置API端点URL和密钥")
+            
+            # 配置说明
+            st.markdown("""
+            **📖 配置说明:**
+            - **API端点URL**: OpenAI兼容的API服务地址
+            - **API密钥**: 对应服务的API密钥
+            - **模型**: 选择或自定义模型名称
+            
+            **🔧 支持的服务类型:**
+            - OpenAI官方API
+            - OpenAI中转服务
+            - 本地部署的OpenAI兼容服务
+            - 其他兼容OpenAI格式的API服务
+            """)
         else:  # openrouter
             # OpenRouter模型分类选择
             model_category = st.selectbox(

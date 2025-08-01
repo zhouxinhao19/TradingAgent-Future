@@ -1056,8 +1056,14 @@ def run_analysis():
         config["llm_provider"] = "dashscope"
     elif "deepseek" in selected_llm_provider_name or "DeepSeek" in selections["llm_provider"]:
         config["llm_provider"] = "deepseek"
-    elif "openai" in selected_llm_provider_name:
+    elif "openai" in selected_llm_provider_name and "自定义" not in selections["llm_provider"]:
         config["llm_provider"] = "openai"
+    elif "自定义openai端点" in selected_llm_provider_name or "自定义" in selections["llm_provider"]:
+        config["llm_provider"] = "custom_openai"
+        # 从环境变量获取自定义URL
+        custom_url = os.getenv('CUSTOM_OPENAI_BASE_URL', selections["backend_url"])
+        config["custom_openai_base_url"] = custom_url
+        config["backend_url"] = custom_url
     elif "anthropic" in selected_llm_provider_name:
         config["llm_provider"] = "anthropic"
     elif "google" in selected_llm_provider_name:

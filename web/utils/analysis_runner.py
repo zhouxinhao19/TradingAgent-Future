@@ -320,6 +320,13 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             config["backend_url"] = "https://openrouter.ai/api/v1"
             logger.info(f"🌐 [OpenRouter] 使用模型: {llm_model}")
             logger.info(f"🌐 [OpenRouter] API端点: https://openrouter.ai/api/v1")
+        elif llm_provider == "custom_openai":
+            # 自定义OpenAI端点
+            custom_base_url = st.session_state.get("custom_openai_base_url", "https://api.openai.com/v1")
+            config["backend_url"] = custom_base_url
+            config["custom_openai_base_url"] = custom_base_url
+            logger.info(f"🔧 [自定义OpenAI] 使用模型: {llm_model}")
+            logger.info(f"🔧 [自定义OpenAI] API端点: {custom_base_url}")
 
         # 修复路径问题 - 优先使用环境变量配置
         # 数据目录：优先使用环境变量，否则使用默认路径
