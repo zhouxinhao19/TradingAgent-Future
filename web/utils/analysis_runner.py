@@ -310,6 +310,26 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         elif llm_provider == "google":
             # Google AI不需要backend_url，使用默认的OpenAI格式
             config["backend_url"] = "https://api.openai.com/v1"
+            
+            # 根据研究深度优化Google模型选择
+            if research_depth == 1:  # 快速分析 - 使用最快模型
+                config["quick_think_llm"] = "gemini-2.5-flash-lite-preview-06-17"  # 1.45s
+                config["deep_think_llm"] = "gemini-2.0-flash"  # 1.87s
+            elif research_depth == 2:  # 基础分析 - 使用快速模型
+                config["quick_think_llm"] = "gemini-2.0-flash"  # 1.87s
+                config["deep_think_llm"] = "gemini-1.5-pro"  # 2.25s
+            elif research_depth == 3:  # 标准分析 - 平衡性能
+                config["quick_think_llm"] = "gemini-1.5-pro"  # 2.25s
+                config["deep_think_llm"] = "gemini-2.5-flash"  # 2.73s
+            elif research_depth == 4:  # 深度分析 - 使用强大模型
+                config["quick_think_llm"] = "gemini-2.5-flash"  # 2.73s
+                config["deep_think_llm"] = "gemini-2.5-pro"  # 16.68s
+            else:  # 全面分析 - 使用最强模型
+                config["quick_think_llm"] = "gemini-2.5-pro"  # 16.68s
+                config["deep_think_llm"] = "gemini-2.5-pro"  # 16.68s
+            
+            logger.info(f"🤖 [Google AI] 快速模型: {config['quick_think_llm']}")
+            logger.info(f"🤖 [Google AI] 深度模型: {config['deep_think_llm']}")
         elif llm_provider == "openai":
             # OpenAI官方API
             config["backend_url"] = "https://api.openai.com/v1"

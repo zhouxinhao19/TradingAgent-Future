@@ -296,7 +296,17 @@ def render_sidebar():
             save_model_selection(st.session_state.llm_provider, st.session_state.model_category, llm_model)
 
         elif llm_provider == "google":
-            google_options = ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
+            google_options = [
+                "gemini-2.5-pro", 
+                "gemini-2.5-flash",
+                "gemini-2.5-flash-lite",
+                "gemini-2.5-pro-002",
+                "gemini-2.5-flash-002",
+                "gemini-2.0-flash",
+                "gemini-2.5-flash-lite-preview-06-17", 
+                "gemini-1.5-pro", 
+                "gemini-1.5-flash"
+            ]
 
             # 获取当前选择的索引
             current_index = 0
@@ -308,9 +318,15 @@ def render_sidebar():
                 options=google_options,
                 index=current_index,
                 format_func=lambda x: {
-                    "gemini-2.0-flash": "Gemini 2.0 Flash - 推荐使用",
-                    "gemini-1.5-pro": "Gemini 1.5 Pro - 强大性能",
-                    "gemini-1.5-flash": "Gemini 1.5 Flash - 快速响应"
+                    "gemini-2.5-pro": "Gemini 2.5 Pro - 🚀 最新旗舰模型",
+                    "gemini-2.5-flash": "Gemini 2.5 Flash - ⚡ 最新快速模型",
+                    "gemini-2.5-flash-lite": "Gemini 2.5 Flash Lite - 💡 轻量快速",
+                    "gemini-2.5-flash-lite-preview-06-17": "Gemini 2.5 Flash Lite Preview - ⚡ 超快响应 (1.45s)",
+                    "gemini-2.5-pro-002": "Gemini 2.5 Pro-002 - 🔧 优化版本",
+                    "gemini-2.5-flash-002": "Gemini 2.5 Flash-002 - ⚡ 优化快速版",
+                    "gemini-2.0-flash": "Gemini 2.0 Flash - 🚀 推荐使用 (1.87s)",
+                    "gemini-1.5-pro": "Gemini 1.5 Pro - ⚖️ 强大性能 (2.25s)",
+                    "gemini-1.5-flash": "Gemini 1.5 Flash - 💨 快速响应 (2.87s)"
                 }[x],
                 help="选择用于分析的Google Gemini模型",
                 key="google_model_select"
@@ -706,6 +722,8 @@ def render_sidebar():
                     "google/gemini-2.5-pro",
                     "google/gemini-2.5-flash",
                     "google/gemini-2.5-flash-lite",
+                    "google/gemini-2.5-pro-002",
+                    "google/gemini-2.5-flash-002",
                     "google/gemini-2.0-flash-001",
                     "google/gemini-2.0-flash-lite-001",
                     "google/gemini-1.5-pro",
@@ -726,8 +744,10 @@ def render_sidebar():
                     index=current_index,
                     format_func=lambda x: {
                         "google/gemini-2.5-pro": "🚀 Gemini 2.5 Pro - 最新旗舰",
-                        "google/gemini-2.5-flash": "🚀 Gemini 2.5 Flash - 最新快速",
-                        "google/gemini-2.5-flash-lite": "Gemini 2.5 Flash Lite - 轻量版",
+                        "google/gemini-2.5-flash": "⚡ Gemini 2.5 Flash - 最新快速",
+                        "google/gemini-2.5-flash-lite": "💡 Gemini 2.5 Flash Lite - 轻量版",
+                        "google/gemini-2.5-pro-002": "🔧 Gemini 2.5 Pro-002 - 优化版",
+                        "google/gemini-2.5-flash-002": "⚡ Gemini 2.5 Flash-002 - 优化快速版",
                         "google/gemini-2.0-flash-001": "Gemini 2.0 Flash - 稳定版",
                         "google/gemini-2.0-flash-lite-001": "Gemini 2.0 Flash Lite",
                         "google/gemini-1.5-pro": "Gemini 1.5 Pro - 专业版",
