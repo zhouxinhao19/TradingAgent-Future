@@ -9,7 +9,7 @@ from typing import Dict, Any, Tuple, List, Optional
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
-from tradingagents.llm_adapters import ChatDashScope, ChatDashScopeOpenAI
+from tradingagents.llm_adapters import ChatDashScope, ChatDashScopeOpenAI, ChatGoogleOpenAI
 
 from langgraph.prebuilt import ToolNode
 
@@ -94,19 +94,26 @@ class TradingAgentsGraph:
             self.deep_thinking_llm = ChatAnthropic(model=self.config["deep_think_llm"], base_url=self.config["backend_url"])
             self.quick_thinking_llm = ChatAnthropic(model=self.config["quick_think_llm"], base_url=self.config["backend_url"])
         elif self.config["llm_provider"].lower() == "google":
+            # 使用 Google OpenAI 兼容适配器，解决工具调用格式不匹配问题
+            logger.info(f"🔧 使用Google AI OpenAI 兼容适配器 (解决工具调用问题)")
             google_api_key = os.getenv('GOOGLE_API_KEY')
-            self.deep_thinking_llm = ChatGoogleGenerativeAI(
+            if not google_api_key:
+                raise ValueError("使用Google AI需要设置GOOGLE_API_KEY环境变量")
+            
+            self.deep_thinking_llm = ChatGoogleOpenAI(
                 model=self.config["deep_think_llm"],
                 google_api_key=google_api_key,
                 temperature=0.1,
                 max_tokens=2000
             )
-            self.quick_thinking_llm = ChatGoogleGenerativeAI(
+            self.quick_thinking_llm = ChatGoogleOpenAI(
                 model=self.config["quick_think_llm"],
                 google_api_key=google_api_key,
                 temperature=0.1,
                 max_tokens=2000
             )
+            
+            logger.info(f"✅ [Google AI] 已启用优化的工具调用和内容格式处理")
         elif (self.config["llm_provider"].lower() == "dashscope" or
               self.config["llm_provider"].lower() == "alibaba" or
               "dashscope" in self.config["llm_provider"].lower() or
