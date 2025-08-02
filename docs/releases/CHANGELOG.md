@@ -2,7 +2,7 @@
 
 本文档记录了TradingAgents-CN项目的所有重要更改。
 
-## [v0.1.13-preview] - 2025-01-28 - 原生OpenAI支持与Google AI全面集成预览版
+## [v0.1.13-preview] - 2025-08-2 - 原生OpenAI支持与Google AI全面集成预览版
 
 ### 🎉 重大更新
 
@@ -19,7 +19,7 @@
   - `langchain-google-genai>=2.1.5` - LangChain集成
   - `google-generativeai>=0.8.0` - 官方SDK (兼容性)
   - `google-genai>=0.1.0` - 新一代SDK (未来发展)
-- **6个验证模型**: gemini-1.5-pro, gemini-1.5-flash, gemini-2.0-flash-exp等
+- **9个验证模型**: gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash等
 - **Google工具处理器**: 专门的Google AI工具调用处理器
 - **智能降级机制**: 高级功能失败时自动降级到基础功能
 
@@ -95,17 +95,11 @@
 ### 📊 功能统计
 
 - **新增LLM适配器**: 2个 (原生OpenAI, Google AI)
-- **支持Google AI模型**: 6个 (验证可用)
+- **支持Google AI模型**: 9个 (验证可用)
 - **新增依赖包**: 3个 (Google AI生态)
 - **新增测试文件**: 15+ (全面覆盖)
 - **新增文档**: 8个 (配置和使用指南)
 
-### 🚀 性能改进
-
-- **LLM调用速度**: 提升30% (优化适配器)
-- **模型切换**: 提升50% (智能选择机制)
-- **错误恢复**: 提升80% (增强异常处理)
-- **系统稳定性**: 提升90% (依赖冲突解决)
 
 ### ⚠️ 预览版说明
 

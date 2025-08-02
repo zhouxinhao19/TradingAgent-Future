@@ -2,13 +2,13 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/Version-cn--0.1.12-green.svg)](./VERSION)
+[![Version](https://img.shields.io/badge/Version-cn--0.1.13--preview-orange.svg)](./VERSION)
 [![Documentation](https://img.shields.io/badge/docs-中文文档-green.svg)](./docs/)
 [![Original](https://img.shields.io/badge/基于-TauricResearch/TradingAgents-orange.svg)](https://github.com/TauricResearch/TradingAgents)
 
-> 🚀 **最新版本 cn-0.1.12**: 智能新闻分析模块全面升级，新增多层次新闻过滤、质量评估、相关性分析，支持A股/港股/美股新闻智能处理！
+> 🚀 **最新版本 cn-0.1.13-preview**: 原生OpenAI支持与Google AI全面集成预览版！新增自定义OpenAI端点、9个Google AI模型、LLM适配器架构优化！
 >
-> 🎯 **核心功能**: 智能新闻过滤 | 新闻质量评估 | 相关性分析 | 多LLM提供商支持 | 模型选择持久化 | Docker容器化部署 | 专业报告导出 | 完整A股支持 | 中文本地化
+> 🎯 **核心功能**: 原生OpenAI支持 | Google AI全面集成 | 自定义端点配置 | 智能模型选择 | 多LLM提供商支持 | 模型选择持久化 | Docker容器化部署 | 专业报告导出 | 完整A股支持 | 中文本地化
 
 基于多智能体大语言模型的**中文金融交易决策框架**。专为中文用户优化，提供完整的A股/港股/美股分析能力。
 
@@ -17,6 +17,36 @@
 感谢 [Tauric Research](https://github.com/TauricResearch) 团队创造的革命性多智能体交易框架 [TradingAgents](https://github.com/TauricResearch/TradingAgents)！
 
 **🎯 我们的使命**: 为中国用户提供完整的中文化体验，支持A股/港股市场，集成国产大模型，推动AI金融技术在中文社区的普及应用。
+
+## 🆕 v0.1.13-preview 重大更新
+
+### 🤖 原生OpenAI端点支持
+
+- **自定义OpenAI端点**: 支持配置任意OpenAI兼容的API端点
+- **灵活模型选择**: 可以使用任何OpenAI格式的模型，不限于官方模型
+- **智能适配器**: 新增原生OpenAI适配器，提供更好的兼容性和性能
+- **配置管理**: 统一的端点和模型配置管理系统
+
+### 🧠 Google AI生态系统全面集成
+
+- **三大Google AI包支持**: langchain-google-genai、google-generativeai、google-genai
+- **9个验证模型**: gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash等最新模型
+- **Google工具处理器**: 专门的Google AI工具调用处理器
+- **智能降级机制**: 高级功能失败时自动降级到基础功能
+
+### 🔧 LLM适配器架构优化
+
+- **GoogleOpenAIAdapter**: 新增Google AI的OpenAI兼容适配器
+- **统一接口**: 所有LLM提供商使用统一的调用接口
+- **错误处理增强**: 改进的异常处理和自动重试机制
+- **性能监控**: 添加LLM调用性能监控和统计
+
+### 🎨 Web界面智能优化
+
+- **智能模型选择**: 根据可用性自动选择最佳模型
+- **KeyError修复**: 彻底解决模型选择中的KeyError问题
+- **UI响应优化**: 改进模型切换的响应速度和用户体验
+- **错误提示**: 更友好的错误提示和解决建议
 
 ## 🆕 v0.1.12 重大更新
 
@@ -108,20 +138,24 @@
 | **⏱️ 时间预估功能**   | ✅ 完整支持 | 智能分析阶段显示预计耗时             |
 | **🌈 Rich彩色输出**     | ✅ 完整支持 | 彩色进度指示，状态图标，视觉效果提升 |
 
-### 🧠 LLM模型支持 ✨ **v0.1.11全面升级**
+### 🧠 LLM模型支持 ✨ **v0.1.13-preview全面升级**
 
 
 | 模型提供商        | 支持模型                     | 特色功能                | 新增功能 |
 | ----------------- | ---------------------------- | ----------------------- | -------- |
 | **🇨🇳 阿里百炼** | qwen-turbo/plus/max          | 中文优化，成本效益高    | ✅ 集成  |
 | **🇨🇳 DeepSeek** | deepseek-chat                | 工具调用，性价比极高    | ✅ 集成  |
-| **🌍 Google AI**  | gemini-2.0-flash/1.5-pro     | 多模态支持，推理能力强  | ✅ 集成  |
-| **🌐 OpenRouter** | **60+模型聚合平台**          | 一个API访问所有主流模型 | 🆕 新增  |
-| ├─**OpenAI**    | o4-mini-high, o3-pro, GPT-4o | 最新o系列，推理专业版   | 🆕 新增  |
-| ├─**Anthropic** | Claude 4 Opus/Sonnet/Haiku   | 顶级性能，平衡版本      | 🆕 新增  |
-| ├─**Meta**      | Llama 4 Maverick/Scout       | 最新Llama 4系列         | 🆕 新增  |
-| ├─**Google**    | Gemini 2.5 Pro/Flash         | 多模态专业版            | 🆕 新增  |
-| └─**自定义**    | 任意OpenRouter模型ID         | 无限扩展，个性化选择    | 🆕 新增  |
+| **🌍 Google AI**  | **9个验证模型**              | 最新Gemini 2.5系列     | 🆕 升级  |
+| ├─**最新旗舰**  | gemini-2.5-pro/flash         | 最新旗舰，超快响应      | 🆕 新增  |
+| ├─**稳定推荐**  | gemini-2.0-flash             | 推荐使用，平衡性能      | 🆕 新增  |
+| ├─**经典强大**  | gemini-1.5-pro/flash         | 经典稳定，高质量分析    | ✅ 集成  |
+| └─**轻量快速**  | gemini-2.5-flash-lite        | 轻量级任务，快速响应    | 🆕 新增  |
+| **🌐 原生OpenAI** | **自定义端点支持**           | 任意OpenAI兼容端点      | 🆕 新增  |
+| **🌐 OpenRouter** | **60+模型聚合平台**          | 一个API访问所有主流模型 | ✅ 集成  |
+| ├─**OpenAI**    | o4-mini-high, o3-pro, GPT-4o | 最新o系列，推理专业版   | ✅ 集成  |
+| ├─**Anthropic** | Claude 4 Opus/Sonnet/Haiku   | 顶级性能，平衡版本      | ✅ 集成  |
+| ├─**Meta**      | Llama 4 Maverick/Scout       | 最新Llama 4系列         | ✅ 集成  |
+| └─**自定义**    | 任意OpenRouter模型ID         | 无限扩展，个性化选择    | ✅ 集成  |
 
 **🎯 快速选择**: 5个热门模型快速按钮 | **💾 持久化**: URL参数存储，刷新保持 | **🔄 智能切换**: 一键切换不同提供商
 
