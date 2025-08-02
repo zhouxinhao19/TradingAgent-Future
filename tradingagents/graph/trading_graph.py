@@ -243,43 +243,81 @@ class TradingAgentsGraph:
         self.graph = self.graph_setup.setup_graph(selected_analysts)
 
     def _create_tool_nodes(self) -> Dict[str, ToolNode]:
-        """Create tool nodes for different data sources."""
+        """Create tool nodes for different data sources based on configuration."""
+        
+        # 获取在线工具配置
+        online_tools_enabled = self.config.get("online_tools", False)
+        online_news_enabled = self.config.get("online_news", True)
+        realtime_data_enabled = self.config.get("realtime_data", False)
+        
+        # 市场数据工具选择
+        market_tools = [
+            # 统一工具 (始终可用)
+            self.toolkit.get_stock_market_data_unified,
+        ]
+        
+        # 根据配置添加在线/离线工具
+        if realtime_data_enabled:
+            # 实时数据优先
+            market_tools.extend([
+                self.toolkit.get_YFin_data_online,
+                self.toolkit.get_stockstats_indicators_report_online,
+                self.toolkit.get_YFin_data,  # 备用
+                self.toolkit.get_stockstats_indicators_report,  # 备用
+            ])
+        else:
+            # 离线数据优先
+            market_tools.extend([
+                self.toolkit.get_YFin_data,
+                self.toolkit.get_stockstats_indicators_report,
+                self.toolkit.get_YFin_data_online,  # 备用
+                self.toolkit.get_stockstats_indicators_report_online,  # 备用
+            ])
+        
+        # 社交媒体工具选择
+        social_tools = []
+        if online_tools_enabled:
+            # 在线工具优先
+            social_tools.extend([
+                self.toolkit.get_stock_news_openai,
+                self.toolkit.get_reddit_stock_info,  # 备用
+            ])
+        else:
+            # 离线工具优先
+            social_tools.extend([
+                self.toolkit.get_reddit_stock_info,
+                self.toolkit.get_stock_news_openai,  # 备用
+            ])
+        
+        # 新闻工具选择
+        news_tools = []
+        if online_news_enabled:
+            # 在线新闻优先
+            news_tools.extend([
+                self.toolkit.get_google_news,
+                self.toolkit.get_finnhub_news,
+                self.toolkit.get_reddit_news,
+            ])
+            # 如果OpenAI也启用，添加OpenAI新闻工具
+            if online_tools_enabled:
+                news_tools.insert(0, self.toolkit.get_global_news_openai)
+        else:
+            # 离线新闻优先
+            news_tools.extend([
+                self.toolkit.get_finnhub_news,
+                self.toolkit.get_reddit_news,
+                self.toolkit.get_google_news,  # 备用 (不需要API key)
+            ])
+        
         return {
-            "market": ToolNode(
-                [
-                    # 统一工具
-                    self.toolkit.get_stock_market_data_unified,
-                    # online tools
-                    self.toolkit.get_YFin_data_online,
-                    self.toolkit.get_stockstats_indicators_report_online,
-                    # offline tools
-                    self.toolkit.get_YFin_data,
-                    self.toolkit.get_stockstats_indicators_report,
-                ]
-            ),
-            "social": ToolNode(
-                [
-                    # online tools
-                    self.toolkit.get_stock_news_openai,
-                    # offline tools
-                    self.toolkit.get_reddit_stock_info,
-                ]
-            ),
-            "news": ToolNode(
-                [
-                    # online tools
-                    self.toolkit.get_global_news_openai,
-                    self.toolkit.get_google_news,
-                    # offline tools
-                    self.toolkit.get_finnhub_news,
-                    self.toolkit.get_reddit_news,
-                ]
-            ),
+            "market": ToolNode(market_tools),
+            "social": ToolNode(social_tools),
+            "news": ToolNode(news_tools),
             "fundamentals": ToolNode(
                 [
-                    # 统一工具
+                    # 统一工具 (始终可用)
                     self.toolkit.get_stock_fundamentals_unified,
-                    # offline tools
+                    # 基础工具 (不依赖在线配置)
                     self.toolkit.get_finnhub_company_insider_sentiment,
                     self.toolkit.get_finnhub_company_insider_transactions,
                     self.toolkit.get_simfin_balance_sheet,
