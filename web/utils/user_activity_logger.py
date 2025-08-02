@@ -72,7 +72,9 @@ class UserActivityLogger:
     
     def _get_user_info(self) -> Dict[str, str]:
         """获取当前用户信息"""
-        user_info = st.session_state.get('user_info', {})
+        user_info = st.session_state.get('user_info')
+        if user_info is None:
+            user_info = {}
         return {
             "username": user_info.get('username', 'anonymous'),
             "role": user_info.get('role', 'guest')
