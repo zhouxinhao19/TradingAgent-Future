@@ -252,11 +252,8 @@ def render_login_form():
             
             if st.button("🚀 立即登录", use_container_width=True, key="login_button"):
                 if username and password:
-                    success, user_info = auth_manager.authenticate(username, password)
-                    if success:
-                        st.session_state.authenticated = True
-                        st.session_state.user_info = user_info
-                        st.session_state.login_time = time.time()
+                    # 使用auth_manager.login()方法来确保前端缓存被正确保存
+                    if auth_manager.login(username, password):
                         st.success("✅ 登录成功！正在为您跳转...")
                         time.sleep(1)
                         st.rerun()
