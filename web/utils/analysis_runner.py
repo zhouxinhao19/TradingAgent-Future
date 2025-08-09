@@ -300,6 +300,10 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             config["backend_url"] = "https://openrouter.ai/api/v1"
             logger.info(f"🌐 [OpenRouter] 使用模型: {llm_model}")
             logger.info(f"🌐 [OpenRouter] API端点: https://openrouter.ai/api/v1")
+        elif llm_provider == "siliconflow":
+            config["backend_url"] = "https://api.siliconflow.cn/v1"
+            logger.info(f"🌐 [SiliconFlow] 使用模型: {llm_model}")
+            logger.info(f"🌐 [SiliconFlow] API端点: https://api.siliconflow.cn/v1")
 
         # 修复路径问题 - 优先使用环境变量配置
         # 数据目录：优先使用环境变量，否则使用默认路径

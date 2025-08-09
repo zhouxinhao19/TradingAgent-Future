@@ -209,9 +209,10 @@ def render_sidebar():
         # LLM提供商选择
         llm_provider = st.selectbox(
             "LLM提供商",
-            options=["dashscope", "deepseek", "google", "openrouter"],
-            index=["dashscope", "deepseek", "google", "openrouter"].index(st.session_state.llm_provider) if st.session_state.llm_provider in ["dashscope", "deepseek", "google", "openrouter"] else 0,
+            options=["siliconflow", "dashscope", "deepseek", "google", "openrouter"],
+            index=["siliconflow", "dashscope", "deepseek", "google", "openrouter"].index(st.session_state.llm_provider) if st.session_state.llm_provider in ["siliconflow", "dashscope", "deepseek", "google", "openrouter"] else 0,
             format_func=lambda x: {
+                "siliconflow": "🇨🇳 硅基流动",
                 "dashscope": "🇨🇳 阿里百炼",
                 "deepseek": "🚀 DeepSeek V3",
                 "google": "🌟 Google AI",
@@ -265,6 +266,40 @@ def render_sidebar():
 
             # 保存到持久化存储
             save_model_selection(st.session_state.llm_provider, st.session_state.model_category, llm_model)
+        elif llm_provider == "siliconflow":
+            siliconflow_options = ["Qwen/Qwen3-30B-A3B-Thinking-2507", "Qwen/Qwen3-30B-A3B-Instruct-2507", "Qwen/Qwen3-235B-A22B-Thinking-2507", "Qwen/Qwen3-235B-A22B-Instruct-2507","deepseek-ai/DeepSeek-R1", "zai-org/GLM-4.5", "moonshotai/Kimi-K2-Instruct"]
+
+            # 获取当前选择的索引
+            current_index = 0
+            if st.session_state.llm_model in siliconflow_options:
+                current_index = siliconflow_options.index(st.session_state.llm_model)
+
+            llm_model = st.selectbox(
+                "选择siliconflow模型",
+                options=siliconflow_options,
+                index=current_index,
+                format_func=lambda x: {
+                    "Qwen/Qwen3-30B-A3B-Thinking-2507": "Qwen3-30B-A3B-Thinking-2507 - 30B思维链模型",
+                    "Qwen/Qwen3-30B-A3B-Instruct-2507": "Qwen3-30B-A3B-Instruct-2507 - 30B指令模型",
+                    "Qwen/Qwen3-235B-A22B-Thinking-2507": "Qwen3-235B-A22B-Thinking-2507 - 235B思维链模型",
+                    "Qwen/Qwen3-235B-A22B-Instruct-2507": "Qwen3-235B-A22B-Instruct-2507 - 235B指令模型",
+                    "deepseek-ai/DeepSeek-R1": "DeepSeek-R1",
+                    "zai-org/GLM-4.5": "GLM-4.5 - 智谱",
+                    "moonshotai/Kimi-K2-Instruct": "Kimi-K2-Instruct",
+                }[x],
+                help="选择用于分析的siliconflow模型",
+                key="siliconflow_model_select"
+            )
+
+            # 更新session state和持久化存储
+            if st.session_state.llm_model != llm_model:
+                logger.debug(f"🔄 [Persistence] siliconflow模型变更: {st.session_state.llm_model} → {llm_model}")
+            st.session_state.llm_model = llm_model
+            logger.debug(f"💾 [Persistence] siliconflow模型已保存: {llm_model}")
+
+            # 保存到持久化存储
+            save_model_selection(st.session_state.llm_provider, st.session_state.model_category, llm_model)
+
         elif llm_provider == "deepseek":
             deepseek_options = ["deepseek-chat"]
 
