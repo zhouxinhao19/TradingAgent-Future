@@ -88,7 +88,7 @@
 
 ## 🖥️ Web界面展示
 
-### 📸 界面截图预览
+### 📸 界面截图
 
 > 🎨 **现代化Web界面**: 基于Streamlit构建的响应式Web应用，提供直观的股票分析体验
 
@@ -125,8 +125,6 @@
 ![1755003033939](images/README/1755003033939.png)
 
 ![1755003048242](images/README/1755003048242.png)
-
-
 
 ![1755003064598](images/README/1755003064598.png)
 
@@ -297,6 +295,7 @@ chmod +x scripts/smart_start.sh && ./scripts/smart_start.sh
 # 4. 访问应用
 # Web界面: http://localhost:8501
 ```
+
 ### 💻 本地部署
 
 ```bash
@@ -311,6 +310,7 @@ python start_web.py
 
 # 4. 访问 http://localhost:8501
 ```
+
 ### 📊 开始分析
 
 1. **选择模型**: DeepSeek V3 / 通义千问 / Gemini
@@ -398,6 +398,7 @@ pip install -e .
 # - 多市场数据源 (Tushare, AKShare, FinnHub等)
 # - Web界面和报告导出功能
 ```
+
 ### 配置API密钥
 
 #### 🇨🇳 推荐：使用阿里百炼（国产大模型）
@@ -431,6 +432,7 @@ REDIS_PORT=6379        # 标准Redis端口
 # MONGODB_HOST=mongodb
 # REDIS_HOST=redis
 ```
+
 #### 📋 部署模式配置说明
 
 **本地部署模式**：
@@ -444,6 +446,7 @@ MONGODB_PORT=27017         # 标准端口
 REDIS_HOST=localhost       # 本地主机
 REDIS_PORT=6379           # 标准端口
 ```
+
 **Docker部署模式**：
 
 ```bash
@@ -455,6 +458,7 @@ MONGODB_PORT=27017        # 标准端口
 REDIS_HOST=redis          # Docker容器服务名
 REDIS_PORT=6379          # 标准端口
 ```
+
 > 💡 **配置提示**：
 >
 > - 本地部署：需要手动启动MongoDB和Redis服务
@@ -470,6 +474,7 @@ OPENAI_API_KEY=your_openai_api_key
 # Anthropic (需要科学上网)
 ANTHROPIC_API_KEY=your_anthropic_api_key
 ```
+
 ### 🗄️ 数据库配置（MongoDB + Redis）
 
 #### 高性能数据存储支持
@@ -495,6 +500,7 @@ docker-compose up -d --build
 # - Redis (端口6379)
 # - 数据库管理界面 (端口8081, 8082)
 ```
+
 **💻 本地部署 - 数据库配置**
 
 如果您使用本地部署，可以选择以下方式：
@@ -511,6 +517,7 @@ docker-compose ps
 # 停止服务
 docker-compose down
 ```
+
 **方式二：完全本地安装**
 
 ```bash
@@ -522,6 +529,7 @@ mongod --dbpath ./data/mongodb
 # 启动 Redis (默认端口 6379)
 redis-server
 ```
+
 > ⚠️ **重要说明**:
 >
 > - **🐳 Docker部署**: 数据库自动包含，无需额外配置
@@ -546,6 +554,7 @@ REDIS_PORT=6379
 REDIS_PASSWORD=your_redis_password
 REDIS_DB=0
 ```
+
 **配置文件方式**：
 
 ```python
@@ -566,6 +575,7 @@ DATABASE_CONFIG = {
     }
 }
 ```
+
 #### 数据库功能特性
 
 **MongoDB 功能**：
@@ -596,6 +606,7 @@ DATABASE_CONFIG = {
 4. 💾 本地文件缓存 (备用)
 5. ❌ 返回错误信息
 ```
+
 **配置降级策略**：
 
 ```python
@@ -608,6 +619,7 @@ ENABLE_FALLBACK=true
 REDIS_CACHE_TTL=300
 MONGODB_CACHE_TTL=3600
 ```
+
 #### 性能优化建议
 
 **生产环境配置**：
@@ -623,6 +635,7 @@ REDIS_MAX_CONNECTIONS=20
 REDIS_CONNECTION_POOL_SIZE=10
 REDIS_SOCKET_TIMEOUT=5
 ```
+
 #### 数据库管理工具
 
 ```bash
@@ -635,6 +648,7 @@ python scripts/validation/check_system_status.py
 # 清理缓存工具
 python scripts/maintenance/cleanup_cache.py --days 7
 ```
+
 #### 故障排除
 
 **常见问题解决**：
@@ -656,6 +670,7 @@ python scripts/maintenance/cleanup_cache.py --days 7
    # 方案3：管理员权限运行
    # 右键PowerShell -> "以管理员身份运行"
    ```
+
    **详细解决方案**：参考 [Windows 10兼容性指南](docs/troubleshooting/windows10-chromadb-fix.md)
 2. **MongoDB连接失败**
 
@@ -668,6 +683,7 @@ python scripts/maintenance/cleanup_cache.py --days 7
    # 重启服务
    docker-compose restart mongodb
    ```
+
    **本地部署**：
 
    ```bash
@@ -737,6 +753,7 @@ pip install markdown pypandoc
 # macOS: brew install pandoc wkhtmltopdf
 # Linux: sudo apt-get install pandoc wkhtmltopdf
 ```
+
 > 📚 **详细文档**: 完整的导出功能使用指南请参考 [导出功能指南](docs/EXPORT_GUIDE.md)
 
 ### 🚀 启动应用
@@ -757,6 +774,7 @@ docker-compose ps
 # 查看日志
 docker-compose logs -f web
 ```
+
 #### 💻 本地启动
 
 如果您使用本地部署：
@@ -781,6 +799,7 @@ python web/run_web.py
 # 方法3：直接使用streamlit（需要先安装项目）
 streamlit run web/app.py
 ```
+
 然后在浏览器中访问 `http://localhost:8501`
 
 **Web界面特色功能**:
@@ -828,6 +847,7 @@ print(f"置信度: {decision['confidence']:.1%}")
 print(f"风险评分: {decision['risk_score']:.1%}")
 print(f"推理过程: {decision['reasoning']}")
 ```
+
 #### 快速启动脚本
 
 ```bash
@@ -846,6 +866,7 @@ python examples/openai/demo_openai.py
 # 集成测试
 python tests/integration/test_dashscope_integration.py
 ```
+
 #### 📁 数据目录配置
 
 **新功能**: 灵活配置数据存储路径，支持多种配置方式：
@@ -860,6 +881,7 @@ python -m cli.main data-config --set /path/to/your/data
 # 重置为默认配置
 python -m cli.main data-config --reset
 ```
+
 **环境变量配置**:
 
 ```bash
@@ -869,6 +891,7 @@ set TRADING_AGENTS_DATA_DIR=C:\MyTradingData
 # Linux/macOS
 export TRADING_AGENTS_DATA_DIR=/home/user/trading_data
 ```
+
 **程序化配置**:
 
 ```python
@@ -882,6 +905,7 @@ config_manager.set_data_directory("/path/to/data")
 data_dir = config_manager.get_data_directory()
 print(f"数据目录: {data_dir}")
 ```
+
 **配置优先级**: 程序设置 > 环境变量 > 配置文件 > 默认值
 
 详细说明请参考: [📁 数据目录配置指南](docs/configuration/data-directory-configuration.md)
@@ -892,6 +916,7 @@ print(f"数据目录: {data_dir}")
 # 启动交互式命令行界面
 python -m cli.main
 ```
+
 ## 🎯 **快速导航** - 找到您需要的内容
 
 
@@ -1023,6 +1048,7 @@ docs/
 └── ❓ faq/                  # 问题解决 - 疑难解答
     └── faq.md              # 🆘 常见问题FAQ
 ```
+
 ### 🎯 **重点推荐文档** (必读精选)
 
 #### 🔥 **最受欢迎的文档**
@@ -1161,6 +1187,7 @@ cost_optimized_config = {
     "online_tools": False  # 使用缓存数据
 }
 ```
+
 ## 🤝 贡献指南
 
 我们欢迎各种形式的贡献：
