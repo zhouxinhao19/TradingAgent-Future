@@ -2,7 +2,7 @@
 
 本文档记录了TradingAgents-CN项目的所有重要更改。
 
-## [v0.1.13-preview] - 2025-08-2 - 原生OpenAI支持与Google AI全面集成预览版
+## [v0.1.13] - 2025-08-2 - 原生OpenAI支持与Google AI全面集成预览版
 
 ### 🎉 重大更新
 
@@ -112,7 +112,7 @@
 
 ### 🔄 升级指南
 
-从v0.1.12升级到v0.1.13-preview：
+从v0.1.12升级到v0.1.13：
 
 1. **更新依赖**: `pip install -r requirements.txt` 或 `pip install -e .`
 2. **配置Google API**: 在`.env`文件中添加`GOOGLE_API_KEY`

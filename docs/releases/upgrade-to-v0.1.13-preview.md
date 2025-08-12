@@ -1,8 +1,8 @@
-# 📈 升级指南: v0.1.12 → v0.1.13-preview
+# 📈 升级指南: v0.1.12 → v0.1.13
 
 ## 🎯 升级概述
 
-本指南将帮助您从 TradingAgents-CN v0.1.12 升级到 v0.1.13-preview，享受原生OpenAI支持和Google AI全面集成的新功能。
+本指南将帮助您从 TradingAgents-CN v0.1.12 升级到 v0.1.13，享受原生OpenAI支持和Google AI全面集成的新功能。
 
 ## ⏰ 预计升级时间
 
@@ -288,7 +288,7 @@ cp -r reports_backup reports
 
 ## 🎉 升级完成
 
-恭喜！您已成功升级到 TradingAgents-CN v0.1.13-preview。
+恭喜！您已成功升级到 TradingAgents-CN v0.1.13。
 
 现在您可以：
 - 🤖 使用原生OpenAI端点支持
