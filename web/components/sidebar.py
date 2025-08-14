@@ -13,6 +13,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from web.utils.persistence import load_model_selection, save_model_selection
+from web.utils.auth_manager import auth_manager
 
 logger = logging.getLogger(__name__)
 
@@ -42,52 +43,27 @@ def render_sidebar():
     </script>
     """, unsafe_allow_html=True)
 
-    # 优化侧边栏样式
+    # 侧边栏特定样式（全局样式在global_sidebar.css中）
     st.markdown("""
     <style>
-    /* 优化侧边栏宽度 - 调整为320px */
-    section[data-testid="stSidebar"] {
-        width: 320px !important;
-        min-width: 320px !important;
-        max-width: 320px !important;
-    }
+    /* 侧边栏宽度和基础样式已在global_sidebar.css中定义 */
 
-    /* 优化侧边栏内容容器 */
-    section[data-testid="stSidebar"] > div {
-        width: 320px !important;
-        min-width: 320px !important;
-        max-width: 320px !important;
-    }
-
-    /* 强制减少侧边栏内边距 - 多种选择器确保生效 */
+    /* 侧边栏特定的内边距和组件样式 */
     section[data-testid="stSidebar"] .block-container,
     section[data-testid="stSidebar"] > div > div,
     .css-1d391kg,
     .css-1lcbmhc,
     .css-1cypcdb {
-        padding-top: 0.75rem !important;
+        padding-top: 0.2rem !important;
         padding-left: 0.5rem !important;
         padding-right: 0.5rem !important;
         padding-bottom: 0.75rem !important;
-    }
-
-    /* 侧边栏内所有元素的边距控制 */
-    section[data-testid="stSidebar"] * {
-        box-sizing: border-box !important;
     }
 
     /* 优化selectbox容器 */
     section[data-testid="stSidebar"] .stSelectbox {
         margin-bottom: 0.4rem !important;
         width: 100% !important;
-    }
-
-    /* 优化selectbox下拉框 - 调整为适合320px */
-    section[data-testid="stSidebar"] .stSelectbox > div > div,
-    section[data-testid="stSidebar"] .stSelectbox [data-baseweb="select"] {
-        width: 100% !important;
-        min-width: 260px !important;
-        max-width: 280px !important;
     }
 
     /* 优化下拉框选项文本 */
@@ -117,7 +93,7 @@ def render_sidebar():
     section[data-testid="stSidebar"] h3 {
         font-size: 1rem !important;
         margin-bottom: 0.5rem !important;
-        margin-top: 0.3rem !important;
+        margin-top: 0rem !important;
         padding: 0 !important;
     }
 
@@ -161,6 +137,26 @@ def render_sidebar():
     .css-1d391kg .element-container {
         padding-left: 0.5rem !important;
         padding-right: 0.5rem !important;
+    }
+
+    /* 减少侧边栏顶部空白 */
+    section[data-testid="stSidebar"] > div:first-child {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+
+    /* 减少第一个元素的顶部边距 */
+    section[data-testid="stSidebar"] .element-container:first-child {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+
+    /* 减少标题的顶部边距 */
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3 {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -998,6 +994,17 @@ def render_sidebar():
         **AI模型**: {st.session_state.llm_provider.upper()} - {st.session_state.llm_model}
         **数据源**: Tushare + FinnHub API
         """)
+        
+        # 管理员功能
+        if auth_manager and auth_manager.check_permission("admin"):
+            st.markdown("---")
+            st.markdown("### 🔧 管理功能")
+            
+            if st.button("📊 用户活动记录", key="user_activity_btn", use_container_width=True):
+                st.session_state.page = "user_activity"
+            
+            if st.button("⚙️ 系统设置", key="system_settings_btn", use_container_width=True):
+                st.session_state.page = "system_settings"
         
         # 帮助链接
         st.markdown("**📚 帮助资源**")
