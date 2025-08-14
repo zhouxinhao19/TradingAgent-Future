@@ -354,6 +354,75 @@ python start_web.py
 5. **查看报告**: 点击"📊 查看分析报告"按钮
 6. **导出报告**: 支持Word/PDF/Markdown格式
 
+## 🔐 用户权限管理
+
+### 🔑 默认账号信息
+
+系统提供以下默认账号，首次启动时自动创建：
+
+| 用户名 | 密码 | 角色 | 权限说明 |
+|--------|------|------|----------|
+| **admin** | **admin123** | 管理员 | 完整系统权限，用户管理，系统配置 |
+| **user** | **user123** | 普通用户 | 股票分析，报告查看，基础功能 |
+
+> ⚠️ **安全提醒**: 首次登录后请立即修改默认密码！
+
+### 🛡️ 权限控制体系
+
+- **🔐 登录认证**: 基于用户名密码的安全认证
+- **👥 角色管理**: 管理员、普通用户等多级权限
+- **⏰ 会话管理**: 自动超时保护，安全登出
+- **📊 操作日志**: 完整的用户活动记录
+
+### 🛠️ 用户管理工具
+
+系统提供完整的命令行用户管理工具：
+
+#### Windows 用户
+```powershell
+# 使用 PowerShell 脚本
+.\scripts\user_manager.ps1 list                    # 列出所有用户
+.\scripts\user_manager.ps1 change-password admin   # 修改密码
+.\scripts\user_manager.ps1 create newuser trader  # 创建新用户
+.\scripts\user_manager.ps1 delete olduser         # 删除用户
+
+# 或使用批处理文件
+.\scripts\user_manager.bat list
+```
+
+#### Python 脚本（跨平台）
+```bash
+# 直接使用 Python 脚本
+python scripts/user_password_manager.py list
+python scripts/user_password_manager.py change-password admin
+python scripts/user_password_manager.py create newuser --role trader
+python scripts/user_password_manager.py delete olduser
+python scripts/user_password_manager.py reset  # 重置为默认配置
+```
+
+### 📋 支持的用户操作
+
+- **📝 列出用户**: 查看所有用户及其角色权限
+- **🔑 修改密码**: 安全的密码更新机制
+- **👤 创建用户**: 支持自定义角色和权限
+- **🗑️ 删除用户**: 安全的用户删除功能
+- **🔄 重置配置**: 恢复默认用户设置
+
+### 📁 配置文件位置
+
+用户配置存储在：`web/config/users.json`
+
+> 📚 **详细文档**: 完整的用户管理指南请参考 [scripts/USER_MANAGEMENT.md](scripts/USER_MANAGEMENT.md)
+
+### 🚧 当前版本限制
+
+- ❌ 暂不支持在线用户注册
+- ❌ 暂不支持Web界面的角色管理
+- ✅ 支持完整的命令行用户管理
+- ✅ 支持完整的权限控制框架
+
+---
+
 ## 🎯 核心优势
 
 - **🧠 智能新闻分析**: v0.1.12新增AI驱动的新闻过滤和质量评估系统
@@ -364,6 +433,7 @@ python start_web.py
 - **🎯 快速切换**: 5个热门模型快速按钮，一键切换不同AI
 - **🆕 实时进度**: v0.1.10异步进度跟踪，告别黑盒等待
 - **💾 智能会话**: 状态持久化，页面刷新不丢失分析结果
+- **🔐 用户权限**: v0.1.14新增完整的用户认证和权限管理体系
 - **🇨🇳 中国优化**: A股/港股数据 + 国产LLM + 中文界面
 - **🐳 容器化**: Docker一键部署，环境隔离，快速扩展
 - **📄 专业报告**: 多格式导出，自动生成投资建议
