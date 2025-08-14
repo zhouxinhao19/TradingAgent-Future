@@ -17,6 +17,18 @@ from web.utils.auth_manager import auth_manager
 
 logger = logging.getLogger(__name__)
 
+def get_version():
+    """从VERSION文件读取项目版本号"""
+    try:
+        version_file = project_root / "VERSION"
+        if version_file.exists():
+            return version_file.read_text().strip()
+        else:
+            return "unknown"
+    except Exception as e:
+        logger.warning(f"无法读取版本文件: {e}")
+        return "unknown"
+
 def render_sidebar():
     """渲染侧边栏配置"""
 
@@ -989,7 +1001,7 @@ def render_sidebar():
         st.markdown("**ℹ️ 系统信息**")
         
         st.info(f"""
-        **版本**: cn-0.1.13
+        **版本**: {get_version()}
         **框架**: Streamlit + LangGraph
         **AI模型**: {st.session_state.llm_provider.upper()} - {st.session_state.llm_model}
         **数据源**: Tushare + FinnHub API
