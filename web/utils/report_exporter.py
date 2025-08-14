@@ -1160,5 +1160,52 @@ def render_export_buttons(results: Dict[str, Any]):
 
                     # 建议使用其他格式
                     st.info("💡 建议：您可以先使用Markdown或Word格式导出，然后使用其他工具转换为PDF")
+
+
+def save_analysis_report(stock_symbol: str, analysis_results: Dict[str, Any], 
+                        report_content: str = None) -> bool:
+    """
+    保存分析报告到MongoDB
+    
+    Args:
+        stock_symbol: 股票代码
+        analysis_results: 分析结果字典
+        report_content: 报告内容（可选，如果不提供则自动生成）
+    
+    Returns:
+        bool: 保存是否成功
+    """
+    try:
+        if not MONGODB_REPORT_AVAILABLE or mongodb_report_manager is None:
+            logger.warning("MongoDB报告管理器不可用，无法保存报告")
+            return False
+        
+        # 如果没有提供报告内容，则生成Markdown报告
+        if report_content is None:
+            report_content = report_exporter.generate_markdown_report(analysis_results)
+        
+        # 调用MongoDB报告管理器保存报告
+        # 将报告内容包装成字典格式
+        reports_dict = {
+            "markdown": report_content,
+            "generated_at": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+        
+        success = mongodb_report_manager.save_analysis_report(
+            stock_symbol=stock_symbol,
+            analysis_results=analysis_results,
+            reports=reports_dict
+        )
+        
+        if success:
+            logger.info(f"✅ 分析报告已成功保存到MongoDB - 股票: {stock_symbol}")
+        else:
+            logger.error(f"❌ 分析报告保存到MongoDB失败 - 股票: {stock_symbol}")
+        
+        return success
+        
+    except Exception as e:
+        logger.error(f"❌ 保存分析报告到MongoDB时发生异常 - 股票: {stock_symbol}, 错误: {str(e)}")
+        return False
     
  

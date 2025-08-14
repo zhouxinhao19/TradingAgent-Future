@@ -435,10 +435,9 @@ def render_analysis_results():
         favorites_count = sum(1 for result in results if result.get('is_favorite', False))
         st.metric("⭐ 收藏数", favorites_count)
     
-    # 标签页
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-        "📋 结果列表", "📈 统计图表", "📊 详细分析", 
-        "🔄 结果对比", "🏷️ 标签管理", "📤 导出数据"
+    # 保留需要的功能按钮，移除不需要的功能
+    tab1, tab2, tab3 = st.tabs([
+        "📋 结果列表", "📈 统计图表", "📊 详细分析"
     ])
     
     with tab1:
@@ -449,15 +448,6 @@ def render_analysis_results():
     
     with tab3:
         render_detailed_analysis(results)
-        
-    with tab4:
-        render_results_comparison(results)
-        
-    with tab5:
-        render_tags_management(results)
-    
-    with tab6:
-        render_results_export(results)
 
 def render_results_list(results: List[Dict[str, Any]]):
     """渲染分析结果列表"""

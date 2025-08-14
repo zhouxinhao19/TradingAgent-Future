@@ -515,6 +515,42 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
                        'event_type': 'web_analysis_complete'
                    })
 
+        # 保存分析报告到本地和MongoDB
+        try:
+            update_progress("💾 正在保存分析报告...")
+            from .report_exporter import save_analysis_report, save_modular_reports_to_results_dir
+            
+            # 1. 保存分模块报告到本地目录
+            logger.info(f"📁 [本地保存] 开始保存分模块报告到本地目录")
+            local_files = save_modular_reports_to_results_dir(results, stock_symbol)
+            if local_files:
+                logger.info(f"✅ [本地保存] 已保存 {len(local_files)} 个本地报告文件")
+                for module, path in local_files.items():
+                    logger.info(f"  - {module}: {path}")
+            else:
+                logger.warning(f"⚠️ [本地保存] 本地报告文件保存失败")
+            
+            # 2. 保存分析报告到MongoDB
+            logger.info(f"🗄️ [MongoDB保存] 开始保存分析报告到MongoDB")
+            save_success = save_analysis_report(
+                stock_symbol=stock_symbol,
+                analysis_results=results
+            )
+            
+            if save_success:
+                logger.info(f"✅ [MongoDB保存] 分析报告已成功保存到MongoDB")
+                update_progress("✅ 分析报告已保存到数据库和本地文件")
+            else:
+                logger.warning(f"⚠️ [MongoDB保存] MongoDB报告保存失败")
+                if local_files:
+                    update_progress("✅ 本地报告已保存，但数据库保存失败")
+                else:
+                    update_progress("⚠️ 报告保存失败，但分析已完成")
+                
+        except Exception as save_error:
+            logger.error(f"❌ [报告保存] 保存分析报告时发生错误: {str(save_error)}")
+            update_progress("⚠️ 报告保存出错，但分析已完成")
+
         update_progress("✅ 分析成功完成！")
         return results
 
