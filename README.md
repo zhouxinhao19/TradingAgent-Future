@@ -2,11 +2,11 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/Version-cn--0.1.13--preview-orange.svg)](./VERSION)
+[![Version](https://img.shields.io/badge/Version-cn--0.1.14--preview-orange.svg)](./VERSION)
 [![Documentation](https://img.shields.io/badge/docs-中文文档-green.svg)](./docs/)
 [![Original](https://img.shields.io/badge/基于-TauricResearch/TradingAgents-orange.svg)](https://github.com/TauricResearch/TradingAgents)
 
-> 🚀 **最新版本 cn-0.1.13-preview**: 原生OpenAI支持与Google AI全面集成预览版！新增自定义OpenAI端点、9个Google AI模型、LLM适配器架构优化！
+> 🚀 **最新版本 cn-0.1.14-preview**: 用户权限管理与Web认证系统预览版！新增完整用户管理、登录认证、权限控制、活动日志、数据管理优化！
 >
 > 🎯 **核心功能**: 原生OpenAI支持 | Google AI全面集成 | 自定义端点配置 | 智能模型选择 | 多LLM提供商支持 | 模型选择持久化 | Docker容器化部署 | 专业报告导出 | 完整A股支持 | 中文本地化
 
@@ -17,6 +17,40 @@
 感谢 [Tauric Research](https://github.com/TauricResearch) 团队创造的革命性多智能体交易框架 [TradingAgents](https://github.com/TauricResearch/TradingAgents)！
 
 **🎯 我们的使命**: 为中国用户提供完整的中文化体验，支持A股/港股市场，集成国产大模型，推动AI金融技术在中文社区的普及应用。
+
+## 🆕 v0.1.14-preview 重大更新
+
+### 👥 用户权限管理系统
+
+- **完整用户管理**: 新增用户注册、登录、权限控制功能
+- **角色权限**: 支持多级用户角色和权限管理
+- **会话管理**: 安全的用户会话和状态管理
+- **用户活动日志**: 完整的用户操作记录和审计功能
+
+### 🔐 Web用户认证系统
+
+- **登录组件**: 现代化的用户登录界面
+- **认证管理器**: 统一的用户认证和授权管理
+- **安全增强**: 密码加密、会话安全等安全机制
+- **用户仪表板**: 个性化的用户活动仪表板
+
+### 🗄️ 数据管理优化
+
+- **MongoDB集成增强**: 改进的MongoDB连接和数据管理
+- **数据目录重组**: 优化的数据存储结构和管理
+- **数据迁移脚本**: 完整的数据迁移和备份工具
+- **缓存优化**: 提升数据加载和分析结果缓存性能
+
+### 🧪 测试覆盖增强
+
+- **功能测试脚本**: 新增6个专项功能测试脚本
+- **工具处理器测试**: Google工具处理器修复验证
+- **引导自动隐藏测试**: UI交互功能测试
+- **在线工具配置测试**: 工具配置和选择逻辑测试
+- **真实场景测试**: 实际使用场景的端到端测试
+- **美股独立性测试**: 美股分析功能独立性验证
+
+---
 
 ## 🆕 v0.1.13 重大更新
 
