@@ -37,6 +37,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "pytdx>=1.72",
     "pytz>=2025.2",
+    "qianfan>=0.4.20",
     "questionary>=2.1.0",
     "redis>=6.2.0",
     "requests>=2.32.4",
