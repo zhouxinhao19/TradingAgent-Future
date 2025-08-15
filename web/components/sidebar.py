@@ -209,15 +209,15 @@ def render_sidebar():
         # LLM提供商选择
         llm_provider = st.selectbox(
             "LLM提供商",
-            options=["siliconflow", "dashscope", "deepseek", "google", "openai", "openrouter", "custom_openai"],
-            index=["siliconflow", "dashscope", "deepseek", "google", "openai", "openrouter", "custom_openai"].index(st.session_state.llm_provider) if st.session_state.llm_provider in ["siliconflow", "dashscope", "deepseek", "google", "openai", "openrouter", "custom_openai"] else 0,
+            options=["dashscope", "deepseek", "google", "openai", "openrouter", "siliconflow","custom_openai"],
+            index=["dashscope", "deepseek", "google", "openai", "openrouter","siliconflow" "custom_openai"].index(st.session_state.llm_provider) if st.session_state.llm_provider in ["siliconflow", "dashscope", "deepseek", "google", "openai", "openrouter", "custom_openai"] else 0,
             format_func=lambda x: {
-                "siliconflow": "🇨🇳 硅基流动",
                 "dashscope": "🇨🇳 阿里百炼",
                 "deepseek": "🚀 DeepSeek V3",
                 "google": "🌟 Google AI",
                 "openai": "🤖 OpenAI",
                 "openrouter": "🌐 OpenRouter",
+                "siliconflow": "🇨🇳 硅基流动",
                 "custom_openai": "🔧 自定义OpenAI端点"
             }[x],
             help="选择AI模型提供商",
