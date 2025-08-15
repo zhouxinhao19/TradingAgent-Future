@@ -215,6 +215,39 @@ class ChatDashScopeOpenAIUnified(OpenAICompatibleBase):
         )
 
 
+class ChatQianfanOpenAI(OpenAICompatibleBase):
+    """文心一言千帆平台 OpenAI兼容适配器"""
+    
+    def __init__(
+        self,
+        model: str = "ERNIE-Speed-8K",
+        api_key: Optional[str] = None,
+        temperature: float = 0.1,
+        max_tokens: Optional[int] = None,
+        **kwargs
+    ):
+        # 千帆需要同时使用ACCESS_KEY和SECRET_KEY进行认证
+        # 为了兼容OpenAI格式，我们将ACCESS_KEY作为api_key，SECRET_KEY通过环境变量获取
+        access_key = api_key or os.getenv('QIANFAN_ACCESS_KEY')
+        secret_key = os.getenv('QIANFAN_SECRET_KEY')
+        
+        if not access_key or not secret_key:
+            raise ValueError(
+                "千帆模型需要设置QIANFAN_ACCESS_KEY和QIANFAN_SECRET_KEY环境变量"
+            )
+        
+        super().__init__(
+            provider_name="qianfan",
+            model=model,
+            api_key_env_var="QIANFAN_ACCESS_KEY",
+            base_url="https://qianfan.baidubce.com/v2",
+            api_key=access_key,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            **kwargs
+        )
+
+
 class ChatCustomOpenAI(OpenAICompatibleBase):
     """自定义OpenAI端点适配器"""
     
@@ -264,6 +297,15 @@ OPENAI_COMPATIBLE_PROVIDERS = {
             "qwen-plus-latest": {"context_length": 32768, "supports_function_calling": True},
             "qwen-max": {"context_length": 32768, "supports_function_calling": True},
             "qwen-max-latest": {"context_length": 32768, "supports_function_calling": True}
+        }
+    },
+    "qianfan": {
+        "adapter_class": ChatQianfanOpenAI,
+        "base_url": "https://qianfan.baidubce.com/v2",
+        "api_key_env": "QIANFAN_ACCESS_KEY",
+        "models": {
+            "ERNIE-Speed-8K": {"context_length": 8192, "supports_function_calling": True},
+            "ERNIE-Lite-8K": {"context_length": 8192, "supports_function_calling": True}
         }
     },
     "custom_openai": {
@@ -371,6 +413,15 @@ def test_openai_compatible_adapters():
         except Exception as e:
             logger.error(f"❌ {provider_name} 测试失败: {e}", exc_info=True)
 
+
+# NOTE FOR CONTRIBUTORS:
+# To add a new OpenAI-compatible provider, follow these steps:
+# 1) Create an adapter class by subclassing OpenAICompatibleBase (see ChatDeepSeekOpenAI/ChatDashScopeOpenAIUnified for examples)
+# 2) Register the provider in OPENAI_COMPATIBLE_PROVIDERS with keys: adapter_class, base_url (if needed), api_key_env, and optional model metadata
+# 3) Ensure the required API key environment variable is documented in docs/LLM_INTEGRATION_GUIDE.md and added to `.env.example`
+# 4) If the provider requires a non-standard base_url, pass it via constructor or provider registry
+# 5) Run the provided tests in this file (test_* functions) or add a similar smoke test for your provider
+# Security: NEVER log raw API keys. Keep logging to high-level info only.
 
 if __name__ == "__main__":
     test_openai_compatible_adapters()

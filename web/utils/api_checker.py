@@ -13,6 +13,8 @@ def check_api_keys():
     openai_key = os.getenv("OPENAI_API_KEY")
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
     google_key = os.getenv("GOOGLE_API_KEY")
+    qianfan_ak = os.getenv("QIANFAN_ACCESS_KEY")
+    qianfan_sk = os.getenv("QIANFAN_SECRET_KEY")
     
     # 构建详细状态
     details = {
@@ -45,6 +47,18 @@ def check_api_keys():
             "display": f"{google_key[:12]}..." if google_key else "未配置",
             "required": False,
             "description": "Google AI API密钥"
+        },
+        "QIANFAN_ACCESS_KEY": {
+            "configured": bool(qianfan_ak),
+            "display": f"{qianfan_ak[:12]}..." if qianfan_ak else "未配置",
+            "required": False,
+            "description": "文心一言（千帆）Access Key"
+        },
+        "QIANFAN_SECRET_KEY": {
+            "configured": bool(qianfan_sk),
+            "display": f"{qianfan_sk[:12]}..." if qianfan_sk else "未配置",
+            "required": False,
+            "description": "文心一言（千帆）Secret Key"
         }
     }
     
@@ -95,6 +109,7 @@ def validate_api_key_format(key_type, api_key):
     elif key_type == "OPENAI_API_KEY":
         if not api_key.startswith("sk-"):
             return False, "OpenAI API密钥应以'sk-'开头"
+    # Qianfan 的AK/SK不强制特定前缀，仅做长度校验
     
     return True, "API密钥格式正确"
 
