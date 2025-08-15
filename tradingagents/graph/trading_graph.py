@@ -69,6 +69,28 @@ class TradingAgentsGraph:
         if self.config["llm_provider"].lower() == "openai":
             self.deep_thinking_llm = ChatOpenAI(model=self.config["deep_think_llm"], base_url=self.config["backend_url"])
             self.quick_thinking_llm = ChatOpenAI(model=self.config["quick_think_llm"], base_url=self.config["backend_url"])
+        elif self.config["llm_provider"] == "siliconflow":
+            # SiliconFlow支持：使用OpenAI兼容API
+            siliconflow_api_key = os.getenv('SILICONFLOW_API_KEY')
+            if not siliconflow_api_key:
+                raise ValueError("使用SiliconFlow需要设置SILICONFLOW_API_KEY环境变量")
+
+            logger.info(f"🌐 [SiliconFlow] 使用API密钥: {siliconflow_api_key[:20]}...")
+
+            self.deep_thinking_llm = ChatOpenAI(
+                model=self.config["deep_think_llm"],
+                base_url=self.config["backend_url"],
+                api_key=siliconflow_api_key,
+                temperature=0.1,
+                max_tokens=2000
+            )
+            self.quick_thinking_llm = ChatOpenAI(
+                model=self.config["quick_think_llm"],
+                base_url=self.config["backend_url"],
+                api_key=siliconflow_api_key,
+                temperature=0.1,
+                max_tokens=2000
+            )
         elif self.config["llm_provider"] == "openrouter":
             # OpenRouter支持：优先使用OPENROUTER_API_KEY，否则使用OPENAI_API_KEY
             openrouter_api_key = os.getenv('OPENROUTER_API_KEY') or os.getenv('OPENAI_API_KEY')

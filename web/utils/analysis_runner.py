@@ -340,6 +340,10 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             config["backend_url"] = "https://openrouter.ai/api/v1"
             logger.info(f"🌐 [OpenRouter] 使用模型: {llm_model}")
             logger.info(f"🌐 [OpenRouter] API端点: https://openrouter.ai/api/v1")
+        elif llm_provider == "siliconflow":
+            config["backend_url"] = "https://api.siliconflow.cn/v1"
+            logger.info(f"🌐 [SiliconFlow] 使用模型: {llm_model}")
+            logger.info(f"🌐 [SiliconFlow] API端点: https://api.siliconflow.cn/v1")
         elif llm_provider == "custom_openai":
             # 自定义OpenAI端点
             custom_base_url = st.session_state.get("custom_openai_base_url", "https://api.openai.com/v1")
