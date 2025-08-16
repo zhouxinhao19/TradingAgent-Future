@@ -792,7 +792,7 @@ def save_modular_reports_to_results_dir(results: Dict[str, Any], stock_symbol: s
 
         logger.info(f"✅ 保存分析元数据: {metadata_file}")
         logger.info(f"✅ 分模块报告保存完成，共保存 {len(saved_files)} 个文件")
-        logger.info(f"📁 保存目录: {reports_dir}")
+        logger.info(f"📁 保存目录: {os.path.normpath(str(reports_dir))}")
 
         # 同时保存到MongoDB
         logger.info(f"🔍 [MongoDB调试] 开始MongoDB保存流程")

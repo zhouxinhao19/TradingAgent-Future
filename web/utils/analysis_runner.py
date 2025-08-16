@@ -307,6 +307,22 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             config["backend_url"] = "https://dashscope.aliyuncs.com/api/v1"
         elif llm_provider == "deepseek":
             config["backend_url"] = "https://api.deepseek.com"
+        elif llm_provider == "qianfan":
+            # 千帆（文心一言）配置
+            config["backend_url"] = "https://aip.baidubce.com"
+            # 根据研究深度设置千帆模型
+            if research_depth <= 2:  # 快速和基础分析
+                config["quick_think_llm"] = "ernie-3.5-8k"
+                config["deep_think_llm"] = "ernie-3.5-8k"
+            elif research_depth <= 4:  # 标准和深度分析
+                config["quick_think_llm"] = "ernie-3.5-8k"
+                config["deep_think_llm"] = "ernie-4.0-turbo-8k"
+            else:  # 全面分析
+                config["quick_think_llm"] = "ernie-4.0-turbo-8k"
+                config["deep_think_llm"] = "ernie-4.0-turbo-8k"
+            
+            logger.info(f"🤖 [千帆] 快速模型: {config['quick_think_llm']}")
+            logger.info(f"🤖 [千帆] 深度模型: {config['deep_think_llm']}")
         elif llm_provider == "google":
             # Google AI不需要backend_url，使用默认的OpenAI格式
             config["backend_url"] = "https://api.openai.com/v1"
