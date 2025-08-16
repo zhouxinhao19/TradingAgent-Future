@@ -180,10 +180,23 @@ class MongoDBReportManager:
             
             results = []
             for doc in cursor:
+                # 处理timestamp字段，兼容不同的数据类型
+                timestamp_value = doc.get("timestamp")
+                if hasattr(timestamp_value, 'timestamp'):
+                    # datetime对象
+                    timestamp = timestamp_value.timestamp()
+                elif isinstance(timestamp_value, (int, float)):
+                    # 已经是时间戳
+                    timestamp = float(timestamp_value)
+                else:
+                    # 其他情况，使用当前时间
+                    from datetime import datetime
+                    timestamp = datetime.now().timestamp()
+                
                 # 转换为Web应用期望的格式
                 result = {
                     "analysis_id": doc["analysis_id"],
-                    "timestamp": doc["timestamp"].timestamp(),
+                    "timestamp": timestamp,
                     "stock_symbol": doc["stock_symbol"],
                     "analysts": doc.get("analysts", []),
                     "research_depth": doc.get("research_depth", 0),

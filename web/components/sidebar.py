@@ -17,6 +17,18 @@ from web.utils.auth_manager import auth_manager
 
 logger = logging.getLogger(__name__)
 
+def get_version():
+    """从VERSION文件读取项目版本号"""
+    try:
+        version_file = project_root / "VERSION"
+        if version_file.exists():
+            return version_file.read_text().strip()
+        else:
+            return "unknown"
+    except Exception as e:
+        logger.warning(f"无法读取版本文件: {e}")
+        return "unknown"
+
 def render_sidebar():
     """渲染侧边栏配置"""
 
@@ -205,14 +217,15 @@ def render_sidebar():
         # LLM提供商选择
         llm_provider = st.selectbox(
             "LLM提供商",
-            options=["dashscope", "deepseek", "google", "openai", "openrouter", "custom_openai", "qianfan"],
-            index=["dashscope", "deepseek", "google", "openai", "openrouter", "custom_openai", "qianfan"].index(st.session_state.llm_provider) if st.session_state.llm_provider in ["dashscope", "deepseek", "google", "openai", "openrouter", "custom_openai", "qianfan"] else 0,
+            options=["dashscope", "deepseek", "google", "openai", "openrouter", "siliconflow", "custom_openai", "qianfan"],
+            index=["dashscope", "deepseek", "google", "openai", "openrouter", "siliconflow", "custom_openai", "qianfan"].index(st.session_state.llm_provider) if st.session_state.llm_provider in ["dashscope", "deepseek", "google", "openai", "openrouter", "siliconflow", "custom_openai", "qianfan"] else 0,
             format_func=lambda x: {
                 "dashscope": "🇨🇳 阿里百炼",
                 "deepseek": "🚀 DeepSeek V3",
                 "google": "🌟 Google AI",
                 "openai": "🤖 OpenAI",
                 "openrouter": "🌐 OpenRouter",
+                "siliconflow": "🇨🇳 硅基流动",
                 "custom_openai": "🔧 自定义OpenAI端点",
                 "qianfan": "🧠 文心一言（千帆）"
             }[x],
@@ -264,6 +277,40 @@ def render_sidebar():
 
             # 保存到持久化存储
             save_model_selection(st.session_state.llm_provider, st.session_state.model_category, llm_model)
+        elif llm_provider == "siliconflow":
+            siliconflow_options = ["Qwen/Qwen3-30B-A3B-Thinking-2507", "Qwen/Qwen3-30B-A3B-Instruct-2507", "Qwen/Qwen3-235B-A22B-Thinking-2507", "Qwen/Qwen3-235B-A22B-Instruct-2507","deepseek-ai/DeepSeek-R1", "zai-org/GLM-4.5", "moonshotai/Kimi-K2-Instruct"]
+
+            # 获取当前选择的索引
+            current_index = 0
+            if st.session_state.llm_model in siliconflow_options:
+                current_index = siliconflow_options.index(st.session_state.llm_model)
+
+            llm_model = st.selectbox(
+                "选择siliconflow模型",
+                options=siliconflow_options,
+                index=current_index,
+                format_func=lambda x: {
+                    "Qwen/Qwen3-30B-A3B-Thinking-2507": "Qwen3-30B-A3B-Thinking-2507 - 30B思维链模型",
+                    "Qwen/Qwen3-30B-A3B-Instruct-2507": "Qwen3-30B-A3B-Instruct-2507 - 30B指令模型",
+                    "Qwen/Qwen3-235B-A22B-Thinking-2507": "Qwen3-235B-A22B-Thinking-2507 - 235B思维链模型",
+                    "Qwen/Qwen3-235B-A22B-Instruct-2507": "Qwen3-235B-A22B-Instruct-2507 - 235B指令模型",
+                    "deepseek-ai/DeepSeek-R1": "DeepSeek-R1",
+                    "zai-org/GLM-4.5": "GLM-4.5 - 智谱",
+                    "moonshotai/Kimi-K2-Instruct": "Kimi-K2-Instruct",
+                }[x],
+                help="选择用于分析的siliconflow模型",
+                key="siliconflow_model_select"
+            )
+
+            # 更新session state和持久化存储
+            if st.session_state.llm_model != llm_model:
+                logger.debug(f"🔄 [Persistence] siliconflow模型变更: {st.session_state.llm_model} → {llm_model}")
+            st.session_state.llm_model = llm_model
+            logger.debug(f"💾 [Persistence] siliconflow模型已保存: {llm_model}")
+
+            # 保存到持久化存储
+            save_model_selection(st.session_state.llm_provider, st.session_state.model_category, llm_model)
+
         elif llm_provider == "deepseek":
             deepseek_options = ["deepseek-chat"]
 
@@ -1018,7 +1065,7 @@ def render_sidebar():
         st.markdown("**ℹ️ 系统信息**")
         
         st.info(f"""
-        **版本**: cn-0.1.13
+        **版本**: {get_version()}
         **框架**: Streamlit + LangGraph
         **AI模型**: {st.session_state.llm_provider.upper()} - {st.session_state.llm_model}
         **数据源**: Tushare + FinnHub API
