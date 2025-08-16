@@ -69,6 +69,28 @@ class TradingAgentsGraph:
         if self.config["llm_provider"].lower() == "openai":
             self.deep_thinking_llm = ChatOpenAI(model=self.config["deep_think_llm"], base_url=self.config["backend_url"])
             self.quick_thinking_llm = ChatOpenAI(model=self.config["quick_think_llm"], base_url=self.config["backend_url"])
+        elif self.config["llm_provider"] == "siliconflow":
+            # SiliconFlow支持：使用OpenAI兼容API
+            siliconflow_api_key = os.getenv('SILICONFLOW_API_KEY')
+            if not siliconflow_api_key:
+                raise ValueError("使用SiliconFlow需要设置SILICONFLOW_API_KEY环境变量")
+
+            logger.info(f"🌐 [SiliconFlow] 使用API密钥: {siliconflow_api_key[:20]}...")
+
+            self.deep_thinking_llm = ChatOpenAI(
+                model=self.config["deep_think_llm"],
+                base_url=self.config["backend_url"],
+                api_key=siliconflow_api_key,
+                temperature=0.1,
+                max_tokens=2000
+            )
+            self.quick_thinking_llm = ChatOpenAI(
+                model=self.config["quick_think_llm"],
+                base_url=self.config["backend_url"],
+                api_key=siliconflow_api_key,
+                temperature=0.1,
+                max_tokens=2000
+            )
         elif self.config["llm_provider"] == "openrouter":
             # OpenRouter支持：优先使用OPENROUTER_API_KEY，否则使用OPENAI_API_KEY
             openrouter_api_key = os.getenv('OPENROUTER_API_KEY') or os.getenv('OPENAI_API_KEY')
@@ -188,19 +210,15 @@ class TradingAgentsGraph:
             )
             
             logger.info(f"✅ [自定义OpenAI] 已配置自定义端点: {custom_base_url}")
-        elif (self.config["llm_provider"].lower() == "qianfan" or
-              "qianfan" in self.config["llm_provider"].lower()):
-            # 文心一言千帆平台配置
+        elif self.config["llm_provider"].lower() == "qianfan":
+            # 百度千帆（文心一言）配置
             from tradingagents.llm_adapters.openai_compatible_base import create_openai_compatible_llm
-            
-            qianfan_access_key = os.getenv('QIANFAN_ACCESS_KEY')
-            qianfan_secret_key = os.getenv('QIANFAN_SECRET_KEY')
-            if not qianfan_access_key or not qianfan_secret_key:
-                raise ValueError("使用文心一言千帆模型需要设置QIANFAN_ACCESS_KEY和QIANFAN_SECRET_KEY环境变量")
-            
-            logger.info(f"🔧 [文心一言千帆] 使用ACCESS_KEY: {qianfan_access_key[:20]}...")
-            
-            # 使用OpenAI兼容适配器创建LLM实例
+            qianfan_ak = os.getenv('QIANFAN_ACCESS_KEY')
+            qianfan_sk = os.getenv('QIANFAN_SECRET_KEY')
+            if not qianfan_ak or not qianfan_sk:
+                raise ValueError("使用千帆需要同时设置QIANFAN_ACCESS_KEY和QIANFAN_SECRET_KEY环境变量")
+
+            # 使用OpenAI兼容适配器创建LLM实例（基类会使用千帆默认base_url）
             self.deep_thinking_llm = create_openai_compatible_llm(
                 provider="qianfan",
                 model=self.config["deep_think_llm"],
@@ -213,8 +231,7 @@ class TradingAgentsGraph:
                 temperature=0.1,
                 max_tokens=2000
             )
-            
-            logger.info(f"✅ [文心一言千帆] 已启用OpenAI兼容适配器")
+            logger.info("✅ [千帆] 文心一言适配器已配置成功")
         else:
             raise ValueError(f"Unsupported LLM provider: {self.config['llm_provider']}")
         
@@ -270,81 +287,43 @@ class TradingAgentsGraph:
         self.graph = self.graph_setup.setup_graph(selected_analysts)
 
     def _create_tool_nodes(self) -> Dict[str, ToolNode]:
-        """Create tool nodes for different data sources based on configuration."""
-        
-        # 获取在线工具配置
-        online_tools_enabled = self.config.get("online_tools", False)
-        online_news_enabled = self.config.get("online_news", True)
-        realtime_data_enabled = self.config.get("realtime_data", False)
-        
-        # 市场数据工具选择
-        market_tools = [
-            # 统一工具 (始终可用)
-            self.toolkit.get_stock_market_data_unified,
-        ]
-        
-        # 根据配置添加在线/离线工具
-        if realtime_data_enabled:
-            # 实时数据优先
-            market_tools.extend([
-                self.toolkit.get_YFin_data_online,
-                self.toolkit.get_stockstats_indicators_report_online,
-                self.toolkit.get_YFin_data,  # 备用
-                self.toolkit.get_stockstats_indicators_report,  # 备用
-            ])
-        else:
-            # 离线数据优先
-            market_tools.extend([
-                self.toolkit.get_YFin_data,
-                self.toolkit.get_stockstats_indicators_report,
-                self.toolkit.get_YFin_data_online,  # 备用
-                self.toolkit.get_stockstats_indicators_report_online,  # 备用
-            ])
-        
-        # 社交媒体工具选择
-        social_tools = []
-        if online_tools_enabled:
-            # 在线工具优先
-            social_tools.extend([
-                self.toolkit.get_stock_news_openai,
-                self.toolkit.get_reddit_stock_info,  # 备用
-            ])
-        else:
-            # 离线工具优先
-            social_tools.extend([
-                self.toolkit.get_reddit_stock_info,
-                self.toolkit.get_stock_news_openai,  # 备用
-            ])
-        
-        # 新闻工具选择
-        news_tools = []
-        if online_news_enabled:
-            # 在线新闻优先
-            news_tools.extend([
-                self.toolkit.get_google_news,
-                self.toolkit.get_finnhub_news,
-                self.toolkit.get_reddit_news,
-            ])
-            # 如果OpenAI也启用，添加OpenAI新闻工具
-            if online_tools_enabled:
-                news_tools.insert(0, self.toolkit.get_global_news_openai)
-        else:
-            # 离线新闻优先
-            news_tools.extend([
-                self.toolkit.get_finnhub_news,
-                self.toolkit.get_reddit_news,
-                self.toolkit.get_google_news,  # 备用 (不需要API key)
-            ])
-        
+        """Create tool nodes for different data sources."""
         return {
-            "market": ToolNode(market_tools),
-            "social": ToolNode(social_tools),
-            "news": ToolNode(news_tools),
+            "market": ToolNode(
+                [
+                    # 统一工具
+                    self.toolkit.get_stock_market_data_unified,
+                    # online tools
+                    self.toolkit.get_YFin_data_online,
+                    self.toolkit.get_stockstats_indicators_report_online,
+                    # offline tools
+                    self.toolkit.get_YFin_data,
+                    self.toolkit.get_stockstats_indicators_report,
+                ]
+            ),
+            "social": ToolNode(
+                [
+                    # online tools
+                    self.toolkit.get_stock_news_openai,
+                    # offline tools
+                    self.toolkit.get_reddit_stock_info,
+                ]
+            ),
+            "news": ToolNode(
+                [
+                    # online tools
+                    self.toolkit.get_global_news_openai,
+                    self.toolkit.get_google_news,
+                    # offline tools
+                    self.toolkit.get_finnhub_news,
+                    self.toolkit.get_reddit_news,
+                ]
+            ),
             "fundamentals": ToolNode(
                 [
-                    # 统一工具 (始终可用)
+                    # 统一工具
                     self.toolkit.get_stock_fundamentals_unified,
-                    # 基础工具 (不依赖在线配置)
+                    # offline tools
                     self.toolkit.get_finnhub_company_insider_sentiment,
                     self.toolkit.get_finnhub_company_insider_transactions,
                     self.toolkit.get_simfin_balance_sheet,
