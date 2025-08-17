@@ -16,6 +16,7 @@ dependencies = [
     "chromadb>=1.0.12",
     "dashscope>=1.20.0",
     "eodhd>=1.0.32",
+    "fastapi>=0.115.0",
     "feedparser>=6.0.11",
     "finnhub-python>=2.4.23",
     "google-genai>=0.1.0",
@@ -26,6 +27,9 @@ dependencies = [
     "langchain-openai>=0.3.23",
     "langgraph>=0.4.8",
     "markdown>=3.4.0",
+    "motor>=3.0.0",
+    "PyJWT>=2.8.0",
+    "pydantic-settings>=2.4.0",
     "openai>=1.0.0,<2.0.0",
     "pandas>=2.3.0",
     "parsel>=1.10.0",
@@ -47,6 +51,7 @@ dependencies = [
     "tqdm>=4.67.1",
     "tushare>=1.4.21",
     "typing-extensions>=4.14.0",
+    "uvicorn>=0.32.0",
     "yfinance>=0.2.63",
 ]
 
