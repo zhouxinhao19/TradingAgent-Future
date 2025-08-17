@@ -1,8 +1,8 @@
-# TradingAgents 大模型接入指导手册
+# TradingAgents-CN 大模型接入指导手册
 
 ## 📋 概述
 
-本手册旨在帮助开发者为 TradingAgents 项目添加新的大模型支持。通过遵循本指南，您可以快速集成新的大模型提供商，并提交高质量的 Pull Request。
+本手册旨在帮助开发者为 TradingAgents-CN 项目添加新的大模型支持。通过遵循本指南，您可以快速集成新的大模型提供商，并提交高质量的 Pull Request。
 
 ## 🎯 适用场景
 
@@ -43,19 +43,20 @@ tradingagents/
 ### 第一步：环境准备
 
 1. **Fork 并克隆仓库**
+
    ```bash
    git clone https://github.com/your-username/TradingAgentsCN.git
    cd TradingAgentsCN
    ```
-
 2. **安装依赖**
+
    ```bash
    pip install -e .
    # 或使用 uv
    uv pip install -e .
    ```
-
 3. **创建开发分支**
+
    ```bash
    git checkout develop
    git checkout -b feature/add-{provider_name}-llm
@@ -70,6 +71,7 @@ tradingagents/
 适用于：支持 OpenAI API 格式的模型（如智谱、MiniMax、月之暗面等）
 
 **优势**：
+
 - 开发工作量最小
 - 复用现有的工具调用逻辑
 - 统一的错误处理和日志记录
@@ -81,6 +83,7 @@ tradingagents/
 适用于：非 OpenAI 兼容格式的模型
 
 **需要更多工作**：
+
 - 需要自定义消息格式转换
 - 需要实现工具调用逻辑
 - 需要处理特定的错误格式
@@ -105,7 +108,7 @@ logger = logging.getLogger(__name__)
 
 class ChatYourProvider(OpenAICompatibleBase):
     """你的提供商 OpenAI 兼容适配器"""
-    
+  
     def __init__(
         self,
         model: str = "your-default-model",
@@ -132,7 +135,7 @@ class ChatYourProvider(OpenAICompatibleBase):
 # 在 OPENAI_COMPATIBLE_PROVIDERS 字典中添加配置
 OPENAI_COMPATIBLE_PROVIDERS = {
     # ... 现有配置 ...
-    
+  
     "your_provider": {
         "adapter_class": ChatYourProvider,
         "base_url": "https://api.yourprovider.com/v1",
@@ -172,11 +175,11 @@ format_mapping={
 # 添加模型选择逻辑
 elif llm_provider == "your_provider":
     your_provider_options = ["your-model-1", "your-model-2"]
-    
+  
     current_index = 0
     if st.session_state.llm_model in your_provider_options:
         current_index = your_provider_options.index(st.session_state.llm_model)
-    
+  
     llm_model = st.selectbox(
         "选择模型",
         options=your_provider_options,
@@ -193,21 +196,25 @@ elif llm_provider == "your_provider":
 #### 5. 运行时配置
 
 在绝大多数情况下，新增一个 OpenAI 兼容提供商时，无需修改 <mcfile name="analysis_runner.py" path="web/utils/analysis_runner.py"></mcfile>。原因：
+
 - 侧边栏 <mcfile name="sidebar.py" path="web/components/sidebar.py"></mcfile> 收集 `llm_provider` 与 `llm_model`
 - 这些参数会被传入 <mcfile name="trading_graph.py" path="tradingagents/graph/trading_graph.py"></mcfile>，由 <mcsymbol name="create_openai_compatible_llm" filename="openai_compatible_base.py" path="tradingagents/llm_adapters/openai_compatible_base.py" startline="329" type="function"></mcsymbol> 基于 `OPENAI_COMPATIBLE_PROVIDERS` 自动实例化正确的适配器
 - 因此，真正的“运行时配置”主要体现在 <mcfile name="openai_compatible_base.py" path="tradingagents/llm_adapters/openai_compatible_base.py"></mcfile> 的注册表和工厂方法，而非 analysis_runner 本身
 
 推荐做法：
+
 - 在 <mcfile name="openai_compatible_base.py" path="tradingagents/llm_adapters/openai_compatible_base.py"></mcfile> 中完善 `OPENAI_COMPATIBLE_PROVIDERS`（base_url、api_key 环境变量、模型清单等）
 - 在 <mcfile name="sidebar.py" path="web/components/sidebar.py"></mcfile> 中新增该 `llm_provider` 的下拉选项与模型列表
 - 保持 <mcfile name="analysis_runner.py" path="web/utils/analysis_runner.py"></mcfile> 无需改动
 
 何时需要少量修改 analysis_runner：
+
 - 该提供商要求在分析阶段动态切换不同模型（例如“快速/深度”分开）
 - 需要在任务执行流水线中注入特定的 header、代理或文件型鉴权
 - 需要为该提供商设置额外的日志或成本估算逻辑
 
 即便如此，也请：
+
 - 不在 analysis_runner 硬编码模型清单或 API 细节，统一放在 `OPENAI_COMPATIBLE_PROVIDERS`
 - 仍然使用 <mcsymbol name="create_openai_compatible_llm" filename="openai_compatible_base.py" path="tradingagents/llm_adapters/openai_compatible_base.py" startline="329" type="function"></mcsymbol> 创建实例，避免重复初始化逻辑
 
@@ -243,7 +250,7 @@ def test_basic_connection():
     """测试基础连接"""
     # 设置测试环境变量
     os.environ["YOUR_PROVIDER_API_KEY"] = "your_test_key"
-    
+  
     try:
         llm = ChatYourProvider(model="your-model-1")
         response = llm.invoke("Hello, world!")
@@ -271,7 +278,7 @@ def test_function_calling():
     """测试工具调用"""
     llm = ChatYourProvider(model="your-model-1")
     llm_with_tools = llm.bind_tools([get_weather])
-    
+  
     response = llm_with_tools.invoke("北京天气如何？")
     print(f"工具调用测试: {response}")
 ```
@@ -286,37 +293,42 @@ streamlit run app.py
 ```
 
 验证：
-- [ ] 在侧边栏能正确选择新提供商
-- [ ] 模型选择下拉菜单工作正常
-- [ ] API 密钥检查显示正确状态
-- [ ] 能成功进行股票分析
+
+- [ ]  在侧边栏能正确选择新提供商
+- [ ]  模型选择下拉菜单工作正常
+- [ ]  API 密钥检查显示正确状态
+- [ ]  能成功进行股票分析
 
 ## 📊 验证清单
 
 提交 PR 前，请确保以下项目都已完成：
 
 ### 代码实现
-- [ ] 创建了适配器类并继承正确的基类
-- [ ] 在 `OPENAI_COMPATIBLE_PROVIDERS` 中正确注册
-- [ ] 更新了 `__init__.py` 导入
-- [ ] 前端集成完整（模型选择、配置界面）
-- [ ] 运行时配置正确
+
+- [ ]  创建了适配器类并继承正确的基类
+- [ ]  在 `OPENAI_COMPATIBLE_PROVIDERS` 中正确注册
+- [ ]  更新了 `__init__.py` 导入
+- [ ]  前端集成完整（模型选择、配置界面）
+- [ ]  运行时配置正确
 
 ### 环境配置
-- [ ] 添加了环境变量示例到 `.env.example`
-- [ ] API 密钥验证逻辑正确
-- [ ] 错误处理完善
+
+- [ ]  添加了环境变量示例到 `.env.example`
+- [ ]  API 密钥验证逻辑正确
+- [ ]  错误处理完善
 
 ### 测试验证
-- [ ] 基础连接测试通过
-- [ ] 工具调用测试通过（如果支持）
-- [ ] Web 界面集成测试通过
-- [ ] 至少完成一次完整的股票分析
+
+- [ ]  基础连接测试通过
+- [ ]  工具调用测试通过（如果支持）
+- [ ]  Web 界面集成测试通过
+- [ ]  至少完成一次完整的股票分析
 
 ### 文档更新
-- [ ] 更新了相关 README 文档
-- [ ] 添加了模型特性说明
-- [ ] 提供了使用示例
+
+- [ ]  更新了相关 README 文档
+- [ ]  添加了模型特性说明
+- [ ]  提供了使用示例
 
 ## 💡 实际接入案例：百度千帆模型
 
@@ -350,7 +362,7 @@ OPENAI_COMPATIBLE_PROVIDERS["qianfan"] = {
 # 在 openai_compatible_base.py 中添加
 OPENAI_COMPATIBLE_PROVIDERS = {
     # ... 现有配置 ...
-    
+  
     "qianfan": {
         "base_url": "https://qianfan.baidubce.com/v2",
         "api_key_env": "QIANFAN_API_KEY",
@@ -364,100 +376,92 @@ OPENAI_COMPATIBLE_PROVIDERS = {
 }
 ```
 
-#### 3. 前端界面集成
+#### 3. 配置环境变量
+
+在 `.env` 文件中添加千帆API配置：
+
+```bash
+# 千帆API配置
+QIANFAN_ACCESS_KEY=your_access_key_here
+QIANFAN_SECRET_KEY=your_secret_key_here
+```
+
+#### 4. 添加模型价格配置
+
+在 `config/pricing.json` 文件中添加千帆模型的价格信息：
+
+```json
+{
+  "provider": "qianfan",
+  "model_name": "ernie-3.5-8k",
+  "input_price_per_1k": 0.0025,
+  "output_price_per_1k": 0.005,
+  "currency": "CNY"
+},
+{
+  "provider": "qianfan",
+  "model_name": "ernie-4.0-turbo-8k",
+  "input_price_per_1k": 0.03,
+  "output_price_per_1k": 0.09,
+  "currency": "CNY"
+},
+{
+  "provider": "qianfan",
+  "model_name": "ERNIE-Speed-8K",
+  "input_price_per_1k": 0.0004,
+  "output_price_per_1k": 0.0008,
+  "currency": "CNY"
+},
+{
+  "provider": "qianfan",
+  "model_name": "ERNIE-Lite-8K",
+  "input_price_per_1k": 0.0008,
+  "output_price_per_1k": 0.002,
+  "currency": "CNY"
+}
+```
+
+**价格说明**：
+- 价格单位为每1000个token的费用
+- 货币单位为人民币（CNY）
+- 价格基于百度千帆官方定价，可能会有调整
+
+#### 5. 前端界面集成
 
 ```python
 # 在 sidebar.py 中添加千帆选项
 elif llm_provider == "qianfan":
-    qianfan_options = ["ERNIE-4.0-8K", "ERNIE-3.5-8K", "ERNIE-Lite-8K"]
-    
+    qianfan_options = [
+        "ernie-3.5-8k",
+        "ernie-4.0-turbo-8k",
+        "ERNIE-Speed-8K",
+        "ERNIE-Lite-8K"
+    ]
+
     current_index = 0
     if st.session_state.llm_model in qianfan_options:
         current_index = qianfan_options.index(st.session_state.llm_model)
-    
+
     llm_model = st.selectbox(
-        "选择模型",
+        "选择文心一言模型",
         options=qianfan_options,
         index=current_index,
         format_func=lambda x: {
-            "ERNIE-4.0-8K": "文心一言 4.0 - 最强推理",
-            "ERNIE-3.5-8K": "文心一言 3.5 - 平衡性能",
-            "ERNIE-Lite-8K": "文心一言 Lite - 快速响应",
-        }.get(x, x),
-        help="选择用于分析的千帆模型",
+            "ernie-3.5-8k": "ERNIE 3.5 8K - ⚡ 快速高效",
+            "ernie-4.0-turbo-8k": "ERNIE 4.0 Turbo 8K - 🚀 强大推理",
+            "ERNIE-Speed-8K": "ERNIE Speed 8K - 🏃 极速响应",
+            "ERNIE-Lite-8K": "ERNIE Lite 8K - 💡 轻量经济"
+        }[x],
+        help="选择用于分析的文心一言（千帆）模型",
         key="qianfan_model_select"
     )
+
+    if st.session_state.llm_model != llm_model:
+        logger.debug(f"🔄 [Persistence] Qianfan模型变更: {st.session_state.llm_model} → {llm_model}")
+    st.session_state.llm_model = llm_model
+    logger.debug(f"💾 [Persistence] Qianfan模型已保存: {llm_model}")
 ```
 
-### 千帆模型特殊问题与解决方案
-
-#### 问题1: API 认证方式特殊
-
-**问题描述**: 千帆模型使用 Access Token 而非传统 API Key
-
-**解决方案**:
-```python
-# 需要先获取 Access Token
-import requests
-
-def get_qianfan_access_token(api_key: str, secret_key: str) -> str:
-    """获取千帆 Access Token"""
-    url = "https://aip.baidubce.com/oauth/2.0/token"
-    params = {
-        "grant_type": "client_credentials",
-        "client_id": api_key,
-        "client_secret": secret_key
-    }
-    response = requests.post(url, params=params)
-    return response.json().get("access_token")
-```
-
-#### 问题2: 请求格式与 OpenAI 不完全兼容
-
-**问题描述**: 千帆的消息格式和参数名称有差异
-
-**解决方案**:
-```python
-def format_qianfan_request(messages, **kwargs):
-    """转换为千帆格式"""
-    formatted_messages = []
-    for msg in messages:
-        if msg["role"] == "system":
-            # 千帆将 system 消息合并到 user 消息中
-            continue
-        formatted_messages.append({
-            "role": msg["role"],
-            "content": msg["content"]
-        })
-    
-    return {
-        "messages": formatted_messages,
-        "temperature": kwargs.get("temperature", 0.7),
-        "max_output_tokens": kwargs.get("max_tokens", 4096)
-    }
-```
-
-#### 问题3: Function Calling 格式差异
-
-**问题描述**: 千帆的工具调用格式与 OpenAI 标准不同
-
-**解决方案**:
-```python
-def convert_tools_to_qianfan_format(tools):
-    """转换工具定义为千帆格式"""
-    qianfan_tools = []
-    for tool in tools:
-        qianfan_tool = {
-            "type": "function",
-            "function": {
-                "name": tool["function"]["name"],
-                "description": tool["function"]["description"],
-                "parameters": tool["function"]["parameters"]
-            }
-        }
-        qianfan_tools.append(qianfan_tool)
-    return qianfan_tools
-```
 
 ## 🚨 常见问题与解决方案
 
@@ -466,16 +470,18 @@ def convert_tools_to_qianfan_format(tools):
 **问题**: 环境变量设置正确但仍提示 API 密钥错误
 
 **解决方案**:
+
 - 检查 API 密钥格式是否符合提供商要求
 - 确认环境变量名称拼写正确
 - 检查 `.env` 文件是否在正确位置
-- **千帆特殊情况**: 需要同时设置 `QIANFAN_API_KEY` 
+- **千帆特殊情况**: 需要同时设置 `QIANFAN_API_KEY`
 
 ### 2. 工具调用不工作
 
 **问题**: 模型不能正确调用工具
 
 **解决方案**:
+
 - 确认模型本身支持 Function Calling
 - 检查 API 格式是否完全兼容 OpenAI 标准
 - 查看是否需要特殊的工具调用格式
@@ -486,6 +492,7 @@ def convert_tools_to_qianfan_format(tools):
 **问题**: 侧边栏看不到新添加的提供商
 
 **解决方案**:
+
 - 清除浏览器缓存
 - 检查 `sidebar.py` 中的选项列表
 - 确认 Streamlit 重新加载了代码
@@ -496,6 +503,7 @@ def convert_tools_to_qianfan_format(tools):
 **问题**: API 请求经常超时
 
 **解决方案**:
+
 - 调整 `timeout` 参数
 - 检查网络连接和 API 端点状态
 - 考虑添加重试机制
@@ -506,6 +514,7 @@ def convert_tools_to_qianfan_format(tools):
 **问题**: 中文输入或输出出现乱码
 
 **解决方案**:
+
 ```python
 # 确保请求和响应都使用 UTF-8 编码
 import json
@@ -516,12 +525,12 @@ def safe_json_dumps(data):
 def safe_json_loads(text):
     return json.loads(text.encode('utf-8').decode('utf-8'))
 ```
-
 ### 6. 成本控制问题
 
 **问题**: 某些模型调用成本过高
 
 **解决方案**:
+
 - 在配置中设置合理的 `max_tokens` 限制
 - 使用成本较低的模型进行初步分析
 - 实现智能模型路由，根据任务复杂度选择模型
@@ -536,7 +545,6 @@ def select_model_by_task(task_complexity: str) -> str:
     else:
         return "ERNIE-4.0-8K"  # 性能强
 ```
-
 ## 📝 PR 提交规范
 
 ### 提交信息格式
@@ -551,7 +559,6 @@ feat(llm): add {ProviderName} LLM integration
 
 Closes #{issue_number}
 ```
-
 ### PR 描述模板
 
 ```markdown
@@ -585,25 +592,28 @@ Closes #{issue_number}
 - [x] 更新了相关文档
 - [x] 通过了所有现有测试
 ```
-
 ## 🎯 最佳实践
 
 ### 1. 错误处理
+
 - 提供清晰的错误消息
 - 区分不同类型的错误（API 密钥、网络、模型等）
 - 添加重试机制处理临时故障
 
 ### 2. 日志记录
+
 - 使用统一的日志格式
 - 记录关键操作和错误
 - 避免记录敏感信息（API 密钥等）
 
 ### 3. 性能优化
+
 - 合理设置超时时间
 - 考虑并发限制
 - 优化大模型调用的 token 使用
 
 ### 4. 用户体验
+
 - 提供清晰的模型选择说明
 - 添加合适的帮助文本
 - 确保错误消息用户友好
@@ -626,6 +636,6 @@ Closes #{issue_number}
 
 ---
 
-**感谢您为 TradingAgents 项目贡献新的大模型支持！** 🎉
+**感谢您为 TradingAgentsCN 项目贡献新的大模型支持！** 🎉
 
 通过遵循本指南，您的贡献将更容易被审查和合并，同时也为其他开发者提供了良好的参考示例。
