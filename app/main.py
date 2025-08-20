@@ -21,7 +21,8 @@ from app.routers import auth, analysis, screening, queue, sse, health, favorites
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    # 启动时初始化数据库
+    # 启动时初始化
+    setup_logging()
     await init_db()
     logging.info("TradingAgents FastAPI backend started")
 
@@ -107,7 +108,7 @@ async def test_log():
     return {"message": "测试成功", "timestamp": time.time()}
 
 # 注册路由
-app.include_router(health.router, prefix="/api/health", tags=["health"])
+app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
 app.include_router(analysis.router, prefix="/api/analysis", tags=["analysis"])
 app.include_router(screening.router, prefix="/api/screening", tags=["screening"])

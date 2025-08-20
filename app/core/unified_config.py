@@ -189,14 +189,32 @@ class UnifiedConfigManager:
             return False
     
     def get_default_model(self) -> str:
-        """获取默认模型"""
+        """获取默认模型（向后兼容）"""
         settings = self.get_system_settings()
-        return settings.get("default_model", "qwen-turbo")
-    
+        # 优先返回快速分析模型，保持向后兼容
+        return settings.get("quick_analysis_model", settings.get("default_model", "qwen-turbo"))
+
     def set_default_model(self, model_name: str) -> bool:
-        """设置默认模型"""
+        """设置默认模型（向后兼容）"""
         settings = self.get_system_settings()
-        settings["default_model"] = model_name
+        settings["quick_analysis_model"] = model_name
+        return self.save_system_settings(settings)
+
+    def get_quick_analysis_model(self) -> str:
+        """获取快速分析模型"""
+        settings = self.get_system_settings()
+        return settings.get("quick_analysis_model", "qwen-turbo")
+
+    def get_deep_analysis_model(self) -> str:
+        """获取深度分析模型"""
+        settings = self.get_system_settings()
+        return settings.get("deep_analysis_model", "qwen-max")
+
+    def set_analysis_models(self, quick_model: str, deep_model: str) -> bool:
+        """设置分析模型"""
+        settings = self.get_system_settings()
+        settings["quick_analysis_model"] = quick_model
+        settings["deep_analysis_model"] = deep_model
         return self.save_system_settings(settings)
     
     # ==================== 数据源配置管理 ====================

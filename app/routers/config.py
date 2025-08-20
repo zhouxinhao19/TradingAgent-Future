@@ -13,7 +13,9 @@ from app.models.config import (
     SystemConfigResponse, LLMConfigRequest, DataSourceConfigRequest,
     DatabaseConfigRequest, ConfigTestRequest, ConfigTestResponse,
     LLMConfig, DataSourceConfig, DatabaseConfig,
-    LLMProvider, LLMProviderRequest, LLMProviderResponse
+    LLMProvider, LLMProviderRequest, LLMProviderResponse,
+    MarketCategory, MarketCategoryRequest, DataSourceGrouping,
+    DataSourceGroupingRequest, DataSourceOrderRequest
 )
 from app.services.config_service import config_service
 
@@ -264,14 +266,63 @@ async def add_llm_config(
 ):
     """添加或更新大模型配置"""
     try:
-        # 开源版本：所有用户都可以修改配置
-        
-        llm_config = LLMConfig(**request.dict())
+        logger.info(f"🔧 添加/更新大模型配置开始")
+        logger.info(f"📊 请求数据: {request.dict()}")
+        logger.info(f"🏷️ 厂家: {request.provider}, 模型: {request.model_name}")
+
+        # 创建LLM配置
+        llm_config_data = request.dict()
+        logger.info(f"📋 原始配置数据: {llm_config_data}")
+
+        # 如果没有提供API密钥，从厂家配置中获取
+        if not llm_config_data.get('api_key'):
+            logger.info(f"🔑 API密钥为空，从厂家配置获取: {request.provider}")
+
+            # 获取厂家配置
+            providers = await config_service.get_llm_providers()
+            logger.info(f"📊 找到 {len(providers)} 个厂家配置")
+
+            for p in providers:
+                logger.info(f"   - 厂家: {p.name}, 有API密钥: {bool(p.api_key)}")
+
+            provider_config = next((p for p in providers if p.name == request.provider), None)
+
+            if provider_config:
+                logger.info(f"✅ 找到厂家配置: {provider_config.name}")
+                if provider_config.api_key:
+                    llm_config_data['api_key'] = provider_config.api_key
+                    logger.info(f"✅ 成功获取厂家API密钥 (长度: {len(provider_config.api_key)})")
+                else:
+                    logger.warning(f"⚠️ 厂家 {request.provider} 没有配置API密钥")
+                    llm_config_data['api_key'] = ""
+            else:
+                logger.warning(f"⚠️ 未找到厂家 {request.provider} 的配置")
+                llm_config_data['api_key'] = ""
+        else:
+            logger.info(f"🔑 使用提供的API密钥 (长度: {len(llm_config_data.get('api_key', ''))})")
+
+        logger.info(f"📋 最终配置数据: {llm_config_data}")
+
+        # 尝试创建LLMConfig对象
+        try:
+            llm_config = LLMConfig(**llm_config_data)
+            logger.info(f"✅ LLMConfig对象创建成功")
+        except Exception as e:
+            logger.error(f"❌ LLMConfig对象创建失败: {e}")
+            logger.error(f"📋 失败的数据: {llm_config_data}")
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"配置数据验证失败: {str(e)}"
+            )
+
+        # 保存配置
         success = await config_service.update_llm_config(llm_config)
-        
+
         if success:
+            logger.info(f"✅ 大模型配置更新成功: {llm_config.provider}/{llm_config.model_name}")
             return {"message": "大模型配置更新成功", "model_name": llm_config.model_name}
         else:
+            logger.error(f"❌ 大模型配置保存失败")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="大模型配置更新失败"
@@ -279,6 +330,9 @@ async def add_llm_config(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"❌ 添加大模型配置异常: {e}")
+        import traceback
+        logger.error(f"📋 异常堆栈: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"添加大模型配置失败: {str(e)}"
@@ -491,6 +545,309 @@ async def get_data_source_configs(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"获取数据源配置失败: {str(e)}"
+        )
+
+
+@router.put("/datasource/{name}", response_model=dict)
+async def update_data_source_config(
+    name: str,
+    request: DataSourceConfigRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """更新数据源配置"""
+    try:
+        # 获取当前配置
+        config = await config_service.get_system_config()
+        if not config:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="系统配置不存在"
+            )
+
+        # 查找并更新数据源配置
+        for i, ds_config in enumerate(config.data_source_configs):
+            if ds_config.name == name:
+                # 更新配置
+                updated_config = DataSourceConfig(**request.dict())
+                config.data_source_configs[i] = updated_config
+
+                success = await config_service.save_system_config(config)
+                if success:
+                    return {"message": "数据源配置更新成功"}
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="数据源配置更新失败"
+                    )
+
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="数据源配置不存在"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"更新数据源配置失败: {str(e)}"
+        )
+
+
+@router.delete("/datasource/{name}", response_model=dict)
+async def delete_data_source_config(
+    name: str,
+    current_user: User = Depends(get_current_user)
+):
+    """删除数据源配置"""
+    try:
+        # 获取当前配置
+        config = await config_service.get_system_config()
+        if not config:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="系统配置不存在"
+            )
+
+        # 查找并删除数据源配置
+        for i, ds_config in enumerate(config.data_source_configs):
+            if ds_config.name == name:
+                config.data_source_configs.pop(i)
+
+                success = await config_service.save_system_config(config)
+                if success:
+                    return {"message": "数据源配置删除成功"}
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="数据源配置删除失败"
+                    )
+
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="数据源配置不存在"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"删除数据源配置失败: {str(e)}"
+        )
+
+
+# ==================== 市场分类管理 ====================
+
+@router.get("/market-categories", response_model=List[MarketCategory])
+async def get_market_categories(
+    current_user: User = Depends(get_current_user)
+):
+    """获取所有市场分类"""
+    try:
+        categories = await config_service.get_market_categories()
+        return categories
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取市场分类失败: {str(e)}"
+        )
+
+
+@router.post("/market-categories", response_model=dict)
+async def add_market_category(
+    request: MarketCategoryRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """添加市场分类"""
+    try:
+        category = MarketCategory(**request.dict())
+        success = await config_service.add_market_category(category)
+
+        if success:
+            return {"message": "市场分类添加成功", "id": category.id}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="市场分类ID已存在"
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"添加市场分类失败: {str(e)}"
+        )
+
+
+@router.put("/market-categories/{category_id}", response_model=dict)
+async def update_market_category(
+    category_id: str,
+    request: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """更新市场分类"""
+    try:
+        success = await config_service.update_market_category(category_id, request)
+
+        if success:
+            return {"message": "市场分类更新成功"}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="市场分类不存在"
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"更新市场分类失败: {str(e)}"
+        )
+
+
+@router.delete("/market-categories/{category_id}", response_model=dict)
+async def delete_market_category(
+    category_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """删除市场分类"""
+    try:
+        success = await config_service.delete_market_category(category_id)
+
+        if success:
+            return {"message": "市场分类删除成功"}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="无法删除分类，可能还有数据源使用此分类"
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"删除市场分类失败: {str(e)}"
+        )
+
+
+# ==================== 数据源分组管理 ====================
+
+@router.get("/datasource-groupings", response_model=List[DataSourceGrouping])
+async def get_datasource_groupings(
+    current_user: User = Depends(get_current_user)
+):
+    """获取所有数据源分组关系"""
+    try:
+        groupings = await config_service.get_datasource_groupings()
+        return groupings
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取数据源分组关系失败: {str(e)}"
+        )
+
+
+@router.post("/datasource-groupings", response_model=dict)
+async def add_datasource_to_category(
+    request: DataSourceGroupingRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """将数据源添加到分类"""
+    try:
+        grouping = DataSourceGrouping(**request.dict())
+        success = await config_service.add_datasource_to_category(grouping)
+
+        if success:
+            return {"message": "数据源添加到分类成功"}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="数据源已在该分类中"
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"添加数据源到分类失败: {str(e)}"
+        )
+
+
+@router.delete("/datasource-groupings/{data_source_name}/{category_id}", response_model=dict)
+async def remove_datasource_from_category(
+    data_source_name: str,
+    category_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """从分类中移除数据源"""
+    try:
+        success = await config_service.remove_datasource_from_category(data_source_name, category_id)
+
+        if success:
+            return {"message": "数据源从分类中移除成功"}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="数据源分组关系不存在"
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"从分类中移除数据源失败: {str(e)}"
+        )
+
+
+@router.put("/datasource-groupings/{data_source_name}/{category_id}", response_model=dict)
+async def update_datasource_grouping(
+    data_source_name: str,
+    category_id: str,
+    request: Dict[str, Any],
+    current_user: User = Depends(get_current_user)
+):
+    """更新数据源分组关系"""
+    try:
+        success = await config_service.update_datasource_grouping(data_source_name, category_id, request)
+
+        if success:
+            return {"message": "数据源分组关系更新成功"}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="数据源分组关系不存在"
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"更新数据源分组关系失败: {str(e)}"
+        )
+
+
+@router.put("/market-categories/{category_id}/datasource-order", response_model=dict)
+async def update_category_datasource_order(
+    category_id: str,
+    request: DataSourceOrderRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """更新分类中数据源的排序"""
+    try:
+        success = await config_service.update_category_datasource_order(category_id, request.data_sources)
+
+        if success:
+            return {"message": "数据源排序更新成功"}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="数据源排序更新失败"
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"更新数据源排序失败: {str(e)}"
         )
 
 

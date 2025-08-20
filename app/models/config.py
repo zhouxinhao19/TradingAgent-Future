@@ -114,7 +114,7 @@ class LLMConfig(BaseModel):
     """大模型配置"""
     provider: ModelProvider = ModelProvider.OPENAI
     model_name: str = Field(..., description="模型名称")
-    api_key: str = Field(..., description="API密钥")
+    api_key: Optional[str] = Field(None, description="API密钥(可选，优先从厂家配置获取)")
     api_base: Optional[str] = Field(None, description="API基础URL")
     max_tokens: int = Field(default=4000, description="最大token数")
     temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="温度参数")
@@ -144,6 +144,12 @@ class DataSourceConfig(BaseModel):
     priority: int = Field(default=0, description="优先级，数字越大优先级越高")
     config_params: Dict[str, Any] = Field(default_factory=dict, description="额外配置参数")
     description: Optional[str] = Field(None, description="配置描述")
+    # 新增字段：支持市场分类
+    market_categories: Optional[List[str]] = Field(default_factory=list, description="所属市场分类列表")
+    display_name: Optional[str] = Field(None, description="显示名称")
+    provider: Optional[str] = Field(None, description="数据提供商")
+    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow, description="创建时间")
+    updated_at: Optional[datetime] = Field(default_factory=datetime.utcnow, description="更新时间")
 
 
 class DatabaseConfig(BaseModel):
@@ -160,6 +166,28 @@ class DatabaseConfig(BaseModel):
     max_overflow: int = Field(default=20, description="最大溢出连接数")
     enabled: bool = Field(default=True, description="是否启用")
     description: Optional[str] = Field(None, description="配置描述")
+
+
+class MarketCategory(BaseModel):
+    """市场分类配置"""
+    id: str = Field(..., description="分类ID")
+    name: str = Field(..., description="分类名称")
+    display_name: str = Field(..., description="显示名称")
+    description: Optional[str] = Field(None, description="分类描述")
+    enabled: bool = Field(default=True, description="是否启用")
+    sort_order: int = Field(default=1, description="排序顺序")
+    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow, description="创建时间")
+    updated_at: Optional[datetime] = Field(default_factory=datetime.utcnow, description="更新时间")
+
+
+class DataSourceGrouping(BaseModel):
+    """数据源分组关系"""
+    data_source_name: str = Field(..., description="数据源名称")
+    market_category_id: str = Field(..., description="市场分类ID")
+    priority: int = Field(default=0, description="在该分类中的优先级")
+    enabled: bool = Field(default=True, description="是否启用")
+    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow, description="创建时间")
+    updated_at: Optional[datetime] = Field(default_factory=datetime.utcnow, description="更新时间")
 
 
 class SystemConfig(BaseModel):
@@ -202,7 +230,7 @@ class LLMConfigRequest(BaseModel):
     """大模型配置请求"""
     provider: ModelProvider
     model_name: str
-    api_key: str
+    api_key: Optional[str] = None  # 可选，优先从厂家配置获取
     api_base: Optional[str] = None
     max_tokens: int = 4000
     temperature: float = 0.7
@@ -210,6 +238,12 @@ class LLMConfigRequest(BaseModel):
     retry_times: int = 3
     enabled: bool = True
     description: Optional[str] = None
+
+    # 新增字段以匹配前端
+    enable_memory: bool = False
+    enable_debug: bool = False
+    priority: int = 0
+    model_category: Optional[str] = None
 
 
 class DataSourceConfigRequest(BaseModel):
@@ -225,6 +259,33 @@ class DataSourceConfigRequest(BaseModel):
     priority: int = 0
     config_params: Dict[str, Any] = Field(default_factory=dict)
     description: Optional[str] = None
+    # 新增字段
+    market_categories: Optional[List[str]] = Field(default_factory=list)
+    display_name: Optional[str] = None
+    provider: Optional[str] = None
+
+
+class MarketCategoryRequest(BaseModel):
+    """市场分类请求"""
+    id: str
+    name: str
+    display_name: str
+    description: Optional[str] = None
+    enabled: bool = True
+    sort_order: int = 1
+
+
+class DataSourceGroupingRequest(BaseModel):
+    """数据源分组请求"""
+    data_source_name: str
+    market_category_id: str
+    priority: int = 0
+    enabled: bool = True
+
+
+class DataSourceOrderRequest(BaseModel):
+    """数据源排序请求"""
+    data_sources: List[Dict[str, Any]] = Field(..., description="排序后的数据源列表")
 
 
 class DatabaseConfigRequest(BaseModel):

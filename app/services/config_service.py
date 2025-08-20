@@ -12,7 +12,8 @@ from app.core.database import get_mongo_db
 from app.core.unified_config import unified_config
 from app.models.config import (
     SystemConfig, LLMConfig, DataSourceConfig, DatabaseConfig,
-    ModelProvider, DataSourceType, DatabaseType, LLMProvider
+    ModelProvider, DataSourceType, DatabaseType, LLMProvider,
+    MarketCategory, DataSourceGrouping
 )
 
 
@@ -33,7 +34,229 @@ class ConfigService:
                 # 否则使用全局函数
                 self.db = get_mongo_db()
         return self.db
-    
+
+    # ==================== 市场分类管理 ====================
+
+    async def get_market_categories(self) -> List[MarketCategory]:
+        """获取所有市场分类"""
+        try:
+            db = await self._get_db()
+            categories_collection = db.market_categories
+
+            categories_data = await categories_collection.find({}).to_list(length=None)
+            categories = [MarketCategory(**data) for data in categories_data]
+
+            # 如果没有分类，创建默认分类
+            if not categories:
+                categories = await self._create_default_market_categories()
+
+            # 按排序顺序排列
+            categories.sort(key=lambda x: x.sort_order)
+            return categories
+        except Exception as e:
+            print(f"❌ 获取市场分类失败: {e}")
+            return []
+
+    async def _create_default_market_categories(self) -> List[MarketCategory]:
+        """创建默认市场分类"""
+        default_categories = [
+            MarketCategory(
+                id="a_shares",
+                name="a_shares",
+                display_name="A股",
+                description="中国A股市场数据源",
+                enabled=True,
+                sort_order=1
+            ),
+            MarketCategory(
+                id="us_stocks",
+                name="us_stocks",
+                display_name="美股",
+                description="美国股票市场数据源",
+                enabled=True,
+                sort_order=2
+            ),
+            MarketCategory(
+                id="hk_stocks",
+                name="hk_stocks",
+                display_name="港股",
+                description="香港股票市场数据源",
+                enabled=True,
+                sort_order=3
+            ),
+            MarketCategory(
+                id="crypto",
+                name="crypto",
+                display_name="数字货币",
+                description="数字货币市场数据源",
+                enabled=True,
+                sort_order=4
+            ),
+            MarketCategory(
+                id="futures",
+                name="futures",
+                display_name="期货",
+                description="期货市场数据源",
+                enabled=True,
+                sort_order=5
+            )
+        ]
+
+        # 保存到数据库
+        db = await self._get_db()
+        categories_collection = db.market_categories
+
+        for category in default_categories:
+            await categories_collection.insert_one(category.dict())
+
+        return default_categories
+
+    async def add_market_category(self, category: MarketCategory) -> bool:
+        """添加市场分类"""
+        try:
+            db = await self._get_db()
+            categories_collection = db.market_categories
+
+            # 检查ID是否已存在
+            existing = await categories_collection.find_one({"id": category.id})
+            if existing:
+                return False
+
+            await categories_collection.insert_one(category.dict())
+            return True
+        except Exception as e:
+            print(f"❌ 添加市场分类失败: {e}")
+            return False
+
+    async def update_market_category(self, category_id: str, updates: Dict[str, Any]) -> bool:
+        """更新市场分类"""
+        try:
+            db = await self._get_db()
+            categories_collection = db.market_categories
+
+            updates["updated_at"] = datetime.utcnow()
+            result = await categories_collection.update_one(
+                {"id": category_id},
+                {"$set": updates}
+            )
+            return result.modified_count > 0
+        except Exception as e:
+            print(f"❌ 更新市场分类失败: {e}")
+            return False
+
+    async def delete_market_category(self, category_id: str) -> bool:
+        """删除市场分类"""
+        try:
+            db = await self._get_db()
+            categories_collection = db.market_categories
+            groupings_collection = db.datasource_groupings
+
+            # 检查是否有数据源使用此分类
+            groupings_count = await groupings_collection.count_documents(
+                {"market_category_id": category_id}
+            )
+            if groupings_count > 0:
+                return False
+
+            result = await categories_collection.delete_one({"id": category_id})
+            return result.deleted_count > 0
+        except Exception as e:
+            print(f"❌ 删除市场分类失败: {e}")
+            return False
+
+    # ==================== 数据源分组管理 ====================
+
+    async def get_datasource_groupings(self) -> List[DataSourceGrouping]:
+        """获取所有数据源分组关系"""
+        try:
+            db = await self._get_db()
+            groupings_collection = db.datasource_groupings
+
+            groupings_data = await groupings_collection.find({}).to_list(length=None)
+            return [DataSourceGrouping(**data) for data in groupings_data]
+        except Exception as e:
+            print(f"❌ 获取数据源分组关系失败: {e}")
+            return []
+
+    async def add_datasource_to_category(self, grouping: DataSourceGrouping) -> bool:
+        """将数据源添加到分类"""
+        try:
+            db = await self._get_db()
+            groupings_collection = db.datasource_groupings
+
+            # 检查是否已存在
+            existing = await groupings_collection.find_one({
+                "data_source_name": grouping.data_source_name,
+                "market_category_id": grouping.market_category_id
+            })
+            if existing:
+                return False
+
+            await groupings_collection.insert_one(grouping.dict())
+            return True
+        except Exception as e:
+            print(f"❌ 添加数据源到分类失败: {e}")
+            return False
+
+    async def remove_datasource_from_category(self, data_source_name: str, category_id: str) -> bool:
+        """从分类中移除数据源"""
+        try:
+            db = await self._get_db()
+            groupings_collection = db.datasource_groupings
+
+            result = await groupings_collection.delete_one({
+                "data_source_name": data_source_name,
+                "market_category_id": category_id
+            })
+            return result.deleted_count > 0
+        except Exception as e:
+            print(f"❌ 从分类中移除数据源失败: {e}")
+            return False
+
+    async def update_datasource_grouping(self, data_source_name: str, category_id: str, updates: Dict[str, Any]) -> bool:
+        """更新数据源分组关系"""
+        try:
+            db = await self._get_db()
+            groupings_collection = db.datasource_groupings
+
+            updates["updated_at"] = datetime.utcnow()
+            result = await groupings_collection.update_one(
+                {
+                    "data_source_name": data_source_name,
+                    "market_category_id": category_id
+                },
+                {"$set": updates}
+            )
+            return result.modified_count > 0
+        except Exception as e:
+            print(f"❌ 更新数据源分组关系失败: {e}")
+            return False
+
+    async def update_category_datasource_order(self, category_id: str, ordered_datasources: List[Dict[str, Any]]) -> bool:
+        """更新分类中数据源的排序"""
+        try:
+            db = await self._get_db()
+            groupings_collection = db.datasource_groupings
+
+            # 批量更新优先级
+            for item in ordered_datasources:
+                await groupings_collection.update_one(
+                    {
+                        "data_source_name": item["name"],
+                        "market_category_id": category_id
+                    },
+                    {
+                        "$set": {
+                            "priority": item["priority"],
+                            "updated_at": datetime.utcnow()
+                        }
+                    }
+                )
+            return True
+        except Exception as e:
+            print(f"❌ 更新分类数据源排序失败: {e}")
+            return False
+
     async def get_system_config(self) -> Optional[SystemConfig]:
         """获取系统配置 - 优先从数据库获取最新数据"""
         try:

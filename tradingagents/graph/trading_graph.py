@@ -133,7 +133,6 @@ class TradingAgentsGraph:
                 google_api_key=google_api_key,
                 temperature=0.1,
                 max_tokens=2000,
-                client_options=client_options,
                 transport="rest"
             )
             

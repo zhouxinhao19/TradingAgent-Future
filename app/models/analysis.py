@@ -34,10 +34,14 @@ class AnalysisParameters(BaseModel):
     market_type: str = "A股"
     analysis_date: Optional[datetime] = None
     research_depth: str = "深度"
-    selected_analysts: List[str] = Field(default_factory=lambda: ["市场分析师", "基本面分析师", "新闻分析师", "情绪分析师"])
+    selected_analysts: List[str] = Field(default_factory=lambda: ["market", "fundamentals", "news", "social"])
     custom_prompt: Optional[str] = None
-    include_charts: bool = True
+    include_sentiment: bool = True
+    include_risk: bool = True
     language: str = "zh-CN"
+    # 模型配置
+    quick_analysis_model: Optional[str] = "qwen-turbo"
+    deep_analysis_model: Optional[str] = "qwen-max"
 
 
 class AnalysisResult(BaseModel):
