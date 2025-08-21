@@ -330,8 +330,14 @@ class TradingAgentsGraph:
             ),
         }
 
-    def propagate(self, company_name, trade_date):
-        """Run the trading agents graph for a company on a specific date."""
+    def propagate(self, company_name, trade_date, progress_callback=None):
+        """Run the trading agents graph for a company on a specific date.
+
+        Args:
+            company_name: Company name or stock symbol
+            trade_date: Date for analysis
+            progress_callback: Optional callback function for progress updates
+        """
 
         # 添加详细的接收日志
         logger.debug(f"🔍 [GRAPH DEBUG] ===== TradingAgentsGraph.propagate 接收参数 =====")
@@ -351,7 +357,7 @@ class TradingAgentsGraph:
         args = self.propagator.get_graph_args()
 
         if self.debug:
-            # Debug mode with tracing
+            # Debug mode with tracing and progress updates
             trace = []
             for chunk in self.graph.stream(init_agent_state, **args):
                 if len(chunk["messages"]) == 0:
@@ -360,10 +366,23 @@ class TradingAgentsGraph:
                     chunk["messages"][-1].pretty_print()
                     trace.append(chunk)
 
+                    # 发送进度更新
+                    if progress_callback:
+                        self._send_progress_update(chunk, progress_callback)
+
             final_state = trace[-1]
         else:
-            # Standard mode without tracing
-            final_state = self.graph.invoke(init_agent_state, **args)
+            # Standard mode without tracing but with progress updates
+            if progress_callback:
+                # 使用stream模式以便获取中间状态
+                trace = []
+                for chunk in self.graph.stream(init_agent_state, **args):
+                    trace.append(chunk)
+                    self._send_progress_update(chunk, progress_callback)
+                final_state = trace[-1]
+            else:
+                # 原有的invoke模式
+                final_state = self.graph.invoke(init_agent_state, **args)
 
         # Store current state for reflection
         self.curr_state = final_state
@@ -373,6 +392,50 @@ class TradingAgentsGraph:
 
         # Return decision and processed signal
         return final_state, self.process_signal(final_state["final_trade_decision"], company_name)
+
+    def _send_progress_update(self, chunk, progress_callback):
+        """发送进度更新到回调函数"""
+        try:
+            # 从chunk中提取当前执行的节点信息
+            if isinstance(chunk, dict):
+                # 尝试从不同的字段中获取节点信息
+                node_name = None
+
+                # 检查是否有明确的节点名称
+                if '__end__' in chunk:
+                    progress_callback("📊 生成报告")
+                    return
+
+                # 检查消息内容
+                messages = chunk.get("messages", [])
+                if messages:
+                    last_message = messages[-1]
+                    if hasattr(last_message, 'content'):
+                        content = last_message.content
+                        # 根据消息内容推断当前步骤
+                        if "市场分析" in content or "market" in content.lower():
+                            progress_callback("📊 市场分析师")
+                        elif "基本面" in content or "fundamental" in content.lower():
+                            progress_callback("💼 基本面分析师")
+                        elif "新闻" in content or "news" in content.lower():
+                            progress_callback("📰 新闻分析师")
+                        elif "社交" in content or "social" in content.lower():
+                            progress_callback("💬 社交媒体分析师")
+                        elif "看涨" in content or "bull" in content.lower():
+                            progress_callback("🐂 看涨研究员")
+                        elif "看跌" in content or "bear" in content.lower():
+                            progress_callback("🐻 看跌研究员")
+                        elif "辩论" in content or "debate" in content.lower():
+                            progress_callback("🎯 研究辩论")
+                        elif "研究经理" in content or "research" in content.lower():
+                            progress_callback("👔 研究经理")
+                        elif "交易员" in content or "trader" in content.lower():
+                            progress_callback("💼 交易员决策")
+                        elif "风险" in content or "risk" in content.lower():
+                            progress_callback("🔥 风险评估")
+
+        except Exception as e:
+            logger.debug(f"进度更新失败: {e}")
 
     def _log_state(self, trade_date, final_state):
         """Log the final state to a JSON file."""

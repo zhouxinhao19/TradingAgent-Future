@@ -52,6 +52,44 @@ class TaskState:
             data['start_time'] = self.start_time.isoformat()
         if self.end_time:
             data['end_time'] = self.end_time.isoformat()
+
+        # 添加实时计算的时间信息
+        if self.start_time:
+            if self.end_time:
+                # 任务已完成，使用最终执行时间
+                data['elapsed_time'] = self.execution_time or (self.end_time - self.start_time).total_seconds()
+                data['remaining_time'] = 0
+                data['estimated_total_time'] = data['elapsed_time']
+            else:
+                # 任务进行中，实时计算已用时间
+                from datetime import datetime
+                elapsed_time = (datetime.now() - self.start_time).total_seconds()
+                data['elapsed_time'] = elapsed_time
+
+                # 计算预计剩余时间和总时长（采用web目录的逻辑）
+                progress = self.progress / 100 if self.progress > 0 else 0
+
+                # 基础预估时间（默认5分钟）
+                base_estimated_total = 300
+
+                if progress >= 1.0:
+                    # 任务已完成
+                    data['remaining_time'] = 0
+                    data['estimated_total_time'] = elapsed_time
+                else:
+                    # 优先使用基础预估时间
+                    data['estimated_total_time'] = base_estimated_total
+                    data['remaining_time'] = max(0, base_estimated_total - elapsed_time)
+
+                    # 如果已经超过预估时间，根据当前进度动态调整
+                    if data['remaining_time'] <= 0 and progress > 0:
+                        data['estimated_total_time'] = elapsed_time / progress
+                        data['remaining_time'] = max(0, data['estimated_total_time'] - elapsed_time)
+        else:
+            data['elapsed_time'] = 0
+            data['remaining_time'] = 300  # 默认5分钟
+            data['estimated_total_time'] = 300
+
         return data
 
 class MemoryStateManager:
@@ -116,6 +154,13 @@ class MemoryStateManager:
             if current_step is not None:
                 task.current_step = current_step
             if result_data is not None:
+                # 🔍 调试：检查保存到内存的result_data
+                logger.info(f"🔍 [MEMORY] 保存result_data到内存: {task_id}")
+                logger.info(f"🔍 [MEMORY] result_data键: {list(result_data.keys()) if result_data else '无'}")
+                logger.info(f"🔍 [MEMORY] result_data中有decision: {bool(result_data.get('decision')) if result_data else False}")
+                if result_data and result_data.get('decision'):
+                    logger.info(f"🔍 [MEMORY] decision内容: {result_data['decision']}")
+
                 task.result_data = result_data
             if error_message is not None:
                 task.error_message = error_message

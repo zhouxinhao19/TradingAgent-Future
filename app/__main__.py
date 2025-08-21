@@ -12,8 +12,17 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from app.core.config import settings
-from app.core.dev_config import DEV_CONFIG
+try:
+    from app.core.config import settings
+    from app.core.dev_config import DEV_CONFIG
+except Exception as e:
+    import traceback
+    print(f"❌ 导入配置模块失败: {e}")
+    print("\n📋 详细错误信息:")
+    print("-" * 50)
+    traceback.print_exc()
+    print("-" * 50)
+    sys.exit(1)
 
 
 def main():
@@ -43,7 +52,12 @@ def main():
     except KeyboardInterrupt:
         print("\n🛑 Server stopped by user")
     except Exception as e:
+        import traceback
         print(f"❌ Failed to start server: {e}")
+        print("\n📋 详细错误信息:")
+        print("-" * 50)
+        traceback.print_exc()
+        print("-" * 50)
         sys.exit(1)
 
 

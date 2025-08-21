@@ -417,6 +417,7 @@ def create_market_analyst(llm, toolkit):
                 # 没有工具调用，直接使用LLM的回复
                 report = result.content
                 logger.info(f"📊 [市场分析师] 直接回复，长度: {len(report)}")
+                logger.debug(f"📊 [DEBUG] 直接回复内容预览: {report[:200]}...")
             else:
                 # 有工具调用，执行工具并生成完整分析报告
                 logger.info(f"📊 [市场分析师] 工具调用: {[call.get('name', 'unknown') for call in result.tool_calls]}")

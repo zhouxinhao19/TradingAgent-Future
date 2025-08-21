@@ -70,10 +70,10 @@ class SmartAnalysisProgressTracker:
 
         # 每个分析师的实际耗时（基于真实测试数据）
         analyst_base_time = {
-            1: 120,  # 快速分析：每个分析师约2分钟
-            2: 180,  # 基础分析：每个分析师约3分钟
-            3: 240   # 标准分析：每个分析师约4分钟
-        }.get(self.research_depth, 180)
+            1: 180,  # 快速分析：每个分析师约3分钟
+            2: 360,  # 标准分析：每个分析师约6分钟
+            3: 600   # 深度分析：每个分析师约10分钟
+        }.get(self.research_depth, 360)
 
         analyst_time = len(self.analysts) * analyst_base_time
 

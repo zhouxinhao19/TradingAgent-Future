@@ -710,18 +710,33 @@ def format_analysis_results(results):
         'final_trade_decision'      # 最终交易决策
     ]
     
+    # 添加调试信息
+    logger.debug(f"🔍 [格式化调试] 原始state中的键: {list(state.keys())}")
+    for key in state.keys():
+        if isinstance(state[key], str):
+            logger.debug(f"🔍 [格式化调试] {key}: 字符串长度 {len(state[key])}")
+        elif isinstance(state[key], dict):
+            logger.debug(f"🔍 [格式化调试] {key}: 字典，包含键 {list(state[key].keys())}")
+        else:
+            logger.debug(f"🔍 [格式化调试] {key}: {type(state[key])}")
+
     for key in analysis_keys:
         if key in state:
             # 对文本内容进行中文化处理
             content = state[key]
             if isinstance(content, str):
                 content = translate_analyst_labels(content)
+                logger.debug(f"🔍 [格式化调试] 处理字符串字段 {key}: 长度 {len(content)}")
+            elif isinstance(content, dict):
+                logger.debug(f"🔍 [格式化调试] 处理字典字段 {key}: 包含键 {list(content.keys())}")
             formatted_state[key] = content
         elif key == 'risk_assessment':
             # 特殊处理：从 risk_debate_state 生成 risk_assessment
             risk_assessment = extract_risk_assessment(state)
             if risk_assessment:
                 formatted_state[key] = risk_assessment
+        else:
+            logger.debug(f"🔍 [格式化调试] 缺失字段: {key}")
     
     return {
         'stock_symbol': results['stock_symbol'],

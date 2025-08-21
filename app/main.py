@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.core.database import init_db, close_db
 from app.core.logging_config import setup_logging
-from app.routers import auth, analysis, screening, queue, sse, health, favorites, config
+from app.routers import auth, analysis, screening, queue, sse, health, favorites, config, reports
 
 
 @asynccontextmanager
@@ -23,14 +23,15 @@ async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     # 启动时初始化
     setup_logging()
+    logger = logging.getLogger("app.main")
     await init_db()
-    logging.info("TradingAgents FastAPI backend started")
+    logger.info("TradingAgents FastAPI backend started")
 
     yield
 
     # 关闭时清理
     await close_db()
-    logging.info("TradingAgents FastAPI backend stopped")
+    logger.info("TradingAgents FastAPI backend stopped")
 
 
 # 创建FastAPI应用
@@ -111,6 +112,7 @@ async def test_log():
 app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
 app.include_router(analysis.router, prefix="/api/analysis", tags=["analysis"])
+app.include_router(reports.router, tags=["reports"])
 app.include_router(screening.router, prefix="/api/screening", tags=["screening"])
 app.include_router(queue.router, prefix="/api/queue", tags=["queue"])
 app.include_router(favorites.router, prefix="/api", tags=["favorites"])

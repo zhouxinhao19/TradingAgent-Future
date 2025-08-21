@@ -16,6 +16,10 @@ import sys
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
+# 初始化TradingAgents日志系统
+from tradingagents.utils.logging_init import init_logging
+init_logging()
+
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
 from app.services.simple_analysis_service import create_analysis_config, get_provider_by_model_name
@@ -29,6 +33,7 @@ from app.core.database import get_mongo_db
 from app.core.redis_client import get_redis_service, RedisKeys
 from app.services.queue_service import QueueService
 from app.core.database import get_redis_client
+from app.services.redis_progress_tracker import RedisProgressTracker
 
 import logging
 logger = logging.getLogger(__name__)
@@ -42,6 +47,8 @@ class AnalysisService:
         redis_client = get_redis_client()
         self.queue_service = QueueService(redis_client)
         self._trading_graph_cache = {}
+        # 进度跟踪器缓存
+        self._progress_trackers: Dict[str, RedisProgressTracker] = {}
 
     def _convert_user_id(self, user_id: str) -> PyObjectId:
         """将字符串用户ID转换为PyObjectId"""
@@ -82,6 +89,89 @@ class AnalysisService:
             logger.info(f"创建新的TradingAgents实例: {config.get('llm_provider', 'default')}")
 
         return self._trading_graph_cache[config_key]
+
+    def _execute_analysis_sync_with_progress(self, task: AnalysisTask, progress_tracker: RedisProgressTracker) -> AnalysisResult:
+        """同步执行分析任务（在线程池中运行，带进度跟踪）"""
+        try:
+            # 在线程中重新初始化日志系统
+            from tradingagents.utils.logging_init import init_logging, get_logger
+            init_logging()
+            thread_logger = get_logger('analysis_thread')
+
+            thread_logger.info(f"🔄 [线程池] 开始执行分析任务: {task.task_id} - {task.stock_code}")
+            logger.info(f"🔄 [线程池] 开始执行分析任务: {task.task_id} - {task.stock_code}")
+
+            # 环境检查
+            progress_tracker.update_progress("🔧 检查环境配置")
+
+            # 使用标准配置函数创建完整配置
+            from app.core.unified_config import unified_config
+
+            quick_model = getattr(task.parameters, 'quick_analysis_model', None) or unified_config.get_quick_analysis_model()
+            deep_model = getattr(task.parameters, 'deep_analysis_model', None) or unified_config.get_deep_analysis_model()
+
+            # 成本估算
+            progress_tracker.update_progress("💰 预估分析成本")
+
+            # 根据模型名称动态查找供应商（同步版本）
+            llm_provider = "dashscope"  # 默认使用dashscope
+
+            # 参数配置
+            progress_tracker.update_progress("⚙️ 配置分析参数")
+
+            # 使用标准配置函数创建完整配置
+            from app.services.simple_analysis_service import create_analysis_config
+            config = create_analysis_config(
+                research_depth=task.parameters.research_depth,
+                selected_analysts=task.parameters.selected_analysts or ["market", "fundamentals"],
+                quick_model=quick_model,
+                deep_model=deep_model,
+                llm_provider=llm_provider,
+                market_type=getattr(task.parameters, 'market_type', "A股")
+            )
+
+            # 启动引擎
+            progress_tracker.update_progress("🚀 初始化AI分析引擎")
+
+            # 获取TradingAgents实例
+            trading_graph = self._get_trading_graph(config)
+
+            # 执行分析
+            from datetime import timezone
+            start_time = datetime.now(timezone.utc)
+            analysis_date = task.parameters.analysis_date or datetime.now().strftime("%Y-%m-%d")
+
+            # 创建进度回调函数
+            def progress_callback(message: str):
+                progress_tracker.update_progress(message)
+
+            # 调用现有的分析方法（同步调用，传递进度回调）
+            _, decision = trading_graph.propagate(task.stock_code, analysis_date, progress_callback)
+
+            execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
+
+            # 生成报告
+            progress_tracker.update_progress("📊 生成分析报告")
+
+            # 构建结果
+            result = AnalysisResult(
+                analysis_id=str(uuid.uuid4()),
+                summary=decision.get("summary", ""),
+                recommendation=decision.get("recommendation", ""),
+                confidence_score=decision.get("confidence_score", 0.0),
+                risk_level=decision.get("risk_level", "中等"),
+                key_points=decision.get("key_points", []),
+                detailed_analysis=decision,
+                execution_time=execution_time,
+                tokens_used=decision.get("tokens_used", 0)
+            )
+
+            logger.info(f"✅ [线程池] 分析任务完成: {task.task_id} - 耗时{execution_time:.2f}秒")
+            return result
+
+        except Exception as e:
+            logger.error(f"❌ [线程池] 执行分析任务失败: {task.task_id} - {e}")
+            raise
 
     def _execute_analysis_sync(self, task: AnalysisTask) -> AnalysisResult:
         """同步执行分析任务（在线程池中运行）"""
@@ -143,11 +233,24 @@ class AnalysisService:
 
     async def _execute_single_analysis_async(self, task: AnalysisTask):
         """异步执行单股分析任务（在后台运行，不阻塞主线程）"""
+        progress_tracker = None
         try:
             logger.info(f"🔄 开始执行分析任务: {task.task_id} - {task.stock_code}")
 
-            # 更新任务状态为处理中
-            await self._update_task_status(task.task_id, AnalysisStatus.PROCESSING, 10)
+            # 创建进度跟踪器
+            progress_tracker = RedisProgressTracker(
+                task_id=task.task_id,
+                analysts=task.parameters.selected_analysts or ["market", "fundamentals"],
+                research_depth=task.parameters.research_depth or "标准",
+                llm_provider="dashscope"
+            )
+
+            # 缓存进度跟踪器
+            self._progress_trackers[task.task_id] = progress_tracker
+
+            # 初始化进度
+            progress_tracker.update_progress("🚀 开始股票分析")
+            await self._update_task_status_with_tracker(task.task_id, AnalysisStatus.PROCESSING, progress_tracker)
 
             # 在线程池中执行分析，避免阻塞事件循环
             import asyncio
@@ -159,19 +262,30 @@ class AnalysisService:
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 result = await loop.run_in_executor(
                     executor,
-                    self._execute_analysis_sync,
-                    task
+                    self._execute_analysis_sync_with_progress,
+                    task,
+                    progress_tracker
                 )
 
-            # 更新任务状态为完成
-            await self._update_task_status(task.task_id, AnalysisStatus.COMPLETED, 100, result)
+            # 标记完成
+            progress_tracker.mark_completed("✅ 分析完成")
+            await self._update_task_status_with_tracker(task.task_id, AnalysisStatus.COMPLETED, progress_tracker, result)
 
             logger.info(f"✅ 分析任务完成: {task.task_id}")
 
         except Exception as e:
             logger.error(f"❌ 分析任务失败: {task.task_id} - {e}")
-            # 更新任务状态为失败
-            await self._update_task_status(task.task_id, AnalysisStatus.FAILED, 0, str(e))
+
+            # 标记失败
+            if progress_tracker:
+                progress_tracker.mark_failed(str(e))
+                await self._update_task_status_with_tracker(task.task_id, AnalysisStatus.FAILED, progress_tracker)
+            else:
+                await self._update_task_status(task.task_id, AnalysisStatus.FAILED, 0, str(e))
+        finally:
+            # 清理进度跟踪器缓存
+            if task.task_id in self._progress_trackers:
+                del self._progress_trackers[task.task_id]
 
     async def submit_single_analysis(
         self,
@@ -445,32 +559,154 @@ class AnalysisService:
             
         except Exception as e:
             logger.error(f"更新任务状态失败: {task_id} - {e}")
-    
+
+    async def _update_task_status_with_tracker(
+        self,
+        task_id: str,
+        status: AnalysisStatus,
+        progress_tracker: RedisProgressTracker,
+        result: Optional[AnalysisResult] = None
+    ):
+        """使用进度跟踪器更新任务状态"""
+        try:
+            db = get_mongo_db()
+            redis_service = get_redis_service()
+
+            # 从进度跟踪器获取详细信息
+            progress_data = progress_tracker.to_dict()
+
+            # 准备更新数据
+            update_data = {
+                "status": status,
+                "progress": progress_data["progress"],
+                "current_step": progress_data["current_step"],
+                "message": progress_data["message"],
+                "updated_at": datetime.utcnow()
+            }
+
+            if status == AnalysisStatus.PROCESSING and "started_at" not in update_data:
+                update_data["started_at"] = datetime.utcnow()
+            elif status in [AnalysisStatus.COMPLETED, AnalysisStatus.FAILED]:
+                update_data["completed_at"] = datetime.utcnow()
+                if result:
+                    update_data["result"] = result.dict()
+
+            # 更新数据库
+            await db.analysis_tasks.update_one(
+                {"task_id": task_id},
+                {"$set": update_data}
+            )
+
+            # 更新Redis缓存（包含详细的进度信息）
+            progress_key = RedisKeys.TASK_PROGRESS.format(task_id=task_id)
+            await redis_service.set_json(progress_key, {
+                "task_id": task_id,
+                "status": status.value,
+                "progress": progress_data["progress"],
+                "current_step": progress_data["current_step"],
+                "message": progress_data["message"],
+                "elapsed_time": progress_data["elapsed_time"],
+                "remaining_time": progress_data["remaining_time"],
+                "steps": progress_data["steps"],
+                "updated_at": datetime.utcnow().isoformat()
+            }, ttl=3600)
+
+        except Exception as e:
+            logger.error(f"更新任务状态失败: {task_id} - {e}")
+
     async def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """获取任务状态"""
         try:
-            # 先从Redis缓存获取
+            # 先检查内存中的进度跟踪器
+            if task_id in self._progress_trackers:
+                progress_tracker = self._progress_trackers[task_id]
+                progress_data = progress_tracker.to_dict()
+
+                # 从数据库获取任务基本信息
+                db = get_mongo_db()
+                task = await db.analysis_tasks.find_one({"task_id": task_id})
+
+                if task:
+                    # 合并数据库信息和进度跟踪器信息
+                    return {
+                        "task_id": task_id,
+                        "user_id": task.get("user_id"),
+                        "stock_code": task.get("stock_symbol"),
+                        "status": progress_data["status"],
+                        "progress": progress_data["progress"],
+                        "current_step": progress_data["current_step"],
+                        "message": progress_data["message"],
+                        "elapsed_time": progress_data["elapsed_time"],
+                        "remaining_time": progress_data["remaining_time"],
+                        "estimated_total_time": progress_data.get("estimated_total_time", 0),
+                        "steps": progress_data["steps"],
+                        "start_time": progress_data["start_time"],
+                        "end_time": None,
+                        "last_update": progress_data["last_update"],
+                        "parameters": task.get("parameters", {}),
+                        "execution_time": None,
+                        "tokens_used": None,
+                        "result_data": task.get("result"),
+                        "error_message": None
+                    }
+
+            # 从Redis缓存获取
             redis_service = get_redis_service()
             progress_key = RedisKeys.TASK_PROGRESS.format(task_id=task_id)
             cached_status = await redis_service.get_json(progress_key)
-            
+
             if cached_status:
                 return cached_status
-            
+
             # 从数据库获取
             db = get_mongo_db()
             task = await db.analysis_tasks.find_one({"task_id": task_id})
-            
+
             if task:
+                # 计算已用时间
+                elapsed_time = 0
+                remaining_time = 0
+                estimated_total_time = 0
+
+                if task.get("started_at"):
+                    from datetime import datetime
+                    start_time = task.get("started_at")
+                    if task.get("completed_at"):
+                        # 任务已完成
+                        elapsed_time = (task.get("completed_at") - start_time).total_seconds()
+                        estimated_total_time = elapsed_time  # 已完成任务的总时长就是已用时间
+                        remaining_time = 0
+                    else:
+                        # 任务进行中
+                        elapsed_time = (datetime.utcnow() - start_time).total_seconds()
+                        # 采用web目录的时间估算逻辑
+                        progress = task.get("progress", 0) / 100
+
+                        # 优先使用默认预估时间
+                        estimated_total_time = 300  # 默认5分钟
+                        remaining_time = max(0, estimated_total_time - elapsed_time)
+
+                        # 如果已经超过预估时间，根据当前进度动态调整
+                        if remaining_time <= 0 and progress > 0:
+                            estimated_total_time = elapsed_time / progress
+                            remaining_time = max(0, estimated_total_time - elapsed_time)
+
                 return {
                     "task_id": task_id,
                     "status": task.get("status"),
                     "progress": task.get("progress", 0),
-                    "updated_at": task.get("updated_at", "").isoformat() if task.get("updated_at") else None
+                    "current_step": task.get("current_step", ""),
+                    "message": task.get("message", ""),
+                    "elapsed_time": elapsed_time,
+                    "remaining_time": remaining_time,
+                    "estimated_total_time": estimated_total_time,
+                    "start_time": task.get("started_at").isoformat() if task.get("started_at") else None,
+                    "updated_at": task.get("updated_at", "").isoformat() if task.get("updated_at") else None,
+                    "result_data": task.get("result")
                 }
-            
+
             return None
-            
+
         except Exception as e:
             logger.error(f"获取任务状态失败: {task_id} - {e}")
             return None
