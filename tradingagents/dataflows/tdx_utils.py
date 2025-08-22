@@ -359,42 +359,44 @@ class TongDaXinDataProvider:
             if df.empty:
                 return {}
             
-            # 计算技术指标
-            indicators = {}
-            
-            # 移动平均线
-            indicators['MA5'] = df['Close'].rolling(5).mean().iloc[-1] if len(df) >= 5 else None
-            indicators['MA10'] = df['Close'].rolling(10).mean().iloc[-1] if len(df) >= 10 else None
-            indicators['MA20'] = df['Close'].rolling(20).mean().iloc[-1] if len(df) >= 20 else None
-            
-            # RSI
-            if len(df) >= 14:
-                delta = df['Close'].diff()
-                gain = (delta.where(delta > 0, 0)).rolling(14).mean()
-                loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
-                rs = gain / loss
-                indicators['RSI'] = (100 - (100 / (1 + rs))).iloc[-1]
-            
-            # MACD
-            if len(df) >= 26:
-                exp1 = df['Close'].ewm(span=12).mean()
-                exp2 = df['Close'].ewm(span=26).mean()
-                macd = exp1 - exp2
-                signal = macd.ewm(span=9).mean()
-                indicators['MACD'] = macd.iloc[-1]
-                indicators['MACD_Signal'] = signal.iloc[-1]
-                indicators['MACD_Histogram'] = (macd - signal).iloc[-1]
-            
-            # 布林带
-            if len(df) >= 20:
-                sma = df['Close'].rolling(20).mean()
-                std = df['Close'].rolling(20).std()
-                indicators['BB_Upper'] = (sma + 2 * std).iloc[-1]
-                indicators['BB_Middle'] = sma.iloc[-1]
-                indicators['BB_Lower'] = (sma - 2 * std).iloc[-1]
-            
+            # 计算技术指标（统一指标库）
+            from tradingagents.tools.analysis.indicators import (
+                IndicatorSpec, compute_many
+            )
+
+            # 规范列名到小写以复用统一库
+            df_u = df.rename(columns={
+                'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close',
+                'Volume': 'vol', 'Amount': 'amount'
+            })
+
+            specs = [
+                IndicatorSpec(name='ma', params={'n': 5}),
+                IndicatorSpec(name='ma', params={'n': 10}),
+                IndicatorSpec(name='ma', params={'n': 20}),
+                IndicatorSpec(name='macd'),
+                IndicatorSpec(name='rsi', params={'n': 14}),
+                IndicatorSpec(name='boll', params={'n': 20, 'k': 2}),
+            ]
+            out = compute_many(df_u, specs)
+
+            # 取最新一行
+            last = out.iloc[-1]
+            indicators = {
+                'MA5': float(last['ma5']) if 'ma5' in out.columns and pd.notna(last['ma5']) else None,
+                'MA10': float(last['ma10']) if 'ma10' in out.columns and pd.notna(last['ma10']) else None,
+                'MA20': float(last['ma20']) if 'ma20' in out.columns and pd.notna(last['ma20']) else None,
+                'RSI': float(last['rsi14']) if 'rsi14' in out.columns and pd.notna(last['rsi14']) else None,
+                'MACD': float(last['dif']) if 'dif' in out.columns and pd.notna(last['dif']) else None,
+                'MACD_Signal': float(last['dea']) if 'dea' in out.columns and pd.notna(last['dea']) else None,
+                'MACD_Histogram': float(last['macd_hist']) if 'macd_hist' in out.columns and pd.notna(last['macd_hist']) else None,
+                'BB_Upper': float(last['boll_upper']) if 'boll_upper' in out.columns and pd.notna(last['boll_upper']) else None,
+                'BB_Middle': float(last['boll_mid']) if 'boll_mid' in out.columns and pd.notna(last['boll_mid']) else None,
+                'BB_Lower': float(last['boll_lower']) if 'boll_lower' in out.columns and pd.notna(last['boll_lower']) else None,
+            }
+
             return indicators
-            
+
         except Exception as e:
             logger.error(f"计算技术指标失败: {e}")
             return {}
