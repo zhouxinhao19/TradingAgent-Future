@@ -5,7 +5,7 @@ from app.routers.auth import get_current_user
 
 from app.services.screening_service import ScreeningService, ScreeningParams
 
-router = APIRouter(prefix="/screening", tags=["screening"])
+router = APIRouter(tags=["screening"])
 
 class OrderByItem(BaseModel):
     field: str
