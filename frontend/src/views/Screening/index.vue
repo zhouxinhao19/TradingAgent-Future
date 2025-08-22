@@ -1,0 +1,604 @@
+<template>
+  <div class="stock-screening">
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <h1 class="page-title">
+        <el-icon><Search /></el-icon>
+        股票筛选
+      </h1>
+      <p class="page-description">
+        通过多维度筛选条件，快速找到符合投资策略的优质股票
+      </p>
+    </div>
+
+    <!-- 筛选条件面板 -->
+    <el-card class="filter-panel" shadow="never">
+      <template #header>
+        <div class="card-header">
+          <span>筛选条件</span>
+          <div class="header-actions">
+            <el-button type="text" @click="resetFilters">
+              <el-icon><Refresh /></el-icon>
+              重置
+            </el-button>
+            <el-button type="text" @click="saveFilterTemplate">
+              <el-icon><Collection /></el-icon>
+              保存模板
+            </el-button>
+          </div>
+        </div>
+      </template>
+
+      <el-form :model="filters" label-width="120px" class="filter-form">
+        <el-row :gutter="24">
+          <!-- 基础信息 -->
+          <el-col :span="8">
+            <el-form-item label="市场类型">
+              <el-select v-model="filters.market" placeholder="选择市场">
+                <el-option label="A股" value="A股" />
+                <el-option label="美股" value="美股" />
+                <el-option label="港股" value="港股" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+
+          <el-col :span="8">
+            <el-form-item label="行业分类">
+              <el-select
+                v-model="filters.industry"
+                placeholder="选择行业"
+                multiple
+                collapse-tags
+                collapse-tags-tooltip
+              >
+                <el-option
+                  v-for="industry in industryOptions"
+                  :key="industry.value"
+                  :label="industry.label"
+                  :value="industry.value"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+
+          <el-col :span="8">
+            <el-form-item label="市值范围">
+              <el-select v-model="filters.marketCapRange" placeholder="选择市值范围">
+                <el-option label="小盘股 (< 100亿)" value="small" />
+                <el-option label="中盘股 (100-500亿)" value="medium" />
+                <el-option label="大盘股 (> 500亿)" value="large" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="24">
+          <!-- 财务指标 -->
+          <el-col :span="8">
+            <el-form-item label="市盈率 (PE)">
+              <el-input-number
+                v-model="filters.peRatio.min"
+                placeholder="最小值"
+                :min="0"
+                :precision="2"
+                style="width: 45%"
+              />
+              <span style="margin: 0 8px">-</span>
+              <el-input-number
+                v-model="filters.peRatio.max"
+                placeholder="最大值"
+                :min="0"
+                :precision="2"
+                style="width: 45%"
+              />
+            </el-form-item>
+          </el-col>
+
+          <el-col :span="8">
+            <el-form-item label="市净率 (PB)">
+              <el-input-number
+                v-model="filters.pbRatio.min"
+                placeholder="最小值"
+                :min="0"
+                :precision="2"
+                style="width: 45%"
+              />
+              <span style="margin: 0 8px">-</span>
+              <el-input-number
+                v-model="filters.pbRatio.max"
+                placeholder="最大值"
+                :min="0"
+                :precision="2"
+                style="width: 45%"
+              />
+            </el-form-item>
+          </el-col>
+
+          <el-col :span="8">
+            <el-form-item label="ROE (%)">
+              <el-input-number
+                v-model="filters.roe.min"
+                placeholder="最小值"
+                :min="0"
+                :max="100"
+                :precision="2"
+                style="width: 45%"
+              />
+              <span style="margin: 0 8px">-</span>
+              <el-input-number
+                v-model="filters.roe.max"
+                placeholder="最大值"
+                :min="0"
+                :max="100"
+                :precision="2"
+                style="width: 45%"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="24">
+          <!-- 技术指标 -->
+          <el-col :span="8">
+            <el-form-item label="涨跌幅 (%)">
+              <el-input-number
+                v-model="filters.changePercent.min"
+                placeholder="最小值"
+                :precision="2"
+                style="width: 45%"
+              />
+              <span style="margin: 0 8px">-</span>
+              <el-input-number
+                v-model="filters.changePercent.max"
+                placeholder="最大值"
+                :precision="2"
+                style="width: 45%"
+              />
+            </el-form-item>
+          </el-col>
+
+          <el-col :span="8">
+            <el-form-item label="成交量">
+              <el-select v-model="filters.volumeLevel" placeholder="选择成交量水平">
+                <el-option label="活跃 (高成交量)" value="high" />
+                <el-option label="正常 (中等成交量)" value="medium" />
+                <el-option label="清淡 (低成交量)" value="low" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+
+          <el-col :span="8">
+            <el-form-item label="技术形态">
+              <el-select
+                v-model="filters.technicalPattern"
+                placeholder="选择技术形态"
+                multiple
+                collapse-tags
+              >
+                <el-option label="突破上升趋势" value="breakout_up" />
+                <el-option label="回调买入机会" value="pullback" />
+                <el-option label="底部反转" value="bottom_reversal" />
+                <el-option label="强势整理" value="consolidation" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <!-- 筛选按钮 -->
+        <el-row>
+          <el-col :span="24">
+            <div class="filter-actions">
+              <el-button
+                type="primary"
+                @click="performScreening"
+                :loading="screeningLoading"
+                size="large"
+              >
+                <el-icon><Search /></el-icon>
+                开始筛选
+              </el-button>
+              <el-button @click="resetFilters" size="large">
+                重置条件
+              </el-button>
+            </div>
+          </el-col>
+        </el-row>
+      </el-form>
+    </el-card>
+
+    <!-- 筛选结果 -->
+    <el-card v-if="screeningResults.length > 0" class="results-panel" shadow="never">
+      <template #header>
+        <div class="card-header">
+          <span>筛选结果 ({{ screeningResults.length }}只股票)</span>
+          <div class="header-actions">
+            <el-button
+              type="primary"
+              @click="batchAnalyze"
+              :disabled="selectedStocks.length === 0"
+            >
+              <el-icon><TrendCharts /></el-icon>
+              批量分析 ({{ selectedStocks.length }})
+            </el-button>
+            <el-button type="text" @click="exportResults">
+              <el-icon><Download /></el-icon>
+              导出结果
+            </el-button>
+          </div>
+        </div>
+      </template>
+
+      <!-- 结果表格 -->
+      <el-table
+        :data="paginatedResults"
+        @selection-change="handleSelectionChange"
+        stripe
+        style="width: 100%"
+      >
+        <el-table-column type="selection" width="55" />
+        
+        <el-table-column prop="code" label="股票代码" width="120">
+          <template #default="{ row }">
+            <el-link type="primary" @click="viewStockDetail(row)">
+              {{ row.code }}
+            </el-link>
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="name" label="股票名称" width="150" />
+        
+        <el-table-column prop="industry" label="行业" width="120" />
+        
+        <el-table-column prop="price" label="当前价格" width="100" align="right">
+          <template #default="{ row }">
+            ¥{{ row.price?.toFixed(2) }}
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="change_percent" label="涨跌幅" width="100" align="right">
+          <template #default="{ row }">
+            <span :class="getChangeClass(row.change_percent)">
+              {{ row.change_percent > 0 ? '+' : '' }}{{ row.change_percent?.toFixed(2) }}%
+            </span>
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="market_cap" label="市值" width="120" align="right">
+          <template #default="{ row }">
+            {{ formatMarketCap(row.market_cap) }}
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="pe_ratio" label="市盈率" width="100" align="right">
+          <template #default="{ row }">
+            {{ row.pe_ratio?.toFixed(2) }}
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="pb_ratio" label="市净率" width="100" align="right">
+          <template #default="{ row }">
+            {{ row.pb_ratio?.toFixed(2) }}
+          </template>
+        </el-table-column>
+        
+        <el-table-column label="操作" width="150" fixed="right">
+          <template #default="{ row }">
+            <el-button type="text" size="small" @click="analyzeSingle(row)">
+              分析
+            </el-button>
+            <el-button type="text" size="small" @click="addToFavorites(row)">
+              <el-icon><Star /></el-icon>
+              自选
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <!-- 分页 -->
+      <div class="pagination-wrapper">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[20, 50, 100]"
+          :total="screeningResults.length"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
+    </el-card>
+
+    <!-- 空状态 -->
+    <el-empty
+      v-else-if="!screeningLoading && hasSearched"
+      description="未找到符合条件的股票"
+      :image-size="200"
+    >
+      <el-button type="primary" @click="resetFilters">
+        重新筛选
+      </el-button>
+    </el-empty>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, reactive, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search, Refresh, Collection, TrendCharts, Download, Star } from '@element-plus/icons-vue'
+import type { StockInfo } from '@/types/analysis'
+import { screeningApi } from '@/api/screening'
+
+// 响应式数据
+const screeningLoading = ref(false)
+const hasSearched = ref(false)
+const screeningResults = ref<StockInfo[]>([])
+const selectedStocks = ref<StockInfo[]>([])
+const currentPage = ref(1)
+const pageSize = ref(20)
+
+// 筛选条件
+const filters = reactive({
+  market: 'A股',
+  industry: [] as string[],
+  marketCapRange: '',
+  peRatio: { min: null, max: null },
+  pbRatio: { min: null, max: null },
+  roe: { min: null, max: null },
+  changePercent: { min: null, max: null },
+  volumeLevel: '',
+  technicalPattern: [] as string[]
+})
+
+// 行业选项
+const industryOptions = ref([
+  { label: '银行', value: 'banking' },
+  { label: '证券', value: 'securities' },
+  { label: '保险', value: 'insurance' },
+  { label: '房地产', value: 'real_estate' },
+  { label: '医药生物', value: 'pharmaceutical' },
+  { label: '食品饮料', value: 'food_beverage' },
+  { label: '电子', value: 'electronics' },
+  { label: '计算机', value: 'computer' },
+  { label: '通信', value: 'communication' },
+  { label: '汽车', value: 'automotive' }
+])
+
+// 计算属性
+const paginatedResults = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return screeningResults.value.slice(start, end)
+})
+
+// 方法
+const performScreening = async () => {
+  screeningLoading.value = true
+  hasSearched.value = true
+
+  try {
+    const payload = {
+      market: 'CN',
+      date: undefined,
+      adj: 'qfq',
+      conditions: {
+        logic: 'AND',
+        children: [
+          { field: 'kdj_k', op: 'cross_up', right_field: 'kdj_d' },
+          { field: 'rsi14', op: '<', value: 80 },
+        ]
+      },
+      order_by: [{ field: 'pct_chg', direction: 'desc' }],
+      limit: 50,
+      offset: 0,
+    }
+
+    const res = await screeningApi.run(payload)
+    const data = (res as any)?.data || res // ApiClient封装会返回 {success,data} 格式
+    const items = data?.items || []
+
+    screeningResults.value = items.map((it: any) => ({
+      code: it.code, name: it.code, market: 'A股',
+      price: it.close, change_percent: it.pct_chg, market_cap: undefined,
+      industry: undefined, sector: undefined,
+    }))
+
+    ElMessage.success(`筛选完成，找到 ${screeningResults.value.length} 只股票`)
+  } catch (error) {
+    ElMessage.error('筛选失败，请重试')
+  } finally {
+    screeningLoading.value = false
+  }
+}
+
+const generateMockResults = (): StockInfo[] => {
+  const mockStocks = [
+    { code: '000001', name: '平安银行', industry: '银行', price: 12.50, change_percent: 2.1, market_cap: 2400, pe_ratio: 5.2, pb_ratio: 0.8 },
+    { code: '000002', name: '万科A', industry: '房地产', price: 18.30, change_percent: -1.5, market_cap: 2100, pe_ratio: 8.5, pb_ratio: 1.2 },
+    { code: '000858', name: '五粮液', industry: '食品饮料', price: 168.50, change_percent: 3.2, market_cap: 6500, pe_ratio: 25.3, pb_ratio: 4.5 }
+  ]
+  
+  return mockStocks.map(stock => ({
+    ...stock,
+    market: filters.market,
+    sector: stock.industry
+  }))
+}
+
+const resetFilters = () => {
+  Object.assign(filters, {
+    market: 'A股',
+    industry: [],
+    marketCapRange: '',
+    peRatio: { min: null, max: null },
+    pbRatio: { min: null, max: null },
+    roe: { min: null, max: null },
+    changePercent: { min: null, max: null },
+    volumeLevel: '',
+    technicalPattern: []
+  })
+  
+  screeningResults.value = []
+  selectedStocks.value = []
+  hasSearched.value = false
+  currentPage.value = 1
+}
+
+const handleSelectionChange = (selection: StockInfo[]) => {
+  selectedStocks.value = selection
+}
+
+const batchAnalyze = async () => {
+  if (selectedStocks.value.length === 0) {
+    ElMessage.warning('请先选择要分析的股票')
+    return
+  }
+  
+  try {
+    await ElMessageBox.confirm(
+      `确定要对选中的 ${selectedStocks.value.length} 只股票进行批量分析吗？`,
+      '确认批量分析',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'info'
+      }
+    )
+    
+    // 跳转到批量分析页面
+    const router = useRouter()
+    router.push({
+      name: 'BatchAnalysis',
+      query: {
+        stocks: selectedStocks.value.map(s => s.code).join(',')
+      }
+    })
+  } catch {
+    // 用户取消
+  }
+}
+
+const analyzeSingle = (stock: StockInfo) => {
+  const router = useRouter()
+  router.push({
+    name: 'SingleAnalysis',
+    query: { stock: stock.code }
+  })
+}
+
+const viewStockDetail = (stock: StockInfo) => {
+  // 打开股票详情页面
+  window.open(`/stock/${stock.code}`, '_blank')
+}
+
+const addToFavorites = async (stock: StockInfo) => {
+  try {
+    // 模拟API调用添加到自选股
+    await new Promise(resolve => setTimeout(resolve, 500))
+    ElMessage.success(`已将 ${stock.name} 添加到自选股`)
+  } catch (error) {
+    ElMessage.error('添加到自选股失败')
+  }
+}
+
+const exportResults = () => {
+  // 导出筛选结果
+  ElMessage.info('导出功能开发中...')
+}
+
+const saveFilterTemplate = () => {
+  ElMessage.info('保存模板功能开发中...')
+}
+
+const getChangeClass = (changePercent: number) => {
+  if (changePercent > 0) return 'text-red'
+  if (changePercent < 0) return 'text-green'
+  return ''
+}
+
+const formatMarketCap = (marketCap: number) => {
+  if (marketCap >= 10000) {
+    return `${(marketCap / 10000).toFixed(1)}万亿`
+  } else if (marketCap >= 100) {
+    return `${(marketCap / 100).toFixed(0)}百亿`
+  } else {
+    return `${marketCap.toFixed(0)}亿`
+  }
+}
+
+const handleSizeChange = (size: number) => {
+  pageSize.value = size
+  currentPage.value = 1
+}
+
+const handleCurrentChange = (page: number) => {
+  currentPage.value = page
+}
+
+// 生命周期
+onMounted(() => {
+  // 初始化数据
+})
+</script>
+
+<style lang="scss" scoped>
+.stock-screening {
+  .page-header {
+    margin-bottom: 24px;
+
+    .page-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--el-text-color-primary);
+      margin: 0 0 8px 0;
+    }
+
+    .page-description {
+      color: var(--el-text-color-regular);
+      margin: 0;
+    }
+  }
+
+  .filter-panel {
+    margin-bottom: 24px;
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      .header-actions {
+        display: flex;
+        gap: 8px;
+      }
+    }
+
+    .filter-form {
+      .filter-actions {
+        display: flex;
+        justify-content: center;
+        gap: 16px;
+        margin-top: 24px;
+      }
+    }
+  }
+
+  .results-panel {
+    .pagination-wrapper {
+      display: flex;
+      justify-content: center;
+      margin-top: 24px;
+    }
+  }
+
+  .text-red {
+    color: #f56c6c;
+  }
+
+  .text-green {
+    color: #67c23a;
+  }
+}
+</style>
