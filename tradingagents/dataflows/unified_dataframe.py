@@ -24,10 +24,10 @@ except Exception:
     AKSHARE_PROVIDER_AVAILABLE = False
 
 try:
-    from .tdx_utils import get_tdx_provider
-    TDX_PROVIDER_AVAILABLE = True
+    from .baostock_utils import get_baostock_provider
+    BAOSTOCK_PROVIDER_AVAILABLE = True
 except Exception:
-    TDX_PROVIDER_AVAILABLE = False
+    BAOSTOCK_PROVIDER_AVAILABLE = False
 
 
 def _std_lower_cols(df: pd.DataFrame) -> pd.DataFrame:
@@ -87,15 +87,15 @@ def _try_akshare(symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def _try_tdx(symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
-    if not TDX_PROVIDER_AVAILABLE:
+def _try_baostock(symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
+    if not BAOSTOCK_PROVIDER_AVAILABLE:
         return pd.DataFrame()
     try:
-        provider = get_tdx_provider()
-        df = provider.get_stock_history_data(symbol, start_date, end_date)
+        provider = get_baostock_provider()
+        df = provider.get_stock_data(symbol, start_date, end_date)
         return _std_lower_cols(df)
     except Exception as e:
-        logger.warning(f"[unified_df] TDX provider failed: {e}")
+        logger.warning(f"[unified_df] BaoStock provider failed: {e}")
         return pd.DataFrame()
 
 
@@ -129,23 +129,23 @@ def get_china_daily_df_unified(symbol: str, start_date: str, end_date: str) -> p
             df = _try_tushare(symbol, start_date, end_date)
         elif src == "akshare":
             df = _try_akshare(symbol, start_date, end_date)
-        elif src == "tdx":
-            df = _try_tdx(symbol, start_date, end_date)
+        elif src == "baostock":
+            df = _try_baostock(symbol, start_date, end_date)
         else:
             df = pd.DataFrame()
         if df is not None and not df.empty:
             logger.info(f"[unified_df] got data from {src}: shape={getattr(df,'shape',None)}")
             return df
 
-    # 兜底：再尝试一个固定顺序
-    for src in ["tushare", "akshare", "tdx"]:
+    # 兜底：再尝试一个固定顺序（去掉tdx）
+    for src in ["tushare", "akshare", "baostock"]:
         df = pd.DataFrame()
         if src == "tushare":
             df = _try_tushare(symbol, start_date, end_date)
         elif src == "akshare":
             df = _try_akshare(symbol, start_date, end_date)
-        elif src == "tdx":
-            df = _try_tdx(symbol, start_date, end_date)
+        elif src == "baostock":
+            df = _try_baostock(symbol, start_date, end_date)
         if df is not None and not df.empty:
             logger.info(f"[unified_df] fallback got data from {src}: shape={getattr(df,'shape',None)}")
             return df
