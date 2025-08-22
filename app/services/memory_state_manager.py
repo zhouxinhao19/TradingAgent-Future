@@ -27,6 +27,7 @@ class TaskState:
     user_id: str
     stock_code: str
     status: TaskStatus
+    stock_name: Optional[str] = None
     progress: int = 0
     message: str = ""
     current_step: str = ""
@@ -105,11 +106,12 @@ class MemoryStateManager:
         self._websocket_manager = websocket_manager
         
     async def create_task(
-        self, 
-        task_id: str, 
-        user_id: str, 
+        self,
+        task_id: str,
+        user_id: str,
         stock_code: str,
-        parameters: Optional[Dict[str, Any]] = None
+        parameters: Optional[Dict[str, Any]] = None,
+        stock_name: Optional[str] = None,
     ) -> TaskState:
         """创建新任务"""
         async with self._lock:
@@ -117,6 +119,7 @@ class MemoryStateManager:
                 task_id=task_id,
                 user_id=user_id,
                 stock_code=stock_code,
+                stock_name=stock_name,
                 status=TaskStatus.PENDING,
                 start_time=datetime.now(),
                 parameters=parameters or {},
@@ -127,7 +130,7 @@ class MemoryStateManager:
             logger.info(f"📊 当前内存中任务数量: {len(self._tasks)}")
             logger.info(f"🔍 内存管理器实例ID: {id(self)}")
             return task_state
-    
+
     async def update_task_status(
         self, 
         task_id: str, 
@@ -225,8 +228,12 @@ class MemoryStateManager:
             for task in self._tasks.values():
                 if task.user_id == user_id:
                     if status is None or task.status == status:
-                        tasks.append(task.to_dict())
-            
+                        item = task.to_dict()
+                        # 兼容前端字段
+                        if 'stock_name' not in item or not item.get('stock_name'):
+                            item['stock_name'] = None
+                        tasks.append(item)
+
             # 按开始时间倒序排列
             tasks.sort(key=lambda x: x.get('start_time', ''), reverse=True)
             

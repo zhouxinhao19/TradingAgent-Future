@@ -9,6 +9,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 import logging
 import time
+import uuid
 
 from app.routers.auth import get_current_user
 from app.services.queue_service import get_queue_service, QueueService
@@ -193,8 +194,16 @@ async def get_task_result(
             from app.core.database import get_mongo_db
             db = get_mongo_db()
 
-            # 从analysis_reports集合中查找
+            # 从analysis_reports集合中查找（优先使用 task_id 匹配）
             mongo_result = await db.analysis_reports.find_one({"task_id": task_id})
+
+            if not mongo_result:
+                # 兼容旧数据：旧记录可能没有 task_id，但 analysis_id 存在于 analysis_tasks.result
+                tasks_doc_for_id = await db.analysis_tasks.find_one({"task_id": task_id}, {"result.analysis_id": 1})
+                analysis_id = tasks_doc_for_id.get("result", {}).get("analysis_id") if tasks_doc_for_id else None
+                if analysis_id:
+                    logger.info(f"🔎 [RESULT] 按analysis_id兜底查询 analysis_reports: {analysis_id}")
+                    mongo_result = await db.analysis_reports.find_one({"analysis_id": analysis_id})
 
             if mongo_result:
                 logger.info(f"✅ [RESULT] 从MongoDB找到结果: {task_id}")
@@ -230,6 +239,35 @@ async def get_task_result(
                 if result_data.get('decision'):
                     decision = result_data['decision']
                     logger.info(f"📊 [RESULT] MongoDB decision内容: action={decision.get('action')}, target_price={decision.get('target_price')}, confidence={decision.get('confidence')}")
+            else:
+                # 兜底：analysis_tasks 集合中的 result 字段
+                tasks_doc = await db.analysis_tasks.find_one({"task_id": task_id}, {"result": 1, "stock_code": 1, "created_at": 1, "completed_at": 1})
+                if tasks_doc and tasks_doc.get("result"):
+                    r = tasks_doc["result"] or {}
+                    logger.info("✅ [RESULT] 从analysis_tasks.result 找到结果")
+                    result_data = {
+                        "analysis_id": r.get("analysis_id"),
+                        "stock_symbol": r.get("stock_symbol", r.get("stock_code", tasks_doc.get("stock_code"))),
+                        "stock_code": r.get("stock_code", tasks_doc.get("stock_code")),
+                        "analysis_date": r.get("analysis_date"),
+                        "summary": r.get("summary", ""),
+                        "recommendation": r.get("recommendation", ""),
+                        "confidence_score": r.get("confidence_score", 0.0),
+                        "risk_level": r.get("risk_level", "中等"),
+                        "key_points": r.get("key_points", []),
+                        "execution_time": r.get("execution_time", 0),
+                        "tokens_used": r.get("tokens_used", 0),
+                        "analysts": r.get("analysts", []),
+                        "research_depth": r.get("research_depth", "快速"),
+                        "reports": r.get("reports", {}),
+                        "state": r.get("state", {}),
+                        "detailed_analysis": r.get("detailed_analysis", {}),
+                        "created_at": tasks_doc.get("created_at"),
+                        "updated_at": tasks_doc.get("completed_at"),
+                        "status": r.get("status", "completed"),
+                        "decision": r.get("decision", {}),
+                        "source": "analysis_tasks"  # 数据来源标记
+                    }
 
         if not result_data:
             logger.warning(f"❌ [RESULT] 所有数据源都未找到结果: {task_id}")
@@ -238,49 +276,98 @@ async def get_task_result(
         if not result_data:
             raise HTTPException(status_code=404, detail="分析结果不存在")
 
-        # 处理reports字段 - 如果没有reports字段，从state中提取
+        # 处理reports字段 - 如果没有reports字段，优先尝试从文件系统加载，其次从state中提取
         if 'reports' not in result_data or not result_data['reports']:
-            logger.info(f"📊 [RESULT] reports字段缺失，尝试从state中提取")
+            import os
+            from pathlib import Path
 
-            # 从state中提取报告内容
-            reports = {}
-            state = result_data.get('state', {})
+            stock_symbol = result_data.get('stock_symbol') or result_data.get('stock_code')
+            # analysis_date 可能是日期或时间戳字符串，这里只取日期部分
+            analysis_date_raw = result_data.get('analysis_date')
+            analysis_date = str(analysis_date_raw)[:10] if analysis_date_raw else None
 
-            if isinstance(state, dict):
-                # 定义所有可能的报告字段
-                report_fields = [
-                    'market_report',
-                    'sentiment_report',
-                    'news_report',
-                    'fundamentals_report',
-                    'investment_plan',
-                    'trader_investment_plan',
-                    'final_trade_decision'
-                ]
+            loaded_reports = {}
+            try:
+                # 1) 尝试从环境变量 TRADINGAGENTS_RESULTS_DIR 指定的位置读取
+                base_env = os.getenv('TRADINGAGENTS_RESULTS_DIR')
+                project_root = Path.cwd()
+                if base_env:
+                    base_path = Path(base_env)
+                    if not base_path.is_absolute():
+                        base_path = project_root / base_env
+                else:
+                    base_path = project_root / 'results'
+
+                candidate_dirs = []
+                if stock_symbol and analysis_date:
+                    candidate_dirs.append(base_path / stock_symbol / analysis_date / 'reports')
+                # 2) 兼容其他保存路径
+                if stock_symbol and analysis_date:
+                    candidate_dirs.append(project_root / 'data' / 'analysis_results' / stock_symbol / analysis_date / 'reports')
+                    candidate_dirs.append(project_root / 'data' / 'analysis_results' / 'detailed' / stock_symbol / analysis_date / 'reports')
+
+                for d in candidate_dirs:
+                    if d.exists() and d.is_dir():
+                        for f in d.glob('*.md'):
+                            try:
+                                content = f.read_text(encoding='utf-8')
+                                if content and content.strip():
+                                    loaded_reports[f.stem] = content.strip()
+                            except Exception:
+                                pass
+                if loaded_reports:
+                    result_data['reports'] = loaded_reports
+                    # 若 summary / recommendation 缺失，尝试从同名报告补全
+                    if not result_data.get('summary') and loaded_reports.get('summary'):
+                        result_data['summary'] = loaded_reports.get('summary')
+                    if not result_data.get('recommendation') and loaded_reports.get('recommendation'):
+                        result_data['recommendation'] = loaded_reports.get('recommendation')
+                    logger.info(f"📁 [RESULT] 从文件系统加载到 {len(loaded_reports)} 个报告: {list(loaded_reports.keys())}")
+            except Exception as fs_err:
+                logger.warning(f"⚠️ [RESULT] 从文件系统加载报告失败: {fs_err}")
+
+            if 'reports' not in result_data or not result_data['reports']:
+                logger.info(f"📊 [RESULT] reports字段缺失，尝试从state中提取")
 
                 # 从state中提取报告内容
-                for field in report_fields:
-                    value = state.get(field, "")
-                    if isinstance(value, str) and len(value.strip()) > 10:
-                        reports[field] = value.strip()
+                reports = {}
+                state = result_data.get('state', {})
 
-                # 处理复杂的辩论状态报告
-                investment_debate_state = state.get('investment_debate_state', {})
-                if isinstance(investment_debate_state, dict):
-                    judge_decision = investment_debate_state.get('judge_decision', "")
-                    if isinstance(judge_decision, str) and len(judge_decision.strip()) > 10:
-                        reports['research_team_decision'] = judge_decision.strip()
+                if isinstance(state, dict):
+                    # 定义所有可能的报告字段
+                    report_fields = [
+                        'market_report',
+                        'sentiment_report',
+                        'news_report',
+                        'fundamentals_report',
+                        'investment_plan',
+                        'trader_investment_plan',
+                        'final_trade_decision'
+                    ]
 
-                risk_debate_state = state.get('risk_debate_state', {})
-                if isinstance(risk_debate_state, dict):
-                    risk_decision = risk_debate_state.get('judge_decision', "")
-                    if isinstance(risk_decision, str) and len(risk_decision.strip()) > 10:
-                        reports['risk_management_decision'] = risk_decision.strip()
+                    # 从state中提取报告内容
+                    for field in report_fields:
+                        value = state.get(field, "")
+                        if isinstance(value, str) and len(value.strip()) > 10:
+                            reports[field] = value.strip()
 
-                logger.info(f"📊 [RESULT] 从state中提取到 {len(reports)} 个报告: {list(reports.keys())}")
-                result_data['reports'] = reports
-            else:
-                logger.warning(f"⚠️ [RESULT] state字段不是字典类型: {type(state)}")
+                    # 处理复杂的辩论状态报告
+                    investment_debate_state = state.get('investment_debate_state', {})
+                    if isinstance(investment_debate_state, dict):
+                        judge_decision = investment_debate_state.get('judge_decision', "")
+                        if isinstance(judge_decision, str) and len(judge_decision.strip()) > 10:
+                            reports['research_team_decision'] = judge_decision.strip()
+
+                    risk_debate_state = state.get('risk_debate_state', {})
+                    if isinstance(risk_debate_state, dict):
+                        risk_decision = risk_debate_state.get('judge_decision', "")
+                        if isinstance(risk_decision, str) and len(risk_decision.strip()) > 10:
+                            reports['risk_management_decision'] = risk_decision.strip()
+
+                    logger.info(f"📊 [RESULT] 从state中提取到 {len(reports)} 个报告: {list(reports.keys())}")
+                    result_data['reports'] = reports
+                else:
+                    logger.warning(f"⚠️ [RESULT] state字段不是字典类型: {type(state)}")
 
         # 确保reports字段中的所有内容都是字符串类型
         if 'reports' in result_data and result_data['reports']:
@@ -309,6 +396,107 @@ async def get_task_result(
             else:
                 logger.warning(f"⚠️ [RESULT] reports字段不是字典类型: {type(reports)}")
                 result_data['reports'] = {}
+
+        # 补全关键字段：recommendation/summary/key_points
+        try:
+            reports = result_data.get('reports', {}) or {}
+            decision = result_data.get('decision', {}) or {}
+
+            # recommendation 优先使用决策摘要或报告中的决策
+            if not result_data.get('recommendation'):
+                rec_candidates = []
+                if isinstance(decision, dict) and decision.get('action'):
+                    parts = [
+                        f"操作: {decision.get('action')}",
+                        f"目标价: {decision.get('target_price')}" if decision.get('target_price') else None,
+                        f"置信度: {decision.get('confidence')}" if decision.get('confidence') is not None else None
+                    ]
+                    rec_candidates.append("；".join([p for p in parts if p]))
+                # 从报告中兜底
+                for k in ['final_trade_decision', 'investment_plan']:
+                    v = reports.get(k)
+                    if isinstance(v, str) and len(v.strip()) > 10:
+                        rec_candidates.append(v.strip())
+                if rec_candidates:
+                    # 取最有信息量的一条（最长）
+                    result_data['recommendation'] = max(rec_candidates, key=len)[:2000]
+
+            # summary 从若干报告拼接生成
+            if not result_data.get('summary'):
+                sum_candidates = []
+                for k in ['market_report', 'fundamentals_report', 'sentiment_report', 'news_report']:
+                    v = reports.get(k)
+                    if isinstance(v, str) and len(v.strip()) > 50:
+                        sum_candidates.append(v.strip())
+                if sum_candidates:
+                    result_data['summary'] = ("\n\n".join(sum_candidates))[:3000]
+
+            # key_points 兜底
+            if not result_data.get('key_points'):
+                kp = []
+                if isinstance(decision, dict):
+                    if decision.get('action'):
+                        kp.append(f"操作建议: {decision.get('action')}")
+                    if decision.get('target_price'):
+                        kp.append(f"目标价: {decision.get('target_price')}")
+                    if decision.get('confidence') is not None:
+                        kp.append(f"置信度: {decision.get('confidence')}")
+                # 从reports中截取前几句作为要点
+                for k in ['investment_plan', 'final_trade_decision']:
+                    v = reports.get(k)
+                    if isinstance(v, str) and len(v.strip()) > 10:
+                        kp.append(v.strip()[:120])
+                if kp:
+                    result_data['key_points'] = kp[:5]
+        except Exception as fill_err:
+            logger.warning(f"⚠️ [RESULT] 补全关键字段时出错: {fill_err}")
+
+
+        # 进一步兜底：从 detailed_analysis 推断并补全
+        try:
+            if not result_data.get('summary') or not result_data.get('recommendation') or not result_data.get('reports'):
+                da = result_data.get('detailed_analysis')
+                # 若reports仍为空，放入一份原始详细分析，便于前端“查看报告详情”
+                if (not result_data.get('reports')) and isinstance(da, str) and len(da.strip()) > 20:
+                    result_data['reports'] = {'detailed_analysis': da.strip()}
+                elif (not result_data.get('reports')) and isinstance(da, dict) and da:
+                    # 将字典的长文本项放入reports
+                    extracted = {}
+                    for k, v in da.items():
+                        if isinstance(v, str) and len(v.strip()) > 20:
+                            extracted[k] = v.strip()
+                    if extracted:
+                        result_data['reports'] = extracted
+
+                # 补 summary
+                if not result_data.get('summary'):
+                    if isinstance(da, str) and da.strip():
+                        result_data['summary'] = da.strip()[:3000]
+                    elif isinstance(da, dict) and da:
+                        # 取最长的文本作为摘要
+                        texts = [v.strip() for v in da.values() if isinstance(v, str) and v.strip()]
+                        if texts:
+                            result_data['summary'] = max(texts, key=len)[:3000]
+
+                # 补 recommendation
+                if not result_data.get('recommendation'):
+                    rec = None
+                    if isinstance(da, str):
+                        # 简单基于关键字提取包含“建议”的段落
+                        import re
+                        m = re.search(r'(投资建议|建议|结论)[:：]?\s*(.+)', da)
+                        if m:
+                            rec = m.group(0)
+                    elif isinstance(da, dict):
+                        for key in ['final_trade_decision', 'investment_plan', '结论', '建议']:
+                            v = da.get(key)
+                            if isinstance(v, str) and len(v.strip()) > 10:
+                                rec = v.strip()
+                                break
+                    if rec:
+                        result_data['recommendation'] = rec[:2000]
+        except Exception as da_err:
+            logger.warning(f"⚠️ [RESULT] 从detailed_analysis补全失败: {da_err}")
 
         # 严格的数据格式化和验证
         def safe_string(value, default=""):
@@ -454,15 +642,47 @@ async def list_user_tasks(
 @router.post("/batch", response_model=Dict[str, Any])
 async def submit_batch_analysis(
     request: BatchAnalysisRequest,
+    background_tasks: BackgroundTasks,
     user: dict = Depends(get_current_user)
 ):
-    """提交批量分析任务"""
+    """提交批量分析任务（方案A：与单股分析同一流水线，进程内并发执行）"""
     try:
-        result = await get_analysis_service().submit_batch_analysis(user["id"], request)
+        simple_service = get_simple_analysis_service()
+        batch_id = str(uuid.uuid4())
+        task_ids: List[str] = []
+        mapping: List[Dict[str, str]] = []
+
+        # 为每只股票创建单股分析任务，并在后台执行
+        for stock_code in request.stock_codes:
+            single_req = SingleAnalysisRequest(
+                stock_code=stock_code,
+                parameters=request.parameters
+            )
+            create_res = await simple_service.create_analysis_task(user["id"], single_req)
+            task_id = create_res.get("task_id")
+            if not task_id:
+                raise RuntimeError("创建任务失败：未返回task_id")
+            task_ids.append(task_id)
+            mapping.append({"stock_code": stock_code, "task_id": task_id})
+
+            # 加入后台执行（与 /analysis/single 相同）
+            background_tasks.add_task(
+                simple_service.execute_analysis_background,
+                task_id,
+                user["id"],
+                single_req
+            )
+
         return {
             "success": True,
-            "data": result,
-            "message": f"批量分析任务已提交，共{result['total_tasks']}个股票"
+            "data": {
+                "batch_id": batch_id,
+                "total_tasks": len(task_ids),
+                "task_ids": task_ids,
+                "mapping": mapping,
+                "status": "submitted"
+            },
+            "message": f"批量分析任务已提交，共{len(task_ids)}个股票"
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -581,21 +801,69 @@ async def get_user_queue_status(
 async def get_user_analysis_history(
     user: dict = Depends(get_current_user),
     status: Optional[str] = Query(None, description="任务状态过滤"),
+    start_date: Optional[str] = Query(None, description="开始日期，YYYY-MM-DD"),
+    end_date: Optional[str] = Query(None, description="结束日期，YYYY-MM-DD"),
+    stock_code: Optional[str] = Query(None, description="股票代码"),
+    market_type: Optional[str] = Query(None, description="市场类型"),
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页大小")
 ):
-    """获取用户分析历史"""
+    """获取用户分析历史（支持基础筛选与分页）"""
     try:
-        # TODO: 实现历史查询逻辑
+        # 先获取用户任务列表（内存优先，MongoDB兜底）
+        raw_tasks = await get_simple_analysis_service().list_user_tasks(
+            user_id=user["id"],
+            status=status,
+            limit=page_size,
+            offset=(page - 1) * page_size
+        )
+
+        # 进行基础筛选
+        from datetime import datetime
+        def in_date_range(t: Optional[str]) -> bool:
+            if not t:
+                return True
+            try:
+                dt = datetime.fromisoformat(t.replace('Z', '+00:00')) if 'Z' in t else datetime.fromisoformat(t)
+            except Exception:
+                return True
+            ok = True
+            if start_date:
+                try:
+                    ok = ok and (dt.date() >= datetime.fromisoformat(start_date).date())
+                except Exception:
+                    pass
+            if end_date:
+                try:
+                    ok = ok and (dt.date() <= datetime.fromisoformat(end_date).date())
+                except Exception:
+                    pass
+            return ok
+
+        filtered = []
+        for x in raw_tasks:
+            if stock_code and (x.get("stock_code") or x.get("stock_symbol")) not in [stock_code]:
+                continue
+            # 市场类型暂时从参数内判断（如有）
+            if market_type:
+                params = x.get("parameters") or {}
+                if params.get("market_type") != market_type:
+                    continue
+            # 时间范围（使用 start_time 或 created_at）
+            t = x.get("start_time") or x.get("created_at")
+            if not in_date_range(t):
+                continue
+            filtered.append(x)
+
         return {
             "success": True,
             "data": {
-                "tasks": [],
-                "total": 0,
+                "tasks": filtered,
+                "total": len(filtered),
                 "page": page,
                 "page_size": page_size
             },
-            "message": "历史查询功能开发中"
+            "message": "历史查询成功"
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

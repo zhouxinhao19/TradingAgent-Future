@@ -33,6 +33,20 @@ def get_stock_name(stock_code: str) -> str:
     """获取股票名称"""
     return STOCK_NAME_MAP.get(stock_code, stock_code)
 
+
+# 统一构建报告查询：支持 _id(ObjectId) / analysis_id / task_id 三种
+def _build_report_query(report_id: str) -> Dict[str, Any]:
+    ors = [
+        {"analysis_id": report_id},
+        {"task_id": report_id},
+    ]
+    try:
+        from bson import ObjectId
+        ors.append({"_id": ObjectId(report_id)})
+    except Exception:
+        pass
+    return {"$or": ors}
+
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
 class ReportFilter(BaseModel):
@@ -65,12 +79,12 @@ async def get_reports_list(
     """获取分析报告列表"""
     try:
         logger.info(f"🔍 获取报告列表: 用户={user['id']}, 页码={page}, 每页={page_size}")
-        
+
         db = get_mongo_db()
-        
+
         # 构建查询条件
         query = {}
-        
+
         # 搜索关键词
         if search_keyword:
             query["$or"] = [
@@ -78,15 +92,15 @@ async def get_reports_list(
                 {"analysis_id": {"$regex": search_keyword, "$options": "i"}},
                 {"summary": {"$regex": search_keyword, "$options": "i"}}
             ]
-        
+
         # 状态筛选
         if status_filter:
             query["status"] = status_filter
-        
+
         # 股票代码筛选
         if stock_code:
             query["stock_symbol"] = stock_code
-        
+
         # 日期范围筛选
         if start_date or end_date:
             date_query = {}
@@ -95,16 +109,16 @@ async def get_reports_list(
             if end_date:
                 date_query["$lte"] = end_date
             query["analysis_date"] = date_query
-        
+
         logger.info(f"📊 查询条件: {query}")
-        
+
         # 计算总数
         total = await db.analysis_reports.count_documents(query)
-        
+
         # 分页查询
         skip = (page - 1) * page_size
         cursor = db.analysis_reports.find(query).sort("created_at", -1).skip(skip).limit(page_size)
-        
+
         reports = []
         async for doc in cursor:
             # 转换为前端需要的格式
@@ -130,9 +144,9 @@ async def get_reports_list(
                 "task_id": doc.get("task_id", "")
             }
             reports.append(report)
-        
+
         logger.info(f"✅ 查询完成: 总数={total}, 返回={len(reports)}")
-        
+
         return {
             "success": True,
             "data": {
@@ -143,7 +157,7 @@ async def get_reports_list(
             },
             "message": "报告列表获取成功"
         }
-        
+
     except Exception as e:
         logger.error(f"❌ 获取报告列表失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -156,51 +170,80 @@ async def get_report_detail(
     """获取报告详情"""
     try:
         logger.info(f"🔍 获取报告详情: {report_id}")
-        
+
         db = get_mongo_db()
-        
-        # 尝试通过ObjectId查询
-        from bson import ObjectId
-        try:
-            query = {"_id": ObjectId(report_id)}
-        except:
-            # 如果不是有效的ObjectId，尝试通过analysis_id查询
-            query = {"analysis_id": report_id}
-        
+
+        # 支持 ObjectId / analysis_id / task_id
+        query = _build_report_query(report_id)
         doc = await db.analysis_reports.find_one(query)
-        
+
         if not doc:
-            raise HTTPException(status_code=404, detail="报告不存在")
-        
-        # 转换为详细格式
-        report = {
-            "id": str(doc["_id"]),
-            "analysis_id": doc.get("analysis_id", ""),
-            "stock_symbol": doc.get("stock_symbol", ""),
-            "analysis_date": doc.get("analysis_date", ""),
-            "status": doc.get("status", "completed"),
-            "created_at": doc.get("created_at", datetime.now()).isoformat(),
-            "updated_at": doc.get("updated_at", datetime.now()).isoformat(),
-            "analysts": doc.get("analysts", []),
-            "research_depth": doc.get("research_depth", 1),
-            "summary": doc.get("summary", ""),
-            "reports": doc.get("reports", {}),
-            "source": doc.get("source", "unknown"),
-            "task_id": doc.get("task_id", ""),
-            "recommendation": doc.get("recommendation", ""),
-            "confidence_score": doc.get("confidence_score", 0.0),
-            "risk_level": doc.get("risk_level", "中等"),
-            "key_points": doc.get("key_points", []),
-            "execution_time": doc.get("execution_time", 0),
-            "tokens_used": doc.get("tokens_used", 0)
-        }
-        
+            # 兜底：从 analysis_tasks.result 中还原报告详情
+            logger.info(f"⚠️ 未在analysis_reports找到，尝试从analysis_tasks还原: {report_id}")
+            tasks_doc = await db.analysis_tasks.find_one(
+                {"$or": [{"task_id": report_id}, {"result.analysis_id": report_id}]},
+                {"result": 1, "task_id": 1, "stock_code": 1, "created_at": 1, "completed_at": 1}
+            )
+            if not tasks_doc or not tasks_doc.get("result"):
+                raise HTTPException(status_code=404, detail="报告不存在")
+
+            r = tasks_doc["result"] or {}
+            created_at = tasks_doc.get("created_at")
+            updated_at = tasks_doc.get("completed_at") or created_at
+            def to_iso(x):
+                return x.isoformat() if hasattr(x, "isoformat") else (x or "")
+
+            report = {
+                "id": tasks_doc.get("task_id", report_id),
+                "analysis_id": r.get("analysis_id", ""),
+                "stock_symbol": r.get("stock_symbol", r.get("stock_code", tasks_doc.get("stock_code", ""))),
+                "analysis_date": r.get("analysis_date", ""),
+                "status": r.get("status", "completed"),
+                "created_at": to_iso(created_at),
+                "updated_at": to_iso(updated_at),
+                "analysts": r.get("analysts", []),
+                "research_depth": r.get("research_depth", 1),
+                "summary": r.get("summary", ""),
+                "reports": r.get("reports", {}),
+                "source": "analysis_tasks",
+                "task_id": tasks_doc.get("task_id", report_id),
+                "recommendation": r.get("recommendation", ""),
+                "confidence_score": r.get("confidence_score", 0.0),
+                "risk_level": r.get("risk_level", "中等"),
+                "key_points": r.get("key_points", []),
+                "execution_time": r.get("execution_time", 0),
+                "tokens_used": r.get("tokens_used", 0)
+            }
+        else:
+            # 转换为详细格式（analysis_reports 命中）
+            report = {
+                "id": str(doc["_id"]),
+                "analysis_id": doc.get("analysis_id", ""),
+                "stock_symbol": doc.get("stock_symbol", ""),
+                "analysis_date": doc.get("analysis_date", ""),
+                "status": doc.get("status", "completed"),
+                "created_at": doc.get("created_at", datetime.now()).isoformat(),
+                "updated_at": doc.get("updated_at", datetime.now()).isoformat(),
+                "analysts": doc.get("analysts", []),
+                "research_depth": doc.get("research_depth", 1),
+                "summary": doc.get("summary", ""),
+                "reports": doc.get("reports", {}),
+                "source": doc.get("source", "unknown"),
+                "task_id": doc.get("task_id", ""),
+                "recommendation": doc.get("recommendation", ""),
+                "confidence_score": doc.get("confidence_score", 0.0),
+                "risk_level": doc.get("risk_level", "中等"),
+                "key_points": doc.get("key_points", []),
+                "execution_time": doc.get("execution_time", 0),
+                "tokens_used": doc.get("tokens_used", 0)
+            }
+
         return {
             "success": True,
             "data": report,
             "message": "报告详情获取成功"
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -216,28 +259,23 @@ async def get_report_module_content(
     """获取报告特定模块的内容"""
     try:
         logger.info(f"🔍 获取报告模块内容: {report_id}/{module}")
-        
+
         db = get_mongo_db()
-        
-        # 查询报告
-        from bson import ObjectId
-        try:
-            query = {"_id": ObjectId(report_id)}
-        except:
-            query = {"analysis_id": report_id}
-        
+
+        # 查询报告（支持多种ID）
+        query = _build_report_query(report_id)
         doc = await db.analysis_reports.find_one(query)
-        
+
         if not doc:
             raise HTTPException(status_code=404, detail="报告不存在")
-        
+
         reports = doc.get("reports", {})
-        
+
         if module not in reports:
             raise HTTPException(status_code=404, detail=f"模块 {module} 不存在")
-        
+
         content = reports[module]
-        
+
         return {
             "success": True,
             "data": {
@@ -247,7 +285,7 @@ async def get_report_module_content(
             },
             "message": "模块内容获取成功"
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -262,28 +300,23 @@ async def delete_report(
     """删除报告"""
     try:
         logger.info(f"🗑️ 删除报告: {report_id}")
-        
+
         db = get_mongo_db()
-        
-        # 查询报告
-        from bson import ObjectId
-        try:
-            query = {"_id": ObjectId(report_id)}
-        except:
-            query = {"analysis_id": report_id}
-        
+
+        # 查询报告（支持多种ID）
+        query = _build_report_query(report_id)
         result = await db.analysis_reports.delete_one(query)
-        
+
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="报告不存在")
-        
+
         logger.info(f"✅ 报告删除成功: {report_id}")
-        
+
         return {
             "success": True,
             "message": "报告删除成功"
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -299,72 +332,67 @@ async def download_report(
     """下载报告"""
     try:
         logger.info(f"📥 下载报告: {report_id}, 格式: {format}")
-        
+
         db = get_mongo_db()
-        
-        # 查询报告
-        from bson import ObjectId
-        try:
-            query = {"_id": ObjectId(report_id)}
-        except:
-            query = {"analysis_id": report_id}
-        
+
+        # 查询报告（支持多种ID）
+        query = _build_report_query(report_id)
         doc = await db.analysis_reports.find_one(query)
-        
+
         if not doc:
             raise HTTPException(status_code=404, detail="报告不存在")
-        
+
         stock_symbol = doc.get("stock_symbol", "unknown")
         analysis_date = doc.get("analysis_date", datetime.now().strftime("%Y-%m-%d"))
-        
+
         if format == "json":
             # JSON格式下载
             content = json.dumps(doc, ensure_ascii=False, indent=2, default=str)
             filename = f"{stock_symbol}_{analysis_date}_report.json"
             media_type = "application/json"
-            
+
         elif format == "markdown":
             # Markdown格式下载
             reports = doc.get("reports", {})
             content_parts = []
-            
+
             # 添加标题
             content_parts.append(f"# {stock_symbol} 分析报告")
             content_parts.append(f"**分析日期**: {analysis_date}")
             content_parts.append(f"**分析师**: {', '.join(doc.get('analysts', []))}")
             content_parts.append(f"**研究深度**: {doc.get('research_depth', 1)}")
             content_parts.append("")
-            
+
             # 添加摘要
             if doc.get("summary"):
                 content_parts.append("## 执行摘要")
                 content_parts.append(doc["summary"])
                 content_parts.append("")
-            
+
             # 添加各模块内容
             for module_name, module_content in reports.items():
                 if isinstance(module_content, str) and module_content.strip():
                     content_parts.append(f"## {module_name}")
                     content_parts.append(module_content)
                     content_parts.append("")
-            
+
             content = "\n".join(content_parts)
             filename = f"{stock_symbol}_{analysis_date}_report.md"
             media_type = "text/markdown"
-            
+
         else:
             raise HTTPException(status_code=400, detail="不支持的下载格式")
-        
+
         # 返回文件流
         def generate():
             yield content.encode('utf-8')
-        
+
         return StreamingResponse(
             generate(),
             media_type=media_type,
             headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:

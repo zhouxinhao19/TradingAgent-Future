@@ -32,6 +32,12 @@ from app.services.memory_state_manager import get_memory_state_manager, TaskStat
 from app.services.redis_progress_tracker import RedisProgressTracker, get_progress_by_id
 from app.services.progress_log_handler import register_analysis_tracker, unregister_analysis_tracker
 
+# 股票基础信息获取（用于补充显示名称）
+try:
+    from tradingagents.dataflows.stock_api import get_stock_info as _get_stock_info_safe
+except Exception:
+    _get_stock_info_safe = None
+
 # 设置日志
 logger = logging.getLogger("app.services.simple_analysis_service")
 
@@ -223,17 +229,55 @@ class SimpleAnalysisService:
         logger.info(f"🔧 [服务初始化] 内存管理器实例ID: {id(self.memory_manager)}")
 
         # 设置 WebSocket 管理器
+        # 简单的股票名称缓存，减少重复查询
+        self._stock_name_cache: Dict[str, str] = {}
+
+        def _resolve_stock_name(code: Optional[str]) -> str:
+            if not code:
+                return ""
+            # 命中缓存
+            if code in self._stock_name_cache:
+                return self._stock_name_cache[code]
+            name = None
+            try:
+                if _get_stock_info_safe:
+                    info = _get_stock_info_safe(code)
+                    if isinstance(info, dict):
+                        name = info.get("name")
+            except Exception as e:
+                logger.warning(f"⚠️ 获取股票名称失败: {code} - {e}")
+            if not name:
+                name = f"股票{code}"
+            # 写缓存
+            self._stock_name_cache[code] = name
+            return name
+
+        # 绑定到实例（避免破坏现有结构且便于在异步方法中使用）
+        self._resolve_stock_name = _resolve_stock_name  # type: ignore
+
+    def _enrich_stock_names(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """为任务列表补齐股票名称(就地更新)"""
+        try:
+            for t in tasks:
+                code = t.get("stock_code") or t.get("stock_symbol")
+                name = t.get("stock_name")
+                if not name and code:
+                    t["stock_name"] = self._resolve_stock_name(code)  # type: ignore
+        except Exception as e:
+            logger.warning(f"⚠️ 补齐股票名称时出现异常: {e}")
+        return tasks
+
         try:
             from app.services.websocket_manager import get_websocket_manager
             self.memory_manager.set_websocket_manager(get_websocket_manager())
         except ImportError:
             logger.warning("⚠️ WebSocket 管理器不可用")
-    
+
     def _convert_user_id(self, user_id: str) -> PyObjectId:
         """将字符串用户ID转换为PyObjectId"""
         try:
             logger.info(f"🔄 开始转换用户ID: {user_id} (类型: {type(user_id)})")
-            
+
             # 如果是admin用户，使用固定的ObjectId
             if user_id == "admin":
                 admin_object_id = ObjectId("507f1f77bcf86cd799439011")
@@ -250,7 +294,7 @@ class SimpleAnalysisService:
             new_object_id = ObjectId()
             logger.warning(f"⚠️ 生成新的用户ID: {new_object_id}")
             return PyObjectId(new_object_id)
-    
+
     def _get_trading_graph(self, config: Dict[str, Any]) -> TradingAgentsGraph:
         """获取或创建TradingAgents实例 - 完全复制web目录的创建方式"""
         config_key = str(sorted(config.items()))
@@ -288,7 +332,8 @@ class SimpleAnalysisService:
                 task_id=task_id,
                 user_id=user_id,
                 stock_code=request.stock_code,
-                parameters=request.parameters.model_dump() if request.parameters else {}
+                parameters=request.parameters.model_dump() if request.parameters else {},
+                stock_name=(self._resolve_stock_name(request.stock_code) if hasattr(self, '_resolve_stock_name') else None),
             )
 
             logger.info(f"✅ 任务状态已创建: {task_state.task_id}")
@@ -299,6 +344,27 @@ class SimpleAnalysisService:
                 logger.info(f"✅ 任务创建验证成功: {verify_task.task_id}")
             else:
                 logger.error(f"❌ 任务创建验证失败: 无法查询到刚创建的任务 {task_id}")
+
+            # 尝试补齐股票名称并写入数据库任务文档的初始记录
+            try:
+                code = request.stock_code
+                name = self._resolve_stock_name(code) if hasattr(self, '_resolve_stock_name') else f"股票{code}"
+                db = get_mongo_db()
+                await db.analysis_tasks.update_one(
+                    {"task_id": task_id},
+                    {"$setOnInsert": {
+                        "task_id": task_id,
+                        "user_id": user_id,
+                        "stock_code": code,
+                        "stock_symbol": code,
+                        "stock_name": name,
+                        "status": "pending",
+                        "created_at": datetime.utcnow(),
+                    }},
+                    upsert=True
+                )
+            except Exception as e:
+                logger.warning(f"⚠️ 创建任务时写入初始文档失败(可忽略): {e}")
 
             return {
                 "task_id": task_id,
@@ -905,30 +971,161 @@ class SimpleAnalysisService:
         limit: int = 20,
         offset: int = 0
     ) -> List[Dict[str, Any]]:
-        """获取用户任务列表"""
+        """获取用户任务列表
+        优先返回内存中的实时任务；如为空则从MongoDB中兜底读取历史任务。
+        """
         task_status = None
         if status:
             try:
                 task_status = TaskStatus(status)
             except ValueError:
-                pass
+                task_status = None
 
-        return await self.memory_manager.list_user_tasks(
+        # 1) 优先从内存读取（包含实时进度）
+        logger.info(f"📋 [Tasks] 准备从内存读取任务: user_id={user_id}, status={task_status}, limit={limit}, offset={offset}")
+        tasks_in_mem = await self.memory_manager.list_user_tasks(
             user_id=user_id,
             status=task_status,
             limit=limit,
             offset=offset
         )
+        logger.info(f"📋 [Tasks] 内存返回数量: {len(tasks_in_mem)}")
+        if tasks_in_mem and len(tasks_in_mem) > 0:
+            logger.info(f"📋 [Tasks] 使用内存结果")
+            return self._enrich_stock_names(tasks_in_mem)
+
+        # 2) 兜底：从MongoDB读取历史任务
+        try:
+            db = get_mongo_db()
+
+            # user_id 可能是字符串或 ObjectId，做兼容
+            uid_candidates: List[Any] = [user_id]
+            try:
+                from bson import ObjectId
+                uid_candidates.append(ObjectId(user_id))
+            except Exception as conv_err:
+                logger.warning(f"⚠️ [Tasks] 用户ID转换ObjectId失败，按字符串匹配: {conv_err}")
+                # 若为admin，加入固定的ObjectId（与提交任务时一致）并加入其字符串形式
+                if str(user_id) == 'admin':
+                    try:
+                        admin_oid_str = '507f1f77bcf86cd799439011'
+                        uid_candidates.append(ObjectId(admin_oid_str))
+                        uid_candidates.append(admin_oid_str)  # 兼容字符串存储
+                        logger.info("📋 [Tasks] 已加入admin固定ObjectId(对象+字符串)用于匹配")
+                    except Exception:
+                        pass
+
+            # 构造查询条件
+            if str(user_id) == 'admin':
+                # 管理员：精确匹配固定ObjectId（字符串与对象两种形式）
+                admin_oid_str = '507f1f77bcf86cd799439011'
+                try:
+                    from bson import ObjectId
+                    uid_candidates.extend([admin_oid_str, ObjectId(admin_oid_str)])
+                except Exception:
+                    uid_candidates.append(admin_oid_str)
+                logger.info(f"📋 [Tasks] 管理员用户，使用固定OID匹配: candidates={uid_candidates}")
+
+            # 兼容 user_id 与 user 两种字段名
+            base_condition = {"$in": uid_candidates}
+            or_conditions: List[Dict[str, Any]] = [
+                {"user_id": base_condition},
+                {"user": base_condition}
+            ]
+            query = {"$or": or_conditions}
+
+            if status:
+                # 这里直接用字符串状态过滤，数据库内通常为字符串
+                query["status"] = status
+
+            logger.info(f"📋 [Tasks] MongoDB 查询条件: {query}")
+            cursor = db.analysis_tasks.find(query).sort("created_at", -1).skip(offset).limit(limit)
+            results: List[Dict[str, Any]] = []
+            count = 0
+            async for doc in cursor:
+                count += 1
+                # 兼容 user_id 或 user 字段
+                user_field_val = doc.get("user_id", doc.get("user"))
+                item = {
+                    "task_id": doc.get("task_id"),
+                    "user_id": str(user_field_val) if user_field_val is not None else None,
+                    "stock_code": doc.get("stock_code") or doc.get("stock_symbol"),
+                    "stock_name": doc.get("stock_name"),
+                    "status": str(doc.get("status", "pending")),
+                    "progress": int(doc.get("progress", 0) or 0),
+                    "message": doc.get("message", ""),
+                    "current_step": doc.get("current_step", ""),
+                    "start_time": doc.get("started_at") or doc.get("created_at"),
+                    "end_time": doc.get("completed_at"),
+                    "parameters": doc.get("parameters", {}),
+                    "execution_time": doc.get("execution_time"),
+                    "tokens_used": doc.get("tokens_used"),
+                    # 为兼容前端，这里沿用 memory_manager 的字段名
+                    "result_data": doc.get("result"),
+                }
+                # 时间格式转为 ISO 字符串
+                for k in ("start_time", "end_time"):
+                    if item.get(k) and hasattr(item[k], "isoformat"):
+                        item[k] = item[k].isoformat()
+                results.append(item)
+
+            # 为结果补齐股票名称
+            results = self._enrich_stock_names(results)
+            logger.info(f"📋 [Tasks] MongoDB 返回数量: {count}")
+            if count == 0:
+                try:
+                    # 二次兜底：完全不加用户过滤，确保重启后也能列出历史任务
+                    fallback_query: Dict[str, Any] = {}
+                    if status:
+                        fallback_query["status"] = status
+                    logger.warning(f"⚠️ [Tasks] 首次查询无结果，进行全量兜底查询: {fallback_query}")
+                    cursor2 = db.analysis_tasks.find(fallback_query).sort("created_at", -1).skip(offset).limit(limit)
+                    results2: List[Dict[str, Any]] = []
+                    count2 = 0
+                    async for doc in cursor2:
+                        count2 += 1
+                        user_field_val = doc.get("user_id", doc.get("user"))
+                        item2 = {
+                            "task_id": doc.get("task_id"),
+                            "user_id": str(user_field_val) if user_field_val is not None else None,
+                            "stock_code": doc.get("stock_code") or doc.get("stock_symbol"),
+                            "stock_name": doc.get("stock_name"),
+                            "status": str(doc.get("status", "pending")),
+                            "progress": int(doc.get("progress", 0) or 0),
+                            "message": doc.get("message", ""),
+                            "current_step": doc.get("current_step", ""),
+                            "start_time": doc.get("started_at") or doc.get("created_at"),
+                            "end_time": doc.get("completed_at"),
+                            "parameters": doc.get("parameters", {}),
+                            "execution_time": doc.get("execution_time"),
+                            "tokens_used": doc.get("tokens_used"),
+                            "result_data": doc.get("result"),
+                        }
+                        for k in ("start_time", "end_time"):
+                            if item2.get(k) and hasattr(item2[k], "isoformat"):
+                                item2[k] = item2[k].isoformat()
+                        results2.append(item2)
+                    # 为结果补齐股票名称
+                    results2 = self._enrich_stock_names(results2)
+
+                    logger.warning(f"⚠️ [Tasks] 兜底全量查询返回数量: {count2}")
+                    return results2
+                except Exception as e2:
+                    logger.error(f"❌ [Tasks] 兜底全量查询失败: {e2}")
+            return results
+        except Exception as e:
+            logger.error(f"❌ MongoDB 兜底查询任务列表失败: {e}")
+            return []
 
 
-    
 
-    
+
+
     async def _update_task_status(
-        self, 
-        task_id: str, 
-        status: AnalysisStatus, 
-        progress: int, 
+        self,
+        task_id: str,
+        status: AnalysisStatus,
+        progress: int,
         error_message: str = None
     ):
         """更新任务状态"""
@@ -939,7 +1136,7 @@ class SimpleAnalysisService:
                 "progress": progress,
                 "updated_at": datetime.utcnow()
             }
-            
+
             if status == AnalysisStatus.PROCESSING and progress == 10:
                 update_data["started_at"] = datetime.utcnow()
             elif status == AnalysisStatus.COMPLETED:
@@ -947,17 +1144,17 @@ class SimpleAnalysisService:
             elif status == AnalysisStatus.FAILED:
                 update_data["last_error"] = error_message
                 update_data["completed_at"] = datetime.utcnow()
-            
+
             await db.analysis_tasks.update_one(
                 {"task_id": task_id},
                 {"$set": update_data}
             )
-            
+
             logger.debug(f"📊 任务状态已更新: {task_id} -> {status} ({progress}%)")
-            
+
         except Exception as e:
             logger.error(f"❌ 更新任务状态失败: {task_id} - {e}")
-    
+
     async def _save_analysis_result(self, task_id: str, result: Dict[str, Any]):
         """保存分析结果（原始方法）"""
         try:
@@ -1356,7 +1553,7 @@ class SimpleAnalysisService:
             import traceback
             logger.error(f"❌ 详细错误: {traceback.format_exc()}")
             return {}
-    
+
 # 重复的 get_task_status 方法已删除，使用第469行的内存版本
 
 
