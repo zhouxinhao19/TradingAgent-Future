@@ -13,7 +13,17 @@ __pycache__/
 .env.*.local
 .env.db
 .env.mongodb*
-frontend
+frontend/dist
+frontend/node_modules
+frontend/.env*
+!frontend/src/**
+!frontend/public/**
+!frontend/index.html
+!frontend/vite.config.*
+!frontend/package*.json
+!frontend/tsconfig*.json
+!frontend/.eslintrc*
+!frontend/.prettier*
 backend
 
 # 系统文件

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>认证测试</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        .log { max-height: 300px; overflow-y: auto; background: #f9f9f9; padding: 10px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>认证测试工具</h1>
+    
+    <div class="test-section">
+        <h2>1. 当前认证状态</h2>
+        <div id="auth-status"></div>
+        <button onclick="checkAuthStatus()">检查认证状态</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. 登录测试</h2>
+        <div>
+            <input type="text" id="username" placeholder="用户名" value="admin">
+            <input type="password" id="password" placeholder="密码" value="admin123">
+            <button onclick="testLogin()">登录</button>
+        </div>
+        <div id="login-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. API测试</h2>
+        <button onclick="testAPI()">测试 /api/config/llm</button>
+        <button onclick="testAuthAPI()">测试 /api/auth/me</button>
+        <div id="api-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>4. Token测试</h2>
+        <button onclick="testTokenFormat()">检查Token格式</button>
+        <button onclick="testTokenRefresh()">测试Token刷新</button>
+        <div id="token-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>5. 调试日志</h2>
+        <button onclick="clearLog()">清除日志</button>
+        <div id="debug-log" class="log"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('debug-log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            logDiv.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function clearLog() {
+            document.getElementById('debug-log').innerHTML = '';
+        }
+        
+        function checkAuthStatus() {
+            const token = localStorage.getItem('auth-token');
+            const refreshToken = localStorage.getItem('refresh-token');
+            const userInfo = localStorage.getItem('user-info');
+            
+            let html = '<h3>LocalStorage 认证信息:</h3>';
+            html += `<p><strong>Auth Token:</strong> ${token ? '✅ 存在 (' + token.length + ' 字符)' : '❌ 不存在'}</p>`;
+            html += `<p><strong>Refresh Token:</strong> ${refreshToken ? '✅ 存在 (' + refreshToken.length + ' 字符)' : '❌ 不存在'}</p>`;
+            html += `<p><strong>User Info:</strong> ${userInfo ? '✅ 存在' : '❌ 不存在'}</p>`;
+            
+            if (token) {
+                const parts = token.split('.');
+                html += `<p><strong>Token格式:</strong> ${parts.length === 3 ? '✅ 有效JWT格式' : '❌ 无效格式'}</p>`;
+                
+                if (parts.length === 3) {
+                    try {
+                        const payload = JSON.parse(atob(parts[1]));
+                        const exp = new Date(payload.exp * 1000);
+                        const now = new Date();
+                        html += `<p><strong>过期时间:</strong> ${exp.toLocaleString()}</p>`;
+                        html += `<p><strong>是否过期:</strong> ${exp < now ? '❌ 已过期' : '✅ 未过期'}</p>`;
+                        html += `<p><strong>用户:</strong> ${payload.sub || 'N/A'}</p>`;
+                    } catch (e) {
+                        html += `<p><strong>Token解析:</strong> ❌ 解析失败</p>`;
+                    }
+                }
+            }
+            
+            document.getElementById('auth-status').innerHTML = html;
+            log('检查认证状态完成');
+        }
+        
+        async function testLogin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            log(`开始登录测试: ${username}`);
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                log(`登录响应状态: ${response.status}`, response.ok ? 'success' : 'error');
+                log(`登录响应数据: ${JSON.stringify(data, null, 2)}`);
+                
+                if (response.ok && data.success) {
+                    // 保存认证信息
+                    localStorage.setItem('auth-token', data.data.access_token);
+                    localStorage.setItem('refresh-token', data.data.refresh_token);
+                    localStorage.setItem('user-info', JSON.stringify(data.data.user));
+                    
+                    document.getElementById('login-result').innerHTML = '<p class="success">✅ 登录成功！认证信息已保存。</p>';
+                    log('认证信息已保存到localStorage', 'success');
+                } else {
+                    document.getElementById('login-result').innerHTML = `<p class="error">❌ 登录失败: ${data.message || '未知错误'}</p>`;
+                }
+            } catch (error) {
+                log(`登录异常: ${error.message}`, 'error');
+                document.getElementById('login-result').innerHTML = `<p class="error">❌ 登录异常: ${error.message}</p>`;
+            }
+        }
+        
+        async function testAPI() {
+            const token = localStorage.getItem('auth-token');
+            
+            if (!token) {
+                document.getElementById('api-result').innerHTML = '<p class="error">❌ 没有认证token，请先登录</p>';
+                return;
+            }
+            
+            log('开始测试 /api/config/llm');
+            log(`使用token: ${token.substring(0, 20)}...`);
+            
+            try {
+                const response = await fetch(`${API_BASE}/config/llm`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                log(`API响应状态: ${response.status}`, response.ok ? 'success' : 'error');
+                log(`API响应数据: ${JSON.stringify(data, null, 2)}`);
+                
+                if (response.ok) {
+                    document.getElementById('api-result').innerHTML = '<p class="success">✅ API调用成功！</p><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                } else {
+                    document.getElementById('api-result').innerHTML = `<p class="error">❌ API调用失败 (${response.status}): ${data.message || data.detail || '未知错误'}</p>`;
+                }
+            } catch (error) {
+                log(`API调用异常: ${error.message}`, 'error');
+                document.getElementById('api-result').innerHTML = `<p class="error">❌ API调用异常: ${error.message}</p>`;
+            }
+        }
+        
+        async function testAuthAPI() {
+            const token = localStorage.getItem('auth-token');
+            
+            if (!token) {
+                document.getElementById('api-result').innerHTML = '<p class="error">❌ 没有认证token，请先登录</p>';
+                return;
+            }
+            
+            log('开始测试 /api/auth/me');
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/me`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                log(`认证API响应状态: ${response.status}`, response.ok ? 'success' : 'error');
+                log(`认证API响应数据: ${JSON.stringify(data, null, 2)}`);
+                
+                if (response.ok) {
+                    document.getElementById('api-result').innerHTML = '<p class="success">✅ 认证API调用成功！</p><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                } else {
+                    document.getElementById('api-result').innerHTML = `<p class="error">❌ 认证API调用失败 (${response.status}): ${data.message || data.detail || '未知错误'}</p>`;
+                }
+            } catch (error) {
+                log(`认证API调用异常: ${error.message}`, 'error');
+                document.getElementById('api-result').innerHTML = `<p class="error">❌ 认证API调用异常: ${error.message}</p>`;
+            }
+        }
+        
+        function testTokenFormat() {
+            const token = localStorage.getItem('auth-token');
+            const refreshToken = localStorage.getItem('refresh-token');
+            
+            let html = '<h3>Token格式检查:</h3>';
+            
+            if (token) {
+                const parts = token.split('.');
+                html += `<p><strong>Access Token:</strong> ${parts.length === 3 ? '✅ 有效JWT格式' : '❌ 无效格式'} (${parts.length} 部分)</p>`;
+            } else {
+                html += '<p><strong>Access Token:</strong> ❌ 不存在</p>';
+            }
+            
+            if (refreshToken) {
+                const parts = refreshToken.split('.');
+                html += `<p><strong>Refresh Token:</strong> ${parts.length === 3 ? '✅ 有效JWT格式' : '❌ 无效格式'} (${parts.length} 部分)</p>`;
+            } else {
+                html += '<p><strong>Refresh Token:</strong> ❌ 不存在</p>';
+            }
+            
+            document.getElementById('token-result').innerHTML = html;
+            log('Token格式检查完成');
+        }
+        
+        async function testTokenRefresh() {
+            const refreshToken = localStorage.getItem('refresh-token');
+            
+            if (!refreshToken) {
+                document.getElementById('token-result').innerHTML = '<p class="error">❌ 没有refresh token</p>';
+                return;
+            }
+            
+            log('开始测试token刷新');
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/refresh`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ refresh_token: refreshToken })
+                });
+                
+                const data = await response.json();
+                log(`刷新响应状态: ${response.status}`, response.ok ? 'success' : 'error');
+                log(`刷新响应数据: ${JSON.stringify(data, null, 2)}`);
+                
+                if (response.ok && data.success) {
+                    localStorage.setItem('auth-token', data.data.access_token);
+                    localStorage.setItem('refresh-token', data.data.refresh_token);
+                    document.getElementById('token-result').innerHTML = '<p class="success">✅ Token刷新成功！</p>';
+                } else {
+                    document.getElementById('token-result').innerHTML = `<p class="error">❌ Token刷新失败: ${data.message || data.detail || '未知错误'}</p>`;
+                }
+            } catch (error) {
+                log(`Token刷新异常: ${error.message}`, 'error');
+                document.getElementById('token-result').innerHTML = `<p class="error">❌ Token刷新异常: ${error.message}</p>`;
+            }
+        }
+        
+        // 页面加载时自动检查认证状态
+        window.onload = function() {
+            checkAuthStatus();
+            log('认证测试工具已加载');
+        };
+    </script>
+</body>
+</html>
