@@ -9,8 +9,8 @@ import numpy as np
 
 # 统一指标库
 from tradingagents.tools.analysis.indicators import IndicatorSpec, compute_many
-# 数据提供器（A股）
-from tradingagents.dataflows.tdx_utils import get_tdx_provider
+# 统一多数据源DF接口（按优先级降级）
+from tradingagents.dataflows.unified_dataframe import get_china_daily_df_unified
 
 
 # --- DSL 约束 ---
@@ -44,7 +44,8 @@ class ScreeningParams:
 
 class ScreeningService:
     def __init__(self):
-        self.provider = get_tdx_provider()
+        # 数据源通过统一DF接口获取，不直接绑定具体源
+        self.provider = None
 
     # --- 公共入口 ---
     def run(self, conditions: Dict[str, Any], params: ScreeningParams) -> Dict[str, Any]:
@@ -61,7 +62,7 @@ class ScreeningService:
 
         for code in symbols:
             try:
-                df = self.provider.get_stock_history_data(code, start_s, end_s)
+                df = get_china_daily_df_unified(code, start_s, end_s)
                 if df is None or df.empty:
                     continue
                 # 统一列为小写
