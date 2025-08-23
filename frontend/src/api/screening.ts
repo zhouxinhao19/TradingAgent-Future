@@ -1,4 +1,4 @@
-import { ApiClient, ApiResponse } from './request'
+import { ApiClient } from './request'
 
 export interface ScreeningOrderBy { field: string; direction: 'asc' | 'desc' }
 export interface ScreeningRunReq {
@@ -29,6 +29,7 @@ export interface ScreeningRunItem {
 export interface ScreeningRunResp { total: number; items: ScreeningRunItem[] }
 
 export const screeningApi = {
-  run: (payload: ScreeningRunReq) => ApiClient.post<ScreeningRunResp>('/screening/run', payload),
+  run: (payload: ScreeningRunReq, options?: { timeout?: number }) =>
+    ApiClient.post<ScreeningRunResp>('/screening/run', payload, { timeout: options?.timeout ?? 120000 }),
 }
 
