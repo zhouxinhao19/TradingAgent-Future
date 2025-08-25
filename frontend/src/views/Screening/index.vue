@@ -376,23 +376,44 @@ const performScreening = async () => {
   hasSearched.value = true
 
   try {
+    // 基于用户真实选择构建 conditions（只拼选中的项，不注入默认技术条件）
+    const children: any[] = []
+
+    // 市场类型（仅作为演示，实际后端暂用CN）
+    if (filters.market) {
+      // 可作为 universe 选择；当未实现时可忽略
+    }
+
+    // 行业分类（如果用户选择了行业）
+    if (filters.industry && filters.industry.length > 0) {
+      // 这里暂用占位符字段 industry，后端当前未实现行业过滤逻辑，可先不发送
+      // children.push({ field: 'industry', op: 'in', value: filters.industry })
+    }
+
+    // 市值范围映射为区间（单位：亿元 → 转换为万元以匹配后端 market_cap 单位）
+    const capRangeMap: Record<string, [number, number] | null> = {
+      small: [0, 100 * 10000], // <100亿 → < 100*1e4 万元
+      medium: [100 * 10000, 500 * 10000],
+      large: [500 * 10000, Number.MAX_SAFE_INTEGER],
+    }
+    const cap = filters.marketCapRange ? capRangeMap[filters.marketCapRange] : null
+    if (cap) {
+      children.push({ field: 'market_cap', op: 'between', value: cap })
+    }
+
+    // 明确指定：不加任何技术指标相关条件
+
     const payload = {
       market: 'CN',
       date: undefined,
       adj: 'qfq',
-      conditions: {
-        logic: 'AND',
-        children: [
-          { field: 'kdj_k', op: 'cross_up', right_field: 'kdj_d' },
-          { field: 'rsi14', op: '<', value: 80 },
-        ]
-      },
-      order_by: [{ field: 'pct_chg', direction: 'desc' }],
+      conditions: { logic: 'AND', children },
+      order_by: [{ field: 'market_cap', direction: 'desc' }],
       limit: 50,
       offset: 0,
     }
 
-    const res = await screeningApi.run(payload)
+    const res = await screeningApi.run(payload, { timeout: 120000 })
     const data = (res as any)?.data || res // ApiClient封装会返回 {success,data} 格式
     const items = data?.items || []
 

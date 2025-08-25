@@ -408,9 +408,15 @@ class AKShareProvider:
             logger.error(f"❌ AKShare获取{symbol}财务数据失败: {e}")
             return {}
 
+# 全局提供器实例，避免重复初始化与重复日志
+_AKSHARE_PROVIDER_SINGLETON: Optional[AKShareProvider] = None
+
 def get_akshare_provider() -> AKShareProvider:
-    """获取AKShare提供器实例"""
-    return AKShareProvider()
+    """获取AKShare提供器实例（单例）"""
+    global _AKSHARE_PROVIDER_SINGLETON
+    if _AKSHARE_PROVIDER_SINGLETON is None:
+        _AKSHARE_PROVIDER_SINGLETON = AKShareProvider()
+    return _AKSHARE_PROVIDER_SINGLETON
 
 
 # 便捷函数
