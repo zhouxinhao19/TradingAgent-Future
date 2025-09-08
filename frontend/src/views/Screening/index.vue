@@ -406,7 +406,7 @@ const performScreening = async () => {
     }
     const cap = filters.marketCapRange ? capRangeMap[filters.marketCapRange] : null
     if (cap) {
-      children.push({ field: 'total_mv', op: 'between', value: cap })
+      children.push({ field: 'market_cap', op: 'between', value: cap })
     }
 
     // 明确指定：不加任何技术指标相关条件
@@ -416,7 +416,7 @@ const performScreening = async () => {
       date: undefined,
       adj: 'qfq',
       conditions: { logic: 'AND', children },
-      order_by: [{ field: 'total_mv', direction: 'desc' }],
+      order_by: [{ field: 'market_cap', direction: 'desc' }],
       limit: 50,
       offset: 0,
     }
