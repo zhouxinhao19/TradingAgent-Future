@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>测试数据库API响应</title>
+</head>
+<body>
+    <h1>数据库API测试</h1>
+    <button onclick="testDatabaseStatus()">测试数据库状态API</button>
+    <div id="result"></div>
+
+    <script>
+        async function testDatabaseStatus() {
+            try {
+                const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImV4cCI6MTc1NzAzNDUxMn0.vpLtZI_lvNzIlPR_jJ_GBZZ1RHxgCoRzBz9oYdINebE';
+                
+                const response = await fetch('http://localhost:8000/api/system/database/status', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                document.getElementById('result').innerHTML = `
+                    <h2>API响应:</h2>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                    <h3>MongoDB连接状态: ${data.mongodb?.connected}</h3>
+                    <h3>Redis连接状态: ${data.redis?.connected}</h3>
+                `;
+                
+                console.log('📊 数据库状态API响应:', data);
+                
+            } catch (error) {
+                console.error('❌ API调用失败:', error);
+                document.getElementById('result').innerHTML = `<p style="color: red;">错误: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

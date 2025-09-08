@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API修复测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #409eff;
+            margin-bottom: 10px;
+        }
+        .test-button {
+            background: #409eff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        .test-button:hover {
+            background: #337ecc;
+        }
+        .test-button:disabled {
+            background: #c0c4cc;
+            cursor: not-allowed;
+        }
+        .result-box {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success { color: #67c23a; }
+        .error { color: #f56c6c; }
+        .warning { color: #e6a23c; }
+        .info { color: #909399; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔧 API修复测试</h1>
+        <p>测试修复后的API路径是否正确</p>
+    </div>
+
+    <div class="container">
+        <h3>🧪 API路径测试</h3>
+        <button class="test-button" onclick="testApiPaths()">测试API路径</button>
+        <div id="pathResult" class="result-box" style="display: none;"></div>
+    </div>
+
+    <div class="container">
+        <h3>📊 多数据源API测试</h3>
+        <button class="test-button" onclick="testMultiSourceApis()">测试多数据源API</button>
+        <div id="multiSourceResult" class="result-box" style="display: none;"></div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type;
+            return `<span class="${className}">[${timestamp}] ${message}</span><br>`;
+        }
+
+        function showResult(elementId, content) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.innerHTML = content;
+        }
+
+        function appendResult(elementId, content) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.innerHTML += content;
+        }
+
+        async function testApiPaths() {
+            showResult('pathResult', log('开始测试API路径...', 'info'));
+            
+            // 测试不同的API路径格式
+            const testUrls = [
+                '/api/sync/multi-source/sources/status',
+                'http://localhost:3000/api/sync/multi-source/sources/status',
+                'http://localhost:8000/api/sync/multi-source/sources/status'
+            ];
+            
+            for (const url of testUrls) {
+                try {
+                    appendResult('pathResult', log(`测试URL: ${url}`, 'info'));
+                    
+                    const response = await fetch(url, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        appendResult('pathResult', log(`✅ 成功: ${response.status} - ${JSON.stringify(data).substring(0, 100)}...`, 'success'));
+                    } else {
+                        appendResult('pathResult', log(`❌ 失败: ${response.status} ${response.statusText}`, 'error'));
+                    }
+                } catch (error) {
+                    appendResult('pathResult', log(`❌ 错误: ${error.message}`, 'error'));
+                }
+                
+                // 短暂延迟
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            appendResult('pathResult', log('API路径测试完成', 'info'));
+        }
+
+        async function testMultiSourceApis() {
+            showResult('multiSourceResult', log('开始测试多数据源API...', 'info'));
+            
+            const apis = [
+                {
+                    name: '数据源状态',
+                    url: '/api/sync/multi-source/sources/status',
+                    method: 'GET'
+                },
+                {
+                    name: '同步状态',
+                    url: '/api/sync/multi-source/status',
+                    method: 'GET'
+                },
+                {
+                    name: '同步建议',
+                    url: '/api/sync/multi-source/recommendations',
+                    method: 'GET'
+                }
+            ];
+            
+            for (const api of apis) {
+                try {
+                    appendResult('multiSourceResult', log(`测试: ${api.name} (${api.method} ${api.url})`, 'info'));
+                    
+                    const response = await fetch(api.url, {
+                        method: api.method,
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        appendResult('multiSourceResult', log(`✅ ${api.name}: 成功`, 'success'));
+                        
+                        // 显示关键信息
+                        if (api.name === '数据源状态' && data.data) {
+                            appendResult('multiSourceResult', log(`   数据源数量: ${data.data.length}`, 'info'));
+                            data.data.forEach(source => {
+                                const status = source.available ? '可用' : '不可用';
+                                appendResult('multiSourceResult', log(`   - ${source.name}: ${status} (优先级: ${source.priority})`, 'info'));
+                            });
+                        } else if (api.name === '同步状态' && data.data) {
+                            appendResult('multiSourceResult', log(`   状态: ${data.data.status}`, 'info'));
+                            appendResult('multiSourceResult', log(`   总数: ${data.data.total}, 错误: ${data.data.errors}`, 'info'));
+                        } else if (api.name === '同步建议' && data.data) {
+                            if (data.data.primary_source) {
+                                appendResult('multiSourceResult', log(`   推荐主数据源: ${data.data.primary_source.name}`, 'info'));
+                            }
+                            if (data.data.suggestions && data.data.suggestions.length > 0) {
+                                appendResult('multiSourceResult', log(`   建议数量: ${data.data.suggestions.length}`, 'info'));
+                            }
+                        }
+                    } else {
+                        appendResult('multiSourceResult', log(`❌ ${api.name}: ${response.status} ${response.statusText}`, 'error'));
+                    }
+                } catch (error) {
+                    appendResult('multiSourceResult', log(`❌ ${api.name}: ${error.message}`, 'error'));
+                }
+                
+                // 短暂延迟
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            appendResult('multiSourceResult', log('多数据源API测试完成', 'info'));
+        }
+
+        // 页面加载时显示当前配置
+        window.onload = function() {
+            console.log('当前页面URL:', window.location.href);
+            console.log('测试环境: 前端开发服务器 (通常是 http://localhost:3000)');
+            console.log('后端API服务器: http://localhost:8000');
+            console.log('Vite代理配置: /api -> http://localhost:8000');
+        };
+    </script>
+</body>
+</html>

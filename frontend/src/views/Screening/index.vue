@@ -249,35 +249,39 @@
         
         <el-table-column prop="industry" label="行业" width="120" />
         
-        <el-table-column prop="price" label="当前价格" width="100" align="right">
+        <el-table-column prop="close" label="当前价格" width="100" align="right">
           <template #default="{ row }">
-            ¥{{ row.price?.toFixed(2) }}
+            <span v-if="row.close">¥{{ row.close?.toFixed(2) }}</span>
+            <span v-else class="text-gray-400">-</span>
           </template>
         </el-table-column>
-        
-        <el-table-column prop="change_percent" label="涨跌幅" width="100" align="right">
+
+        <el-table-column prop="pct_chg" label="涨跌幅" width="100" align="right">
           <template #default="{ row }">
-            <span :class="getChangeClass(row.change_percent)">
-              {{ row.change_percent > 0 ? '+' : '' }}{{ row.change_percent?.toFixed(2) }}%
+            <span v-if="row.pct_chg !== null && row.pct_chg !== undefined" :class="getChangeClass(row.pct_chg)">
+              {{ row.pct_chg > 0 ? '+' : '' }}{{ row.pct_chg?.toFixed(2) }}%
             </span>
+            <span v-else class="text-gray-400">-</span>
           </template>
         </el-table-column>
-        
-        <el-table-column prop="market_cap" label="市值" width="120" align="right">
+
+        <el-table-column prop="total_mv" label="市值" width="120" align="right">
           <template #default="{ row }">
-            {{ formatMarketCap(row.market_cap) }}
+            {{ formatMarketCap(row.total_mv) }}
           </template>
         </el-table-column>
-        
-        <el-table-column prop="pe_ratio" label="市盈率" width="100" align="right">
+
+        <el-table-column prop="pe" label="市盈率" width="100" align="right">
           <template #default="{ row }">
-            {{ row.pe_ratio?.toFixed(2) }}
+            <span v-if="row.pe">{{ row.pe?.toFixed(2) }}</span>
+            <span v-else class="text-gray-400">-</span>
           </template>
         </el-table-column>
-        
-        <el-table-column prop="pb_ratio" label="市净率" width="100" align="right">
+
+        <el-table-column prop="pb" label="市净率" width="100" align="right">
           <template #default="{ row }">
-            {{ row.pb_ratio?.toFixed(2) }}
+            <span v-if="row.pb">{{ row.pb?.toFixed(2) }}</span>
+            <span v-else class="text-gray-400">-</span>
           </template>
         </el-table-column>
         
@@ -326,7 +330,7 @@ import { ref, computed, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Collection, TrendCharts, Download, Star } from '@element-plus/icons-vue'
 import type { StockInfo } from '@/types/analysis'
-import { screeningApi } from '@/api/screening'
+import { screeningApi, type FieldConfigResponse, type FieldInfo } from '@/api/screening'
 
 // 响应式数据
 const screeningLoading = ref(false)
@@ -335,6 +339,10 @@ const screeningResults = ref<StockInfo[]>([])
 const selectedStocks = ref<StockInfo[]>([])
 const currentPage = ref(1)
 const pageSize = ref(20)
+
+// 字段配置
+const fieldConfig = ref<FieldConfigResponse | null>(null)
+const fieldsLoading = ref(false)
 
 // 筛选条件
 const filters = reactive({
@@ -398,7 +406,7 @@ const performScreening = async () => {
     }
     const cap = filters.marketCapRange ? capRangeMap[filters.marketCapRange] : null
     if (cap) {
-      children.push({ field: 'market_cap', op: 'between', value: cap })
+      children.push({ field: 'total_mv', op: 'between', value: cap })
     }
 
     // 明确指定：不加任何技术指标相关条件
@@ -408,7 +416,7 @@ const performScreening = async () => {
       date: undefined,
       adj: 'qfq',
       conditions: { logic: 'AND', children },
-      order_by: [{ field: 'market_cap', direction: 'desc' }],
+      order_by: [{ field: 'total_mv', direction: 'desc' }],
       limit: 50,
       offset: 0,
     }
@@ -417,10 +425,40 @@ const performScreening = async () => {
     const data = (res as any)?.data || res // ApiClient封装会返回 {success,data} 格式
     const items = data?.items || []
 
+    // 直接使用后端返回的数据，字段名已统一
     screeningResults.value = items.map((it: any) => ({
-      code: it.code, name: it.code, market: 'A股',
-      price: it.close, change_percent: it.pct_chg, market_cap: undefined,
-      industry: undefined, sector: undefined,
+      code: it.code,
+      name: it.name || it.code,  // 使用股票名称，如果没有则用代码
+      market: it.market || 'A股',
+      industry: it.industry,
+      area: it.area,
+
+      // 市值信息
+      total_mv: it.total_mv,
+      circ_mv: it.circ_mv,
+
+      // 财务指标
+      pe: it.pe,
+      pb: it.pb,
+      pe_ttm: it.pe_ttm,
+      pb_mrq: it.pb_mrq,
+
+      // 交易数据
+      close: it.close,
+      pct_chg: it.pct_chg,
+      amount: it.amount,
+      turnover_rate: it.turnover_rate,
+      volume_ratio: it.volume_ratio,
+
+      // 技术指标
+      ma20: it.ma20,
+      rsi14: it.rsi14,
+      kdj_k: it.kdj_k,
+      kdj_d: it.kdj_d,
+      kdj_j: it.kdj_j,
+      dif: it.dif,
+      dea: it.dea,
+      macd_hist: it.macd_hist,
     }))
 
     ElMessage.success(`筛选完成，找到 ${screeningResults.value.length} 只股票`)
@@ -433,15 +471,14 @@ const performScreening = async () => {
 
 const generateMockResults = (): StockInfo[] => {
   const mockStocks = [
-    { code: '000001', name: '平安银行', industry: '银行', price: 12.50, change_percent: 2.1, market_cap: 2400, pe_ratio: 5.2, pb_ratio: 0.8 },
-    { code: '000002', name: '万科A', industry: '房地产', price: 18.30, change_percent: -1.5, market_cap: 2100, pe_ratio: 8.5, pb_ratio: 1.2 },
-    { code: '000858', name: '五粮液', industry: '食品饮料', price: 168.50, change_percent: 3.2, market_cap: 6500, pe_ratio: 25.3, pb_ratio: 4.5 }
+    { code: '000001', name: '平安银行', industry: '银行', close: 12.50, pct_chg: 2.1, total_mv: 2400, pe: 5.2, pb: 0.8 },
+    { code: '000002', name: '万科A', industry: '房地产', close: 18.30, pct_chg: -1.5, total_mv: 2100, pe: 8.5, pb: 1.2 },
+    { code: '000858', name: '五粮液', industry: '食品饮料', close: 168.50, pct_chg: 3.2, total_mv: 6500, pe: 25.3, pb: 4.5 }
   ]
-  
+
   return mockStocks.map(stock => ({
     ...stock,
-    market: filters.market,
-    sector: stock.industry
+    market: filters.market
   }))
 }
 
@@ -555,9 +592,25 @@ const handleCurrentChange = (page: number) => {
   currentPage.value = page
 }
 
+// 获取字段配置
+const loadFieldConfig = async () => {
+  fieldsLoading.value = true
+  try {
+    const response = await screeningApi.getFields()
+    fieldConfig.value = response.data || response
+    console.log('字段配置加载成功:', fieldConfig.value)
+  } catch (error) {
+    console.error('加载字段配置失败:', error)
+    ElMessage.error('加载字段配置失败')
+  } finally {
+    fieldsLoading.value = false
+  }
+}
+
 // 生命周期
 onMounted(() => {
-  // 初始化数据
+  // 加载字段配置
+  loadFieldConfig()
 })
 </script>
 

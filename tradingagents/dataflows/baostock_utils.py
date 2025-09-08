@@ -114,6 +114,53 @@ class BaoStockProvider:
         except Exception:
             return {"symbol": symbol}
 
+    def get_valuation_data(self, symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
+        """
+        获取估值指标数据
+        返回列：date, code, close, peTTM, pbMRQ, psTTM, pcfNcfTTM
+        """
+        if not self._ensure_login():
+            return pd.DataFrame()
+        try:
+            import baostock as bs
+            bs_code = _to_baostock_code(symbol)
+
+            # 使用BaoStock的估值指标接口
+            rs = bs.query_history_k_data_plus(
+                code=bs_code,
+                fields="date,code,close,peTTM,pbMRQ,psTTM,pcfNcfTTM",
+                start_date=start_date,
+                end_date=end_date,
+                frequency='d',
+                adjustflag='3'  # 前复权
+            )
+
+            if rs.error_code != '0':
+                logger.error(f"❌ BaoStock估值数据查询失败: {rs.error_msg}")
+                return pd.DataFrame()
+
+            data_list: List[List[str]] = []
+            while (rs.error_code == '0') & rs.next():
+                data_list.append(rs.get_row_data())
+
+            if not data_list:
+                return pd.DataFrame()
+
+            df = pd.DataFrame(data_list, columns=rs.fields)
+
+            # 转换数值类型
+            numeric_cols = ['close', 'peTTM', 'pbMRQ', 'psTTM', 'pcfNcfTTM']
+            for col in numeric_cols:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+
+            logger.info(f"✅ BaoStock估值数据获取成功: {symbol}, {len(df)}条记录")
+            return df
+
+        except Exception as e:
+            logger.error(f"❌ BaoStock获取估值数据异常: {e}")
+            return pd.DataFrame()
+
 
 # 全局实例
 _baostock_provider: Optional[BaoStockProvider] = None

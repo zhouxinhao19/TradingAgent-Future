@@ -71,9 +71,14 @@ services:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: tradingagents123
       MONGO_INITDB_DATABASE: tradingagents
+      # 时区配置
+      TZ: "Asia/Shanghai"
     volumes:
       - mongodb_data:/data/db
       - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      # 时区文件映射
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
     networks:
       - tradingagents-network
     healthcheck:
@@ -90,9 +95,15 @@ services:
     restart: unless-stopped
     ports:
       - "6379:6379"
+    environment:
+      # 时区配置
+      TZ: "Asia/Shanghai"
     command: redis-server --appendonly yes --requirepass tradingagents123
     volumes:
       - redis_data:/data
+      # 时区文件映射
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
     networks:
       - tradingagents-network
     healthcheck:

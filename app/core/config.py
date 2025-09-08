@@ -97,6 +97,19 @@ class Settings(BaseSettings):
     METRICS_ENABLED: bool = Field(default=True)
     HEALTH_CHECK_INTERVAL: int = Field(default=60)  # 60秒
 
+
+    # 基础信息同步任务配置（可配置调度）
+    SYNC_STOCK_BASICS_ENABLED: bool = Field(default=True)
+    # 优先使用 CRON 表达式，例如 "30 6 * * *" 表示每日 06:30
+    SYNC_STOCK_BASICS_CRON: str = Field(default="")
+    # 若未提供 CRON，则使用简单时间字符串 "HH:MM"（24小时制）
+    SYNC_STOCK_BASICS_TIME: str = Field(default="06:30")
+    # 时区
+    TIMEZONE: str = Field(default="Asia/Shanghai")
+
+    # 数据目录配置
+    TRADINGAGENTS_DATA_DIR: str = Field(default="./data")
+
     @property
     def log_dir(self) -> str:
         """获取日志目录"""
