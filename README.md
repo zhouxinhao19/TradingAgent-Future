@@ -2,11 +2,11 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/Version-cn--0.1.14--preview-orange.svg)](./VERSION)
+[![Version](https://img.shields.io/badge/Version-cn--0.1.14-green.svg)](./VERSION)
 [![Documentation](https://img.shields.io/badge/docs-中文文档-green.svg)](./docs/)
 [![Original](https://img.shields.io/badge/基于-TauricResearch/TradingAgents-orange.svg)](https://github.com/TauricResearch/TradingAgents)
 
-> 🚀 **最新版本 cn-0.1.14-preview**: 用户权限管理与Web认证系统预览版！新增完整用户管理、登录认证、权限控制、活动日志、数据管理优化！
+> 🚀 **最新版本 cn-0.1.14**: 用户权限管理与Web认证系统正式版！新增完整用户管理、登录认证、权限控制、活动日志、数据管理优化！
 >
 > 🎯 **核心功能**: 原生OpenAI支持 | Google AI全面集成 | 自定义端点配置 | 智能模型选择 | 多LLM提供商支持 | 模型选择持久化 | Docker容器化部署 | 专业报告导出 | 完整A股支持 | 中文本地化
 
@@ -18,7 +18,7 @@
 
 **🎯 我们的使命**: 为中国用户提供完整的中文化体验，支持A股/港股市场，集成国产大模型，推动AI金融技术在中文社区的普及应用。
 
-## 🆕 v0.1.14-preview 重大更新
+## 🆕 v0.1.14 重大更新
 
 ### 👥 用户权限管理系统
 
