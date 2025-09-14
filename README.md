@@ -2,11 +2,11 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/Version-cn--0.1.14-green.svg)](./VERSION)
+[![Version](https://img.shields.io/badge/Version-cn--0.1.15-green.svg)](./VERSION)
 [![Documentation](https://img.shields.io/badge/docs-中文文档-green.svg)](./docs/)
 [![Original](https://img.shields.io/badge/基于-TauricResearch/TradingAgents-orange.svg)](https://github.com/TauricResearch/TradingAgents)
 
-> 🚀 **最新版本 cn-0.1.14**: 用户权限管理与Web认证系统正式版！新增完整用户管理、登录认证、权限控制、活动日志、数据管理优化！
+> 🚀 **最新版本 cn-0.1.15**: 开发者体验与LLM生态系统大升级！新增千帆大模型支持、完整开发工具链、学术研究资料、企业级工作流规范！
 >
 > 🎯 **核心功能**: 原生OpenAI支持 | Google AI全面集成 | 自定义端点配置 | 智能模型选择 | 多LLM提供商支持 | 模型选择持久化 | Docker容器化部署 | 专业报告导出 | 完整A股支持 | 中文本地化
 
@@ -18,7 +18,37 @@
 
 **🎯 我们的使命**: 为中国用户提供完整的中文化体验，支持A股/港股市场，集成国产大模型，推动AI金融技术在中文社区的普及应用。
 
-## 🆕 v0.1.14 重大更新
+## 🆕 v0.1.15 重大更新
+
+### 🤖 LLM生态系统大升级
+
+- **千帆大模型支持**: 新增百度千帆(ERNIE)大模型完整集成
+- **LLM适配器重构**: 统一的OpenAI兼容适配器架构
+- **多厂商支持**: 支持更多国产大模型提供商
+- **集成指南**: 完整的LLM集成开发文档和测试工具
+
+### 📚 学术研究支持
+
+- **TradingAgents论文**: 完整的中文翻译版本和深度解读
+- **技术博客**: 详细的技术分析和实现原理解读
+- **学术资料**: PDF论文和相关研究资料
+- **引用支持**: 标准的学术引用格式和参考文献
+
+### 🛠️ 开发者体验升级
+
+- **开发工作流**: 标准化的开发流程和分支管理规范
+- **安装验证**: 完整的安装测试和验证脚本
+- **文档重构**: 结构化的文档系统和快速开始指南
+- **PR模板**: 标准化的Pull Request模板和代码审查流程
+
+### 🔧 企业级工具链
+
+- **分支保护**: GitHub分支保护策略和安全规则
+- **紧急程序**: 完整的紧急处理和故障恢复程序
+- **测试框架**: 增强的测试覆盖和验证工具
+- **部署指南**: 企业级部署和配置管理
+
+## 📋 v0.1.14 功能回顾
 
 ### 👥 用户权限管理系统
 
