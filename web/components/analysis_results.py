@@ -1644,7 +1644,9 @@ def save_analysis_result(analysis_id: str, stock_symbol: str, analysts: List[str
                     project_root = Path(__file__).parent.parent.parent
                     reports_dir = project_root / "data" / "analysis_results" / stock_symbol / current_date / "reports"
 
-                    print(f"🔍 [MongoDB保存] 查找报告目录: {reports_dir}")
+                    # 确保路径在Windows上正确显示（避免双反斜杠）
+                    reports_dir_str = os.path.normpath(str(reports_dir))
+                    print(f"🔍 [MongoDB保存] 查找报告目录: {reports_dir_str}")
 
                     if reports_dir.exists():
                         # 读取所有报告文件
@@ -1660,7 +1662,7 @@ def save_analysis_result(analysis_id: str, stock_symbol: str, analysts: List[str
 
                         print(f"📊 [MongoDB保存] 共读取 {len(reports)} 个报告文件")
                     else:
-                        print(f"⚠️ [MongoDB保存] 报告目录不存在: {reports_dir}")
+                        print(f"⚠️ [MongoDB保存] 报告目录不存在: {reports_dir_str}")
 
                 except Exception as e:
                     print(f"⚠️ [MongoDB保存] 读取报告文件异常: {e}")

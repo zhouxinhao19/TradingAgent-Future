@@ -217,8 +217,8 @@ def render_sidebar():
         # LLM提供商选择
         llm_provider = st.selectbox(
             "LLM提供商",
-            options=["dashscope", "deepseek", "google", "openai", "openrouter", "siliconflow","custom_openai"],
-            index=["dashscope", "deepseek", "google", "openai", "openrouter","siliconflow", "custom_openai"].index(st.session_state.llm_provider) if st.session_state.llm_provider in ["siliconflow", "dashscope", "deepseek", "google", "openai", "openrouter", "custom_openai"] else 0,
+            options=["dashscope", "deepseek", "google", "openai", "openrouter", "siliconflow", "custom_openai", "qianfan"],
+            index=["dashscope", "deepseek", "google", "openai", "openrouter", "siliconflow", "custom_openai", "qianfan"].index(st.session_state.llm_provider) if st.session_state.llm_provider in ["dashscope", "deepseek", "google", "openai", "openrouter", "siliconflow", "custom_openai", "qianfan"] else 0,
             format_func=lambda x: {
                 "dashscope": "🇨🇳 阿里百炼",
                 "deepseek": "🚀 DeepSeek V3",
@@ -226,7 +226,8 @@ def render_sidebar():
                 "openai": "🤖 OpenAI",
                 "openrouter": "🌐 OpenRouter",
                 "siliconflow": "🇨🇳 硅基流动",
-                "custom_openai": "🔧 自定义OpenAI端点"
+                "custom_openai": "🔧 自定义OpenAI端点",
+                "qianfan": "🧠 文心一言（千帆）"
             }[x],
             help="选择AI模型提供商",
             key="llm_provider_select"
@@ -383,6 +384,38 @@ def render_sidebar():
 
             # 保存到持久化存储
             save_model_selection(st.session_state.llm_provider, st.session_state.model_category, llm_model)
+        elif llm_provider == "qianfan":
+            qianfan_options = [
+                "ernie-3.5-8k",
+                "ernie-4.0-turbo-8k",
+                "ERNIE-Speed-8K",
+                "ERNIE-Lite-8K"
+            ]
+
+            current_index = 0
+            if st.session_state.llm_model in qianfan_options:
+                current_index = qianfan_options.index(st.session_state.llm_model)
+
+            llm_model = st.selectbox(
+                "选择文心一言模型",
+                options=qianfan_options,
+                index=current_index,
+                format_func=lambda x: {
+                    "ernie-3.5-8k": "ERNIE 3.5 8K - ⚡ 快速高效",
+                    "ernie-4.0-turbo-8k": "ERNIE 4.0 Turbo 8K - 🚀 强大推理",
+                    "ERNIE-Speed-8K": "ERNIE Speed 8K - 🏃 极速响应",
+                    "ERNIE-Lite-8K": "ERNIE Lite 8K - 💡 轻量经济"
+                }[x],
+                help="选择用于分析的文心一言（千帆）模型",
+                key="qianfan_model_select"
+            )
+
+            if st.session_state.llm_model != llm_model:
+                logger.debug(f"🔄 [Persistence] Qianfan模型变更: {st.session_state.llm_model} → {llm_model}")
+            st.session_state.llm_model = llm_model
+            logger.debug(f"💾 [Persistence] Qianfan模型已保存: {llm_model}")
+
+            save_model_selection(st.session_state.llm_provider, st.session_state.model_category, llm_model)
         elif llm_provider == "openai":
              openai_options = [
                  "gpt-4o",
@@ -391,12 +424,12 @@ def render_sidebar():
                  "gpt-4",
                  "gpt-3.5-turbo"
              ]
- 
+
              # 获取当前选择的索引
              current_index = 0
              if st.session_state.llm_model in openai_options:
                  current_index = openai_options.index(st.session_state.llm_model)
- 
+
              llm_model = st.selectbox(
                  "选择OpenAI模型",
                  options=openai_options,
@@ -431,13 +464,13 @@ def render_sidebar():
                      save_model_selection(st.session_state.llm_provider, st.session_state.model_category, model_id)
                      logger.debug(f"💾 [Persistence] 快速选择GPT-4o Mini: {model_id}")
                      st.rerun()
- 
+
              # 更新session state和持久化存储
              if st.session_state.llm_model != llm_model:
                  logger.debug(f"🔄 [Persistence] OpenAI模型变更: {st.session_state.llm_model} → {llm_model}")
              st.session_state.llm_model = llm_model
              logger.debug(f"💾 [Persistence] OpenAI模型已保存: {llm_model}")
- 
+
              # 保存到持久化存储
              save_model_selection(st.session_state.llm_provider, st.session_state.model_category, llm_model)
 
