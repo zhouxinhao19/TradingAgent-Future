@@ -130,3 +130,40 @@ COMMIT_SUMMARY.md
 *.temp
 *.pyc.*
 *.pyo.*
+
+# ----- Repository hygiene additions (v0.1.16-preview) -----
+# Node/TS build artifacts
+node_modules/
+*.tsbuildinfo
+frontend/.vite
+
+# Installers and archives
+*.msi
+*.msix
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.tgz
+*.xz
+*.archive
+*.bak
+*.old
+
+# Build outputs
+/dist/
+build/
+frontend/dist/
+
+# Logs and runtime artifacts
+*.log*
+*.pid
+*.pid.lock
+
+# Local OS thumbnails
+ehthumbs.db
+
+
+# Historical backup snapshots (do not track)
+data_backup_*/

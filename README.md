@@ -2,11 +2,13 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/Version-cn--0.1.14--preview-orange.svg)](./VERSION)
+[![Version](https://img.shields.io/badge/Version-cn--0.1.16--preview-orange.svg)](./VERSION)
 [![Documentation](https://img.shields.io/badge/docs-中文文档-green.svg)](./docs/)
 [![Original](https://img.shields.io/badge/基于-TauricResearch/TradingAgents-orange.svg)](https://github.com/TauricResearch/TradingAgents)
 
-> 🚀 **最新版本 cn-0.1.14-preview**: 用户权限管理与Web认证系统预览版！新增完整用户管理、登录认证、权限控制、活动日志、数据管理优化！
+[📜 v0.1.16-preview Release Notes](docs/releases/v0.1.16-preview-release-notes.md) · [v0.1.15 Release Notes](docs/releases/v0.1.15-release-notes.md)
+
+> 🚀 **最新版本 cn-0.1.16-preview**: 多应用架构预览！新增 FastAPI 后端 + Vite 前端（与现有 Streamlit 并存过渡），统一配置与服务化，文档与脚本体系升级。
 >
 > 🎯 **核心功能**: 原生OpenAI支持 | Google AI全面集成 | 自定义端点配置 | 智能模型选择 | 多LLM提供商支持 | 模型选择持久化 | Docker容器化部署 | 专业报告导出 | 完整A股支持 | 中文本地化
 
@@ -1286,7 +1288,7 @@ docs/
 # 低成本配置示例
 cost_optimized_config = {
     "deep_think_llm": "gpt-4o-mini",
-    "quick_think_llm": "gpt-4o-mini", 
+    "quick_think_llm": "gpt-4o-mini",
     "max_debate_rounds": 1,
     "online_tools": False  # 使用缓存数据
 }
@@ -1384,7 +1386,10 @@ cost_optimized_config = {
 
 ## 📈 版本历史
 
-- **v0.1.13** (2025-08-02): 🤖 原生OpenAI支持与Google AI生态系统全面集成 ✨ **最新版本**
+- **v0.1.16-preview** (2025-08-XX): 🧭 多应用架构预览（FastAPI + Vite + Streamlit）
+- **v0.1.15** (2025-08-XX): 🔧 开发者体验与 LLM 生态系统升级
+- **v0.1.14-preview** (2025-08-14): 👥 用户权限管理与 Web 认证系统预览
+- **v0.1.13** (2025-08-02): 🤖 原生 OpenAI 支持与 Google AI 生态系统全面集成
 - **v0.1.12** (2025-07-29): 🧠 智能新闻分析模块与项目结构优化
 - **v0.1.11** (2025-07-27): 🤖 多LLM提供商集成与模型选择持久化
 - **v0.1.10** (2025-07-18): 🚀 Web界面实时进度显示与智能会话管理

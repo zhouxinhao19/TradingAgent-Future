@@ -2,6 +2,27 @@
 
 本文档记录了TradingAgents-CN项目的所有重要更改。
 
+## [v0.1.16-preview] - 2025-08-XX - 多应用架构预览版 (FastAPI + Vite + Streamlit)
+
+### 🎉 重大更新
+- 新增 FastAPI 后端应用 (app/)：路由/服务/中间件/统一配置
+- 新增 Vite + TypeScript 前端 (frontend/)：与现有 Streamlit 并存过渡
+- 统一配置与日志：pydantic-settings + 结构化日志，脚本与文档完善
+
+### ⚠️ 注意
+- 预览版，功能持续演进；与主 Web 共存期间请关注依赖与端口
+
+---
+
+## [v0.1.15] - 2025-08-XX - LLM生态与开发者体验升级
+
+### 🎉 亮点
+- LLM 适配体系增强：千帆/Google/OpenRouter 路径统一与适配优化
+- 开发流程规范化：分支保护、PR 模板、紧急流程文档
+- 学术与文档：论文中文版与深入技术解读，安装/验证脚本补全
+
+---
+
 ## [v0.1.14-preview] - 2025-08-14 - 用户权限管理与Web认证系统预览版
 
 ### 🎉 重大更新
@@ -87,7 +108,7 @@
 
 #### 🧠 Google AI生态系统全面集成
 
-- **三大Google AI包支持**: 
+- **三大Google AI包支持**:
   - `langchain-google-genai>=2.1.5` - LangChain集成
   - `google-generativeai>=0.8.0` - 官方SDK (兼容性)
   - `google-genai>=0.1.0` - 新一代SDK (未来发展)

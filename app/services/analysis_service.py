@@ -517,46 +517,16 @@ class AnalysisService:
             raise
     
     async def _update_task_status(
-        self, 
-        task_id: str, 
-        status: AnalysisStatus, 
+        self,
+        task_id: str,
+        status: AnalysisStatus,
         progress: int,
-        result: Optional[AnalysisResult] = None
-    ):
-        """更新任务状态"""
+        result: Optional[AnalysisResult] = None,
+    ) -> None:
+        """更新任务状态（委托至拆分的工具函数）"""
         try:
-            db = get_mongo_db()
-            redis_service = get_redis_service()
-            
-            # 准备更新数据
-            update_data = {
-                "status": status,
-                "progress": progress,
-                "updated_at": datetime.utcnow()
-            }
-            
-            if status == AnalysisStatus.PROCESSING and "started_at" not in update_data:
-                update_data["started_at"] = datetime.utcnow()
-            elif status in [AnalysisStatus.COMPLETED, AnalysisStatus.FAILED]:
-                update_data["completed_at"] = datetime.utcnow()
-                if result:
-                    update_data["result"] = result.dict()
-            
-            # 更新数据库
-            await db.analysis_tasks.update_one(
-                {"task_id": task_id},
-                {"$set": update_data}
-            )
-            
-            # 更新Redis缓存
-            progress_key = RedisKeys.TASK_PROGRESS.format(task_id=task_id)
-            await redis_service.set_json(progress_key, {
-                "task_id": task_id,
-                "status": status,
-                "progress": progress,
-                "updated_at": datetime.utcnow().isoformat()
-            }, ttl=3600)
-            
+            from app.services.analysis.status_update_utils import perform_update_task_status
+            await perform_update_task_status(task_id, status, progress, result)
         except Exception as e:
             logger.error(f"更新任务状态失败: {task_id} - {e}")
 
@@ -565,52 +535,12 @@ class AnalysisService:
         task_id: str,
         status: AnalysisStatus,
         progress_tracker: RedisProgressTracker,
-        result: Optional[AnalysisResult] = None
-    ):
-        """使用进度跟踪器更新任务状态"""
+        result: Optional[AnalysisResult] = None,
+    ) -> None:
+        """使用进度跟踪器更新任务状态（委托至拆分的工具函数）"""
         try:
-            db = get_mongo_db()
-            redis_service = get_redis_service()
-
-            # 从进度跟踪器获取详细信息
-            progress_data = progress_tracker.to_dict()
-
-            # 准备更新数据
-            update_data = {
-                "status": status,
-                "progress": progress_data["progress"],
-                "current_step": progress_data["current_step"],
-                "message": progress_data["message"],
-                "updated_at": datetime.utcnow()
-            }
-
-            if status == AnalysisStatus.PROCESSING and "started_at" not in update_data:
-                update_data["started_at"] = datetime.utcnow()
-            elif status in [AnalysisStatus.COMPLETED, AnalysisStatus.FAILED]:
-                update_data["completed_at"] = datetime.utcnow()
-                if result:
-                    update_data["result"] = result.dict()
-
-            # 更新数据库
-            await db.analysis_tasks.update_one(
-                {"task_id": task_id},
-                {"$set": update_data}
-            )
-
-            # 更新Redis缓存（包含详细的进度信息）
-            progress_key = RedisKeys.TASK_PROGRESS.format(task_id=task_id)
-            await redis_service.set_json(progress_key, {
-                "task_id": task_id,
-                "status": status.value,
-                "progress": progress_data["progress"],
-                "current_step": progress_data["current_step"],
-                "message": progress_data["message"],
-                "elapsed_time": progress_data["elapsed_time"],
-                "remaining_time": progress_data["remaining_time"],
-                "steps": progress_data["steps"],
-                "updated_at": datetime.utcnow().isoformat()
-            }, ttl=3600)
-
+            from app.services.analysis.status_update_utils import perform_update_task_status_with_tracker
+            await perform_update_task_status_with_tracker(task_id, status, progress_tracker, result)
         except Exception as e:
             logger.error(f"更新任务状态失败: {task_id} - {e}")
 
