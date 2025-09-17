@@ -21,6 +21,12 @@ from pymongo import UpdateOne
 
 from app.core.database import get_mongo_db
 
+from app.services.basics_sync import (
+    fetch_stock_basic_df as _fetch_stock_basic_df_util,
+    find_latest_trade_date as _find_latest_trade_date_util,
+    fetch_daily_basic_mv_map as _fetch_daily_basic_mv_map_util,
+)
+
 logger = logging.getLogger(__name__)
 
 STATUS_COLLECTION = "sync_status"
@@ -204,63 +210,16 @@ class BasicsSyncService:
 
     # ---- Blocking helpers (run in thread) ----
     def _fetch_stock_basic_df(self):
-        from tradingagents.dataflows.tushare_utils import get_tushare_provider
-        provider = get_tushare_provider()
-        if not getattr(provider, "connected", False):
-            raise RuntimeError("Tushare not connected. Set TUSHARE_ENABLED=true and TUSHARE_TOKEN in .env")
-        df = provider.get_stock_list()
-        return df
+        """委托到 basics_sync.utils 的阻塞式实现"""
+        return _fetch_stock_basic_df_util()
 
     def _find_latest_trade_date(self) -> str:
-        """Find the latest trade_date with daily_basic data (YYYYMMDD)."""
-        from tradingagents.dataflows.tushare_utils import get_tushare_provider
-        provider = get_tushare_provider()
-        api = provider.api
-        if api is None:
-            raise RuntimeError("Tushare API unavailable")
-        # Try today back to today-5
-        today = datetime.now()
-        for delta in range(0, 6):
-            d = (today - timedelta(days=delta)).strftime("%Y%m%d")
-            try:
-                db = api.daily_basic(trade_date=d, fields="ts_code,total_mv")
-                if db is not None and not db.empty:
-                    return d
-            except Exception:
-                continue
-        # Fallback: return yesterday
-        return (today - timedelta(days=1)).strftime("%Y%m%d")
+        """Delegate to basics_sync.utils (blocking)"""
+        return _find_latest_trade_date_util()
 
     def _fetch_daily_basic_mv_map(self, trade_date: str) -> Dict[str, Dict[str, float]]:
-        """Fetch daily basic data including market cap, PE, PB, turnover rate, etc."""
-        from tradingagents.dataflows.tushare_utils import get_tushare_provider
-        provider = get_tushare_provider()
-        api = provider.api
-        if api is None:
-            raise RuntimeError("Tushare API unavailable")
-
-        # Expand fields to include more financial metrics
-        fields = "ts_code,total_mv,circ_mv,pe,pb,turnover_rate,volume_ratio,pe_ttm,pb_mrq"
-        db = api.daily_basic(trade_date=trade_date, fields=fields)
-
-        data_map: Dict[str, Dict[str, float]] = {}
-        if db is not None and not db.empty:
-            for _, row in db.iterrows():  # type: ignore
-                ts_code = row.get("ts_code")
-                if ts_code is not None:
-                    try:
-                        # Extract all available metrics
-                        metrics = {}
-                        for field in ["total_mv", "circ_mv", "pe", "pb", "turnover_rate", "volume_ratio", "pe_ttm", "pb_mrq"]:
-                            value = row.get(field)
-                            if value is not None and str(value).lower() not in ['nan', 'none', '']:
-                                metrics[field] = float(value)
-
-                        if metrics:  # Only add if we have at least some data
-                            data_map[str(ts_code)] = metrics
-                    except Exception:
-                        pass
-        return data_map
+        """Delegate to basics_sync.utils (blocking)"""
+        return _fetch_daily_basic_mv_map_util(trade_date)
 
 
 # Singleton accessor

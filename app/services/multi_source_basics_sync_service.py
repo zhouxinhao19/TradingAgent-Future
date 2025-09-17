@@ -19,6 +19,8 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from pymongo import UpdateOne
 
 from app.core.database import get_mongo_db
+from app.services.basics_sync import add_financial_metrics as _add_financial_metrics_util
+
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +104,7 @@ class MultiSourceBasicsSyncService:
     async def run_full_sync(self, force: bool = False, preferred_sources: List[str] = None) -> Dict[str, Any]:
         """
         运行完整同步
-        
+
         Args:
             force: 是否强制运行（即使已在运行中）
             preferred_sources: 优先使用的数据源列表
@@ -154,11 +156,11 @@ class MultiSourceBasicsSyncService:
                         if ts_code:
                             daily_data_map[ts_code] = row.to_dict()
                     stats.data_sources_used.append(f"daily_data:{daily_source}")
-            
+
             # Step 5: 处理和更新数据
             ops = []
             inserted = updated = errors = 0
-            
+
             for _, row in stock_df.iterrows():
                 try:
                     # 提取基础信息
@@ -175,7 +177,7 @@ class MultiSourceBasicsSyncService:
                     else:
                         symbol = row.get("symbol") or ""
                         code = str(symbol).zfill(6) if symbol else ""
-                    
+
                     sse = "sh" if (isinstance(ts_code, str) and ts_code.endswith(".SH")) else "sz"
                     category = "stock_cn"
 
@@ -221,7 +223,7 @@ class MultiSourceBasicsSyncService:
             stats.errors = errors
             stats.status = "success" if errors == 0 else "success_with_errors"
             stats.finished_at = datetime.now().isoformat()
-            
+
             await self._persist_status(db, stats.__dict__.copy())
             logger.info(
                 f"Multi-source sync finished: total={stats.total} inserted={inserted} "
@@ -243,33 +245,8 @@ class MultiSourceBasicsSyncService:
 
 
     def _add_financial_metrics(self, doc: Dict, daily_metrics: Dict) -> None:
-        """添加财务指标到文档"""
-        # 处理市值数据（从万元转换为亿元）
-        if "total_mv" in daily_metrics and daily_metrics["total_mv"] is not None:
-            doc["total_mv"] = daily_metrics["total_mv"] / 10000
-
-        if "circ_mv" in daily_metrics and daily_metrics["circ_mv"] is not None:
-            doc["circ_mv"] = daily_metrics["circ_mv"] / 10000
-
-        # 处理估值指标
-        for field in ["pe", "pb", "pe_ttm", "pb_mrq"]:
-            if field in daily_metrics and daily_metrics[field] is not None:
-                try:
-                    value = float(daily_metrics[field])
-                    if not (value != value):  # 检查是否为NaN
-                        doc[field] = value
-                except (ValueError, TypeError):
-                    pass
-
-        # 处理交易指标
-        for field in ["turnover_rate", "volume_ratio"]:
-            if field in daily_metrics and daily_metrics[field] is not None:
-                try:
-                    value = float(daily_metrics[field])
-                    if not (value != value):  # 检查是否为NaN
-                        doc[field] = value
-                except (ValueError, TypeError):
-                    pass
+        """委托到 basics_sync.processing.add_financial_metrics"""
+        return _add_financial_metrics_util(doc, daily_metrics)
 
 
 # 全局服务实例
