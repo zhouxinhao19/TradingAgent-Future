@@ -15,27 +15,31 @@ from redis.asyncio import Redis
 
 from app.core.database import get_redis_client
 
+from app.services.queue import (
+    READY_LIST,
+    TASK_PREFIX,
+    BATCH_PREFIX,
+    SET_PROCESSING,
+    SET_COMPLETED,
+    SET_FAILED,
+    BATCH_TASKS_PREFIX,
+    USER_PROCESSING_PREFIX,
+    GLOBAL_CONCURRENT_KEY,
+    VISIBILITY_TIMEOUT_PREFIX,
+    DEFAULT_USER_CONCURRENT_LIMIT,
+    GLOBAL_CONCURRENT_LIMIT,
+    VISIBILITY_TIMEOUT_SECONDS,
+    check_user_concurrent_limit,
+    check_global_concurrent_limit,
+    mark_task_processing,
+    unmark_task_processing,
+    set_visibility_timeout,
+    clear_visibility_timeout,
+)
+
 logger = logging.getLogger(__name__)
 
-# Redis键名常量
-READY_LIST = "qa:ready"
-
-TASK_PREFIX = "qa:task:"
-BATCH_PREFIX = "qa:batch:"
-SET_PROCESSING = "qa:processing"
-SET_COMPLETED = "qa:completed"
-SET_FAILED = "qa:failed"
-BATCH_TASKS_PREFIX = "qa:batch_tasks:"
-
-# 新增：并发控制相关
-USER_PROCESSING_PREFIX = "qa:user_processing:"
-GLOBAL_CONCURRENT_KEY = "qa:global_concurrent"
-VISIBILITY_TIMEOUT_PREFIX = "qa:visibility:"
-
-# 配置常量 - 开源版限制
-DEFAULT_USER_CONCURRENT_LIMIT = 3
-GLOBAL_CONCURRENT_LIMIT = 3  # 开源版全局最大并发限制为3
-VISIBILITY_TIMEOUT_SECONDS = 300  # 5分钟
+# Redis键名与配置常量由 app.services.queue.keys 提供（此处不再重复定义）
 
 
 class QueueService:
@@ -232,45 +236,28 @@ class QueueService:
 
     # 新增：并发控制方法
     async def _check_user_concurrent_limit(self, user_id: str) -> bool:
-        """检查用户并发限制"""
-        user_processing_key = USER_PROCESSING_PREFIX + user_id
-        current_count = await self.r.scard(user_processing_key)
-        return current_count < self.user_concurrent_limit
+        """检查用户并发限制（委托 helpers）"""
+        return await check_user_concurrent_limit(self.r, user_id, self.user_concurrent_limit)
 
     async def _check_global_concurrent_limit(self) -> bool:
-        """检查全局并发限制"""
-        current_count = await self.r.scard(SET_PROCESSING)
-        return current_count < self.global_concurrent_limit
+        """检查全局并发限制（委托 helpers）"""
+        return await check_global_concurrent_limit(self.r, self.global_concurrent_limit)
 
     async def _mark_task_processing(self, task_id: str, user_id: str, worker_id: str):
-        """标记任务为处理中"""
-        user_processing_key = USER_PROCESSING_PREFIX + user_id
-        await self.r.sadd(user_processing_key, task_id)
-        await self.r.sadd(SET_PROCESSING, task_id)
+        """标记任务为处理中（委托 helpers）"""
+        await mark_task_processing(self.r, task_id, user_id)
 
     async def _unmark_task_processing(self, task_id: str, user_id: str):
-        """取消任务处理中标记"""
-        user_processing_key = USER_PROCESSING_PREFIX + user_id
-        await self.r.srem(user_processing_key, task_id)
-        await self.r.srem(SET_PROCESSING, task_id)
+        """取消任务处理中标记（委托 helpers）"""
+        await unmark_task_processing(self.r, task_id, user_id)
 
     async def _set_visibility_timeout(self, task_id: str, worker_id: str):
-        """设置可见性超时"""
-        timeout_key = VISIBILITY_TIMEOUT_PREFIX + task_id
-        timeout_data = {
-            "task_id": task_id,
-            "worker_id": worker_id,
-            "timeout_at": int(time.time()) + self.visibility_timeout
-        }
-        await self.r.hset(timeout_key, mapping={
-            k: str(v) for k, v in timeout_data.items()
-        })
-        await self.r.expire(timeout_key, self.visibility_timeout)
+        """设置可见性超时（委托 helpers）"""
+        await set_visibility_timeout(self.r, task_id, worker_id, self.visibility_timeout)
 
     async def _clear_visibility_timeout(self, task_id: str):
         """清除可见性超时"""
-        timeout_key = VISIBILITY_TIMEOUT_PREFIX + task_id
-        await self.r.delete(timeout_key)
+        await clear_visibility_timeout(self.r, task_id)
 
     async def get_user_queue_status(self, user_id: str) -> Dict[str, int]:
         """获取用户队列状态"""
