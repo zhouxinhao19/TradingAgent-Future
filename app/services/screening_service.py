@@ -14,6 +14,13 @@ from tradingagents.dataflows.unified_dataframe import get_china_daily_df_unified
 from tradingagents.dataflows.fundamentals_snapshot import get_cn_fund_snapshot
 
 
+from app.services.screening.eval_utils import (
+    collect_fields_from_conditions as _collect_fields_from_conditions_util,
+    evaluate_conditions as _evaluate_conditions_util,
+    evaluate_fund_conditions as _evaluate_fund_conditions_util,
+    safe_float as _safe_float_util,
+)
+
 # --- DSL 约束 ---
 ALLOWED_FIELDS = {
     # 原始行情（统一为小写列）
@@ -177,152 +184,23 @@ class ScreeningService:
             "items": page_items,
         }
     def _evaluate_fund_conditions(self, snap: Dict[str, Any], node: Dict[str, Any]) -> bool:
-        if not node:
-            return True
-        # group
-        if node.get("op") == "group" or "children" in node:
-            logic = (node.get("logic") or "AND").upper()
-            children = node.get("children", [])
-            flags = [self._evaluate_fund_conditions(snap, c) for c in children]
-            return all(flags) if logic == "AND" else any(flags)
-        # leaf
-        field = node.get("field")
-        op = node.get("op")
-        if field not in FUND_FIELDS:
-            return True  # 非基本面字段在纯基本面路径中跳过
-        left = snap.get(field)
-        if left is None:
-            return False
-        if node.get("right_field"):
-            rf = node.get("right_field")
-            right = snap.get(rf)
-        else:
-            right = node.get("value")
-        try:
-            if op == ">":
-                return float(left) > float(right)
-            if op == "<":
-                return float(left) < float(right)
-            if op == ">=":
-                return float(left) >= float(right)
-            if op == "<=":
-                return float(left) <= float(right)
-            if op == "==":
-                return float(left) == float(right)
-            if op == "!=":
-                return float(left) != float(right)
-            if op == "between":
-                lo, hi = right if isinstance(right, (list, tuple)) else (None, None)
-                if lo is None or hi is None:
-                    return False
-                v = float(left)
-                return float(lo) <= v <= float(hi)
-        except Exception:
-            return False
-        return False
+        """Delegate fundamental condition evaluation to utils to keep service slim."""
+        return _evaluate_fund_conditions_util(snap, node, FUND_FIELDS)
 
 
     def _collect_fields_from_conditions(self, node: Dict[str, Any]) -> List[str]:
-        if not node:
-            return []
-        if node.get("op") == "group" or "children" in node:
-            fields: List[str] = []
-            for c in node.get("children", []):
-                fields.extend(self._collect_fields_from_conditions(c))
-            return list(dict.fromkeys(fields))
-        f = node.get("field")
-        rf = node.get("right_field")
-        out = []
-        if isinstance(f, str) and f in ALLOWED_FIELDS:
-            out.append(f)
-        if isinstance(rf, str) and rf in ALLOWED_FIELDS:
-            out.append(rf)
-        return out
+        """Delegate field collection to utils."""
+        return _collect_fields_from_conditions_util(node, ALLOWED_FIELDS)
 
     # --- 内部：DSL 评估 ---
     def _evaluate_conditions(self, df: pd.DataFrame, node: Dict[str, Any]) -> bool:
-        if not node:
-            return True
-        # group 节点
-        if node.get("op") == "group" or "children" in node:
-            logic = (node.get("logic") or "AND").upper()
-            children = node.get("children", [])
-            if logic not in {"AND", "OR"}:
-                logic = "AND"
-            flags = [self._evaluate_conditions(df, c) for c in children]
-            return all(flags) if logic == "AND" else any(flags)
-
-        # 叶子：字段比较
-        field = node.get("field")
-        op = node.get("op")
-        if field not in ALLOWED_FIELDS or op not in ALLOWED_OPS:
-            return False
-
-        # 需要最近两行（交叉）
-        if op in {"cross_up", "cross_down"}:
-            right_field = node.get("right_field")
-            if right_field not in ALLOWED_FIELDS:
-                return False
-            if len(df) < 2:
-                return False
-            t0 = df.iloc[-1]
-            t1 = df.iloc[-2]
-            a0 = t0.get(field)
-            a1 = t1.get(field)
-            b0 = t0.get(right_field)
-            b1 = t1.get(right_field)
-            if any(pd.isna([a0, a1, b0, b1])):
-                return False
-            if op == "cross_up":
-                return (a1 <= b1) and (a0 > b0)
-            else:
-                return (a1 >= b1) and (a0 < b0)
-
-        # 普通比较：最近一行
-        t0 = df.iloc[-1]
-        left = t0.get(field)
-        if pd.isna(left):
-            return False
-
-        if node.get("right_field"):
-            rf = node.get("right_field")
-            if rf not in ALLOWED_FIELDS:
-                return False
-            right = t0.get(rf)
-        else:
-            right = node.get("value")
-
-        try:
-            if op == ">":
-                return float(left) > float(right)
-            if op == "<":
-                return float(left) < float(right)
-            if op == ">=":
-                return float(left) >= float(right)
-            if op == "<=":
-                return float(left) <= float(right)
-            if op == "==":
-                return float(left) == float(right)
-            if op == "!=":
-                return float(left) != float(right)
-            if op == "between":
-                lo, hi = right if isinstance(right, (list, tuple)) else (None, None)
-                if lo is None or hi is None:
-                    return False
-                v = float(left)
-                return float(lo) <= v <= float(hi)
-        except Exception:
-            return False
-        return False
+        """Delegate technical/base condition evaluation to utils."""
+        return _evaluate_conditions_util(df, node, ALLOWED_FIELDS, ALLOWED_OPS)
 
     # --- 工具 ---
     def _safe_float(self, v: Any) -> Optional[float]:
-        try:
-            if v is None or (isinstance(v, float) and np.isnan(v)):
-                return None
-            return float(v)
-        except Exception:
-            return None
+        """Delegate numeric coercion to utils."""
+        return _safe_float_util(v)
 
     def _get_universe(self) -> List[str]:
         """获取A股代码集合：
