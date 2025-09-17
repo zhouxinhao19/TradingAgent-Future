@@ -41,17 +41,17 @@ def safe_serialize(data):
 
 class RedisProgressTracker:
     """Redis进度跟踪器"""
-    
+
     def __init__(self, task_id: str, analysts: List[str], research_depth: str, llm_provider: str):
         self.task_id = task_id
         self.analysts = analysts
         self.research_depth = research_depth
         self.llm_provider = llm_provider
-        
+
         # Redis连接
         self.redis_client = None
         self.use_redis = self._init_redis()
-        
+
         # 进度数据
         self.progress_data = {
             'task_id': task_id,
@@ -68,17 +68,17 @@ class RedisProgressTracker:
             'remaining_time': 0.0,
             'steps': []
         }
-        
+
         # 生成分析步骤
         self.analysis_steps = self._generate_dynamic_steps()
         self.progress_data['total_steps'] = len(self.analysis_steps)
         self.progress_data['steps'] = [asdict(step) for step in self.analysis_steps]
-        
+
         # 保存初始状态
         self._save_progress()
-        
+
         logger.info(f"📊 [Redis进度] 初始化完成: {task_id}, 步骤数: {len(self.analysis_steps)}")
-    
+
     def _init_redis(self) -> bool:
         """初始化Redis连接"""
         try:
@@ -120,11 +120,11 @@ class RedisProgressTracker:
         except Exception as e:
             logger.warning(f"📊 [Redis进度] Redis连接失败，使用文件存储: {e}")
             return False
-    
+
     def _generate_dynamic_steps(self) -> List[AnalysisStep]:
         """根据分析师数量和研究深度动态生成分析步骤"""
         steps = []
-        
+
         # 1. 基础准备阶段 (10%)
         steps.extend([
             AnalysisStep("📋 准备阶段", "验证股票代码，检查数据源可用性", "pending", 0.03),
@@ -148,16 +148,16 @@ class RedisProgressTracker:
         # 3. 研究团队辩论阶段 (25%)
         debate_rounds = self._get_debate_rounds()
         debate_weight = 0.25 / (3 + debate_rounds)  # 多头+空头+经理+辩论轮次
-        
+
         steps.extend([
             AnalysisStep("🐂 看涨研究员", "基于分析师报告构建买入论据", "pending", debate_weight),
             AnalysisStep("🐻 看跌研究员", "识别潜在风险和问题", "pending", debate_weight),
         ])
-        
+
         # 根据研究深度添加辩论轮次
         for i in range(debate_rounds):
             steps.append(AnalysisStep(f"🎯 研究辩论 第{i+1}轮", "多头空头研究员深度辩论", "pending", debate_weight))
-        
+
         steps.append(AnalysisStep("👔 研究经理", "综合辩论结果，形成研究共识", "pending", debate_weight))
 
         # 4. 交易团队阶段 (8%)
@@ -179,7 +179,7 @@ class RedisProgressTracker:
         ])
 
         return steps
-    
+
     def _get_debate_rounds(self) -> int:
         """根据研究深度获取辩论轮次"""
         if self.research_depth == "快速":
@@ -544,3 +544,13 @@ class RedisProgressTracker:
 # 兼容性重导出：使用 progress 子包的实现
 from app.services.progress.tracker import get_progress_by_id as _get_progress_by_id
 get_progress_by_id = _get_progress_by_id
+
+
+from app.services.progress.tracker import (
+    AnalysisStep as _AnalysisStep,
+    safe_serialize as _safe_serialize,
+    RedisProgressTracker as _RedisProgressTracker,
+)
+AnalysisStep = _AnalysisStep
+safe_serialize = _safe_serialize
+RedisProgressTracker = _RedisProgressTracker
