@@ -13,34 +13,34 @@ logger = logging.getLogger(__name__)
 
 class DataSourceAdapter(ABC):
     """数据源适配器基类"""
-    
+
     @property
     @abstractmethod
     def name(self) -> str:
         """数据源名称"""
         pass
-    
+
     @property
     @abstractmethod
     def priority(self) -> int:
         """数据源优先级（数字越小优先级越高）"""
         pass
-    
+
     @abstractmethod
     def is_available(self) -> bool:
         """检查数据源是否可用"""
         pass
-    
+
     @abstractmethod
     def get_stock_list(self) -> Optional[pd.DataFrame]:
         """获取股票列表"""
         pass
-    
+
     @abstractmethod
     def get_daily_basic(self, trade_date: str) -> Optional[pd.DataFrame]:
         """获取每日基础财务数据"""
         pass
-    
+
     @abstractmethod
     def find_latest_trade_date(self) -> Optional[str]:
         """查找最新交易日期"""
@@ -49,11 +49,11 @@ class DataSourceAdapter(ABC):
 
 class TushareAdapter(DataSourceAdapter):
     """Tushare数据源适配器"""
-    
+
     def __init__(self):
         self._provider = None
         self._initialize()
-    
+
     def _initialize(self):
         """初始化Tushare提供器"""
         try:
@@ -62,26 +62,26 @@ class TushareAdapter(DataSourceAdapter):
         except Exception as e:
             logger.warning(f"Failed to initialize Tushare provider: {e}")
             self._provider = None
-    
+
     @property
     def name(self) -> str:
         return "tushare"
-    
+
     @property
     def priority(self) -> int:
         return 1  # 最高优先级
-    
+
     def is_available(self) -> bool:
         """检查Tushare是否可用"""
-        return (self._provider is not None and 
+        return (self._provider is not None and
                 getattr(self._provider, "connected", False) and
                 self._provider.api is not None)
-    
+
     def get_stock_list(self) -> Optional[pd.DataFrame]:
         """获取股票列表"""
         if not self.is_available():
             return None
-        
+
         try:
             df = self._provider.get_stock_list()
             if df is not None and not df.empty:
@@ -89,14 +89,14 @@ class TushareAdapter(DataSourceAdapter):
                 return df
         except Exception as e:
             logger.error(f"Tushare: Failed to fetch stock list: {e}")
-        
+
         return None
-    
+
     def get_daily_basic(self, trade_date: str) -> Optional[pd.DataFrame]:
         """获取每日基础财务数据"""
         if not self.is_available():
             return None
-        
+
         try:
             fields = "ts_code,total_mv,circ_mv,pe,pb,turnover_rate,volume_ratio,pe_ttm,pb_mrq"
             df = self._provider.api.daily_basic(trade_date=trade_date, fields=fields)
@@ -105,14 +105,14 @@ class TushareAdapter(DataSourceAdapter):
                 return df
         except Exception as e:
             logger.error(f"Tushare: Failed to fetch daily data for {trade_date}: {e}")
-        
+
         return None
-    
+
     def find_latest_trade_date(self) -> Optional[str]:
         """查找最新交易日期"""
         if not self.is_available():
             return None
-        
+
         try:
             today = datetime.now()
             for delta in range(0, 10):  # 最多回溯10天
@@ -126,21 +126,21 @@ class TushareAdapter(DataSourceAdapter):
                     continue
         except Exception as e:
             logger.error(f"Tushare: Failed to find latest trade date: {e}")
-        
+
         return None
 
 
 class AKShareAdapter(DataSourceAdapter):
     """AKShare数据源适配器"""
-    
+
     @property
     def name(self) -> str:
         return "akshare"
-    
+
     @property
     def priority(self) -> int:
         return 2
-    
+
     def is_available(self) -> bool:
         """检查AKShare是否可用"""
         try:
@@ -148,7 +148,7 @@ class AKShareAdapter(DataSourceAdapter):
             return True
         except ImportError:
             return False
-    
+
     def get_stock_list(self) -> Optional[pd.DataFrame]:
         """获取股票列表"""
         if not self.is_available():
@@ -239,7 +239,7 @@ class AKShareAdapter(DataSourceAdapter):
             logger.error(f"AKShare: Failed to generate stock list: {e}")
 
         return None
-    
+
     def get_daily_basic(self, trade_date: str) -> Optional[pd.DataFrame]:
         """获取每日基础财务数据"""
         if not self.is_available():
@@ -339,7 +339,7 @@ class AKShareAdapter(DataSourceAdapter):
             return float(value)
         except (ValueError, TypeError):
             return None
-    
+
     def find_latest_trade_date(self) -> Optional[str]:
         """查找最新交易日期"""
         # 简单返回昨天的日期
@@ -350,15 +350,15 @@ class AKShareAdapter(DataSourceAdapter):
 
 class BaoStockAdapter(DataSourceAdapter):
     """BaoStock数据源适配器"""
-    
+
     @property
     def name(self) -> str:
         return "baostock"
-    
+
     @property
     def priority(self) -> int:
         return 3
-    
+
     def is_available(self) -> bool:
         """检查BaoStock是否可用"""
         try:
@@ -366,21 +366,21 @@ class BaoStockAdapter(DataSourceAdapter):
             return True
         except ImportError:
             return False
-    
+
     def get_stock_list(self) -> Optional[pd.DataFrame]:
         """获取股票列表"""
         if not self.is_available():
             return None
-        
+
         try:
             import baostock as bs
-            
+
             # 登录BaoStock
             lg = bs.login()
             if lg.error_code != '0':
                 logger.error(f"BaoStock: Login failed: {lg.error_msg}")
                 return None
-            
+
             try:
                 # 获取证券基本资料 - 包含type字段用于过滤股票类型
                 logger.info(f"BaoStock: Querying stock basic info...")
@@ -389,26 +389,26 @@ class BaoStockAdapter(DataSourceAdapter):
                 if rs.error_code != '0':
                     logger.error(f"BaoStock: Query failed: {rs.error_msg}")
                     return None
-                
+
                 # 解析数据
                 data_list = []
                 while (rs.error_code == '0') & rs.next():
                     data_list.append(rs.get_row_data())
-                
+
                 if not data_list:
                     return None
-                
+
                 # 转换为DataFrame
                 df = pd.DataFrame(data_list, columns=rs.fields)
-                
+
                 # 过滤A股股票：type=1表示股票，排除指数(type=2)等其他类型
                 df = df[df['type'] == '1']
-                
+
                 # 标准化格式
                 df['symbol'] = df['code'].str.replace(r'^(sh|sz)\.', '', regex=True)
                 df['ts_code'] = df['code'].str.replace('sh.', '').str.replace('sz.', '') + \
                                df['code'].str.extract(r'^(sh|sz)\.').iloc[:, 0].str.upper().str.replace('SH', '.SH').str.replace('SZ', '.SZ')
-                
+
                 # 重命名字段以匹配标准格式
                 # query_stock_basic返回字段：['code', 'code_name', 'ipoDate', 'outDate', 'type', 'status']
                 df['name'] = df['code_name']  # BaoStock使用code_name字段
@@ -421,15 +421,15 @@ class BaoStockAdapter(DataSourceAdapter):
 
                 logger.info(f"BaoStock: Successfully fetched {len(df)} stocks")
                 return df[['symbol', 'name', 'ts_code', 'area', 'industry', 'market', 'list_date']]
-                
+
             finally:
                 bs.logout()
-                
+
         except Exception as e:
             logger.error(f"BaoStock: Failed to fetch stock list: {e}")
-        
+
         return None
-    
+
     def get_daily_basic(self, trade_date: str) -> Optional[pd.DataFrame]:
         """获取每日基础财务数据"""
         if not self.is_available():
@@ -569,7 +569,7 @@ class BaoStockAdapter(DataSourceAdapter):
         # 深圳A股：000xxx, 001xxx, 002xxx, 003xxx, 300xxx (创业板)
         a_stock_pattern = r'^(sh\.(60[0135]|688)|sz\.(00[0123]|300))[0-9]{3}$'
         return bool(re.match(a_stock_pattern, code))
-    
+
     def find_latest_trade_date(self) -> Optional[str]:
         """查找最新交易日期"""
         # 简单返回昨天的日期
@@ -597,7 +597,7 @@ class DataSourceManager:
         except ImportError:
             logger.warning("⚠️ 数据一致性检查器不可用")
             self.consistency_checker = None
-    
+
     def get_available_adapters(self) -> List[DataSourceAdapter]:
         """获取可用的数据源适配器"""
         available = []
@@ -607,13 +607,13 @@ class DataSourceManager:
                 logger.info(f"Data source {adapter.name} is available (priority: {adapter.priority})")
             else:
                 logger.warning(f"Data source {adapter.name} is not available")
-        
+
         return available
-    
+
     def get_stock_list_with_fallback(self) -> tuple[Optional[pd.DataFrame], Optional[str]]:
         """使用fallback机制获取股票列表"""
         available_adapters = self.get_available_adapters()
-        
+
         for adapter in available_adapters:
             try:
                 logger.info(f"Trying to fetch stock list from {adapter.name}")
@@ -623,13 +623,13 @@ class DataSourceManager:
             except Exception as e:
                 logger.error(f"Failed to fetch stock list from {adapter.name}: {e}")
                 continue
-        
+
         return None, None
-    
+
     def get_daily_basic_with_fallback(self, trade_date: str) -> tuple[Optional[pd.DataFrame], Optional[str]]:
         """使用fallback机制获取每日基础数据"""
         available_adapters = self.get_available_adapters()
-        
+
         for adapter in available_adapters:
             try:
                 logger.info(f"Trying to fetch daily basic data from {adapter.name}")
@@ -639,13 +639,13 @@ class DataSourceManager:
             except Exception as e:
                 logger.error(f"Failed to fetch daily basic data from {adapter.name}: {e}")
                 continue
-        
+
         return None, None
-    
+
     def find_latest_trade_date_with_fallback(self) -> Optional[str]:
         """使用fallback机制查找最新交易日期"""
         available_adapters = self.get_available_adapters()
-        
+
         for adapter in available_adapters:
             try:
                 trade_date = adapter.find_latest_trade_date()
@@ -654,7 +654,7 @@ class DataSourceManager:
             except Exception as e:
                 logger.error(f"Failed to find trade date from {adapter.name}: {e}")
                 continue
-        
+
         # 如果所有数据源都失败，返回昨天
         return (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
 
@@ -729,3 +729,25 @@ class DataSourceManager:
             # 出错时使用fallback机制
             df, source = self.get_daily_basic_with_fallback(trade_date)
             return df, source, None
+
+
+# ---- Backward-compatible re-exports (delegating to subpackage) ----
+try:
+    from app.services.data_sources.base import DataSourceAdapter as _BaseAdapter
+    from app.services.data_sources.tushare_adapter import TushareAdapter as _TsAdapter
+    from app.services.data_sources.akshare_adapter import AKShareAdapter as _AkAdapter
+    from app.services.data_sources.baostock_adapter import BaoStockAdapter as _BsAdapter
+    from app.services.data_sources.manager import DataSourceManager as _DsManager
+
+    # Override local definitions to use subpackage implementations
+    DataSourceAdapter = _BaseAdapter  # type: ignore
+    TushareAdapter = _TsAdapter  # type: ignore
+    AKShareAdapter = _AkAdapter  # type: ignore
+    BaoStockAdapter = _BsAdapter  # type: ignore
+    DataSourceManager = _DsManager  # type: ignore
+except Exception as _e:
+    # Fallback: keep original in-file implementations if subpackage import fails
+    import logging as _logging
+    _logging.getLogger(__name__).warning(
+        f"Data source subpackage not fully available, using in-file classes. Detail: {_e}"
+    )
