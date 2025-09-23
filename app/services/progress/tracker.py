@@ -10,14 +10,8 @@ import logging
 import time
 
 
-# 过渡期：从旧模块导入类，保持现有行为不变
-from app.services.redis_progress_tracker import (
-    RedisProgressTracker as _RedisProgressTracker,
-)
 
-RedisProgressTracker = _RedisProgressTracker  # type: ignore
-
-logger = logging.getLogger("app.services.redis_progress_tracker")
+logger = logging.getLogger("app.services.progress.tracker")
 
 from dataclasses import dataclass, asdict
 from datetime import datetime
@@ -250,7 +244,7 @@ class RedisProgressTracker:
         return progress_data
 
     def update_progress(self, progress_update: Dict[str, Any]) -> Dict[str, Any]:
-        """  update progress and persist"""
+        """update progress and persist"""
         try:
             self.progress_data.update(progress_update)
             current_step = self._detect_current_step()
@@ -367,9 +361,6 @@ class RedisProgressTracker:
 
 
 def get_progress_by_id(task_id: str) -> Optional[Dict[str, Any]]:
-
-        """根据分析师数量和研究深度动态生成分析步骤"""
-
     """根据任务ID获取进度（与旧实现一致，修正 cls 引用）"""
     try:
         # 检查REDIS_ENABLED环境变量

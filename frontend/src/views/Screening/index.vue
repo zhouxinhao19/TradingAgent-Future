@@ -357,19 +357,8 @@ const filters = reactive({
   technicalPattern: [] as string[]
 })
 
-// 行业选项
-const industryOptions = ref([
-  { label: '银行', value: 'banking' },
-  { label: '证券', value: 'securities' },
-  { label: '保险', value: 'insurance' },
-  { label: '房地产', value: 'real_estate' },
-  { label: '医药生物', value: 'pharmaceutical' },
-  { label: '食品饮料', value: 'food_beverage' },
-  { label: '电子', value: 'electronics' },
-  { label: '计算机', value: 'computer' },
-  { label: '通信', value: 'communication' },
-  { label: '汽车', value: 'automotive' }
-])
+// 行业选项（动态加载）
+const industryOptions = ref<Array<{label: string, value: string, count?: number}>>([])
 
 // 计算属性
 const paginatedResults = computed(() => {
@@ -394,8 +383,8 @@ const performScreening = async () => {
 
     // 行业分类（如果用户选择了行业）
     if (filters.industry && filters.industry.length > 0) {
-      // 这里暂用占位符字段 industry，后端当前未实现行业过滤逻辑，可先不发送
-      // children.push({ field: 'industry', op: 'in', value: filters.industry })
+      // 直接使用数据库中的行业名称，无需映射
+      children.push({ field: 'industry', op: 'in', value: filters.industry })
     }
 
     // 市值范围映射为区间（单位：亿元 → 转换为万元以匹配后端 market_cap 单位）
@@ -607,10 +596,32 @@ const loadFieldConfig = async () => {
   }
 }
 
+// 加载行业列表
+const loadIndustries = async () => {
+  try {
+    const response = await screeningApi.getIndustries()
+    const data = response.data || response
+    industryOptions.value = data.industries || []
+    console.log('行业列表加载成功:', industryOptions.value.length, '个行业')
+  } catch (error) {
+    console.error('加载行业列表失败:', error)
+    ElMessage.error('加载行业列表失败')
+    // 如果加载失败，使用默认的行业列表
+    industryOptions.value = [
+      { label: '银行', value: '银行' },
+      { label: '证券', value: '证券' },
+      { label: '保险', value: '保险' },
+      { label: '房地产', value: '房地产' },
+      { label: '医药生物', value: '医药生物' }
+    ]
+  }
+}
+
 // 生命周期
 onMounted(() => {
-  // 加载字段配置
+  // 加载字段配置和行业列表
   loadFieldConfig()
+  loadIndustries()
 })
 </script>
 

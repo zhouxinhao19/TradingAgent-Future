@@ -18,6 +18,7 @@ from app.services.enhanced_screening.utils import (
     analyze_conditions as _analyze_conditions_util,
     convert_conditions_to_traditional_format as _convert_to_traditional_util,
 )
+from app.services.quotes_service import get_quotes_service
 
 
 class EnhancedScreeningService:
@@ -83,13 +84,36 @@ class EnhancedScreeningService:
                 optimization_used = "traditional"
                 source = "api"
 
+            # 提取 items/total
+            items = result[0] if isinstance(result, tuple) else result.get("items", [])
+            total = result[1] if isinstance(result, tuple) else result.get("total", 0)
+
+            # 若使用数据库优化路径，则做实时行情富集（AKShare，30s TTL 缓存）
+            if source == "mongodb" and items:
+                try:
+                    qs = get_quotes_service()
+                    codes = [it.get("code") for it in items if it.get("code")]
+                    quotes = await qs.get_quotes(codes)
+                    for it in items:
+                        q = quotes.get(it.get("code"))
+                        if q:
+                            # 仅在不存在或为None时补齐/覆盖
+                            if q.get("close") is not None:
+                                it["close"] = q.get("close")
+                            if q.get("pct_chg") is not None:
+                                it["pct_chg"] = q.get("pct_chg")
+                            if q.get("amount") is not None:
+                                it["amount"] = q.get("amount")
+                except Exception as enrich_err:
+                    logger.warning(f"实时行情富集失败（已忽略）: {enrich_err}")
+
             # 计算耗时
             took_ms = int((time.time() - start_time) * 1000)
 
             # 返回结果
             return {
-                "total": result[1] if isinstance(result, tuple) else result.get("total", 0),
-                "items": result[0] if isinstance(result, tuple) else result.get("items", []),
+                "total": total,
+                "items": items,
                 "took_ms": took_ms,
                 "optimization_used": optimization_used,
                 "source": source,
