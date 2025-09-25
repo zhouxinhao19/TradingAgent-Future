@@ -39,7 +39,12 @@ def main():
 
     # 设置简化的日志配置
     print("🔧 正在设置日志配置...")
-    DEV_CONFIG.setup_logging(settings.DEBUG)
+    try:
+        from app.core.logging_config import setup_logging as app_setup_logging
+        app_setup_logging(settings.LOG_LEVEL)
+    except Exception:
+        # 回退到开发环境简化日志配置
+        DEV_CONFIG.setup_logging(settings.DEBUG)
     print("✅ 日志配置设置完成")
 
     try:

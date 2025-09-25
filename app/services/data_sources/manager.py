@@ -86,6 +86,25 @@ class DataSourceManager:
                 continue
         return (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
 
+    def get_realtime_quotes_with_fallback(self) -> Tuple[Optional[Dict], Optional[str]]:
+        """
+        获取全市场实时快照，按适配器优先级依次尝试，返回首个成功结果
+        Returns: (quotes_dict, source_name)
+        quotes_dict 形如 { '000001': {'close': 10.0, 'pct_chg': 1.2, 'amount': 1.2e8}, ... }
+        """
+        available_adapters = self.get_available_adapters()
+        for adapter in available_adapters:
+            try:
+                logger.info(f"Trying to fetch realtime quotes from {adapter.name}")
+                data = adapter.get_realtime_quotes()
+                if data:
+                    return data, adapter.name
+            except Exception as e:
+                logger.error(f"Failed to fetch realtime quotes from {adapter.name}: {e}")
+                continue
+        return None, None
+
+
     def get_daily_basic_with_consistency_check(
         self, trade_date: str
     ) -> Tuple[Optional[pd.DataFrame], Optional[str], Optional[Dict]]:

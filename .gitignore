@@ -7,6 +7,14 @@ __pycache__/
 .Python
 *.egg-info/
 
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
 # 环境变量文件 (包含敏感API密钥)
 .env
 .env.local

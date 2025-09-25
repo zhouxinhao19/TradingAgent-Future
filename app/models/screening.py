@@ -196,6 +196,15 @@ BASIC_FIELDS_INFO = {
         unit="倍",
         supported_operators=[OperatorType.GT, OperatorType.LT, OperatorType.GTE, OperatorType.LTE, OperatorType.BETWEEN]
     ),
+    "roe": FieldInfo(
+        name="roe",
+        display_name="净资产收益率",
+        field_type=FieldType.FUNDAMENTAL,
+        data_type="number",
+        description="净资产收益率(最近一期，%)",
+        unit="%",
+        supported_operators=[OperatorType.GT, OperatorType.LT, OperatorType.GTE, OperatorType.LTE, OperatorType.BETWEEN]
+    ),
     "turnover_rate": FieldInfo(
         name="turnover_rate",
         display_name="换手率",

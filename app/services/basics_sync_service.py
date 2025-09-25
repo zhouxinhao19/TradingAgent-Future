@@ -25,6 +25,7 @@ from app.services.basics_sync import (
     fetch_stock_basic_df as _fetch_stock_basic_df_util,
     find_latest_trade_date as _find_latest_trade_date_util,
     fetch_daily_basic_mv_map as _fetch_daily_basic_mv_map_util,
+    fetch_latest_roe_map as _fetch_latest_roe_map_util,
 )
 
 logger = logging.getLogger(__name__)
@@ -95,6 +96,9 @@ class BasicsSyncService:
             stats.last_trade_date = latest_trade_date
             daily_data_map = await asyncio.to_thread(self._fetch_daily_basic_mv_map, latest_trade_date)
 
+            # Step 2b: Fetch latest ROE snapshot from fina_indicator (blocking -> thread)
+            roe_map = await asyncio.to_thread(self._fetch_latest_roe_map)
+
             # Step 3: Upsert into MongoDB (batched bulk writes)
             ops: List[UpdateOne] = []
             now_iso = datetime.utcnow().isoformat()
@@ -159,6 +163,11 @@ class BasicsSyncService:
                 for field in ["pe", "pb", "pe_ttm", "pb_mrq"]:
                     if field in daily_metrics:
                         doc[field] = daily_metrics[field]
+                # ROE from fina_indicator snapshot
+                if isinstance(ts_code, str) and ts_code in roe_map:
+                    roe_val = roe_map[ts_code].get("roe")
+                    if roe_val is not None:
+                        doc["roe"] = roe_val
 
                 # Add trading metrics
                 for field in ["turnover_rate", "volume_ratio"]:
@@ -220,6 +229,10 @@ class BasicsSyncService:
     def _fetch_daily_basic_mv_map(self, trade_date: str) -> Dict[str, Dict[str, float]]:
         """Delegate to basics_sync.utils (blocking)"""
         return _fetch_daily_basic_mv_map_util(trade_date)
+
+    def _fetch_latest_roe_map(self) -> Dict[str, Dict[str, float]]:
+        """Delegate to basics_sync.utils (blocking)"""
+        return _fetch_latest_roe_map_util()
 
 
 # Singleton accessor

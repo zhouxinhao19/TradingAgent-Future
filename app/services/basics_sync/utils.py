@@ -90,3 +90,62 @@ def fetch_daily_basic_mv_map(trade_date: str) -> Dict[str, Dict[str, float]]:
                     pass
     return data_map
 
+
+
+
+def fetch_latest_roe_map() -> Dict[str, Dict[str, float]]:
+    """
+    获取最近一个可用财报期的 ROE 映射（ts_code -> {"roe": float}）。
+    优先按最近季度的 end_date 逆序探测，找到第一期非空数据。
+    """
+    from tradingagents.dataflows.tushare_utils import get_tushare_provider
+    from datetime import datetime
+
+    provider = get_tushare_provider()
+    api = provider.api
+    if api is None:
+        raise RuntimeError("Tushare API unavailable")
+
+    # 生成最近若干个财政季度的期末日期，格式 YYYYMMDD
+    def quarter_ends(now: datetime):
+        y = now.year
+        q_dates = [
+            f"{y}0331",
+            f"{y}0630",
+            f"{y}0930",
+            f"{y}1231",
+        ]
+        # 包含上一年，增加成功概率
+        py = y - 1
+        q_dates_prev = [
+            f"{py}1231",
+            f"{py}0930",
+            f"{py}0630",
+            f"{py}0331",
+        ]
+        # 近6期即可
+        return q_dates_prev + q_dates
+
+    candidates = quarter_ends(datetime.now())
+    data_map: Dict[str, Dict[str, float]] = {}
+
+    for end_date in candidates:
+        try:
+            df = api.fina_indicator(end_date=end_date, fields="ts_code,end_date,roe")
+            if df is not None and not df.empty:
+                for _, row in df.iterrows():  # type: ignore
+                    ts_code = row.get("ts_code")
+                    val = row.get("roe")
+                    if ts_code is None or val is None:
+                        continue
+                    try:
+                        v = float(val)
+                    except Exception:
+                        continue
+                    data_map[str(ts_code)] = {"roe": v}
+                if data_map:
+                    break  # 找到最近一期即可
+        except Exception:
+            continue
+
+    return data_map

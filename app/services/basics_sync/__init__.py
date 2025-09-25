@@ -7,6 +7,7 @@ from .utils import (
     fetch_stock_basic_df,
     find_latest_trade_date,
     fetch_daily_basic_mv_map,
+    fetch_latest_roe_map,
 )
 from .processing import add_financial_metrics
 

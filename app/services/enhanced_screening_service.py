@@ -18,7 +18,7 @@ from app.services.enhanced_screening.utils import (
     analyze_conditions as _analyze_conditions_util,
     convert_conditions_to_traditional_format as _convert_to_traditional_util,
 )
-from app.services.quotes_service import get_quotes_service
+from app.core.database import get_mongo_db
 
 
 class EnhancedScreeningService:
@@ -88,16 +88,24 @@ class EnhancedScreeningService:
             items = result[0] if isinstance(result, tuple) else result.get("items", [])
             total = result[1] if isinstance(result, tuple) else result.get("total", 0)
 
-            # 若使用数据库优化路径，则做实时行情富集（AKShare，30s TTL 缓存）
+            # 若使用数据库优化路径，则从数据库行情表进行富集（避免请求时外部调用）
             if source == "mongodb" and items:
                 try:
-                    qs = get_quotes_service()
-                    codes = [it.get("code") for it in items if it.get("code")]
-                    quotes = await qs.get_quotes(codes)
-                    for it in items:
-                        q = quotes.get(it.get("code"))
-                        if q:
-                            # 仅在不存在或为None时补齐/覆盖
+                    db = get_mongo_db()
+                    coll = db["market_quotes"]
+                    codes = [str(it.get("code")).zfill(6) for it in items if it.get("code")]
+                    if codes:
+                        cursor = coll.find(
+                            {"code": {"$in": codes}},
+                            projection={"_id": 0, "code": 1, "close": 1, "pct_chg": 1, "amount": 1},
+                        )
+                        quotes_list = await cursor.to_list(length=len(codes))
+                        quotes_map = {str(d.get("code")).zfill(6): d for d in quotes_list}
+                        for it in items:
+                            key = str(it.get("code")).zfill(6)
+                            q = quotes_map.get(key)
+                            if not q:
+                                continue
                             if q.get("close") is not None:
                                 it["close"] = q.get("close")
                             if q.get("pct_chg") is not None:

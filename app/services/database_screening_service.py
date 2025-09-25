@@ -33,13 +33,14 @@ class DatabaseScreeningService:
             "total_mv": "total_mv",      # 总市值
             "circ_mv": "circ_mv",        # 流通市值
             "market_cap": "total_mv",    # 市值别名
-            
+
             # 财务指标
             "pe": "pe",                  # 市盈率
             "pb": "pb",                  # 市净率
             "pe_ttm": "pe_ttm",         # 滚动市盈率
             "pb_mrq": "pb_mrq",         # 最新市净率
-            
+            "roe": "roe",                # 净资产收益率（最近一期）
+
             # 交易指标
             "turnover_rate": "turnover_rate",  # 换手率%
             "volume_ratio": "volume_ratio",    # 量比
@@ -220,6 +221,7 @@ class DatabaseScreeningService:
             "pb": doc.get("pb"),
             "pe_ttm": doc.get("pe_ttm"),
             "pb_mrq": doc.get("pb_mrq"),
+            "roe": doc.get("roe"),
 
             # 交易指标
             "turnover_rate": doc.get("turnover_rate"),

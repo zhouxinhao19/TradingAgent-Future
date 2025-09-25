@@ -16,12 +16,14 @@ import asyncio
 from app.core.config import settings
 from app.core.database import init_db, close_db
 from app.core.logging_config import setup_logging
-from app.routers import auth, analysis, screening, queue, sse, health, favorites, config, reports, database, operation_logs
+from app.routers import auth, analysis, screening, queue, sse, health, favorites, config, reports, database, operation_logs, tags
 from app.routers import sync as sync_router, multi_source_sync
 from app.services.basics_sync_service import get_basics_sync_service
 from app.middleware.operation_log_middleware import OperationLogMiddleware
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
+from app.services.quotes_ingestion_service import QuotesIngestionService
 
 
 @asynccontextmanager
@@ -32,6 +34,15 @@ async def lifespan(app: FastAPI):
     logger = logging.getLogger("app.main")
     await init_db()
     logger.info("TradingAgents FastAPI backend started")
+
+    # 启动期：若需要在休市时补充上一交易日收盘快照
+    if settings.QUOTES_BACKFILL_ON_STARTUP:
+        try:
+            qi = QuotesIngestionService()
+            await qi.ensure_indexes()
+            await qi.backfill_last_close_snapshot_if_needed()
+        except Exception as e:
+            logger.warning(f"Startup backfill failed (ignored): {e}")
 
     # 启动每日定时任务：可配置
     scheduler: AsyncIOScheduler | None = None
@@ -50,17 +61,27 @@ async def lifespan(app: FastAPI):
             if settings.SYNC_STOCK_BASICS_CRON:
                 # 如果提供了cron表达式
                 scheduler.add_job(
-                    lambda: asyncio.create_task(service.run_full_sync()),
+                    service.run_full_sync,  # coroutine function; AsyncIOScheduler will await it
                     CronTrigger.from_crontab(settings.SYNC_STOCK_BASICS_CRON, timezone=settings.TIMEZONE)
                 )
                 logger.info(f"📅 Stock basics sync scheduled by CRON: {settings.SYNC_STOCK_BASICS_CRON} ({settings.TIMEZONE})")
             else:
                 hh, mm = (settings.SYNC_STOCK_BASICS_TIME or "06:30").split(":")
                 scheduler.add_job(
-                    lambda: asyncio.create_task(service.run_full_sync()),
+                    service.run_full_sync,  # coroutine function; AsyncIOScheduler will await it
                     CronTrigger(hour=int(hh), minute=int(mm), timezone=settings.TIMEZONE)
                 )
                 logger.info(f"📅 Stock basics sync scheduled daily at {settings.SYNC_STOCK_BASICS_TIME} ({settings.TIMEZONE})")
+
+                # 实时行情入库任务（每N秒），内部自判交易时段
+                if settings.QUOTES_INGEST_ENABLED:
+                    quotes_ingestion = QuotesIngestionService()
+                    await quotes_ingestion.ensure_indexes()
+                    scheduler.add_job(
+                        quotes_ingestion.run_once,  # coroutine function; AsyncIOScheduler will await it
+                        IntervalTrigger(seconds=settings.QUOTES_INGEST_INTERVAL_SECONDS, timezone=settings.TIMEZONE),
+                    )
+                    logger.info(f"⏱ 实时行情入库任务已启动: 每 {settings.QUOTES_INGEST_INTERVAL_SECONDS}s")
 
         scheduler.start()
     except Exception as e:
@@ -93,7 +114,7 @@ app = FastAPI(
 # 安全中间件
 if not settings.DEBUG:
     app.add_middleware(
-        TrustedHostMiddleware, 
+        TrustedHostMiddleware,
         allowed_hosts=settings.ALLOWED_HOSTS
     )
 
@@ -105,6 +126,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
 
 # 操作日志中间件
 app.add_middleware(OperationLogMiddleware)
@@ -135,6 +157,10 @@ async def log_requests(request: Request, call_next):
 
 
 # 全局异常处理
+# 请求ID/Trace-ID 中间件（需作为最外层，放在函数式中间件之后）
+from app.middleware.request_id import RequestIDMiddleware
+app.add_middleware(RequestIDMiddleware)
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logging.error(f"Unhandled exception: {exc}", exc_info=True)
@@ -165,9 +191,14 @@ app.include_router(reports.router, tags=["reports"])
 app.include_router(screening.router, prefix="/api/screening", tags=["screening"])
 app.include_router(queue.router, prefix="/api/queue", tags=["queue"])
 app.include_router(favorites.router, prefix="/api", tags=["favorites"])
+app.include_router(tags.router, prefix="/api", tags=["tags"])
 app.include_router(config.router, prefix="/api", tags=["config"])
 app.include_router(database.router, prefix="/api/system", tags=["database"])
 app.include_router(operation_logs.router, prefix="/api/system", tags=["operation_logs"])
+# 新增：系统配置只读摘要
+from app.routers import system_config as system_config_router
+app.include_router(system_config_router.router, prefix="/api/system", tags=["system"])
+
 app.include_router(sse.router, prefix="/api/stream", tags=["streaming"])
 app.include_router(sync_router.router)
 app.include_router(multi_source_sync.router)

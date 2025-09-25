@@ -164,6 +164,15 @@ class BaoStockAdapter(DataSourceAdapter):
         except (ValueError, TypeError):
             return None
 
+
+    def get_realtime_quotes(self):
+        """Placeholder: BaoStock  does not provide full-market realtime snapshot in our adapter.
+        Return None to allow fallback to higher-priority sources.
+        """
+        if not self.is_available():
+            return None
+        return None
+
     def find_latest_trade_date(self) -> Optional[str]:
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
         logger.info(f"BaoStock: Using yesterday as trade date: {yesterday}")

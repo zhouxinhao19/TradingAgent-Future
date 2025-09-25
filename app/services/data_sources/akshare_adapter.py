@@ -186,6 +186,40 @@ class AKShareAdapter(DataSourceAdapter):
         except (ValueError, TypeError):
             return None
 
+
+    def get_realtime_quotes(self):
+        """获取全市场实时快照，返回以6位代码为键的字典"""
+        if not self.is_available():
+            return None
+        try:
+            import akshare as ak  # type: ignore
+            df = ak.stock_zh_a_spot_em()
+            if df is None or getattr(df, "empty", True):
+                logger.warning("AKShare spot 返回空数据")
+                return None
+            # 列名兼容
+            code_col = next((c for c in ["代码", "代码code", "symbol", "股票代码"] if c in df.columns), None)
+            price_col = next((c for c in ["最新价", "现价", "最新价(元)", "price", "最新"] if c in df.columns), None)
+            pct_col = next((c for c in ["涨跌幅", "涨跌幅(%)", "涨幅", "pct_chg"] if c in df.columns), None)
+            amount_col = next((c for c in ["成交额", "成交额(元)", "amount", "成交额(万元)"] if c in df.columns), None)
+            if not code_col or not price_col:
+                logger.error(f"AKShare spot 缺少必要列: code={code_col}, price={price_col}")
+                return None
+            result: Dict[str, Dict[str, Optional[float]]] = {}
+            for _, row in df.iterrows():  # type: ignore
+                code_raw = row.get(code_col)
+                if not code_raw:
+                    continue
+                code = str(code_raw).zfill(6)
+                close = self._safe_float(row.get(price_col))
+                pct = self._safe_float(row.get(pct_col)) if pct_col else None
+                amt = self._safe_float(row.get(amount_col)) if amount_col else None
+                result[code] = {"close": close, "pct_chg": pct, "amount": amt}
+            return result
+        except Exception as e:
+            logger.error(f"获取AKShare实时快照失败: {e}")
+            return None
+
     def find_latest_trade_date(self) -> Optional[str]:
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
         logger.info(f"AKShare: Using yesterday as trade date: {yesterday}")

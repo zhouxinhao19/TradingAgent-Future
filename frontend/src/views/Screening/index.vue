@@ -167,7 +167,8 @@
             </el-form-item>
           </el-col>
 
-          <el-col :span="8">
+          <!-- 技术形态暂不实现，先隐藏 -->
+          <el-col :span="8" v-if="false">
             <el-form-item label="技术形态">
               <el-select
                 v-model="filters.technicalPattern"
@@ -236,7 +237,7 @@
         style="width: 100%"
       >
         <el-table-column type="selection" width="55" />
-        
+
         <el-table-column prop="code" label="股票代码" width="120">
           <template #default="{ row }">
             <el-link type="primary" @click="viewStockDetail(row)">
@@ -244,11 +245,11 @@
             </el-link>
           </template>
         </el-table-column>
-        
+
         <el-table-column prop="name" label="股票名称" width="150" />
-        
+
         <el-table-column prop="industry" label="行业" width="120" />
-        
+
         <el-table-column prop="close" label="当前价格" width="100" align="right">
           <template #default="{ row }">
             <span v-if="row.close">¥{{ row.close?.toFixed(2) }}</span>
@@ -284,15 +285,22 @@
             <span v-else class="text-gray-400">-</span>
           </template>
         </el-table-column>
-        
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column prop="roe" label="ROE(%)" width="110" align="right">
+          <template #default="{ row }">
+            <span v-if="row.roe !== null && row.roe !== undefined">{{ row.roe?.toFixed(2) }}%</span>
+            <span v-else class="text-gray-400">-</span>
+          </template>
+        </el-table-column>
+
+
+        <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
             <el-button type="text" size="small" @click="analyzeSingle(row)">
               分析
             </el-button>
-            <el-button type="text" size="small" @click="addToFavorites(row)">
+            <el-button type="text" size="small" @click="toggleFavorite(row)">
               <el-icon><Star /></el-icon>
-              自选
+              {{ isFavorited(row.code) ? '取消自选' : '加入自选' }}
             </el-button>
           </template>
         </el-table-column>
@@ -327,10 +335,13 @@
 
 <script setup lang="ts">
 import { ref, computed, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Collection, TrendCharts, Download, Star } from '@element-plus/icons-vue'
 import type { StockInfo } from '@/types/analysis'
 import { screeningApi, type FieldConfigResponse, type FieldInfo } from '@/api/screening'
+import { favoritesApi } from '@/api/favorites'
+import { normalizeMarketForAnalysis } from '@/utils/market'
 
 // 响应式数据
 const screeningLoading = ref(false)
@@ -339,6 +350,10 @@ const screeningResults = ref<StockInfo[]>([])
 const selectedStocks = ref<StockInfo[]>([])
 const currentPage = ref(1)
 const pageSize = ref(20)
+
+// 路由 & 自选集
+const router = useRouter()
+const favoriteSet = ref<Set<string>>(new Set())
 
 // 字段配置
 const fieldConfig = ref<FieldConfigResponse | null>(null)
@@ -397,6 +412,23 @@ const performScreening = async () => {
     if (cap) {
       children.push({ field: 'market_cap', op: 'between', value: cap })
     }
+    // 市盈率/市净率/ROE 条件（仅当填写任一端时才拼接）
+    if (filters.peRatio.min != null || filters.peRatio.max != null) {
+      const lo = filters.peRatio.min ?? 0
+      const hi = filters.peRatio.max ?? Number.MAX_SAFE_INTEGER
+      children.push({ field: 'pe', op: 'between', value: [lo, hi] })
+    }
+    if (filters.pbRatio.min != null || filters.pbRatio.max != null) {
+      const lo = filters.pbRatio.min ?? 0
+      const hi = filters.pbRatio.max ?? Number.MAX_SAFE_INTEGER
+      children.push({ field: 'pb', op: 'between', value: [lo, hi] })
+    }
+    if (filters.roe.min != null || filters.roe.max != null) {
+      const lo = filters.roe.min ?? 0
+      const hi = filters.roe.max ?? 100
+      children.push({ field: 'roe', op: 'between', value: [lo, hi] })
+    }
+
 
     // 明确指定：不加任何技术指标相关条件
 
@@ -431,6 +463,7 @@ const performScreening = async () => {
       pb: it.pb,
       pe_ttm: it.pe_ttm,
       pb_mrq: it.pb_mrq,
+      roe: it.roe,
 
       // 交易数据
       close: it.close,
@@ -483,7 +516,7 @@ const resetFilters = () => {
     volumeLevel: '',
     technicalPattern: []
   })
-  
+
   screeningResults.value = []
   selectedStocks.value = []
   hasSearched.value = false
@@ -499,7 +532,7 @@ const batchAnalyze = async () => {
     ElMessage.warning('请先选择要分析的股票')
     return
   }
-  
+
   try {
     await ElMessageBox.confirm(
       `确定要对选中的 ${selectedStocks.value.length} 只股票进行批量分析吗？`,
@@ -510,13 +543,13 @@ const batchAnalyze = async () => {
         type: 'info'
       }
     )
-    
-    // 跳转到批量分析页面
-    const router = useRouter()
+
+    // 跳转到批量分析页面（携带统一市场参数）
     router.push({
       name: 'BatchAnalysis',
       query: {
-        stocks: selectedStocks.value.map(s => s.code).join(',')
+        stocks: selectedStocks.value.map(s => s.code).join(','),
+        market: normalizeMarketForAnalysis(filters.market)
       }
     })
   } catch {
@@ -524,11 +557,14 @@ const batchAnalyze = async () => {
   }
 }
 
+
 const analyzeSingle = (stock: StockInfo) => {
-  const router = useRouter()
   router.push({
     name: 'SingleAnalysis',
-    query: { stock: stock.code }
+    query: {
+      stock: stock.code,
+      market: normalizeMarketForAnalysis((stock as any).market || filters.market)
+    }
   })
 }
 
@@ -537,13 +573,31 @@ const viewStockDetail = (stock: StockInfo) => {
   window.open(`/stock/${stock.code}`, '_blank')
 }
 
-const addToFavorites = async (stock: StockInfo) => {
+const isFavorited = (code: string) => favoriteSet.value.has(code)
+
+const toggleFavorite = async (stock: StockInfo) => {
   try {
-    // 模拟API调用添加到自选股
-    await new Promise(resolve => setTimeout(resolve, 500))
-    ElMessage.success(`已将 ${stock.name} 添加到自选股`)
-  } catch (error) {
-    ElMessage.error('添加到自选股失败')
+    const code = stock.code
+    if (favoriteSet.value.has(code)) {
+      // 取消自选
+      const res = await favoritesApi.remove(code)
+      if ((res as any)?.success === false) throw new Error((res as any)?.message || '取消失败')
+      favoriteSet.value.delete(code)
+      ElMessage.success(`已取消自选：${stock.name || code}`)
+    } else {
+      // 加入自选
+      const payload = {
+        stock_code: code,
+        stock_name: stock.name || code,
+        market: (stock as any).market || 'A股'
+      }
+      const res = await favoritesApi.add(payload)
+      if ((res as any)?.success === false) throw new Error((res as any)?.message || '添加失败')
+      favoriteSet.value.add(code)
+      ElMessage.success(`已加入自选：${stock.name || code}`)
+    }
+  } catch (error: any) {
+    ElMessage.error(error?.message || '自选操作失败')
   }
 }
 
@@ -617,11 +671,29 @@ const loadIndustries = async () => {
   }
 }
 
+// 加载自选列表，初始化 favoriteSet
+const loadFavorites = async () => {
+  try {
+    const resp = await favoritesApi.list()
+    const list = (resp as any)?.data || resp
+    const set = new Set<string>()
+    ;(list || []).forEach((item: any) => {
+      const code = item.stock_code || item.code
+      if (code) set.add(code)
+    })
+    favoriteSet.value = set
+  } catch (e) {
+    console.warn('加载自选列表失败，可能未登录或接口不可用。', e)
+  }
+}
+
 // 生命周期
 onMounted(() => {
   // 加载字段配置和行业列表
   loadFieldConfig()
   loadIndustries()
+  // 初始化自选状态
+  loadFavorites()
 })
 </script>
 

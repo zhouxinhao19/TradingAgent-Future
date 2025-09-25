@@ -2,7 +2,7 @@
 Base classes and shared typing for data source adapters
 """
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Dict
 import pandas as pd
 
 
@@ -40,4 +40,11 @@ class DataSourceAdapter(ABC):
     def find_latest_trade_date(self) -> Optional[str]:
         """查找最新交易日期"""
         raise NotImplementedError
+
+    # 新增：全市场实时快照（近实时价格/涨跌幅/成交额），键为6位代码
+    @abstractmethod
+    def get_realtime_quotes(self) -> Optional[Dict[str, Dict[str, Optional[float]]]]:
+        """返回 { '000001': {'close': 10.0, 'pct_chg': 1.2, 'amount': 1.2e8}, ... }"""
+        raise NotImplementedError
+
 

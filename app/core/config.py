@@ -2,6 +2,22 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 import os
+import warnings
+
+# Legacy env var aliases (deprecated): map API_HOST/PORT/DEBUG -> HOST/PORT/DEBUG
+_LEGACY_ENV_ALIASES = {
+    "API_HOST": "HOST",
+    "API_PORT": "PORT",
+    "API_DEBUG": "DEBUG",
+}
+for _legacy, _new in _LEGACY_ENV_ALIASES.items():
+    if _new not in os.environ and _legacy in os.environ:
+        os.environ[_new] = os.environ[_legacy]
+        warnings.warn(
+            f"Environment variable {_legacy} is deprecated; use {_new} instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
 class Settings(BaseSettings):
     # 基础配置
@@ -106,6 +122,14 @@ class Settings(BaseSettings):
     SYNC_STOCK_BASICS_TIME: str = Field(default="06:30")
     # 时区
     TIMEZONE: str = Field(default="Asia/Shanghai")
+
+    # 实时行情入库任务
+    QUOTES_INGEST_ENABLED: bool = Field(default=True)
+    QUOTES_INGEST_INTERVAL_SECONDS: int = Field(default=30)
+    # 休市期/启动兜底补数（填充上一笔快照）
+    QUOTES_BACKFILL_ON_STARTUP: bool = Field(default=True)
+    QUOTES_BACKFILL_ON_OFFHOURS: bool = Field(default=True)
+
 
     # 数据目录配置
     TRADINGAGENTS_DATA_DIR: str = Field(default="./data")
