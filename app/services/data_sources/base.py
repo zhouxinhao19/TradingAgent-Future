@@ -47,4 +47,13 @@ class DataSourceAdapter(ABC):
         """返回 { '000001': {'close': 10.0, 'pct_chg': 1.2, 'amount': 1.2e8}, ... }"""
         raise NotImplementedError
 
+    # 新增：K线与新闻抽象接口
+    @abstractmethod
+    def get_kline(self, code: str, period: str = "day", limit: int = 120, adj: Optional[str] = None):
+        """获取K线，返回按时间正序的列表: [{time, open, high, low, close, volume, amount}]"""
+        raise NotImplementedError
 
+    @abstractmethod
+    def get_news(self, code: str, days: int = 2, limit: int = 50, include_announcements: bool = True):
+        """获取新闻/公告，返回 [{title, source, time, url, type}]，type in ['news','announcement']"""
+        raise NotImplementedError

@@ -110,25 +110,42 @@ async def get_fundamentals(code: str, current_user: dict = Depends(get_current_u
 
 
 @router.get("/{code}/kline", response_model=dict)
-async def get_kline(code: str, period: str = "day", limit: int = 120, current_user: dict = Depends(get_current_user)):
-    """K线数据（占位实现）：返回空数组，保留接口形态，后续接入数据源"""
-    # 预留：接入数据源获取K线
+async def get_kline(code: str, period: str = "day", limit: int = 120, adj: str = "none", current_user: dict = Depends(get_current_user)):
+    """获取K线数据（Tushare主，AkShare兜底）
+    period: day/week/month/5m/15m/30m/60m
+    adj: none/qfq/hfq
+    """
+    from app.services.data_sources.manager import DataSourceManager
+    valid_periods = {"day","week","month","5m","15m","30m","60m"}
+    if period not in valid_periods:
+        raise HTTPException(status_code=400, detail=f"不支持的period: {period}")
+    adj_norm = None if adj in (None, "none", "", "null") else adj
+    mgr = DataSourceManager()
+    items, source = mgr.get_kline_with_fallback(code=_zfill_code(code), period=period, limit=limit, adj=adj_norm)
     data = {
         "code": _zfill_code(code),
         "period": period,
         "limit": limit,
-        "items": []  # 形如 [{"time": "2024-09-01", "open":..., "high":..., "low":..., "close":..., "volume":...}]
+        "adj": adj if adj else "none",
+        "source": source,
+        "items": items or []
     }
     return ok(data)
 
 
 @router.get("/{code}/news", response_model=dict)
-async def get_news(code: str, days: int = 2, current_user: dict = Depends(get_current_user)):
-    """新闻与情绪（占位实现）：返回空列表，保留接口形态，后续对接聚合源"""
+async def get_news(code: str, days: int = 2, limit: int = 50, include_announcements: bool = True, current_user: dict = Depends(get_current_user)):
+    """获取新闻与公告（Tushare 主，AkShare 兜底）"""
+    from app.services.data_sources.manager import DataSourceManager
+    mgr = DataSourceManager()
+    items, source = mgr.get_news_with_fallback(code=_zfill_code(code), days=days, limit=limit, include_announcements=include_announcements)
     data = {
         "code": _zfill_code(code),
         "days": days,
-        "items": []  # 形如 [{"title":..., "source":..., "time":..., "sentiment": "pos|neu|neg"}]
+        "limit": limit,
+        "include_announcements": include_announcements,
+        "source": source,
+        "items": items or []
     }
     return ok(data)
 

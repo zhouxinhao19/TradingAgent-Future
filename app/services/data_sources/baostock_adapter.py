@@ -166,12 +166,28 @@ class BaoStockAdapter(DataSourceAdapter):
 
 
     def get_realtime_quotes(self):
-        """Placeholder: BaoStock  does not provide full-market realtime snapshot in our adapter.
+        """Placeholder: BaoStock does not provide full-market realtime snapshot in our adapter.
         Return None to allow fallback to higher-priority sources.
         """
         if not self.is_available():
             return None
         return None
+
+    def get_kline(self, code: str, period: str = "day", limit: int = 120, adj: Optional[str] = None):
+        """BaoStock not used for K-line here; return None to allow fallback"""
+        if not self.is_available():
+            return None
+        return None
+
+    def get_news(self, code: str, days: int = 2, limit: int = 50, include_announcements: bool = True):
+        """BaoStock does not provide news in this adapter; return None"""
+        if not self.is_available():
+            return None
+        return None
+
+        """Placeholder: BaoStock  does not provide full-market realtime snapshot in our adapter.
+        Return None to allow fallback to higher-priority sources.
+        """
 
     def find_latest_trade_date(self) -> Optional[str]:
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")

@@ -230,6 +230,98 @@ class AKShareAdapter(DataSourceAdapter):
             logger.error(f"获取AKShare实时快照失败: {e}")
             return None
 
+    def get_kline(self, code: str, period: str = "day", limit: int = 120, adj: Optional[str] = None):
+        """AKShare K-line as fallback. Try daily/week/month via stock_zh_a_hist; minutes via stock_zh_a_minute."""
+        if not self.is_available():
+            return None
+        try:
+            import akshare as ak
+            code6 = str(code).zfill(6)
+            items = []
+            if period in ("day", "week", "month"):
+                period_map = {"day": "daily", "week": "weekly", "month": "monthly"}
+                adjust_map = {None: "", "qfq": "qfq", "hfq": "hfq"}
+                df = ak.stock_zh_a_hist(symbol=code6, period=period_map[period], adjust=adjust_map.get(adj, ""))
+                if df is None or getattr(df, 'empty', True):
+                    return None
+                df = df.tail(limit)
+                for _, row in df.iterrows():
+                    items.append({
+                        "time": str(row.get('日期') or row.get('date') or ''),
+                        "open": self._safe_float(row.get('开盘') or row.get('open')),
+                        "high": self._safe_float(row.get('最高') or row.get('high')),
+                        "low": self._safe_float(row.get('最低') or row.get('low')),
+                        "close": self._safe_float(row.get('收盘') or row.get('close')),
+                        "volume": self._safe_float(row.get('成交量') or row.get('volume')),
+                        "amount": self._safe_float(row.get('成交额') or row.get('amount')),
+                    })
+                return items
+            else:
+                # minutes
+                per_map = {"5m": "5", "15m": "15", "30m": "30", "60m": "60"}
+                if period not in per_map:
+                    return None
+                df = ak.stock_zh_a_minute(symbol=code6, period=per_map[period], adjust=adj if adj in ("qfq", "hfq") else "")
+                if df is None or getattr(df, 'empty', True):
+                    return None
+                df = df.tail(limit)
+                for _, row in df.iterrows():
+                    items.append({
+                        "time": str(row.get('时间') or row.get('day') or ''),
+                        "open": self._safe_float(row.get('开盘') or row.get('open')),
+                        "high": self._safe_float(row.get('最高') or row.get('high')),
+                        "low": self._safe_float(row.get('最低') or row.get('low')),
+                        "close": self._safe_float(row.get('收盘') or row.get('close')),
+                        "volume": self._safe_float(row.get('成交量') or row.get('volume')),
+                        "amount": self._safe_float(row.get('成交额') or row.get('amount')),
+                    })
+                return items
+        except Exception as e:
+            logger.error(f"AKShare get_kline failed: {e}")
+            return None
+
+    def get_news(self, code: str, days: int = 2, limit: int = 50, include_announcements: bool = True):
+        """AKShare-based news/announcements fallback"""
+        if not self.is_available():
+            return None
+        try:
+            import akshare as ak
+            code6 = str(code).zfill(6)
+            items = []
+            # news
+            try:
+                dfn = ak.stock_news_em(symbol=code6)
+                if dfn is not None and not dfn.empty:
+                    for _, row in dfn.head(limit).iterrows():
+                        items.append({
+                            "title": str(row.get('标题') or row.get('title') or ''),
+                            "source": str(row.get('来源') or row.get('source') or 'akshare'),
+                            "time": str(row.get('发布时间') or row.get('time') or ''),
+                            "url": str(row.get('新闻链接') or row.get('url') or ''),
+                            "type": "news",
+                        })
+            except Exception:
+                pass
+            # announcements
+            try:
+                if include_announcements:
+                    dfa = ak.stock_announcement_em(symbol=code6)
+                    if dfa is not None and not dfa.empty:
+                        for _, row in dfa.head(max(0, limit - len(items))).iterrows():
+                            items.append({
+                                "title": str(row.get('公告标题') or row.get('title') or ''),
+                                "source": "akshare",
+                                "time": str(row.get('公告时间') or row.get('time') or ''),
+                                "url": str(row.get('公告链接') or row.get('url') or ''),
+                                "type": "announcement",
+                            })
+            except Exception:
+                pass
+            return items if items else None
+        except Exception as e:
+            logger.error(f"AKShare get_news failed: {e}")
+            return None
+
     def find_latest_trade_date(self) -> Optional[str]:
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
         logger.info(f"AKShare: Using yesterday as trade date: {yesterday}")

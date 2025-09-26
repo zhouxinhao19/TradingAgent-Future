@@ -137,6 +137,124 @@ class TushareAdapter(DataSourceAdapter):
             logger.error(f'Failed to fetch realtime quotes from Tushare rt_k: {e}')
             return None
 
+    def get_kline(self, code: str, period: str = "day", limit: int = 120, adj: Optional[str] = None):
+        """Get K-line bars using tushare pro_bar
+        period: day/week/month/5m/15m/30m/60m
+        adj: None/qfq/hfq
+        Returns: list of {time, open, high, low, close, volume, amount}
+        """
+        if not self.is_available():
+            return None
+        try:
+            from tushare.pro.data_pro import pro_bar
+        except Exception:
+            logger.error("Tushare pro_bar not available")
+            return None
+        try:
+            prov = self._provider
+            if prov is None or prov.api is None:
+                return None
+            # normalize ts_code
+            ts_code = prov._normalize_symbol(code) if hasattr(prov, "_normalize_symbol") else code
+            # map period -> freq
+            freq_map = {
+                "day": "D",
+                "week": "W",
+                "month": "M",
+                "5m": "5min",
+                "15m": "15min",
+                "30m": "30min",
+                "60m": "60min",
+            }
+            freq = freq_map.get(period, "D")
+            adj_arg = adj if adj in (None, "qfq", "hfq") else None
+            df = pro_bar(ts_code=ts_code, api=prov.api, freq=freq, adj=adj_arg, limit=limit, fields="open,high,low,close,vol,amount,trade_date,trade_time")
+            if df is None or getattr(df, 'empty', True):
+                return None
+            # standardize columns
+            items = []
+            # choose time column
+            tcol = 'trade_time' if 'trade_time' in df.columns else 'trade_date' if 'trade_date' in df.columns else None
+            if tcol is None:
+                logger.error(f'Tushare pro_bar missing time column: {list(df.columns)}')
+                return None
+            df = df.sort_values(tcol)
+            for _, row in df.iterrows():
+                tval = row.get(tcol)
+                try:
+                    # keep as string; if Timestamp, convert
+                    time_str = str(tval)
+                    items.append({
+                        "time": time_str,
+                        "open": float(row.get('open')) if row.get('open') is not None else None,
+                        "high": float(row.get('high')) if row.get('high') is not None else None,
+                        "low": float(row.get('low')) if row.get('low') is not None else None,
+                        "close": float(row.get('close')) if row.get('close') is not None else None,
+                        "volume": float(row.get('vol')) if row.get('vol') is not None else None,
+                        "amount": float(row.get('amount')) if row.get('amount') is not None else None,
+                    })
+                except Exception:
+                    continue
+            return items
+        except Exception as e:
+            logger.error(f"Failed to fetch kline from Tushare: {e}")
+            return None
+
+    def get_news(self, code: str, days: int = 2, limit: int = 50, include_announcements: bool = True):
+        """Try to fetch news/announcements via tushare pro api if available.
+        Returns list of {title, source, time, url, type}
+        """
+        if not self.is_available():
+            return None
+        api = self._provider.api if self._provider else None
+        if api is None:
+            return None
+        items = []
+        # resolve ts_code and date range
+        try:
+            ts_code = self._provider._normalize_symbol(code) if hasattr(self._provider, "_normalize_symbol") else code
+        except Exception:
+            ts_code = code
+        try:
+            from datetime import datetime, timedelta
+            end = datetime.now()
+            start = end - timedelta(days=max(1, days))
+            start_str = start.strftime('%Y%m%d')
+            end_str = end.strftime('%Y%m%d')
+        except Exception:
+            start_str = end_str = ""
+        # Attempt announcements first (if requested)
+        try:
+            if include_announcements and hasattr(api, 'anns'):
+                df_anns = api.anns(ts_code=ts_code, start_date=start_str, end_date=end_str)
+                if df_anns is not None and not df_anns.empty:
+                    for _, row in df_anns.head(limit).iterrows():
+                        items.append({
+                            "title": row.get('title') or row.get('ann_title') or '',
+                            "source": "tushare",
+                            "time": str(row.get('ann_date') or row.get('pub_date') or ''),
+                            "url": row.get('url') or row.get('ann_url') or '',
+                            "type": "announcement",
+                        })
+        except Exception:
+            pass
+        # Attempt news
+        try:
+            if hasattr(api, 'news'):
+                df_news = api.news(ts_code=ts_code, start_date=start_str, end_date=end_str)
+                if df_news is not None and not df_news.empty:
+                    for _, row in df_news.head(max(0, limit - len(items))).iterrows():
+                        items.append({
+                            "title": row.get('title') or '',
+                            "source": row.get('src') or 'tushare',
+                            "time": str(row.get('pub_time') or row.get('pub_date') or ''),
+                            "url": row.get('url') or '',
+                            "type": "news",
+                        })
+        except Exception:
+            pass
+        return items if items else None
+
     def find_latest_trade_date(self) -> Optional[str]:
         """Find latest trade date by probing Tushare"""
         if not self.is_available():
