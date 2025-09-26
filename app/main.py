@@ -25,6 +25,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from app.services.quotes_ingestion_service import QuotesIngestionService
+from app.routers import paper as paper_router
 
 
 @asynccontextmanager
@@ -204,6 +205,7 @@ app.include_router(system_config_router.router, prefix="/api/system", tags=["sys
 app.include_router(sse.router, prefix="/api/stream", tags=["streaming"])
 app.include_router(sync_router.router)
 app.include_router(multi_source_sync.router)
+app.include_router(paper_router.router, prefix="/api", tags=["paper"])
 
 
 @app.get("/")
