@@ -78,15 +78,22 @@
           <el-empty v-if="newsItems.length === 0" description="暂无新闻" />
           <div v-else class="news-list">
             <div v-for="(n, i) in filteredNews" :key="i" class="news-item">
-              <div class="title">
-                <template v-if="n.url && n.url !== '#'">
-                  <a :href="n.url" target="_blank" rel="noopener">{{ n.title || '查看详情' }}</a>
-                </template>
-                <template v-else>
-                  <span>{{ n.title || '（无标题）' }}</span>
-                </template>
+              <div class="row">
+                <div class="left">
+                  <el-tag size="small" effect="plain" :type="n.type==='announcement' ? 'warning' : 'info'" class="tag">{{ n.type==='announcement' ? '公告' : '新闻' }}</el-tag>
+                  <div class="title">
+                    <template v-if="n.url && n.url !== '#'">
+                      <a :href="n.url" target="_blank" rel="noopener">{{ n.title || '查看详情' }}</a>
+                      <el-icon class="ext"><Link /></el-icon>
+                    </template>
+                    <template v-else>
+                      <span>{{ n.title || '（无标题）' }}</span>
+                    </template>
+                  </div>
+                </div>
+                <div class="right">{{ n.time || '-' }}</div>
               </div>
-              <div class="meta">{{ n.source || '-' }} · {{ n.time || '-' }} · {{ newsSource || '-' }}</div>
+              <div class="meta">{{ n.source || '-' }} · {{ newsSource || '-' }}</div>
             </div>
           </div>
         </el-card>
@@ -124,7 +131,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { TrendCharts, Star, Bell, Refresh } from '@element-plus/icons-vue'
+import { TrendCharts, Star, Bell, Refresh, Link } from '@element-plus/icons-vue'
 import { stocksApi } from '@/api/stocks'
 import { use as echartsUse } from 'echarts/core'
 import { CandlestickChart } from 'echarts/charts'
@@ -409,9 +416,21 @@ function fmtAmount(v: any) {
 .k-chart { height: 320px; }
 .legend { margin-top: 8px; font-size: 12px; color: var(--el-text-color-secondary); }
 
-.news-card .news-list { display: flex; flex-direction: column; gap: 12px; }
-.news-item .title { font-weight: 600; display: flex; align-items: center; gap: 6px; }
-.news-item .meta { font-size: 12px; color: var(--el-text-color-secondary); }
+.news-card .news-list { display: flex; flex-direction: column; }
+.news-item { padding: 10px 12px; border-bottom: 1px solid var(--el-border-color-lighter); transition: background-color .2s ease; }
+.news-item:last-child { border-bottom: none; }
+.news-item:hover { background: var(--el-fill-color-light); border-radius: 8px; }
+.news-item .row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.news-item .left { display: flex; align-items: flex-start; gap: 8px; flex: 1 1 auto; min-width: 0; }
+.news-item .tag { flex: 0 0 auto; }
+.news-item .title { font-weight: 600; display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; }
+.news-item .title a, .news-item .title span { color: var(--el-text-color-primary); text-decoration: none; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.news-item .title a:hover { text-decoration: underline; }
+.news-item .ext { color: var(--el-text-color-placeholder); font-size: 14px; }
+.news-item .title:hover .ext { color: var(--el-color-primary); }
+.news-item .right { color: var(--el-text-color-secondary); font-size: 12px; white-space: nowrap; margin-left: 8px; }
+.news-item .meta { font-size: 12px; color: var(--el-text-color-secondary); margin-top: 4px; }
+
 .sentiment { font-size: 12px; }
 .sentiment.pos { color: #ef4444; }
 .sentiment.neu { color: #64748b; }
