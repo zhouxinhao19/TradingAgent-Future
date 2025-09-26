@@ -109,7 +109,22 @@ class TushareAdapter(DataSourceAdapter):
                         pct_chg = (close / pre_close - 1.0) * 100.0
                     except Exception:
                         pct_chg = None
-                result[code6] = {'close': close, 'pct_chg': pct_chg, 'amount': amount}
+                # optional OHLC
+                op = None
+                hi = None
+                lo = None
+                try:
+                    if 'open' in df.columns:
+                        op = float(row.get('open')) if row.get('open') is not None else None
+                    if 'high' in df.columns:
+                        hi = float(row.get('high')) if row.get('high') is not None else None
+                    if 'low' in df.columns:
+                        lo = float(row.get('low')) if row.get('low') is not None else None
+                except Exception:
+                    op = op or None
+                    hi = hi or None
+                    lo = lo or None
+                result[code6] = {'close': close, 'pct_chg': pct_chg, 'amount': amount, 'open': op, 'high': hi, 'low': lo, 'pre_close': pre_close}
             return result
         except Exception as e:
             logger.error(f'Failed to fetch realtime quotes from Tushare rt_k: {e}')

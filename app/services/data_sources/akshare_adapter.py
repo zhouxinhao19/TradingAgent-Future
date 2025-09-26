@@ -1,7 +1,7 @@
 """
 AKShare data source adapter
 """
-from typing import Optional
+from typing import Optional, Dict
 import logging
 from datetime import datetime, timedelta
 import pandas as pd
@@ -202,6 +202,10 @@ class AKShareAdapter(DataSourceAdapter):
             price_col = next((c for c in ["最新价", "现价", "最新价(元)", "price", "最新"] if c in df.columns), None)
             pct_col = next((c for c in ["涨跌幅", "涨跌幅(%)", "涨幅", "pct_chg"] if c in df.columns), None)
             amount_col = next((c for c in ["成交额", "成交额(元)", "amount", "成交额(万元)"] if c in df.columns), None)
+            open_col = next((c for c in ["今开", "开盘", "open", "今开(元)"] if c in df.columns), None)
+            high_col = next((c for c in ["最高", "high"] if c in df.columns), None)
+            low_col = next((c for c in ["最低", "low"] if c in df.columns), None)
+            pre_close_col = next((c for c in ["昨收", "昨收(元)", "pre_close", "昨收价"] if c in df.columns), None)
             if not code_col or not price_col:
                 logger.error(f"AKShare spot 缺少必要列: code={code_col}, price={price_col}")
                 return None
@@ -214,7 +218,11 @@ class AKShareAdapter(DataSourceAdapter):
                 close = self._safe_float(row.get(price_col))
                 pct = self._safe_float(row.get(pct_col)) if pct_col else None
                 amt = self._safe_float(row.get(amount_col)) if amount_col else None
-                result[code] = {"close": close, "pct_chg": pct, "amount": amt}
+                op = self._safe_float(row.get(open_col)) if open_col else None
+                hi = self._safe_float(row.get(high_col)) if high_col else None
+                lo = self._safe_float(row.get(low_col)) if low_col else None
+                pre = self._safe_float(row.get(pre_close_col)) if pre_close_col else None
+                result[code] = {"close": close, "pct_chg": pct, "amount": amt, "open": op, "high": hi, "low": lo, "pre_close": pre}
             return result
         except Exception as e:
             logger.error(f"获取AKShare实时快照失败: {e}")

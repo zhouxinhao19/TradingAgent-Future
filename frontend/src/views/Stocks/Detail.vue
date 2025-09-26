@@ -122,6 +122,7 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { TrendCharts, Star, Bell, Refresh } from '@element-plus/icons-vue'
+import { stocksApi } from '@/api/stocks'
 
 const route = useRoute()
 const router = useRouter()
@@ -149,24 +150,58 @@ const lastRefreshAt = ref<Date | null>(null)
 const refreshText = computed(() => lastRefreshAt.value ? `已刷新 ${lastRefreshAt.value.toLocaleTimeString()}` : '未刷新')
 const changeClass = computed(() => quote.changePercent > 0 ? 'up' : quote.changePercent < 0 ? 'down' : '')
 
-function refreshMockQuote() {
-  // 简单随机扰动
-  const delta = (Math.random() - 0.5) * 0.2
-  quote.price = Number((quote.price + delta).toFixed(2))
-  quote.changePercent = Number((quote.changePercent + (Math.random() - 0.5) * 0.3).toFixed(2))
-  quote.high = Math.max(quote.high, quote.price)
-  quote.low = Math.min(quote.low, quote.price)
-  quote.volume += Math.floor(Math.random() * 10000)
-  quote.amount += Math.floor(Math.random() * 1_000_000)
-  lastRefreshAt.value = new Date()
+async function refreshMockQuote() {
+  // 改为调用后端接口获取真实数据
+  await fetchQuote()
+}
+
+async function fetchQuote() {
+  try {
+    const res = await stocksApi.getQuote(code.value)
+    const d: any = (res as any)?.data || {}
+    // 后端为 snake_case，前端状态为 camelCase，这里进行映射
+    quote.price = Number(d.price ?? d.close ?? quote.price)
+    quote.changePercent = Number(d.change_percent ?? quote.changePercent)
+    quote.open = Number(d.open ?? quote.open)
+    quote.high = Number(d.high ?? quote.high)
+    quote.low = Number(d.low ?? quote.low)
+    quote.prevClose = Number(d.prev_close ?? quote.prevClose)
+    quote.volume = Number.isFinite(d.volume) ? Number(d.volume) : quote.volume
+    quote.amount = Number.isFinite(d.amount) ? Number(d.amount) : quote.amount
+    quote.turnover = Number.isFinite(d.turnover_rate) ? Number(d.turnover_rate) : quote.turnover
+    quote.volumeRatio = Number.isFinite(d.volume_ratio) ? Number(d.volume_ratio) : quote.volumeRatio
+    if (d.name) stockName.value = d.name
+    if (d.market) market.value = d.market
+    lastRefreshAt.value = new Date()
+  } catch (e) {
+    console.error('获取报价失败', e)
+  }
+}
+
+async function fetchFundamentals() {
+  try {
+    const res = await stocksApi.getFundamentals(code.value)
+    const f: any = (res as any)?.data || {}
+    // 基本面快照映射到现有占位字段
+    if (f.name) stockName.value = f.name
+    if (f.market) market.value = f.market
+    basics.industry = f.industry || basics.industry
+    basics.sector = basics.sector || '—'
+    basics.marketCap = Number.isFinite(f.total_mv) ? Number(f.total_mv) * 1e8 : basics.marketCap // 亿元 -> 元
+    basics.pe = Number.isFinite(f.pe) ? Number(f.pe) : basics.pe
+    basics.roe = Number.isFinite(f.roe) ? Number(f.roe) : basics.roe
+    basics.debtRatio = basics.debtRatio // 后端暂未提供
+  } catch (e) {
+    console.error('获取基本面失败', e)
+  }
 }
 
 let timer: any = null
-onMounted(() => {
-  // 初次模拟刷新
-  refreshMockQuote()
-  // 每10秒模拟刷新一次
-  timer = setInterval(refreshMockQuote, 10000)
+onMounted(async () => {
+  // 首次加载：打通后端
+  await Promise.all([fetchQuote(), fetchFundamentals()])
+  // 每30秒刷新一次报价
+  timer = setInterval(fetchQuote, 30000)
 })
 onUnmounted(() => { if (timer) clearInterval(timer) })
 

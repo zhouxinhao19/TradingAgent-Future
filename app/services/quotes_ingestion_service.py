@@ -17,7 +17,7 @@ class QuotesIngestionService:
     定时从数据源适配层获取全市场近实时行情，入库到 MongoDB 集合 `market_quotes`。
     - 调度频率：由 settings.QUOTES_INGEST_INTERVAL_SECONDS 控制（默认30秒）
     - 休市时间：跳过任务，保持上次收盘数据；必要时执行一次性兜底补数
-    - 字段：code(6位)、close、pct_chg、amount、trade_date、updated_at
+    - 字段：code(6位)、close、pct_chg、amount、open、high、low、pre_close、trade_date、updated_at
     """
 
     def __init__(self, collection_name: str = "market_quotes") -> None:
@@ -86,6 +86,10 @@ class QuotesIngestionService:
                         "close": q.get("close"),
                         "pct_chg": q.get("pct_chg"),
                         "amount": q.get("amount"),
+                        "open": q.get("open"),
+                        "high": q.get("high"),
+                        "low": q.get("low"),
+                        "pre_close": q.get("pre_close"),
                         "trade_date": trade_date,
                         "updated_at": updated_at,
                     }},

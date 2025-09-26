@@ -18,6 +18,7 @@ from app.core.database import init_db, close_db
 from app.core.logging_config import setup_logging
 from app.routers import auth, analysis, screening, queue, sse, health, favorites, config, reports, database, operation_logs, tags
 from app.routers import sync as sync_router, multi_source_sync
+from app.routers import stocks as stocks_router
 from app.services.basics_sync_service import get_basics_sync_service
 from app.middleware.operation_log_middleware import OperationLogMiddleware
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -191,6 +192,7 @@ app.include_router(reports.router, tags=["reports"])
 app.include_router(screening.router, prefix="/api/screening", tags=["screening"])
 app.include_router(queue.router, prefix="/api/queue", tags=["queue"])
 app.include_router(favorites.router, prefix="/api", tags=["favorites"])
+app.include_router(stocks_router.router, prefix="/api", tags=["stocks"])
 app.include_router(tags.router, prefix="/api", tags=["tags"])
 app.include_router(config.router, prefix="/api", tags=["config"])
 app.include_router(database.router, prefix="/api/system", tags=["database"])
