@@ -50,7 +50,7 @@
         <el-card shadow="hover">
           <template #header>
             <div class="card-hd">
-              <div>价格K线（占位）</div>
+              <div>价格K线</div>
               <div class="periods">
                 <el-segmented v-model="period" :options="periodOptions" size="small" />
               </div>
@@ -60,30 +60,27 @@
             <div class="chart-grid">
               <div v-for="n in 40" :key="n" class="bar" :style="{ height: barHeights[n-1] + '%' }"></div>
             </div>
-            <div class="legend">当前周期：{{ period }} · 指标：MA(5/20/60), MACD, RSI（展示占位，无数据对接）</div>
+            <div class="legend">当前周期：{{ period }} · 数据源：{{ klineSource || '-' }}</div>
           </div>
         </el-card>
 
-        <!-- 新闻占位 -->
+        <!-- 新闻 -->
         <el-card shadow="hover" class="news-card">
           <template #header>
             <div class="card-hd">
-              <div>近期新闻与情绪（占位）</div>
+              <div>近期新闻与公告</div>
               <el-select v-model="newsFilter" size="small" style="width: 120px">
                 <el-option label="全部" value="all" />
-                <el-option label="利好" value="pos" />
-                <el-option label="中性" value="neu" />
-                <el-option label="利空" value="neg" />
               </el-select>
             </div>
           </template>
-          <el-empty v-if="filteredNews.length === 0" description="暂无新闻（占位）" />
+          <el-empty v-if="newsItems.length === 0" description="暂无新闻" />
           <div v-else class="news-list">
-            <div v-for="(n, i) in filteredNews" :key="i" class="news-item">
+            <div v-for="(n, i) in newsItems" :key="i" class="news-item">
               <div class="title">
-                <span class="sentiment" :class="n.sentiment">●</span>{{ n.title }}
+                <a :href="n.url" target="_blank" rel="noopener">{{ n.title }}</a>
               </div>
-              <div class="meta">{{ n.source }} · {{ n.time }}</div>
+              <div class="meta">{{ n.source }} · {{ n.time }} · {{ newsSource || '-' }}</div>
             </div>
           </div>
         </el-card>
@@ -118,7 +115,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { TrendCharts, Star, Bell, Refresh } from '@element-plus/icons-vue'
@@ -198,25 +195,70 @@ async function fetchFundamentals() {
 
 let timer: any = null
 onMounted(async () => {
-  // 首次加载：打通后端
-  await Promise.all([fetchQuote(), fetchFundamentals()])
+  // 首次加载：打通后端（并行）
+  await Promise.all([fetchQuote(), fetchFundamentals(), fetchKline(), fetchNews()])
   // 每30秒刷新一次报价
   timer = setInterval(fetchQuote, 30000)
 })
 onUnmounted(() => { if (timer) clearInterval(timer) })
+// 当周期切换时刷新K线
+watch(period, () => { fetchKline() })
+
 
 // K线占位相关
 const periodOptions = ['分时','5分钟','15分钟','60分钟','日K','周K','月K']
 const period = ref('日K')
 const barHeights = ref<number[]>(Array.from({ length: 40 }, () => 30 + Math.random() * 60))
+const klineSource = ref<string | undefined>(undefined)
 
-// 新闻（mock）
+function periodLabelToParam(p: string): 'day'|'week'|'month'|'5m'|'15m'|'60m'|'30m' {
+  if (p.includes('5')) return '5m'
+  if (p.includes('15')) return '15m'
+  if (p.includes('60')) return '60m'
+  if (p.includes('日')) return 'day'
+  if (p.includes('周')) return 'week'
+  if (p.includes('月')) return 'month'
+  return '5m'
+}
+
+async function fetchKline() {
+  try {
+    const param = periodLabelToParam(period.value)
+    const res = await stocksApi.getKline(code.value, param, 120, 'none')
+    const d: any = (res as any)?.data || {}
+    klineSource.value = d.source
+    const items: any[] = Array.isArray(d.items) ? d.items : []
+    const closes = items.map(it => Number(it.close || it.price || 0)).filter((n: number) => Number.isFinite(n))
+    const last40 = closes.slice(-40)
+    if (last40.length > 0) {
+      const min = Math.min(...last40)
+      const max = Math.max(...last40)
+      const span = Math.max(1e-6, max - min)
+      barHeights.value = last40.map(v => 20 + ((v - min) / span) * 70)
+    } else {
+      barHeights.value = Array.from({ length: 40 }, () => 30 + Math.random() * 60)
+    }
+  } catch (e) {
+    console.error('获取K线失败', e)
+  }
+}
+
+
+// 新闻
 const newsFilter = ref('all')
-const news = ref([
-  { title: '公司发布年度业绩预增公告，营收创历史新高', source: '财联社', time: '2小时前', sentiment: 'pos' },
-  { title: '行业监管新规落地，短期扰动不改长期趋势', source: '证券时报', time: '6小时前', sentiment: 'neu' },
-  { title: '原材料价格波动或对毛利率产生压力', source: '21财经', time: '1天前', sentiment: 'neg' }
-])
+const newsItems = ref<any[]>([])
+const newsSource = ref<string | undefined>(undefined)
+
+async function fetchNews() {
+  try {
+    const res = await stocksApi.getNews(code.value, 2, 50, true)
+    const d: any = (res as any)?.data || {}
+    newsItems.value = Array.isArray(d.items) ? d.items : []
+    newsSource.value = d.source
+  } catch (e) {
+    console.error('获取新闻失败', e)
+  }
+}
 const filteredNews = computed(() => newsFilter.value === 'all' ? news.value : news.value.filter(n => n.sentiment === newsFilter.value))
 
 // 基本面（mock）
