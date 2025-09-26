@@ -102,7 +102,7 @@
       <el-col :span="8">
         <!-- 基本面快照 -->
         <el-card shadow="hover">
-          <template #header><div class="card-hd">基本面快照（占位）</div></template>
+          <template #header><div class="card-hd">基本面快照</div></template>
           <div class="facts">
             <div class="fact"><span>行业</span><b>{{ basics.industry }}</b></div>
             <div class="fact"><span>板块</span><b>{{ basics.sector }}</b></div>
@@ -238,15 +238,17 @@ async function fetchFundamentals() {
   try {
     const res = await stocksApi.getFundamentals(code.value)
     const f: any = (res as any)?.data || {}
-    // 基本面快照映射到现有占位字段
+    // 基本面快照映射（以后台为准）
     if (f.name) stockName.value = f.name
     if (f.market) market.value = f.market
     basics.industry = f.industry || basics.industry
-    basics.sector = basics.sector || '—'
-    basics.marketCap = Number.isFinite(f.total_mv) ? Number(f.total_mv) * 1e8 : basics.marketCap // 亿元 -> 元
-    basics.pe = Number.isFinite(f.pe) ? Number(f.pe) : basics.pe
+    basics.sector = f.sector || basics.sector || '—'
+    // 后端 total_mv 单位：亿元，这里转为元以便与金额格式化函数配合
+    basics.marketCap = Number.isFinite(f.total_mv) ? Number(f.total_mv) * 1e8 : basics.marketCap
+    // 优先使用 pe_ttm，其次 pe
+    basics.pe = Number.isFinite(f.pe_ttm) ? Number(f.pe_ttm) : (Number.isFinite(f.pe) ? Number(f.pe) : basics.pe)
     basics.roe = Number.isFinite(f.roe) ? Number(f.roe) : basics.roe
-    basics.debtRatio = basics.debtRatio // 后端暂未提供
+    basics.debtRatio = Number.isFinite((f as any).debt_ratio) ? Number((f as any).debt_ratio) : basics.debtRatio
   } catch (e) {
     console.error('获取基本面失败', e)
   }
