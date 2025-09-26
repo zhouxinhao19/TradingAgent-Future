@@ -86,6 +86,7 @@ class QuotesIngestionService:
                         "close": q.get("close"),
                         "pct_chg": q.get("pct_chg"),
                         "amount": q.get("amount"),
+                        "volume": q.get("volume"),
                         "open": q.get("open"),
                         "high": q.get("high"),
                         "low": q.get("low"),

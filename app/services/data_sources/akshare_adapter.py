@@ -206,6 +206,7 @@ class AKShareAdapter(DataSourceAdapter):
             high_col = next((c for c in ["最高", "high"] if c in df.columns), None)
             low_col = next((c for c in ["最低", "low"] if c in df.columns), None)
             pre_close_col = next((c for c in ["昨收", "昨收(元)", "pre_close", "昨收价"] if c in df.columns), None)
+            volume_col = next((c for c in ["成交量", "成交量(手)", "volume", "成交量(股)"] if c in df.columns), None)
             if not code_col or not price_col:
                 logger.error(f"AKShare spot 缺少必要列: code={code_col}, price={price_col}")
                 return None
@@ -222,7 +223,8 @@ class AKShareAdapter(DataSourceAdapter):
                 hi = self._safe_float(row.get(high_col)) if high_col else None
                 lo = self._safe_float(row.get(low_col)) if low_col else None
                 pre = self._safe_float(row.get(pre_close_col)) if pre_close_col else None
-                result[code] = {"close": close, "pct_chg": pct, "amount": amt, "open": op, "high": hi, "low": lo, "pre_close": pre}
+                vol = self._safe_float(row.get(volume_col)) if volume_col else None
+                result[code] = {"close": close, "pct_chg": pct, "amount": amt, "volume": vol, "open": op, "high": hi, "low": lo, "pre_close": pre}
             return result
         except Exception as e:
             logger.error(f"获取AKShare实时快照失败: {e}")

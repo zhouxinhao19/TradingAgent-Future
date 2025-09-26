@@ -63,6 +63,7 @@ async def get_quote(code: str, current_user: dict = Depends(get_current_user)):
         "price": close,
         "change_percent": pct,
         "amount": (q or {}).get("amount"),
+        "volume": (q or {}).get("volume"),
         "open": (q or {}).get("open"),
         "high": (q or {}).get("high"),
         "low": (q or {}).get("low"),

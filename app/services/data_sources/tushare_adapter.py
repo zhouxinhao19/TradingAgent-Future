@@ -109,10 +109,11 @@ class TushareAdapter(DataSourceAdapter):
                         pct_chg = (close / pre_close - 1.0) * 100.0
                     except Exception:
                         pct_chg = None
-                # optional OHLC
+                # optional OHLC + volume
                 op = None
                 hi = None
                 lo = None
+                vol = None
                 try:
                     if 'open' in df.columns:
                         op = float(row.get('open')) if row.get('open') is not None else None
@@ -120,11 +121,17 @@ class TushareAdapter(DataSourceAdapter):
                         hi = float(row.get('high')) if row.get('high') is not None else None
                     if 'low' in df.columns:
                         lo = float(row.get('low')) if row.get('low') is not None else None
+                    # tushare 实时快照可能为 'vol' 或 'volume'
+                    if 'vol' in df.columns:
+                        vol = float(row.get('vol')) if row.get('vol') is not None else None
+                    elif 'volume' in df.columns:
+                        vol = float(row.get('volume')) if row.get('volume') is not None else None
                 except Exception:
                     op = op or None
                     hi = hi or None
                     lo = lo or None
-                result[code6] = {'close': close, 'pct_chg': pct_chg, 'amount': amount, 'open': op, 'high': hi, 'low': lo, 'pre_close': pre_close}
+                    vol = vol or None
+                result[code6] = {'close': close, 'pct_chg': pct_chg, 'amount': amount, 'volume': vol, 'open': op, 'high': hi, 'low': lo, 'pre_close': pre_close}
             return result
         except Exception as e:
             logger.error(f'Failed to fetch realtime quotes from Tushare rt_k: {e}')
