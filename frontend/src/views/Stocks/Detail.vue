@@ -68,18 +68,25 @@
           <template #header>
             <div class="card-hd">
               <div>近期新闻与公告</div>
-              <el-select v-model="newsFilter" size="small" style="width: 120px">
+              <el-select v-model="newsFilter" size="small" style="width: 160px">
                 <el-option label="全部" value="all" />
+                <el-option label="新闻" value="news" />
+                <el-option label="公告" value="announcement" />
               </el-select>
             </div>
           </template>
           <el-empty v-if="newsItems.length === 0" description="暂无新闻" />
           <div v-else class="news-list">
-            <div v-for="(n, i) in newsItems" :key="i" class="news-item">
+            <div v-for="(n, i) in filteredNews" :key="i" class="news-item">
               <div class="title">
-                <a :href="n.url" target="_blank" rel="noopener">{{ n.title }}</a>
+                <template v-if="n.url && n.url !== '#'">
+                  <a :href="n.url" target="_blank" rel="noopener">{{ n.title || '查看详情' }}</a>
+                </template>
+                <template v-else>
+                  <span>{{ n.title || '（无标题）' }}</span>
+                </template>
               </div>
-              <div class="meta">{{ n.source }} · {{ n.time }} · {{ newsSource || '-' }}</div>
+              <div class="meta">{{ n.source || '-' }} · {{ n.time || '-' }} · {{ newsSource || '-' }}</div>
             </div>
           </div>
         </el-card>
@@ -311,17 +318,35 @@ const newsFilter = ref('all')
 const newsItems = ref<any[]>([])
 const newsSource = ref<string | undefined>(undefined)
 
+function cleanTitle(s: any): string {
+  const t = String(s || '')
+  return t.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim()
+}
+
 async function fetchNews() {
   try {
     const res = await stocksApi.getNews(code.value, 2, 50, true)
     const d: any = (res as any)?.data || {}
-    newsItems.value = Array.isArray(d.items) ? d.items : []
+    const itemsRaw: any[] = Array.isArray(d.items) ? d.items : []
+    newsItems.value = itemsRaw.map((it: any) => {
+      const title = cleanTitle(it.title || it.summary || it.name || '')
+      const url = it.url || it.link || '#'
+      const source = it.source || d.source || ''
+      const time = it.time || it.pub_time || it.publish_time || it.pub_date || ''
+      const type = it.type || 'news'
+      return { title, url, source, time, type }
+    })
     newsSource.value = d.source
   } catch (e) {
     console.error('获取新闻失败', e)
   }
 }
-const filteredNews = computed(() => newsItems.value)
+
+const filteredNews = computed(() => {
+  if (newsFilter.value === 'news') return newsItems.value.filter(x => x.type === 'news')
+  if (newsFilter.value === 'announcement') return newsItems.value.filter(x => x.type === 'announcement')
+  return newsItems.value
+})
 
 // 基本面（mock）
 const basics = reactive({
