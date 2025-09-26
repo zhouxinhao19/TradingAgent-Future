@@ -201,8 +201,7 @@ onMounted(async () => {
   timer = setInterval(fetchQuote, 30000)
 })
 onUnmounted(() => { if (timer) clearInterval(timer) })
-// 当周期切换时刷新K线
-watch(period, () => { fetchKline() })
+
 
 
 // K线占位相关
@@ -220,6 +219,9 @@ function periodLabelToParam(p: string): 'day'|'week'|'month'|'5m'|'15m'|'60m'|'3
   if (p.includes('月')) return 'month'
   return '5m'
 }
+
+// 当周期切换时刷新K线
+watch(period, () => { fetchKline() })
 
 async function fetchKline() {
   try {
@@ -259,7 +261,7 @@ async function fetchNews() {
     console.error('获取新闻失败', e)
   }
 }
-const filteredNews = computed(() => newsFilter.value === 'all' ? news.value : news.value.filter(n => n.sentiment === newsFilter.value))
+const filteredNews = computed(() => newsItems.value)
 
 // 基本面（mock）
 const basics = reactive({
