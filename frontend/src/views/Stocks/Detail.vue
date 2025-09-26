@@ -46,7 +46,7 @@
 
     <el-row :gutter="16" class="body">
       <el-col :span="16">
-        <!-- 图表占位 -->
+        <!-- K线蜡烛图 -->
         <el-card shadow="hover">
           <template #header>
             <div class="card-hd">
@@ -56,13 +56,12 @@
               </div>
             </div>
           </template>
-          <div class="chart-placeholder">
-            <div class="chart-grid">
-              <div v-for="n in 40" :key="n" class="bar" :style="{ height: barHeights[n-1] + '%' }"></div>
-            </div>
-            <div class="legend">当前周期：{{ period }} · 数据源：{{ klineSource || '-' }}</div>
+          <div class="kline-container">
+            <v-chart class="k-chart" :option="kOption" autoresize />
+            <div class="legend">当前周期：{{ period }} · 数据源：{{ klineSource || '-' }} · 最近：{{ lastKTime || '-' }} · 收：{{ fmtPrice(lastKClose) }}</div>
           </div>
         </el-card>
+
 
         <!-- 新闻 -->
         <el-card shadow="hover" class="news-card">
@@ -104,9 +103,9 @@
         <el-card shadow="hover" class="actions-card">
           <template #header><div class="card-hd">快捷操作</div></template>
           <div class="quick-actions">
-            <el-button type="primary" @click="onAnalyze" icon="TrendCharts" plain>发起分析</el-button>
-            <el-button @click="onToggleFavorite" icon="Star">{{ isFav ? '移出自选' : '加入自选' }}</el-button>
-            <el-button @click="onSetAlert" icon="Bell">添加预警</el-button>
+            <el-button type="primary" @click="onAnalyze" :icon="TrendCharts" plain>发起分析</el-button>
+            <el-button @click="onToggleFavorite" :icon="Star">{{ isFav ? '移出自选' : '加入自选' }}</el-button>
+            <el-button @click="onSetAlert" :icon="Bell">添加预警</el-button>
           </div>
         </el-card>
       </el-col>
@@ -120,6 +119,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { TrendCharts, Star, Bell, Refresh } from '@element-plus/icons-vue'
 import { stocksApi } from '@/api/stocks'
+import { use as echartsUse } from 'echarts/core'
+import { CandlestickChart } from 'echarts/charts'
+import { GridComponent, TooltipComponent, DataZoomComponent, LegendComponent, TitleComponent } from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
+import VChart from 'vue-echarts'
+import type { EChartsOption } from 'echarts'
+
+echartsUse([CandlestickChart, GridComponent, TooltipComponent, DataZoomComponent, LegendComponent, TitleComponent, CanvasRenderer])
 
 const route = useRoute()
 const router = useRouter()
@@ -129,18 +136,56 @@ const stockName = ref('示例公司')
 const market = ref('A股')
 const isFav = ref(false)
 
-// 报价（mock）
+// ECharts K线配置
+const kOption = ref<EChartsOption>({
+  grid: { left: 40, right: 20, top: 20, bottom: 40 },
+  tooltip: {
+    trigger: 'axis',
+    axisPointer: { type: 'cross' }
+  },
+  xAxis: {
+    type: 'category',
+    data: [],
+    boundaryGap: true,
+    axisLine: { onZero: false }
+  },
+  yAxis: {
+    scale: true,
+    type: 'value'
+  },
+  dataZoom: [
+    { type: 'inside', start: 70, end: 100 },
+    { start: 70, end: 100 }
+  ],
+  series: [
+    {
+      type: 'candlestick',
+      name: 'K线',
+      data: [],
+      itemStyle: {
+        color: '#ef4444',
+        color0: '#16a34a',
+        borderColor: '#ef4444',
+        borderColor0: '#16a34a'
+      }
+    }
+  ]
+})
+const lastKTime = ref<string | null>(null)
+const lastKClose = ref<number | null>(null)
+
+// 报价（初始化）
 const quote = reactive({
-  price: 23.56,
-  changePercent: 1.82,
-  open: 23.10,
-  high: 24.20,
-  low: 22.95,
-  prevClose: 23.14,
-  volume: 12_340_000,
-  amount: 2_560_000_00,
-  turnover: 1.23,
-  volumeRatio: 0.96
+  price: 0,
+  changePercent: 0,
+  open: 0,
+  high: 0,
+  low: 0,
+  prevClose: 0,
+  volume: 0,
+  amount: 0,
+  turnover: 0,
+  volumeRatio: 0
 })
 
 const lastRefreshAt = ref<Date | null>(null)
@@ -207,7 +252,7 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
 // K线占位相关
 const periodOptions = ['分时','5分钟','15分钟','60分钟','日K','周K','月K']
 const period = ref('日K')
-const barHeights = ref<number[]>(Array.from({ length: 40 }, () => 30 + Math.random() * 60))
+
 const klineSource = ref<string | undefined>(undefined)
 
 function periodLabelToParam(p: string): 'day'|'week'|'month'|'5m'|'15m'|'60m'|'30m' {
@@ -226,19 +271,34 @@ watch(period, () => { fetchKline() })
 async function fetchKline() {
   try {
     const param = periodLabelToParam(period.value)
-    const res = await stocksApi.getKline(code.value, param, 120, 'none')
+    const res = await stocksApi.getKline(code.value, param, 200, 'none')
     const d: any = (res as any)?.data || {}
     klineSource.value = d.source
     const items: any[] = Array.isArray(d.items) ? d.items : []
-    const closes = items.map(it => Number(it.close || it.price || 0)).filter((n: number) => Number.isFinite(n))
-    const last40 = closes.slice(-40)
-    if (last40.length > 0) {
-      const min = Math.min(...last40)
-      const max = Math.max(...last40)
-      const span = Math.max(1e-6, max - min)
-      barHeights.value = last40.map(v => 20 + ((v - min) / span) * 70)
-    } else {
-      barHeights.value = Array.from({ length: 40 }, () => 30 + Math.random() * 60)
+
+    const category: string[] = []
+    const values: Array<[number, number, number, number]> = [] // [open, close, low, high]
+
+    for (const it of items) {
+      const t = String(it.time || it.trade_time || it.trade_date || '')
+      const o = Number(it.open ?? NaN)
+      const h = Number(it.high ?? NaN)
+      const l = Number(it.low ?? NaN)
+      const c = Number(it.close ?? NaN)
+      if (!Number.isFinite(o) || !Number.isFinite(h) || !Number.isFinite(l) || !Number.isFinite(c) || !t) continue
+      category.push(t)
+      values.push([o, c, l, h])
+    }
+
+    if (category.length) {
+      lastKTime.value = category[category.length - 1]
+      lastKClose.value = values[values.length - 1][1]
+    }
+
+    kOption.value = {
+      ...kOption.value,
+      xAxis: { ...(kOption.value.xAxis as any), type: 'category', data: category },
+      series: [ { ...(kOption.value.series?.[0] as any), type: 'candlestick', name: 'K线', data: values } ]
     }
   } catch (e) {
     console.error('获取K线失败', e)
@@ -321,9 +381,7 @@ function fmtAmount(v: any) {
 
 .body { margin-top: 4px; }
 .card-hd { display: flex; align-items: center; justify-content: space-between; }
-.chart-placeholder { height: 280px; display: flex; flex-direction: column; justify-content: space-between; }
-.chart-grid { flex: 1; display: grid; grid-template-columns: repeat(40, 1fr); align-items: end; gap: 3px; background: linear-gradient(180deg, rgba(99,102,241,0.05), transparent 60%); padding: 8px; border-radius: 8px; }
-.bar { background: linear-gradient(180deg, #60a5fa, #3b82f6); border-radius: 2px; }
+.k-chart { height: 320px; }
 .legend { margin-top: 8px; font-size: 12px; color: var(--el-text-color-secondary); }
 
 .news-card .news-list { display: flex; flex-direction: column; gap: 12px; }
