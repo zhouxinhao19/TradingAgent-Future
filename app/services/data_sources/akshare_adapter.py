@@ -294,8 +294,9 @@ class AKShareAdapter(DataSourceAdapter):
                 if dfn is not None and not dfn.empty:
                     for _, row in dfn.head(limit).iterrows():
                         items.append({
-                            "title": str(row.get('标题') or row.get('title') or ''),
-                            "source": str(row.get('来源') or row.get('source') or 'akshare'),
+                            # AkShare 将字段标准化为中文列名：新闻标题 / 文章来源 / 发布时间 / 新闻链接
+                            "title": str(row.get('新闻标题') or row.get('标题') or row.get('title') or ''),
+                            "source": str(row.get('文章来源') or row.get('来源') or row.get('source') or 'akshare'),
                             "time": str(row.get('发布时间') or row.get('time') or ''),
                             "url": str(row.get('新闻链接') or row.get('url') or ''),
                             "type": "news",
