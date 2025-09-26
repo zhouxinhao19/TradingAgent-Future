@@ -4,11 +4,11 @@
     <div class="header">
       <div class="title">
         <div class="code">{{ code }}</div>
-        <div class="name">{{ stockName }}</div>
-        <el-tag size="small">{{ market }}</el-tag>
+        <div class="name">{{ stockName || '-' }}</div>
+        <el-tag size="small">{{ market || '-' }}</el-tag>
       </div>
       <div class="actions">
-        <el-button type="primary" plain @click="onAnalyze">
+        <el-button type="primary" plain @click="onQuickAnalyze">
           <el-icon><TrendCharts /></el-icon> 一键分析
         </el-button>
         <el-button @click="onToggleFavorite">
@@ -39,7 +39,7 @@
           <div class="item"><span>成交量</span><b>{{ fmtVolume(quote.volume) }}</b></div>
           <div class="item"><span>成交额</span><b>{{ fmtAmount(quote.amount) }}</b></div>
           <div class="item"><span>换手率</span><b>{{ fmtPercent(quote.turnover) }}</b></div>
-          <div class="item"><span>量比</span><b>{{ quote.volumeRatio?.toFixed(2) }}</b></div>
+          <div class="item"><span>量比</span><b>{{ Number.isFinite(quote.volumeRatio) ? quote.volumeRatio.toFixed(2) : '-' }}</b></div>
         </div>
       </div>
     </el-card>
@@ -62,8 +62,24 @@
           </div>
         </el-card>
 
+        <!-- 详细分析结果（方案B）：仅在进行中或有结果时显示 -->
+        <el-card v-if="analysisStatus==='running' || lastAnalysis" shadow="hover" class="analysis-detail-card" id="analysis-detail">
+          <template #header><div class="card-hd">详细分析结果</div></template>
+          <div v-if="analysisStatus==='running'" class="running">
+            <el-progress :percentage="analysisProgress" :text-inside="true" style="width:100%" />
+            <div class="hint">{{ analysisMessage || '正在生成分析报告…' }}</div>
+          </div>
+          <div v-else class="detail">
+            <div class="row">
+              <el-tag :type="lastAnalysisTagType" size="small">{{ lastAnalysis?.recommendation || '-' }}</el-tag>
+              <span class="conf">信心度 {{ fmtConf(lastAnalysis?.confidence_score ?? lastAnalysis?.overall_score) }}</span>
+              <span class="date">{{ lastAnalysis?.analysis_date || '-' }}</span>
+            </div>
+            <div class="summary-text">{{ lastAnalysis?.summary || '-' }}</div>
+          </div>
+        </el-card>
 
-        <!-- 新闻 -->
+        <!-- 新闻与公告：位于详细分析结果下方 -->
         <el-card shadow="hover" class="news-card">
           <template #header>
             <div class="card-hd">
@@ -97,6 +113,10 @@
             </div>
           </div>
         </el-card>
+
+
+
+
       </el-col>
 
       <el-col :span="8">
@@ -107,11 +127,31 @@
             <div class="fact"><span>行业</span><b>{{ basics.industry }}</b></div>
             <div class="fact"><span>板块</span><b>{{ basics.sector }}</b></div>
             <div class="fact"><span>总市值</span><b>{{ fmtAmount(basics.marketCap) }}</b></div>
-            <div class="fact"><span>PE(TTM)</span><b>{{ basics.pe?.toFixed(2) }}</b></div>
+            <div class="fact"><span>PE(TTM)</span><b>{{ Number.isFinite(basics.pe) ? basics.pe.toFixed(2) : '-' }}</b></div>
             <div class="fact"><span>ROE</span><b>{{ fmtPercent(basics.roe) }}</b></div>
             <div class="fact"><span>负债率</span><b>{{ fmtPercent(basics.debtRatio) }}</b></div>
           </div>
         </el-card>
+
+        <!-- 最新分析（方案A：右侧卡片） -->
+        <el-card shadow="hover" class="latest-analysis-card">
+          <template #header><div class="card-hd">最新分析</div></template>
+          <div v-if="analysisStatus==='running'">
+            <el-progress :percentage="analysisProgress" :text-inside="true" style="width:100%" />
+            <div class="hint">{{ analysisMessage || '正在分析…' }}</div>
+            <el-button size="small" type="primary" link @click="scrollToDetail">查看进度</el-button>
+          </div>
+          <div v-else-if="lastAnalysis">
+            <div class="reco">
+              <el-tag :type="lastAnalysisTagType" size="small">{{ lastAnalysis?.recommendation || '-' }}</el-tag>
+              <span class="conf">信心度 {{ fmtConf(lastAnalysis?.confidence_score ?? lastAnalysis?.overall_score) }}</span>
+            </div>
+            <div class="summary two-lines">{{ lastAnalysis?.summary || '-' }}</div>
+            <el-button size="small" type="primary" link @click="scrollToDetail">查看详情</el-button>
+          </div>
+          <el-empty v-else description="暂无分析" />
+        </el-card>
+
 
         <!-- 快捷操作 -->
         <el-card shadow="hover" class="actions-card">
@@ -133,21 +173,41 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { TrendCharts, Star, Bell, Refresh, Link } from '@element-plus/icons-vue'
 import { stocksApi } from '@/api/stocks'
+import { analysisApi } from '@/api/analysis'
 import { use as echartsUse } from 'echarts/core'
 import { CandlestickChart } from 'echarts/charts'
+
 import { GridComponent, TooltipComponent, DataZoomComponent, LegendComponent, TitleComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
 import type { EChartsOption } from 'echarts'
+import { favoritesApi } from '@/api/favorites'
+
 
 echartsUse([CandlestickChart, GridComponent, TooltipComponent, DataZoomComponent, LegendComponent, TitleComponent, CanvasRenderer])
 
 const route = useRoute()
 const router = useRouter()
 
+
+// 分析状态
+const analysisStatus = ref<'idle' | 'running' | 'completed' | 'failed'>('idle')
+const analysisProgress = ref(0)
+const analysisMessage = ref('')
+const currentTaskId = ref<string | null>(null)
+const lastAnalysis = ref<any | null>(null)
+
+const lastAnalysisTagType = computed(() => {
+  const reco = String(lastAnalysis.value?.recommendation || '').toLowerCase()
+  if (reco.includes('买') || reco.includes('buy') || reco.includes('增持') || reco.includes('强')) return 'success'
+  if (reco.includes('卖') || reco.includes('sell')) return 'danger'
+  if (reco.includes('减持') || reco.includes('谨慎')) return 'warning'
+  return 'info'
+})
+
 const code = computed(() => String(route.params.code || '').toUpperCase())
-const stockName = ref('示例公司')
-const market = ref('A股')
+const stockName = ref('')
+const market = ref('')
 const isFav = ref(false)
 
 // ECharts K线配置
@@ -190,16 +250,16 @@ const lastKClose = ref<number | null>(null)
 
 // 报价（初始化）
 const quote = reactive({
-  price: 0,
-  changePercent: 0,
-  open: 0,
-  high: 0,
-  low: 0,
-  prevClose: 0,
-  volume: 0,
-  amount: 0,
-  turnover: 0,
-  volumeRatio: 0
+  price: NaN,
+  changePercent: NaN,
+  open: NaN,
+  high: NaN,
+  low: NaN,
+  prevClose: NaN,
+  volume: NaN,
+  amount: NaN,
+  turnover: NaN,
+  volumeRatio: NaN
 })
 
 const lastRefreshAt = ref<Date | null>(null)
@@ -248,16 +308,26 @@ async function fetchFundamentals() {
     // 优先使用 pe_ttm，其次 pe
     basics.pe = Number.isFinite(f.pe_ttm) ? Number(f.pe_ttm) : (Number.isFinite(f.pe) ? Number(f.pe) : basics.pe)
     basics.roe = Number.isFinite(f.roe) ? Number(f.roe) : basics.roe
-    basics.debtRatio = Number.isFinite((f as any).debt_ratio) ? Number((f as any).debt_ratio) : basics.debtRatio
+const ff: any = f
+basics.debtRatio = Number.isFinite(ff.debt_ratio) ? Number(ff.debt_ratio) : basics.debtRatio
   } catch (e) {
     console.error('获取基本面失败', e)
   }
 }
 
 let timer: any = null
+async function checkFavorite() {
+  try {
+    const res: any = await favoritesApi.check(code.value)
+    const d: any = (res as any)?.data || {}
+    isFav.value = !!d.is_favorite
+  } catch (e) {
+    console.warn('检查自选失败', e)
+  }
+}
 onMounted(async () => {
   // 首次加载：打通后端（并行）
-  await Promise.all([fetchQuote(), fetchFundamentals(), fetchKline(), fetchNews()])
+  await Promise.all([fetchQuote(), fetchFundamentals(), fetchKline(), fetchNews(), checkFavorite()])
   // 每30秒刷新一次报价
   timer = setInterval(fetchQuote, 30000)
 })
@@ -266,12 +336,12 @@ onUnmounted(() => { if (timer) clearInterval(timer) })
 
 
 // K线占位相关
-const periodOptions = ['分时','5分钟','15分钟','60分钟','日K','周K','月K']
+const periodOptions = ['日K','周K','月K']
 const period = ref('日K')
 
 const klineSource = ref<string | undefined>(undefined)
 
-function periodLabelToParam(p: string): 'day'|'week'|'month'|'5m'|'15m'|'60m'|'30m' {
+function periodLabelToParam(p: string): string {
   if (p.includes('5')) return '5m'
   if (p.includes('15')) return '15m'
   if (p.includes('60')) return '60m'
@@ -287,13 +357,13 @@ watch(period, () => { fetchKline() })
 async function fetchKline() {
   try {
     const param = periodLabelToParam(period.value)
-    const res = await stocksApi.getKline(code.value, param, 200, 'none')
+    const res = await stocksApi.getKline(code.value, param as any, 200, 'none')
     const d: any = (res as any)?.data || {}
     klineSource.value = d.source
     const items: any[] = Array.isArray(d.items) ? d.items : []
 
     const category: string[] = []
-    const values: Array<[number, number, number, number]> = [] // [open, close, low, high]
+    const values: number[][] = [] // [open, close, low, high]
 
     for (const it of items) {
       const t = String(it.time || it.trade_time || it.trade_date || '')
@@ -313,8 +383,20 @@ async function fetchKline() {
 
     kOption.value = {
       ...kOption.value,
-      xAxis: { ...(kOption.value.xAxis as any), type: 'category', data: category },
-      series: [ { ...(kOption.value.series?.[0] as any), type: 'candlestick', name: 'K线', data: values } ]
+      xAxis: { type: 'category', data: category, boundaryGap: true, axisLine: { onZero: false } },
+      series: [
+        {
+          type: 'candlestick',
+          name: 'K线',
+          data: values,
+          itemStyle: {
+            color: '#ef4444',
+            color0: '#16a34a',
+            borderColor: '#ef4444',
+            borderColor0: '#16a34a'
+          }
+        }
+      ]
     }
   } catch (e) {
     console.error('获取K线失败', e)
@@ -359,24 +441,113 @@ const filteredNews = computed(() => {
 
 // 基本面（mock）
 const basics = reactive({
-  industry: '白酒制造',
-  sector: '消费品',
-  marketCap: 256000000000,
-  pe: 18.36,
-  roe: 14.2,
-  debtRatio: 38.5
+  industry: '-',
+  sector: '-',
+  marketCap: NaN,
+  pe: NaN,
+  roe: NaN,
+  debtRatio: NaN
 })
 
 // 操作
-function onAnalyze() { ElMessage.info('前端占位：待接入分析接口') }
-function onToggleFavorite() { isFav.value = !isFav.value; ElMessage.success(isFav.value ? '已加入自选（占位）' : '已移出自选（占位）') }
+function onAnalyze() {
+  router.push({ name: 'SingleAnalysis', query: { stock: code.value } })
+}
+async function onToggleFavorite() {
+  try {
+    if (!isFav.value) {
+      const payload = { stock_code: code.value, stock_name: stockName.value, market: market.value }
+      await favoritesApi.add(payload)
+      isFav.value = true
+      ElMessage.success('已加入自选')
+    } else {
+      await favoritesApi.remove(code.value)
+      isFav.value = false
+      ElMessage.success('已移出自选')
+    }
+  } catch (e: any) {
+    console.error('自选操作失败', e)
+    ElMessage.error(e?.message || '自选操作失败')
+  }
+}
 function onSetAlert() { ElMessage.info('前端占位：待接入预警接口') }
+
+
+// 一键分析（快速）
+async function onQuickAnalyze() {
+  try {
+    analysisStatus.value = 'running'
+    analysisProgress.value = 1
+    analysisMessage.value = '正在启动分析…'
+    lastAnalysis.value = null
+
+    const today = new Date().toISOString().slice(0, 10)
+    const resp: any = await analysisApi.startSingleAnalysis({
+      stock_code: code.value,
+      parameters: {
+        market_type: market.value || 'A股',
+        analysis_date: today,
+        research_depth: '快速',
+        selected_analysts: ['market','fundamentals'],
+        include_sentiment: false,
+        include_risk: true,
+        language: 'zh-CN'
+      }
+    })
+    const taskId = resp?.data?.task_id || resp?.data?.id || resp?.data?.taskId || resp?.data?.analysis_id
+    if (!taskId) {
+      analysisStatus.value = 'failed'
+      analysisMessage.value = resp?.message || '创建任务失败'
+      ElMessage.error(analysisMessage.value)
+      return
+    }
+    currentTaskId.value = String(taskId)
+    await pollTask(String(taskId))
+  } catch (e: any) {
+    analysisStatus.value = 'failed'
+    analysisMessage.value = e?.message || '启动分析失败'
+    ElMessage.error(analysisMessage.value)
+  }
+}
+
+async function pollTask(taskId: string) {
+  for (let i = 0; i < 600; i++) {
+    try {
+      const s: any = await analysisApi.getTaskStatus(taskId)
+      const d: any = s?.data || s
+      const status = String(d.status || d.state || '').toLowerCase()
+      const p = Number(d.progress ?? d.percent ?? 0)
+      if (Number.isFinite(p)) analysisProgress.value = Math.max(0, Math.min(100, p))
+      analysisMessage.value = d.current_step || d.message || analysisMessage.value
+      if (status === 'completed' || status === 'success' || status === 'done') {
+        analysisStatus.value = 'completed'
+        const r: any = await analysisApi.getTaskResult(taskId)
+        lastAnalysis.value = r?.data || r
+        return
+
+      }
+      if (status === 'failed' || status === 'error') {
+        analysisStatus.value = 'failed'
+        analysisMessage.value = d.error || d.message || '分析失败'
+        return
+      }
+    } catch {}
+    await new Promise(r => setTimeout(r, 2000))
+  }
+}
+
+function scrollToDetail() {
+  const el = document.getElementById('analysis-detail')
+  if (el) el.scrollIntoView({ behavior: 'smooth' })
+}
 
 // 格式化
 function fmtPrice(v: any) { const n = Number(v); return Number.isFinite(n) ? n.toFixed(2) : '-' }
 function fmtPercent(v: any) { const n = Number(v); return Number.isFinite(n) ? `${n>0?'+':''}${n.toFixed(2)}%` : '-' }
 function fmtVolume(v: any) {
   const n = Number(v)
+
+
   if (!Number.isFinite(n)) return '-'
   if (n >= 1e8) return (n/1e8).toFixed(2) + '亿手'
   if (n >= 1e4) return (n/1e4).toFixed(2) + '万手'
@@ -390,12 +561,20 @@ function fmtAmount(v: any) {
   if (n >= 1e4) return (n/1e4).toFixed(2) + '万'
   return n.toFixed(0)
 }
+function fmtConf(v: any) {
+  const n = Number(v)
+  if (!Number.isFinite(n)) return '-'
+  const pct = n <= 1 ? n * 100 : n
+  return `${Math.round(pct)}%`
+}
+
 </script>
 
 <style scoped lang="scss">
 .stock-detail {
   display: flex; flex-direction: column; gap: 16px;
 }
+
 .header { display: flex; justify-content: space-between; align-items: center; }
 .title { display: flex; align-items: center; gap: 12px; }
 .code { font-size: 22px; font-weight: 700; }
