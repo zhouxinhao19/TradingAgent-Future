@@ -578,7 +578,8 @@ class ConfigService:
                 "data_source_configs": [_ds_sanitize(ds) for ds in config.data_source_configs],
                 "default_data_source": config.default_data_source,
                 "database_configs": [_db_sanitize(db) for db in config.database_configs],
-                "system_settings": config.system_settings,
+                # 方案A：导出时对 system_settings 中的敏感键做脱敏
+                "system_settings": {k: (None if any(p in k.lower() for p in ("key","secret","password","token","client_secret")) else v) for k, v in (config.system_settings or {}).items()},
                 "exported_at": datetime.utcnow().isoformat(),
                 "version": config.version
             }

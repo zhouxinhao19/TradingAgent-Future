@@ -44,6 +44,23 @@ def _sanitize_database_configs(items):
     except Exception:
         return items
 
+def _sanitize_kv(d: Dict[str, Any]) -> Dict[str, Any]:
+    """对字典中的可能敏感键进行脱敏（仅用于响应）。"""
+    try:
+        if not isinstance(d, dict):
+            return d
+        sens_patterns = ("key", "secret", "password", "token", "client_secret")
+        redacted = {}
+        for k, v in d.items():
+            if isinstance(k, str) and any(p in k.lower() for p in sens_patterns):
+                redacted[k] = None
+            else:
+                redacted[k] = v
+        return redacted
+    except Exception:
+        return d
+
+
 
 
 class SetDefaultRequest(BaseModel):
@@ -72,7 +89,7 @@ async def get_system_config(
             data_source_configs=_sanitize_datasource_configs(config.data_source_configs),
             default_data_source=config.default_data_source,
             database_configs=_sanitize_database_configs(config.database_configs),
-            system_settings=config.system_settings,
+            system_settings=_sanitize_kv(config.system_settings),
             created_at=config.created_at,
             updated_at=config.updated_at,
             version=config.version,
@@ -919,7 +936,7 @@ async def get_system_settings(
         config = await config_service.get_system_config()
         if not config:
             return {}
-        return config.system_settings
+        return _sanitize_kv(config.system_settings)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
