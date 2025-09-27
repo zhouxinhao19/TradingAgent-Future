@@ -596,15 +596,32 @@ class ConfigService:
             if not self._validate_config_data(config_data):
                 return False
 
-            # 创建新的系统配置
+            # 创建新的系统配置（方案A：导入时忽略敏感字段）
+            def _llm_sanitize_in(llm: Dict[str, Any]):
+                d = dict(llm or {})
+                d.pop("api_key", None)
+                d["api_key"] = ""
+                return LLMConfig(**d)
+            def _ds_sanitize_in(ds: Dict[str, Any]):
+                d = dict(ds or {})
+                d.pop("api_key", None)
+                d.pop("api_secret", None)
+                d["api_key"] = ""
+                d["api_secret"] = ""
+                return DataSourceConfig(**d)
+            def _db_sanitize_in(db: Dict[str, Any]):
+                d = dict(db or {})
+                d.pop("password", None)
+                d["password"] = ""
+                return DatabaseConfig(**d)
             new_config = SystemConfig(
                 config_name=config_data.get("config_name", "导入的配置"),
                 config_type="imported",
-                llm_configs=[LLMConfig(**llm) for llm in config_data.get("llm_configs", [])],
+                llm_configs=[_llm_sanitize_in(llm) for llm in config_data.get("llm_configs", [])],
                 default_llm=config_data.get("default_llm"),
-                data_source_configs=[DataSourceConfig(**ds) for ds in config_data.get("data_source_configs", [])],
+                data_source_configs=[_ds_sanitize_in(ds) for ds in config_data.get("data_source_configs", [])],
                 default_data_source=config_data.get("default_data_source"),
-                database_configs=[DatabaseConfig(**db) for db in config_data.get("database_configs", [])],
+                database_configs=[_db_sanitize_in(db) for db in config_data.get("database_configs", [])],
                 system_settings=config_data.get("system_settings", {})
             )
 
