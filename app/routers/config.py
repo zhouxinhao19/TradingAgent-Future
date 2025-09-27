@@ -23,6 +23,29 @@ router = APIRouter(prefix="/config", tags=["配置管理"])
 logger = logging.getLogger("webapi")
 
 
+# ===== 方案A：敏感字段响应脱敏 & 请求清洗 =====
+from copy import deepcopy
+
+def _sanitize_llm_configs(items):
+    try:
+        return [LLMConfig(**{**i.dict(), "api_key": None}) for i in items]
+    except Exception:
+        return items
+
+def _sanitize_datasource_configs(items):
+    try:
+        return [DataSourceConfig(**{**i.dict(), "api_key": None, "api_secret": None}) for i in items]
+    except Exception:
+        return items
+
+def _sanitize_database_configs(items):
+    try:
+        return [DatabaseConfig(**{**i.dict(), "password": None}) for i in items]
+    except Exception:
+        return items
+
+
+
 class SetDefaultRequest(BaseModel):
     """设置默认配置请求"""
     name: str
@@ -44,11 +67,11 @@ async def get_system_config(
         return SystemConfigResponse(
             config_name=config.config_name,
             config_type=config.config_type,
-            llm_configs=config.llm_configs,
+            llm_configs=_sanitize_llm_configs(config.llm_configs),
             default_llm=config.default_llm,
-            data_source_configs=config.data_source_configs,
+            data_source_configs=_sanitize_datasource_configs(config.data_source_configs),
             default_data_source=config.default_data_source,
-            database_configs=config.database_configs,
+            database_configs=_sanitize_database_configs(config.database_configs),
             system_settings=config.system_settings,
             created_at=config.created_at,
             updated_at=config.updated_at,
@@ -360,8 +383,11 @@ async def add_data_source_config(
                 detail="系统配置不存在"
             )
 
-        # 添加新的数据源配置
-        ds_config = DataSourceConfig(**request.dict())
+        # 添加新的数据源配置（方案A：清洗敏感字段）
+        _req = request.dict()
+        _req['api_key'] = ""
+        _req['api_secret'] = ""
+        ds_config = DataSourceConfig(**_req)
         config.data_source_configs.append(ds_config)
 
         success = await config_service.save_system_config(config)
@@ -398,8 +424,10 @@ async def add_database_config(
                 detail="系统配置不存在"
             )
 
-        # 添加新的数据库配置
-        db_config = DatabaseConfig(**request.dict())
+        # 添加新的数据库配置（方案A：清洗敏感字段）
+        _req = request.dict()
+        _req['password'] = ""
+        db_config = DatabaseConfig(**_req)
         config.database_configs.append(db_config)
 
         success = await config_service.save_system_config(config)
@@ -472,7 +500,7 @@ async def get_llm_configs(
             # 这里可以根据已有的厂家创建示例配置
             # 暂时返回空列表，让前端显示"暂无配置"
 
-        return config.llm_configs
+        return _sanitize_llm_configs(config.llm_configs)
     except Exception as e:
         logger.error(f"❌ 获取大模型配置失败: {e}")
         raise HTTPException(
@@ -544,7 +572,7 @@ async def get_data_source_configs(
         config = await config_service.get_system_config()
         if not config:
             return []
-        return config.data_source_configs
+        return _sanitize_datasource_configs(config.data_source_configs)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -571,8 +599,11 @@ async def update_data_source_config(
         # 查找并更新数据源配置
         for i, ds_config in enumerate(config.data_source_configs):
             if ds_config.name == name:
-                # 更新配置
-                updated_config = DataSourceConfig(**request.dict())
+                # 更新配置（方案A：清洗敏感字段）
+                _req = request.dict()
+                _req['api_key'] = ""
+                _req['api_secret'] = ""
+                updated_config = DataSourceConfig(**_req)
                 config.data_source_configs[i] = updated_config
 
                 success = await config_service.save_system_config(config)

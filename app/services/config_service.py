@@ -556,14 +556,28 @@ class ConfigService:
                 return {}
 
             # 转换为可序列化的字典格式
+            # 方案A：导出时对敏感字段脱敏/清空
+            def _llm_sanitize(x: LLMConfig):
+                d = x.dict()
+                d["api_key"] = ""
+                return d
+            def _ds_sanitize(x: DataSourceConfig):
+                d = x.dict()
+                d["api_key"] = ""
+                d["api_secret"] = ""
+                return d
+            def _db_sanitize(x: DatabaseConfig):
+                d = x.dict()
+                d["password"] = ""
+                return d
             export_data = {
                 "config_name": config.config_name,
                 "config_type": config.config_type,
-                "llm_configs": [llm.dict() for llm in config.llm_configs],
+                "llm_configs": [_llm_sanitize(llm) for llm in config.llm_configs],
                 "default_llm": config.default_llm,
-                "data_source_configs": [ds.dict() for ds in config.data_source_configs],
+                "data_source_configs": [_ds_sanitize(ds) for ds in config.data_source_configs],
                 "default_data_source": config.default_data_source,
-                "database_configs": [db.dict() for db in config.database_configs],
+                "database_configs": [_db_sanitize(db) for db in config.database_configs],
                 "system_settings": config.system_settings,
                 "exported_at": datetime.utcnow().isoformat(),
                 "version": config.version
