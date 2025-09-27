@@ -18,6 +18,10 @@ from app.models.config import (
     DataSourceGroupingRequest, DataSourceOrderRequest
 )
 from app.services.config_service import config_service
+from datetime import datetime
+from app.services.operation_log_service import log_operation
+from app.models.operation_log import ActionType
+
 
 router = APIRouter(prefix="/config", tags=["配置管理"])
 logger = logging.getLogger("webapi")
@@ -953,6 +957,18 @@ async def update_system_settings(
     try:
         success = await config_service.update_system_settings(settings)
         if success:
+            # 审计日志（忽略日志异常，不影响主流程）
+            try:
+                await log_operation(
+                    user_id=str(getattr(current_user, "id", "")),
+                    username=getattr(current_user, "username", "unknown"),
+                    action_type=ActionType.CONFIG_MANAGEMENT,
+                    action="update_system_settings",
+                    details={"changed_keys": list(settings.keys())},
+                    success=True,
+                )
+            except Exception:
+                pass
             return {"message": "系统设置更新成功"}
         else:
             raise HTTPException(
@@ -962,6 +978,19 @@ async def update_system_settings(
     except HTTPException:
         raise
     except Exception as e:
+        # 审计失败记录（忽略日志异常）
+        try:
+            await log_operation(
+                user_id=str(getattr(current_user, "id", "")),
+                username=getattr(current_user, "username", "unknown"),
+                action_type=ActionType.CONFIG_MANAGEMENT,
+                action="update_system_settings",
+                details={"changed_keys": list(settings.keys())},
+                success=False,
+                error_message=str(e),
+            )
+        except Exception:
+            pass
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"更新系统设置失败: {str(e)}"

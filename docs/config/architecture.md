@@ -59,3 +59,17 @@ P2：扩展
 - 中期：抽取 shared 配置模型与合并逻辑，两侧共同依赖
 - 文件（models.json/settings.json）用于导入/导出与本地开发，不作为运行时真相
 
+
+## 七、执行记录（持续更新）
+
+- 2025-09-27（P0 完成项）
+  - API：/config/system、/config/settings 读取端对 system_settings 中敏感键统一脱敏；LLM/数据源/数据库配置读取端继续脱敏
+  - 导出：export_config 对 system_settings 敏感键脱敏，导入忽略敏感字段
+  - DB 清理：执行 scripts/config/cleanup_sensitive_in_db.py --apply，处理 48 条记录（system_configs 41 条、llm_providers 7 条），清空 api_key/api_secret/password
+  - REST 写入：/config 相关写入端清洗敏感字段，禁止密钥落库
+  - 审计：为“更新系统设置”写入操作接入操作日志（ActionType.CONFIG_MANAGEMENT）
+
+- 待办（P1 进行中）
+  - ConfigProvider：env→DB→用户偏好合并 + 短缓存 + 版本失效
+  - 更全面的写入审计覆盖（LLM/数据源/数据库配置增改删）
+  - system_settings 中第三方 key/secret 逐步迁移至环境变量，前端仅展示“已配置/来源ENV”状态
