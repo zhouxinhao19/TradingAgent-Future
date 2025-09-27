@@ -40,7 +40,7 @@ async def get_system_config(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="系统配置不存在"
             )
-        
+
         return SystemConfigResponse(
             config_name=config.config_name,
             config_type=config.config_type,
@@ -302,6 +302,10 @@ async def add_llm_config(
             logger.info(f"🔑 使用提供的API密钥 (长度: {len(llm_config_data.get('api_key', ''))})")
 
         logger.info(f"📋 最终配置数据: {llm_config_data}")
+        # 方案A：禁止通过 REST 写入/落盘密钥，统一从环境变量/厂家配置注入
+        if 'api_key' in llm_config_data:
+            llm_config_data['api_key'] = ""
+
 
         # 尝试创建LLMConfig对象
         try:
@@ -347,7 +351,7 @@ async def add_data_source_config(
     """添加数据源配置"""
     try:
         # 开源版本：所有用户都可以修改配置
-        
+
         # 获取当前配置
         config = await config_service.get_system_config()
         if not config:
@@ -355,11 +359,11 @@ async def add_data_source_config(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="系统配置不存在"
             )
-        
+
         # 添加新的数据源配置
         ds_config = DataSourceConfig(**request.dict())
         config.data_source_configs.append(ds_config)
-        
+
         success = await config_service.save_system_config(config)
         if success:
             return {"message": "数据源配置添加成功", "name": ds_config.name}
@@ -385,7 +389,7 @@ async def add_database_config(
     """添加数据库配置"""
     try:
         # 开源版本：所有用户都可以修改配置
-        
+
         # 获取当前配置
         config = await config_service.get_system_config()
         if not config:
@@ -393,11 +397,11 @@ async def add_database_config(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="系统配置不存在"
             )
-        
+
         # 添加新的数据库配置
         db_config = DatabaseConfig(**request.dict())
         config.database_configs.append(db_config)
-        
+
         success = await config_service.save_system_config(config)
         if success:
             return {"message": "数据库配置添加成功", "name": db_config.name}
@@ -990,7 +994,7 @@ async def set_default_llm(
     """设置默认大模型"""
     try:
         # 开源版本：所有用户都可以修改配置
-        
+
         success = await config_service.set_default_llm(request.name)
         if success:
             return {"message": f"默认大模型已设置为: {request.name}"}
@@ -1016,7 +1020,7 @@ async def set_default_data_source(
     """设置默认数据源"""
     try:
         # 开源版本：所有用户都可以修改配置
-        
+
         success = await config_service.set_default_data_source(request.name)
         if success:
             return {"message": f"默认数据源已设置为: {request.name}"}

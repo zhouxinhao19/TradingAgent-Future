@@ -112,10 +112,11 @@ class UnifiedConfigManager:
                 
                 provider = provider_map.get(model.get("provider", ""), ModelProvider.OPENAI)
                 
+                # 方案A：敏感密钥不从文件加载，统一走环境变量/厂家目录
                 llm_config = LLMConfig(
                     provider=provider,
                     model_name=model.get("model_name", ""),
-                    api_key=model.get("api_key", ""),
+                    api_key="",
                     api_base=model.get("base_url"),
                     max_tokens=model.get("max_tokens", 4000),
                     temperature=model.get("temperature", 0.7),
@@ -144,10 +145,11 @@ class UnifiedConfigManager:
                 ModelProvider.LOCAL: "deepseek"
             }
             
+            # 方案A：保存到文件时不写入密钥
             legacy_model = {
                 "provider": provider_reverse_map.get(llm_config.provider, "openai"),
                 "model_name": llm_config.model_name,
-                "api_key": llm_config.api_key,
+                "api_key": "",
                 "base_url": llm_config.api_base,
                 "max_tokens": llm_config.max_tokens,
                 "temperature": llm_config.temperature,

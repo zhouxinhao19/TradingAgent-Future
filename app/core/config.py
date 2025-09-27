@@ -114,6 +114,13 @@ class Settings(BaseSettings):
     HEALTH_CHECK_INTERVAL: int = Field(default=60)  # 60秒
 
 
+    # 配置真相来源（方案A）：file|db|hybrid
+    # - file：以文件/env 为准（推荐，生产缺省）
+    # - db：以数据库为准（仅兼容旧版，不推荐）
+    # - hybrid：文件/env 优先，DB 作为兜底
+    CONFIG_SOT: str = Field(default="file")
+
+
     # 基础信息同步任务配置（可配置调度）
     SYNC_STOCK_BASICS_ENABLED: bool = Field(default=True)
     # 优先使用 CRON 表达式，例如 "30 6 * * *" 表示每日 06:30
