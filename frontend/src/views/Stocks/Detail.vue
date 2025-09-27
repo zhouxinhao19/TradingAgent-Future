@@ -17,6 +17,9 @@
         <el-button @click="onSetAlert">
           <el-icon><Bell /></el-icon> 预警
         </el-button>
+        <el-button type="success" @click="goPaperTrading">
+          <el-icon><CreditCard /></el-icon> 模拟交易
+        </el-button>
       </div>
     </div>
 
@@ -133,24 +136,6 @@
           </div>
         </el-card>
 
-        <!-- 最新分析（方案A：右侧卡片） -->
-        <el-card shadow="hover" class="latest-analysis-card">
-          <template #header><div class="card-hd">最新分析</div></template>
-          <div v-if="analysisStatus==='running'">
-            <el-progress :percentage="analysisProgress" :text-inside="true" style="width:100%" />
-            <div class="hint">{{ analysisMessage || '正在分析…' }}</div>
-            <el-button size="small" type="primary" link @click="scrollToDetail">查看进度</el-button>
-          </div>
-          <div v-else-if="lastAnalysis">
-            <div class="reco">
-              <el-tag :type="lastAnalysisTagType" size="small">{{ lastAnalysis?.recommendation || '-' }}</el-tag>
-              <span class="conf">信心度 {{ fmtConf(lastAnalysis?.confidence_score ?? lastAnalysis?.overall_score) }}</span>
-            </div>
-            <div class="summary two-lines">{{ lastAnalysis?.summary || '-' }}</div>
-            <el-button size="small" type="primary" link @click="scrollToDetail">查看详情</el-button>
-          </div>
-          <el-empty v-else description="暂无分析" />
-        </el-card>
 
 
         <!-- 快捷操作 -->
@@ -160,6 +145,7 @@
             <el-button type="primary" @click="onAnalyze" :icon="TrendCharts" plain>发起分析</el-button>
             <el-button @click="onToggleFavorite" :icon="Star">{{ isFav ? '移出自选' : '加入自选' }}</el-button>
             <el-button @click="onSetAlert" :icon="Bell">添加预警</el-button>
+            <el-button type="success" :icon="CreditCard" @click="goPaperTrading">模拟交易</el-button>
           </div>
         </el-card>
       </el-col>
@@ -172,6 +158,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { TrendCharts, Star, Bell, Refresh, Link } from '@element-plus/icons-vue'
+import { CreditCard } from '@element-plus/icons-vue'
 import { stocksApi } from '@/api/stocks'
 import { analysisApi } from '@/api/analysis'
 import { use as echartsUse } from 'echarts/core'
@@ -182,6 +169,7 @@ import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
 import type { EChartsOption } from 'echarts'
 import { favoritesApi } from '@/api/favorites'
+import { useNotificationStore } from '@/stores/notifications'
 
 
 echartsUse([CandlestickChart, GridComponent, TooltipComponent, DataZoomComponent, LegendComponent, TitleComponent, CanvasRenderer])
@@ -196,6 +184,8 @@ const analysisProgress = ref(0)
 const analysisMessage = ref('')
 const currentTaskId = ref<string | null>(null)
 const lastAnalysis = ref<any | null>(null)
+
+const notifStore = useNotificationStore()
 
 const lastAnalysisTagType = computed(() => {
   const reco = String(lastAnalysis.value?.recommendation || '').toLowerCase()
@@ -472,6 +462,11 @@ async function onToggleFavorite() {
 }
 function onSetAlert() { ElMessage.info('前端占位：待接入预警接口') }
 
+function goPaperTrading() {
+  router.push({ name: 'PaperTradingHome', query: { code: code.value } })
+}
+
+
 
 // 一键分析（快速）
 async function onQuickAnalyze() {
@@ -523,6 +518,16 @@ async function pollTask(taskId: string) {
         analysisStatus.value = 'completed'
         const r: any = await analysisApi.getTaskResult(taskId)
         lastAnalysis.value = r?.data || r
+        // 新通知：分析完成
+        try {
+          const summary = String(lastAnalysis.value?.summary || '').slice(0, 120)
+          notifStore.addNotification({
+            title: `${code.value} 分析完成`,
+            content: summary,
+            type: 'analysis',
+            link: `/stocks/${code.value}`
+          })
+        } catch {}
         return
 
       }

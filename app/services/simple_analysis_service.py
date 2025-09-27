@@ -25,6 +25,7 @@ from app.models.analysis import (
     AnalysisTask, AnalysisStatus, SingleAnalysisRequest, AnalysisParameters
 )
 from app.models.user import PyObjectId
+from app.models.notification import NotificationCreate
 from bson import ObjectId
 from app.core.database import get_mongo_db
 from app.services.config_service import ConfigService
@@ -453,6 +454,24 @@ class SimpleAnalysisService:
                 current_step="completed",
                 result_data=result
             )
+
+            # 创建通知：分析完成（方案B：REST+SSE）
+            try:
+                from app.services.notifications_service import get_notifications_service
+                svc = get_notifications_service()
+                summary = str(result.get("summary", ""))[:120]
+                await svc.create_and_publish(
+                    payload=NotificationCreate(
+                        user_id=str(user_id),
+                        type='analysis',
+                        title=f"{request.stock_code} 分析完成",
+                        content=summary,
+                        link=f"/stocks/{request.stock_code}",
+                        source='analysis'
+                    )
+                )
+            except Exception as notif_err:
+                logger.warning(f"⚠️ 创建通知失败(忽略): {notif_err}")
 
             logger.info(f"✅ 后台分析任务完成: {task_id}")
 

@@ -335,6 +335,232 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/paper',
+    name: 'PaperTrading',
+    component: () => import('@/layouts/BasicLayout.vue'),
+    meta: {
+      title: '模拟交易',
+      icon: 'CreditCard',
+      requiresAuth: true,
+      transition: 'slide-up'
+    },
+    children: [
+      {
+        path: '',
+        name: 'PaperTradingHome',
+        component: () => import('@/views/PaperTrading/index.vue'),
+        meta: {
+          title: '模拟交易',
+          requiresAuth: true
+        }
+      }
+    ]
+  },
+  {
+    path: '/stocks',
+    name: 'Stocks',
+    component: () => import('@/layouts/BasicLayout.vue'),
+    meta: {
+      title: '股票详情',
+      icon: 'TrendCharts',
+      requiresAuth: true,
+      hideInMenu: true,
+      transition: 'fade'
+    },
+    children: [
+      {
+        path: ':code',
+        name: 'StockDetail',
+        component: () => import('@/views/Stocks/Detail.vue'),
+        meta: {
+          title: '股票详情',
+          requiresAuth: true,
+          hideInMenu: true,
+          transition: 'fade'
+        }
+      }
+    ]
+  },
+
+  {
+    path: '/queue',
+    name: 'QueueManagement',
+    component: () => import('@/layouts/BasicLayout.vue'),
+    meta: {
+      title: '队列管理',
+      icon: 'List',
+      requiresAuth: true,
+      transition: 'slide-up'
+    },
+    children: [
+      {
+        path: '',
+        name: 'QueueManagementHome',
+        component: () => import('@/views/Queue/index.vue'),
+        meta: {
+          title: '队列管理',
+          requiresAuth: true
+        }
+      }
+    ]
+  },
+  {
+    path: '/tasks',
+    name: 'TaskCenter',
+    component: () => import('@/layouts/BasicLayout.vue'),
+    meta: {
+      title: '任务中心',
+      icon: 'List',
+      requiresAuth: true,
+      transition: 'slide-up'
+    },
+    children: [
+      {
+        path: '',
+        name: 'TaskCenterHome',
+        component: () => import('@/views/Tasks/TaskCenter.vue'),
+        meta: { title: '任务中心', requiresAuth: true }
+      }
+    ]
+  },
+  { path: '/queue', redirect: '/tasks' },
+  { path: '/analysis/history', redirect: '/tasks?tab=completed' },
+  {
+    path: '/reports',
+    name: 'Reports',
+    component: () => import('@/layouts/BasicLayout.vue'),
+    meta: {
+      title: '分析报告',
+      icon: 'Document',
+      requiresAuth: true,
+      transition: 'fade'
+    },
+    children: [
+      {
+        path: '',
+        name: 'ReportsHome',
+        component: () => import('@/views/Reports/index.vue'),
+        meta: {
+          title: '分析报告',
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'view/:id',
+        name: 'ReportDetail',
+        component: () => import('@/views/Reports/ReportDetail.vue'),
+        meta: {
+          title: '报告详情',
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'token',
+        name: 'TokenStatistics',
+        component: () => import('@/views/Reports/TokenStatistics.vue'),
+        meta: {
+          title: 'Token统计',
+          requiresAuth: true
+        }
+      }
+    ]
+  },
+  {
+    path: '/settings',
+    name: 'Settings',
+    component: () => import('@/layouts/BasicLayout.vue'),
+    meta: {
+      title: '个人设置',
+      icon: 'Setting',
+      requiresAuth: true,
+      transition: 'slide-left'
+    },
+    children: [
+      {
+        path: '',
+        name: 'SettingsHome',
+        component: () => import('@/views/Settings/index.vue'),
+        meta: {
+          title: '个人设置',
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'config',
+        name: 'ConfigManagement',
+        component: () => import('@/views/Settings/ConfigManagement.vue'),
+        meta: {
+          title: '配置管理',
+          requiresAuth: true
+        }
+      }
+    ]
+  },
+
+  {
+    path: '/system',
+    name: 'System',
+    component: () => import('@/layouts/BasicLayout.vue'),
+    meta: {
+      title: '系统管理',
+      icon: 'Tools',
+      requiresAuth: true,
+      transition: 'slide-up'
+    },
+    children: [
+      {
+        path: 'database',
+        name: 'DatabaseManagement',
+        component: () => import('@/views/System/DatabaseManagement.vue'),
+        meta: {
+          title: '数据库管理',
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'logs',
+        name: 'OperationLogs',
+        component: () => import('@/views/System/OperationLogs.vue'),
+        meta: {
+          title: '操作日志',
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'sync',
+        name: 'MultiSourceSync',
+        component: () => import('@/views/System/MultiSourceSync.vue'),
+        meta: {
+          title: '多数据源同步',
+          requiresAuth: true
+        }
+      }
+    ]
+  },
+
+  {
+    path: '/login',
+    name: 'Login',
+    component: () => import('@/views/Auth/Login.vue'),
+    meta: {
+      title: '登录',
+      hideInMenu: true,
+      transition: 'fade'
+    }
+  },
+
+  {
+    path: '/about',
+    name: 'About',
+    component: () => import('@/views/About/index.vue'),
+    meta: {
+      title: '关于',
+      icon: 'InfoFilled',
+      requiresAuth: true,
+      transition: 'fade'
+    }
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('@/views/Error/404.vue'),

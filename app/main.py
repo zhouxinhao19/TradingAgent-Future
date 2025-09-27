@@ -19,6 +19,7 @@ from app.core.logging_config import setup_logging
 from app.routers import auth, analysis, screening, queue, sse, health, favorites, config, reports, database, operation_logs, tags
 from app.routers import sync as sync_router, multi_source_sync
 from app.routers import stocks as stocks_router
+from app.routers import notifications as notifications_router
 from app.services.basics_sync_service import get_basics_sync_service
 from app.middleware.operation_log_middleware import OperationLogMiddleware
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -201,6 +202,9 @@ app.include_router(operation_logs.router, prefix="/api/system", tags=["operation
 # 新增：系统配置只读摘要
 from app.routers import system_config as system_config_router
 app.include_router(system_config_router.router, prefix="/api/system", tags=["system"])
+
+# 通知模块（REST + SSE）
+app.include_router(notifications_router.router, prefix="/api", tags=["notifications"])
 
 app.include_router(sse.router, prefix="/api/stream", tags=["streaming"])
 app.include_router(sync_router.router)

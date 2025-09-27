@@ -17,6 +17,8 @@ class PlaceOrderRequest(BaseModel):
     code: str = Field(..., description="6位股票代码")
     side: Literal["buy", "sell"]
     quantity: int = Field(..., gt=0)
+    # 可选：关联的分析ID，便于从分析页面一键下单后追踪
+    analysis_id: Optional[str] = None
 
 
 async def _get_or_create_account(user_id: str) -> Dict[str, Any]:
@@ -97,6 +99,7 @@ async def place_order(payload: PlaceOrderRequest, current_user: dict = Depends(g
     code6 = _zfill_code(payload.code)
     side = payload.side
     qty = int(payload.quantity)
+    analysis_id = getattr(payload, "analysis_id", None)
 
     # 获取账户
     acc = await _get_or_create_account(current_user["id"])
@@ -169,6 +172,8 @@ async def place_order(payload: PlaceOrderRequest, current_user: dict = Depends(g
         "created_at": now_iso,
         "filled_at": now_iso,
     }
+    if analysis_id:
+        order_doc["analysis_id"] = analysis_id
     await db["paper_orders"].insert_one(order_doc)
 
     trade_doc = {
@@ -181,6 +186,8 @@ async def place_order(payload: PlaceOrderRequest, current_user: dict = Depends(g
         "pnl": realized_pnl_delta if side == "sell" else 0.0,
         "timestamp": now_iso,
     }
+    if analysis_id:
+        trade_doc["analysis_id"] = analysis_id
     await db["paper_trades"].insert_one(trade_doc)
 
     return ok({"order": {k: v for k, v in order_doc.items() if k != "_id"}})
