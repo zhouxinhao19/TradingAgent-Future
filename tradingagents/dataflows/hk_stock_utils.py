@@ -8,8 +8,12 @@ import yfinance as yf
 import time
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+from tradingagents.config.runtime_settings import get_timezone_name
+
 import os
 
+from tradingagents.config.runtime_settings import get_float, get_int
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
 logger = get_logger('agents')
@@ -22,53 +26,53 @@ class HKStockProvider:
     def __init__(self):
         """初始化港股数据提供器"""
         self.last_request_time = 0
-        self.min_request_interval = 2.0  # 增加请求间隔到2秒
-        self.timeout = 60  # 请求超时时间（增加到60秒）
-        self.max_retries = 3  # 增加重试次数
-        self.rate_limit_wait = 60  # 遇到限制时等待时间
+        self.min_request_interval = get_float("TA_HK_MIN_REQUEST_INTERVAL_SECONDS", "ta_hk_min_request_interval_seconds", 2.0)
+        self.timeout = get_int("TA_HK_TIMEOUT_SECONDS", "ta_hk_timeout_seconds", 60)
+        self.max_retries = get_int("TA_HK_MAX_RETRIES", "ta_hk_max_retries", 3)
+        self.rate_limit_wait = get_int("TA_HK_RATE_LIMIT_WAIT_SECONDS", "ta_hk_rate_limit_wait_seconds", 60)
 
         logger.info(f"🇭🇰 港股数据提供器初始化完成")
-    
+
     def _wait_for_rate_limit(self):
         """等待速率限制"""
         current_time = time.time()
         time_since_last_request = current_time - self.last_request_time
-        
+
         if time_since_last_request < self.min_request_interval:
             sleep_time = self.min_request_interval - time_since_last_request
             time.sleep(sleep_time)
-        
+
         self.last_request_time = time.time()
-    
+
     def get_stock_data(self, symbol: str, start_date: str = None, end_date: str = None) -> Optional[pd.DataFrame]:
         """
         获取港股历史数据
-        
+
         Args:
             symbol: 港股代码 (如: 0700.HK)
             start_date: 开始日期 (YYYY-MM-DD)
             end_date: 结束日期 (YYYY-MM-DD)
-            
+
         Returns:
             DataFrame: 股票历史数据
         """
         try:
             # 标准化港股代码
             symbol = self._normalize_hk_symbol(symbol)
-            
+
             # 设置默认日期
             if not end_date:
-                end_date = datetime.now().strftime('%Y-%m-%d')
+                end_date = datetime.now(ZoneInfo(get_timezone_name())).strftime('%Y-%m-%d')
             if not start_date:
-                start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
-            
+                start_date = (datetime.now(ZoneInfo(get_timezone_name())) - timedelta(days=365)).strftime('%Y-%m-%d')
+
             logger.info(f"🇭🇰 获取港股数据: {symbol} ({start_date} 到 {end_date})")
-            
+
             # 多次重试获取数据
             for attempt in range(self.max_retries):
                 try:
                     self._wait_for_rate_limit()
-                    
+
                     # 使用yfinance获取数据
                     ticker = yf.Ticker(symbol)
                     data = ticker.history(
@@ -76,17 +80,17 @@ class HKStockProvider:
                         end=end_date,
                         timeout=self.timeout
                     )
-                    
+
                     if not data.empty:
                         # 数据预处理
                         data = data.reset_index()
                         data['Symbol'] = symbol
-                        
+
                         logger.info(f"✅ 港股数据获取成功: {symbol}, {len(data)}条记录")
                         return data
                     else:
                         logger.warning(f"⚠️ 港股数据为空: {symbol} (尝试 {attempt + 1}/{self.max_retries})")
-                        
+
                 except Exception as e:
                     error_msg = str(e)
                     logger.error(f"❌ 港股数据获取失败 (尝试 {attempt + 1}/{self.max_retries}): {error_msg}")
@@ -102,34 +106,34 @@ class HKStockProvider:
                     else:
                         if attempt < self.max_retries - 1:
                             time.sleep(2 ** attempt)  # 指数退避
-                    
+
             logger.error(f"❌ 港股数据获取最终失败: {symbol}")
             return None
 
         except Exception as e:
             logger.error(f"❌ 港股数据获取异常: {e}")
             return None
-    
+
     def get_stock_info(self, symbol: str) -> Dict[str, Any]:
         """
         获取港股基本信息
-        
+
         Args:
             symbol: 港股代码
-            
+
         Returns:
             Dict: 股票基本信息
         """
         try:
             symbol = self._normalize_hk_symbol(symbol)
-            
+
             logger.info(f"🇭🇰 获取港股信息: {symbol}")
-            
+
             self._wait_for_rate_limit()
-            
+
             ticker = yf.Ticker(symbol)
             info = ticker.info
-            
+
             if info and 'symbol' in info:
                 return {
                     'symbol': symbol,
@@ -149,7 +153,7 @@ class HKStockProvider:
                     'exchange': 'HKG',
                     'source': 'yfinance_hk'
                 }
-                
+
         except Exception as e:
             logger.error(f"❌ 获取港股信息失败: {e}")
             return {
@@ -160,27 +164,27 @@ class HKStockProvider:
                 'source': 'unknown',
                 'error': str(e)
             }
-    
+
     def get_real_time_price(self, symbol: str) -> Optional[Dict]:
         """
         获取港股实时价格
-        
+
         Args:
             symbol: 港股代码
-            
+
         Returns:
             Dict: 实时价格信息
         """
         try:
             symbol = self._normalize_hk_symbol(symbol)
-            
+
             self._wait_for_rate_limit()
-            
+
             ticker = yf.Ticker(symbol)
-            
+
             # 获取最新的历史数据（1天）
             data = ticker.history(period="1d", timeout=self.timeout)
-            
+
             if not data.empty:
                 latest = data.iloc[-1]
                 return {
@@ -195,26 +199,26 @@ class HKStockProvider:
                 }
             else:
                 return None
-                
+
         except Exception as e:
             logger.error(f"❌ 获取港股实时价格失败: {e}")
             return None
-    
+
     def _normalize_hk_symbol(self, symbol: str) -> str:
         """
         标准化港股代码格式
-        
+
         Args:
             symbol: 原始港股代码
-            
+
         Returns:
             str: 标准化后的港股代码
         """
         if not symbol:
             return symbol
-            
+
         symbol = str(symbol).strip().upper()
-        
+
         # 如果是纯4-5位数字，添加.HK后缀
         if symbol.isdigit() and 4 <= len(symbol) <= 5:
             return f"{symbol}.HK"
@@ -227,39 +231,39 @@ class HKStockProvider:
         if '.' not in symbol and symbol.isdigit():
             # 保持原有位数，不强制填充到4位
             return f"{symbol}.HK"
-            
+
         return symbol
 
     def format_stock_data(self, symbol: str, data: pd.DataFrame, start_date: str, end_date: str) -> str:
         """
         格式化港股数据为文本格式
-        
+
         Args:
             symbol: 股票代码
             data: 股票数据DataFrame
             start_date: 开始日期
             end_date: 结束日期
-            
+
         Returns:
             str: 格式化的股票数据文本
         """
         if data is None or data.empty:
             return f"❌ 无法获取港股 {symbol} 的数据"
-        
+
         try:
             # 获取股票基本信息
             stock_info = self.get_stock_info(symbol)
             stock_name = stock_info.get('name', f'港股{symbol}')
-            
+
             # 计算统计信息
             latest_price = data['Close'].iloc[-1]
             price_change = data['Close'].iloc[-1] - data['Close'].iloc[0]
             price_change_pct = (price_change / data['Close'].iloc[0]) * 100
-            
+
             avg_volume = data['Volume'].mean()
             max_price = data['High'].max()
             min_price = data['Low'].min()
-            
+
             # 格式化输出
             formatted_text = f"""
 🇭🇰 港股数据报告
@@ -284,7 +288,7 @@ class HKStockProvider:
 
 最近5个交易日:
 """
-            
+
             # 添加最近5天的数据
             recent_data = data.tail(5)
             for _, row in recent_data.iterrows():
@@ -292,9 +296,9 @@ class HKStockProvider:
                 formatted_text += f"- {date}: 开盘HK${row['Open']:.2f}, 收盘HK${row['Close']:.2f}, 成交量{row['Volume']:,.0f}\n"
 
             formatted_text += f"\n数据来源: Yahoo Finance (港股)\n"
-            
+
             return formatted_text
-            
+
         except Exception as e:
             logger.error(f"❌ 格式化港股数据失败: {e}")
             return f"❌ 港股数据格式化失败: {symbol}"
@@ -314,12 +318,12 @@ def get_hk_stock_provider() -> HKStockProvider:
 def get_hk_stock_data(symbol: str, start_date: str = None, end_date: str = None) -> str:
     """
     获取港股数据的便捷函数
-    
+
     Args:
         symbol: 港股代码
         start_date: 开始日期
         end_date: 结束日期
-        
+
     Returns:
         str: 格式化的港股数据
     """
@@ -331,10 +335,10 @@ def get_hk_stock_data(symbol: str, start_date: str = None, end_date: str = None)
 def get_hk_stock_info(symbol: str) -> Dict:
     """
     获取港股信息的便捷函数
-    
+
     Args:
         symbol: 港股代码
-        
+
     Returns:
         Dict: 港股信息
     """

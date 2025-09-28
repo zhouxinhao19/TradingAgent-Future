@@ -187,11 +187,11 @@ class DataSourceManager:
         except Exception as e:
             logger.error(f"❌ [Tushare] 获取股票信息失败: {e}", exc_info=True)
             return f"❌ 获取{symbol}股票信息失败: {e}"
-    
+
     def _check_available_sources(self) -> List[ChinaDataSource]:
         """检查可用的数据源"""
         available = []
-        
+
         # 检查Tushare
         try:
             import tushare as ts
@@ -203,7 +203,7 @@ class DataSourceManager:
                 logger.warning("⚠️ Tushare数据源不可用: 未设置TUSHARE_TOKEN")
         except ImportError:
             logger.warning("⚠️ Tushare数据源不可用: 库未安装")
-        
+
         # 检查AKShare
         try:
             import akshare as ak
@@ -211,7 +211,7 @@ class DataSourceManager:
             logger.info("✅ AKShare数据源可用")
         except ImportError:
             logger.warning("⚠️ AKShare数据源不可用: 库未安装")
-        
+
         # 检查BaoStock
         try:
             import baostock as bs
@@ -219,7 +219,7 @@ class DataSourceManager:
             logger.info(f"✅ BaoStock数据源可用")
         except ImportError:
             logger.warning(f"⚠️ BaoStock数据源不可用: 库未安装")
-        
+
         # 检查TDX (通达信)
         try:
             import pytdx
@@ -227,13 +227,13 @@ class DataSourceManager:
             logger.warning(f"⚠️ TDX数据源可用 (将被淘汰)")
         except ImportError:
             logger.info(f"ℹ️ TDX数据源不可用: 库未安装")
-        
+
         return available
-    
+
     def get_current_source(self) -> ChinaDataSource:
         """获取当前数据源"""
         return self.current_source
-    
+
     def set_current_source(self, source: ChinaDataSource) -> bool:
         """设置当前数据源"""
         if source in self.available_sources:
@@ -243,7 +243,7 @@ class DataSourceManager:
         else:
             logger.error(f"❌ 数据源不可用: {source.value}")
             return False
-    
+
     def get_data_adapter(self):
         """获取当前数据源的适配器"""
         if self.current_source == ChinaDataSource.TUSHARE:
@@ -256,7 +256,7 @@ class DataSourceManager:
             return self._get_tdx_adapter()
         else:
             raise ValueError(f"不支持的数据源: {self.current_source}")
-    
+
     def _get_tushare_adapter(self):
         """获取Tushare适配器"""
         try:
@@ -265,7 +265,7 @@ class DataSourceManager:
         except ImportError as e:
             logger.error(f"❌ Tushare适配器导入失败: {e}")
             return None
-    
+
     def _get_akshare_adapter(self):
         """获取AKShare适配器"""
         try:
@@ -274,7 +274,7 @@ class DataSourceManager:
         except ImportError as e:
             logger.error(f"❌ AKShare适配器导入失败: {e}")
             return None
-    
+
     def _get_baostock_adapter(self):
         """获取BaoStock适配器"""
         try:
@@ -283,7 +283,7 @@ class DataSourceManager:
         except ImportError as e:
             logger.error(f"❌ BaoStock适配器导入失败: {e}")
             return None
-    
+
     def _get_tdx_adapter(self):
         """获取TDX适配器 (已弃用)"""
         logger.warning(f"⚠️ 警告: TDX数据源已弃用，建议使用Tushare")
@@ -293,7 +293,7 @@ class DataSourceManager:
         except ImportError as e:
             logger.error(f"❌ TDX适配器导入失败: {e}")
             return None
-    
+
     def get_stock_data(self, symbol: str, start_date: str = None, end_date: str = None) -> str:
         """
         获取股票数据的统一接口
@@ -391,7 +391,7 @@ class DataSourceManager:
                             'event_type': 'data_fetch_exception'
                         }, exc_info=True)
             return self._try_fallback_sources(symbol, start_date, end_date)
-    
+
     def _get_tushare_data(self, symbol: str, start_date: str, end_date: str) -> str:
         """使用Tushare获取数据 - 直接调用适配器，避免循环调用"""
         logger.debug(f"📊 [Tushare] 调用参数: symbol={symbol}, start_date={start_date}, end_date={end_date}")
@@ -463,7 +463,7 @@ class DataSourceManager:
             import traceback
             logger.error(f"❌ [DataSourceManager详细日志] 异常堆栈: {traceback.format_exc()}")
             raise
-    
+
     def _get_akshare_data(self, symbol: str, start_date: str, end_date: str) -> str:
         """使用AKShare获取数据"""
         logger.debug(f"📊 [AKShare] 调用参数: symbol={symbol}, start_date={start_date}, end_date={end_date}")
@@ -519,14 +519,14 @@ class DataSourceManager:
             duration = time.time() - start_time
             logger.error(f"❌ [AKShare] 调用失败: {e}, 耗时={duration:.2f}s", exc_info=True)
             return f"❌ AKShare获取{symbol}数据失败: {e}"
-    
+
     def _get_baostock_data(self, symbol: str, start_date: str, end_date: str) -> str:
         """使用BaoStock获取数据"""
         # 这里需要实现BaoStock的统一接口
         from .baostock_utils import get_baostock_provider
         provider = get_baostock_provider()
         data = provider.get_stock_data(symbol, start_date, end_date)
-        
+
         if data is not None and not data.empty:
             result = f"股票代码: {symbol}\n"
             result += f"数据期间: {start_date} 至 {end_date}\n"
@@ -545,13 +545,13 @@ class DataSourceManager:
             return result
         else:
             return f"❌ 未能获取{symbol}的股票数据"
-    
+
     def _get_tdx_data(self, symbol: str, start_date: str, end_date: str) -> str:
         """使用TDX获取数据 (已弃用)"""
         logger.warning(f"⚠️ 警告: 正在使用已弃用的TDX数据源")
         from .tdx_utils import get_china_stock_data
         return get_china_stock_data(symbol, start_date, end_date)
-    
+
     def _get_volume_safely(self, data) -> float:
         """安全地获取成交量数据，支持多种列名"""
         try:
@@ -610,12 +610,79 @@ class DataSourceManager:
                 except Exception as e:
                     logger.error(f"❌ 备用数据源{source.value}也失败: {e}")
                     continue
-        
+
         return f"❌ 所有数据源都无法获取{symbol}的数据"
-    
+
     def get_stock_info(self, symbol: str) -> Dict:
         """获取股票基本信息，支持降级机制"""
         logger.info(f"📊 [股票信息] 开始获取{symbol}基本信息...")
+
+        # 优先使用 App Mongo 缓存（当 ta_use_app_cache=True）
+        try:
+            from tradingagents.config.runtime_settings import use_app_cache_enabled  # type: ignore
+            use_cache = use_app_cache_enabled(False)
+        except Exception:
+            use_cache = False
+        if use_cache:
+            logger.info(f"🔧 [配置] ta_use_app_cache={use_cache}")
+
+            try:
+                from .app_cache_adapter import get_basics_from_cache, get_market_quote_dataframe
+                doc = get_basics_from_cache(symbol)
+                if doc:
+                    name = doc.get('name') or doc.get('stock_name') or ''
+                    # 规范化行业与板块（避免把“中小板/创业板”等板块值误作行业）
+                    board_labels = {'主板', '中小板', '创业板', '科创板'}
+                    raw_industry = (doc.get('industry') or doc.get('industry_name') or '').strip()
+                    sec_or_cat = (doc.get('sec') or doc.get('category') or '').strip()
+                    market_val = (doc.get('market') or '').strip()
+                    industry_val = raw_industry or sec_or_cat or '未知'
+                    changed = False
+                    if raw_industry in board_labels:
+                        # 若industry是板块名，则将其用于market；industry改用更细分类（sec/category）
+                        if not market_val:
+                            market_val = raw_industry
+                            changed = True
+                        if sec_or_cat:
+                            industry_val = sec_or_cat
+                            changed = True
+                    if changed:
+                        try:
+                            logger.debug(f"🔧 [字段归一化] industry原值='{raw_industry}' → 行业='{industry_val}', 市场/板块='{market_val or doc.get('market', '未知')}'")
+                        except Exception:
+                            pass
+
+                    result = {
+                        'symbol': symbol,
+                        'name': name or f'股票{symbol}',
+                        'area': doc.get('area', '未知'),
+                        'industry': industry_val or '未知',
+                        'market': market_val or doc.get('market', '未知'),
+                        'list_date': doc.get('list_date', '未知'),
+                        'source': 'app_cache'
+                    }
+                    # 追加快照行情（若存在）
+                    try:
+                        df = get_market_quote_dataframe(symbol)
+                        if df is not None and not df.empty:
+                            row = df.iloc[-1]
+                            result['current_price'] = row.get('close')
+                            result['change_pct'] = row.get('pct_chg')
+                            result['volume'] = row.get('volume')
+                            result['quote_date'] = row.get('date')
+                            result['quote_source'] = 'market_quotes'
+                            logger.info(f"✅ [股票信息] 附加行情 | price={result['current_price']} pct={result['change_pct']} vol={result['volume']} code={symbol}")
+                    except Exception as _e:
+                        logger.debug(f"附加行情失败（忽略）：{_e}")
+
+                    if name:
+                        logger.info(f"✅ [股票信息] 缓存命中 | source=stock_basic_info cache_hit=true code={symbol}")
+                        return result
+                    else:
+                        logger.debug(f"未在缓存中找到有效名称，继续外部数据源 | code={symbol}")
+            except Exception as e:
+                logger.debug(f"读取缓存失败，继续外部数据源 | code={symbol} err={e}")
+
 
         # 首先尝试当前数据源
         try:
@@ -790,13 +857,13 @@ class DataSourceManager:
         try:
             info = {'symbol': symbol, 'source': self.current_source.value}
             lines = info_str.split('\n')
-            
+
             for line in lines:
                 if ':' in line:
                     key, value = line.split(':', 1)
                     key = key.strip()
                     value = value.strip()
-                    
+
                     if '股票名称' in key:
                         info['name'] = value
                     elif '所属行业' in key:
@@ -807,9 +874,9 @@ class DataSourceManager:
                         info['market'] = value
                     elif '上市日期' in key:
                         info['list_date'] = value
-            
+
             return info
-            
+
         except Exception as e:
             logger.error(f"⚠️ 解析股票信息失败: {e}")
             return {'symbol': symbol, 'name': f'股票{symbol}', 'source': self.current_source.value}
@@ -866,10 +933,10 @@ def get_china_stock_data_unified(symbol: str, start_date: str, end_date: str) ->
 def get_china_stock_info_unified(symbol: str) -> Dict:
     """
     统一的中国股票信息获取接口
-    
+
     Args:
         symbol: 股票代码
-        
+
     Returns:
         Dict: 股票基本信息
     """

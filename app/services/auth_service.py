@@ -1,5 +1,6 @@
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from app.utils.timezone import now_tz
 from typing import Optional
 import jwt
 from pydantic import BaseModel
@@ -14,10 +15,10 @@ class AuthService:
     def create_access_token(sub: str, expires_minutes: int | None = None, expires_delta: int | None = None) -> str:
         if expires_delta:
             # 如果指定了秒数，使用秒数
-            expire = datetime.utcnow() + timedelta(seconds=expires_delta)
+            expire = now_tz() + timedelta(seconds=expires_delta)
         else:
             # 否则使用分钟数
-            expire = datetime.utcnow() + timedelta(minutes=expires_minutes or settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+            expire = now_tz() + timedelta(minutes=expires_minutes or settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         payload = {"sub": sub, "exp": expire}
         token = jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
         return token

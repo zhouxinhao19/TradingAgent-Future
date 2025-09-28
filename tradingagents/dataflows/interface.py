@@ -1314,6 +1314,20 @@ def get_china_stock_info_unified(
             result += f"所属行业: {info.get('industry', '未知')}\n"
             result += f"上市市场: {info.get('market', '未知')}\n"
             result += f"上市日期: {info.get('list_date', '未知')}\n"
+            # 附加快照行情（若存在）
+            cp = info.get('current_price')
+            pct = info.get('change_pct')
+            vol = info.get('volume')
+            if cp is not None:
+                result += f"当前价格: {cp}\n"
+            if pct is not None:
+                try:
+                    pct_str = f"{float(pct):+.2f}%"
+                except Exception:
+                    pct_str = str(pct)
+                result += f"涨跌幅: {pct_str}\n"
+            if vol is not None:
+                result += f"成交量: {vol}\n"
             result += f"数据来源: {info.get('source', 'unknown')}\n"
 
             return result

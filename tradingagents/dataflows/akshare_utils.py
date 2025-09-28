@@ -328,17 +328,17 @@ class AKShareProvider:
     def get_financial_data(self, symbol: str) -> Dict[str, Any]:
         """
         获取股票财务数据
-        
+
         Args:
             symbol: 股票代码 (6位数字)
-            
+
         Returns:
             Dict: 包含主要财务指标的财务数据
         """
         if not self.connected:
             logger.error(f"❌ AKShare未连接，无法获取{symbol}财务数据")
             return {}
-        
+
         try:
             logger.info(f"🔍 开始获取{symbol}的AKShare财务数据")
             
@@ -401,7 +401,7 @@ class AKShareProvider:
                         logger.info(f"  - {key}: {len(value)}条记录")
             else:
                 logger.warning(f"⚠️ 未能获取{symbol}的任何AKShare财务数据")
-            
+
             return financial_data
             
         except Exception as e:

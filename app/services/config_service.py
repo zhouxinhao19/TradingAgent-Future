@@ -6,6 +6,7 @@ import time
 import asyncio
 from typing import List, Optional, Dict, Any
 from datetime import datetime
+from app.utils.timezone import now_tz
 from bson import ObjectId
 
 from app.core.database import get_mongo_db
@@ -107,7 +108,7 @@ class ConfigService:
         categories_collection = db.market_categories
 
         for category in default_categories:
-            await categories_collection.insert_one(category.dict())
+            await categories_collection.insert_one(category.model_dump())
 
         return default_categories
 
@@ -122,7 +123,7 @@ class ConfigService:
             if existing:
                 return False
 
-            await categories_collection.insert_one(category.dict())
+            await categories_collection.insert_one(category.model_dump())
             return True
         except Exception as e:
             print(f"❌ 添加市场分类失败: {e}")
@@ -134,7 +135,7 @@ class ConfigService:
             db = await self._get_db()
             categories_collection = db.market_categories
 
-            updates["updated_at"] = datetime.utcnow()
+            updates["updated_at"] = now_tz()
             result = await categories_collection.update_one(
                 {"id": category_id},
                 {"$set": updates}
@@ -192,7 +193,7 @@ class ConfigService:
             if existing:
                 return False
 
-            await groupings_collection.insert_one(grouping.dict())
+            await groupings_collection.insert_one(grouping.model_dump())
             return True
         except Exception as e:
             print(f"❌ 添加数据源到分类失败: {e}")
@@ -219,7 +220,7 @@ class ConfigService:
             db = await self._get_db()
             groupings_collection = db.datasource_groupings
 
-            updates["updated_at"] = datetime.utcnow()
+            updates["updated_at"] = now_tz()
             result = await groupings_collection.update_one(
                 {
                     "data_source_name": data_source_name,
@@ -248,7 +249,7 @@ class ConfigService:
                     {
                         "$set": {
                             "priority": item["priority"],
-                            "updated_at": datetime.utcnow()
+                            "updated_at": now_tz()
                         }
                     }
                 )
@@ -379,7 +380,31 @@ class ConfigService:
                 "enable_cache": True,
                 "cache_ttl": 3600,
                 "log_level": "INFO",
-                "enable_monitoring": True
+                "enable_monitoring": True,
+                # Worker/Queue intervals
+                "worker_heartbeat_interval_seconds": 30,
+                "queue_poll_interval_seconds": 1.0,
+                "queue_cleanup_interval_seconds": 60.0,
+                # SSE intervals
+                "sse_poll_timeout_seconds": 1.0,
+                "sse_heartbeat_interval_seconds": 10,
+                "sse_task_max_idle_seconds": 300,
+                "sse_batch_poll_interval_seconds": 2.0,
+                "sse_batch_max_idle_seconds": 600,
+                # TradingAgents runtime intervals (optional; DB-managed)
+                "ta_hk_min_request_interval_seconds": 2.0,
+                "ta_hk_timeout_seconds": 60,
+                "ta_hk_max_retries": 3,
+                "ta_hk_rate_limit_wait_seconds": 60,
+                "ta_hk_cache_ttl_seconds": 86400,
+                # 新增：TradingAgents 数据来源策略
+                # 是否优先从 app 缓存(Mongo 集合 stock_basic_info / market_quotes) 读取
+                "ta_use_app_cache": False,
+                "ta_china_min_api_interval_seconds": 0.5,
+                "ta_us_min_api_interval_seconds": 1.0,
+                "ta_google_news_sleep_min_seconds": 2.0,
+                "ta_google_news_sleep_max_seconds": 6.0,
+                "app_timezone": "Asia/Shanghai"
             }
         )
         
@@ -397,7 +422,7 @@ class ConfigService:
             config_collection = db.system_configs
 
             # 更新时间戳和版本
-            config.updated_at = datetime.utcnow()
+            config.updated_at = now_tz()
             config.version += 1
 
             # 将当前激活的配置设为非激活
@@ -408,7 +433,7 @@ class ConfigService:
             print(f"📝 禁用旧配置数量: {update_result.modified_count}")
 
             # 插入新配置 - 移除_id字段让MongoDB自动生成新的
-            config_dict = config.dict(by_alias=True)
+            config_dict = config.model_dump(by_alias=True)
             if '_id' in config_dict:
                 del config_dict['_id']  # 移除旧的_id，让MongoDB生成新的
 
@@ -558,16 +583,16 @@ class ConfigService:
             # 转换为可序列化的字典格式
             # 方案A：导出时对敏感字段脱敏/清空
             def _llm_sanitize(x: LLMConfig):
-                d = x.dict()
+                d = x.model_dump()
                 d["api_key"] = ""
                 return d
             def _ds_sanitize(x: DataSourceConfig):
-                d = x.dict()
+                d = x.model_dump()
                 d["api_key"] = ""
                 d["api_secret"] = ""
                 return d
             def _db_sanitize(x: DatabaseConfig):
-                d = x.dict()
+                d = x.model_dump()
                 d["password"] = ""
                 return d
             export_data = {
@@ -580,7 +605,7 @@ class ConfigService:
                 "database_configs": [_db_sanitize(db) for db in config.database_configs],
                 # 方案A：导出时对 system_settings 中的敏感键做脱敏
                 "system_settings": {k: (None if any(p in k.lower() for p in ("key","secret","password","token","client_secret")) else v) for k, v in (config.system_settings or {}).items()},
-                "exported_at": datetime.utcnow().isoformat(),
+                "exported_at": now_tz().isoformat(),
                 "version": config.version
             }
 
@@ -909,10 +934,10 @@ class ConfigService:
             if existing:
                 raise ValueError(f"厂家 {provider.name} 已存在")
 
-            provider.created_at = datetime.utcnow()
-            provider.updated_at = datetime.utcnow()
+            provider.created_at = now_tz()
+            provider.updated_at = now_tz()
 
-            result = await providers_collection.insert_one(provider.dict(by_alias=True))
+            result = await providers_collection.insert_one(provider.model_dump(by_alias=True))
             return str(result.inserted_id)
         except Exception as e:
             print(f"添加厂家失败: {e}")
@@ -924,7 +949,7 @@ class ConfigService:
             db = await self._get_db()
             providers_collection = db.llm_providers
 
-            update_data["updated_at"] = datetime.utcnow()
+            update_data["updated_at"] = now_tz()
 
             result = await providers_collection.update_one(
                 {"_id": ObjectId(provider_id)},
@@ -996,7 +1021,7 @@ class ConfigService:
 
             result = await providers_collection.update_one(
                 {"_id": ObjectId(provider_id)},
-                {"$set": {"is_active": is_active, "updated_at": datetime.utcnow()}}
+                {"$set": {"is_active": is_active, "updated_at": now_tz()}}
             )
 
             return result.modified_count > 0
@@ -1070,7 +1095,7 @@ class ConfigService:
                             "api_key": api_key,
                             "is_active": True,
                             "extra_config": {"migrated_from": "environment"},
-                            "updated_at": datetime.utcnow()
+                            "updated_at": now_tz()
                         }
                         await providers_collection.update_one(
                             {"name": provider_config["name"]},
@@ -1089,8 +1114,8 @@ class ConfigService:
                     "api_key": api_key,
                     "is_active": bool(api_key),  # 有密钥的自动启用
                     "extra_config": {"migrated_from": "environment"} if api_key else {},
-                    "created_at": datetime.utcnow(),
-                    "updated_at": datetime.utcnow()
+                    "created_at": now_tz(),
+                    "updated_at": now_tz()
                 }
 
                 await providers_collection.insert_one(provider_data)

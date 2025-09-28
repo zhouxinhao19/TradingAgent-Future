@@ -108,11 +108,50 @@ async def get_task_status_new(
             from app.core.database import get_mongo_db
             db = get_mongo_db()
 
-            # 从analysis_reports集合中查找
+            # 首先从analysis_tasks集合中查找（正在进行的任务）
+            task_result = await db.analysis_tasks.find_one({"task_id": task_id})
+
+            if task_result:
+                logger.info(f"✅ [STATUS] 从analysis_tasks找到任务: {task_id}")
+
+                # 构造状态响应（正在进行的任务）
+                status = task_result.get("status", "pending")
+                progress = task_result.get("progress", 0)
+
+                # 计算时间信息
+                start_time = task_result.get("started_at") or task_result.get("created_at")
+                current_time = datetime.utcnow()
+                elapsed_time = 0
+                if start_time:
+                    elapsed_time = (current_time - start_time).total_seconds()
+
+                status_data = {
+                    "task_id": task_id,
+                    "status": status,
+                    "progress": progress,
+                    "message": f"任务{status}中...",
+                    "current_step": status,
+                    "start_time": start_time,
+                    "end_time": task_result.get("completed_at"),
+                    "elapsed_time": elapsed_time,
+                    "remaining_time": 0,  # 无法准确估算
+                    "estimated_total_time": 0,
+                    "stock_code": task_result.get("stock_code"),
+                    "stock_symbol": task_result.get("stock_code"),
+                    "source": "mongodb_tasks"  # 标记数据来源
+                }
+
+                return {
+                    "success": True,
+                    "data": status_data,
+                    "message": "任务状态获取成功（从任务记录恢复）"
+                }
+
+            # 如果analysis_tasks中没有找到，再从analysis_reports集合中查找（已完成的任务）
             mongo_result = await db.analysis_reports.find_one({"task_id": task_id})
 
             if mongo_result:
-                logger.info(f"✅ [STATUS] 从MongoDB找到任务: {task_id}")
+                logger.info(f"✅ [STATUS] 从analysis_reports找到任务: {task_id}")
 
                 # 构造状态响应（模拟已完成的任务）
                 # 计算已完成任务的时间信息
@@ -137,7 +176,7 @@ async def get_task_status_new(
                     "stock_symbol": mongo_result.get("stock_symbol"),
                     "analysts": mongo_result.get("analysts", []),
                     "research_depth": mongo_result.get("research_depth", "快速"),
-                    "source": "mongodb_recovery"  # 标记数据来源
+                    "source": "mongodb_reports"  # 标记数据来源
                 }
 
                 return {
@@ -146,7 +185,7 @@ async def get_task_status_new(
                     "message": "任务状态获取成功（从历史记录恢复）"
                 }
             else:
-                logger.warning(f"❌ [STATUS] MongoDB中也未找到: {task_id}")
+                logger.warning(f"❌ [STATUS] MongoDB中也未找到: {task_id} trace={task_id}")
                 raise HTTPException(status_code=404, detail="任务不存在")
 
     except HTTPException:

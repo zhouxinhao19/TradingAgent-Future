@@ -10,6 +10,11 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 import logging
 
+from collections import defaultdict
+
+# 简单指标计数器（可后续接入 Prometheus）
+_metrics = defaultdict(int)
+
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
 logger = get_logger('agents')
@@ -45,12 +50,12 @@ class StockDataService:
     统一的股票数据获取服务
     实现完整的降级机制：MongoDB -> Tushare数据接口 -> 缓存 -> 错误处理
     """
-    
+
     def __init__(self):
         self.db_manager = None
         self.tdx_provider = None
         self._init_services()
-    
+
     def _init_services(self):
         """初始化服务"""
         # 尝试初始化数据库管理器
@@ -64,7 +69,7 @@ class StockDataService:
             except Exception as e:
                 logger.error(f"⚠️ 数据库管理器初始化失败: {e}")
                 self.db_manager = None
-        
+
         # 尝试初始化通达信提供器
         if TDX_AVAILABLE:
             try:
@@ -73,46 +78,71 @@ class StockDataService:
             except Exception as e:
                 logger.error(f"⚠️ Tushare数据接口初始化失败: {e}")
                 self.tdx_provider = None
-    
+
     def get_stock_basic_info(self, stock_code: str = None) -> Optional[Dict[str, Any]]:
         """
         获取股票基础信息（单个股票或全部股票）
-        
-        Args:
-            stock_code: 股票代码，如果为None则返回所有股票
-        
-        Returns:
-            Dict: 股票基础信息
+
+        策略（由配置 ta_use_app_cache 控制）：
+        - True: 先查 app 缓存(Mongo stock_basic_info) → 未命中再走直连接口 → 最后兜底
+        - False: 先走直连接口 → 未命中再查 app 缓存 → 最后兜底
         """
         logger.info(f"📊 获取股票基础信息: {stock_code or '全部股票'}")
-        
-        # 1. 优先从MongoDB获取
-        if self.db_manager and self.db_manager.is_mongodb_available():
-            try:
-                result = self._get_from_mongodb(stock_code)
-                if result:
-                    logger.info(f"✅ 从MongoDB获取成功: {len(result) if isinstance(result, list) else 1}条记录")
-                    return result
-            except Exception as e:
-                logger.error(f"⚠️ MongoDB查询失败: {e}")
-        
-        # 2. 降级到Tushare数据接口
-        logger.info(f"🔄 MongoDB不可用，降级到Tushare数据接口")
-        if ENHANCED_FETCHER_AVAILABLE:
-            try:
-                result = self._get_from_tdx_api(stock_code)
-                if result:
-                    logger.info(f"✅ 从Tushare数据接口获取成功: {len(result) if isinstance(result, list) else 1}条记录")
-                    # 尝试缓存到MongoDB（如果可用）
-                    self._cache_to_mongodb(result)
-                    return result
-            except Exception as e:
-                logger.error(f"⚠️ Tushare数据接口查询失败: {e}")
-        
-        # 3. 最后的降级方案
-        logger.error(f"❌ 所有数据源都不可用")
+
+        # 延迟导入，避免循环依赖
+        try:
+            from tradingagents.config.runtime_settings import use_app_cache_enabled
+            use_app_cache = use_app_cache_enabled(False)
+        except Exception:
+            use_app_cache = False
+
+        def _from_mongo() -> Optional[Dict[str, Any]]:
+            if self.db_manager and self.db_manager.is_mongodb_available():
+                try:
+                    result = self._get_from_mongodb(stock_code)
+                    if result:
+                        _metrics['basics_cache_hit'] += 1
+                        logger.info(
+                            f"✅ 从MongoDB获取成功: {len(result) if isinstance(result, list) else 1}条记录 | "
+                            f"source=mongo cache_hit=true code={stock_code or 'ALL'}"
+                        )
+                        return result
+                except Exception as e:
+                    logger.error(f"⚠️ MongoDB查询失败: {e}")
+            return None
+
+        def _from_api_and_cache() -> Optional[Dict[str, Any]]:
+            if ENHANCED_FETCHER_AVAILABLE:
+                try:
+                    result = self._get_from_tdx_api(stock_code)
+                    if result:
+                        _metrics['basics_api_hit'] += 1
+                        logger.info(
+                            f"✅ 从Tushare数据接口获取成功: {len(result) if isinstance(result, list) else 1}条记录 | "
+                            f"source=tdx_api cache_hit=false code={stock_code or 'ALL'}"
+                        )
+                        # 尝试缓存到MongoDB（如果可用）
+                        self._cache_to_mongodb(result)
+                        return result
+                except Exception as e:
+                    logger.error(f"⚠️ Tushare数据接口查询失败: {e}")
+            return None
+
+        # 根据配置决定优先级
+        result = None
+        if use_app_cache:
+            result = _from_mongo() or _from_api_and_cache()
+        else:
+            result = _from_api_and_cache() or _from_mongo()
+
+        if result is not None:
+            return result
+
+        # 兜底
+        _metrics['basics_fallback'] += 1
+        logger.error("❌ 所有数据源都不可用 | fallback_reason=all_sources_unavailable code=%s", stock_code or 'ALL')
         return self._get_fallback_data(stock_code)
-    
+
     def _get_from_mongodb(self, stock_code: str = None) -> Optional[Dict[str, Any]]:
         """从MongoDB获取数据"""
         try:
@@ -136,7 +166,7 @@ class StockDataService:
         except Exception as e:
             logger.error(f"MongoDB查询失败: {e}")
             return None
-    
+
     def _get_from_tdx_api(self, stock_code: str = None) -> Optional[Dict[str, Any]]:
         """从Tushare数据接口获取数据"""
         try:
@@ -160,7 +190,7 @@ class StockDataService:
                     enable_server_failover=True,
                     max_retries=3
                 )
-                
+
                 if stock_df is not None and not stock_df.empty:
                     # 转换为字典列表
                     results = []
@@ -174,19 +204,19 @@ class StockDataService:
                             'updated_at': datetime.now().isoformat()
                         })
                     return results
-                    
+
         except Exception as e:
             logger.error(f"Tushare数据接口查询失败: {e}")
             return None
-    
+
     def _cache_to_mongodb(self, data: Any) -> bool:
         """将数据缓存到MongoDB"""
         if not self.db_manager or not self.db_manager.mongodb_db:
             return False
-        
+
         try:
             collection = self.db_manager.mongodb_db['stock_basic_info']
-            
+
             if isinstance(data, list):
                 # 批量插入
                 for item in data:
@@ -204,13 +234,13 @@ class StockDataService:
                     upsert=True
                 )
                 logger.info(f"💾 已缓存股票{data['code']}到MongoDB")
-            
+
             return True
-            
+
         except Exception as e:
             logger.error(f"缓存到MongoDB失败: {e}")
             return False
-    
+
     def _get_fallback_data(self, stock_code: str = None) -> Dict[str, Any]:
         """最后的降级数据"""
         if stock_code:
@@ -228,7 +258,7 @@ class StockDataService:
                 'error': '无法获取股票列表，请检查网络连接和数据库配置',
                 'suggestion': '请确保MongoDB已配置或网络连接正常以访问Tushare数据接口'
             }
-    
+
     def _get_market_name(self, stock_code: str) -> str:
         """根据股票代码判断市场"""
         if stock_code.startswith(('60', '68', '90')):
@@ -237,7 +267,7 @@ class StockDataService:
             return '深圳'
         else:
             return '未知'
-    
+
     def _get_stock_category(self, stock_code: str) -> str:
         """根据股票代码判断类别"""
         if stock_code.startswith('60'):
@@ -252,19 +282,19 @@ class StockDataService:
             return '深市B股'
         else:
             return '其他'
-    
+
     def get_stock_data_with_fallback(self, stock_code: str, start_date: str, end_date: str) -> str:
         """
         获取股票数据（带降级机制）
         这是对现有get_china_stock_data函数的增强
         """
         logger.info(f"📊 获取股票数据: {stock_code} ({start_date} 到 {end_date})")
-        
+
         # 首先确保股票基础信息可用
         stock_info = self.get_stock_basic_info(stock_code)
         if stock_info and 'error' in stock_info:
             return f"❌ 无法获取股票{stock_code}的基础信息: {stock_info.get('error', '未知错误')}"
-        
+
         # 调用现有的get_china_stock_data函数
         try:
             from .tdx_utils import get_china_stock_data

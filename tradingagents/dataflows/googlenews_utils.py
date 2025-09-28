@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 import time
 import random
+import os
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -12,9 +13,13 @@ from tenacity import (
     retry_if_result,
 )
 
+from tradingagents.config.runtime_settings import get_float
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
 logger = get_logger('agents')
+
+SLEEP_MIN = get_float("TA_GOOGLE_NEWS_SLEEP_MIN_SECONDS", "ta_google_news_sleep_min_seconds", 2.0)
+SLEEP_MAX = get_float("TA_GOOGLE_NEWS_SLEEP_MAX_SECONDS", "ta_google_news_sleep_max_seconds", 6.0)
 
 
 def is_rate_limited(response):
@@ -30,7 +35,7 @@ def is_rate_limited(response):
 def make_request(url, headers):
     """Make a request with retry logic for rate limiting and connection issues"""
     # Random delay before each request to avoid detection
-    time.sleep(random.uniform(2, 6))
+    time.sleep(random.uniform(SLEEP_MIN, SLEEP_MAX))
     # 添加超时参数，设置连接超时和读取超时
     response = requests.get(url, headers=headers, timeout=(10, 30))  # 连接超时10秒，读取超时30秒
     return response

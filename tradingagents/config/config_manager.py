@@ -8,6 +8,7 @@ import json
 import os
 import re
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
 from pathlib import Path
@@ -18,6 +19,8 @@ from tradingagents.utils.logging_init import get_logger
 
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
+# 运行时设置：读取系统时区
+from tradingagents.config.runtime_settings import get_timezone_name
 logger = get_logger('agents')
 
 try:
@@ -373,7 +376,7 @@ class ConfigManager:
         cost = self.calculate_cost(provider, model_name, input_tokens, output_tokens)
         
         record = UsageRecord(
-            timestamp=datetime.now().isoformat(),
+            timestamp=datetime.now(ZoneInfo(get_timezone_name())).isoformat(),
             provider=provider,
             model_name=model_name,
             input_tokens=input_tokens,
@@ -660,7 +663,7 @@ class TokenTracker:
                    output_tokens: int, session_id: str = None, analysis_type: str = "stock_analysis"):
         """跟踪Token使用"""
         if session_id is None:
-            session_id = f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            session_id = f"session_{datetime.now(ZoneInfo(get_timezone_name())).strftime('%Y%m%d_%H%M%S')}"
 
         # 检查是否启用成本跟踪
         settings = self.config_manager.load_settings()

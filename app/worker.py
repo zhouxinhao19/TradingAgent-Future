@@ -44,7 +44,7 @@ async def publish_progress(task_id: str, message: str, step: Optional[int] = Non
         progress_data["step"] = step
         progress_data["total_steps"] = total_steps
         progress_data["progress"] = round((step / total_steps) * 100, 1)
-    
+
     try:
         await r.publish(f"task_progress:{task_id}", json.dumps(progress_data, ensure_ascii=False))
     except Exception as e:
@@ -96,7 +96,7 @@ async def process_task(task_id: str) -> None:
         # Import and call the actual analysis function
         try:
             from web.utils.analysis_runner import run_stock_analysis
-            
+
             loop = asyncio.get_running_loop()
 
             # Wrap the sync function in an async executor
@@ -166,7 +166,7 @@ async def process_task(task_id: str) -> None:
             await r.sadd(SET_COMPLETED, task_id)
         else:
             await r.sadd(SET_FAILED, task_id)
-        
+
         logger.info(f"Task {task_id} {status}")
 
     except Exception as e:
@@ -204,6 +204,17 @@ async def worker_loop(stop_event: asyncio.Event):
 async def main():
     setup_logging("INFO")
     await init_db()
+    # Apply dynamic log level from system settings
+    try:
+        from app.services.config_provider import provider as config_provider
+        eff = await config_provider.get_effective_system_settings()
+        desired_level = str(eff.get("log_level", "INFO")).upper()
+        setup_logging(desired_level)
+        for name in ("worker", "webapi", "uvicorn", "fastapi"):
+            logging.getLogger(name).setLevel(desired_level)
+    except Exception as e:
+        logging.getLogger("worker").warning(f"Failed to apply dynamic log level: {e}")
+
 
     stop_event = asyncio.Event()
 

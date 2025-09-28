@@ -19,6 +19,7 @@ from app.core.logging_config import setup_logging
 from app.routers import auth, analysis, screening, queue, sse, health, favorites, config, reports, database, operation_logs, tags
 from app.routers import sync as sync_router, multi_source_sync
 from app.routers import stocks as stocks_router
+from app.routers import stock_data as stock_data_router
 from app.routers import notifications as notifications_router
 from app.services.basics_sync_service import get_basics_sync_service
 from app.middleware.operation_log_middleware import OperationLogMiddleware
@@ -36,6 +37,22 @@ async def lifespan(app: FastAPI):
     setup_logging()
     logger = logging.getLogger("app.main")
     await init_db()
+    # Apply dynamic settings (log_level, enable_monitoring) from ConfigProvider
+    try:
+        from app.services.config_provider import provider as config_provider  # local import to avoid early DB init issues
+        eff = await config_provider.get_effective_system_settings()
+        desired_level = str(eff.get("log_level", "INFO")).upper()
+        setup_logging(log_level=desired_level)
+        for name in ("webapi", "worker", "uvicorn", "fastapi"):
+            logging.getLogger(name).setLevel(desired_level)
+        try:
+            from app.middleware.operation_log_middleware import set_operation_log_enabled
+            set_operation_log_enabled(bool(eff.get("enable_monitoring", True)))
+        except Exception:
+            pass
+    except Exception as e:
+        logging.getLogger("webapi").warning(f"Failed to apply dynamic settings: {e}")
+
     logger.info("TradingAgents FastAPI backend started")
 
     # 启动期：若需要在休市时补充上一交易日收盘快照
@@ -195,6 +212,7 @@ app.include_router(screening.router, prefix="/api/screening", tags=["screening"]
 app.include_router(queue.router, prefix="/api/queue", tags=["queue"])
 app.include_router(favorites.router, prefix="/api", tags=["favorites"])
 app.include_router(stocks_router.router, prefix="/api", tags=["stocks"])
+app.include_router(stock_data_router.router, tags=["stock-data"])
 app.include_router(tags.router, prefix="/api", tags=["tags"])
 app.include_router(config.router, prefix="/api", tags=["config"])
 app.include_router(database.router, prefix="/api/system", tags=["database"])

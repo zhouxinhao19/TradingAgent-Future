@@ -19,8 +19,12 @@ from app.models.config import (
 )
 from app.services.config_service import config_service
 from datetime import datetime
+from app.utils.timezone import now_tz
+
 from app.services.operation_log_service import log_operation
 from app.models.operation_log import ActionType
+from app.services.config_provider import provider as config_provider
+
 
 
 router = APIRouter(prefix="/config", tags=["配置管理"])
@@ -32,19 +36,19 @@ from copy import deepcopy
 
 def _sanitize_llm_configs(items):
     try:
-        return [LLMConfig(**{**i.dict(), "api_key": None}) for i in items]
+        return [LLMConfig(**{**i.model_dump(), "api_key": None}) for i in items]
     except Exception:
         return items
 
 def _sanitize_datasource_configs(items):
     try:
-        return [DataSourceConfig(**{**i.dict(), "api_key": None, "api_secret": None}) for i in items]
+        return [DataSourceConfig(**{**i.model_dump(), "api_key": None, "api_secret": None}) for i in items]
     except Exception:
         return items
 
 def _sanitize_database_configs(items):
     try:
-        return [DatabaseConfig(**{**i.dict(), "password": None}) for i in items]
+        return [DatabaseConfig(**{**i.model_dump(), "password": None}) for i in items]
     except Exception:
         return items
 
@@ -152,11 +156,26 @@ async def add_llm_provider(
     request: LLMProviderRequest,
     current_user: User = Depends(get_current_user)
 ):
-    """添加大模型厂家"""
+    """添加大模型厂家（方案A：REST不接受密钥，强制清洗）"""
     try:
-        provider = LLMProvider(**request.dict())
+        sanitized = request.model_dump()
+        if 'api_key' in sanitized:
+            sanitized['api_key'] = ""
+        provider = LLMProvider(**sanitized)
         provider_id = await config_service.add_llm_provider(provider)
 
+        # 审计日志（忽略异常）
+        try:
+            await log_operation(
+                user_id=str(getattr(current_user, "id", "")),
+                username=getattr(current_user, "username", "unknown"),
+                action_type=ActionType.CONFIG_MANAGEMENT,
+                action="add_llm_provider",
+                details={"provider_id": str(provider_id), "name": request.name},
+                success=True,
+            )
+        except Exception:
+            pass
         return {
             "success": True,
             "message": "厂家添加成功",
@@ -177,9 +196,24 @@ async def update_llm_provider(
 ):
     """更新大模型厂家"""
     try:
-        success = await config_service.update_llm_provider(provider_id, request.dict())
+        update_data = request.model_dump()
+        if 'api_key' in update_data:
+            update_data['api_key'] = ""
+        success = await config_service.update_llm_provider(provider_id, update_data)
 
         if success:
+            # 审计日志（忽略异常）
+            try:
+                await log_operation(
+                    user_id=str(getattr(current_user, "id", "")),
+                    username=getattr(current_user, "username", "unknown"),
+                    action_type=ActionType.CONFIG_MANAGEMENT,
+                    action="update_llm_provider",
+                    details={"provider_id": provider_id, "changed_keys": list(request.model_dump().keys())},
+                    success=True,
+                )
+            except Exception:
+                pass
             return {
                 "success": True,
                 "message": "厂家更新成功",
@@ -209,6 +243,18 @@ async def delete_llm_provider(
         success = await config_service.delete_llm_provider(provider_id)
 
         if success:
+            # 审计日志（忽略异常）
+            try:
+                await log_operation(
+                    user_id=str(getattr(current_user, "id", "")),
+                    username=getattr(current_user, "username", "unknown"),
+                    action_type=ActionType.CONFIG_MANAGEMENT,
+                    action="delete_llm_provider",
+                    details={"provider_id": provider_id},
+                    success=True,
+                )
+            except Exception:
+                pass
             return {
                 "success": True,
                 "message": "厂家删除成功",
@@ -240,6 +286,18 @@ async def toggle_llm_provider(
         success = await config_service.toggle_llm_provider(provider_id, is_active)
 
         if success:
+            # 审计日志（忽略异常）
+            try:
+                await log_operation(
+                    user_id=str(getattr(current_user, "id", "")),
+                    username=getattr(current_user, "username", "unknown"),
+                    action_type=ActionType.CONFIG_MANAGEMENT,
+                    action="toggle_llm_provider",
+                    details={"provider_id": provider_id, "is_active": bool(is_active)},
+                    success=True,
+                )
+            except Exception:
+                pass
             return {
                 "success": True,
                 "message": f"厂家已{'启用' if is_active else '禁用'}",
@@ -266,6 +324,21 @@ async def migrate_env_to_providers(
     """将环境变量配置迁移到厂家管理"""
     try:
         result = await config_service.migrate_env_to_providers()
+        # 审计日志（忽略异常）
+        try:
+            await log_operation(
+                user_id=str(getattr(current_user, "id", "")),
+                username=getattr(current_user, "username", "unknown"),
+                action_type=ActionType.CONFIG_MANAGEMENT,
+                action="migrate_env_to_providers",
+                details={
+                    "migrated_count": result.get("migrated_count", 0),
+                    "skipped_count": result.get("skipped_count", 0)
+                },
+                success=bool(result.get("success", False)),
+            )
+        except Exception:
+            pass
 
         return {
             "success": result["success"],
@@ -311,11 +384,11 @@ async def add_llm_config(
     """添加或更新大模型配置"""
     try:
         logger.info(f"🔧 添加/更新大模型配置开始")
-        logger.info(f"📊 请求数据: {request.dict()}")
+        logger.info(f"📊 请求数据: {request.model_dump()}")
         logger.info(f"🏷️ 厂家: {request.provider}, 模型: {request.model_name}")
 
         # 创建LLM配置
-        llm_config_data = request.dict()
+        llm_config_data = request.model_dump()
         logger.info(f"📋 原始配置数据: {llm_config_data}")
 
         # 如果没有提供API密钥，从厂家配置中获取
@@ -368,6 +441,18 @@ async def add_llm_config(
 
         if success:
             logger.info(f"✅ 大模型配置更新成功: {llm_config.provider}/{llm_config.model_name}")
+            # 审计日志（忽略异常）
+            try:
+                await log_operation(
+                    user_id=str(getattr(current_user, "id", "")),
+                    username=getattr(current_user, "username", "unknown"),
+                    action_type=ActionType.CONFIG_MANAGEMENT,
+                    action="update_llm_config",
+                    details={"provider": llm_config.provider, "model_name": llm_config.model_name},
+                    success=True,
+                )
+            except Exception:
+                pass
             return {"message": "大模型配置更新成功", "model_name": llm_config.model_name}
         else:
             logger.error(f"❌ 大模型配置保存失败")
@@ -405,7 +490,7 @@ async def add_data_source_config(
             )
 
         # 添加新的数据源配置（方案A：清洗敏感字段）
-        _req = request.dict()
+        _req = request.model_dump()
         _req['api_key'] = ""
         _req['api_secret'] = ""
         ds_config = DataSourceConfig(**_req)
@@ -413,6 +498,18 @@ async def add_data_source_config(
 
         success = await config_service.save_system_config(config)
         if success:
+            # 审计日志（忽略异常）
+            try:
+                await log_operation(
+                    user_id=str(getattr(current_user, "id", "")),
+                    username=getattr(current_user, "username", "unknown"),
+                    action_type=ActionType.CONFIG_MANAGEMENT,
+                    action="add_data_source_config",
+                    details={"name": ds_config.name},
+                    success=True,
+                )
+            except Exception:
+                pass
             return {"message": "数据源配置添加成功", "name": ds_config.name}
         else:
             raise HTTPException(
@@ -446,13 +543,25 @@ async def add_database_config(
             )
 
         # 添加新的数据库配置（方案A：清洗敏感字段）
-        _req = request.dict()
+        _req = request.model_dump()
         _req['password'] = ""
         db_config = DatabaseConfig(**_req)
         config.database_configs.append(db_config)
 
         success = await config_service.save_system_config(config)
         if success:
+            # 审计日志（忽略异常）
+            try:
+                await log_operation(
+                    user_id=str(getattr(current_user, "id", "")),
+                    username=getattr(current_user, "username", "unknown"),
+                    action_type=ActionType.CONFIG_MANAGEMENT,
+                    action="add_database_config",
+                    details={"name": db_config.name},
+                    success=True,
+                )
+            except Exception:
+                pass
             return {"message": "数据库配置添加成功", "name": db_config.name}
         else:
             raise HTTPException(
@@ -543,6 +652,18 @@ async def delete_llm_config(
 
         if success:
             logger.info(f"✅ 大模型配置删除成功 - {provider}/{model_name}")
+            # 审计日志（忽略异常）
+            try:
+                await log_operation(
+                    user_id=str(getattr(current_user, "id", "")),
+                    username=getattr(current_user, "username", "unknown"),
+                    action_type=ActionType.CONFIG_MANAGEMENT,
+                    action="delete_llm_config",
+                    details={"provider": provider, "model_name": model_name},
+                    success=True,
+                )
+            except Exception:
+                pass
             return {"message": "大模型配置删除成功"}
         else:
             logger.warning(f"⚠️ 未找到大模型配置 - {provider}/{model_name}")
@@ -569,6 +690,18 @@ async def set_default_llm(
     try:
         success = await config_service.set_default_llm(request.name)
         if success:
+            # 审计日志（忽略异常）
+            try:
+                await log_operation(
+                    user_id=str(getattr(current_user, "id", "")),
+                    username=getattr(current_user, "username", "unknown"),
+                    action_type=ActionType.CONFIG_MANAGEMENT,
+                    action="set_default_llm",
+                    details={"name": request.name},
+                    success=True,
+                )
+            except Exception:
+                pass
             return {"message": "默认大模型设置成功", "default_llm": request.name}
         else:
             raise HTTPException(
@@ -621,7 +754,7 @@ async def update_data_source_config(
         for i, ds_config in enumerate(config.data_source_configs):
             if ds_config.name == name:
                 # 更新配置（方案A：清洗敏感字段）
-                _req = request.dict()
+                _req = request.model_dump()
                 _req['api_key'] = ""
                 _req['api_secret'] = ""
                 updated_config = DataSourceConfig(**_req)
@@ -629,6 +762,18 @@ async def update_data_source_config(
 
                 success = await config_service.save_system_config(config)
                 if success:
+                    # 审计日志（忽略异常）
+                    try:
+                        await log_operation(
+                            user_id=str(getattr(current_user, "id", "")),
+                            username=getattr(current_user, "username", "unknown"),
+                            action_type=ActionType.CONFIG_MANAGEMENT,
+                            action="update_data_source_config",
+                            details={"name": name},
+                            success=True,
+                        )
+                    except Exception:
+                        pass
                     return {"message": "数据源配置更新成功"}
                 else:
                     raise HTTPException(
@@ -671,6 +816,18 @@ async def delete_data_source_config(
 
                 success = await config_service.save_system_config(config)
                 if success:
+                    # 审计日志（忽略异常）
+                    try:
+                        await log_operation(
+                            user_id=str(getattr(current_user, "id", "")),
+                            username=getattr(current_user, "username", "unknown"),
+                            action_type=ActionType.CONFIG_MANAGEMENT,
+                            action="delete_data_source_config",
+                            details={"name": name},
+                            success=True,
+                        )
+                    except Exception:
+                        pass
                     return {"message": "数据源配置删除成功"}
                 else:
                     raise HTTPException(
@@ -715,10 +872,22 @@ async def add_market_category(
 ):
     """添加市场分类"""
     try:
-        category = MarketCategory(**request.dict())
+        category = MarketCategory(**request.model_dump())
         success = await config_service.add_market_category(category)
 
         if success:
+            # 审计日志（忽略异常）
+            try:
+                await log_operation(
+                    user_id=str(getattr(current_user, "id", "")),
+                    username=getattr(current_user, "username", "unknown"),
+                    action_type=ActionType.CONFIG_MANAGEMENT,
+                    action="add_market_category",
+                    details={"id": str(getattr(category, 'id', ''))},
+                    success=True,
+                )
+            except Exception:
+                pass
             return {"message": "市场分类添加成功", "id": category.id}
         else:
             raise HTTPException(
@@ -745,6 +914,18 @@ async def update_market_category(
         success = await config_service.update_market_category(category_id, request)
 
         if success:
+            # 审计日志（忽略异常）
+            try:
+                await log_operation(
+                    user_id=str(getattr(current_user, "id", "")),
+                    username=getattr(current_user, "username", "unknown"),
+                    action_type=ActionType.CONFIG_MANAGEMENT,
+                    action="update_market_category",
+                    details={"category_id": category_id, "changed_keys": list(request.keys())},
+                    success=True,
+                )
+            except Exception:
+                pass
             return {"message": "市场分类更新成功"}
         else:
             raise HTTPException(
@@ -770,6 +951,18 @@ async def delete_market_category(
         success = await config_service.delete_market_category(category_id)
 
         if success:
+            # 审计日志（忽略异常）
+            try:
+                await log_operation(
+                    user_id=str(getattr(current_user, "id", "")),
+                    username=getattr(current_user, "username", "unknown"),
+                    action_type=ActionType.CONFIG_MANAGEMENT,
+                    action="delete_market_category",
+                    details={"category_id": category_id},
+                    success=True,
+                )
+            except Exception:
+                pass
             return {"message": "市场分类删除成功"}
         else:
             raise HTTPException(
@@ -809,10 +1002,22 @@ async def add_datasource_to_category(
 ):
     """将数据源添加到分类"""
     try:
-        grouping = DataSourceGrouping(**request.dict())
+        grouping = DataSourceGrouping(**request.model_dump())
         success = await config_service.add_datasource_to_category(grouping)
 
         if success:
+            # 审计日志（忽略异常）
+            try:
+                await log_operation(
+                    user_id=str(getattr(current_user, "id", "")),
+                    username=getattr(current_user, "username", "unknown"),
+                    action_type=ActionType.CONFIG_MANAGEMENT,
+                    action="add_datasource_to_category",
+                    details={"data_source_name": request.data_source_name, "category_id": request.category_id},
+                    success=True,
+                )
+            except Exception:
+                pass
             return {"message": "数据源添加到分类成功"}
         else:
             raise HTTPException(
@@ -839,6 +1044,18 @@ async def remove_datasource_from_category(
         success = await config_service.remove_datasource_from_category(data_source_name, category_id)
 
         if success:
+            # 审计日志（忽略异常）
+            try:
+                await log_operation(
+                    user_id=str(getattr(current_user, "id", "")),
+                    username=getattr(current_user, "username", "unknown"),
+                    action_type=ActionType.CONFIG_MANAGEMENT,
+                    action="remove_datasource_from_category",
+                    details={"data_source_name": data_source_name, "category_id": category_id},
+                    success=True,
+                )
+            except Exception:
+                pass
             return {"message": "数据源从分类中移除成功"}
         else:
             raise HTTPException(
@@ -866,6 +1083,18 @@ async def update_datasource_grouping(
         success = await config_service.update_datasource_grouping(data_source_name, category_id, request)
 
         if success:
+            # 审计日志（忽略异常）
+            try:
+                await log_operation(
+                    user_id=str(getattr(current_user, "id", "")),
+                    username=getattr(current_user, "username", "unknown"),
+                    action_type=ActionType.CONFIG_MANAGEMENT,
+                    action="update_datasource_grouping",
+                    details={"data_source_name": data_source_name, "category_id": category_id, "changed_keys": list(request.keys())},
+                    success=True,
+                )
+            except Exception:
+                pass
             return {"message": "数据源分组关系更新成功"}
         else:
             raise HTTPException(
@@ -892,6 +1121,18 @@ async def update_category_datasource_order(
         success = await config_service.update_category_datasource_order(category_id, request.data_sources)
 
         if success:
+            # 审计日志（忽略异常）
+            try:
+                await log_operation(
+                    user_id=str(getattr(current_user, "id", "")),
+                    username=getattr(current_user, "username", "unknown"),
+                    action_type=ActionType.CONFIG_MANAGEMENT,
+                    action="update_category_datasource_order",
+                    details={"category_id": category_id, "data_sources": request.data_sources},
+                    success=True,
+                )
+            except Exception:
+                pass
             return {"message": "数据源排序更新成功"}
         else:
             raise HTTPException(
@@ -916,6 +1157,18 @@ async def set_default_data_source(
     try:
         success = await config_service.set_default_data_source(request.name)
         if success:
+            # 审计日志（忽略异常）
+            try:
+                await log_operation(
+                    user_id=str(getattr(current_user, "id", "")),
+                    username=getattr(current_user, "username", "unknown"),
+                    action_type=ActionType.CONFIG_MANAGEMENT,
+                    action="set_default_datasource",
+                    details={"name": request.name},
+                    success=True,
+                )
+            except Exception:
+                pass
             return {"message": "默认数据源设置成功", "default_data_source": request.name}
         else:
             raise HTTPException(
@@ -937,14 +1190,32 @@ async def get_system_settings(
 ):
     """获取系统设置"""
     try:
-        config = await config_service.get_system_config()
-        if not config:
-            return {}
-        return _sanitize_kv(config.system_settings)
+        effective = await config_provider.get_effective_system_settings()
+        return _sanitize_kv(effective)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"获取系统设置失败: {str(e)}"
+        )
+
+
+@router.get("/settings/meta", response_model=dict)
+async def get_system_settings_meta(
+    current_user: User = Depends(get_current_user)
+):
+    """获取系统设置的元数据（敏感性、可编辑性、来源、是否有值）。
+    返回结构：{success, data: {items: [{key,sensitive,editable,source,has_value}]}, message}
+    """
+    try:
+        meta_map = await config_provider.get_system_settings_meta()
+        items = [
+            {"key": k, **v} for k, v in meta_map.items()
+        ]
+        return {"success": True, "data": {"items": items}, "message": ""}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取系统设置元数据失败: {str(e)}"
         )
 
 
@@ -967,6 +1238,11 @@ async def update_system_settings(
                     details={"changed_keys": list(settings.keys())},
                     success=True,
                 )
+            except Exception:
+                pass
+            # 失效缓存
+            try:
+                config_provider.invalidate()
             except Exception:
                 pass
             return {"message": "系统设置更新成功"}
@@ -1004,10 +1280,22 @@ async def export_config(
     """导出配置"""
     try:
         config_data = await config_service.export_config()
+        # 审计日志（忽略异常）
+        try:
+            await log_operation(
+                user_id=str(getattr(current_user, "id", "")),
+                username=getattr(current_user, "username", "unknown"),
+                action_type=ActionType.DATA_EXPORT,
+                action="export_config",
+                details={"size": len(str(config_data))},
+                success=True,
+            )
+        except Exception:
+            pass
         return {
             "message": "配置导出成功",
             "data": config_data,
-            "exported_at": datetime.utcnow().isoformat()
+            "exported_at": now_tz().isoformat()
         }
     except Exception as e:
         raise HTTPException(
@@ -1025,6 +1313,18 @@ async def import_config(
     try:
         success = await config_service.import_config(config_data)
         if success:
+            # 审计日志（忽略异常）
+            try:
+                await log_operation(
+                    user_id=str(getattr(current_user, "id", "")),
+                    username=getattr(current_user, "username", "unknown"),
+                    action_type=ActionType.DATA_IMPORT,
+                    action="import_config",
+                    details={"keys": list(config_data.keys())[:10]},
+                    success=True,
+                )
+            except Exception:
+                pass
             return {"message": "配置导入成功"}
         else:
             raise HTTPException(
@@ -1048,6 +1348,18 @@ async def migrate_legacy_config(
     try:
         success = await config_service.migrate_legacy_config()
         if success:
+            # 审计日志（忽略异常）
+            try:
+                await log_operation(
+                    user_id=str(getattr(current_user, "id", "")),
+                    username=getattr(current_user, "username", "unknown"),
+                    action_type=ActionType.CONFIG_MANAGEMENT,
+                    action="migrate_legacy_config",
+                    details={},
+                    success=True,
+                )
+            except Exception:
+                pass
             return {"message": "传统配置迁移成功"}
         else:
             raise HTTPException(
@@ -1074,6 +1386,18 @@ async def set_default_llm(
 
         success = await config_service.set_default_llm(request.name)
         if success:
+            # 审计日志（忽略异常）
+            try:
+                await log_operation(
+                    user_id=str(getattr(current_user, "id", "")),
+                    username=getattr(current_user, "username", "unknown"),
+                    action_type=ActionType.CONFIG_MANAGEMENT,
+                    action="set_default_llm",
+                    details={"name": request.name},
+                    success=True,
+                )
+            except Exception:
+                pass
             return {"message": f"默认大模型已设置为: {request.name}"}
         else:
             raise HTTPException(
@@ -1100,6 +1424,18 @@ async def set_default_data_source(
 
         success = await config_service.set_default_data_source(request.name)
         if success:
+            # 审计日志（忽略异常）
+            try:
+                await log_operation(
+                    user_id=str(getattr(current_user, "id", "")),
+                    username=getattr(current_user, "username", "unknown"),
+                    action_type=ActionType.CONFIG_MANAGEMENT,
+                    action="set_default_datasource",
+                    details={"name": request.name},
+                    success=True,
+                )
+            except Exception:
+                pass
             return {"message": f"默认数据源已设置为: {request.name}"}
         else:
             raise HTTPException(

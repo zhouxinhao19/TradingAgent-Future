@@ -78,6 +78,11 @@ class Settings(BaseSettings):
     QUEUE_MAX_RETRIES: int = Field(default=3)
     WORKER_HEARTBEAT_INTERVAL: int = Field(default=30)  # 30秒
 
+
+    # 队列轮询/清理间隔（秒）
+    QUEUE_POLL_INTERVAL_SECONDS: float = Field(default=1.0)
+    QUEUE_CLEANUP_INTERVAL_SECONDS: float = Field(default=60.0)
+
     # 并发控制
     DEFAULT_USER_CONCURRENT_LIMIT: int = Field(default=3)
     GLOBAL_CONCURRENT_LIMIT: int = Field(default=50)
@@ -108,6 +113,14 @@ class Settings(BaseSettings):
     # 外部服务配置
     STOCK_DATA_API_URL: str = Field(default="")
     STOCK_DATA_API_KEY: str = Field(default="")
+
+    # SSE 配置
+    SSE_POLL_TIMEOUT_SECONDS: float = Field(default=1.0)
+    SSE_HEARTBEAT_INTERVAL_SECONDS: int = Field(default=10)
+    SSE_TASK_MAX_IDLE_SECONDS: int = Field(default=300)
+    SSE_BATCH_POLL_INTERVAL_SECONDS: float = Field(default=2.0)
+    SSE_BATCH_MAX_IDLE_SECONDS: int = Field(default=600)
+
 
     # 监控配置
     METRICS_ENABLED: bool = Field(default=True)

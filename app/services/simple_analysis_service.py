@@ -346,12 +346,13 @@ class SimpleAnalysisService:
             else:
                 logger.error(f"❌ 任务创建验证失败: 无法查询到刚创建的任务 {task_id}")
 
-            # 尝试补齐股票名称并写入数据库任务文档的初始记录
+            # 补齐股票名称并写入数据库任务文档的初始记录
+            code = request.stock_code
+            name = self._resolve_stock_name(code) if hasattr(self, '_resolve_stock_name') else f"股票{code}"
+
             try:
-                code = request.stock_code
-                name = self._resolve_stock_name(code) if hasattr(self, '_resolve_stock_name') else f"股票{code}"
                 db = get_mongo_db()
-                await db.analysis_tasks.update_one(
+                result = await db.analysis_tasks.update_one(
                     {"task_id": task_id},
                     {"$setOnInsert": {
                         "task_id": task_id,
@@ -360,12 +361,23 @@ class SimpleAnalysisService:
                         "stock_symbol": code,
                         "stock_name": name,
                         "status": "pending",
+                        "progress": 0,
                         "created_at": datetime.utcnow(),
                     }},
                     upsert=True
                 )
+
+                if result.upserted_id or result.matched_count > 0:
+                    logger.info(f"✅ 任务已保存到MongoDB: {task_id}")
+                else:
+                    logger.warning(f"⚠️ MongoDB保存结果异常: matched={result.matched_count}, upserted={result.upserted_id}")
+
             except Exception as e:
-                logger.warning(f"⚠️ 创建任务时写入初始文档失败(可忽略): {e}")
+                logger.error(f"❌ 创建任务时写入MongoDB失败: {e}")
+                # 这里不应该忽略错误，因为没有MongoDB记录会导致状态查询失败
+                # 但为了不影响任务执行，我们记录错误但继续执行
+                import traceback
+                logger.error(f"❌ MongoDB保存详细错误: {traceback.format_exc()}")
 
             return {
                 "task_id": task_id,
@@ -414,6 +426,9 @@ class SimpleAnalysisService:
                 current_step="initialization"
             )
 
+            # 同步更新MongoDB状态
+            await self._update_task_status(task_id, AnalysisStatus.PROCESSING, 10)
+
             # 数据准备阶段
             progress_tracker.update_progress("🔧 检查环境配置")
             await self.memory_manager.update_task_status(
@@ -423,6 +438,9 @@ class SimpleAnalysisService:
                 message="准备分析数据...",
                 current_step="data_preparation"
             )
+
+            # 同步更新MongoDB状态
+            await self._update_task_status(task_id, AnalysisStatus.PROCESSING, 20)
 
             # 执行实际的分析
             result = await self._execute_analysis_sync(task_id, user_id, request, progress_tracker)
@@ -454,6 +472,9 @@ class SimpleAnalysisService:
                 current_step="completed",
                 result_data=result
             )
+
+            # 同步更新MongoDB状态为完成
+            await self._update_task_status(task_id, AnalysisStatus.COMPLETED, 100)
 
             # 创建通知：分析完成（方案B：REST+SSE）
             try:
@@ -491,6 +512,9 @@ class SimpleAnalysisService:
                 current_step="failed",
                 error_message=str(e)
             )
+
+            # 同步更新MongoDB状态为失败
+            await self._update_task_status(task_id, AnalysisStatus.FAILED, 0, str(e))
         finally:
             # 清理进度跟踪器缓存
             if task_id in self._progress_trackers:

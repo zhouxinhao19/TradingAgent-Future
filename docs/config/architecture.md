@@ -73,3 +73,85 @@ P2：扩展
   - ConfigProvider：env→DB→用户偏好合并 + 短缓存 + 版本失效
   - 更全面的写入审计覆盖（LLM/数据源/数据库配置增改删）
   - system_settings 中第三方 key/secret 逐步迁移至环境变量，前端仅展示“已配置/来源ENV”状态
+
+
+## 八、元数据接口（前端只读/来源渲染依据）
+
+- 端点：GET /config/settings/meta
+- 作用：返回 system_settings 中每个键的元数据，供前端决定“是否敏感/是否可编辑/来源标记/是否有值”
+- 响应结构：
+  - { success, data: { items: [{ key, sensitive, editable, source, has_value }] }, message }
+- 字段含义：
+  - key：设置名
+  - sensitive：是否敏感（按关键词匹配：key/secret/password/token/client_secret）
+  - editable：是否可编辑（敏感项或来源为 environment 时为 False，其余为 True）
+  - source：environment | database | default（ENV 覆盖优先，其次 DB，否则 default）
+  - has_value：是否存在生效值（按 ENV→DB 合并后的结果）
+- 说明：当前接口以 DB 中已有的 system_settings 键为主，若 ENV 中存在同名覆盖，会在 source/has_value 上体现。
+
+### 示例返回
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {"key": "finnhub_api_key", "sensitive": true, "editable": false, "source": "environment", "has_value": true},
+      {"key": "news_page_size", "sensitive": false, "editable": true, "source": "database", "has_value": true}
+    ]
+  },
+  "message": ""
+}
+```
+
+## 执行记录追加（P1）
+
+## 九、运行时可调参数（SSE/队列/Worker）
+
+这些参数支持运行时通过“系统设置（system_settings）”在前端配置中心进行可视化编辑；范围下限均需大于 0（前端提供最小值约束与保存前校验）。优先级：DB(system_settings) > ENV(Settings) > 代码默认。
+
+- worker_heartbeat_interval_seconds（默认 30）
+  - Worker 心跳上报间隔（秒），用于健康与活跃度监测
+- queue_poll_interval_seconds（默认 1.0）
+  - 队列轮询间隔（秒），影响任务提取频率
+- queue_cleanup_interval_seconds（默认 60.0）
+  - 队列清理循环间隔（秒），用于过期或异常任务清理
+- sse_poll_timeout_seconds（默认 1.0）
+  - SSE 任务进度流轮询超时（秒）
+- sse_heartbeat_interval_seconds（默认 10）
+  - SSE 任务进度流心跳事件发送间隔（秒）
+- sse_task_max_idle_seconds（默认 300）
+  - SSE 单任务流在无事件情况下的最大空闲时间（秒），超过将结束连接
+- sse_batch_poll_interval_seconds（默认 2.0）
+  - SSE 批次进度流轮询间隔（秒）
+- sse_batch_max_idle_seconds（默认 600）
+  - SSE 批次进度流在无事件情况下的最大空闲时间（秒），超过将结束连接
+
+## 十、TradingAgents 环境参数（可选）
+
+TradingAgents 侧部分限速/睡眠参数支持通过后端系统设置统一管理，亦可通过环境变量覆盖；优先级：DB(system_settings) > ENV > 代码默认。
+
+- TA_HK_MIN_REQUEST_INTERVAL_SECONDS（默认 2.0）
+  - 港股数据最小请求间隔；用于 yfinance/AK 数据请求的节流
+- TA_HK_TIMEOUT_SECONDS（默认 60）
+  - 港股请求超时时间（秒）
+- TA_HK_MAX_RETRIES（默认 3）
+  - 港股数据获取最大重试次数
+- TA_HK_RATE_LIMIT_WAIT_SECONDS（默认 60）
+  - 遇到速率限制时等待时间（秒）
+- TA_HK_CACHE_TTL_SECONDS（默认 86400）
+  - 改进版港股名称/信息缓存的 TTL（秒）
+- TA_CHINA_MIN_API_INTERVAL_SECONDS（默认 0.5）
+  - A 股数据接口最小调用间隔（秒）
+- TA_US_MIN_API_INTERVAL_SECONDS（默认 1.0）
+  - 美股数据接口最小调用间隔（秒）
+- TA_GOOGLE_NEWS_SLEEP_MIN_SECONDS（默认 2.0）
+  - Google News 抓取最小随机延时（秒）
+- TA_GOOGLE_NEWS_SLEEP_MAX_SECONDS（默认 6.0）
+  - Google News 抓取最大随机延时（秒）
+
+备注：已通过“弱依赖适配器”对接后端系统设置；若不可用则自动回退到环境变量与代码默认值。
+
+
+- 2025-09-27（P1 进行中）
+  - 后端新增元数据接口：GET /config/settings/meta，用于前端渲染敏感只读与来源标记
+  - 前端配置中心：统一使用 has_key/source 渲染，移除密钥明文输入与显示，测试/提交时不再传递敏感字段

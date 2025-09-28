@@ -243,10 +243,21 @@ class RedisProgressTracker:
         progress_data['remaining_time'] = remaining
         return progress_data
 
-    def update_progress(self, progress_update: Dict[str, Any]) -> Dict[str, Any]:
-        """update progress and persist"""
+    def update_progress(self, progress_update: Any) -> Dict[str, Any]:
+        """update progress and persist; accepts dict or plain message string"""
         try:
-            self.progress_data.update(progress_update)
+            if isinstance(progress_update, dict):
+                self.progress_data.update(progress_update)
+            elif isinstance(progress_update, str):
+                self.progress_data['last_message'] = progress_update
+                self.progress_data['last_update'] = time.time()
+            else:
+                # try to coerce iterable of pairs; otherwise fallback to string
+                try:
+                    self.progress_data.update(dict(progress_update))
+                except Exception:
+                    self.progress_data['last_message'] = str(progress_update)
+                    self.progress_data['last_update'] = time.time()
             current_step = self._detect_current_step()
             self.progress_data['current_step'] = current_step
             elapsed, remaining, est_total = self._calculate_time_estimates()
@@ -254,10 +265,10 @@ class RedisProgressTracker:
             self.progress_data['remaining_time'] = remaining
             self.progress_data['estimated_total_time'] = est_total
             self._save_progress()
-            logger.debug(f"\ud83d\udcca [Redis\u8fdb\u5ea6] \u8fdb\u5ea6\u5df2\u66f4\u65b0: {self.task_id} - {self.progress_data.get('progress_percentage', 0)}%")
+            logger.debug(f"[RedisProgress] updated: {self.task_id} - {self.progress_data.get('progress_percentage', 0)}%")
             return self.progress_data
         except Exception as e:
-            logger.error(f"\ud83d\udcca [Redis\u8fdb\u5ea6] \u66f4\u65b0\u8fdb\u5ea6\u5931\u8d25: {self.task_id} - {e}")
+            logger.error(f"[RedisProgress] update failed: {self.task_id} - {e}")
             return self.progress_data
 
     def _detect_current_step(self) -> Optional[str]:
@@ -274,7 +285,7 @@ class RedisProgressTracker:
                     return step.name
             return None
         except Exception as e:
-            logger.debug(f"\ud83d\udcca [Redis\u8fdb\u5ea6] \u68c0\u6d4b\u5f53\u524d\u6b65\u9aa4\u5931\u8d25: {e}")
+            logger.debug(f"[RedisProgress] detect current step failed: {e}")
             return None
 
     def _find_step_by_name(self, step_name: str) -> Optional[AnalysisStep]:
@@ -302,7 +313,7 @@ class RedisProgressTracker:
                 with open(f"./data/progress/{self.task_id}.json", 'w', encoding='utf-8') as f:
                     f.write(serialized)
         except Exception as e:
-            logger.error(f"\ud83d\udcca [Redis\u8fdb\u5ea6] \u4fdd\u5b58\u8fdb\u5ea6\u5931\u8d25: {self.task_id} - {e}")
+            logger.error(f"[RedisProgress] save progress failed: {self.task_id} - {e}")
 
     def mark_completed(self) -> Dict[str, Any]:
         try:
@@ -317,7 +328,7 @@ class RedisProgressTracker:
             self._save_progress()
             return self.progress_data
         except Exception as e:
-            logger.error(f"\ud83d\udcca [Redis\u8fdb\u5ea6] \u6807\u8bb0\u5b8c\u6210\u5931\u8d25: {self.task_id} - {e}")
+            logger.error(f"[RedisProgress] mark completed failed: {self.task_id} - {e}")
             return self.progress_data
 
     def mark_failed(self, reason: str = "") -> Dict[str, Any]:
@@ -333,7 +344,7 @@ class RedisProgressTracker:
             self._save_progress()
             return self.progress_data
         except Exception as e:
-            logger.error(f"\ud83d\udcca [Redis\u8fdb\u5ea6] \u6807\u8bb0\u5931\u8d25\u5931\u8d25: {self.task_id} - {e}")
+            logger.error(f"[RedisProgress] mark failed failed: {self.task_id} - {e}")
             return self.progress_data
 
     def to_dict(self) -> Dict[str, Any]:
@@ -353,7 +364,7 @@ class RedisProgressTracker:
                 'current_step': self.progress_data.get('current_step')
             }
         except Exception as e:
-            logger.error(f"\ud83d\udcca [Redis\u8fdb\u5ea6] \u8f6c\u6362\u4e3a\u5b57\u5178\u5931\u8d25: {self.task_id} - {e}")
+            logger.error(f"[RedisProgress] to_dict failed: {self.task_id} - {e}")
             return self.progress_data
 
 

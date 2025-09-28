@@ -10,6 +10,7 @@ import os
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 
+from tradingagents.config.runtime_settings import get_int
 # 导入统一日志系统
 from tradingagents.utils.logging_init import get_logger
 logger = get_logger("default")
@@ -20,10 +21,10 @@ class ImprovedHKStockProvider:
     
     def __init__(self):
         self.cache_file = "hk_stock_cache.json"
-        self.cache_ttl = 3600 * 24  # 24小时缓存
-        self.rate_limit_wait = 5  # 速率限制等待时间
+        self.cache_ttl = get_int("TA_HK_CACHE_TTL_SECONDS", "ta_hk_cache_ttl_seconds", 3600 * 24)
+        self.rate_limit_wait = get_int("TA_HK_RATE_LIMIT_WAIT_SECONDS", "ta_hk_rate_limit_wait_seconds", 5)
         self.last_request_time = 0
-        
+
         # 内置港股名称映射（避免API调用）
         self.hk_stock_names = {
             # 腾讯系

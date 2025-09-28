@@ -2,9 +2,10 @@
 用户数据模型
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
+from app.utils.timezone import now_tz
 from typing import Optional, Dict, Any, Annotated, List
-from pydantic import BaseModel, Field, BeforeValidator, PlainSerializer
+from pydantic import BaseModel, Field, BeforeValidator, PlainSerializer, ConfigDict
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
 from bson import ObjectId
@@ -48,7 +49,7 @@ class FavoriteStock(BaseModel):
     stock_code: str = Field(..., description="股票代码")
     stock_name: str = Field(..., description="股票名称")
     market: str = Field(..., description="市场类型")
-    added_at: datetime = Field(default_factory=datetime.utcnow, description="添加时间")
+    added_at: datetime = Field(default_factory=now_tz, description="添加时间")
     tags: List[str] = Field(default_factory=list, description="用户标签")
     notes: str = Field(default="", description="用户备注")
     alert_price_high: Optional[float] = Field(None, description="价格上限提醒")
@@ -64,8 +65,8 @@ class User(BaseModel):
     is_active: bool = True
     is_verified: bool = False
     is_admin: bool = False
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=now_tz)
+    updated_at: datetime = Field(default_factory=now_tz)
     last_login: Optional[datetime] = None
     preferences: UserPreferences = Field(default_factory=UserPreferences)
     
@@ -81,10 +82,7 @@ class User(BaseModel):
     # 自选股
     favorite_stocks: List[FavoriteStock] = Field(default_factory=list, description="用户自选股列表")
     
-    class Config:
-        allow_population_by_field_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
+    model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True)
 
 
 class UserCreate(BaseModel):

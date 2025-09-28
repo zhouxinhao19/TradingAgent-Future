@@ -8,10 +8,13 @@ import os
 import time
 import random
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
 from typing import Optional, Dict, Any
 from .cache_manager import get_cache
 from .config import get_config
 
+from tradingagents.config.runtime_settings import get_float, get_timezone_name
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
 logger = get_logger('agents')
@@ -19,42 +22,42 @@ logger = get_logger('agents')
 
 class OptimizedChinaDataProvider:
     """优化的A股数据提供器 - 集成缓存和Tushare数据接口"""
-    
+
     def __init__(self):
         self.cache = get_cache()
         self.config = get_config()
         self.last_api_call = 0
-        self.min_api_interval = 0.5  # Tushare数据接口调用间隔较短
-        
+        self.min_api_interval = get_float("TA_CHINA_MIN_API_INTERVAL_SECONDS", "ta_china_min_api_interval_seconds", 0.5)
+
         logger.info(f"📊 优化A股数据提供器初始化完成")
-    
+
     def _wait_for_rate_limit(self):
         """等待API限制"""
         current_time = time.time()
         time_since_last_call = current_time - self.last_api_call
-        
+
         if time_since_last_call < self.min_api_interval:
             wait_time = self.min_api_interval - time_since_last_call
             time.sleep(wait_time)
-        
+
         self.last_api_call = time.time()
-    
-    def get_stock_data(self, symbol: str, start_date: str, end_date: str, 
+
+    def get_stock_data(self, symbol: str, start_date: str, end_date: str,
                       force_refresh: bool = False) -> str:
         """
         获取A股数据 - 优先使用缓存
-        
+
         Args:
             symbol: 股票代码（6位数字）
             start_date: 开始日期 (YYYY-MM-DD)
             end_date: 结束日期 (YYYY-MM-DD)
             force_refresh: 是否强制刷新缓存
-        
+
         Returns:
             格式化的股票数据字符串
         """
         logger.info(f"📈 获取A股数据: {symbol} ({start_date} 到 {end_date})")
-        
+
         # 检查缓存（除非强制刷新）
         if not force_refresh:
             cache_key = self.cache.find_cached_stock_data(
@@ -63,20 +66,20 @@ class OptimizedChinaDataProvider:
                 end_date=end_date,
                 data_source="tdx"
             )
-            
+
             if cache_key:
                 cached_data = self.cache.load_stock_data(cache_key)
                 if cached_data:
                     logger.info(f"⚡ 从缓存加载A股数据: {symbol}")
                     return cached_data
-        
+
         # 缓存未命中，从Tushare数据接口获取
         logger.info(f"🌐 从Tushare数据接口获取数据: {symbol}")
-        
+
         try:
             # API限制处理
             self._wait_for_rate_limit()
-            
+
             # 调用统一数据源接口（默认Tushare，支持备用数据源）
             from .data_source_manager import get_china_stock_data_unified
 
@@ -97,7 +100,7 @@ class OptimizedChinaDataProvider:
 
                 # 生成备用数据
                 return self._generate_fallback_data(symbol, start_date, end_date, "数据源API调用失败")
-            
+
             # 保存到缓存
             self.cache.save_stock_data(
                 symbol=symbol,
@@ -106,36 +109,36 @@ class OptimizedChinaDataProvider:
                 end_date=end_date,
                 data_source="unified"  # 使用统一数据源标识
             )
-            
+
             logger.info(f"✅ A股数据获取成功: {symbol}")
             return formatted_data
-            
+
         except Exception as e:
             error_msg = f"Tushare数据接口调用异常: {str(e)}"
             logger.error(f"❌ {error_msg}")
-            
+
             # 尝试从旧缓存获取数据
             old_cache = self._try_get_old_cache(symbol, start_date, end_date)
             if old_cache:
                 logger.info(f"📁 使用过期缓存数据: {symbol}")
                 return old_cache
-            
+
             # 生成备用数据
             return self._generate_fallback_data(symbol, start_date, end_date, error_msg)
-    
+
     def get_fundamentals_data(self, symbol: str, force_refresh: bool = False) -> str:
         """
         获取A股基本面数据 - 优先使用缓存
-        
+
         Args:
             symbol: 股票代码
             force_refresh: 是否强制刷新缓存
-        
+
         Returns:
             格式化的基本面数据字符串
         """
         logger.info(f"📊 获取A股基本面数据: {symbol}")
-        
+
         # 检查缓存（除非强制刷新）
         if not force_refresh:
             # 查找基本面数据缓存
@@ -144,11 +147,11 @@ class OptimizedChinaDataProvider:
                     import json
                     with open(metadata_file, 'r', encoding='utf-8') as f:
                         metadata = json.load(f)
-                    
-                    if (metadata.get('symbol') == symbol and 
+
+                    if (metadata.get('symbol') == symbol and
                         metadata.get('data_type') == 'fundamentals' and
                         metadata.get('market_type') == 'china'):
-                        
+
                         cache_key = metadata_file.stem.replace('_meta', '')
                         if self.cache.is_cache_valid(cache_key, symbol=symbol, data_type='fundamentals'):
                             cached_data = self.cache.load_stock_data(cache_key)
@@ -157,35 +160,80 @@ class OptimizedChinaDataProvider:
                                 return cached_data
                 except Exception:
                     continue
-        
+
         # 缓存未命中，生成基本面分析
         logger.debug(f"🔍 生成A股基本面分析: {symbol}")
-        
+
         try:
-            # 先获取股票数据
-            current_date = datetime.now().strftime('%Y-%m-%d')
-            start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
-            
-            stock_data = self.get_stock_data(symbol, start_date, current_date)
-            
+            # 基本面分析只需要基础信息，不需要完整的历史交易数据
+            # 获取股票基础信息（公司名称、当前价格等）
+            stock_basic_info = self._get_stock_basic_info_only(symbol)
+
             # 生成基本面分析报告
-            fundamentals_data = self._generate_fundamentals_report(symbol, stock_data)
-            
+            fundamentals_data = self._generate_fundamentals_report(symbol, stock_basic_info)
+
             # 保存到缓存
             self.cache.save_fundamentals_data(
                 symbol=symbol,
                 fundamentals_data=fundamentals_data,
                 data_source="tdx_analysis"
             )
-            
+
             logger.info(f"✅ A股基本面数据生成成功: {symbol}")
             return fundamentals_data
-            
+
         except Exception as e:
             error_msg = f"基本面数据生成失败: {str(e)}"
             logger.error(f"❌ {error_msg}")
             return self._generate_fallback_fundamentals(symbol, error_msg)
-    
+
+    def _get_stock_basic_info_only(self, symbol: str) -> str:
+        """
+        获取股票基础信息（仅用于基本面分析）
+        不获取历史交易数据，只获取公司名称、当前价格等基础信息
+        """
+        logger.debug(f"📊 [基本面优化] 获取{symbol}基础信息（不含历史数据）")
+
+        try:
+            # 从统一接口获取股票基本信息
+            from .interface import get_china_stock_info_unified
+            stock_info = get_china_stock_info_unified(symbol)
+
+            # 如果获取成功，直接返回基础信息
+            if stock_info and "股票名称:" in stock_info:
+                logger.debug(f"📊 [基本面优化] 成功获取{symbol}基础信息，无需历史数据")
+                return stock_info
+
+            # 如果基础信息获取失败，尝试从缓存获取最基本的信息
+            try:
+                from tradingagents.config.runtime_settings import use_app_cache_enabled
+                if use_app_cache_enabled(False):
+                    from .app_cache_adapter import get_market_quote_dataframe
+                    df_q = get_market_quote_dataframe(symbol)
+                    if df_q is not None and not df_q.empty:
+                        row_q = df_q.iloc[-1]
+                        current_price = str(row_q.get('close', 'N/A'))
+                        change_pct = f"{float(row_q.get('pct_chg', 0)):+.2f}%" if row_q.get('pct_chg') is not None else 'N/A'
+                        volume = str(row_q.get('volume', 'N/A'))
+
+                        # 构造基础信息格式
+                        basic_info = f"""股票代码: {symbol}
+股票名称: 未知公司
+当前价格: {current_price}
+涨跌幅: {change_pct}
+成交量: {volume}"""
+                        logger.debug(f"📊 [基本面优化] 从缓存构造{symbol}基础信息")
+                        return basic_info
+            except Exception as e:
+                logger.debug(f"📊 [基本面优化] 从缓存获取基础信息失败: {e}")
+
+            # 如果都失败了，返回最基本的信息
+            return f"股票代码: {symbol}\n股票名称: 未知公司\n当前价格: N/A\n涨跌幅: N/A\n成交量: N/A"
+
+        except Exception as e:
+            logger.warning(f"⚠️ [基本面优化] 获取{symbol}基础信息失败: {e}")
+            return f"股票代码: {symbol}\n股票名称: 未知公司\n当前价格: N/A\n涨跌幅: N/A\n成交量: N/A"
+
     def _generate_fundamentals_report(self, symbol: str, stock_data: str) -> str:
         """基于股票数据生成真实的基本面分析报告"""
 
@@ -218,6 +266,30 @@ class OptimizedChinaDataProvider:
         except Exception as e:
             logger.warning(f"⚠️ 获取股票基本信息失败: {e}")
 
+        # 若仍缺失当前价格/涨跌幅/成交量，且启用app缓存，则直接读取 market_quotes 兜底
+        try:
+            if (current_price == "N/A" or change_pct == "N/A" or volume == "N/A"):
+                from tradingagents.config.runtime_settings import use_app_cache_enabled  # type: ignore
+                if use_app_cache_enabled(False):
+                    from .app_cache_adapter import get_market_quote_dataframe
+                    df_q = get_market_quote_dataframe(symbol)
+                    if df_q is not None and not df_q.empty:
+                        row_q = df_q.iloc[-1]
+                        if current_price == "N/A" and row_q.get('close') is not None:
+                            current_price = str(row_q.get('close'))
+                            logger.debug(f"🔍 [股票代码追踪] 从market_quotes补齐当前价格: {current_price}")
+                        if change_pct == "N/A" and row_q.get('pct_chg') is not None:
+                            try:
+                                change_pct = f"{float(row_q.get('pct_chg')):+.2f}%"
+                            except Exception:
+                                change_pct = str(row_q.get('pct_chg'))
+                            logger.debug(f"🔍 [股票代码追踪] 从market_quotes补齐涨跌幅: {change_pct}")
+                        if volume == "N/A" and row_q.get('volume') is not None:
+                            volume = str(row_q.get('volume'))
+                            logger.debug(f"🔍 [股票代码追踪] 从market_quotes补齐成交量: {volume}")
+        except Exception as _qe:
+            logger.debug(f"🔍 [股票代码追踪] 读取market_quotes失败（忽略）: {_qe}")
+
         # 然后从股票数据中提取价格信息
         if "股票名称:" in stock_data:
             lines = stock_data.split('\n')
@@ -226,6 +298,12 @@ class OptimizedChinaDataProvider:
                     company_name = line.split(':')[1].strip()
                 elif "当前价格:" in line:
                     current_price = line.split(':')[1].strip()
+                elif "最新价格:" in line or "💰 最新价格:" in line:
+                    # 兼容另一种模板输出
+                    try:
+                        current_price = line.split(':', 1)[1].strip().lstrip('¥').strip()
+                    except Exception:
+                        current_price = line.split(':')[-1].strip()
                 elif "涨跌幅:" in line:
                     change_pct = line.split(':')[1].strip()
                 elif "成交量:" in line:
@@ -265,11 +343,11 @@ class OptimizedChinaDataProvider:
         logger.debug(f"🔍 [股票代码追踪] _estimate_financial_metrics 返回结果: {financial_estimates}")
 
         logger.debug(f"🔍 [股票代码追踪] 开始生成报告，使用股票代码: '{symbol}'")
-        
+
         # 检查数据来源并生成相应说明
         data_source_note = ""
         data_source = financial_estimates.get('data_source', '')
-        
+
         if any("（估算值）" in str(v) for v in financial_estimates.values() if isinstance(v, str)):
             data_source_note = "\n⚠️ **数据说明**: 部分财务指标为估算值，建议结合最新财报数据进行分析"
         elif data_source == "AKShare":
@@ -278,7 +356,7 @@ class OptimizedChinaDataProvider:
             data_source_note = "\n✅ **数据说明**: 财务指标基于Tushare真实财务数据计算"
         else:
             data_source_note = "\n✅ **数据说明**: 财务指标基于真实财务数据计算"
-        
+
         report = f"""# 中国A股基本面分析报告 - {symbol}
 
 ## 📊 股票基本信息
@@ -289,7 +367,7 @@ class OptimizedChinaDataProvider:
 - **当前股价**: {current_price}
 - **涨跌幅**: {change_pct}
 - **成交量**: {volume}
-- **分析日期**: {datetime.now().strftime('%Y年%m月%d日')}{data_source_note}
+- **分析日期**: {datetime.now(ZoneInfo(get_timezone_name())).strftime('%Y年%m月%d日')}{data_source_note}
 
 ## 💰 财务数据分析
 
@@ -383,43 +461,123 @@ class OptimizedChinaDataProvider:
 实际投资决策请结合最新财报数据和专业分析师意见。
 
 **数据来源**: {data_source if data_source else "多源数据"}数据接口 + 基本面分析模型
-**生成时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+**生成时间**: {datetime.now(ZoneInfo(get_timezone_name())).strftime('%Y-%m-%d %H:%M:%S')}
 """
-        
+
         return report
 
     def _get_industry_info(self, symbol: str) -> dict:
-        """根据股票代码获取行业信息"""
+        """根据股票代码获取行业信息（优先使用数据库真实数据）"""
 
         # 添加详细的股票代码追踪日志
         logger.debug(f"🔍 [股票代码追踪] _get_industry_info 接收到的股票代码: '{symbol}' (类型: {type(symbol)})")
         logger.debug(f"🔍 [股票代码追踪] 股票代码长度: {len(str(symbol))}")
         logger.debug(f"🔍 [股票代码追踪] 股票代码字符: {list(str(symbol))}")
 
-        # 根据股票代码前缀判断行业（简化版）
+        # 首先尝试从数据库获取真实的行业信息
+        try:
+            from .app_cache_adapter import get_basics_from_cache
+            doc = get_basics_from_cache(symbol)
+            if doc:
+                logger.debug(f"🔍 [股票代码追踪] 从数据库获取到基础信息: {doc}")
+
+                # 规范化行业与板块（避免把"中小板/创业板"等板块值误作行业）
+                board_labels = {'主板', '中小板', '创业板', '科创板'}
+                raw_industry = (doc.get('industry') or doc.get('industry_name') or '').strip()
+                sec_or_cat = (doc.get('sec') or doc.get('category') or '').strip()
+                market_val = (doc.get('market') or '').strip()
+                industry_val = raw_industry or sec_or_cat or '未知'
+
+                # 如果industry字段是板块名，则将其用于market；industry改用更细分类（sec/category）
+                if raw_industry in board_labels:
+                    if not market_val:
+                        market_val = raw_industry
+                    if sec_or_cat:
+                        industry_val = sec_or_cat
+                    logger.debug(f"🔧 [字段归一化] industry原值='{raw_industry}' → 行业='{industry_val}', 市场/板块='{market_val}'")
+
+                # 构建行业信息
+                info = {
+                    "industry": industry_val or '未知',
+                    "market": market_val or doc.get('market', '未知'),
+                    "type": self._get_market_type_by_code(symbol)
+                }
+
+                logger.debug(f"🔍 [股票代码追踪] 从数据库获取的行业信息: {info}")
+
+                # 添加特殊股票的详细分析
+                if symbol in self._get_special_stocks():
+                    info.update(self._get_special_stocks()[symbol])
+                else:
+                    info.update({
+                        "analysis": f"该股票属于{info['industry']}行业，在{info['market']}上市交易。",
+                        "market_share": "待分析",
+                        "brand_value": "待评估",
+                        "tech_advantage": "待分析"
+                    })
+
+                return info
+
+        except Exception as e:
+            logger.warning(f"⚠️ 从数据库获取行业信息失败: {e}")
+
+        # 备用方案：使用代码前缀判断（但修正了行业/市场的映射）
+        logger.debug(f"🔍 [股票代码追踪] 使用备用方案，基于代码前缀判断")
         code_prefix = symbol[:3]
         logger.debug(f"🔍 [股票代码追踪] 提取的代码前缀: '{code_prefix}'")
 
-        industry_map = {
-            "000": {"industry": "深市主板", "market": "深圳证券交易所", "type": "综合"},
-            "001": {"industry": "深市主板", "market": "深圳证券交易所", "type": "综合"},
-            "002": {"industry": "中小板", "market": "深圳证券交易所", "type": "成长型"},
-            "003": {"industry": "创业板", "market": "深圳证券交易所", "type": "创新型"},
-            "300": {"industry": "创业板", "market": "深圳证券交易所", "type": "高科技"},
-            "600": {"industry": "沪市主板", "market": "上海证券交易所", "type": "大盘蓝筹"},
-            "601": {"industry": "沪市主板", "market": "上海证券交易所", "type": "大盘蓝筹"},
-            "603": {"industry": "沪市主板", "market": "上海证券交易所", "type": "中小盘"},
-            "688": {"industry": "科创板", "market": "上海证券交易所", "type": "科技创新"},
+        # 修正后的映射表：区分行业和市场板块
+        market_map = {
+            "000": {"market": "主板", "exchange": "深圳证券交易所", "type": "综合"},
+            "001": {"market": "主板", "exchange": "深圳证券交易所", "type": "综合"},
+            "002": {"market": "主板", "exchange": "深圳证券交易所", "type": "成长型"},  # 002开头现在也是主板
+            "003": {"market": "创业板", "exchange": "深圳证券交易所", "type": "创新型"},
+            "300": {"market": "创业板", "exchange": "深圳证券交易所", "type": "高科技"},
+            "600": {"market": "主板", "exchange": "上海证券交易所", "type": "大盘蓝筹"},
+            "601": {"market": "主板", "exchange": "上海证券交易所", "type": "大盘蓝筹"},
+            "603": {"market": "主板", "exchange": "上海证券交易所", "type": "中小盘"},
+            "688": {"market": "科创板", "exchange": "上海证券交易所", "type": "科技创新"},
         }
 
-        info = industry_map.get(code_prefix, {
-            "industry": "其他",
+        market_info = market_map.get(code_prefix, {
             "market": "未知市场",
+            "exchange": "未知交易所",
             "type": "综合"
         })
 
+        info = {
+            "industry": "未知",  # 无法从代码前缀准确判断具体行业
+            "market": market_info["market"],
+            "type": market_info["type"]
+        }
+
         # 特殊股票的详细信息
-        special_stocks = {
+        special_stocks = self._get_special_stocks()
+        if symbol in special_stocks:
+            info.update(special_stocks[symbol])
+        else:
+            info.update({
+                "analysis": f"该股票在{info['market']}上市交易，具体行业信息需要进一步查询。",
+                "market_share": "待分析",
+                "brand_value": "待评估",
+                "tech_advantage": "待分析"
+            })
+
+        return info
+
+    def _get_market_type_by_code(self, symbol: str) -> str:
+        """根据股票代码判断市场类型"""
+        code_prefix = symbol[:3]
+        type_map = {
+            "000": "综合", "001": "综合", "002": "成长型", "003": "创新型",
+            "300": "高科技", "600": "大盘蓝筹", "601": "大盘蓝筹",
+            "603": "中小盘", "688": "科技创新"
+        }
+        return type_map.get(code_prefix, "综合")
+
+    def _get_special_stocks(self) -> dict:
+        """获取特殊股票的详细信息"""
+        return {
             "000001": {
                 "industry": "银行业",
                 "analysis": "平安银行是中国领先的股份制商业银行，在零售银行业务方面具有显著优势。",
@@ -440,20 +598,15 @@ class OptimizedChinaDataProvider:
                 "market_share": "房地产行业前三",
                 "brand_value": "知名地产品牌",
                 "tech_advantage": "绿色建筑技术"
+            },
+            "002475": {
+                "industry": "元器件",
+                "analysis": "立讯精密是全球领先的精密制造服务商，主要从事连接器、声学、无线充电等产品的研发制造。",
+                "market_share": "消费电子连接器龙头",
+                "brand_value": "精密制造知名品牌",
+                "tech_advantage": "精密制造技术领先"
             }
         }
-
-        if symbol in special_stocks:
-            info.update(special_stocks[symbol])
-        else:
-            info.update({
-                "analysis": f"该股票属于{info['industry']}，具体业务需要进一步分析。",
-                "market_share": "待分析",
-                "brand_value": "待评估",
-                "tech_advantage": "待分析"
-            })
-
-        return info
 
     def _estimate_financial_metrics(self, symbol: str, current_price: str) -> dict:
         """获取真实财务指标（优先使用Tushare真实数据，失败时使用估算）"""
@@ -469,42 +622,64 @@ class OptimizedChinaDataProvider:
         if real_metrics:
             logger.debug(f"✅ 使用真实财务数据: {symbol}")
             return real_metrics
-        
+
         # 如果无法获取真实数据，使用估算数据并标注
         logger.warning(f"⚠️ 无法获取真实财务数据，使用估算数据: {symbol}")
         estimated_metrics = self._get_estimated_financial_metrics(symbol, price_value)
-        
+
         # 在所有指标后添加估算标注
         for key in estimated_metrics:
             if isinstance(estimated_metrics[key], str) and key not in ['fundamental_score', 'valuation_score', 'growth_score', 'risk_level']:
                 if "（" not in estimated_metrics[key]:
                     estimated_metrics[key] += "（估算值）"
-        
+
         return estimated_metrics
 
     def _get_real_financial_metrics(self, symbol: str, price_value: float) -> dict:
-        """获取真实财务指标 - 优先使用AKShare"""
+        """获取真实财务指标 - 优先使用数据库缓存，再使用API"""
         try:
-            # 优先尝试AKShare数据源
-            logger.info(f"🔄 优先尝试AKShare获取{symbol}财务数据")
+            # 第一优先级：检查是否启用数据库缓存
+            from tradingagents.config.runtime_settings import use_app_cache_enabled
+            if use_app_cache_enabled(False):
+                logger.info(f"🔍 优先从数据库缓存获取{symbol}财务数据")
+
+                # 尝试从数据库获取原始财务数据
+                cached_financial_data = self._get_cached_raw_financial_data(symbol)
+                if cached_financial_data:
+                    logger.info(f"✅ 从数据库缓存获取{symbol}原始财务数据成功")
+                    # 将缓存的数据转换回DataFrame格式
+                    restored_financial_data = self._restore_financial_data_format(cached_financial_data)
+                    # 解析缓存的财务数据
+                    stock_info = self._get_cached_stock_info(symbol)
+                    metrics = self._parse_akshare_financial_data(restored_financial_data, stock_info, price_value)
+                    if metrics:
+                        return metrics
+                else:
+                    logger.info(f"🔄 数据库缓存未命中，从AKShare API获取{symbol}财务数据")
+            else:
+                logger.info(f"🔄 数据库缓存未启用，直接从AKShare API获取{symbol}财务数据")
+
+            # 第二优先级：从AKShare API获取
             from .akshare_utils import get_akshare_provider
-            
+
             akshare_provider = get_akshare_provider()
-            
+
             if akshare_provider.connected:
                 financial_data = akshare_provider.get_financial_data(symbol)
-                
+
                 if financial_data and any(not v.empty if hasattr(v, 'empty') else bool(v) for v in financial_data.values()):
                     logger.info(f"✅ AKShare财务数据获取成功: {symbol}")
                     # 获取股票基本信息
                     stock_info = akshare_provider.get_stock_info(symbol)
-                    
+
                     # 解析AKShare财务数据
                     logger.debug(f"🔧 调用AKShare解析函数，股价: {price_value}")
                     metrics = self._parse_akshare_financial_data(financial_data, stock_info, price_value)
                     logger.debug(f"🔧 AKShare解析结果: {metrics}")
                     if metrics:
                         logger.info(f"✅ AKShare解析成功，返回指标")
+                        # 缓存原始财务数据到数据库（而不是解析后的指标）
+                        self._cache_raw_financial_data(symbol, financial_data, stock_info)
                         return metrics
                     else:
                         logger.warning(f"⚠️ AKShare解析失败，返回None")
@@ -512,33 +687,35 @@ class OptimizedChinaDataProvider:
                     logger.warning(f"⚠️ AKShare未获取到{symbol}财务数据，尝试Tushare")
             else:
                 logger.warning(f"⚠️ AKShare未连接，尝试Tushare")
-            
-            # 备用方案：使用Tushare数据源
+
+            # 第三优先级：使用Tushare数据源
             logger.info(f"🔄 使用Tushare备用数据源获取{symbol}财务数据")
             from .tushare_utils import get_tushare_provider
-            
+
             provider = get_tushare_provider()
             if not provider.connected:
                 logger.debug(f"Tushare未连接，无法获取{symbol}真实财务数据")
                 return None
-            
+
             # 获取财务数据
             financial_data = provider.get_financial_data(symbol)
             if not financial_data:
                 logger.debug(f"未获取到{symbol}的财务数据")
                 return None
-            
+
             # 获取股票基本信息
             stock_info = provider.get_stock_info(symbol)
-            
+
             # 解析Tushare财务数据
             metrics = self._parse_financial_data(financial_data, stock_info, price_value)
             if metrics:
+                # 缓存原始财务数据到数据库
+                self._cache_raw_financial_data(symbol, financial_data, stock_info)
                 return metrics
-                
+
         except Exception as e:
             logger.debug(f"获取{symbol}真实财务数据失败: {e}")
-        
+
         return None
 
     def _parse_akshare_financial_data(self, financial_data: dict, stock_info: dict, price_value: float) -> dict:
@@ -549,32 +726,32 @@ class OptimizedChinaDataProvider:
             income_statement = financial_data.get('income_statement', [])
             cash_flow = financial_data.get('cash_flow', [])
             main_indicators = financial_data.get('main_indicators')
-            
+
             if main_indicators is None or main_indicators.empty:
                 logger.warning("AKShare主要财务指标为空")
                 return None
-            
+
             # main_indicators是DataFrame，需要转换为字典格式便于查找
             # 获取最新数据列（第3列，索引为2）
             latest_col = main_indicators.columns[2] if len(main_indicators.columns) > 2 else None
             if not latest_col:
                 logger.warning("AKShare主要财务指标缺少数据列")
                 return None
-            
+
             logger.info(f"📅 使用AKShare最新数据期间: {latest_col}")
-            
+
             # 创建指标名称到值的映射
             indicators_dict = {}
             for _, row in main_indicators.iterrows():
                 indicator_name = row['指标']
                 value = row[latest_col]
                 indicators_dict[indicator_name] = value
-            
+
             logger.debug(f"AKShare主要财务指标数量: {len(indicators_dict)}")
-            
+
             # 计算财务指标
             metrics = {}
-            
+
             # 获取ROE - 直接从指标中获取
             roe_value = indicators_dict.get('净资产收益率(ROE)')
             if roe_value is not None and str(roe_value) != 'nan' and roe_value != '--':
@@ -587,7 +764,7 @@ class OptimizedChinaDataProvider:
                     metrics["roe"] = "N/A"
             else:
                 metrics["roe"] = "N/A"
-            
+
             # 获取每股收益 - 用于计算PE
             eps_value = indicators_dict.get('基本每股收益')
             if eps_value is not None and str(eps_value) != 'nan' and eps_value != '--':
@@ -604,7 +781,7 @@ class OptimizedChinaDataProvider:
                     metrics["pe"] = "N/A"
             else:
                 metrics["pe"] = "N/A"
-            
+
             # 获取每股净资产 - 用于计算PB
             bps_value = indicators_dict.get('每股净资产_最新股数')
             if bps_value is not None and str(bps_value) != 'nan' and bps_value != '--':
@@ -621,7 +798,7 @@ class OptimizedChinaDataProvider:
                     metrics["pb"] = "N/A"
             else:
                 metrics["pb"] = "N/A"
-            
+
             # 尝试获取其他指标
             # 总资产收益率(ROA)
             roa_value = indicators_dict.get('总资产报酬率')
@@ -633,7 +810,7 @@ class OptimizedChinaDataProvider:
                     metrics["roa"] = "N/A"
             else:
                 metrics["roa"] = "N/A"
-            
+
             # 毛利率
             gross_margin_value = indicators_dict.get('毛利率')
             if gross_margin_value is not None and str(gross_margin_value) != 'nan' and gross_margin_value != '--':
@@ -644,7 +821,7 @@ class OptimizedChinaDataProvider:
                     metrics["gross_margin"] = "N/A"
             else:
                 metrics["gross_margin"] = "N/A"
-            
+
             # 销售净利率
             net_margin_value = indicators_dict.get('销售净利率')
             if net_margin_value is not None and str(net_margin_value) != 'nan' and net_margin_value != '--':
@@ -655,7 +832,7 @@ class OptimizedChinaDataProvider:
                     metrics["net_margin"] = "N/A"
             else:
                 metrics["net_margin"] = "N/A"
-            
+
             # 资产负债率
             debt_ratio_value = indicators_dict.get('资产负债率')
             if debt_ratio_value is not None and str(debt_ratio_value) != 'nan' and debt_ratio_value != '--':
@@ -666,7 +843,7 @@ class OptimizedChinaDataProvider:
                     metrics["debt_ratio"] = "N/A"
             else:
                 metrics["debt_ratio"] = "N/A"
-            
+
             # 流动比率
             current_ratio_value = indicators_dict.get('流动比率')
             if current_ratio_value is not None and str(current_ratio_value) != 'nan' and current_ratio_value != '--':
@@ -677,7 +854,7 @@ class OptimizedChinaDataProvider:
                     metrics["current_ratio"] = "N/A"
             else:
                 metrics["current_ratio"] = "N/A"
-            
+
             # 速动比率
             quick_ratio_value = indicators_dict.get('速动比率')
             if quick_ratio_value is not None and str(quick_ratio_value) != 'nan' and quick_ratio_value != '--':
@@ -688,20 +865,20 @@ class OptimizedChinaDataProvider:
                     metrics["quick_ratio"] = "N/A"
             else:
                 metrics["quick_ratio"] = "N/A"
-            
+
             # 补充其他指标的默认值
             metrics.update({
                 "ps": "待计算",
                 "dividend_yield": "待查询",
                 "cash_ratio": "待分析"
             })
-            
+
             # 评分（基于AKShare数据的简化评分）
             fundamental_score = self._calculate_fundamental_score(metrics, stock_info)
             valuation_score = self._calculate_valuation_score(metrics)
             growth_score = self._calculate_growth_score(metrics, stock_info)
             risk_level = self._calculate_risk_level(metrics, stock_info)
-            
+
             metrics.update({
                 "fundamental_score": fundamental_score,
                 "valuation_score": valuation_score,
@@ -709,10 +886,10 @@ class OptimizedChinaDataProvider:
                 "risk_level": risk_level,
                 "data_source": "AKShare"
             })
-            
+
             logger.info(f"✅ AKShare财务数据解析成功: PE={metrics['pe']}, PB={metrics['pb']}, ROE={metrics['roe']}")
             return metrics
-            
+
         except Exception as e:
             logger.error(f"❌ AKShare财务数据解析失败: {e}")
             return None
@@ -724,17 +901,17 @@ class OptimizedChinaDataProvider:
             balance_sheet = financial_data.get('balance_sheet', [])
             income_statement = financial_data.get('income_statement', [])
             cash_flow = financial_data.get('cash_flow', [])
-            
+
             if not (balance_sheet or income_statement):
                 return None
-            
+
             latest_balance = balance_sheet[0] if balance_sheet else {}
             latest_income = income_statement[0] if income_statement else {}
             latest_cash = cash_flow[0] if cash_flow else {}
-            
+
             # 计算财务指标
             metrics = {}
-            
+
             # 基础数据
             total_assets = latest_balance.get('total_assets', 0) or 0
             total_liab = latest_balance.get('total_liab', 0) or 0
@@ -742,10 +919,10 @@ class OptimizedChinaDataProvider:
             total_revenue = latest_income.get('total_revenue', 0) or 0
             net_income = latest_income.get('n_income', 0) or 0
             operate_profit = latest_income.get('operate_profit', 0) or 0
-            
+
             # 估算市值（简化计算）
             market_cap = price_value * 1000000000  # 假设10亿股本
-            
+
             # 计算各项指标
             # PE比率
             if net_income > 0:
@@ -753,49 +930,49 @@ class OptimizedChinaDataProvider:
                 metrics["pe"] = f"{pe_ratio:.1f}倍"
             else:
                 metrics["pe"] = "N/A（亏损）"
-            
+
             # PB比率
             if total_equity > 0:
                 pb_ratio = market_cap / (total_equity * 10000)
                 metrics["pb"] = f"{pb_ratio:.2f}倍"
             else:
                 metrics["pb"] = "N/A"
-            
+
             # PS比率
             if total_revenue > 0:
                 ps_ratio = market_cap / (total_revenue * 10000)
                 metrics["ps"] = f"{ps_ratio:.1f}倍"
             else:
                 metrics["ps"] = "N/A"
-            
+
             # ROE
             if total_equity > 0 and net_income > 0:
                 roe = (net_income / total_equity) * 100
                 metrics["roe"] = f"{roe:.1f}%"
             else:
                 metrics["roe"] = "N/A"
-            
+
             # ROA
             if total_assets > 0 and net_income > 0:
                 roa = (net_income / total_assets) * 100
                 metrics["roa"] = f"{roa:.1f}%"
             else:
                 metrics["roa"] = "N/A"
-            
+
             # 净利率
             if total_revenue > 0 and net_income > 0:
                 net_margin = (net_income / total_revenue) * 100
                 metrics["net_margin"] = f"{net_margin:.1f}%"
             else:
                 metrics["net_margin"] = "N/A"
-            
+
             # 资产负债率
             if total_assets > 0:
                 debt_ratio = (total_liab / total_assets) * 100
                 metrics["debt_ratio"] = f"{debt_ratio:.1f}%"
             else:
                 metrics["debt_ratio"] = "N/A"
-            
+
             # 其他指标设为默认值
             metrics.update({
                 "dividend_yield": "待查询",
@@ -804,22 +981,22 @@ class OptimizedChinaDataProvider:
                 "quick_ratio": "待计算",
                 "cash_ratio": "待分析"
             })
-            
+
             # 评分（基于真实数据的简化评分）
             fundamental_score = self._calculate_fundamental_score(metrics, stock_info)
             valuation_score = self._calculate_valuation_score(metrics)
             growth_score = self._calculate_growth_score(metrics, stock_info)
             risk_level = self._calculate_risk_level(metrics, stock_info)
-            
+
             metrics.update({
                 "fundamental_score": fundamental_score,
                 "valuation_score": valuation_score,
                 "growth_score": growth_score,
                 "risk_level": risk_level
             })
-            
+
             return metrics
-            
+
         except Exception as e:
             logger.error(f"解析财务数据失败: {e}")
             return None
@@ -827,7 +1004,7 @@ class OptimizedChinaDataProvider:
     def _calculate_fundamental_score(self, metrics: dict, stock_info: dict) -> float:
         """计算基本面评分"""
         score = 5.0  # 基础分
-        
+
         # ROE评分
         roe_str = metrics.get("roe", "N/A")
         if roe_str != "N/A":
@@ -841,7 +1018,7 @@ class OptimizedChinaDataProvider:
                     score += 0.5
             except:
                 pass
-        
+
         # 净利率评分
         net_margin_str = metrics.get("net_margin", "N/A")
         if net_margin_str != "N/A":
@@ -853,13 +1030,13 @@ class OptimizedChinaDataProvider:
                     score += 0.5
             except:
                 pass
-        
+
         return min(score, 10.0)
 
     def _calculate_valuation_score(self, metrics: dict) -> float:
         """计算估值评分"""
         score = 5.0  # 基础分
-        
+
         # PE评分
         pe_str = metrics.get("pe", "N/A")
         if pe_str != "N/A" and "亏损" not in pe_str:
@@ -873,7 +1050,7 @@ class OptimizedChinaDataProvider:
                     score -= 1.0
             except:
                 pass
-        
+
         # PB评分
         pb_str = metrics.get("pb", "N/A")
         if pb_str != "N/A":
@@ -887,20 +1064,20 @@ class OptimizedChinaDataProvider:
                     score -= 0.5
             except:
                 pass
-        
+
         return min(max(score, 1.0), 10.0)
 
     def _calculate_growth_score(self, metrics: dict, stock_info: dict) -> float:
         """计算成长性评分"""
         score = 6.0  # 基础分
-        
+
         # 根据行业调整
         industry = stock_info.get('industry', '')
         if '科技' in industry or '软件' in industry or '互联网' in industry:
             score += 1.0
         elif '银行' in industry or '保险' in industry:
             score -= 0.5
-        
+
         return min(max(score, 1.0), 10.0)
 
     def _calculate_risk_level(self, metrics: dict, stock_info: dict) -> str:
@@ -918,14 +1095,14 @@ class OptimizedChinaDataProvider:
                     return "较低"
             except:
                 pass
-        
+
         # 根据行业判断
         industry = stock_info.get('industry', '')
         if '银行' in industry:
             return "中等"
         elif '科技' in industry or '创业板' in industry:
             return "较高"
-        
+
         return "中等"
 
     def _get_estimated_financial_metrics(self, symbol: str, price_value: float) -> dict:
@@ -1059,7 +1236,7 @@ class OptimizedChinaDataProvider:
 - 当前风险较高，不建议投资
 - 建议等待基本面改善或估值回落
 - 风险承受能力较低的投资者应避免"""
-    
+
     def _try_get_old_cache(self, symbol: str, start_date: str, end_date: str) -> Optional[str]:
         """尝试获取过期的缓存数据作为备用"""
         try:
@@ -1070,11 +1247,11 @@ class OptimizedChinaDataProvider:
 
                     with open(metadata_file, 'r', encoding='utf-8') as f:
                         metadata = json.load(f)
-                    
-                    if (metadata.get('symbol') == symbol and 
+
+                    if (metadata.get('symbol') == symbol and
                         metadata.get('data_type') == 'stock_data' and
                         metadata.get('market_type') == 'china'):
-                        
+
                         cache_key = metadata_file.stem.replace('_meta', '')
                         cached_data = self.cache.load_stock_data(cache_key)
                         if cached_data:
@@ -1083,9 +1260,9 @@ class OptimizedChinaDataProvider:
                     continue
         except Exception:
             pass
-        
+
         return None
-    
+
     def _generate_fallback_data(self, symbol: str, start_date: str, end_date: str, error_msg: str) -> str:
         """生成备用数据"""
         return f"""# {symbol} A股数据获取失败
@@ -1104,9 +1281,9 @@ class OptimizedChinaDataProvider:
 由于数据接口限制或网络问题，无法获取实时数据。
 建议稍后重试或检查网络连接。
 
-生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+生成时间: {datetime.now(ZoneInfo(get_timezone_name())).strftime('%Y-%m-%d %H:%M:%S')}
 """
-    
+
     def _generate_fallback_fundamentals(self, symbol: str, error_msg: str) -> str:
         """生成备用基本面数据"""
         return f"""# {symbol} A股基本面分析失败
@@ -1119,7 +1296,7 @@ class OptimizedChinaDataProvider:
 - 分析状态: 数据获取失败
 - 建议: 稍后重试或检查网络连接
 
-生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+生成时间: {datetime.now(ZoneInfo(get_timezone_name())).strftime('%Y-%m-%d %H:%M:%S')}
 """
 
 
@@ -1134,17 +1311,17 @@ def get_optimized_china_data_provider() -> OptimizedChinaDataProvider:
     return _china_data_provider
 
 
-def get_china_stock_data_cached(symbol: str, start_date: str, end_date: str, 
+def get_china_stock_data_cached(symbol: str, start_date: str, end_date: str,
                                force_refresh: bool = False) -> str:
     """
     获取A股数据的便捷函数
-    
+
     Args:
         symbol: 股票代码（6位数字）
         start_date: 开始日期 (YYYY-MM-DD)
         end_date: 结束日期 (YYYY-MM-DD)
         force_refresh: 是否强制刷新缓存
-    
+
     Returns:
         格式化的股票数据字符串
     """
@@ -1155,13 +1332,155 @@ def get_china_stock_data_cached(symbol: str, start_date: str, end_date: str,
 def get_china_fundamentals_cached(symbol: str, force_refresh: bool = False) -> str:
     """
     获取A股基本面数据的便捷函数
-    
+
     Args:
         symbol: 股票代码（6位数字）
         force_refresh: 是否强制刷新缓存
-    
+
     Returns:
         格式化的基本面数据字符串
     """
     provider = get_optimized_china_data_provider()
     return provider.get_fundamentals_data(symbol, force_refresh)
+
+
+# 在OptimizedChinaDataProvider类中添加缓存方法
+def _add_financial_cache_methods():
+    """为OptimizedChinaDataProvider类添加财务数据缓存方法"""
+
+    def _get_cached_raw_financial_data(self, symbol: str) -> dict:
+        """从数据库缓存获取原始财务数据"""
+        try:
+            from .app_cache_adapter import get_mongodb_client
+            client = get_mongodb_client()
+            if not client:
+                logger.debug(f"📊 [财务缓存] MongoDB客户端不可用")
+                return None
+
+            db = client.get_database('tradingagents')
+            collection = db.financial_data_cache
+
+            # 查找缓存的原始财务数据
+            cache_doc = collection.find_one({
+                'symbol': symbol,
+                'cache_type': 'raw_financial_data'
+            }, sort=[('updated_at', -1)])
+
+            if cache_doc:
+                # 检查缓存是否过期（24小时）
+                from datetime import datetime, timedelta
+                cache_time = cache_doc.get('updated_at')
+                if cache_time and datetime.now() - cache_time < timedelta(hours=24):
+                    financial_data = cache_doc.get('financial_data', {})
+                    if financial_data:
+                        logger.info(f"✅ [财务缓存] 从数据库缓存获取{symbol}原始财务数据")
+                        return financial_data
+                else:
+                    logger.debug(f"📊 [财务缓存] {symbol}原始财务数据缓存已过期")
+            else:
+                logger.debug(f"📊 [财务缓存] 未找到{symbol}原始财务数据缓存")
+
+        except Exception as e:
+            logger.debug(f"📊 [财务缓存] 获取{symbol}原始财务数据缓存失败: {e}")
+
+        return None
+
+    def _get_cached_stock_info(self, symbol: str) -> dict:
+        """从数据库缓存获取股票基本信息"""
+        try:
+            from .app_cache_adapter import get_mongodb_client
+            client = get_mongodb_client()
+            if not client:
+                return {}
+
+            db = client.get_database('tradingagents')
+            collection = db.stock_basic_info
+
+            # 查找股票基本信息
+            doc = collection.find_one({'code': symbol})
+            if doc:
+                return {
+                    'symbol': symbol,
+                    'name': doc.get('name', ''),
+                    'industry': doc.get('industry', ''),
+                    'market': doc.get('market', ''),
+                    'source': 'database_cache'
+                }
+        except Exception as e:
+            logger.debug(f"📊 获取{symbol}股票基本信息缓存失败: {e}")
+
+        return {}
+
+    def _restore_financial_data_format(self, cached_data: dict) -> dict:
+        """将缓存的财务数据恢复为DataFrame格式"""
+        try:
+            import pandas as pd
+            restored_data = {}
+
+            for key, value in cached_data.items():
+                if isinstance(value, list) and value:  # 如果是list格式的数据
+                    # 转换回DataFrame
+                    restored_data[key] = pd.DataFrame(value)
+                else:
+                    restored_data[key] = value
+
+            return restored_data
+        except Exception as e:
+            logger.debug(f"📊 恢复财务数据格式失败: {e}")
+            return cached_data
+
+    def _cache_raw_financial_data(self, symbol: str, financial_data: dict, stock_info: dict):
+        """将原始财务数据缓存到数据库"""
+        try:
+            from tradingagents.config.runtime_settings import use_app_cache_enabled
+            if not use_app_cache_enabled(False):
+                logger.debug(f"📊 [财务缓存] 应用缓存未启用，跳过缓存保存")
+                return
+
+            from .app_cache_adapter import get_mongodb_client
+            client = get_mongodb_client()
+            if not client:
+                logger.debug(f"📊 [财务缓存] MongoDB客户端不可用")
+                return
+
+            db = client.get_database('tradingagents')
+            collection = db.financial_data_cache
+
+            from datetime import datetime
+
+            # 将DataFrame转换为可序列化的格式
+            serializable_data = {}
+            for key, value in financial_data.items():
+                if hasattr(value, 'to_dict'):  # pandas DataFrame
+                    serializable_data[key] = value.to_dict('records')
+                else:
+                    serializable_data[key] = value
+
+            cache_doc = {
+                'symbol': symbol,
+                'cache_type': 'raw_financial_data',
+                'financial_data': serializable_data,
+                'stock_info': stock_info,
+                'updated_at': datetime.now()
+            }
+
+            # 使用upsert更新或插入
+            collection.replace_one(
+                {'symbol': symbol, 'cache_type': 'raw_financial_data'},
+                cache_doc,
+                upsert=True
+            )
+
+            logger.info(f"✅ [财务缓存] {symbol}原始财务数据已缓存到数据库")
+
+        except Exception as e:
+            logger.debug(f"📊 [财务缓存] 缓存{symbol}原始财务数据失败: {e}")
+
+    # 将方法添加到类中
+    OptimizedChinaDataProvider._get_cached_raw_financial_data = _get_cached_raw_financial_data
+    OptimizedChinaDataProvider._get_cached_stock_info = _get_cached_stock_info
+    OptimizedChinaDataProvider._restore_financial_data_format = _restore_financial_data_format
+    OptimizedChinaDataProvider._cache_raw_financial_data = _cache_raw_financial_data
+
+# 执行方法添加
+_add_financial_cache_methods()

@@ -15,6 +15,11 @@ warnings.filterwarnings('ignore')
 from tradingagents.utils.logging_init import get_logger
 logger = get_logger("default")
 
+
+# 简单指标计数器（可后续接入 Prometheus）
+from collections import defaultdict
+_ta_metrics = defaultdict(int)
+
 # 导入Tushare工具
 try:
     from .tushare_utils import get_tushare_provider
@@ -34,17 +39,17 @@ except ImportError:
 
 class TushareDataAdapter:
     """Tushare数据适配器"""
-    
+
     def __init__(self, enable_cache: bool = True):
         """
         初始化Tushare数据适配器
-        
+
         Args:
             enable_cache: 是否启用缓存
         """
         self.enable_cache = enable_cache and CACHE_AVAILABLE
         self.provider = None
-        
+
         # 初始化缓存管理器
         self.cache_manager = None
         if self.enable_cache:
@@ -67,18 +72,18 @@ class TushareDataAdapter:
                 logger.warning(f"⚠️ Tushare提供器初始化失败: {e}")
         else:
             logger.error("❌ Tushare不可用")
-    
-    def get_stock_data(self, symbol: str, start_date: str = None, end_date: str = None, 
+
+    def get_stock_data(self, symbol: str, start_date: str = None, end_date: str = None,
                       data_type: str = "daily") -> pd.DataFrame:
         """
         获取股票数据
-        
+
         Args:
             symbol: 股票代码
             start_date: 开始日期
             end_date: 结束日期
             data_type: 数据类型 ("daily", "realtime")
-            
+
         Returns:
             DataFrame: 股票数据
         """
@@ -102,11 +107,11 @@ class TushareDataAdapter:
             else:
                 logger.error(f"❌ 不支持的数据类型: {data_type}")
                 return pd.DataFrame()
-                
+
         except Exception as e:
             logger.error(f"❌ 获取{symbol}数据失败: {e}")
             return pd.DataFrame()
-    
+
     def _get_daily_data(self, symbol: str, start_date: str = None, end_date: str = None) -> pd.DataFrame:
         """获取日线数据"""
 
@@ -187,25 +192,46 @@ class TushareDataAdapter:
             if data is not None:
                 logger.warning(f"⚠️ [TushareAdapter详细日志] DataFrame为空: {data.empty}")
             return pd.DataFrame()
-    
+
     def _get_realtime_data(self, symbol: str) -> pd.DataFrame:
-        """获取实时数据（使用最新日线数据）"""
-        
-        # Tushare免费版不支持实时数据，使用最新日线数据
+        """获取实时数据。
+        优先级（由 ta_use_app_cache 控制）：
+        - True: 先从 app 的 market_quotes 集合读取 → 失败则回退到最近日线
+        - False: 使用最近日线
+        """
+        # 先尝试 app 缓存（若启用）
+        try:
+            from tradingagents.config.runtime_settings import use_app_cache_enabled
+            enabled = use_app_cache_enabled(False)
+            logger.info(f"🔧 [配置] ta_use_app_cache={enabled} (realtime)")
+            if enabled:
+                from .app_cache_adapter import get_market_quote_dataframe
+                df = get_market_quote_dataframe(symbol)
+                if df is not None and not df.empty:
+                    _ta_metrics['realtime_cache_hit'] += 1
+                    logger.info(
+                        f"✅ 实时行情命中缓存 | source=market_quotes cache_hit=true code={symbol}"
+                    )
+                    return self._standardize_data(df)
+                else:
+                    logger.debug(f"未命中缓存，回退到最近日线 | source=market_quotes cache_hit=false code={symbol}")
+        except Exception as e:
+            logger.debug(f"app 缓存实时行情读取失败（忽略并回退）: {e}")
+
+        # 回退：Tushare免费版不支持实时数据，使用最新日线数据
         end_date = datetime.now().strftime('%Y-%m-%d')
         start_date = (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d')
-        
         data = self.provider.get_stock_daily(symbol, start_date, end_date)
-        
         if data is not None and not data.empty:
-            # 返回最新一条数据
+            _ta_metrics['realtime_api_hit'] += 1
             latest_data = data.tail(1)
-            logger.debug(f"✅ 从Tushare获取{symbol}最新数据")
+            logger.info(f"✅ 从Tushare获取{symbol}最新数据 | source=tdx_daily_latest cache_hit=false code={symbol}")
             return self._standardize_data(latest_data)
         else:
-            logger.warning(f"⚠️ 无法获取{symbol}实时数据")
+            _ta_metrics['realtime_fallback'] += 1
+            logger.warning(f"⚠️ 无法获取{symbol}实时数据 | fallback_reason=no_data code={symbol}")
             return pd.DataFrame()
-    
+
     def _validate_and_standardize_data(self, data: pd.DataFrame) -> pd.DataFrame:
         """验证并标准化数据格式，增强版本（修复KeyError: 'volume'问题）"""
         if data.empty:
@@ -305,20 +331,20 @@ class TushareDataAdapter:
     def _standardize_data(self, data: pd.DataFrame) -> pd.DataFrame:
         """标准化数据格式 - 保持向后兼容性，调用增强版本"""
         return self._validate_and_standardize_data(data)
-    
+
     def get_stock_info(self, symbol: str) -> Dict:
         """
         获取股票基本信息
-        
+
         Args:
             symbol: 股票代码
-            
+
         Returns:
             Dict: 股票基本信息
         """
         if not self.provider or not self.provider.connected:
             return {'symbol': symbol, 'name': f'股票{symbol}', 'source': 'unknown'}
-        
+
         try:
             info = self.provider.get_stock_info(symbol)
             if info and info.get('name') and info.get('name') != f'股票{symbol}':
@@ -330,14 +356,14 @@ class TushareDataAdapter:
         except Exception as e:
             logger.error(f"❌ 获取{symbol}股票信息失败: {e}")
             return {'symbol': symbol, 'name': f'股票{symbol}', 'source': 'unknown'}
-    
+
     def search_stocks(self, keyword: str) -> pd.DataFrame:
         """
         搜索股票
-        
+
         Args:
             keyword: 搜索关键词
-            
+
         Returns:
             DataFrame: 搜索结果
         """
@@ -358,32 +384,32 @@ class TushareDataAdapter:
         except Exception as e:
             logger.error(f"❌ 搜索股票失败: {e}")
             return pd.DataFrame()
-    
+
     def get_fundamentals(self, symbol: str) -> str:
         """
         获取基本面数据
-        
+
         Args:
             symbol: 股票代码
-            
+
         Returns:
             str: 基本面分析报告
         """
         if not self.provider or not self.provider.connected:
             return f"❌ Tushare数据源不可用，无法获取{symbol}基本面数据"
-        
+
         try:
             logger.debug(f"📊 获取{symbol}基本面数据...")
 
             # 获取股票基本信息
             stock_info = self.get_stock_info(symbol)
-            
+
             # 获取财务数据
             financial_data = self.provider.get_financial_data(symbol)
-            
+
             # 生成基本面分析报告
             report = self._generate_fundamentals_report(symbol, stock_info, financial_data)
-            
+
             # 缓存基本面数据
             if self.enable_cache and self.cache_manager:
                 try:
@@ -401,13 +427,13 @@ class TushareDataAdapter:
         except Exception as e:
             logger.error(f"❌ 获取{symbol}基本面数据失败: {e}")
             return f"❌ 获取{symbol}基本面数据失败: {e}"
-    
+
     def _generate_fundamentals_report(self, symbol: str, stock_info: Dict, financial_data: Dict) -> str:
         """生成基本面分析报告"""
-        
+
         report = f"📊 {symbol} 基本面分析报告 (Tushare数据源)\n"
         report += "=" * 50 + "\n\n"
-        
+
         # 基本信息
         report += "📋 基本信息\n"
         report += f"股票代码: {symbol}\n"
@@ -416,11 +442,11 @@ class TushareDataAdapter:
         report += f"所属行业: {stock_info.get('industry', '未知')}\n"
         report += f"上市市场: {stock_info.get('market', '未知')}\n"
         report += f"上市日期: {stock_info.get('list_date', '未知')}\n\n"
-        
+
         # 财务数据
         if financial_data:
             report += "💰 财务数据\n"
-            
+
             # 资产负债表
             balance_sheet = financial_data.get('balance_sheet', [])
             if balance_sheet:
@@ -428,7 +454,7 @@ class TushareDataAdapter:
                 report += f"总资产: {latest_balance.get('total_assets', 'N/A')}\n"
                 report += f"总负债: {latest_balance.get('total_liab', 'N/A')}\n"
                 report += f"股东权益: {latest_balance.get('total_hldr_eqy_exc_min_int', 'N/A')}\n"
-            
+
             # 利润表
             income_statement = financial_data.get('income_statement', [])
             if income_statement:
@@ -436,7 +462,7 @@ class TushareDataAdapter:
                 report += f"营业收入: {latest_income.get('total_revenue', 'N/A')}\n"
                 report += f"营业利润: {latest_income.get('operate_profit', 'N/A')}\n"
                 report += f"净利润: {latest_income.get('n_income', 'N/A')}\n"
-            
+
             # 现金流量表
             cash_flow = financial_data.get('cash_flow', [])
             if cash_flow:
@@ -444,10 +470,10 @@ class TushareDataAdapter:
                 report += f"经营活动现金流: {latest_cash.get('c_fr_sale_sg', 'N/A')}\n"
         else:
             report += "💰 财务数据: 暂无数据\n"
-        
+
         report += f"\n📅 报告生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
         report += f"📊 数据来源: Tushare\n"
-        
+
         return report
 
 
@@ -465,12 +491,12 @@ def get_tushare_adapter() -> TushareDataAdapter:
 def get_china_stock_data_tushare_adapter(symbol: str, start_date: str = None, end_date: str = None) -> pd.DataFrame:
     """
     获取中国股票数据的便捷函数（Tushare适配器）
-    
+
     Args:
         symbol: 股票代码
         start_date: 开始日期
         end_date: 结束日期
-        
+
     Returns:
         DataFrame: 股票数据
     """
@@ -481,10 +507,10 @@ def get_china_stock_data_tushare_adapter(symbol: str, start_date: str = None, en
 def get_china_stock_info_tushare_adapter(symbol: str) -> Dict:
     """
     获取中国股票信息的便捷函数（Tushare适配器）
-    
+
     Args:
         symbol: 股票代码
-        
+
     Returns:
         Dict: 股票信息
     """

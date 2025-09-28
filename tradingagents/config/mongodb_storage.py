@@ -5,13 +5,15 @@ MongoDB存储适配器
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from typing import Dict, List, Optional, Any
 from dataclasses import asdict
 from .config_manager import UsageRecord
 
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
+from tradingagents.config.runtime_settings import get_timezone_name
 logger = get_logger('agents')
 
 try:
@@ -111,7 +113,7 @@ class MongoDBStorage:
             record_dict = asdict(record)
             
             # 添加MongoDB特有的字段
-            record_dict['_created_at'] = datetime.now()
+            record_dict['_created_at'] = datetime.now(ZoneInfo(get_timezone_name()))
             
             # 插入记录
             result = self.collection.insert_one(record_dict)
@@ -136,7 +138,7 @@ class MongoDBStorage:
             query = {}
             if days:
                 from datetime import timedelta
-                cutoff_date = datetime.now() - timedelta(days=days)
+                cutoff_date = datetime.now(ZoneInfo(get_timezone_name())) - timedelta(days=days)
                 query['timestamp'] = {'$gte': cutoff_date.isoformat()}
             
             # 查询记录，按时间倒序

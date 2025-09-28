@@ -2,9 +2,10 @@
 系统配置相关数据模型
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
+from app.utils.timezone import now_tz
 from typing import Optional, Dict, Any, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
 from bson import ObjectId
 from .user import PyObjectId
@@ -46,13 +47,10 @@ class LLMProvider(BaseModel):
     api_key: Optional[str] = Field(None, description="API密钥")
     api_secret: Optional[str] = Field(None, description="API密钥（某些厂家需要）")
     extra_config: Dict[str, Any] = Field(default_factory=dict, description="额外配置参数")
-    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
-    updated_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
+    created_at: Optional[datetime] = Field(default_factory=now_tz)
+    updated_at: Optional[datetime] = Field(default_factory=now_tz)
 
-    class Config:
-        allow_population_by_field_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
+    model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True)
 
 
 class LLMProviderRequest(BaseModel):
@@ -148,8 +146,8 @@ class DataSourceConfig(BaseModel):
     market_categories: Optional[List[str]] = Field(default_factory=list, description="所属市场分类列表")
     display_name: Optional[str] = Field(None, description="显示名称")
     provider: Optional[str] = Field(None, description="数据提供商")
-    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow, description="创建时间")
-    updated_at: Optional[datetime] = Field(default_factory=datetime.utcnow, description="更新时间")
+    created_at: Optional[datetime] = Field(default_factory=now_tz, description="创建时间")
+    updated_at: Optional[datetime] = Field(default_factory=now_tz, description="更新时间")
 
 
 class DatabaseConfig(BaseModel):
@@ -176,8 +174,8 @@ class MarketCategory(BaseModel):
     description: Optional[str] = Field(None, description="分类描述")
     enabled: bool = Field(default=True, description="是否启用")
     sort_order: int = Field(default=1, description="排序顺序")
-    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow, description="创建时间")
-    updated_at: Optional[datetime] = Field(default_factory=datetime.utcnow, description="更新时间")
+    created_at: Optional[datetime] = Field(default_factory=now_tz, description="创建时间")
+    updated_at: Optional[datetime] = Field(default_factory=now_tz, description="更新时间")
 
 
 class DataSourceGrouping(BaseModel):
@@ -186,8 +184,8 @@ class DataSourceGrouping(BaseModel):
     market_category_id: str = Field(..., description="市场分类ID")
     priority: int = Field(default=0, description="在该分类中的优先级")
     enabled: bool = Field(default=True, description="是否启用")
-    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow, description="创建时间")
-    updated_at: Optional[datetime] = Field(default_factory=datetime.utcnow, description="更新时间")
+    created_at: Optional[datetime] = Field(default_factory=now_tz, description="创建时间")
+    updated_at: Optional[datetime] = Field(default_factory=now_tz, description="更新时间")
 
 
 class SystemConfig(BaseModel):
@@ -211,17 +209,14 @@ class SystemConfig(BaseModel):
     system_settings: Dict[str, Any] = Field(default_factory=dict, description="系统设置")
     
     # 元数据
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=now_tz)
+    updated_at: datetime = Field(default_factory=now_tz)
     created_by: Optional[PyObjectId] = Field(None, description="创建者")
     updated_by: Optional[PyObjectId] = Field(None, description="更新者")
     version: int = Field(default=1, description="配置版本")
     is_active: bool = Field(default=True, description="是否激活")
     
-    class Config:
-        allow_population_by_field_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
+    model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True)
 
 
 # API请求/响应模型

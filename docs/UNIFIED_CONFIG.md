@@ -7,6 +7,12 @@
 
 > 提示：当前运行时的完整配置清单、默认值与历史别名，请参见 docs/CONFIG_MATRIX.md。
 
+> 安全与敏感信息：遵循“方案A（分层集中式）”的敏感信息策略：
+> - REST 接口不接受/不持久化敏感字段（如 api_key/api_secret/password），提交即清洗忽略；
+> - 运行时密钥来自环境变量或厂家目录，接口仅返回 has_value/source 状态；
+> - 导出（export）对敏感项脱敏，导入（import）忽略敏感项。
+
+
 ## 🏗️ 架构设计
 
 ### 配置层次结构
@@ -73,6 +79,19 @@
   - `default_model` → `default_llm`
   - `tushare_token` → 数据源配置
   - `finnhub_api_key` → 数据源配置
+
+
+### TradingAgents 数据来源策略（App 缓存优先开关）
+- 键：`ta_use_app_cache`（系统设置）；ENV 覆盖：`TA_USE_APP_CACHE`
+- 默认：`false`
+- 语义：
+  - `true`：优先从 App 缓存数据库读取，未命中回退到直连数据源
+  - `false`：保持直连数据源优先，未命中回退到 App 缓存
+- 缓存集合（固定名）：
+  - 基础信息：`stock_basic_info`
+  - 行情快照：`market_quotes`
+- 适用范围：TradingAgents 内部数据获取（基础信息、近实时行情）
+- 优先级：DB(system_settings) > ENV > 默认
 
 ### 数据源配置
 - **来源**: 从 `settings.json` 提取

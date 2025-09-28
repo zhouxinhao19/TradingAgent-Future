@@ -8,12 +8,15 @@ import os
 import time
 import random
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
 from typing import Optional, Dict, Any
 import yfinance as yf
 import pandas as pd
 from .cache_manager import get_cache
 from .config import get_config
 
+from tradingagents.config.runtime_settings import get_float, get_timezone_name
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
 logger = get_logger('agents')
@@ -21,43 +24,43 @@ logger = get_logger('agents')
 
 class OptimizedUSDataProvider:
     """优化的美股数据提供器 - 集成缓存和API限制处理"""
-    
+
     def __init__(self):
         self.cache = get_cache()
         self.config = get_config()
         self.last_api_call = 0
-        self.min_api_interval = 1.0  # 最小API调用间隔（秒）
-        
+        self.min_api_interval = get_float("TA_US_MIN_API_INTERVAL_SECONDS", "ta_us_min_api_interval_seconds", 1.0)
+
         logger.info(f"📊 优化美股数据提供器初始化完成")
-    
+
     def _wait_for_rate_limit(self):
         """等待API限制"""
         current_time = time.time()
         time_since_last_call = current_time - self.last_api_call
-        
+
         if time_since_last_call < self.min_api_interval:
             wait_time = self.min_api_interval - time_since_last_call
             logger.info(f"⏳ API限制等待 {wait_time:.1f}s...")
             time.sleep(wait_time)
-        
+
         self.last_api_call = time.time()
-    
-    def get_stock_data(self, symbol: str, start_date: str, end_date: str, 
+
+    def get_stock_data(self, symbol: str, start_date: str, end_date: str,
                       force_refresh: bool = False) -> str:
         """
         获取美股数据 - 优先使用缓存
-        
+
         Args:
             symbol: 股票代码
             start_date: 开始日期 (YYYY-MM-DD)
             end_date: 结束日期 (YYYY-MM-DD)
             force_refresh: 是否强制刷新缓存
-        
+
         Returns:
             格式化的股票数据字符串
         """
         logger.info(f"📈 获取美股数据: {symbol} ({start_date} 到 {end_date})")
-        
+
         # 检查缓存（除非强制刷新）
         if not force_refresh:
             # 优先查找FINNHUB缓存
@@ -82,7 +85,7 @@ class OptimizedUSDataProvider:
                 if cached_data:
                     logger.info(f"⚡ 从缓存加载美股数据: {symbol}")
                     return cached_data
-        
+
         # 缓存未命中，从API获取 - 优先使用FINNHUB
         formatted_data = None
         data_source = None
@@ -178,38 +181,38 @@ class OptimizedUSDataProvider:
         )
 
         return formatted_data
-    
-    def _format_stock_data(self, symbol: str, data: pd.DataFrame, 
+
+    def _format_stock_data(self, symbol: str, data: pd.DataFrame,
                           start_date: str, end_date: str) -> str:
         """格式化股票数据为字符串"""
-        
+
         # 移除时区信息
         if data.index.tz is not None:
             data.index = data.index.tz_localize(None)
-        
+
         # 四舍五入数值
         numeric_columns = ["Open", "High", "Low", "Close", "Adj Close"]
         for col in numeric_columns:
             if col in data.columns:
                 data[col] = data[col].round(2)
-        
+
         # 获取最新价格和统计信息
         latest_price = data['Close'].iloc[-1]
         price_change = data['Close'].iloc[-1] - data['Close'].iloc[0]
         price_change_pct = (price_change / data['Close'].iloc[0]) * 100
-        
+
         # 计算技术指标
         data['MA5'] = data['Close'].rolling(window=5).mean()
         data['MA10'] = data['Close'].rolling(window=10).mean()
         data['MA20'] = data['Close'].rolling(window=20).mean()
-        
+
         # 计算RSI
         delta = data['Close'].diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
         rs = gain / loss
         rsi = 100 - (100 / (1 + rs))
-        
+
         # 格式化输出
         result = f"""# {symbol} 美股数据分析
 
@@ -235,11 +238,11 @@ class OptimizedUSDataProvider:
 {data.tail().to_string()}
 
 数据来源: Yahoo Finance API
-更新时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+更新时间: {datetime.now(ZoneInfo(get_timezone_name())).strftime('%Y-%m-%d %H:%M:%S')}
 """
-        
+
         return result
-    
+
     def _try_get_old_cache(self, symbol: str, start_date: str, end_date: str) -> Optional[str]:
         """尝试获取过期的缓存数据作为备用"""
         try:
@@ -249,11 +252,11 @@ class OptimizedUSDataProvider:
                     import json
                     with open(metadata_file, 'r', encoding='utf-8') as f:
                         metadata = json.load(f)
-                    
-                    if (metadata.get('symbol') == symbol and 
+
+                    if (metadata.get('symbol') == symbol and
                         metadata.get('data_type') == 'stock_data' and
                         metadata.get('market_type') == 'us'):
-                        
+
                         cache_key = metadata_file.stem.replace('_meta', '')
                         cached_data = self.cache.load_stock_data(cache_key)
                         if cached_data:
@@ -262,7 +265,7 @@ class OptimizedUSDataProvider:
                     continue
         except Exception:
             pass
-        
+
         return None
 
     def _get_data_from_finnhub(self, symbol: str, start_date: str, end_date: str) -> str:
@@ -305,7 +308,7 @@ class OptimizedUSDataProvider:
 - 最高价: ${quote.get('h', 0):.2f}
 - 最低价: ${quote.get('l', 0):.2f}
 - 前收盘: ${quote.get('pc', 0):.2f}
-- 更新时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+- 更新时间: {datetime.now(ZoneInfo(get_timezone_name())).strftime('%Y-%m-%d %H:%M:%S')}
 
 ## 📈 数据概览
 - 数据期间: {start_date} 至 {end_date}
@@ -313,7 +316,7 @@ class OptimizedUSDataProvider:
 - 当前价位相对位置: {((current_price - quote.get('l', current_price)) / max(quote.get('h', current_price) - quote.get('l', current_price), 0.01) * 100):.1f}%
 - 日内振幅: {((quote.get('h', 0) - quote.get('l', 0)) / max(quote.get('pc', 1), 0.01) * 100):.2f}%
 
-生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+生成时间: {datetime.now(ZoneInfo(get_timezone_name())).strftime('%Y-%m-%d %H:%M:%S')}
 """
 
             return formatted_data
@@ -339,7 +342,7 @@ class OptimizedUSDataProvider:
 由于API限制或网络问题，无法获取实时数据。
 建议稍后重试或检查网络连接。
 
-生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+生成时间: {datetime.now(ZoneInfo(get_timezone_name())).strftime('%Y-%m-%d %H:%M:%S')}
 """
 
 
@@ -354,17 +357,17 @@ def get_optimized_us_data_provider() -> OptimizedUSDataProvider:
     return _us_data_provider
 
 
-def get_us_stock_data_cached(symbol: str, start_date: str, end_date: str, 
+def get_us_stock_data_cached(symbol: str, start_date: str, end_date: str,
                            force_refresh: bool = False) -> str:
     """
     获取美股数据的便捷函数
-    
+
     Args:
         symbol: 股票代码
         start_date: 开始日期 (YYYY-MM-DD)
         end_date: 结束日期 (YYYY-MM-DD)
         force_refresh: 是否强制刷新缓存
-    
+
     Returns:
         格式化的股票数据字符串
     """

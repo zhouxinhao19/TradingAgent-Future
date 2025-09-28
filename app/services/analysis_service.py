@@ -34,6 +34,8 @@ from app.core.redis_client import get_redis_service, RedisKeys
 from app.services.queue_service import QueueService
 from app.core.database import get_redis_client
 from app.services.redis_progress_tracker import RedisProgressTracker
+from app.services.config_provider import provider as config_provider
+from app.services.queue import DEFAULT_USER_CONCURRENT_LIMIT, GLOBAL_CONCURRENT_LIMIT, VISIBILITY_TIMEOUT_SECONDS
 
 import logging
 logger = logging.getLogger(__name__)
@@ -309,15 +311,38 @@ class AnalysisService:
 
             # 创建分析任务
             logger.info(f"🏗️ 开始创建AnalysisTask对象...")
+
+            # 读取合并后的系统设置（ENV 优先 → DB），用于填充模型与并发/超时配置
+            try:
+                effective_settings = await config_provider.get_effective_system_settings()
+            except Exception:
+                effective_settings = {}
+
+            # 填充分析参数中的模型（若请求未显式提供）
+            params = request.parameters or AnalysisParameters()
+            if not getattr(params, 'quick_analysis_model', None):
+                params.quick_analysis_model = effective_settings.get("quick_analysis_model", "qwen-turbo")
+            if not getattr(params, 'deep_analysis_model', None):
+                params.deep_analysis_model = effective_settings.get("deep_analysis_model", "qwen-max")
+
+            # 应用系统级并发与可见性超时（若提供）
+            try:
+                self.queue_service.user_concurrent_limit = int(effective_settings.get("max_concurrent_tasks", DEFAULT_USER_CONCURRENT_LIMIT))
+                self.queue_service.global_concurrent_limit = int(effective_settings.get("max_concurrent_tasks", GLOBAL_CONCURRENT_LIMIT))
+                self.queue_service.visibility_timeout = int(effective_settings.get("default_analysis_timeout", VISIBILITY_TIMEOUT_SECONDS))
+            except Exception:
+                # 使用默认值即可
+                pass
+
             task = AnalysisTask(
                 task_id=task_id,
                 user_id=converted_user_id,
                 stock_code=request.stock_code,
-                parameters=request.parameters or AnalysisParameters(),
+                parameters=params,
                 status=AnalysisStatus.PENDING
             )
             logger.info(f"✅ AnalysisTask对象创建成功")
-            
+
             # 保存任务到数据库
             logger.info(f"💾 开始保存任务到数据库...")
             db = get_mongo_db()
@@ -364,6 +389,25 @@ class AnalysisService:
             # 转换用户ID
             converted_user_id = self._convert_user_id(user_id)
 
+            # 读取系统设置，填充模型参数并应用并发/超时配置
+            try:
+                effective_settings = await config_provider.get_effective_system_settings()
+            except Exception:
+                effective_settings = {}
+
+            params = request.parameters or AnalysisParameters()
+            if not getattr(params, 'quick_analysis_model', None):
+                params.quick_analysis_model = effective_settings.get("quick_analysis_model", "qwen-turbo")
+            if not getattr(params, 'deep_analysis_model', None):
+                params.deep_analysis_model = effective_settings.get("deep_analysis_model", "qwen-max")
+
+            try:
+                self.queue_service.user_concurrent_limit = int(effective_settings.get("max_concurrent_tasks", DEFAULT_USER_CONCURRENT_LIMIT))
+                self.queue_service.global_concurrent_limit = int(effective_settings.get("max_concurrent_tasks", GLOBAL_CONCURRENT_LIMIT))
+                self.queue_service.visibility_timeout = int(effective_settings.get("default_analysis_timeout", VISIBILITY_TIMEOUT_SECONDS))
+            except Exception:
+                pass
+
             # 创建批次记录
             batch = AnalysisBatch(
                 batch_id=batch_id,
@@ -371,7 +415,7 @@ class AnalysisService:
                 title=request.title,
                 description=request.description,
                 total_tasks=len(request.stock_codes),
-                parameters=request.parameters or AnalysisParameters(),
+                parameters=params,
                 status=BatchStatus.PENDING
             )
 

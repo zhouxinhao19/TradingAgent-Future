@@ -3,9 +3,12 @@ from fastapi.responses import StreamingResponse
 import asyncio
 import json
 import logging
+import time
 
 from app.routers.auth import get_current_user
 from app.core.database import get_redis_client
+from app.core.config import settings
+
 from app.services.queue_service import get_queue_service, QueueService
 
 router = APIRouter()
@@ -16,39 +19,53 @@ async def task_progress_generator(task_id: str, user_id: str):
     """Generate SSE events for task progress updates"""
     r = get_redis_client()
     pubsub = r.pubsub()
-    
+
     try:
+        # Load dynamic SSE settings
+        try:
+            from app.services.config_provider import provider as config_provider
+            eff = await config_provider.get_effective_system_settings()
+            poll_timeout = float(eff.get("sse_poll_timeout_seconds", 1.0))
+            heartbeat_every = int(eff.get("sse_heartbeat_interval_seconds", 10))
+            max_idle_seconds = int(eff.get("sse_task_max_idle_seconds", 300))
+        except Exception:
+            poll_timeout = float(getattr(settings, "SSE_POLL_TIMEOUT_SECONDS", 1.0))
+            heartbeat_every = int(getattr(settings, "SSE_HEARTBEAT_INTERVAL_SECONDS", 10))
+            max_idle_seconds = int(getattr(settings, "SSE_TASK_MAX_IDLE_SECONDS", 300))
+
         # Subscribe to task progress updates
         await pubsub.subscribe(f"task_progress:{task_id}")
-        
+
         # Send initial connection confirmation
         yield f"event: connected\ndata: {{\"task_id\": \"{task_id}\", \"message\": \"已连接进度流\"}}\n\n"
-        
+
         # Listen for progress updates
-        timeout_count = 0
-        max_timeout = 300  # 5 minutes timeout
-        
-        while timeout_count < max_timeout:
+        idle_elapsed = 0.0
+        last_hb = time.monotonic()
+
+        while idle_elapsed < max_idle_seconds:
             try:
-                message = await asyncio.wait_for(pubsub.get_message(ignore_subscribe_messages=True), timeout=1.0)
+                message = await asyncio.wait_for(pubsub.get_message(ignore_subscribe_messages=True), timeout=poll_timeout)
                 if message and message['type'] == 'message':
-                    # Reset timeout counter on valid message
-                    timeout_count = 0
+                    # Reset idle timer on valid message
+                    idle_elapsed = 0.0
                     try:
                         progress_data = json.loads(message['data'])
                         yield f"event: progress\ndata: {json.dumps(progress_data, ensure_ascii=False)}\n\n"
                     except json.JSONDecodeError:
                         logger.warning(f"Invalid JSON in progress message: {message['data']}")
                 else:
-                    # Send heartbeat every few seconds during no updates
-                    timeout_count += 1
-                    if timeout_count % 10 == 0:
+                    # No update: accumulate idle time and send heartbeat if due
+                    idle_elapsed += poll_timeout
+                    now = time.monotonic()
+                    if now - last_hb >= heartbeat_every:
                         yield f"event: heartbeat\ndata: {{\"timestamp\": \"{asyncio.get_event_loop().time()}\"}}\n\n"
-                        
+                        last_hb = now
+
             except asyncio.TimeoutError:
-                timeout_count += 1
+                idle_elapsed += poll_timeout
                 continue
-                
+
     except Exception as e:
         logger.exception(f"SSE error for task {task_id}: {e}")
         yield f"event: error\ndata: {{\"error\": \"连接异常: {str(e)}\"}}\n\n"
@@ -61,38 +78,48 @@ async def batch_progress_generator(batch_id: str, user_id: str):
     """Generate SSE events for batch progress updates"""
     r = get_redis_client()
     svc = get_queue_service()
-    
+
     try:
+        # Load dynamic SSE settings for batch stream
+        try:
+            from app.services.config_provider import provider as config_provider
+            eff = await config_provider.get_effective_system_settings()
+            batch_poll_interval = float(eff.get("sse_batch_poll_interval_seconds", 2))
+            batch_max_idle_seconds = int(eff.get("sse_batch_max_idle_seconds", 600))
+        except Exception:
+            batch_poll_interval = float(getattr(settings, "SSE_BATCH_POLL_INTERVAL_SECONDS", 2.0))
+            batch_max_idle_seconds = int(getattr(settings, "SSE_BATCH_MAX_IDLE_SECONDS", 600))
+
         # Send initial connection confirmation
         yield f"event: connected\ndata: {{\"batch_id\": \"{batch_id}\", \"message\": \"已连接批次进度流\"}}\n\n"
-        
-        timeout_count = 0
-        max_timeout = 600  # 10 minutes timeout for batches
-        
-        while timeout_count < max_timeout:
+
+        idle_elapsed = 0.0
+
+        while idle_elapsed < batch_max_idle_seconds:
             try:
                 # Get current batch status
                 batch_data = await svc.get_batch(batch_id)
                 if not batch_data:
                     yield f"event: error\ndata: {{\"error\": \"批次不存在\"}}\n\n"
                     break
-                    
+
                 # Check if batch belongs to user
                 if batch_data.get("user") != user_id:
                     yield f"event: error\ndata: {{\"error\": \"无权限访问此批次\"}}\n\n"
                     break
-                
+
                 # Calculate batch progress based on task statuses
                 task_ids = batch_data.get("tasks", [])
                 if not task_ids:
                     yield f"event: progress\ndata: {{\"batch_id\": \"{batch_id}\", \"message\": \"批次无任务\", \"progress\": 0}}\n\n"
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(batch_poll_interval)
+                    idle_elapsed += batch_poll_interval
                     continue
-                
+
                 completed_count = 0
                 failed_count = 0
                 processing_count = 0
-                
+
                 for task_id in task_ids:
                     task_data = await svc.get_task(task_id)
                     if task_data:
@@ -103,11 +130,11 @@ async def batch_progress_generator(batch_id: str, user_id: str):
                             failed_count += 1
                         elif status == "processing":
                             processing_count += 1
-                
+
                 total_tasks = len(task_ids)
                 finished_tasks = completed_count + failed_count
                 progress = round((finished_tasks / total_tasks) * 100, 1) if total_tasks > 0 else 0
-                
+
                 # Determine batch status
                 if finished_tasks == total_tasks:
                     if failed_count == 0:
@@ -125,7 +152,7 @@ async def batch_progress_generator(batch_id: str, user_id: str):
                 else:
                     batch_status = "queued"
                     message = f"批次排队中: {total_tasks} 任务待处理"
-                
+
                 progress_data = {
                     "batch_id": batch_id,
                     "status": batch_status,
@@ -137,23 +164,23 @@ async def batch_progress_generator(batch_id: str, user_id: str):
                     "processing": processing_count,
                     "timestamp": asyncio.get_event_loop().time()
                 }
-                
+
                 yield f"event: progress\ndata: {json.dumps(progress_data, ensure_ascii=False)}\n\n"
-                
+
                 # Break if batch is finished
                 if batch_status in ["completed", "failed", "partial"]:
                     yield f"event: finished\ndata: {{\"batch_id\": \"{batch_id}\", \"final_status\": \"{batch_status}\"}}\n\n"
                     break
-                
+
                 # Wait before next update
-                await asyncio.sleep(2)
-                timeout_count += 1
-                
+                await asyncio.sleep(batch_poll_interval)
+                idle_elapsed += batch_poll_interval
+
             except Exception as e:
                 logger.exception(f"Batch progress error: {e}")
                 yield f"event: error\ndata: {{\"error\": \"获取批次状态失败: {str(e)}\"}}\n\n"
                 break
-                
+
     except Exception as e:
         logger.exception(f"SSE batch error for {batch_id}: {e}")
         yield f"event: error\ndata: {{\"error\": \"连接异常: {str(e)}\"}}\n\n"
@@ -166,9 +193,9 @@ async def stream_task_progress(task_id: str, user: dict = Depends(get_current_us
     task_data = await svc.get_task(task_id)
     if not task_data or task_data.get("user") != user["id"]:
         raise HTTPException(status_code=404, detail="Task not found")
-    
+
     return StreamingResponse(
-        task_progress_generator(task_id, user["id"]), 
+        task_progress_generator(task_id, user["id"]),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -185,9 +212,9 @@ async def stream_batch_progress(batch_id: str, user: dict = Depends(get_current_
     batch_data = await svc.get_batch(batch_id)
     if not batch_data or batch_data.get("user") != user["id"]:
         raise HTTPException(status_code=404, detail="Batch not found")
-    
+
     return StreamingResponse(
-        batch_progress_generator(batch_id, user["id"]), 
+        batch_progress_generator(batch_id, user["id"]),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
