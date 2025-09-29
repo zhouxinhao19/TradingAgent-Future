@@ -131,8 +131,16 @@ class TushareSyncService:
                         batch_stats["skipped_count"] += 1
                         continue
                 
+                # 转换为字典格式（如果是Pydantic模型）
+                if hasattr(stock_info, 'model_dump'):
+                    stock_data = stock_info.model_dump()
+                elif hasattr(stock_info, 'dict'):
+                    stock_data = stock_info.dict()
+                else:
+                    stock_data = stock_info
+
                 # 更新到数据库
-                success = await self.stock_service.update_stock_basic_info(code, stock_info)
+                success = await self.stock_service.update_stock_basic_info(code, stock_data)
                 if success:
                     batch_stats["success_count"] += 1
                 else:
@@ -266,7 +274,15 @@ class TushareSyncService:
         try:
             quotes = await self.provider.get_stock_quotes(symbol)
             if quotes:
-                return await self.stock_service.update_market_quotes(symbol, quotes)
+                # 转换为字典格式（如果是Pydantic模型）
+                if hasattr(quotes, 'model_dump'):
+                    quotes_data = quotes.model_dump()
+                elif hasattr(quotes, 'dict'):
+                    quotes_data = quotes.dict()
+                else:
+                    quotes_data = quotes
+
+                return await self.stock_service.update_market_quotes(symbol, quotes_data)
             return False
         except Exception as e:
             logger.error(f"❌ 获取 {symbol} 行情失败: {e}")
@@ -555,3 +571,64 @@ async def get_tushare_sync_service() -> TushareSyncService:
         _tushare_sync_service = TushareSyncService()
         await _tushare_sync_service.initialize()
     return _tushare_sync_service
+
+
+# APScheduler兼容的任务函数
+async def run_tushare_basic_info_sync(force_update: bool = False):
+    """APScheduler任务：同步股票基础信息"""
+    try:
+        service = await get_tushare_sync_service()
+        result = await service.sync_stock_basic_info(force_update)
+        logger.info(f"✅ Tushare基础信息同步完成: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"❌ Tushare基础信息同步失败: {e}")
+        raise
+
+
+async def run_tushare_quotes_sync():
+    """APScheduler任务：同步实时行情"""
+    try:
+        service = await get_tushare_sync_service()
+        result = await service.sync_realtime_quotes()
+        logger.info(f"✅ Tushare行情同步完成: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"❌ Tushare行情同步失败: {e}")
+        raise
+
+
+async def run_tushare_historical_sync(incremental: bool = True):
+    """APScheduler任务：同步历史数据"""
+    try:
+        service = await get_tushare_sync_service()
+        result = await service.sync_historical_data(incremental=incremental)
+        logger.info(f"✅ Tushare历史数据同步完成: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"❌ Tushare历史数据同步失败: {e}")
+        raise
+
+
+async def run_tushare_financial_sync():
+    """APScheduler任务：同步财务数据"""
+    try:
+        service = await get_tushare_sync_service()
+        result = await service.sync_financial_data()
+        logger.info(f"✅ Tushare财务数据同步完成: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"❌ Tushare财务数据同步失败: {e}")
+        raise
+
+
+async def run_tushare_status_check():
+    """APScheduler任务：检查同步状态"""
+    try:
+        service = await get_tushare_sync_service()
+        result = await service.get_sync_status()
+        logger.info(f"✅ Tushare状态检查完成: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"❌ Tushare状态检查失败: {e}")
+        return {"error": str(e)}
