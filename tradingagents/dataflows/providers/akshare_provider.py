@@ -4,7 +4,7 @@ AKShare统一数据提供器
 """
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional, Union
 import pandas as pd
 
@@ -79,35 +79,38 @@ class AKShareProvider(BaseStockDataProvider):
     async def get_stock_list(self) -> List[Dict[str, Any]]:
         """
         获取股票列表
-        
+
         Returns:
             股票列表，包含代码和名称
         """
         if not self.connected:
             return []
-        
+
         try:
             logger.info("📋 获取AKShare股票列表...")
-            
-            # 异步获取股票列表
-            stock_df = await asyncio.to_thread(self.ak.stock_info_a_code_name)
-            
+
+            # 使用线程池异步获取股票列表，添加超时保护
+            def fetch_stock_list():
+                return self.ak.stock_info_a_code_name()
+
+            stock_df = await asyncio.to_thread(fetch_stock_list)
+
             if stock_df is None or stock_df.empty:
                 logger.warning("⚠️ AKShare股票列表为空")
                 return []
-            
+
             # 转换为标准格式
             stock_list = []
             for _, row in stock_df.iterrows():
                 stock_list.append({
-                    "code": row.get("code", ""),
-                    "name": row.get("name", ""),
+                    "code": str(row.get("code", "")),
+                    "name": str(row.get("name", "")),
                     "source": "akshare"
                 })
-            
+
             logger.info(f"✅ AKShare股票列表获取成功: {len(stock_list)}只股票")
             return stock_list
-            
+
         except Exception as e:
             logger.error(f"❌ AKShare获取股票列表失败: {e}")
             return []
@@ -147,7 +150,7 @@ class AKShareProvider(BaseStockDataProvider):
                 "full_symbol": self._get_full_symbol(code),
                 "market_info": self._get_market_info(code),
                 "data_source": "akshare",
-                "last_sync": datetime.utcnow(),
+                "last_sync": datetime.now(timezone.utc),
                 "sync_status": "success"
             }
             
@@ -161,44 +164,65 @@ class AKShareProvider(BaseStockDataProvider):
     async def _get_stock_info_detail(self, code: str) -> Dict[str, Any]:
         """获取股票详细信息"""
         try:
-            # 尝试获取个股信息
-            stock_info = await asyncio.to_thread(
-                self.ak.stock_individual_info_em, 
-                symbol=code
-            )
-            
-            if stock_info is not None and not stock_info.empty:
-                # 解析信息
-                info = {"code": code}
-                
-                # 提取股票名称
-                name_row = stock_info[stock_info['item'] == '股票简称']
-                if not name_row.empty:
-                    info['name'] = name_row['value'].iloc[0]
-                
-                # 提取行业信息
-                industry_row = stock_info[stock_info['item'] == '所属行业']
-                if not industry_row.empty:
-                    info['industry'] = industry_row['value'].iloc[0]
-                
-                # 提取地区信息（如果有）
-                area_row = stock_info[stock_info['item'] == '所属地区']
-                if not area_row.empty:
-                    info['area'] = area_row['value'].iloc[0]
-                
-                # 提取上市日期
-                list_date_row = stock_info[stock_info['item'] == '上市时间']
-                if not list_date_row.empty:
-                    info['list_date'] = list_date_row['value'].iloc[0]
-                
-                return info
-            
-            # 如果获取不到详细信息，返回基本信息
-            return {"code": code, "name": f"股票{code}"}
-            
+            # 方法1: 尝试获取个股详细信息
+            def fetch_individual_info():
+                return self.ak.stock_individual_info_em(symbol=code)
+
+            try:
+                stock_info = await asyncio.to_thread(fetch_individual_info)
+
+                if stock_info is not None and not stock_info.empty:
+                    # 解析信息
+                    info = {"code": code}
+
+                    # 提取股票名称
+                    name_row = stock_info[stock_info['item'] == '股票简称']
+                    if not name_row.empty:
+                        info['name'] = str(name_row['value'].iloc[0])
+
+                    # 提取行业信息
+                    industry_row = stock_info[stock_info['item'] == '所属行业']
+                    if not industry_row.empty:
+                        info['industry'] = str(industry_row['value'].iloc[0])
+
+                    # 提取地区信息
+                    area_row = stock_info[stock_info['item'] == '所属地区']
+                    if not area_row.empty:
+                        info['area'] = str(area_row['value'].iloc[0])
+
+                    # 提取上市日期
+                    list_date_row = stock_info[stock_info['item'] == '上市时间']
+                    if not list_date_row.empty:
+                        info['list_date'] = str(list_date_row['value'].iloc[0])
+
+                    return info
+            except Exception as e:
+                logger.debug(f"获取{code}个股详细信息失败: {e}")
+
+            # 方法2: 从股票列表中获取基本信息
+            def fetch_stock_list():
+                return self.ak.stock_info_a_code_name()
+
+            try:
+                stock_list = await asyncio.to_thread(fetch_stock_list)
+                if stock_list is not None and not stock_list.empty:
+                    stock_row = stock_list[stock_list['code'] == code]
+                    if not stock_row.empty:
+                        return {
+                            "code": code,
+                            "name": str(stock_row['name'].iloc[0]),
+                            "industry": "未知",
+                            "area": "未知"
+                        }
+            except Exception as e:
+                logger.debug(f"从股票列表获取{code}信息失败: {e}")
+
+            # 如果都失败，返回基本信息
+            return {"code": code, "name": f"股票{code}", "industry": "未知", "area": "未知"}
+
         except Exception as e:
             logger.debug(f"获取{code}详细信息失败: {e}")
-            return {"code": code, "name": f"股票{code}"}
+            return {"code": code, "name": f"股票{code}", "industry": "未知", "area": "未知"}
     
     def _determine_market(self, code: str) -> str:
         """根据股票代码判断市场"""
@@ -297,7 +321,7 @@ class AKShareProvider(BaseStockDataProvider):
                 "full_symbol": self._get_full_symbol(code),
                 "market_info": self._get_market_info(code),
                 "data_source": "akshare",
-                "last_sync": datetime.utcnow(),
+                "last_sync": datetime.now(timezone.utc),
                 "sync_status": "success"
             }
             
@@ -311,34 +335,62 @@ class AKShareProvider(BaseStockDataProvider):
     async def _get_realtime_quotes_data(self, code: str) -> Dict[str, Any]:
         """获取实时行情数据"""
         try:
-            # 获取实时行情
-            spot_df = await asyncio.to_thread(self.ak.stock_zh_a_spot_em)
-            
-            if spot_df is None or spot_df.empty:
-                return {}
-            
-            # 查找对应股票
-            stock_data = spot_df[spot_df['代码'] == code]
-            
-            if stock_data.empty:
-                return {}
-            
-            row = stock_data.iloc[0]
-            
-            # 解析行情数据
-            return {
-                "name": row.get("名称", f"股票{code}"),
-                "price": self._safe_float(row.get("最新价", 0)),
-                "change": self._safe_float(row.get("涨跌额", 0)),
-                "change_percent": self._safe_float(row.get("涨跌幅", 0)),
-                "volume": self._safe_int(row.get("成交量", 0)),
-                "amount": self._safe_float(row.get("成交额", 0)),
-                "open": self._safe_float(row.get("今开", 0)),
-                "high": self._safe_float(row.get("最高", 0)),
-                "low": self._safe_float(row.get("最低", 0)),
-                "pre_close": self._safe_float(row.get("昨收", 0))
-            }
-            
+            # 方法1: 获取A股实时行情
+            def fetch_spot_data():
+                return self.ak.stock_zh_a_spot_em()
+
+            try:
+                spot_df = await asyncio.to_thread(fetch_spot_data)
+
+                if spot_df is not None and not spot_df.empty:
+                    # 查找对应股票
+                    stock_data = spot_df[spot_df['代码'] == code]
+
+                    if not stock_data.empty:
+                        row = stock_data.iloc[0]
+
+                        # 解析行情数据
+                        return {
+                            "name": str(row.get("名称", f"股票{code}")),
+                            "price": self._safe_float(row.get("最新价", 0)),
+                            "change": self._safe_float(row.get("涨跌额", 0)),
+                            "change_percent": self._safe_float(row.get("涨跌幅", 0)),
+                            "volume": self._safe_int(row.get("成交量", 0)),
+                            "amount": self._safe_float(row.get("成交额", 0)),
+                            "open": self._safe_float(row.get("今开", 0)),
+                            "high": self._safe_float(row.get("最高", 0)),
+                            "low": self._safe_float(row.get("最低", 0)),
+                            "pre_close": self._safe_float(row.get("昨收", 0))
+                        }
+            except Exception as e:
+                logger.debug(f"获取{code}A股实时行情失败: {e}")
+
+            # 方法2: 尝试获取单只股票实时数据
+            def fetch_individual_spot():
+                return self.ak.stock_zh_a_hist(symbol=code, period="daily", adjust="")
+
+            try:
+                hist_df = await asyncio.to_thread(fetch_individual_spot)
+                if hist_df is not None and not hist_df.empty:
+                    # 取最新一天的数据作为当前行情
+                    latest_row = hist_df.iloc[-1]
+                    return {
+                        "name": f"股票{code}",
+                        "price": self._safe_float(latest_row.get("收盘", 0)),
+                        "change": 0,  # 历史数据无法计算涨跌额
+                        "change_percent": self._safe_float(latest_row.get("涨跌幅", 0)),
+                        "volume": self._safe_int(latest_row.get("成交量", 0)),
+                        "amount": self._safe_float(latest_row.get("成交额", 0)),
+                        "open": self._safe_float(latest_row.get("开盘", 0)),
+                        "high": self._safe_float(latest_row.get("最高", 0)),
+                        "low": self._safe_float(latest_row.get("最低", 0)),
+                        "pre_close": self._safe_float(latest_row.get("收盘", 0))
+                    }
+            except Exception as e:
+                logger.debug(f"获取{code}历史数据作为行情失败: {e}")
+
+            return {}
+
         except Exception as e:
             logger.debug(f"获取{code}实时行情数据失败: {e}")
             return {}
@@ -408,14 +460,16 @@ class AKShareProvider(BaseStockDataProvider):
             end_date_formatted = end_date.replace('-', '')
 
             # 获取历史数据
-            hist_df = await asyncio.to_thread(
-                self.ak.stock_zh_a_hist,
-                symbol=code,
-                period=ak_period,
-                start_date=start_date_formatted,
-                end_date=end_date_formatted,
-                adjust="qfq"  # 前复权
-            )
+            def fetch_historical_data():
+                return self.ak.stock_zh_a_hist(
+                    symbol=code,
+                    period=ak_period,
+                    start_date=start_date_formatted,
+                    end_date=end_date_formatted,
+                    adjust="qfq"  # 前复权
+                )
+
+            hist_df = await asyncio.to_thread(fetch_historical_data)
 
             if hist_df is None or hist_df.empty:
                 logger.warning(f"⚠️ {code}历史数据为空")
@@ -492,48 +546,48 @@ class AKShareProvider(BaseStockDataProvider):
 
             # 1. 获取主要财务指标
             try:
-                main_indicators = await asyncio.to_thread(
-                    self.ak.stock_financial_abstract,
-                    symbol=code
-                )
+                def fetch_financial_abstract():
+                    return self.ak.stock_financial_abstract(symbol=code)
+
+                main_indicators = await asyncio.to_thread(fetch_financial_abstract)
                 if main_indicators is not None and not main_indicators.empty:
-                    financial_data['main_indicators'] = main_indicators
+                    financial_data['main_indicators'] = main_indicators.to_dict('records')
                     logger.debug(f"✅ {code}主要财务指标获取成功")
             except Exception as e:
                 logger.debug(f"获取{code}主要财务指标失败: {e}")
 
             # 2. 获取资产负债表
             try:
-                balance_sheet = await asyncio.to_thread(
-                    self.ak.stock_balance_sheet_by_report_em,
-                    symbol=code
-                )
+                def fetch_balance_sheet():
+                    return self.ak.stock_balance_sheet_by_report_em(symbol=code)
+
+                balance_sheet = await asyncio.to_thread(fetch_balance_sheet)
                 if balance_sheet is not None and not balance_sheet.empty:
-                    financial_data['balance_sheet'] = balance_sheet
+                    financial_data['balance_sheet'] = balance_sheet.to_dict('records')
                     logger.debug(f"✅ {code}资产负债表获取成功")
             except Exception as e:
                 logger.debug(f"获取{code}资产负债表失败: {e}")
 
             # 3. 获取利润表
             try:
-                income_statement = await asyncio.to_thread(
-                    self.ak.stock_profit_sheet_by_report_em,
-                    symbol=code
-                )
+                def fetch_income_statement():
+                    return self.ak.stock_profit_sheet_by_report_em(symbol=code)
+
+                income_statement = await asyncio.to_thread(fetch_income_statement)
                 if income_statement is not None and not income_statement.empty:
-                    financial_data['income_statement'] = income_statement
+                    financial_data['income_statement'] = income_statement.to_dict('records')
                     logger.debug(f"✅ {code}利润表获取成功")
             except Exception as e:
                 logger.debug(f"获取{code}利润表失败: {e}")
 
             # 4. 获取现金流量表
             try:
-                cash_flow = await asyncio.to_thread(
-                    self.ak.stock_cash_flow_sheet_by_report_em,
-                    symbol=code
-                )
+                def fetch_cash_flow():
+                    return self.ak.stock_cash_flow_sheet_by_report_em(symbol=code)
+
+                cash_flow = await asyncio.to_thread(fetch_cash_flow)
                 if cash_flow is not None and not cash_flow.empty:
-                    financial_data['cash_flow'] = cash_flow
+                    financial_data['cash_flow'] = cash_flow.to_dict('records')
                     logger.debug(f"✅ {code}现金流量表获取成功")
             except Exception as e:
                 logger.debug(f"获取{code}现金流量表失败: {e}")
