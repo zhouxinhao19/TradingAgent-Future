@@ -16,7 +16,7 @@ import asyncio
 from app.core.config import settings
 from app.core.database import init_db, close_db
 from app.core.logging_config import setup_logging
-from app.routers import auth, analysis, screening, queue, sse, health, favorites, config, reports, database, operation_logs, tags, tushare_init, akshare_init
+from app.routers import auth, analysis, screening, queue, sse, health, favorites, config, reports, database, operation_logs, tags, tushare_init, akshare_init, baostock_init
 from app.routers import sync as sync_router, multi_source_sync
 from app.routers import stocks as stocks_router
 from app.routers import stock_data as stock_data_router
@@ -35,6 +35,12 @@ from app.worker.akshare_sync_service import (
     run_akshare_historical_sync,
     run_akshare_financial_sync,
     run_akshare_status_check
+)
+from app.worker.baostock_sync_service import (
+    run_baostock_basic_info_sync,
+    run_baostock_quotes_sync,
+    run_baostock_historical_sync,
+    run_baostock_status_check
 )
 from app.middleware.operation_log_middleware import OperationLogMiddleware
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -219,6 +225,46 @@ async def lifespan(app: FastAPI):
                 )
                 logger.info(f"🔍 AKShare状态检查已配置: {settings.AKSHARE_STATUS_CHECK_CRON}")
 
+        # BaoStock统一数据同步任务配置
+        if settings.BAOSTOCK_UNIFIED_ENABLED:
+            logger.info("🔄 配置BaoStock统一数据同步任务...")
+
+            # 基础信息同步任务
+            if settings.BAOSTOCK_BASIC_INFO_SYNC_ENABLED:
+                scheduler.add_job(
+                    run_baostock_basic_info_sync,
+                    CronTrigger.from_crontab(settings.BAOSTOCK_BASIC_INFO_SYNC_CRON, timezone=settings.TIMEZONE),
+                    id="baostock_basic_info_sync"
+                )
+                logger.info(f"📋 BaoStock基础信息同步已配置: {settings.BAOSTOCK_BASIC_INFO_SYNC_CRON}")
+
+            # 行情同步任务
+            if settings.BAOSTOCK_QUOTES_SYNC_ENABLED:
+                scheduler.add_job(
+                    run_baostock_quotes_sync,
+                    CronTrigger.from_crontab(settings.BAOSTOCK_QUOTES_SYNC_CRON, timezone=settings.TIMEZONE),
+                    id="baostock_quotes_sync"
+                )
+                logger.info(f"📈 BaoStock行情同步已配置: {settings.BAOSTOCK_QUOTES_SYNC_CRON}")
+
+            # 历史数据同步任务
+            if settings.BAOSTOCK_HISTORICAL_SYNC_ENABLED:
+                scheduler.add_job(
+                    run_baostock_historical_sync,
+                    CronTrigger.from_crontab(settings.BAOSTOCK_HISTORICAL_SYNC_CRON, timezone=settings.TIMEZONE),
+                    id="baostock_historical_sync"
+                )
+                logger.info(f"📊 BaoStock历史数据同步已配置: {settings.BAOSTOCK_HISTORICAL_SYNC_CRON}")
+
+            # 状态检查任务
+            if settings.BAOSTOCK_STATUS_CHECK_ENABLED:
+                scheduler.add_job(
+                    run_baostock_status_check,
+                    CronTrigger.from_crontab(settings.BAOSTOCK_STATUS_CHECK_CRON, timezone=settings.TIMEZONE),
+                    id="baostock_status_check"
+                )
+                logger.info(f"🔍 BaoStock状态检查已配置: {settings.BAOSTOCK_STATUS_CHECK_CRON}")
+
         scheduler.start()
     except Exception as e:
         logger.warning(f"Failed to start scheduler: {e}")
@@ -346,6 +392,7 @@ app.include_router(multi_source_sync.router)
 app.include_router(paper_router.router, prefix="/api", tags=["paper"])
 app.include_router(tushare_init.router, prefix="/api", tags=["tushare-init"])
 app.include_router(akshare_init.router, prefix="/api", tags=["akshare-init"])
+app.include_router(baostock_init.router, prefix="/api", tags=["baostock-init"])
 
 
 @app.get("/")

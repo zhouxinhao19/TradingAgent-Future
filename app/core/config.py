@@ -186,6 +186,25 @@ class Settings(BaseSettings):
     AKSHARE_INIT_BATCH_SIZE: int = Field(default=100, ge=10, le=1000, description="初始化批处理大小")
     AKSHARE_INIT_AUTO_START: bool = Field(default=False, description="应用启动时自动检查并初始化数据")
 
+    # ==================== BaoStock统一数据同步配置 ====================
+
+    # BaoStock统一数据同步总开关
+    BAOSTOCK_UNIFIED_ENABLED: bool = Field(default=True, description="启用BaoStock统一数据同步")
+
+    # BaoStock数据同步任务配置
+    BAOSTOCK_BASIC_INFO_SYNC_ENABLED: bool = Field(default=True, description="启用基础信息同步")
+    BAOSTOCK_BASIC_INFO_SYNC_CRON: str = Field(default="0 4 * * *", description="基础信息同步CRON表达式")  # 每日凌晨4点
+    BAOSTOCK_QUOTES_SYNC_ENABLED: bool = Field(default=True, description="启用行情同步")
+    BAOSTOCK_QUOTES_SYNC_CRON: str = Field(default="*/15 9-15 * * 1-5", description="行情同步CRON表达式")  # 交易时间每15分钟
+    BAOSTOCK_HISTORICAL_SYNC_ENABLED: bool = Field(default=True, description="启用历史数据同步")
+    BAOSTOCK_HISTORICAL_SYNC_CRON: str = Field(default="0 18 * * 1-5", description="历史数据同步CRON表达式")  # 工作日18点
+    BAOSTOCK_STATUS_CHECK_ENABLED: bool = Field(default=True, description="启用状态检查")
+    BAOSTOCK_STATUS_CHECK_CRON: str = Field(default="45 * * * *", description="状态检查CRON表达式")  # 每小时45分
+
+    # BaoStock数据初始化配置
+    BAOSTOCK_INIT_HISTORICAL_DAYS: int = Field(default=365, ge=1, le=3650, description="初始化历史数据天数")
+    BAOSTOCK_INIT_BATCH_SIZE: int = Field(default=50, ge=10, le=500, description="初始化批处理大小")
+    BAOSTOCK_INIT_AUTO_START: bool = Field(default=False, description="应用启动时自动检查并初始化数据")
 
     # 数据目录配置
     TRADINGAGENTS_DATA_DIR: str = Field(default="./data")
@@ -204,3 +223,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()
+
+
+def get_settings() -> Settings:
+    """获取配置实例"""
+    return settings
