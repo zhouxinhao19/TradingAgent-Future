@@ -193,29 +193,53 @@ class TushareProvider(BaseStockDataProvider):
             return None
     
     async def get_historical_data(
-        self, 
-        symbol: str, 
-        start_date: Union[str, date], 
-        end_date: Union[str, date] = None
+        self,
+        symbol: str,
+        start_date: Union[str, date],
+        end_date: Union[str, date] = None,
+        period: str = "daily"
     ) -> Optional[pd.DataFrame]:
-        """获取历史数据"""
+        """
+        获取历史数据
+
+        Args:
+            symbol: 股票代码
+            start_date: 开始日期
+            end_date: 结束日期
+            period: 数据周期 (daily/weekly/monthly)
+        """
         if not self.is_available():
             return None
-        
+
         try:
             ts_code = self._normalize_ts_code(symbol)
-            
+
             # 格式化日期
             start_str = self._format_date(start_date)
             end_str = self._format_date(end_date) if end_date else datetime.now().strftime('%Y%m%d')
-            
-            # 获取日线数据
-            df = await asyncio.to_thread(
-                self.api.daily,
-                ts_code=ts_code,
-                start_date=start_str,
-                end_date=end_str
-            )
+
+            # 根据周期选择API接口
+            if period == "weekly":
+                df = await asyncio.to_thread(
+                    self.api.weekly,
+                    ts_code=ts_code,
+                    start_date=start_str,
+                    end_date=end_str
+                )
+            elif period == "monthly":
+                df = await asyncio.to_thread(
+                    self.api.monthly,
+                    ts_code=ts_code,
+                    start_date=start_str,
+                    end_date=end_str
+                )
+            else:  # daily
+                df = await asyncio.to_thread(
+                    self.api.daily,
+                    ts_code=ts_code,
+                    start_date=start_str,
+                    end_date=end_str
+                )
             
             if df is None or df.empty:
                 return None
@@ -223,7 +247,7 @@ class TushareProvider(BaseStockDataProvider):
             # 数据标准化
             df = self._standardize_historical_data(df)
             
-            self.logger.info(f"✅ 获取历史数据: {symbol} {len(df)}条记录")
+            self.logger.info(f"✅ 获取{period}历史数据: {symbol} {len(df)}条记录")
             return df
             
         except Exception as e:
@@ -287,51 +311,486 @@ class TushareProvider(BaseStockDataProvider):
             self.logger.error(f"❌ 查找最新交易日期失败: {e}")
             return None
     
-    async def get_financial_data(self, symbol: str, report_type: str = "annual") -> Optional[Dict[str, Any]]:
-        """获取财务数据"""
+    async def get_financial_data(self, symbol: str, report_type: str = "quarterly",
+                                period: str = None, limit: int = 4) -> Optional[Dict[str, Any]]:
+        """
+        获取财务数据
+
+        Args:
+            symbol: 股票代码
+            report_type: 报告类型 (quarterly/annual)
+            period: 指定报告期 (YYYYMMDD格式)，为空则获取最新数据
+            limit: 获取记录数量，默认4条（最近4个季度）
+
+        Returns:
+            财务数据字典，包含利润表、资产负债表、现金流量表和财务指标
+        """
         if not self.is_available():
             return None
-        
+
         try:
             ts_code = self._normalize_ts_code(symbol)
-            
-            # 获取最新财务数据
+            self.logger.debug(f"📊 获取Tushare财务数据: {ts_code}, 类型: {report_type}")
+
+            # 构建查询参数
+            query_params = {
+                'ts_code': ts_code,
+                'limit': limit
+            }
+
+            # 如果指定了报告期，添加期间参数
+            if period:
+                query_params['period'] = period
+
             financial_data = {}
-            
-            # 利润表
+
+            # 1. 获取利润表数据 (income statement)
+            try:
+                income_df = await asyncio.to_thread(
+                    self.api.income,
+                    **query_params
+                )
+                if income_df is not None and not income_df.empty:
+                    financial_data['income_statement'] = income_df.to_dict('records')
+                    self.logger.debug(f"✅ {ts_code} 利润表数据获取成功: {len(income_df)} 条记录")
+            except Exception as e:
+                self.logger.debug(f"获取{ts_code}利润表数据失败: {e}")
+
+            # 2. 获取资产负债表数据 (balance sheet)
+            try:
+                balance_df = await asyncio.to_thread(
+                    self.api.balancesheet,
+                    **query_params
+                )
+                if balance_df is not None and not balance_df.empty:
+                    financial_data['balance_sheet'] = balance_df.to_dict('records')
+                    self.logger.debug(f"✅ {ts_code} 资产负债表数据获取成功: {len(balance_df)} 条记录")
+            except Exception as e:
+                self.logger.debug(f"获取{ts_code}资产负债表数据失败: {e}")
+
+            # 3. 获取现金流量表数据 (cash flow statement)
+            try:
+                cashflow_df = await asyncio.to_thread(
+                    self.api.cashflow,
+                    **query_params
+                )
+                if cashflow_df is not None and not cashflow_df.empty:
+                    financial_data['cashflow_statement'] = cashflow_df.to_dict('records')
+                    self.logger.debug(f"✅ {ts_code} 现金流量表数据获取成功: {len(cashflow_df)} 条记录")
+            except Exception as e:
+                self.logger.debug(f"获取{ts_code}现金流量表数据失败: {e}")
+
+            # 4. 获取财务指标数据 (financial indicators)
+            try:
+                indicator_df = await asyncio.to_thread(
+                    self.api.fina_indicator,
+                    **query_params
+                )
+                if indicator_df is not None and not indicator_df.empty:
+                    financial_data['financial_indicators'] = indicator_df.to_dict('records')
+                    self.logger.debug(f"✅ {ts_code} 财务指标数据获取成功: {len(indicator_df)} 条记录")
+            except Exception as e:
+                self.logger.debug(f"获取{ts_code}财务指标数据失败: {e}")
+
+            # 5. 获取主营业务构成数据 (可选)
+            try:
+                mainbz_df = await asyncio.to_thread(
+                    self.api.fina_mainbz,
+                    **query_params
+                )
+                if mainbz_df is not None and not mainbz_df.empty:
+                    financial_data['main_business'] = mainbz_df.to_dict('records')
+                    self.logger.debug(f"✅ {ts_code} 主营业务构成数据获取成功: {len(mainbz_df)} 条记录")
+            except Exception as e:
+                self.logger.debug(f"获取{ts_code}主营业务构成数据失败: {e}")
+
+            if financial_data:
+                # 标准化财务数据
+                standardized_data = self._standardize_tushare_financial_data(financial_data, ts_code)
+                self.logger.info(f"✅ {ts_code} Tushare财务数据获取完成: {len(financial_data)} 个数据集")
+                return standardized_data
+            else:
+                self.logger.warning(f"⚠️ {ts_code} 未获取到任何Tushare财务数据")
+                return None
+
+        except Exception as e:
+            self.logger.error(f"❌ 获取Tushare财务数据失败 symbol={symbol}: {e}")
+            return None
+
+    async def get_stock_news(self, symbol: str = None, limit: int = 10,
+                           hours_back: int = 24, src: str = None) -> Optional[List[Dict[str, Any]]]:
+        """
+        获取股票新闻（需要Tushare新闻权限）
+
+        Args:
+            symbol: 股票代码，为None时获取市场新闻
+            limit: 返回数量限制
+            hours_back: 回溯小时数，默认24小时
+            src: 新闻源，默认自动选择
+
+        Returns:
+            新闻列表
+        """
+        if not self.is_available():
+            return None
+
+        try:
+            from datetime import datetime, timedelta
+
+            # 计算时间范围
+            end_time = datetime.now()
+            start_time = end_time - timedelta(hours=hours_back)
+
+            start_date = start_time.strftime('%Y-%m-%d %H:%M:%S')
+            end_date = end_time.strftime('%Y-%m-%d %H:%M:%S')
+
+            self.logger.debug(f"📰 获取Tushare新闻: symbol={symbol}, 时间范围={start_date} 到 {end_date}")
+
+            # 支持的新闻源列表（按优先级排序）
+            news_sources = [
+                'sina',        # 新浪财经
+                'eastmoney',   # 东方财富
+                '10jqka',      # 同花顺
+                'wallstreetcn', # 华尔街见闻
+                'cls',         # 财联社
+                'yicai',       # 第一财经
+                'jinrongjie',  # 金融界
+                'yuncaijing',  # 云财经
+                'fenghuang'    # 凤凰新闻
+            ]
+
+            # 如果指定了数据源，优先使用
+            if src and src in news_sources:
+                sources_to_try = [src]
+            else:
+                sources_to_try = news_sources[:3]  # 默认尝试前3个源
+
+            all_news = []
+
+            for source in sources_to_try:
+                try:
+                    self.logger.debug(f"📰 尝试从 {source} 获取新闻...")
+
+                    # 获取新闻数据
+                    news_df = await asyncio.to_thread(
+                        self.api.news,
+                        src=source,
+                        start_date=start_date,
+                        end_date=end_date
+                    )
+
+                    if news_df is not None and not news_df.empty:
+                        source_news = self._process_tushare_news(news_df, source, symbol, limit)
+                        all_news.extend(source_news)
+
+                        self.logger.info(f"✅ 从 {source} 获取到 {len(source_news)} 条新闻")
+
+                        # 如果已经获取足够的新闻，停止尝试其他源
+                        if len(all_news) >= limit:
+                            break
+                    else:
+                        self.logger.debug(f"⚠️ {source} 未返回新闻数据")
+
+                except Exception as e:
+                    self.logger.debug(f"从 {source} 获取新闻失败: {e}")
+                    continue
+
+                # API限流
+                await asyncio.sleep(0.2)
+
+            # 去重和排序
+            if all_news:
+                # 按时间排序并去重
+                unique_news = self._deduplicate_news(all_news)
+                sorted_news = sorted(unique_news, key=lambda x: x.get('publish_time', datetime.min), reverse=True)
+
+                # 限制返回数量
+                final_news = sorted_news[:limit]
+
+                self.logger.info(f"✅ Tushare新闻获取成功: {len(final_news)} 条（去重后）")
+                return final_news
+            else:
+                self.logger.warning("⚠️ 未获取到任何Tushare新闻数据")
+                return []
+
+        except Exception as e:
+            # 如果是权限问题，给出明确提示
+            if any(keyword in str(e).lower() for keyword in ['权限', 'permission', 'unauthorized', 'access denied']):
+                self.logger.warning(f"⚠️ Tushare新闻接口需要单独开通权限（付费功能）: {e}")
+            elif "积分" in str(e) or "point" in str(e).lower():
+                self.logger.warning(f"⚠️ Tushare积分不足，无法获取新闻数据: {e}")
+            else:
+                self.logger.error(f"❌ 获取Tushare新闻失败: {e}")
+            return None
+
+    def _process_tushare_news(self, news_df: pd.DataFrame, source: str,
+                            symbol: str = None, limit: int = 10) -> List[Dict[str, Any]]:
+        """处理Tushare新闻数据"""
+        news_list = []
+
+        # 限制处理数量
+        df_limited = news_df.head(limit * 2)  # 多获取一些，用于过滤
+
+        for _, row in df_limited.iterrows():
+            news_item = {
+                "title": str(row.get('title', '') or row.get('content', '')[:50] + '...'),
+                "content": str(row.get('content', '')),
+                "summary": self._generate_summary(row.get('content', '')),
+                "url": "",  # Tushare新闻接口不提供URL
+                "source": self._get_source_name(source),
+                "author": "",
+                "publish_time": self._parse_tushare_news_time(row.get('datetime', '')),
+                "category": self._classify_tushare_news(row.get('channels', ''), row.get('content', '')),
+                "sentiment": self._analyze_news_sentiment(row.get('content', ''), row.get('title', '')),
+                "importance": self._assess_news_importance(row.get('content', ''), row.get('title', '')),
+                "keywords": self._extract_keywords(row.get('content', ''), row.get('title', '')),
+                "data_source": "tushare",
+                "original_source": source
+            }
+
+            # 如果指定了股票代码，过滤相关新闻
+            if symbol:
+                if self._is_news_relevant_to_symbol(news_item, symbol):
+                    news_list.append(news_item)
+            else:
+                news_list.append(news_item)
+
+        return news_list
+
+    def _get_source_name(self, source_code: str) -> str:
+        """获取新闻源中文名称"""
+        source_names = {
+            'sina': '新浪财经',
+            'eastmoney': '东方财富',
+            '10jqka': '同花顺',
+            'wallstreetcn': '华尔街见闻',
+            'cls': '财联社',
+            'yicai': '第一财经',
+            'jinrongjie': '金融界',
+            'yuncaijing': '云财经',
+            'fenghuang': '凤凰新闻'
+        }
+        return source_names.get(source_code, source_code)
+
+    def _generate_summary(self, content: str) -> str:
+        """生成新闻摘要"""
+        if not content:
+            return ""
+
+        content_str = str(content)
+        if len(content_str) <= 200:
+            return content_str
+
+        # 简单的摘要生成：取前200个字符
+        return content_str[:200] + "..."
+
+    def _is_news_relevant_to_symbol(self, news_item: Dict[str, Any], symbol: str) -> bool:
+        """判断新闻是否与股票相关"""
+        content = news_item.get("content", "").lower()
+        title = news_item.get("title", "").lower()
+
+        # 标准化股票代码
+        symbol_clean = symbol.replace('.SH', '').replace('.SZ', '').zfill(6)
+
+        # 关键词匹配
+        return any([
+            symbol_clean in content,
+            symbol_clean in title,
+            symbol in content,
+            symbol in title
+        ])
+
+    def _deduplicate_news(self, news_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """新闻去重"""
+        seen_titles = set()
+        unique_news = []
+
+        for news in news_list:
+            title = news.get('title', '')
+            if title and title not in seen_titles:
+                seen_titles.add(title)
+                unique_news.append(news)
+
+        return unique_news
+
+    def _analyze_news_sentiment(self, content: str, title: str) -> str:
+        """分析新闻情绪"""
+        text = f"{title} {content}".lower()
+
+        positive_keywords = ['利好', '上涨', '增长', '盈利', '突破', '创新高', '买入', '推荐']
+        negative_keywords = ['利空', '下跌', '亏损', '风险', '暴跌', '卖出', '警告', '下调']
+
+        positive_count = sum(1 for keyword in positive_keywords if keyword in text)
+        negative_count = sum(1 for keyword in negative_keywords if keyword in text)
+
+        if positive_count > negative_count:
+            return 'positive'
+        elif negative_count > positive_count:
+            return 'negative'
+        else:
+            return 'neutral'
+
+    def _assess_news_importance(self, content: str, title: str) -> str:
+        """评估新闻重要性"""
+        text = f"{title} {content}".lower()
+
+        high_importance_keywords = ['业绩', '财报', '重大', '公告', '监管', '政策', '并购', '重组']
+        medium_importance_keywords = ['分析', '预测', '观点', '建议', '行业', '市场']
+
+        if any(keyword in text for keyword in high_importance_keywords):
+            return 'high'
+        elif any(keyword in text for keyword in medium_importance_keywords):
+            return 'medium'
+        else:
+            return 'low'
+
+    def _extract_keywords(self, content: str, title: str) -> List[str]:
+        """提取关键词"""
+        text = f"{title} {content}"
+
+        # 简单的关键词提取
+        keywords = []
+        common_keywords = ['股票', '公司', '市场', '投资', '业绩', '财报', '政策', '行业', '分析', '预测']
+
+        for keyword in common_keywords:
+            if keyword in text:
+                keywords.append(keyword)
+
+        return keywords[:5]  # 最多返回5个关键词
+
+    def _parse_tushare_news_time(self, time_str: str) -> Optional[datetime]:
+        """解析Tushare新闻时间"""
+        if not time_str:
+            return datetime.utcnow()
+
+        try:
+            # Tushare时间格式: 2018-11-21 09:30:00
+            return datetime.strptime(str(time_str), '%Y-%m-%d %H:%M:%S')
+        except Exception as e:
+            self.logger.debug(f"解析Tushare新闻时间失败: {e}")
+            return datetime.utcnow()
+
+    def _classify_tushare_news(self, channels: str, content: str) -> str:
+        """分类Tushare新闻"""
+        channels = str(channels).lower()
+        content = str(content).lower()
+
+        # 根据频道和内容关键词分类
+        if any(keyword in channels or keyword in content for keyword in ['公告', '业绩', '财报']):
+            return 'company_announcement'
+        elif any(keyword in channels or keyword in content for keyword in ['政策', '监管', '央行']):
+            return 'policy_news'
+        elif any(keyword in channels or keyword in content for keyword in ['行业', '板块']):
+            return 'industry_news'
+        elif any(keyword in channels or keyword in content for keyword in ['市场', '指数', '大盘']):
+            return 'market_news'
+        else:
+            return 'other'
+
+    async def get_financial_data_by_period(self, symbol: str, start_period: str = None,
+                                         end_period: str = None, report_type: str = "quarterly") -> Optional[List[Dict[str, Any]]]:
+        """
+        按时间范围获取财务数据
+
+        Args:
+            symbol: 股票代码
+            start_period: 开始报告期 (YYYYMMDD)
+            end_period: 结束报告期 (YYYYMMDD)
+            report_type: 报告类型 (quarterly/annual)
+
+        Returns:
+            财务数据列表，按报告期倒序排列
+        """
+        if not self.is_available():
+            return None
+
+        try:
+            ts_code = self._normalize_ts_code(symbol)
+            self.logger.debug(f"📊 按期间获取Tushare财务数据: {ts_code}, {start_period} - {end_period}")
+
+            # 构建查询参数
+            query_params = {'ts_code': ts_code}
+
+            if start_period:
+                query_params['start_date'] = start_period
+            if end_period:
+                query_params['end_date'] = end_period
+
+            # 获取利润表数据作为主要数据源
             income_df = await asyncio.to_thread(
                 self.api.income,
-                ts_code=ts_code,
-                limit=1
+                **query_params
             )
-            if income_df is not None and not income_df.empty:
-                financial_data['income'] = income_df.iloc[0].to_dict()
-            
-            # 资产负债表
-            balance_df = await asyncio.to_thread(
-                self.api.balancesheet,
+
+            if income_df is None or income_df.empty:
+                self.logger.warning(f"⚠️ {ts_code} 指定期间无财务数据")
+                return None
+
+            # 按报告期分组获取完整财务数据
+            financial_data_list = []
+
+            for _, income_row in income_df.iterrows():
+                period = income_row['end_date']
+
+                # 获取该期间的完整财务数据
+                period_data = await self.get_financial_data(
+                    symbol=symbol,
+                    period=period,
+                    limit=1
+                )
+
+                if period_data:
+                    financial_data_list.append(period_data)
+
+                # API限流
+                await asyncio.sleep(0.1)
+
+            self.logger.info(f"✅ {ts_code} 按期间获取财务数据完成: {len(financial_data_list)} 个报告期")
+            return financial_data_list
+
+        except Exception as e:
+            self.logger.error(f"❌ 按期间获取Tushare财务数据失败 symbol={symbol}: {e}")
+            return None
+
+    async def get_financial_indicators_only(self, symbol: str, limit: int = 4) -> Optional[Dict[str, Any]]:
+        """
+        仅获取财务指标数据（轻量级接口）
+
+        Args:
+            symbol: 股票代码
+            limit: 获取记录数量
+
+        Returns:
+            财务指标数据
+        """
+        if not self.is_available():
+            return None
+
+        try:
+            ts_code = self._normalize_ts_code(symbol)
+
+            # 仅获取财务指标
+            indicator_df = await asyncio.to_thread(
+                self.api.fina_indicator,
                 ts_code=ts_code,
-                limit=1
+                limit=limit
             )
-            if balance_df is not None and not balance_df.empty:
-                financial_data['balance'] = balance_df.iloc[0].to_dict()
-            
-            # 现金流量表
-            cashflow_df = await asyncio.to_thread(
-                self.api.cashflow,
-                ts_code=ts_code,
-                limit=1
-            )
-            if cashflow_df is not None and not cashflow_df.empty:
-                financial_data['cashflow'] = cashflow_df.iloc[0].to_dict()
-            
-            if financial_data:
-                return self._standardize_financial_data(financial_data)
-            
+
+            if indicator_df is not None and not indicator_df.empty:
+                indicators = indicator_df.to_dict('records')
+
+                return {
+                    "symbol": symbol,
+                    "ts_code": ts_code,
+                    "financial_indicators": indicators,
+                    "data_source": "tushare",
+                    "updated_at": datetime.utcnow()
+                }
+
             return None
 
         except Exception as e:
-            self.logger.error(f"❌ 获取财务数据失败 symbol={symbol}: {e}")
+            self.logger.error(f"❌ 获取Tushare财务指标失败 symbol={symbol}: {e}")
             return None
 
     # ==================== 数据标准化方法 ====================
@@ -499,39 +958,164 @@ class TushareProvider(BaseStockDataProvider):
 
         return df
 
-    def _standardize_financial_data(self, financial_data: Dict[str, Any]) -> Dict[str, Any]:
-        """标准化财务数据"""
-        return {
-            "symbol": financial_data.get('income', {}).get('ts_code', '').split('.')[0],
-            "report_period": financial_data.get('income', {}).get('end_date'),
-            "report_type": "quarterly",
+    def _standardize_tushare_financial_data(self, financial_data: Dict[str, Any], ts_code: str) -> Dict[str, Any]:
+        """
+        标准化Tushare财务数据
 
-            # 利润表数据
-            "revenue": self._convert_to_float(financial_data.get('income', {}).get('revenue')),
-            "net_income": self._convert_to_float(financial_data.get('income', {}).get('n_income')),
-            "gross_profit": self._calculate_gross_profit(
-                financial_data.get('income', {}).get('revenue'),
-                financial_data.get('income', {}).get('oper_cost')
-            ),
+        Args:
+            financial_data: 原始财务数据字典
+            ts_code: Tushare股票代码
 
-            # 资产负债表数据
-            "total_assets": self._convert_to_float(financial_data.get('balance', {}).get('total_assets')),
-            "total_equity": self._convert_to_float(financial_data.get('balance', {}).get('total_hldr_eqy_exc_min_int')),
-            "total_liab": self._convert_to_float(financial_data.get('balance', {}).get('total_liab')),
+        Returns:
+            标准化后的财务数据
+        """
+        try:
+            # 获取最新的数据记录（第一条记录通常是最新的）
+            latest_income = financial_data.get('income_statement', [{}])[0] if financial_data.get('income_statement') else {}
+            latest_balance = financial_data.get('balance_sheet', [{}])[0] if financial_data.get('balance_sheet') else {}
+            latest_cashflow = financial_data.get('cashflow_statement', [{}])[0] if financial_data.get('cashflow_statement') else {}
+            latest_indicator = financial_data.get('financial_indicators', [{}])[0] if financial_data.get('financial_indicators') else {}
 
-            # 现金流量表数据
-            "cash_flow": self._convert_to_float(financial_data.get('cashflow', {}).get('n_cashflow_act')),
-            "operating_cf": self._convert_to_float(financial_data.get('cashflow', {}).get('n_cashflow_act')),
+            # 提取基础信息
+            symbol = ts_code.split('.')[0] if '.' in ts_code else ts_code
+            report_period = latest_income.get('end_date') or latest_balance.get('end_date') or latest_cashflow.get('end_date')
+            ann_date = latest_income.get('ann_date') or latest_balance.get('ann_date') or latest_cashflow.get('ann_date')
 
-            # 元数据
-            "data_source": "tushare",
-            "updated_at": datetime.utcnow()
-        }
+            standardized_data = {
+                # 基础信息
+                "symbol": symbol,
+                "ts_code": ts_code,
+                "report_period": report_period,
+                "ann_date": ann_date,
+                "report_type": self._determine_report_type(report_period),
+
+                # 利润表核心指标
+                "revenue": self._safe_float(latest_income.get('revenue')),  # 营业收入
+                "oper_rev": self._safe_float(latest_income.get('oper_rev')),  # 营业收入
+                "net_income": self._safe_float(latest_income.get('n_income')),  # 净利润
+                "net_profit": self._safe_float(latest_income.get('n_income_attr_p')),  # 归属母公司净利润
+                "oper_profit": self._safe_float(latest_income.get('oper_profit')),  # 营业利润
+                "total_profit": self._safe_float(latest_income.get('total_profit')),  # 利润总额
+                "oper_cost": self._safe_float(latest_income.get('oper_cost')),  # 营业成本
+                "oper_exp": self._safe_float(latest_income.get('oper_exp')),  # 营业费用
+                "admin_exp": self._safe_float(latest_income.get('admin_exp')),  # 管理费用
+                "fin_exp": self._safe_float(latest_income.get('fin_exp')),  # 财务费用
+                "rd_exp": self._safe_float(latest_income.get('rd_exp')),  # 研发费用
+
+                # 资产负债表核心指标
+                "total_assets": self._safe_float(latest_balance.get('total_assets')),  # 总资产
+                "total_liab": self._safe_float(latest_balance.get('total_liab')),  # 总负债
+                "total_equity": self._safe_float(latest_balance.get('total_hldr_eqy_exc_min_int')),  # 股东权益
+                "total_cur_assets": self._safe_float(latest_balance.get('total_cur_assets')),  # 流动资产
+                "total_nca": self._safe_float(latest_balance.get('total_nca')),  # 非流动资产
+                "total_cur_liab": self._safe_float(latest_balance.get('total_cur_liab')),  # 流动负债
+                "total_ncl": self._safe_float(latest_balance.get('total_ncl')),  # 非流动负债
+                "money_cap": self._safe_float(latest_balance.get('money_cap')),  # 货币资金
+                "accounts_receiv": self._safe_float(latest_balance.get('accounts_receiv')),  # 应收账款
+                "inventories": self._safe_float(latest_balance.get('inventories')),  # 存货
+                "fix_assets": self._safe_float(latest_balance.get('fix_assets')),  # 固定资产
+
+                # 现金流量表核心指标
+                "n_cashflow_act": self._safe_float(latest_cashflow.get('n_cashflow_act')),  # 经营活动现金流
+                "n_cashflow_inv_act": self._safe_float(latest_cashflow.get('n_cashflow_inv_act')),  # 投资活动现金流
+                "n_cashflow_fin_act": self._safe_float(latest_cashflow.get('n_cashflow_fin_act')),  # 筹资活动现金流
+                "c_cash_equ_end_period": self._safe_float(latest_cashflow.get('c_cash_equ_end_period')),  # 期末现金
+                "c_cash_equ_beg_period": self._safe_float(latest_cashflow.get('c_cash_equ_beg_period')),  # 期初现金
+
+                # 财务指标
+                "roe": self._safe_float(latest_indicator.get('roe')),  # 净资产收益率
+                "roa": self._safe_float(latest_indicator.get('roa')),  # 总资产收益率
+                "roe_waa": self._safe_float(latest_indicator.get('roe_waa')),  # 加权平均净资产收益率
+                "roe_dt": self._safe_float(latest_indicator.get('roe_dt')),  # 净资产收益率(扣除非经常损益)
+                "roa2": self._safe_float(latest_indicator.get('roa2')),  # 总资产收益率(扣除非经常损益)
+                "gross_margin": self._safe_float(latest_indicator.get('gross_margin')),  # 销售毛利率
+                "netprofit_margin": self._safe_float(latest_indicator.get('netprofit_margin')),  # 销售净利率
+                "cogs_of_sales": self._safe_float(latest_indicator.get('cogs_of_sales')),  # 销售成本率
+                "expense_of_sales": self._safe_float(latest_indicator.get('expense_of_sales')),  # 销售期间费用率
+                "profit_to_gr": self._safe_float(latest_indicator.get('profit_to_gr')),  # 净利润/营业总收入
+                "saleexp_to_gr": self._safe_float(latest_indicator.get('saleexp_to_gr')),  # 销售费用/营业总收入
+                "adminexp_of_gr": self._safe_float(latest_indicator.get('adminexp_of_gr')),  # 管理费用/营业总收入
+                "finaexp_of_gr": self._safe_float(latest_indicator.get('finaexp_of_gr')),  # 财务费用/营业总收入
+                "debt_to_assets": self._safe_float(latest_indicator.get('debt_to_assets')),  # 资产负债率
+                "assets_to_eqt": self._safe_float(latest_indicator.get('assets_to_eqt')),  # 权益乘数
+                "dp_assets_to_eqt": self._safe_float(latest_indicator.get('dp_assets_to_eqt')),  # 权益乘数(杜邦分析)
+                "ca_to_assets": self._safe_float(latest_indicator.get('ca_to_assets')),  # 流动资产/总资产
+                "nca_to_assets": self._safe_float(latest_indicator.get('nca_to_assets')),  # 非流动资产/总资产
+                "current_ratio": self._safe_float(latest_indicator.get('current_ratio')),  # 流动比率
+                "quick_ratio": self._safe_float(latest_indicator.get('quick_ratio')),  # 速动比率
+                "cash_ratio": self._safe_float(latest_indicator.get('cash_ratio')),  # 现金比率
+
+                # 原始数据保留（用于详细分析）
+                "raw_data": {
+                    "income_statement": financial_data.get('income_statement', []),
+                    "balance_sheet": financial_data.get('balance_sheet', []),
+                    "cashflow_statement": financial_data.get('cashflow_statement', []),
+                    "financial_indicators": financial_data.get('financial_indicators', []),
+                    "main_business": financial_data.get('main_business', [])
+                },
+
+                # 元数据
+                "data_source": "tushare",
+                "updated_at": datetime.utcnow()
+            }
+
+            return standardized_data
+
+        except Exception as e:
+            self.logger.error(f"❌ 标准化Tushare财务数据失败: {e}")
+            return {
+                "symbol": ts_code.split('.')[0] if '.' in ts_code else ts_code,
+                "data_source": "tushare",
+                "updated_at": datetime.utcnow(),
+                "error": str(e)
+            }
+
+    def _determine_report_type(self, report_period: str) -> str:
+        """根据报告期确定报告类型"""
+        if not report_period:
+            return "quarterly"
+
+        try:
+            # 报告期格式: YYYYMMDD
+            month_day = report_period[4:8]
+            if month_day == "1231":
+                return "annual"  # 年报
+            else:
+                return "quarterly"  # 季报
+        except:
+            return "quarterly"
+
+    def _safe_float(self, value) -> Optional[float]:
+        """安全转换为浮点数，处理各种异常情况"""
+        if value is None:
+            return None
+
+        try:
+            # 处理字符串类型
+            if isinstance(value, str):
+                value = value.strip()
+                if not value or value.lower() in ['nan', 'null', 'none', '--', '']:
+                    return None
+                # 移除可能的单位符号
+                value = value.replace(',', '').replace('万', '').replace('亿', '')
+
+            # 处理数值类型
+            if isinstance(value, (int, float)):
+                # 检查是否为NaN
+                if isinstance(value, float) and (value != value):  # NaN检查
+                    return None
+                return float(value)
+
+            # 尝试转换
+            return float(value)
+
+        except (ValueError, TypeError, AttributeError):
+            return None
 
     def _calculate_gross_profit(self, revenue, oper_cost) -> Optional[float]:
         """安全计算毛利润"""
-        revenue_float = self._convert_to_float(revenue)
-        oper_cost_float = self._convert_to_float(oper_cost)
+        revenue_float = self._safe_float(revenue)
+        oper_cost_float = self._safe_float(oper_cost)
 
         if revenue_float is not None and oper_cost_float is not None:
             return revenue_float - oper_cost_float

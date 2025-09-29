@@ -431,9 +431,16 @@ class BaoStockProvider(BaseStockDataProvider):
                     raise Exception(f"登录失败: {lg.error_msg}")
 
                 try:
+                    # 根据频率选择不同的字段（周线和月线支持的字段较少）
+                    if bs_frequency == "d":
+                        fields_str = "date,code,open,high,low,close,preclose,volume,amount,adjustflag,turn,tradestatus,pctChg,isST"
+                    else:
+                        # 周线和月线只支持基础字段
+                        fields_str = "date,code,open,high,low,close,volume,amount,pctChg"
+
                     rs = self.bs.query_history_k_data_plus(
                         code=bs_code,
-                        fields="date,code,open,high,low,close,preclose,volume,amount,adjustflag,turn,tradestatus,pctChg,isST",
+                        fields=fields_str,
                         start_date=start_date,
                         end_date=end_date,
                         frequency=bs_frequency,
@@ -465,6 +472,11 @@ class BaoStockProvider(BaseStockDataProvider):
             for col in numeric_cols:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce')
+
+            # 如果没有preclose字段，使用前一日收盘价估算
+            if 'preclose' not in df.columns and len(df) > 0:
+                df['preclose'] = df['close'].shift(1)
+                df.loc[0, 'preclose'] = df.loc[0, 'close']  # 第一行使用当日收盘价
 
             # 标准化列名
             df = df.rename(columns={
@@ -735,3 +747,15 @@ class BaoStockProvider(BaseStockDataProvider):
         except Exception as e:
             logger.debug(f"获取{code}现金流量数据失败: {e}")
             return None
+
+
+# 全局提供器实例
+_baostock_provider = None
+
+
+def get_baostock_provider() -> BaoStockProvider:
+    """获取全局BaoStock提供器实例"""
+    global _baostock_provider
+    if _baostock_provider is None:
+        _baostock_provider = BaoStockProvider()
+    return _baostock_provider

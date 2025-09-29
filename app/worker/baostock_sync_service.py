@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 from app.core.config import get_settings
 from app.core.database import get_database
+from app.services.historical_data_service import get_historical_data_service
 from tradingagents.dataflows.providers.baostock_provider import BaoStockProvider
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,7 @@ class BaoStockSyncService:
         try:
             self.settings = get_settings()
             self.provider = BaoStockProvider()
+            self.historical_service = None  # 延迟初始化
 
             if require_db:
                 self.db = get_database()
@@ -52,6 +54,19 @@ class BaoStockSyncService:
             logger.info("✅ BaoStock同步服务初始化成功")
         except Exception as e:
             logger.error(f"❌ BaoStock同步服务初始化失败: {e}")
+            raise
+
+    async def initialize(self):
+        """异步初始化服务"""
+        try:
+            # 初始化历史数据服务
+            if self.historical_service is None:
+                from app.services.historical_data_service import get_historical_data_service
+                self.historical_service = await get_historical_data_service()
+
+            logger.info("✅ BaoStock同步服务异步初始化完成")
+        except Exception as e:
+            logger.error(f"❌ BaoStock同步服务异步初始化失败: {e}")
             raise
     
     async def sync_stock_basic_info(self, batch_size: int = 100) -> BaoStockSyncStats:
@@ -300,28 +315,42 @@ class BaoStockSyncService:
     async def _update_historical_data(self, code: str, hist_data) -> int:
         """更新历史数据到数据库"""
         try:
-            # 这里可以根据需要选择存储到专门的历史数据集合
-            # 或者更新到market_quotes集合的历史字段
-            collection = self.db.market_quotes
-            
-            # 更新最新的历史数据信息
-            if not hist_data.empty:
-                latest_record = hist_data.iloc[-1]
+            if hist_data is None or hist_data.empty:
+                logger.warning(f"⚠️ {code} 历史数据为空，跳过保存")
+                return 0
+
+            # 初始化历史数据服务
+            if self.historical_service is None:
+                self.historical_service = await get_historical_data_service()
+
+            # 保存到统一历史数据集合
+            saved_count = await self.historical_service.save_historical_data(
+                symbol=code,
+                data=hist_data,
+                data_source="baostock",
+                market="CN"
+            )
+
+            # 同时更新market_quotes集合的元信息（保持兼容性）
+            if self.db is not None:
+                collection = self.db.market_quotes
+                latest_record = hist_data.iloc[-1] if not hist_data.empty else None
+
                 await collection.update_one(
                     {"code": code},
                     {"$set": {
                         "historical_data_updated": datetime.now(),
-                        "latest_historical_date": latest_record.get('date'),
-                        "historical_records_count": len(hist_data)
+                        "latest_historical_date": latest_record.get('date') if latest_record is not None else None,
+                        "historical_records_count": saved_count
                     }},
                     upsert=True
                 )
-            
-            return len(hist_data)
-            
+
+            return saved_count
+
         except Exception as e:
             logger.error(f"❌ 更新历史数据到数据库失败: {e}")
-            raise
+            return 0
     
     async def check_service_status(self) -> Dict[str, Any]:
         """检查服务状态"""

@@ -9,6 +9,7 @@ import logging
 
 from tradingagents.dataflows.providers.tushare_provider import TushareProvider
 from app.services.stock_data_service import get_stock_data_service
+from app.services.historical_data_service import get_historical_data_service
 from app.core.database import get_mongo_db
 from app.core.config import settings
 
@@ -24,9 +25,10 @@ class TushareSyncService:
     def __init__(self):
         self.provider = TushareProvider()
         self.stock_service = get_stock_data_service()
+        self.historical_service = None  # 延迟初始化
         self.db = get_mongo_db()
         self.settings = settings
-        
+
         # 同步配置
         self.batch_size = 100  # 批量处理大小
         self.rate_limit_delay = 0.1  # API调用间隔(秒)
@@ -37,7 +39,10 @@ class TushareSyncService:
         success = await self.provider.connect()
         if not success:
             raise RuntimeError("❌ Tushare连接失败，无法启动同步服务")
-        
+
+        # 初始化历史数据服务
+        self.historical_service = await get_historical_data_service()
+
         logger.info("✅ Tushare同步服务初始化完成")
     
     # ==================== 基础信息同步 ====================
@@ -295,7 +300,8 @@ class TushareSyncService:
         symbols: List[str] = None,
         start_date: str = None,
         end_date: str = None,
-        incremental: bool = True
+        incremental: bool = True,
+        all_history: bool = False
     ) -> Dict[str, Any]:
         """
         同步历史数据
@@ -305,6 +311,7 @@ class TushareSyncService:
             start_date: 开始日期
             end_date: 结束日期
             incremental: 是否增量同步
+            all_history: 是否同步所有历史数据
 
         Returns:
             同步结果统计
@@ -333,11 +340,14 @@ class TushareSyncService:
 
             # 2. 确定日期范围
             if not start_date:
-                if incremental:
+                if all_history:
+                    # 全历史同步：从1990年开始
+                    start_date = "1990-01-01"
+                elif incremental:
                     # 增量同步：从最后更新日期开始
                     start_date = await self._get_last_sync_date()
                 else:
-                    # 全量同步：从一年前开始
+                    # 默认同步：从一年前开始
                     start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
 
             if not end_date:
@@ -397,16 +407,42 @@ class TushareSyncService:
 
     async def _save_historical_data(self, symbol: str, df) -> int:
         """保存历史数据到数据库"""
-        # 这里需要根据实际的数据库设计来实现
-        # 可能需要创建新的历史数据集合
-        # 暂时返回数据条数
-        return len(df)
+        try:
+            if self.historical_service is None:
+                self.historical_service = await get_historical_data_service()
 
-    async def _get_last_sync_date(self) -> str:
+            # 使用统一历史数据服务保存
+            saved_count = await self.historical_service.save_historical_data(
+                symbol=symbol,
+                data=df,
+                data_source="tushare",
+                market="CN"
+            )
+
+            return saved_count
+
+        except Exception as e:
+            logger.error(f"❌ 保存历史数据失败 {symbol}: {e}")
+            return 0
+
+    async def _get_last_sync_date(self, symbol: str = None) -> str:
         """获取最后同步日期"""
-        # 查询最新的历史数据日期
-        # 这里需要根据实际的数据库设计来实现
-        return (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+        try:
+            if self.historical_service is None:
+                self.historical_service = await get_historical_data_service()
+
+            if symbol:
+                # 获取特定股票的最新日期
+                latest_date = await self.historical_service.get_latest_date(symbol, "tushare")
+                if latest_date:
+                    return latest_date
+
+            # 默认返回7天前
+            return (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+
+        except Exception as e:
+            logger.error(f"❌ 获取最后同步日期失败: {e}")
+            return (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
 
     # ==================== 财务数据同步 ====================
 
@@ -485,30 +521,22 @@ class TushareSyncService:
     async def _save_financial_data(self, symbol: str, financial_data: Dict[str, Any]) -> bool:
         """保存财务数据"""
         try:
-            # 这里需要根据实际的财务数据集合设计来实现
-            # 可能需要创建 stock_financial_data 集合
-            collection = self.db.stock_financial_data
+            # 使用统一的财务数据服务
+            from app.services.financial_data_service import get_financial_data_service
 
-            # 更新或插入财务数据
-            filter_query = {
-                "symbol": symbol,
-                "report_period": financial_data.get("report_period")
-            }
+            financial_service = await get_financial_data_service()
 
-            update_data = {
-                "$set": {
-                    **financial_data,
-                    "updated_at": datetime.utcnow()
-                }
-            }
-
-            result = await collection.update_one(
-                filter_query,
-                update_data,
-                upsert=True
+            # 保存财务数据
+            saved_count = await financial_service.save_financial_data(
+                symbol=symbol,
+                financial_data=financial_data,
+                data_source="tushare",
+                market="CN",
+                report_period=financial_data.get("report_period"),
+                report_type=financial_data.get("report_type", "quarterly")
             )
 
-            return result.acknowledged
+            return saved_count > 0
 
         except Exception as e:
             logger.error(f"❌ 保存 {symbol} 财务数据失败: {e}")

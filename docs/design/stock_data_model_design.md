@@ -230,7 +230,143 @@
 }
 ```
 
-### 6. 技术指标数据 (stock_technical_indicators)
+### 6. 社媒消息数据 (social_media_messages)
+
+```javascript
+{
+  "_id": ObjectId("..."),
+  "symbol": "000001",           // 主要相关股票代码
+  "full_symbol": "000001.SZ",   // 完整标准化代码
+  "market": "CN",               // 市场标识
+  "symbols": ["000001", "000002"], // 相关股票列表
+
+  // 消息基本信息
+  "message_id": "weibo_123456789",  // 原始消息ID
+  "platform": "weibo",         // 平台类型 (weibo/wechat/douyin/xiaohongshu/zhihu/twitter/reddit)
+  "message_type": "post",      // 消息类型 (post/comment/repost/reply)
+  "content": "平安银行今天涨停了，基本面确实不错...",
+  "media_urls": ["https://example.com/image1.jpg"], // 媒体文件URL
+  "hashtags": ["#平安银行", "#涨停"],
+
+  // 作者信息
+  "author": {
+    "user_id": "user_123",
+    "username": "股市小散",
+    "display_name": "投资达人",
+    "verified": false,          // 是否认证用户
+    "follower_count": 10000,    // 粉丝数
+    "influence_score": 0.75     // 影响力评分 (0-1)
+  },
+
+  // 互动数据
+  "engagement": {
+    "likes": 150,
+    "shares": 25,
+    "comments": 30,
+    "views": 5000,
+    "engagement_rate": 0.041    // 互动率
+  },
+
+  // 时间信息
+  "publish_time": ISODate("2024-03-20T14:30:00Z"),
+  "crawl_time": ISODate("2024-03-20T15:00:00Z"),
+
+  // 分析结果
+  "sentiment": "positive",      // 情绪分析 (positive/negative/neutral)
+  "sentiment_score": 0.8,       // 情绪得分 (-1到1)
+  "confidence": 0.85,           // 分析置信度
+  "keywords": ["涨停", "基本面", "不错"],
+  "topics": ["股价表现", "基本面分析"],
+  "importance": "medium",       // 重要性 (high/medium/low)
+  "credibility": "medium",      // 可信度 (high/medium/low)
+
+  // 地理位置
+  "location": {
+    "country": "CN",
+    "province": "广东",
+    "city": "深圳"
+  },
+
+  // 元数据
+  "language": "zh-CN",
+  "created_at": ISODate("2024-03-20T15:00:00Z"),
+  "updated_at": ISODate("2024-03-20T15:00:00Z"),
+  "data_source": "crawler_weibo",
+  "crawler_version": "1.0",
+  "version": 1
+}
+```
+
+### 7. 内部消息数据 (internal_messages)
+
+```javascript
+{
+  "_id": ObjectId("..."),
+  "symbol": "000001",           // 主要相关股票代码
+  "full_symbol": "000001.SZ",   // 完整标准化代码
+  "market": "CN",               // 市场标识
+  "symbols": ["000001", "000002"], // 相关股票列表
+
+  // 消息基本信息
+  "message_id": "internal_20240320_001",
+  "message_type": "research_report", // 消息类型 (research_report/insider_info/analyst_note/meeting_minutes/internal_analysis)
+  "title": "平安银行Q1业绩预期分析",
+  "content": "根据内部分析，平安银行Q1业绩预期...",
+  "summary": "Q1净利润预期增长5-8%",
+
+  // 来源信息
+  "source": {
+    "type": "internal_research",  // 来源类型 (internal_research/insider/analyst/meeting/system_analysis)
+    "department": "研究部",
+    "author": "张分析师",
+    "author_id": "analyst_001",
+    "reliability": "high"        // 可靠性 (high/medium/low)
+  },
+
+  // 分类信息
+  "category": "fundamental_analysis", // 类别 (fundamental_analysis/technical_analysis/market_sentiment/risk_assessment)
+  "subcategory": "earnings_forecast",
+  "tags": ["业绩预期", "财务分析", "Q1"],
+
+  // 重要性和影响
+  "importance": "high",         // 重要性 (high/medium/low)
+  "impact_scope": "stock_specific", // 影响范围 (stock_specific/sector/market_wide)
+  "time_sensitivity": "short_term", // 时效性 (immediate/short_term/medium_term/long_term)
+  "confidence_level": 0.85,     // 置信度 (0-1)
+
+  // 分析结果
+  "sentiment": "positive",      // 情绪倾向
+  "sentiment_score": 0.7,       // 情绪得分
+  "keywords": ["业绩", "增长", "预期"],
+  "risk_factors": ["监管政策", "市场环境"],
+  "opportunities": ["业务扩张", "成本控制"],
+
+  // 相关数据
+  "related_data": {
+    "financial_metrics": ["roe", "roa", "net_profit"],
+    "price_targets": [15.5, 16.0, 16.8],
+    "rating": "buy"             // 评级 (strong_buy/buy/hold/sell/strong_sell)
+  },
+
+  // 访问控制
+  "access_level": "internal",   // 访问级别 (public/internal/restricted/confidential)
+  "permissions": ["research_team", "portfolio_managers"],
+
+  // 时间信息
+  "created_time": ISODate("2024-03-20T10:00:00Z"),
+  "effective_time": ISODate("2024-03-20T10:00:00Z"),
+  "expiry_time": ISODate("2024-06-20T10:00:00Z"),
+
+  // 元数据
+  "language": "zh-CN",
+  "created_at": ISODate("2024-03-20T10:00:00Z"),
+  "updated_at": ISODate("2024-03-20T10:00:00Z"),
+  "data_source": "internal_system",
+  "version": 1
+}
+```
+
+### 8. 技术指标数据 (stock_technical_indicators)
 
 ```javascript
 {

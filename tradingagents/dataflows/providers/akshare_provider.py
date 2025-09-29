@@ -635,3 +635,149 @@ class AKShareProvider(BaseStockDataProvider):
                 "data_source": "akshare",
                 "error": str(e)
             }
+
+    async def get_stock_news(self, symbol: str = None, limit: int = 10) -> Optional[List[Dict[str, Any]]]:
+        """
+        获取股票新闻
+
+        Args:
+            symbol: 股票代码，为None时获取市场新闻
+            limit: 返回数量限制
+
+        Returns:
+            新闻列表
+        """
+        if not self.is_available():
+            return None
+
+        try:
+            import akshare as ak
+
+            if symbol:
+                # 获取个股新闻
+                self.logger.debug(f"📰 获取AKShare个股新闻: {symbol}")
+
+                # 标准化股票代码
+                symbol_6 = symbol.zfill(6)
+
+                # 获取东方财富个股新闻
+                news_df = await asyncio.to_thread(
+                    ak.stock_news_em,
+                    symbol=symbol_6
+                )
+
+                if news_df is not None and not news_df.empty:
+                    news_list = []
+
+                    for _, row in news_df.head(limit).iterrows():
+                        news_item = {
+                            "title": str(row.get('新闻标题', '') or row.get('标题', '')),
+                            "content": str(row.get('新闻内容', '') or row.get('内容', '')),
+                            "summary": str(row.get('新闻摘要', '') or row.get('摘要', '')),
+                            "url": str(row.get('新闻链接', '') or row.get('链接', '')),
+                            "source": str(row.get('文章来源', '') or row.get('来源', '') or '东方财富'),
+                            "author": str(row.get('作者', '') or ''),
+                            "publish_time": self._parse_news_time(row.get('发布时间', '') or row.get('时间', '')),
+                            "data_source": "akshare"
+                        }
+
+                        # 过滤空标题的新闻
+                        if news_item["title"]:
+                            news_list.append(news_item)
+
+                    self.logger.info(f"✅ {symbol} AKShare新闻获取成功: {len(news_list)} 条")
+                    return news_list
+                else:
+                    self.logger.warning(f"⚠️ {symbol} 未获取到AKShare新闻数据")
+                    return []
+            else:
+                # 获取市场新闻
+                self.logger.debug("📰 获取AKShare市场新闻")
+
+                try:
+                    # 获取财经新闻
+                    news_df = await asyncio.to_thread(
+                        ak.news_cctv,
+                        limit=limit
+                    )
+
+                    if news_df is not None and not news_df.empty:
+                        news_list = []
+
+                        for _, row in news_df.iterrows():
+                            news_item = {
+                                "title": str(row.get('title', '') or row.get('标题', '')),
+                                "content": str(row.get('content', '') or row.get('内容', '')),
+                                "summary": str(row.get('brief', '') or row.get('摘要', '')),
+                                "url": str(row.get('url', '') or row.get('链接', '')),
+                                "source": str(row.get('source', '') or row.get('来源', '') or 'CCTV财经'),
+                                "author": str(row.get('author', '') or ''),
+                                "publish_time": self._parse_news_time(row.get('time', '') or row.get('时间', '')),
+                                "data_source": "akshare"
+                            }
+
+                            if news_item["title"]:
+                                news_list.append(news_item)
+
+                        self.logger.info(f"✅ AKShare市场新闻获取成功: {len(news_list)} 条")
+                        return news_list
+
+                except Exception as e:
+                    self.logger.debug(f"CCTV新闻获取失败: {e}")
+
+                return []
+
+        except Exception as e:
+            self.logger.error(f"❌ 获取AKShare新闻失败 symbol={symbol}: {e}")
+            return None
+
+    def _parse_news_time(self, time_str: str) -> Optional[datetime]:
+        """解析新闻时间"""
+        if not time_str:
+            return datetime.utcnow()
+
+        try:
+            # 尝试多种时间格式
+            formats = [
+                "%Y-%m-%d %H:%M:%S",
+                "%Y-%m-%d %H:%M",
+                "%Y-%m-%d",
+                "%Y/%m/%d %H:%M:%S",
+                "%Y/%m/%d %H:%M",
+                "%Y/%m/%d",
+                "%m-%d %H:%M",
+                "%m/%d %H:%M"
+            ]
+
+            for fmt in formats:
+                try:
+                    parsed_time = datetime.strptime(str(time_str), fmt)
+
+                    # 如果只有月日，补充年份
+                    if fmt in ["%m-%d %H:%M", "%m/%d %H:%M"]:
+                        current_year = datetime.now().year
+                        parsed_time = parsed_time.replace(year=current_year)
+
+                    return parsed_time
+                except ValueError:
+                    continue
+
+            # 如果都失败了，返回当前时间
+            self.logger.debug(f"⚠️ 无法解析新闻时间: {time_str}")
+            return datetime.utcnow()
+
+        except Exception as e:
+            self.logger.debug(f"解析新闻时间异常: {e}")
+            return datetime.utcnow()
+
+
+# 全局提供器实例
+_akshare_provider = None
+
+
+def get_akshare_provider() -> AKShareProvider:
+    """获取全局AKShare提供器实例"""
+    global _akshare_provider
+    if _akshare_provider is None:
+        _akshare_provider = AKShareProvider()
+    return _akshare_provider

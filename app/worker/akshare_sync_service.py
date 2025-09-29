@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
 from app.core.database import get_mongo_db
-
+from app.services.historical_data_service import get_historical_data_service
 from tradingagents.dataflows.providers.akshare_provider import AKShareProvider
 
 logger = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ class AKShareSyncService:
     
     def __init__(self):
         self.provider = None
-
+        self.historical_service = None  # 延迟初始化
         self.db = None
         self.batch_size = 100
         self.rate_limit_delay = 0.2  # AKShare建议的延迟
@@ -37,16 +37,17 @@ class AKShareSyncService:
         try:
             # 初始化数据库连接
             self.db = get_mongo_db()
-            
 
-            
+            # 初始化历史数据服务
+            self.historical_service = await get_historical_data_service()
+
             # 初始化AKShare提供器
             self.provider = AKShareProvider()
-            
+
             # 测试连接
             if not await self.provider.test_connection():
                 raise RuntimeError("❌ AKShare连接失败，无法启动同步服务")
-            
+
             logger.info("✅ AKShare同步服务初始化完成")
             
         except Exception as e:
@@ -458,11 +459,20 @@ class AKShareSyncService:
                 hist_data = await self.provider.get_historical_data(symbol, start_date, end_date)
 
                 if hist_data is not None and not hist_data.empty:
-                    # 保存到数据库（这里需要实现历史数据保存逻辑）
-                    # TODO: 实现历史数据保存到MongoDB
+                    # 保存到统一历史数据集合
+                    if self.historical_service is None:
+                        self.historical_service = await get_historical_data_service()
+
+                    saved_count = await self.historical_service.save_historical_data(
+                        symbol=symbol,
+                        data=hist_data,
+                        data_source="akshare",
+                        market="CN"
+                    )
+
                     batch_stats["success_count"] += 1
-                    batch_stats["total_records"] += len(hist_data)
-                    logger.debug(f"✅ {symbol}历史数据同步成功: {len(hist_data)}条记录")
+                    batch_stats["total_records"] += saved_count
+                    logger.debug(f"✅ {symbol}历史数据同步成功: {saved_count}条记录")
                 else:
                     batch_stats["error_count"] += 1
                     batch_stats["errors"].append({
@@ -566,10 +576,18 @@ class AKShareSyncService:
                 financial_data = await self.provider.get_financial_data(symbol)
 
                 if financial_data:
-                    # 保存到数据库（这里需要实现财务数据保存逻辑）
-                    # TODO: 实现财务数据保存到MongoDB
-                    batch_stats["success_count"] += 1
-                    logger.debug(f"✅ {symbol}财务数据同步成功")
+                    # 使用统一的财务数据服务保存数据
+                    success = await self._save_financial_data(symbol, financial_data)
+                    if success:
+                        batch_stats["success_count"] += 1
+                        logger.debug(f"✅ {symbol}财务数据保存成功")
+                    else:
+                        batch_stats["error_count"] += 1
+                        batch_stats["errors"].append({
+                            "code": symbol,
+                            "error": "财务数据保存失败",
+                            "context": "_process_financial_batch"
+                        })
                 else:
                     batch_stats["error_count"] += 1
                     batch_stats["errors"].append({
@@ -587,6 +605,29 @@ class AKShareSyncService:
                 })
 
         return batch_stats
+
+    async def _save_financial_data(self, symbol: str, financial_data: Dict[str, Any]) -> bool:
+        """保存财务数据"""
+        try:
+            # 使用统一的财务数据服务
+            from app.services.financial_data_service import get_financial_data_service
+
+            financial_service = await get_financial_data_service()
+
+            # 保存财务数据
+            saved_count = await financial_service.save_financial_data(
+                symbol=symbol,
+                financial_data=financial_data,
+                data_source="akshare",
+                market="CN",
+                report_type="quarterly"
+            )
+
+            return saved_count > 0
+
+        except Exception as e:
+            logger.error(f"❌ 保存 {symbol} 财务数据失败: {e}")
+            return False
 
     async def run_status_check(self) -> Dict[str, Any]:
         """运行状态检查"""

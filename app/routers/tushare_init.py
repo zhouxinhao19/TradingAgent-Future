@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from app.routers.auth import get_current_user
 from app.core.database import get_mongo_db
 from app.worker.tushare_init_service import get_tushare_init_service
-from app.schemas.response import StandardResponse
+from app.core.response import ok
 
 router = APIRouter(prefix="/api/tushare-init", tags=["Tushare初始化"])
 
@@ -52,7 +52,7 @@ _initialization_status = {
 }
 
 
-@router.get("/status", response_model=StandardResponse[DatabaseStatusResponse])
+@router.get("/status", response_model=dict)
 async def get_database_status(
     current_user: dict = Depends(get_current_user)
 ):
@@ -100,9 +100,7 @@ async def get_database_status(
             needs_initialization=needs_initialization
         )
         
-        return StandardResponse(
-            success=True,
-            data=status,
+        return ok(data=status,
             message="数据库状态获取成功"
         )
         
@@ -110,7 +108,7 @@ async def get_database_status(
         raise HTTPException(status_code=500, detail=f"获取数据库状态失败: {str(e)}")
 
 
-@router.get("/initialization-status", response_model=StandardResponse[InitializationStatusResponse])
+@router.get("/initialization-status", response_model=dict)
 async def get_initialization_status(
     current_user: dict = Depends(get_current_user)
 ):
@@ -127,9 +125,7 @@ async def get_initialization_status(
             estimated_completion=None  # TODO: 可以根据历史数据估算
         )
         
-        return StandardResponse(
-            success=True,
-            data=status,
+        return ok(data=status,
             message="初始化状态获取成功"
         )
         
@@ -137,7 +133,7 @@ async def get_initialization_status(
         raise HTTPException(status_code=500, detail=f"获取初始化状态失败: {str(e)}")
 
 
-@router.post("/start-basic", response_model=StandardResponse[Dict[str, Any]])
+@router.post("/start-basic", response_model=dict)
 async def start_basic_initialization(
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user)
@@ -153,9 +149,7 @@ async def start_basic_initialization(
         # 启动后台任务
         background_tasks.add_task(_run_basic_initialization)
         
-        return StandardResponse(
-            success=True,
-            data={"message": "基础信息初始化已启动"},
+        return ok(data={"message": "基础信息初始化已启动"},
             message="基础信息初始化任务已在后台启动"
         )
         
@@ -163,7 +157,7 @@ async def start_basic_initialization(
         raise HTTPException(status_code=500, detail=f"启动基础信息初始化失败: {str(e)}")
 
 
-@router.post("/start-full", response_model=StandardResponse[Dict[str, Any]])
+@router.post("/start-full", response_model=dict)
 async def start_full_initialization(
     request: InitializationRequest,
     background_tasks: BackgroundTasks,
@@ -184,9 +178,7 @@ async def start_full_initialization(
             not request.skip_if_exists or request.force_update
         )
         
-        return StandardResponse(
-            success=True,
-            data={
+        return ok(data={
                 "message": "完整数据初始化已启动",
                 "historical_days": request.historical_days,
                 "force_update": not request.skip_if_exists or request.force_update
@@ -198,7 +190,7 @@ async def start_full_initialization(
         raise HTTPException(status_code=500, detail=f"启动完整数据初始化失败: {str(e)}")
 
 
-@router.post("/stop", response_model=StandardResponse[Dict[str, Any]])
+@router.post("/stop", response_model=dict)
 async def stop_initialization(
     current_user: dict = Depends(get_current_user)
 ):
@@ -223,9 +215,7 @@ async def stop_initialization(
             "task": None
         })
         
-        return StandardResponse(
-            success=True,
-            data={"message": "初始化任务已停止"},
+        return ok(data={"message": "初始化任务已停止"},
             message="初始化任务停止成功"
         )
         

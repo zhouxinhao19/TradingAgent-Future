@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from app.core.database import get_mongo_db
 from app.worker.akshare_init_service import get_akshare_init_service
 from app.worker.akshare_sync_service import get_akshare_sync_service
-from app.core.auth import get_current_user
+from app.routers.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
