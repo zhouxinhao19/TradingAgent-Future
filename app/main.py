@@ -16,7 +16,7 @@ import asyncio
 from app.core.config import settings
 from app.core.database import init_db, close_db
 from app.core.logging_config import setup_logging
-from app.routers import auth, analysis, screening, queue, sse, health, favorites, config, reports, database, operation_logs, tags, tushare_init
+from app.routers import auth, analysis, screening, queue, sse, health, favorites, config, reports, database, operation_logs, tags, tushare_init, akshare_init
 from app.routers import sync as sync_router, multi_source_sync
 from app.routers import stocks as stocks_router
 from app.routers import stock_data as stock_data_router
@@ -28,6 +28,13 @@ from app.worker.tushare_sync_service import (
     run_tushare_historical_sync,
     run_tushare_financial_sync,
     run_tushare_status_check
+)
+from app.worker.akshare_sync_service import (
+    run_akshare_basic_info_sync,
+    run_akshare_quotes_sync,
+    run_akshare_historical_sync,
+    run_akshare_financial_sync,
+    run_akshare_status_check
 )
 from app.middleware.operation_log_middleware import OperationLogMiddleware
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -161,6 +168,57 @@ async def lifespan(app: FastAPI):
                 )
                 logger.info(f"🔍 Tushare状态检查已配置: {settings.TUSHARE_STATUS_CHECK_CRON}")
 
+        # AKShare统一数据同步任务配置
+        if settings.AKSHARE_UNIFIED_ENABLED:
+            logger.info("🔄 配置AKShare统一数据同步任务...")
+
+            # 基础信息同步任务
+            if settings.AKSHARE_BASIC_INFO_SYNC_ENABLED:
+                scheduler.add_job(
+                    run_akshare_basic_info_sync,
+                    CronTrigger.from_crontab(settings.AKSHARE_BASIC_INFO_SYNC_CRON, timezone=settings.TIMEZONE),
+                    id="akshare_basic_info_sync",
+                    kwargs={"force_update": False}
+                )
+                logger.info(f"📅 AKShare基础信息同步已配置: {settings.AKSHARE_BASIC_INFO_SYNC_CRON}")
+
+            # 实时行情同步任务
+            if settings.AKSHARE_QUOTES_SYNC_ENABLED:
+                scheduler.add_job(
+                    run_akshare_quotes_sync,
+                    CronTrigger.from_crontab(settings.AKSHARE_QUOTES_SYNC_CRON, timezone=settings.TIMEZONE),
+                    id="akshare_quotes_sync"
+                )
+                logger.info(f"📈 AKShare行情同步已配置: {settings.AKSHARE_QUOTES_SYNC_CRON}")
+
+            # 历史数据同步任务
+            if settings.AKSHARE_HISTORICAL_SYNC_ENABLED:
+                scheduler.add_job(
+                    run_akshare_historical_sync,
+                    CronTrigger.from_crontab(settings.AKSHARE_HISTORICAL_SYNC_CRON, timezone=settings.TIMEZONE),
+                    id="akshare_historical_sync",
+                    kwargs={"incremental": True}
+                )
+                logger.info(f"📊 AKShare历史数据同步已配置: {settings.AKSHARE_HISTORICAL_SYNC_CRON}")
+
+            # 财务数据同步任务
+            if settings.AKSHARE_FINANCIAL_SYNC_ENABLED:
+                scheduler.add_job(
+                    run_akshare_financial_sync,
+                    CronTrigger.from_crontab(settings.AKSHARE_FINANCIAL_SYNC_CRON, timezone=settings.TIMEZONE),
+                    id="akshare_financial_sync"
+                )
+                logger.info(f"💰 AKShare财务数据同步已配置: {settings.AKSHARE_FINANCIAL_SYNC_CRON}")
+
+            # 状态检查任务
+            if settings.AKSHARE_STATUS_CHECK_ENABLED:
+                scheduler.add_job(
+                    run_akshare_status_check,
+                    CronTrigger.from_crontab(settings.AKSHARE_STATUS_CHECK_CRON, timezone=settings.TIMEZONE),
+                    id="akshare_status_check"
+                )
+                logger.info(f"🔍 AKShare状态检查已配置: {settings.AKSHARE_STATUS_CHECK_CRON}")
+
         scheduler.start()
     except Exception as e:
         logger.warning(f"Failed to start scheduler: {e}")
@@ -287,6 +345,7 @@ app.include_router(sync_router.router)
 app.include_router(multi_source_sync.router)
 app.include_router(paper_router.router, prefix="/api", tags=["paper"])
 app.include_router(tushare_init.router, prefix="/api", tags=["tushare-init"])
+app.include_router(akshare_init.router, prefix="/api", tags=["akshare-init"])
 
 
 @app.get("/")
