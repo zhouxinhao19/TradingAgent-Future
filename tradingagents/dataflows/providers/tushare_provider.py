@@ -352,8 +352,8 @@ class TushareProvider(BaseStockDataProvider):
             "market_info": self._determine_market_info_from_ts_code(ts_code),
 
             # 业务信息
-            "area": raw_data.get('area'),
-            "industry": raw_data.get('industry'),
+            "area": self._safe_str(raw_data.get('area')),
+            "industry": self._safe_str(raw_data.get('industry')),
             "market": raw_data.get('market'),  # 主板/创业板/科创板
             "list_date": self._format_date_output(raw_data.get('list_date')),
 
@@ -536,6 +536,14 @@ class TushareProvider(BaseStockDataProvider):
         if revenue_float is not None and oper_cost_float is not None:
             return revenue_float - oper_cost_float
         return None
+
+    def _safe_str(self, value) -> Optional[str]:
+        """安全转换为字符串，处理NaN值"""
+        if value is None:
+            return None
+        if isinstance(value, float) and (value != value):  # 检查NaN
+            return None
+        return str(value) if value else None
 
 
 # 全局提供器实例
