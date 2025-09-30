@@ -569,11 +569,17 @@ async function fetchLatestAnalysis() {
     if (tasks && tasks.length > 0) {
       const latestTask = tasks[0]
 
-      // 如果有 result 字段，直接使用
-      if (latestTask.result) {
+      // 优先使用 result_data 字段（后端实际返回的字段名）
+      if (latestTask.result_data) {
+        lastAnalysis.value = latestTask.result_data
+        analysisStatus.value = 'completed'
+        console.log('✅ 加载历史分析报告成功 (result_data):', latestTask.result_data)
+      }
+      // 兼容旧的 result 字段
+      else if (latestTask.result) {
         lastAnalysis.value = latestTask.result
         analysisStatus.value = 'completed'
-        console.log('✅ 加载历史分析报告成功:', latestTask.result)
+        console.log('✅ 加载历史分析报告成功 (result):', latestTask.result)
       }
       // 否则尝试通过 task_id 获取结果
       else if (latestTask.task_id) {
