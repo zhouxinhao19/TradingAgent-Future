@@ -1,0 +1,355 @@
+<template>
+  <el-dialog
+    :model-value="visible"
+    :title="isEdit ? '编辑厂家信息' : '添加厂家'"
+    width="600px"
+    @update:model-value="handleVisibleChange"
+    @close="handleClose"
+  >
+    <el-form
+      ref="formRef"
+      :model="formData"
+      :rules="rules"
+      label-width="120px"
+    >
+      <!-- 预设厂家选择 -->
+      <el-form-item v-if="!isEdit" label="快速选择">
+        <el-select
+          v-model="selectedPreset"
+          placeholder="选择预设厂家或手动填写"
+          clearable
+          @change="handlePresetChange"
+        >
+          <el-option
+            v-for="preset in presetProviders"
+            :key="preset.name"
+            :label="preset.display_name"
+            :value="preset.name"
+          />
+        </el-select>
+      </el-form-item>
+
+      <el-form-item label="厂家ID" prop="name">
+        <el-input 
+          v-model="formData.name" 
+          placeholder="如: openai, anthropic"
+          :disabled="isEdit"
+        />
+        <div class="form-tip">厂家的唯一标识符，创建后不可修改</div>
+      </el-form-item>
+
+      <el-form-item label="显示名称" prop="display_name">
+        <el-input 
+          v-model="formData.display_name" 
+          placeholder="如: OpenAI, Anthropic"
+        />
+      </el-form-item>
+
+      <el-form-item label="描述" prop="description">
+        <el-input 
+          v-model="formData.description" 
+          type="textarea"
+          :rows="3"
+          placeholder="厂家简介和特点"
+        />
+      </el-form-item>
+
+      <el-form-item label="官网" prop="website">
+        <el-input 
+          v-model="formData.website" 
+          placeholder="https://openai.com"
+        />
+      </el-form-item>
+
+      <el-form-item label="API文档" prop="api_doc_url">
+        <el-input 
+          v-model="formData.api_doc_url" 
+          placeholder="https://platform.openai.com/docs"
+        />
+      </el-form-item>
+
+      <el-form-item label="默认API地址" prop="default_base_url">
+        <el-input
+          v-model="formData.default_base_url"
+          placeholder="https://api.openai.com/v1"
+        />
+      </el-form-item>
+
+      <el-alert
+        title="🔒 安全提示"
+        type="info"
+        description="敏感密钥通过环境变量/运维配置注入，出于安全考虑，此处不存储或展示真实密钥。"
+        show-icon
+        :closable="false"
+        class="mb-2"
+      />
+      <el-form-item label="密钥状态">
+        <el-tag :type="(props.provider?.extra_config?.has_api_key ? 'success' : 'danger')" size="small">
+          {{ props.provider?.extra_config?.has_api_key ? '已配置' : '未配置' }}
+        </el-tag>
+        <el-tag v-if="props.provider?.extra_config?.has_api_key" :type="props.provider?.extra_config?.source === 'environment' ? 'warning' : 'success'" size="small" class="ml-2">
+          {{ props.provider?.extra_config?.source === 'environment' ? 'ENV' : 'DB' }}
+        </el-tag>
+      </el-form-item>
+
+      <el-form-item label="支持功能" prop="supported_features">
+        <el-checkbox-group v-model="formData.supported_features">
+          <el-checkbox label="chat">对话</el-checkbox>
+          <el-checkbox label="completion">文本补全</el-checkbox>
+          <el-checkbox label="embedding">向量化</el-checkbox>
+          <el-checkbox label="image">图像生成</el-checkbox>
+          <el-checkbox label="vision">图像理解</el-checkbox>
+          <el-checkbox label="function_calling">函数调用</el-checkbox>
+          <el-checkbox label="streaming">流式输出</el-checkbox>
+        </el-checkbox-group>
+      </el-form-item>
+
+      <el-form-item label="状态">
+        <el-switch 
+          v-model="formData.is_active"
+          active-text="启用"
+          inactive-text="禁用"
+        />
+      </el-form-item>
+    </el-form>
+
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="handleClose">取消</el-button>
+        <el-button type="primary" @click="handleSubmit" :loading="submitting">
+          {{ isEdit ? '更新' : '添加' }}
+        </el-button>
+      </div>
+    </template>
+  </el-dialog>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
+import { configApi, type LLMProvider } from '@/api/config'
+
+interface Props {
+  visible: boolean
+  provider?: Partial<LLMProvider>
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  provider: () => ({})
+})
+
+const emit = defineEmits<{
+  'update:visible': [value: boolean]
+  'success': []
+}>()
+
+// 表单引用
+const formRef = ref<FormInstance>()
+const submitting = ref(false)
+const selectedPreset = ref('')
+
+// 是否为编辑模式
+const isEdit = computed(() => !!props.provider?.id)
+
+// 是否需要API Secret（某些厂家需要）
+const needsApiSecret = computed(() => {
+  const providersNeedSecret = ['baidu', 'dashscope', 'qianfan']
+  return providersNeedSecret.includes(formData.value.name)
+})
+
+// 预设厂家数据
+const presetProviders = [
+  {
+    name: 'openai',
+    display_name: 'OpenAI',
+    description: 'OpenAI是人工智能领域的领先公司，提供GPT系列模型',
+    website: 'https://openai.com',
+    api_doc_url: 'https://platform.openai.com/docs',
+    default_base_url: 'https://api.openai.com/v1',
+    supported_features: ['chat', 'completion', 'embedding', 'image', 'vision', 'function_calling', 'streaming']
+  },
+  {
+    name: 'anthropic',
+    display_name: 'Anthropic',
+    description: 'Anthropic专注于AI安全研究，提供Claude系列模型',
+    website: 'https://anthropic.com',
+    api_doc_url: 'https://docs.anthropic.com',
+    default_base_url: 'https://api.anthropic.com',
+    supported_features: ['chat', 'completion', 'function_calling', 'streaming']
+  },
+  {
+    name: 'google',
+    display_name: 'Google AI',
+    description: 'Google的人工智能平台，提供Gemini系列模型',
+    website: 'https://ai.google.dev',
+    api_doc_url: 'https://ai.google.dev/docs',
+    default_base_url: 'https://generativelanguage.googleapis.com/v1',
+    supported_features: ['chat', 'completion', 'embedding', 'vision', 'function_calling', 'streaming']
+  },
+  {
+    name: 'azure',
+    display_name: 'Azure OpenAI',
+    description: 'Microsoft Azure平台上的OpenAI服务',
+    website: 'https://azure.microsoft.com/en-us/products/ai-services/openai-service',
+    api_doc_url: 'https://learn.microsoft.com/en-us/azure/ai-services/openai/',
+    default_base_url: 'https://your-resource.openai.azure.com',
+    supported_features: ['chat', 'completion', 'embedding', 'function_calling', 'streaming']
+  },
+  {
+    name: 'zhipu',
+    display_name: '智谱AI',
+    description: '智谱AI提供GLM系列中文大模型',
+    website: 'https://zhipuai.cn',
+    api_doc_url: 'https://open.bigmodel.cn/doc',
+    default_base_url: 'https://open.bigmodel.cn/api/paas/v4',
+    supported_features: ['chat', 'completion', 'embedding', 'function_calling', 'streaming']
+  },
+  {
+    name: 'baidu',
+    display_name: '百度智能云',
+    description: '百度提供的文心一言等AI服务',
+    website: 'https://cloud.baidu.com',
+    api_doc_url: 'https://cloud.baidu.com/doc/WENXINWORKSHOP/index.html',
+    default_base_url: 'https://aip.baidubce.com',
+    supported_features: ['chat', 'completion', 'embedding', 'streaming']
+  },
+  {
+    name: 'deepseek',
+    display_name: 'DeepSeek',
+    description: 'DeepSeek提供高性能的AI推理服务',
+    website: 'https://www.deepseek.com',
+    api_doc_url: 'https://platform.deepseek.com/api-docs',
+    default_base_url: 'https://api.deepseek.com',
+    supported_features: ['chat', 'completion', 'function_calling', 'streaming']
+  },
+  {
+    name: 'dashscope',
+    display_name: '阿里云百炼',
+    description: '阿里云百炼大模型服务平台，提供通义千问等模型',
+    website: 'https://bailian.console.aliyun.com',
+    api_doc_url: 'https://help.aliyun.com/zh/dashscope/',
+    default_base_url: 'https://dashscope.aliyuncs.com/api/v1',
+    supported_features: ['chat', 'completion', 'embedding', 'function_calling', 'streaming']
+  }
+]
+
+// 表单数据
+const formData = ref<Partial<LLMProvider>>({
+  name: '',
+  display_name: '',
+  description: '',
+  website: '',
+  api_doc_url: '',
+  default_base_url: '',
+  api_key: '',
+  api_secret: '',
+  supported_features: [],
+  is_active: true
+})
+
+// 表单验证规则
+const rules: FormRules = {
+  name: [
+    { required: true, message: '请输入厂家ID', trigger: 'blur' },
+    { pattern: /^[a-z0-9_-]+$/, message: '只能包含小写字母、数字、下划线和连字符', trigger: 'blur' }
+  ],
+  display_name: [
+    { required: true, message: '请输入显示名称', trigger: 'blur' }
+  ],
+  supported_features: [
+    { type: 'array', min: 1, message: '请至少选择一个支持的功能', trigger: 'change' }
+  ]
+}
+
+// 重置表单
+const resetForm = () => {
+  formData.value = {
+    name: '',
+    display_name: '',
+    description: '',
+    website: '',
+    api_doc_url: '',
+    default_base_url: '',
+    api_key: '',
+    api_secret: '',
+    supported_features: [],
+    is_active: true
+  }
+  selectedPreset.value = ''
+}
+
+// 监听props变化，更新表单数据
+watch(() => props.provider, (newProvider) => {
+  if (newProvider && Object.keys(newProvider).length > 0) {
+    formData.value = { ...newProvider }
+  } else {
+    resetForm()
+  }
+}, { immediate: true, deep: true })
+
+// 处理预设选择
+const handlePresetChange = (presetName: string) => {
+  if (!presetName) return
+
+  const preset = presetProviders.find(p => p.name === presetName)
+  if (preset) {
+    formData.value = {
+      ...preset,
+      is_active: true
+    }
+  }
+}
+
+// 处理可见性变化
+const handleVisibleChange = (value: boolean) => {
+  emit('update:visible', value)
+}
+
+// 处理关闭
+const handleClose = () => {
+  emit('update:visible', false)
+  formRef.value?.resetFields()
+}
+
+// 处理提交
+const handleSubmit = async () => {
+  try {
+    await formRef.value?.validate()
+    submitting.value = true
+
+    // 按方案A：前端不提交敏感字段
+    const payload: any = { ...formData.value }
+    delete payload.api_key
+    delete payload.api_secret
+
+    if (isEdit.value) {
+      await configApi.updateLLMProvider(formData.value.id!, payload)
+      ElMessage.success('厂家信息更新成功')
+    } else {
+      await configApi.addLLMProvider(payload)
+      ElMessage.success('厂家添加成功')
+    }
+
+    emit('success')
+    handleClose()
+  } catch (error) {
+    console.error('提交失败:', error)
+    ElMessage.error(isEdit.value ? '更新失败' : '添加失败')
+  } finally {
+    submitting.value = false
+  }
+}
+</script>
+
+<style lang="scss" scoped>
+.form-tip {
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
+  margin-top: 4px;
+}
+
+.dialog-footer {
+  text-align: right;
+}
+</style>
