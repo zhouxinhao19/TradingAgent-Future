@@ -733,8 +733,11 @@ class DataSourceManager:
         return f"❌ 所有数据源都无法获取{symbol}的数据"
 
     def get_stock_info(self, symbol: str) -> Dict:
-        """获取股票基本信息，支持降级机制"""
-        logger.info(f"📊 [股票信息] 开始获取{symbol}基本信息...")
+        """
+        获取股票基本信息，支持多数据源和自动降级
+        优先级：MongoDB → Tushare → AKShare → BaoStock
+        """
+        logger.info(f"📊 [数据来源: {self.current_source.value}] 开始获取股票信息: {symbol}")
 
         # 优先使用 App Mongo 缓存（当 ta_use_app_cache=True）
         try:
@@ -795,12 +798,12 @@ class DataSourceManager:
                         logger.debug(f"附加行情失败（忽略）：{_e}")
 
                     if name:
-                        logger.info(f"✅ [数据来源: MongoDB-stock_basic_info] 缓存命中 | cache_hit=true code={symbol}")
+                        logger.info(f"✅ [数据来源: MongoDB-stock_basic_info] 成功获取: {symbol}")
                         return result
                     else:
-                        logger.debug(f"[数据来源: MongoDB] 未在缓存中找到有效名称，继续外部数据源 | code={symbol}")
+                        logger.warning(f"⚠️ [数据来源: MongoDB] 未找到有效名称: {symbol}，降级到其他数据源")
             except Exception as e:
-                logger.debug(f"读取缓存失败，继续外部数据源 | code={symbol} err={e}")
+                logger.error(f"❌ [数据来源: MongoDB异常] 获取股票信息失败: {e}", exc_info=True)
 
 
         # 首先尝试当前数据源
@@ -812,32 +815,32 @@ class DataSourceManager:
 
                 # 检查是否获取到有效信息
                 if result.get('name') and result['name'] != f'股票{symbol}':
-                    logger.info(f"✅ [数据来源: Tushare API] 成功获取{symbol}信息")
+                    logger.info(f"✅ [数据来源: Tushare-股票信息] 成功获取: {symbol}")
                     return result
                 else:
-                    logger.warning(f"⚠️ [数据来源: Tushare API失败] 返回无效信息，尝试降级...")
+                    logger.warning(f"⚠️ [数据来源: Tushare失败] 返回无效信息，尝试降级: {symbol}")
                     return self._try_fallback_stock_info(symbol)
             else:
                 adapter = self.get_data_adapter()
                 if adapter and hasattr(adapter, 'get_stock_info'):
                     result = adapter.get_stock_info(symbol)
                     if result.get('name') and result['name'] != f'股票{symbol}':
-                        logger.info(f"✅ [数据来源: {self.current_source.value} API] 成功获取{symbol}信息")
+                        logger.info(f"✅ [数据来源: {self.current_source.value}-股票信息] 成功获取: {symbol}")
                         return result
                     else:
-                        logger.warning(f"⚠️ [数据来源: {self.current_source.value} API失败] 返回无效信息，尝试降级...")
+                        logger.warning(f"⚠️ [数据来源: {self.current_source.value}失败] 返回无效信息，尝试降级: {symbol}")
                         return self._try_fallback_stock_info(symbol)
                 else:
-                    logger.warning(f"⚠️ [数据来源: {self.current_source.value}] 不支持股票信息获取，尝试降级...")
+                    logger.warning(f"⚠️ [数据来源: {self.current_source.value}] 不支持股票信息获取，尝试降级: {symbol}")
                     return self._try_fallback_stock_info(symbol)
 
         except Exception as e:
-            logger.error(f"❌ [数据来源: {self.current_source.value} API异常] 获取失败: {e}")
+            logger.error(f"❌ [数据来源: {self.current_source.value}异常] 获取股票信息失败: {e}", exc_info=True)
             return self._try_fallback_stock_info(symbol)
 
     def _try_fallback_stock_info(self, symbol: str) -> Dict:
         """尝试使用备用数据源获取股票基本信息"""
-        logger.info(f"🔄 [股票信息] {self.current_source.value}失败，尝试备用数据源...")
+        logger.error(f"🔄 {self.current_source.value}失败，尝试备用数据源获取股票信息...")
 
         # 获取所有可用数据源
         available_sources = self.available_sources.copy()
@@ -850,7 +853,7 @@ class DataSourceManager:
         for source_name in available_sources:
             try:
                 source = ChinaDataSource(source_name)
-                logger.info(f"🔄 [股票信息] 尝试备用数据源: {source_name}")
+                logger.info(f"🔄 尝试备用数据源获取股票信息: {source_name}")
 
                 # 根据数据源类型获取股票信息
                 if source == ChinaDataSource.TUSHARE:
@@ -876,17 +879,17 @@ class DataSourceManager:
 
                 # 检查是否获取到有效信息
                 if result.get('name') and result['name'] != f'股票{symbol}':
-                    logger.info(f"✅ [股票信息] 备用数据源{source_name}成功获取{symbol}信息")
+                    logger.info(f"✅ [数据来源: 备用数据源] 降级成功获取股票信息: {source_name}")
                     return result
                 else:
-                    logger.warning(f"⚠️ [股票信息] 备用数据源{source_name}返回无效信息")
+                    logger.warning(f"⚠️ [数据来源: {source_name}] 返回无效信息")
 
             except Exception as e:
-                logger.error(f"❌ [股票信息] 备用数据源{source_name}失败: {e}")
+                logger.error(f"❌ 备用数据源{source_name}失败: {e}")
                 continue
 
         # 所有数据源都失败，返回默认值
-        logger.error(f"❌ [股票信息] 所有数据源都无法获取{symbol}的基本信息")
+        logger.error(f"❌ 所有数据源都无法获取{symbol}的股票信息")
         return {'symbol': symbol, 'name': f'股票{symbol}', 'source': 'unknown'}
 
     def _get_akshare_stock_info(self, symbol: str) -> Dict:
