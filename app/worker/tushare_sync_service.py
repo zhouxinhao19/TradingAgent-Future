@@ -10,6 +10,7 @@ import logging
 from tradingagents.dataflows.providers.tushare_provider import TushareProvider
 from app.services.stock_data_service import get_stock_data_service
 from app.services.historical_data_service import get_historical_data_service
+from app.services.news_data_service import get_news_data_service
 from app.core.database import get_mongo_db
 from app.core.config import settings
 from app.core.rate_limiter import get_tushare_rate_limiter
@@ -27,6 +28,7 @@ class TushareSyncService:
         self.provider = TushareProvider()
         self.stock_service = get_stock_data_service()
         self.historical_service = None  # 延迟初始化
+        self.news_service = None  # 延迟初始化
         self.db = get_mongo_db()
         self.settings = settings
 
@@ -48,6 +50,9 @@ class TushareSyncService:
 
         # 初始化历史数据服务
         self.historical_service = await get_historical_data_service()
+
+        # 初始化新闻数据服务
+        self.news_service = await get_news_data_service()
 
         logger.info("✅ Tushare同步服务初始化完成")
     
@@ -606,6 +611,141 @@ class TushareSyncService:
             logger.error(f"❌ 获取同步状态失败: {e}")
             return {"error": str(e)}
 
+    # ==================== 新闻数据同步 ====================
+
+    async def sync_news_data(
+        self,
+        symbols: List[str] = None,
+        hours_back: int = 24,
+        max_news_per_stock: int = 20,
+        force_update: bool = False
+    ) -> Dict[str, Any]:
+        """
+        同步新闻数据
+
+        Args:
+            symbols: 股票代码列表，为None时获取所有股票
+            hours_back: 回溯小时数，默认24小时
+            max_news_per_stock: 每只股票最大新闻数量
+            force_update: 是否强制更新
+
+        Returns:
+            同步结果统计
+        """
+        logger.info("🔄 开始同步新闻数据...")
+
+        stats = {
+            "total_processed": 0,
+            "success_count": 0,
+            "error_count": 0,
+            "news_count": 0,
+            "start_time": datetime.utcnow(),
+            "errors": []
+        }
+
+        try:
+            # 1. 获取股票列表
+            if symbols is None:
+                stock_list = await self.stock_service.get_all_stocks()
+                symbols = [stock["code"] for stock in stock_list]
+
+            if not symbols:
+                logger.warning("⚠️ 没有找到需要同步新闻的股票")
+                return stats
+
+            stats["total_processed"] = len(symbols)
+            logger.info(f"📊 需要同步 {len(symbols)} 只股票的新闻")
+
+            # 2. 批量处理
+            for i in range(0, len(symbols), self.batch_size):
+                batch = symbols[i:i + self.batch_size]
+                batch_stats = await self._process_news_batch(
+                    batch, hours_back, max_news_per_stock
+                )
+
+                # 更新统计
+                stats["success_count"] += batch_stats["success_count"]
+                stats["error_count"] += batch_stats["error_count"]
+                stats["news_count"] += batch_stats["news_count"]
+                stats["errors"].extend(batch_stats["errors"])
+
+                # 进度日志
+                progress = min(i + self.batch_size, len(symbols))
+                logger.info(f"📈 新闻同步进度: {progress}/{len(symbols)} "
+                           f"(成功: {stats['success_count']}, 新闻: {stats['news_count']})")
+
+                # API限流
+                if i + self.batch_size < len(symbols):
+                    await asyncio.sleep(self.rate_limit_delay)
+
+            # 3. 完成统计
+            stats["end_time"] = datetime.utcnow()
+            stats["duration"] = (stats["end_time"] - stats["start_time"]).total_seconds()
+
+            logger.info(f"✅ 新闻数据同步完成: "
+                       f"总计 {stats['total_processed']} 只股票, "
+                       f"成功 {stats['success_count']} 只, "
+                       f"获取 {stats['news_count']} 条新闻, "
+                       f"错误 {stats['error_count']} 只, "
+                       f"耗时 {stats['duration']:.2f} 秒")
+
+            return stats
+
+        except Exception as e:
+            logger.error(f"❌ 新闻数据同步失败: {e}")
+            stats["errors"].append({"error": str(e), "context": "sync_news_data"})
+            return stats
+
+    async def _process_news_batch(
+        self,
+        batch: List[str],
+        hours_back: int,
+        max_news_per_stock: int
+    ) -> Dict[str, Any]:
+        """处理新闻批次"""
+        batch_stats = {
+            "success_count": 0,
+            "error_count": 0,
+            "news_count": 0,
+            "errors": []
+        }
+
+        for symbol in batch:
+            try:
+                # 从Tushare获取新闻数据
+                news_data = await self.provider.get_stock_news(
+                    symbol=symbol,
+                    limit=max_news_per_stock,
+                    hours_back=hours_back
+                )
+
+                if news_data:
+                    # 保存新闻数据
+                    saved_count = await self.news_service.save_news_data(
+                        news_data=news_data,
+                        data_source="tushare",
+                        market="CN"
+                    )
+
+                    batch_stats["success_count"] += 1
+                    batch_stats["news_count"] += saved_count
+
+                    logger.debug(f"✅ {symbol} 新闻同步成功: {saved_count}条")
+                else:
+                    logger.debug(f"⚠️ {symbol} 未获取到新闻数据")
+                    batch_stats["success_count"] += 1  # 没有新闻也算成功
+
+                # API限流
+                await asyncio.sleep(0.2)
+
+            except Exception as e:
+                batch_stats["error_count"] += 1
+                error_msg = f"{symbol}: {str(e)}"
+                batch_stats["errors"].append(error_msg)
+                logger.error(f"❌ {symbol} 新闻同步失败: {e}")
+
+        return batch_stats
+
 
 # 全局同步服务实例
 _tushare_sync_service = None
@@ -678,3 +818,18 @@ async def run_tushare_status_check():
     except Exception as e:
         logger.error(f"❌ Tushare状态检查失败: {e}")
         return {"error": str(e)}
+
+
+async def run_tushare_news_sync(hours_back: int = 24, max_news_per_stock: int = 20):
+    """APScheduler任务：同步新闻数据"""
+    try:
+        service = await get_tushare_sync_service()
+        result = await service.sync_news_data(
+            hours_back=hours_back,
+            max_news_per_stock=max_news_per_stock
+        )
+        logger.info(f"✅ Tushare新闻数据同步完成: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"❌ Tushare新闻数据同步失败: {e}")
+        raise

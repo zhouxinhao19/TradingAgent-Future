@@ -28,6 +28,7 @@ class AKShareInitializationStats:
     monthly_records: int = 0
     financial_records: int = 0
     quotes_count: int = 0
+    news_count: int = 0
     errors: List[Dict[str, Any]] = None
 
     def __post_init__(self):
@@ -64,7 +65,8 @@ class AKShareInitService:
         historical_days: int = 365,
         skip_if_exists: bool = True,
         batch_size: int = 100,
-        enable_multi_period: bool = False
+        enable_multi_period: bool = False,
+        sync_items: List[str] = None
     ) -> Dict[str, Any]:
         """
         运行完整的数据初始化
@@ -74,42 +76,91 @@ class AKShareInitService:
             skip_if_exists: 如果数据已存在是否跳过
             batch_size: 批处理大小
             enable_multi_period: 是否启用多周期数据同步（日线、周线、月线）
+            sync_items: 要同步的数据类型列表，可选值：
+                - 'basic_info': 股票基础信息
+                - 'historical': 历史行情数据（日线）
+                - 'weekly': 周线数据
+                - 'monthly': 月线数据
+                - 'financial': 财务数据
+                - 'quotes': 最新行情
+                - 'news': 新闻数据
+                - None: 同步所有数据（默认）
 
         Returns:
             初始化结果统计
         """
-        logger.info("🚀 开始AKShare数据完整初始化...")
+        # 如果未指定sync_items，则同步所有数据
+        if sync_items is None:
+            sync_items = ['basic_info', 'historical', 'financial', 'quotes']
+            if enable_multi_period:
+                sync_items.extend(['weekly', 'monthly'])
 
-        # 根据是否启用多周期调整总步骤数
-        total_steps = 8 if enable_multi_period else 6
+        logger.info("🚀 开始AKShare数据完整初始化...")
+        logger.info(f"📋 同步项目: {', '.join(sync_items)}")
+
+        # 计算总步骤数（检查状态 + 同步项目数 + 验证）
+        total_steps = 1 + len(sync_items) + 1
 
         self.stats = AKShareInitializationStats(
             started_at=datetime.utcnow(),
             total_steps=total_steps
         )
-        
+
         try:
             # 步骤1: 检查数据库状态
-            await self._step_check_database_status(skip_if_exists)
-            
+            # 只有在同步 basic_info 时才检查是否跳过
+            if 'basic_info' in sync_items:
+                await self._step_check_database_status(skip_if_exists)
+            else:
+                logger.info("📊 检查数据库状态...")
+                basic_count = await self.db.stock_basic_info.count_documents({})
+                logger.info(f"  当前股票基础信息: {basic_count}条")
+                if basic_count == 0:
+                    logger.warning("⚠️ 数据库中没有股票基础信息，建议先同步 basic_info")
+
             # 步骤2: 初始化股票基础信息
-            await self._step_initialize_basic_info()
-            
+            if 'basic_info' in sync_items:
+                await self._step_initialize_basic_info()
+            else:
+                logger.info("⏭️ 跳过股票基础信息同步")
+
             # 步骤3: 同步历史数据（日线）
-            await self._step_initialize_historical_data(historical_days)
+            if 'historical' in sync_items:
+                await self._step_initialize_historical_data(historical_days)
+            else:
+                logger.info("⏭️ 跳过历史数据（日线）同步")
 
-            # 步骤4: 同步多周期数据（如果启用）
-            if enable_multi_period:
+            # 步骤4: 同步周线数据
+            if 'weekly' in sync_items:
                 await self._step_initialize_weekly_data(historical_days)
+            else:
+                logger.info("⏭️ 跳过周线数据同步")
+
+            # 步骤5: 同步月线数据
+            if 'monthly' in sync_items:
                 await self._step_initialize_monthly_data(historical_days)
+            else:
+                logger.info("⏭️ 跳过月线数据同步")
 
-            # 步骤5: 同步财务数据
-            await self._step_initialize_financial_data()
+            # 步骤6: 同步财务数据
+            if 'financial' in sync_items:
+                await self._step_initialize_financial_data()
+            else:
+                logger.info("⏭️ 跳过财务数据同步")
 
-            # 步骤6: 同步最新行情
-            await self._step_initialize_quotes()
+            # 步骤7: 同步最新行情
+            if 'quotes' in sync_items:
+                await self._step_initialize_quotes()
+            else:
+                logger.info("⏭️ 跳过最新行情同步")
 
-            # 步骤7: 验证数据完整性
+            # 步骤8: 同步新闻数据
+            if 'news' in sync_items:
+                await self._step_initialize_news_data()
+            else:
+                logger.info("⏭️ 跳过新闻数据同步")
+
+            # 最后: 验证数据完整性
             await self._step_verify_data_integrity()
             
             self.stats.finished_at = datetime.utcnow()
@@ -289,10 +340,10 @@ class AKShareInitService:
         """步骤5: 同步最新行情"""
         self.stats.current_step = "同步最新行情"
         logger.info(f"📈 {self.stats.current_step}...")
-        
+
         try:
             result = await self.sync_service.sync_realtime_quotes()
-            
+
             if result:
                 self.stats.quotes_count = result.get("success_count", 0)
                 logger.info(f"✅ 最新行情初始化完成: {self.stats.quotes_count}只股票")
@@ -300,9 +351,29 @@ class AKShareInitService:
                 logger.warning("⚠️ 最新行情初始化失败")
         except Exception as e:
             logger.warning(f"⚠️ 最新行情初始化失败: {e}（继续后续步骤）")
-        
+
         self.stats.completed_steps += 1
-    
+
+    async def _step_initialize_news_data(self):
+        """步骤6: 同步新闻数据"""
+        self.stats.current_step = "同步新闻数据"
+        logger.info(f"📰 {self.stats.current_step}...")
+
+        try:
+            result = await self.sync_service.sync_news_data(
+                max_news_per_stock=20
+            )
+
+            if result:
+                self.stats.news_count = result.get("news_count", 0)
+                logger.info(f"✅ 新闻数据初始化完成: {self.stats.news_count}条新闻")
+            else:
+                logger.warning("⚠️ 新闻数据初始化失败")
+        except Exception as e:
+            logger.warning(f"⚠️ 新闻数据初始化失败: {e}（继续后续步骤）")
+
+        self.stats.completed_steps += 1
+
     async def _step_verify_data_integrity(self):
         """步骤6: 验证数据完整性"""
         self.stats.current_step = "验证数据完整性"
@@ -352,7 +423,8 @@ class AKShareInitService:
                 "weekly_records": self.stats.weekly_records,
                 "monthly_records": self.stats.monthly_records,
                 "financial_records": self.stats.financial_records,
-                "quotes_count": self.stats.quotes_count
+                "quotes_count": self.stats.quotes_count,
+                "news_count": self.stats.news_count
             },
             "errors": self.stats.errors,
             "current_step": self.stats.current_step

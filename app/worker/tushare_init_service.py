@@ -28,6 +28,7 @@ class InitializationStats:
     monthly_records: int = 0
     financial_records: int = 0
     quotes_count: int = 0
+    news_count: int = 0
     errors: List[Dict[str, Any]] = None
 
     def __post_init__(self):
@@ -82,6 +83,7 @@ class TushareInitService:
                 - 'monthly': 月线数据
                 - 'financial': 财务数据
                 - 'quotes': 最新行情
+                - 'news': 新闻数据
                 - None: 同步所有数据（默认）
 
         Returns:
@@ -143,6 +145,12 @@ class TushareInitService:
                 await self._step_initialize_quotes()
             else:
                 logger.info("⏭️ 跳过最新行情同步")
+
+            # 步骤8: 同步新闻数据
+            if 'news' in sync_items:
+                await self._step_initialize_news_data(historical_days)
+            else:
+                logger.info("⏭️ 跳过新闻数据同步")
 
             # 最后: 验证数据完整性
             await self._step_verify_data_integrity()
@@ -324,10 +332,10 @@ class TushareInitService:
         """步骤5: 同步最新行情"""
         self.stats.current_step = "同步最新行情"
         logger.info(f"📈 {self.stats.current_step}...")
-        
+
         try:
             result = await self.sync_service.sync_realtime_quotes()
-            
+
             if result:
                 self.stats.quotes_count = result.get("success_count", 0)
                 logger.info(f"✅ 最新行情初始化完成: {self.stats.quotes_count}只股票")
@@ -335,9 +343,33 @@ class TushareInitService:
                 logger.warning("⚠️ 最新行情初始化失败")
         except Exception as e:
             logger.warning(f"⚠️ 最新行情初始化失败: {e}（继续后续步骤）")
-        
+
         self.stats.completed_steps += 1
-    
+
+    async def _step_initialize_news_data(self, historical_days: int):
+        """步骤6: 同步新闻数据"""
+        self.stats.current_step = "同步新闻数据"
+        logger.info(f"📰 {self.stats.current_step}...")
+
+        try:
+            # 计算回溯小时数
+            hours_back = min(historical_days * 24, 24 * 7)  # 最多回溯7天新闻
+
+            result = await self.sync_service.sync_news_data(
+                hours_back=hours_back,
+                max_news_per_stock=20
+            )
+
+            if result:
+                self.stats.news_count = result.get("news_count", 0)
+                logger.info(f"✅ 新闻数据初始化完成: {self.stats.news_count}条新闻")
+            else:
+                logger.warning("⚠️ 新闻数据初始化失败（可能需要Tushare新闻权限）")
+        except Exception as e:
+            logger.warning(f"⚠️ 新闻数据初始化失败: {e}（继续后续步骤）")
+
+        self.stats.completed_steps += 1
+
     async def _step_verify_data_integrity(self):
         """步骤6: 验证数据完整性"""
         self.stats.current_step = "验证数据完整性"
@@ -388,7 +420,8 @@ class TushareInitService:
                 "weekly_records": self.stats.weekly_records,     # 周线数据
                 "monthly_records": self.stats.monthly_records,   # 月线数据
                 "financial_records": self.stats.financial_records,
-                "quotes_count": self.stats.quotes_count
+                "quotes_count": self.stats.quotes_count,
+                "news_count": self.stats.news_count
             },
             "errors": self.stats.errors,
             "current_step": self.stats.current_step

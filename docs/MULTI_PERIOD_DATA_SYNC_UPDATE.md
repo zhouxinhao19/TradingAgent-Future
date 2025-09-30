@@ -3,11 +3,12 @@
 ## 📋 更新概述
 
 **更新日期**: 2025-09-30
-**版本**: v1.3
+**版本**: v1.4
 **功能**:
 1. 为Tushare、AKShare、BaoStock三个数据源添加多周期历史数据同步支持
 2. 为Tushare添加选择性数据同步功能
 3. 为所有数据源添加全历史数据同步支持（从1990年至今）
+4. 为Tushare添加新闻数据同步功能 🆕
 
 ## 🎯 更新内容
 
@@ -27,6 +28,7 @@
 - **monthly** - 月线数据
 - **financial** - 财务数据
 - **quotes** - 最新行情
+- **news** - 新闻数据 🆕
 
 **优势**:
 - 只更新需要的数据类型
@@ -83,7 +85,76 @@ python cli/tushare_init.py --full --multi-period
 
 # 指定历史数据范围
 python cli/tushare_init.py --full --multi-period --historical-days 365
+
+# 选择性数据同步示例
+# 仅同步历史数据（日线）
+python cli/tushare_init.py --full --sync-items historical
+
+# 仅同步财务数据和行情数据
+python cli/tushare_init.py --full --sync-items financial,quotes
+
+# 仅同步新闻数据 🆕
+python cli/tushare_init.py --full --sync-items news
+
+# 同步多种数据类型
+python cli/tushare_init.py --full --sync-items historical,weekly,monthly,news
 ```
+
+### 新增功能3: 新闻数据同步 🆕
+
+为Tushare添加了新闻数据同步功能，支持从多个新闻源获取股票相关新闻：
+
+#### 新闻数据源
+- **sina** - 新浪财经
+- **eastmoney** - 东方财富
+- **10jqka** - 同花顺
+- **wallstreetcn** - 华尔街见闻
+- **cls** - 财联社
+- **yicai** - 第一财经
+- **jinrongjie** - 金融界
+- **yuncaijing** - 云财经
+- **fenghuang** - 凤凰财经
+
+#### 新闻数据结构
+```javascript
+{
+  "symbol": "000001",
+  "full_symbol": "000001.SZ",
+  "market": "CN",
+  "title": "新闻标题",
+  "content": "新闻内容",
+  "summary": "新闻摘要",
+  "url": "新闻链接",
+  "source": "sina",
+  "author": "作者",
+  "publish_time": "2025-09-30 12:00:00",
+  "category": "general",
+  "sentiment": "neutral",  // positive/negative/neutral
+  "sentiment_score": 0.0,
+  "keywords": ["关键词1", "关键词2"],
+  "importance": "medium",  // high/medium/low
+  "language": "zh-CN",
+  "data_source": "tushare",
+  "created_at": "2025-09-30 12:00:00",
+  "updated_at": "2025-09-30 12:00:00"
+}
+```
+
+#### 使用方法
+```bash
+# 仅同步新闻数据（默认回溯24小时）
+python cli/tushare_init.py --full --sync-items news
+
+# 同步新闻和其他数据
+python cli/tushare_init.py --full --sync-items basic_info,historical,news
+```
+
+#### 注意事项
+- 新闻数据需要Tushare新闻权限（部分数据源可能需要付费）
+- 默认回溯时间为24小时（最多7天）
+- 每只股票默认获取最多20条新闻
+- 新闻数据存储在 `stock_news` 集合中
+- 使用URL、标题和发布时间作为唯一标识，自动去重
 
 ### 2. AKShare数据源
 

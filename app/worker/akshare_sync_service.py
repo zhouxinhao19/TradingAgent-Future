@@ -9,6 +9,7 @@ from typing import Dict, Any, List, Optional
 
 from app.core.database import get_mongo_db
 from app.services.historical_data_service import get_historical_data_service
+from app.services.news_data_service import get_news_data_service
 from tradingagents.dataflows.providers.akshare_provider import AKShareProvider
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ class AKShareSyncService:
     def __init__(self):
         self.provider = None
         self.historical_service = None  # 延迟初始化
+        self.news_service = None  # 延迟初始化
         self.db = None
         self.batch_size = 100
         self.rate_limit_delay = 0.2  # AKShare建议的延迟
@@ -40,6 +42,9 @@ class AKShareSyncService:
 
             # 初始化历史数据服务
             self.historical_service = await get_historical_data_service()
+
+            # 初始化新闻数据服务
+            self.news_service = await get_news_data_service()
 
             # 初始化AKShare提供器
             self.provider = AKShareProvider()
@@ -681,6 +686,141 @@ class AKShareSyncService:
                 "status_time": datetime.utcnow()
             }
 
+    # ==================== 新闻数据同步 ====================
+
+    async def sync_news_data(
+        self,
+        symbols: List[str] = None,
+        max_news_per_stock: int = 20,
+        force_update: bool = False
+    ) -> Dict[str, Any]:
+        """
+        同步新闻数据
+
+        Args:
+            symbols: 股票代码列表，为None时获取所有股票
+            max_news_per_stock: 每只股票最大新闻数量
+            force_update: 是否强制更新
+
+        Returns:
+            同步结果统计
+        """
+        logger.info("🔄 开始同步AKShare新闻数据...")
+
+        stats = {
+            "total_processed": 0,
+            "success_count": 0,
+            "error_count": 0,
+            "news_count": 0,
+            "start_time": datetime.utcnow(),
+            "errors": []
+        }
+
+        try:
+            # 1. 获取股票列表
+            if symbols is None:
+                # 获取所有股票（不限制数据源）
+                stock_list = await self.db.stock_basic_info.find(
+                    {},
+                    {"code": 1, "_id": 0}
+                ).to_list(None)
+                symbols = [stock["code"] for stock in stock_list if stock.get("code")]
+
+            if not symbols:
+                logger.warning("⚠️ 没有找到需要同步新闻的股票")
+                return stats
+
+            stats["total_processed"] = len(symbols)
+            logger.info(f"📊 需要同步 {len(symbols)} 只股票的新闻")
+
+            # 2. 批量处理
+            for i in range(0, len(symbols), self.batch_size):
+                batch = symbols[i:i + self.batch_size]
+                batch_stats = await self._process_news_batch(
+                    batch, max_news_per_stock
+                )
+
+                # 更新统计
+                stats["success_count"] += batch_stats["success_count"]
+                stats["error_count"] += batch_stats["error_count"]
+                stats["news_count"] += batch_stats["news_count"]
+                stats["errors"].extend(batch_stats["errors"])
+
+                # 进度日志
+                progress = min(i + self.batch_size, len(symbols))
+                logger.info(f"📈 新闻同步进度: {progress}/{len(symbols)} "
+                           f"(成功: {stats['success_count']}, 新闻: {stats['news_count']})")
+
+                # API限流
+                if i + self.batch_size < len(symbols):
+                    await asyncio.sleep(self.rate_limit_delay)
+
+            # 3. 完成统计
+            stats["end_time"] = datetime.utcnow()
+            stats["duration"] = (stats["end_time"] - stats["start_time"]).total_seconds()
+
+            logger.info(f"✅ AKShare新闻数据同步完成: "
+                       f"总计 {stats['total_processed']} 只股票, "
+                       f"成功 {stats['success_count']} 只, "
+                       f"获取 {stats['news_count']} 条新闻, "
+                       f"错误 {stats['error_count']} 只, "
+                       f"耗时 {stats['duration']:.2f} 秒")
+
+            return stats
+
+        except Exception as e:
+            logger.error(f"❌ AKShare新闻数据同步失败: {e}")
+            stats["errors"].append({"error": str(e), "context": "sync_news_data"})
+            return stats
+
+    async def _process_news_batch(
+        self,
+        batch: List[str],
+        max_news_per_stock: int
+    ) -> Dict[str, Any]:
+        """处理新闻批次"""
+        batch_stats = {
+            "success_count": 0,
+            "error_count": 0,
+            "news_count": 0,
+            "errors": []
+        }
+
+        for symbol in batch:
+            try:
+                # 从AKShare获取新闻数据
+                news_data = await self.provider.get_stock_news(
+                    symbol=symbol,
+                    limit=max_news_per_stock
+                )
+
+                if news_data:
+                    # 保存新闻数据
+                    saved_count = await self.news_service.save_news_data(
+                        news_data=news_data,
+                        data_source="akshare",
+                        market="CN"
+                    )
+
+                    batch_stats["success_count"] += 1
+                    batch_stats["news_count"] += saved_count
+
+                    logger.debug(f"✅ {symbol} 新闻同步成功: {saved_count}条")
+                else:
+                    logger.debug(f"⚠️ {symbol} 未获取到新闻数据")
+                    batch_stats["success_count"] += 1  # 没有新闻也算成功
+
+                # API限流
+                await asyncio.sleep(0.2)
+
+            except Exception as e:
+                batch_stats["error_count"] += 1
+                error_msg = f"{symbol}: {str(e)}"
+                batch_stats["errors"].append(error_msg)
+                logger.error(f"❌ {symbol} 新闻同步失败: {e}")
+
+        return batch_stats
+
 
 # 全局同步服务实例
 _akshare_sync_service = None
@@ -752,4 +892,18 @@ async def run_akshare_status_check():
         return result
     except Exception as e:
         logger.error(f"❌ AKShare状态检查失败: {e}")
+        raise
+
+
+async def run_akshare_news_sync(max_news_per_stock: int = 20):
+    """APScheduler任务：同步新闻数据"""
+    try:
+        service = await get_akshare_sync_service()
+        result = await service.sync_news_data(
+            max_news_per_stock=max_news_per_stock
+        )
+        logger.info(f"✅ AKShare新闻数据同步完成: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"❌ AKShare新闻数据同步失败: {e}")
         raise

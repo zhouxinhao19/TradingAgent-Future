@@ -133,9 +133,22 @@ class NewsDataService:
             
         except BulkWriteError as e:
             # 处理批量写入错误，但不完全失败
-            saved_count = len(e.details.get('writeErrors', []))
-            self.logger.warning(f"⚠️ 部分新闻数据保存失败: {saved_count}条错误")
-            return len(operations) - saved_count
+            write_errors = e.details.get('writeErrors', [])
+            error_count = len(write_errors)
+            self.logger.warning(f"⚠️ 部分新闻数据保存失败: {error_count}条错误")
+
+            # 记录详细错误信息
+            for i, error in enumerate(write_errors[:3], 1):  # 只记录前3个错误
+                error_msg = error.get('errmsg', 'Unknown error')
+                error_code = error.get('code', 'N/A')
+                self.logger.warning(f"   错误 {i}: [Code {error_code}] {error_msg}")
+
+            # 计算成功保存的数量
+            success_count = len(operations) - error_count
+            if success_count > 0:
+                self.logger.info(f"💾 成功保存 {success_count} 条新闻数据")
+
+            return success_count
             
         except Exception as e:
             self.logger.error(f"❌ 保存新闻数据失败: {e}")
@@ -183,8 +196,8 @@ class NewsDataService:
             "sentiment_score": self._safe_float(news_data.get("sentiment_score")),
             "keywords": news_data.get("keywords", []),
             "importance": news_data.get("importance", "medium"),
-            "language": news_data.get("language", "zh-CN"),
-            
+            # 注意：不包含 language 字段，避免与 MongoDB 文本索引冲突
+
             # 元数据
             "data_source": data_source,
             "created_at": now,

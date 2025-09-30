@@ -670,14 +670,24 @@ class AKShareProvider(BaseStockDataProvider):
                     news_list = []
 
                     for _, row in news_df.head(limit).iterrows():
+                        title = str(row.get('新闻标题', '') or row.get('标题', ''))
+                        content = str(row.get('新闻内容', '') or row.get('内容', ''))
+                        summary = str(row.get('新闻摘要', '') or row.get('摘要', ''))
+
                         news_item = {
-                            "title": str(row.get('新闻标题', '') or row.get('标题', '')),
-                            "content": str(row.get('新闻内容', '') or row.get('内容', '')),
-                            "summary": str(row.get('新闻摘要', '') or row.get('摘要', '')),
+                            "symbol": symbol,
+                            "title": title,
+                            "content": content,
+                            "summary": summary,
                             "url": str(row.get('新闻链接', '') or row.get('链接', '')),
                             "source": str(row.get('文章来源', '') or row.get('来源', '') or '东方财富'),
                             "author": str(row.get('作者', '') or ''),
                             "publish_time": self._parse_news_time(row.get('发布时间', '') or row.get('时间', '')),
+                            "category": self._classify_news(content, title),
+                            "sentiment": self._analyze_news_sentiment(content, title),
+                            "sentiment_score": self._calculate_sentiment_score(content, title),
+                            "keywords": self._extract_keywords(content, title),
+                            "importance": self._assess_news_importance(content, title),
                             "data_source": "akshare"
                         }
 
@@ -705,14 +715,23 @@ class AKShareProvider(BaseStockDataProvider):
                         news_list = []
 
                         for _, row in news_df.iterrows():
+                            title = str(row.get('title', '') or row.get('标题', ''))
+                            content = str(row.get('content', '') or row.get('内容', ''))
+                            summary = str(row.get('brief', '') or row.get('摘要', ''))
+
                             news_item = {
-                                "title": str(row.get('title', '') or row.get('标题', '')),
-                                "content": str(row.get('content', '') or row.get('内容', '')),
-                                "summary": str(row.get('brief', '') or row.get('摘要', '')),
+                                "title": title,
+                                "content": content,
+                                "summary": summary,
                                 "url": str(row.get('url', '') or row.get('链接', '')),
                                 "source": str(row.get('source', '') or row.get('来源', '') or 'CCTV财经'),
                                 "author": str(row.get('author', '') or ''),
                                 "publish_time": self._parse_news_time(row.get('time', '') or row.get('时间', '')),
+                                "category": self._classify_news(content, title),
+                                "sentiment": self._analyze_news_sentiment(content, title),
+                                "sentiment_score": self._calculate_sentiment_score(content, title),
+                                "keywords": self._extract_keywords(content, title),
+                                "importance": self._assess_news_importance(content, title),
                                 "data_source": "akshare"
                             }
 
@@ -769,6 +788,188 @@ class AKShareProvider(BaseStockDataProvider):
         except Exception as e:
             self.logger.debug(f"解析新闻时间异常: {e}")
             return datetime.utcnow()
+
+    def _analyze_news_sentiment(self, content: str, title: str) -> str:
+        """
+        分析新闻情绪
+
+        Args:
+            content: 新闻内容
+            title: 新闻标题
+
+        Returns:
+            情绪类型: positive/negative/neutral
+        """
+        text = f"{title} {content}".lower()
+
+        # 积极关键词
+        positive_keywords = [
+            '利好', '上涨', '增长', '盈利', '突破', '创新高', '买入', '推荐',
+            '看好', '乐观', '强势', '大涨', '飙升', '暴涨', '涨停', '涨幅',
+            '业绩增长', '营收增长', '净利润增长', '扭亏为盈', '超预期',
+            '获批', '中标', '签约', '合作', '并购', '重组', '分红', '回购'
+        ]
+
+        # 消极关键词
+        negative_keywords = [
+            '利空', '下跌', '亏损', '风险', '暴跌', '卖出', '警告', '下调',
+            '看空', '悲观', '弱势', '大跌', '跳水', '暴跌', '跌停', '跌幅',
+            '业绩下滑', '营收下降', '净利润下降', '亏损', '低于预期',
+            '被查', '违规', '处罚', '诉讼', '退市', '停牌', '商誉减值'
+        ]
+
+        positive_count = sum(1 for keyword in positive_keywords if keyword in text)
+        negative_count = sum(1 for keyword in negative_keywords if keyword in text)
+
+        if positive_count > negative_count:
+            return 'positive'
+        elif negative_count > positive_count:
+            return 'negative'
+        else:
+            return 'neutral'
+
+    def _calculate_sentiment_score(self, content: str, title: str) -> float:
+        """
+        计算情绪分数
+
+        Args:
+            content: 新闻内容
+            title: 新闻标题
+
+        Returns:
+            情绪分数: -1.0 到 1.0
+        """
+        text = f"{title} {content}".lower()
+
+        # 积极关键词权重
+        positive_keywords = {
+            '涨停': 1.0, '暴涨': 0.9, '大涨': 0.8, '飙升': 0.8,
+            '创新高': 0.7, '突破': 0.6, '上涨': 0.5, '增长': 0.4,
+            '利好': 0.6, '看好': 0.5, '推荐': 0.5, '买入': 0.6
+        }
+
+        # 消极关键词权重
+        negative_keywords = {
+            '跌停': -1.0, '暴跌': -0.9, '大跌': -0.8, '跳水': -0.8,
+            '创新低': -0.7, '破位': -0.6, '下跌': -0.5, '下滑': -0.4,
+            '利空': -0.6, '看空': -0.5, '卖出': -0.6, '警告': -0.5
+        }
+
+        score = 0.0
+
+        # 计算积极分数
+        for keyword, weight in positive_keywords.items():
+            if keyword in text:
+                score += weight
+
+        # 计算消极分数
+        for keyword, weight in negative_keywords.items():
+            if keyword in text:
+                score += weight
+
+        # 归一化到 [-1.0, 1.0]
+        return max(-1.0, min(1.0, score / 3.0))
+
+    def _extract_keywords(self, content: str, title: str) -> List[str]:
+        """
+        提取关键词
+
+        Args:
+            content: 新闻内容
+            title: 新闻标题
+
+        Returns:
+            关键词列表
+        """
+        text = f"{title} {content}"
+
+        # 常见财经关键词
+        common_keywords = [
+            '股票', '公司', '市场', '投资', '业绩', '财报', '政策', '行业',
+            '分析', '预测', '涨停', '跌停', '上涨', '下跌', '盈利', '亏损',
+            '并购', '重组', '分红', '回购', '增持', '减持', '融资', 'IPO',
+            '监管', '央行', '利率', '汇率', 'GDP', '通胀', '经济', '贸易',
+            '科技', '互联网', '新能源', '医药', '房地产', '金融', '制造业'
+        ]
+
+        keywords = []
+        for keyword in common_keywords:
+            if keyword in text:
+                keywords.append(keyword)
+
+        return keywords[:10]  # 最多返回10个关键词
+
+    def _assess_news_importance(self, content: str, title: str) -> str:
+        """
+        评估新闻重要性
+
+        Args:
+            content: 新闻内容
+            title: 新闻标题
+
+        Returns:
+            重要性级别: high/medium/low
+        """
+        text = f"{title} {content}".lower()
+
+        # 高重要性关键词
+        high_importance_keywords = [
+            '业绩', '财报', '年报', '季报', '重大', '公告', '监管', '政策',
+            '并购', '重组', '退市', '停牌', '涨停', '跌停', '暴涨', '暴跌',
+            '央行', '证监会', '交易所', '违规', '处罚', '立案', '调查'
+        ]
+
+        # 中等重要性关键词
+        medium_importance_keywords = [
+            '分析', '预测', '观点', '建议', '行业', '市场', '趋势', '机会',
+            '研报', '评级', '目标价', '增持', '减持', '买入', '卖出',
+            '合作', '签约', '中标', '获批', '分红', '回购'
+        ]
+
+        # 检查高重要性
+        if any(keyword in text for keyword in high_importance_keywords):
+            return 'high'
+
+        # 检查中等重要性
+        if any(keyword in text for keyword in medium_importance_keywords):
+            return 'medium'
+
+        return 'low'
+
+    def _classify_news(self, content: str, title: str) -> str:
+        """
+        分类新闻
+
+        Args:
+            content: 新闻内容
+            title: 新闻标题
+
+        Returns:
+            新闻类别
+        """
+        text = f"{title} {content}".lower()
+
+        # 公司公告
+        if any(keyword in text for keyword in ['公告', '业绩', '财报', '年报', '季报']):
+            return 'company_announcement'
+
+        # 政策新闻
+        if any(keyword in text for keyword in ['政策', '监管', '央行', '证监会', '国务院']):
+            return 'policy_news'
+
+        # 行业新闻
+        if any(keyword in text for keyword in ['行业', '板块', '产业', '领域']):
+            return 'industry_news'
+
+        # 市场新闻
+        if any(keyword in text for keyword in ['市场', '指数', '大盘', '沪指', '深成指']):
+            return 'market_news'
+
+        # 研究报告
+        if any(keyword in text for keyword in ['研报', '分析', '评级', '目标价', '机构']):
+            return 'research_report'
+
+        return 'general'
 
 
 # 全局提供器实例

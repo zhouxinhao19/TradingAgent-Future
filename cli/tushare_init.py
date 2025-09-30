@@ -37,7 +37,7 @@ def print_help():
     print("  --historical-days   历史数据天数（默认365天）")
     print("  --multi-period      同步多周期数据（日线、周线、月线）")
     print("  --sync-items        指定要同步的数据类型（逗号分隔）")
-    print("                      可选值: basic_info,historical,weekly,monthly,financial,quotes")
+    print("                      可选值: basic_info,historical,weekly,monthly,financial,quotes,news")
     print("  --force             强制初始化（覆盖已有数据）")
     print("  --batch-size        批处理大小（默认100）")
     print("  --check-only        仅检查数据库状态")
@@ -62,8 +62,11 @@ def print_help():
     print("  # 仅同步历史数据（日线）")
     print("  python cli/tushare_init.py --full --sync-items historical")
     print()
-    print("  # 仅同步财务数据和新闻数据")
+    print("  # 仅同步财务数据和行情数据")
     print("  python cli/tushare_init.py --full --sync-items financial,quotes")
+    print()
+    print("  # 仅同步新闻数据")
+    print("  python cli/tushare_init.py --full --sync-items news")
     print()
     print("  # 仅更新周线和月线数据")
     print("  python cli/tushare_init.py --full --sync-items weekly,monthly")
@@ -189,6 +192,7 @@ async def run_full_initialization(historical_days: int, force: bool, multi_perio
             print(f"     - 月线数据: {data_summary.get('monthly_records', 0):,}条")
         print(f"  💰 财务数据: {data_summary['financial_records']:,}条")
         print(f"  📈 行情数据: {data_summary['quotes_count']:,}条")
+        print(f"  📰 新闻数据: {data_summary.get('news_count', 0):,}条")
         
         if result["errors"]:
             print(f"  ⚠️  错误数量: {len(result['errors'])}")
@@ -213,7 +217,7 @@ async def main():
     parser.add_argument("--basic-only", action="store_true", help="仅初始化基础信息")
     parser.add_argument("--historical-days", type=int, default=365, help="历史数据天数")
     parser.add_argument("--multi-period", action="store_true", help="同步多周期数据（日线、周线、月线）")
-    parser.add_argument("--sync-items", type=str, help="指定要同步的数据类型（逗号分隔），可选: basic_info,historical,weekly,monthly,financial,quotes")
+    parser.add_argument("--sync-items", type=str, help="指定要同步的数据类型（逗号分隔），可选: basic_info,historical,weekly,monthly,financial,quotes,news")
     parser.add_argument("--force", action="store_true", help="强制初始化")
     parser.add_argument("--batch-size", type=int, default=100, help="批处理大小")
     parser.add_argument("--check-only", action="store_true", help="仅检查数据库状态")
@@ -257,7 +261,7 @@ async def main():
             if args.sync_items:
                 sync_items = [item.strip() for item in args.sync_items.split(',')]
                 # 验证sync_items
-                valid_items = ['basic_info', 'historical', 'weekly', 'monthly', 'financial', 'quotes']
+                valid_items = ['basic_info', 'historical', 'weekly', 'monthly', 'financial', 'quotes', 'news']
                 invalid_items = [item for item in sync_items if item not in valid_items]
                 if invalid_items:
                     print(f"❌ 无效的同步项目: {', '.join(invalid_items)}")
