@@ -65,19 +65,30 @@ class EnhancedDataAdapter:
             logger.warning(f"⚠️ 获取基础信息失败: {e}")
             return None
     
-    def get_historical_data(self, symbol: str, start_date: str = None, end_date: str = None, 
+    def get_historical_data(self, symbol: str, start_date: str = None, end_date: str = None,
                           period: str = "daily") -> Optional[pd.DataFrame]:
-        """获取历史数据"""
+        """
+        获取历史数据，支持多周期
+
+        Args:
+            symbol: 股票代码
+            start_date: 开始日期
+            end_date: 结束日期
+            period: 数据周期（daily/weekly/monthly），默认为daily
+
+        Returns:
+            DataFrame: 历史数据
+        """
         if not self.use_app_cache or self.db is None:
             return None
-            
+
         try:
             code6 = str(symbol).zfill(6)
             collection = self.db.stock_daily_quotes
-            
+
             # 构建查询条件
-            query = {"symbol": code6}
-            
+            query = {"symbol": code6, "period": period}
+
             if start_date:
                 query["trade_date"] = {"$gte": start_date}
             if end_date:
@@ -85,17 +96,17 @@ class EnhancedDataAdapter:
                     query["trade_date"]["$lte"] = end_date
                 else:
                     query["trade_date"] = {"$lte": end_date}
-            
+
             # 查询数据
             cursor = collection.find(query, {"_id": 0}).sort("trade_date", 1)
             data = list(cursor)
-            
+
             if data:
                 df = pd.DataFrame(data)
-                logger.debug(f"✅ [数据来源: MongoDB-历史数据] 从MongoDB获取历史数据: {symbol}, 记录数: {len(df)}")
+                logger.debug(f"✅ [数据来源: MongoDB-{period}数据] 从MongoDB获取历史数据: {symbol}, 记录数: {len(df)}")
                 return df
             else:
-                logger.debug(f"📊 [数据来源: MongoDB-历史数据] MongoDB中未找到历史数据: {symbol}")
+                logger.debug(f"📊 [数据来源: MongoDB-{period}数据] MongoDB中未找到历史数据: {symbol}")
                 return None
                 
         except Exception as e:

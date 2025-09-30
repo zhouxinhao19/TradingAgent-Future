@@ -385,24 +385,26 @@ class DataSourceManager:
             logger.error(f"❌ TDX适配器导入失败: {e}")
             return None
 
-    def get_stock_data(self, symbol: str, start_date: str = None, end_date: str = None) -> str:
+    def get_stock_data(self, symbol: str, start_date: str = None, end_date: str = None, period: str = "daily") -> str:
         """
-        获取股票数据的统一接口
+        获取股票数据的统一接口，支持多周期数据
 
         Args:
             symbol: 股票代码
             start_date: 开始日期
             end_date: 结束日期
+            period: 数据周期（daily/weekly/monthly），默认为daily
 
         Returns:
             str: 格式化的股票数据
         """
         # 记录详细的输入参数
-        logger.info(f"📊 [数据来源: {self.current_source.value}] 开始获取股票数据: {symbol}",
+        logger.info(f"📊 [数据来源: {self.current_source.value}] 开始获取{period}数据: {symbol}",
                    extra={
                        'symbol': symbol,
                        'start_date': start_date,
                        'end_date': end_date,
+                       'period': period,
                        'data_source': self.current_source.value,
                        'event_type': 'data_fetch_start'
                    })
@@ -418,16 +420,16 @@ class DataSourceManager:
         try:
             # 根据数据源调用相应的获取方法
             if self.current_source == ChinaDataSource.MONGODB:
-                result = self._get_mongodb_data(symbol, start_date, end_date)
+                result = self._get_mongodb_data(symbol, start_date, end_date, period)
             elif self.current_source == ChinaDataSource.TUSHARE:
-                logger.info(f"🔍 [股票代码追踪] 调用 Tushare 数据源，传入参数: symbol='{symbol}'")
-                result = self._get_tushare_data(symbol, start_date, end_date)
+                logger.info(f"🔍 [股票代码追踪] 调用 Tushare 数据源，传入参数: symbol='{symbol}', period='{period}'")
+                result = self._get_tushare_data(symbol, start_date, end_date, period)
             elif self.current_source == ChinaDataSource.AKSHARE:
-                result = self._get_akshare_data(symbol, start_date, end_date)
+                result = self._get_akshare_data(symbol, start_date, end_date, period)
             elif self.current_source == ChinaDataSource.BAOSTOCK:
-                result = self._get_baostock_data(symbol, start_date, end_date)
+                result = self._get_baostock_data(symbol, start_date, end_date, period)
             elif self.current_source == ChinaDataSource.TDX:
-                result = self._get_tdx_data(symbol, start_date, end_date)
+                result = self._get_tdx_data(symbol, start_date, end_date, period)
             else:
                 result = f"❌ 不支持的数据源: {self.current_source.value}"
 
@@ -485,34 +487,34 @@ class DataSourceManager:
                         }, exc_info=True)
             return self._try_fallback_sources(symbol, start_date, end_date)
 
-    def _get_mongodb_data(self, symbol: str, start_date: str, end_date: str) -> str:
-        """从MongoDB获取数据"""
-        logger.debug(f"📊 [MongoDB] 调用参数: symbol={symbol}, start_date={start_date}, end_date={end_date}")
+    def _get_mongodb_data(self, symbol: str, start_date: str, end_date: str, period: str = "daily") -> str:
+        """从MongoDB获取多周期数据"""
+        logger.debug(f"📊 [MongoDB] 调用参数: symbol={symbol}, start_date={start_date}, end_date={end_date}, period={period}")
 
         try:
             from tradingagents.dataflows.enhanced_data_adapter import get_enhanced_data_adapter
             adapter = get_enhanced_data_adapter()
 
-            # 从MongoDB获取历史数据
-            df = adapter.get_historical_data(symbol, start_date, end_date)
+            # 从MongoDB获取指定周期的历史数据
+            df = adapter.get_historical_data(symbol, start_date, end_date, period=period)
 
             if df is not None and not df.empty:
-                logger.info(f"✅ [数据来源: MongoDB] 成功获取数据: {symbol} ({len(df)}条记录)")
+                logger.info(f"✅ [数据来源: MongoDB-{period}] 成功获取数据: {symbol} ({len(df)}条记录)")
                 # 转换为字符串格式返回
                 return df.to_string()
             else:
-                logger.warning(f"⚠️ [数据来源: MongoDB] 未找到数据: {symbol}，降级到其他数据源")
+                logger.warning(f"⚠️ [数据来源: MongoDB] 未找到{period}数据: {symbol}，降级到其他数据源")
                 # MongoDB没有数据，降级到其他数据源
-                return self._try_fallback_sources(symbol, start_date, end_date)
+                return self._try_fallback_sources(symbol, start_date, end_date, period)
 
         except Exception as e:
             logger.error(f"❌ [数据来源: MongoDB异常] 获取失败: {e}")
             # MongoDB异常，降级到其他数据源
             return self._try_fallback_sources(symbol, start_date, end_date)
 
-    def _get_tushare_data(self, symbol: str, start_date: str, end_date: str) -> str:
-        """使用Tushare获取数据 - 直接调用适配器，避免循环调用"""
-        logger.debug(f"📊 [Tushare] 调用参数: symbol={symbol}, start_date={start_date}, end_date={end_date}")
+    def _get_tushare_data(self, symbol: str, start_date: str, end_date: str, period: str = "daily") -> str:
+        """使用Tushare获取多周期数据 - 直接调用适配器，避免循环调用"""
+        logger.debug(f"📊 [Tushare] 调用参数: symbol={symbol}, start_date={start_date}, end_date={end_date}, period={period}")
 
         # 添加详细的股票代码追踪日志
         logger.info(f"🔍 [股票代码追踪] _get_tushare_data 接收到的股票代码: '{symbol}' (类型: {type(symbol)})")
@@ -582,9 +584,9 @@ class DataSourceManager:
             logger.error(f"❌ [DataSourceManager详细日志] 异常堆栈: {traceback.format_exc()}")
             raise
 
-    def _get_akshare_data(self, symbol: str, start_date: str, end_date: str) -> str:
-        """使用AKShare获取数据"""
-        logger.debug(f"📊 [AKShare] 调用参数: symbol={symbol}, start_date={start_date}, end_date={end_date}")
+    def _get_akshare_data(self, symbol: str, start_date: str, end_date: str, period: str = "daily") -> str:
+        """使用AKShare获取多周期数据"""
+        logger.debug(f"📊 [AKShare] 调用参数: symbol={symbol}, start_date={start_date}, end_date={end_date}, period={period}")
 
         start_time = time.time()
         try:
@@ -638,8 +640,8 @@ class DataSourceManager:
             logger.error(f"❌ [AKShare] 调用失败: {e}, 耗时={duration:.2f}s", exc_info=True)
             return f"❌ AKShare获取{symbol}数据失败: {e}"
 
-    def _get_baostock_data(self, symbol: str, start_date: str, end_date: str) -> str:
-        """使用BaoStock获取数据"""
+    def _get_baostock_data(self, symbol: str, start_date: str, end_date: str, period: str = "daily") -> str:
+        """使用BaoStock获取多周期数据"""
         # 这里需要实现BaoStock的统一接口
         from .baostock_utils import get_baostock_provider
         provider = get_baostock_provider()
@@ -664,8 +666,8 @@ class DataSourceManager:
         else:
             return f"❌ 未能获取{symbol}的股票数据"
 
-    def _get_tdx_data(self, symbol: str, start_date: str, end_date: str) -> str:
-        """使用TDX获取数据 (已弃用)"""
+    def _get_tdx_data(self, symbol: str, start_date: str, end_date: str, period: str = "daily") -> str:
+        """使用TDX获取多周期数据 (已弃用)"""
         logger.warning(f"⚠️ 警告: 正在使用已弃用的TDX数据源")
         from .tdx_utils import get_china_stock_data
         return get_china_stock_data(symbol, start_date, end_date)
@@ -689,9 +691,9 @@ class DataSourceManager:
             logger.error(f"❌ 获取成交量失败: {e}")
             return 0
 
-    def _try_fallback_sources(self, symbol: str, start_date: str, end_date: str) -> str:
+    def _try_fallback_sources(self, symbol: str, start_date: str, end_date: str, period: str = "daily") -> str:
         """尝试备用数据源 - 避免递归调用"""
-        logger.error(f"🔄 {self.current_source.value}失败，尝试备用数据源...")
+        logger.error(f"🔄 {self.current_source.value}失败，尝试备用数据源获取{period}数据...")
 
         # 备用数据源优先级: AKShare > Tushare > BaoStock > TDX
         # 注意：不包含MongoDB，因为MongoDB是最高优先级，如果失败了就不再尝试
@@ -705,23 +707,23 @@ class DataSourceManager:
         for source in fallback_order:
             if source != self.current_source and source in self.available_sources:
                 try:
-                    logger.info(f"🔄 尝试备用数据源: {source.value}")
+                    logger.info(f"🔄 尝试备用数据源获取{period}数据: {source.value}")
 
                     # 直接调用具体的数据源方法，避免递归
                     if source == ChinaDataSource.TUSHARE:
-                        result = self._get_tushare_data(symbol, start_date, end_date)
+                        result = self._get_tushare_data(symbol, start_date, end_date, period)
                     elif source == ChinaDataSource.AKSHARE:
-                        result = self._get_akshare_data(symbol, start_date, end_date)
+                        result = self._get_akshare_data(symbol, start_date, end_date, period)
                     elif source == ChinaDataSource.BAOSTOCK:
-                        result = self._get_baostock_data(symbol, start_date, end_date)
+                        result = self._get_baostock_data(symbol, start_date, end_date, period)
                     elif source == ChinaDataSource.TDX:
-                        result = self._get_tdx_data(symbol, start_date, end_date)
+                        result = self._get_tdx_data(symbol, start_date, end_date, period)
                     else:
                         logger.warning(f"⚠️ 未知数据源: {source.value}")
                         continue
 
                     if "❌" not in result:
-                        logger.info(f"✅ 备用数据源{source.value}获取成功")
+                        logger.info(f"✅ [数据来源: 备用数据源] 降级成功获取{period}数据: {source.value}")
                         return result
                     else:
                         logger.warning(f"⚠️ 备用数据源{source.value}返回错误结果")
@@ -730,7 +732,7 @@ class DataSourceManager:
                     logger.error(f"❌ 备用数据源{source.value}也失败: {e}")
                     continue
 
-        return f"❌ 所有数据源都无法获取{symbol}的数据"
+        return f"❌ 所有数据源都无法获取{symbol}的{period}数据"
 
     def get_stock_info(self, symbol: str) -> Dict:
         """
