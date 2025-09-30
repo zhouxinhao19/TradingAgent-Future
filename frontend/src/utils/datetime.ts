@@ -1,0 +1,165 @@
+/**
+ * 日期时间工具函数
+ * 统一处理 UTC 时间转换为本地时间（UTC+8）
+ */
+
+/**
+ * 格式化时间字符串，自动处理 UTC 时间转换
+ * @param dateStr - 时间字符串或时间戳
+ * @param options - 格式化选项
+ * @returns 格式化后的时间字符串
+ */
+export function formatDateTime(
+  dateStr: string | number | null | undefined,
+  options?: Intl.DateTimeFormatOptions
+): string {
+  if (!dateStr) return '-'
+  
+  try {
+    let timeStr: string
+    
+    // 处理时间戳（秒或毫秒）
+    if (typeof dateStr === 'number') {
+      // 如果是秒级时间戳（小于 10000000000），转换为毫秒
+      const timestamp = dateStr < 10000000000 ? dateStr * 1000 : dateStr
+      timeStr = new Date(timestamp).toISOString()
+    } else {
+      timeStr = String(dateStr).trim()
+    }
+    
+    // 如果时间字符串没有时区标识，假定为UTC时间，添加Z后缀
+    if (timeStr.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/) && !timeStr.endsWith('Z') && !timeStr.includes('+')) {
+      timeStr += 'Z'
+    }
+    
+    // 解析UTC时间
+    const utcDate = new Date(timeStr)
+    
+    if (isNaN(utcDate.getTime())) {
+      console.warn('无效的时间格式:', dateStr)
+      return String(dateStr)
+    }
+    
+    // 默认格式化选项
+    const defaultOptions: Intl.DateTimeFormatOptions = {
+      timeZone: 'Asia/Shanghai',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }
+    
+    // 合并用户提供的选项
+    const finalOptions = { ...defaultOptions, ...options }
+    
+    // 格式化为中国本地时间（UTC+8）
+    return utcDate.toLocaleString('zh-CN', finalOptions)
+  } catch (e) {
+    console.error('时间格式化错误:', e, dateStr)
+    return String(dateStr)
+  }
+}
+
+/**
+ * 格式化时间并添加相对时间描述
+ * @param dateStr - 时间字符串或时间戳
+ * @returns 格式化后的时间字符串 + 相对时间
+ */
+export function formatDateTimeWithRelative(dateStr: string | number | null | undefined): string {
+  if (!dateStr) return '-'
+  
+  try {
+    let timeStr: string
+    
+    // 处理时间戳
+    if (typeof dateStr === 'number') {
+      const timestamp = dateStr < 10000000000 ? dateStr * 1000 : dateStr
+      timeStr = new Date(timestamp).toISOString()
+    } else {
+      timeStr = String(dateStr).trim()
+    }
+    
+    // 如果时间字符串没有时区标识，假定为UTC时间，添加Z后缀
+    if (timeStr.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/) && !timeStr.endsWith('Z') && !timeStr.includes('+')) {
+      timeStr += 'Z'
+    }
+    
+    const utcDate = new Date(timeStr)
+    
+    if (isNaN(utcDate.getTime())) {
+      console.warn('无效的时间格式:', dateStr)
+      return String(dateStr)
+    }
+    
+    // 获取当前时间
+    const now = new Date()
+    
+    // 计算时间差
+    const diff = now.getTime() - utcDate.getTime()
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+    const hours = Math.floor(diff / (1000 * 60 * 60))
+    const minutes = Math.floor(diff / (1000 * 60))
+    
+    // 格式化为中国本地时间
+    const formatted = utcDate.toLocaleString('zh-CN', {
+      timeZone: 'Asia/Shanghai',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    })
+    
+    // 添加相对时间
+    let relative = ''
+    if (days > 0) {
+      relative = `（${days}天前）`
+    } else if (hours > 0) {
+      relative = `（${hours}小时前）`
+    } else if (minutes > 0) {
+      relative = `（${minutes}分钟前）`
+    } else {
+      relative = '（刚刚）'
+    }
+    
+    return formatted + ' ' + relative
+  } catch (e) {
+    console.error('时间格式化错误:', e, dateStr)
+    return String(dateStr)
+  }
+}
+
+/**
+ * 仅格式化日期部分（不含时间）
+ * @param dateStr - 时间字符串或时间戳
+ * @returns 格式化后的日期字符串
+ */
+export function formatDate(dateStr: string | number | null | undefined): string {
+  return formatDateTime(dateStr, {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  })
+}
+
+/**
+ * 仅格式化时间部分（不含日期）
+ * @param dateStr - 时间字符串或时间戳
+ * @returns 格式化后的时间字符串
+ */
+export function formatTime(dateStr: string | number | null | undefined): string {
+  return formatDateTime(dateStr, {
+    timeZone: 'Asia/Shanghai',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  })
+}
+

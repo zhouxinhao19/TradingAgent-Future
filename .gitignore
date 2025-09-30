@@ -45,12 +45,14 @@ Thumbs.db
 *.xls
 
 # 项目特定目录
-src/
+# 注意：排除规则必须在忽略规则之前
 eval_results/
 eval_data/
 results/
 logs/
 temp/
+# 忽略根目录的 src/，但不影响 frontend/src/
+/src/
 
 # 数据缓存目录 (不纳入版本控制)
 cache/

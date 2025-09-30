@@ -48,7 +48,7 @@
     </el-card>
 
     <el-row :gutter="16" class="body">
-      <el-col :span="16">
+      <el-col :span="18">
         <!-- K线蜡烛图 -->
         <el-card shadow="hover">
           <template #header>
@@ -73,12 +73,69 @@
             <div class="hint">{{ analysisMessage || '正在生成分析报告…' }}</div>
           </div>
           <div v-else class="detail">
-            <div class="row">
-              <el-tag :type="lastAnalysisTagType" size="small">{{ lastAnalysis?.recommendation || '-' }}</el-tag>
-              <span class="conf">信心度 {{ fmtConf(lastAnalysis?.confidence_score ?? lastAnalysis?.overall_score) }}</span>
-              <span class="date">{{ lastAnalysis?.analysis_date || '-' }}</span>
+            <!-- 分析时间和信心度 -->
+            <div class="analysis-meta">
+              <span class="analysis-time">
+                <el-icon><Clock /></el-icon>
+                分析时间：{{ formatAnalysisTime(lastTaskInfo?.end_time) }}
+              </span>
+              <span class="confidence">
+                <el-icon><TrendCharts /></el-icon>
+                信心度：{{ fmtConf(lastAnalysis?.confidence_score ?? lastAnalysis?.overall_score) }}
+              </span>
             </div>
-            <div class="summary-text">{{ lastAnalysis?.summary || '-' }}</div>
+
+            <!-- 投资建议 - 重点突出 -->
+            <div class="recommendation-box">
+              <div class="recommendation-header">
+                <el-icon class="icon"><TrendCharts /></el-icon>
+                <span class="title">投资建议</span>
+              </div>
+              <div class="recommendation-content">
+                <div class="recommendation-text">
+                  {{ lastAnalysis?.recommendation || '-' }}
+                </div>
+              </div>
+            </div>
+
+            <!-- 分析摘要 -->
+            <div class="summary-section">
+              <div class="summary-title">
+                <el-icon><Reading /></el-icon>
+                分析摘要
+              </div>
+              <div class="summary-text">{{ lastAnalysis?.summary || '-' }}</div>
+            </div>
+
+            <!-- 详细报告展示 -->
+            <div v-if="lastAnalysis?.reports && Object.keys(lastAnalysis.reports).length > 0" class="reports-section">
+              <el-divider />
+              <div class="reports-header">
+                <span class="reports-title">📊 详细分析报告 ({{ Object.keys(lastAnalysis.reports).length }})</span>
+                <el-button
+                  type="primary"
+                  plain
+                  @click="showReportsDialog = true"
+                  :icon="Document"
+                >
+                  查看完整报告
+                </el-button>
+              </div>
+
+              <!-- 报告列表预览 -->
+              <div class="reports-preview">
+                <el-tag
+                  v-for="(content, key) in lastAnalysis.reports"
+                  :key="key"
+                  size="small"
+                  effect="plain"
+                  class="report-tag"
+                  @click="openReport(key)"
+                >
+                  {{ formatReportName(key) }}
+                </el-tag>
+              </div>
+            </div>
           </div>
         </el-card>
 
@@ -122,7 +179,7 @@
 
       </el-col>
 
-      <el-col :span="8">
+      <el-col :span="6">
         <!-- 基本面快照 -->
         <el-card shadow="hover">
           <template #header><div class="card-hd">基本面快照</div></template>
@@ -150,6 +207,35 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- 详细报告对话框 -->
+    <el-dialog
+      v-model="showReportsDialog"
+      title="📊 详细分析报告"
+      width="80%"
+      :close-on-click-modal="false"
+      class="reports-dialog"
+    >
+      <el-tabs v-model="activeReportTab" type="border-card">
+        <el-tab-pane
+          v-for="(content, key) in lastAnalysis?.reports"
+          :key="key"
+          :label="formatReportName(key)"
+          :name="key"
+        >
+          <div class="report-content">
+            <el-scrollbar height="500px">
+              <div class="markdown-body" v-html="renderMarkdown(content)"></div>
+            </el-scrollbar>
+          </div>
+        </el-tab-pane>
+      </el-tabs>
+
+      <template #footer>
+        <el-button @click="showReportsDialog = false">关闭</el-button>
+        <el-button type="primary" @click="exportReport">导出报告</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -157,8 +243,9 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { TrendCharts, Star, Bell, Refresh, Link } from '@element-plus/icons-vue'
+import { TrendCharts, Star, Bell, Refresh, Link, Document, Clock, Reading } from '@element-plus/icons-vue'
 import { CreditCard } from '@element-plus/icons-vue'
+import { marked } from 'marked'
 import { stocksApi } from '@/api/stocks'
 import { analysisApi } from '@/api/analysis'
 import { use as echartsUse } from 'echarts/core'
@@ -184,6 +271,11 @@ const analysisProgress = ref(0)
 const analysisMessage = ref('')
 const currentTaskId = ref<string | null>(null)
 const lastAnalysis = ref<any | null>(null)
+const lastTaskInfo = ref<any | null>(null) // 保存任务信息（包含 end_time 等）
+
+// 报告对话框
+const showReportsDialog = ref(false)
+const activeReportTab = ref('')
 
 const notifStore = useNotificationStore()
 
@@ -556,6 +648,8 @@ function scrollToDetail() {
 // 获取最新的历史分析报告
 async function fetchLatestAnalysis() {
   try {
+    console.log('🔍 [fetchLatestAnalysis] 开始获取历史分析报告, stock_code:', code.value)
+
     const resp: any = await analysisApi.getHistory({
       stock_code: code.value,
       page: 1,
@@ -563,37 +657,66 @@ async function fetchLatestAnalysis() {
       status: 'completed'
     })
 
-    const data = resp?.data || resp
-    const tasks = data?.tasks || data?.analyses || []
+    console.log('🔍 [fetchLatestAnalysis] API响应:', resp)
+    console.log('🔍 [fetchLatestAnalysis] resp.data:', resp?.data)
+    console.log('🔍 [fetchLatestAnalysis] resp.data.data:', resp?.data?.data)
+
+    // 修复：API返回格式是 { success: true, data: { tasks: [...] } }
+    // 所以需要先取 resp.data，再取 data.tasks
+    const responseData = resp?.data || resp
+    console.log('🔍 [fetchLatestAnalysis] responseData:', responseData)
+
+    // 如果responseData有success字段，说明是标准响应格式，需要再取一层data
+    const actualData = responseData?.success ? responseData.data : responseData
+    console.log('🔍 [fetchLatestAnalysis] actualData:', actualData)
+
+    const tasks = actualData?.tasks || actualData?.analyses || []
+    console.log('🔍 [fetchLatestAnalysis] tasks:', tasks)
+    console.log('🔍 [fetchLatestAnalysis] tasks.length:', tasks?.length)
+    console.log('🔍 [fetchLatestAnalysis] tasks && tasks.length > 0:', tasks && tasks.length > 0)
 
     if (tasks && tasks.length > 0) {
       const latestTask = tasks[0]
+      console.log('✅ [fetchLatestAnalysis] 找到任务:', latestTask)
+      console.log('🔍 [fetchLatestAnalysis] latestTask.result_data:', latestTask.result_data)
+      console.log('🔍 [fetchLatestAnalysis] latestTask.result:', latestTask.result)
+      console.log('🔍 [fetchLatestAnalysis] latestTask.task_id:', latestTask.task_id)
+      console.log('🔍 [fetchLatestAnalysis] latestTask.end_time:', latestTask.end_time)
+
+      // 保存任务信息（包含 end_time 等）
+      lastTaskInfo.value = latestTask
 
       // 优先使用 result_data 字段（后端实际返回的字段名）
       if (latestTask.result_data) {
         lastAnalysis.value = latestTask.result_data
         analysisStatus.value = 'completed'
         console.log('✅ 加载历史分析报告成功 (result_data):', latestTask.result_data)
+        console.log('🔍 [fetchLatestAnalysis] lastAnalysis.value.reports:', lastAnalysis.value?.reports)
       }
       // 兼容旧的 result 字段
       else if (latestTask.result) {
         lastAnalysis.value = latestTask.result
         analysisStatus.value = 'completed'
         console.log('✅ 加载历史分析报告成功 (result):', latestTask.result)
+        console.log('🔍 [fetchLatestAnalysis] lastAnalysis.value.reports:', lastAnalysis.value?.reports)
       }
       // 否则尝试通过 task_id 获取结果
       else if (latestTask.task_id) {
+        console.log('🔍 [fetchLatestAnalysis] 通过task_id获取结果:', latestTask.task_id)
         try {
           const resultResp: any = await analysisApi.getTaskResult(latestTask.task_id)
+          console.log('🔍 [fetchLatestAnalysis] getTaskResult响应:', resultResp)
           lastAnalysis.value = resultResp?.data || resultResp
           analysisStatus.value = 'completed'
           console.log('✅ 通过 task_id 加载分析报告成功:', lastAnalysis.value)
+          console.log('🔍 [fetchLatestAnalysis] lastAnalysis.value.reports:', lastAnalysis.value?.reports)
         } catch (e) {
           console.warn('⚠️ 获取任务结果失败:', e)
         }
       }
     } else {
       console.log('ℹ️ 该股票暂无历史分析报告')
+      console.log('🔍 [fetchLatestAnalysis] 判断条件: tasks=', tasks, ', tasks.length=', tasks?.length)
     }
   } catch (e) {
     console.warn('⚠️ 获取历史分析报告失败:', e)
@@ -625,6 +748,97 @@ function fmtConf(v: any) {
   if (!Number.isFinite(n)) return '-'
   const pct = n <= 1 ? n * 100 : n
   return `${Math.round(pct)}%`
+}
+
+import { formatDateTimeWithRelative } from '@/utils/datetime'
+
+// 格式化分析时间（处理UTC时间转换为中国本地时间）
+function formatAnalysisTime(dateStr: any): string {
+  return formatDateTimeWithRelative(dateStr)
+}
+
+// 格式化报告名称
+function formatReportName(key: string): string {
+  const nameMap: Record<string, string> = {
+    'market_report': '📈 市场分析',
+    'fundamentals_report': '📊 基本面分析',
+    'sentiment_report': '💭 情绪分析',
+    'news_report': '📰 新闻分析',
+    'investment_plan': '💼 投资计划',
+    'trader_investment_plan': '🎯 交易员计划',
+    'final_trade_decision': '✅ 最终决策',
+    'research_team_decision': '🔬 研究团队决策',
+    'risk_management_decision': '⚠️ 风险管理决策'
+  }
+  return nameMap[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+}
+
+// 渲染Markdown
+function renderMarkdown(content: string): string {
+  if (!content) return '<p>暂无内容</p>'
+  try {
+    return marked(content)
+  } catch (e) {
+    console.error('Markdown渲染失败:', e)
+    return `<pre>${content}</pre>`
+  }
+}
+
+// 打开指定报告
+function openReport(reportKey: string) {
+  showReportsDialog.value = true
+  activeReportTab.value = reportKey
+}
+
+// 导出报告
+function exportReport() {
+  if (!lastAnalysis.value?.reports) {
+    ElMessage.warning('暂无报告可导出')
+    return
+  }
+
+  // 生成Markdown格式的完整报告
+  let fullReport = `# ${code.value} 股票分析报告\n\n`
+
+  // 格式化分析时间用于报告
+  const reportTime = lastTaskInfo.value?.end_time
+    ? new Date(lastTaskInfo.value.end_time).toLocaleString('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      })
+    : lastAnalysis.value?.analysis_date
+
+  fullReport += `**分析时间**: ${reportTime}\n`
+  fullReport += `**投资建议**: ${lastAnalysis.value.recommendation}\n`
+  fullReport += `**信心度**: ${fmtConf(lastAnalysis.value.confidence_score)}\n\n`
+  fullReport += `---\n\n`
+
+  for (const [key, content] of Object.entries(lastAnalysis.value.reports)) {
+    fullReport += `## ${formatReportName(key)}\n\n`
+    fullReport += `${content}\n\n`
+    fullReport += `---\n\n`
+  }
+
+  // 创建下载链接
+  const blob = new Blob([fullReport], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+
+  // 使用分析日期作为文件名（简化格式）
+  const fileDate = lastAnalysis.value.analysis_date || new Date().toISOString().slice(0, 10)
+  link.download = `${code.value}_分析报告_${fileDate}.md`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+
+  ElMessage.success('报告已导出')
 }
 
 </script>
@@ -684,6 +898,244 @@ function fmtConf(v: any) {
 
 @media (max-width: 1024px) {
   .stats { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* 报告相关样式 */
+.reports-section {
+  margin-top: 8px;
+}
+
+.reports-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  margin-top: 8px;
+}
+
+.reports-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.reports-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px;
+  background: var(--el-fill-color-lighter);
+  border-radius: 8px;
+}
+
+.report-tag {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 13px;
+  padding: 6px 12px;
+}
+
+.report-tag:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 报告对话框样式 */
+.reports-dialog :deep(.el-dialog__body) {
+  padding: 0;
+}
+
+.report-content {
+  padding: 20px;
+}
+
+.markdown-body {
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--el-text-color-primary);
+}
+
+.markdown-body h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 20px 0 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--el-border-color);
+}
+
+.markdown-body h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 16px 0 12px;
+}
+
+.markdown-body h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 12px 0 8px;
+}
+
+.markdown-body p {
+  margin: 8px 0;
+}
+
+.markdown-body ul, .markdown-body ol {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.markdown-body li {
+  margin: 4px 0;
+}
+
+.markdown-body code {
+  background: var(--el-fill-color-light);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+}
+
+.markdown-body pre {
+  background: var(--el-fill-color-light);
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+
+.markdown-body blockquote {
+  border-left: 4px solid var(--el-color-primary);
+  padding-left: 12px;
+  margin: 12px 0;
+  color: var(--el-text-color-secondary);
+}
+
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+}
+
+.markdown-body th, .markdown-body td {
+  border: 1px solid var(--el-border-color);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.markdown-body th {
+  background: var(--el-fill-color-light);
+  font-weight: 600;
+}
+
+.analysis-detail-card .detail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 分析时间元信息 */
+.analysis-meta {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 8px 12px;
+  background: var(--el-fill-color-lighter);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+
+.analysis-meta .analysis-time,
+.analysis-meta .confidence {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.analysis-meta .el-icon {
+  font-size: 14px;
+}
+
+/* 投资建议盒子 - 重点突出 */
+.recommendation-box {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  padding: 20px 24px;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.25);
+  transition: all 0.3s ease;
+  margin: 16px 0;
+}
+
+.recommendation-box:hover {
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.35);
+  transform: translateY(-2px);
+}
+
+.recommendation-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.recommendation-header .icon {
+  font-size: 20px;
+}
+
+.recommendation-content {
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 8px;
+  padding: 16px 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.recommendation-text {
+  color: #1f2937;
+  font-size: 15px;
+  line-height: 1.8;
+  font-weight: 500;
+  word-wrap: break-word;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+/* 分析摘要 */
+.summary-section {
+  padding: 18px 20px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border-left: 4px solid #3b82f6;
+  margin-top: 16px;
+}
+
+.summary-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e40af;
+  margin-bottom: 12px;
+}
+
+.summary-title .el-icon {
+  font-size: 18px;
+  color: #3b82f6;
+}
+
+.summary-text {
+  color: #334155;
+  line-height: 1.8;
+  font-size: 14px;
+  word-wrap: break-word;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 </style>
 
