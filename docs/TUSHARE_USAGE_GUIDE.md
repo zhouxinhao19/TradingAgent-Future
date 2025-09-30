@@ -66,10 +66,16 @@ print(info)
 
 ### 数据覆盖
 - ✅ **股票基础数据**: 所有A股股票信息
-- ✅ **历史行情**: 日线、周线、月线数据
+- ✅ **历史行情**: 日线、周线、月线数据（支持多周期同步）
 - ✅ **财务数据**: 三大财务报表
 - ✅ **实时数据**: 最新价格和交易信息
 - ✅ **技术指标**: 常用技术分析指标
+
+### 多周期数据支持 🆕
+- **日线数据** (daily): 每个交易日的OHLCV数据
+- **周线数据** (weekly): 每周的OHLCV数据
+- **月线数据** (monthly): 每月的OHLCV数据
+- 所有周期数据统一存储在 `stock_daily_quotes` 集合
 
 ## 🎯 常用功能示例
 
@@ -94,7 +100,55 @@ results = search_china_stocks_tushare("银行")
 print(results)
 ```
 
-### 3. 数据源切换
+### 3. 多周期数据初始化 🆕
+
+```bash
+# 初始化多周期历史数据（日线、周线、月线）
+python cli/tushare_init.py --full --multi-period
+
+# 指定历史数据范围（例如1年）
+python cli/tushare_init.py --full --multi-period --historical-days 365
+
+# 强制重新初始化
+python cli/tushare_init.py --full --multi-period --force
+```
+
+### 4. 查询多周期数据 🆕
+
+```python
+from tradingagents.config.database_manager import get_mongodb_client
+
+client = get_mongodb_client()
+db = client.get_database('tradingagents')
+collection = db.stock_daily_quotes
+
+# 查询日线数据
+daily_data = list(collection.find({
+    'symbol': '000001',
+    'period': 'daily',
+    'data_source': 'tushare'
+}).sort('trade_date', 1))
+
+# 查询周线数据
+weekly_data = list(collection.find({
+    'symbol': '000001',
+    'period': 'weekly',
+    'data_source': 'tushare'
+}).sort('trade_date', 1))
+
+# 查询月线数据
+monthly_data = list(collection.find({
+    'symbol': '000001',
+    'period': 'monthly',
+    'data_source': 'tushare'
+}).sort('trade_date', 1))
+
+print(f"日线: {len(daily_data)} 条")
+print(f"周线: {len(weekly_data)} 条")
+print(f"月线: {len(monthly_data)} 条")
+```
+
+### 5. 数据源切换
 
 ```python
 # 查看当前数据源
@@ -233,3 +287,8 @@ else:
 🎉 **恭喜您成功配置Tushare！现在可以享受高质量的A股数据服务了！**
 
 💡 **建议**: 立即尝试运行`python -m cli.main`开始您的股票分析之旅！
+
+---
+
+**更新日期**: 2025-09-30
+**版本**: v1.1 - 新增多周期数据支持（日线、周线、月线）

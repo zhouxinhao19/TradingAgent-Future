@@ -24,10 +24,12 @@ class AKShareInitializationStats:
     current_step: str = ""
     basic_info_count: int = 0
     historical_records: int = 0
+    weekly_records: int = 0
+    monthly_records: int = 0
     financial_records: int = 0
     quotes_count: int = 0
     errors: List[Dict[str, Any]] = None
-    
+
     def __post_init__(self):
         if self.errors is None:
             self.errors = []
@@ -61,24 +63,29 @@ class AKShareInitService:
         self,
         historical_days: int = 365,
         skip_if_exists: bool = True,
-        batch_size: int = 100
+        batch_size: int = 100,
+        enable_multi_period: bool = False
     ) -> Dict[str, Any]:
         """
         运行完整的数据初始化
-        
+
         Args:
             historical_days: 历史数据天数（默认1年）
             skip_if_exists: 如果数据已存在是否跳过
             batch_size: 批处理大小
-            
+            enable_multi_period: 是否启用多周期数据同步（日线、周线、月线）
+
         Returns:
             初始化结果统计
         """
         logger.info("🚀 开始AKShare数据完整初始化...")
-        
+
+        # 根据是否启用多周期调整总步骤数
+        total_steps = 8 if enable_multi_period else 6
+
         self.stats = AKShareInitializationStats(
             started_at=datetime.utcnow(),
-            total_steps=6
+            total_steps=total_steps
         )
         
         try:
@@ -88,16 +95,21 @@ class AKShareInitService:
             # 步骤2: 初始化股票基础信息
             await self._step_initialize_basic_info()
             
-            # 步骤3: 同步历史数据
+            # 步骤3: 同步历史数据（日线）
             await self._step_initialize_historical_data(historical_days)
-            
-            # 步骤4: 同步财务数据
+
+            # 步骤4: 同步多周期数据（如果启用）
+            if enable_multi_period:
+                await self._step_initialize_weekly_data(historical_days)
+                await self._step_initialize_monthly_data(historical_days)
+
+            # 步骤5: 同步财务数据
             await self._step_initialize_financial_data()
-            
-            # 步骤5: 同步最新行情
+
+            # 步骤6: 同步最新行情
             await self._step_initialize_quotes()
-            
-            # 步骤6: 验证数据完整性
+
+            # 步骤7: 验证数据完整性
             await self._step_verify_data_integrity()
             
             self.stats.finished_at = datetime.utcnow()
@@ -156,13 +168,18 @@ class AKShareInitService:
         """步骤3: 同步历史数据"""
         self.stats.current_step = f"同步历史数据({historical_days}天)"
         logger.info(f"📊 {self.stats.current_step}...")
-        
+
         # 计算日期范围
         end_date = datetime.now().strftime('%Y-%m-%d')
-        start_date = (datetime.now() - timedelta(days=historical_days)).strftime('%Y-%m-%d')
-        
-        logger.info(f"  历史数据范围: {start_date} 到 {end_date}")
-        
+
+        # 如果 historical_days 大于等于10年（3650天），则同步全历史
+        if historical_days >= 3650:
+            start_date = "1990-01-01"  # 全历史同步
+            logger.info(f"  历史数据范围: 全历史（从1990-01-01到{end_date}）")
+        else:
+            start_date = (datetime.now() - timedelta(days=historical_days)).strftime('%Y-%m-%d')
+            logger.info(f"  历史数据范围: {start_date} 到 {end_date}")
+
         # 同步历史数据
         result = await self.sync_service.sync_historical_data(
             start_date=start_date,
@@ -177,7 +194,79 @@ class AKShareInitService:
             logger.warning("⚠️ 历史数据初始化部分失败，继续后续步骤")
         
         self.stats.completed_steps += 1
-    
+
+    async def _step_initialize_weekly_data(self, historical_days: int):
+        """步骤4a: 同步周线数据"""
+        self.stats.current_step = f"同步周线数据({historical_days}天)"
+        logger.info(f"📊 {self.stats.current_step}...")
+
+        # 计算日期范围
+        end_date = datetime.now().strftime('%Y-%m-%d')
+
+        # 如果 historical_days 大于等于10年（3650天），则同步全历史
+        if historical_days >= 3650:
+            start_date = "1990-01-01"  # 全历史同步
+            logger.info(f"  周线数据范围: 全历史（从1990-01-01到{end_date}）")
+        else:
+            start_date = (datetime.now() - timedelta(days=historical_days)).strftime('%Y-%m-%d')
+            logger.info(f"  周线数据范围: {start_date} 到 {end_date}")
+
+        try:
+            # 同步周线数据
+            result = await self.sync_service.sync_historical_data(
+                start_date=start_date,
+                end_date=end_date,
+                incremental=False,
+                period="weekly"  # 指定周线
+            )
+
+            if result:
+                weekly_records = result.get("total_records", 0)
+                self.stats.weekly_records = weekly_records
+                logger.info(f"✅ 周线数据初始化完成: {weekly_records}条记录")
+            else:
+                logger.warning("⚠️ 周线数据初始化部分失败，继续后续步骤")
+        except Exception as e:
+            logger.warning(f"⚠️ 周线数据初始化失败: {e}（继续后续步骤）")
+
+        self.stats.completed_steps += 1
+
+    async def _step_initialize_monthly_data(self, historical_days: int):
+        """步骤4b: 同步月线数据"""
+        self.stats.current_step = f"同步月线数据({historical_days}天)"
+        logger.info(f"📊 {self.stats.current_step}...")
+
+        # 计算日期范围
+        end_date = datetime.now().strftime('%Y-%m-%d')
+
+        # 如果 historical_days 大于等于10年（3650天），则同步全历史
+        if historical_days >= 3650:
+            start_date = "1990-01-01"  # 全历史同步
+            logger.info(f"  月线数据范围: 全历史（从1990-01-01到{end_date}）")
+        else:
+            start_date = (datetime.now() - timedelta(days=historical_days)).strftime('%Y-%m-%d')
+            logger.info(f"  月线数据范围: {start_date} 到 {end_date}")
+
+        try:
+            # 同步月线数据
+            result = await self.sync_service.sync_historical_data(
+                start_date=start_date,
+                end_date=end_date,
+                incremental=False,
+                period="monthly"  # 指定月线
+            )
+
+            if result:
+                monthly_records = result.get("total_records", 0)
+                self.stats.monthly_records = monthly_records
+                logger.info(f"✅ 月线数据初始化完成: {monthly_records}条记录")
+            else:
+                logger.warning("⚠️ 月线数据初始化部分失败，继续后续步骤")
+        except Exception as e:
+            logger.warning(f"⚠️ 月线数据初始化失败: {e}（继续后续步骤）")
+
+        self.stats.completed_steps += 1
+
     async def _step_initialize_financial_data(self):
         """步骤4: 同步财务数据"""
         self.stats.current_step = "同步财务数据"
@@ -259,7 +348,9 @@ class AKShareInitService:
             "progress": f"{self.stats.completed_steps}/{self.stats.total_steps}",
             "data_summary": {
                 "basic_info_count": self.stats.basic_info_count,
-                "historical_records": self.stats.historical_records,
+                "daily_records": self.stats.historical_records,
+                "weekly_records": self.stats.weekly_records,
+                "monthly_records": self.stats.monthly_records,
                 "financial_records": self.stats.financial_records,
                 "quotes_count": self.stats.quotes_count
             },

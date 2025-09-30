@@ -12,6 +12,7 @@ from app.services.stock_data_service import get_stock_data_service
 from app.services.historical_data_service import get_historical_data_service
 from app.core.database import get_mongo_db
 from app.core.config import settings
+from app.core.rate_limiter import get_tushare_rate_limiter
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +32,13 @@ class TushareSyncService:
 
         # 同步配置
         self.batch_size = 100  # 批量处理大小
-        self.rate_limit_delay = 0.1  # API调用间隔(秒)
+        self.rate_limit_delay = 0.1  # API调用间隔(秒) - 已弃用，使用rate_limiter
         self.max_retries = 3  # 最大重试次数
+
+        # 速率限制器（从环境变量读取配置）
+        tushare_tier = getattr(settings, "TUSHARE_TIER", "standard")  # free/basic/standard/premium/vip
+        safety_margin = float(getattr(settings, "TUSHARE_RATE_LIMIT_SAFETY_MARGIN", "0.8"))
+        self.rate_limiter = get_tushare_rate_limiter(tier=tushare_tier, safety_margin=safety_margin)
     
     async def initialize(self):
         """初始化同步服务"""
@@ -301,7 +307,8 @@ class TushareSyncService:
         start_date: str = None,
         end_date: str = None,
         incremental: bool = True,
-        all_history: bool = False
+        all_history: bool = False,
+        period: str = "daily"
     ) -> Dict[str, Any]:
         """
         同步历史数据
@@ -312,11 +319,13 @@ class TushareSyncService:
             end_date: 结束日期
             incremental: 是否增量同步
             all_history: 是否同步所有历史数据
+            period: 数据周期 (daily/weekly/monthly)
 
         Returns:
             同步结果统计
         """
-        logger.info("🔄 开始同步历史数据...")
+        period_name = {"daily": "日线", "weekly": "周线", "monthly": "月线"}.get(period, period)
+        logger.info(f"🔄 开始同步{period_name}历史数据...")
 
         stats = {
             "total_processed": 0,
@@ -358,41 +367,46 @@ class TushareSyncService:
             # 3. 批量处理
             for i, symbol in enumerate(symbols):
                 try:
-                    # 获取历史数据
-                    df = await self.provider.get_historical_data(symbol, start_date, end_date)
+                    # 速率限制
+                    await self.rate_limiter.acquire()
+
+                    # 获取历史数据（指定周期）
+                    df = await self.provider.get_historical_data(symbol, start_date, end_date, period=period)
 
                     if df is not None and not df.empty:
-                        # 保存到数据库
-                        records_saved = await self._save_historical_data(symbol, df)
+                        # 保存到数据库（指定周期）
+                        records_saved = await self._save_historical_data(symbol, df, period=period)
                         stats["success_count"] += 1
                         stats["total_records"] += records_saved
 
-                        logger.debug(f"✅ {symbol}: 保存 {records_saved} 条历史记录")
+                        logger.debug(f"✅ {symbol}: 保存 {records_saved} 条{period_name}记录")
                     else:
-                        logger.warning(f"⚠️ {symbol}: 无历史数据")
+                        logger.warning(f"⚠️ {symbol}: 无{period_name}数据")
 
                     # 进度日志
                     if (i + 1) % 50 == 0:
-                        logger.info(f"📈 历史数据同步进度: {i + 1}/{len(symbols)} "
+                        logger.info(f"📈 {period_name}数据同步进度: {i + 1}/{len(symbols)} "
                                    f"(成功: {stats['success_count']}, 记录: {stats['total_records']})")
-
-                    # API限流
-                    await asyncio.sleep(self.rate_limit_delay)
+                        # 输出速率限制器统计
+                        limiter_stats = self.rate_limiter.get_stats()
+                        logger.info(f"   速率限制: {limiter_stats['current_calls']}/{limiter_stats['max_calls']}次, "
+                                   f"等待次数: {limiter_stats['total_waits']}, "
+                                   f"总等待时间: {limiter_stats['total_wait_time']:.1f}秒")
 
                 except Exception as e:
                     stats["error_count"] += 1
                     stats["errors"].append({
                         "code": symbol,
                         "error": str(e),
-                        "context": "sync_historical_data"
+                        "context": f"sync_historical_data_{period}"
                     })
-                    logger.error(f"❌ {symbol} 历史数据同步失败: {e}")
+                    logger.error(f"❌ {symbol} {period_name}数据同步失败: {e}")
 
             # 4. 完成统计
             stats["end_time"] = datetime.utcnow()
             stats["duration"] = (stats["end_time"] - stats["start_time"]).total_seconds()
 
-            logger.info(f"✅ 历史数据同步完成: "
+            logger.info(f"✅ {period_name}数据同步完成: "
                        f"股票 {stats['success_count']}/{stats['total_processed']}, "
                        f"记录 {stats['total_records']} 条, "
                        f"错误 {stats['error_count']} 个, "
@@ -405,24 +419,25 @@ class TushareSyncService:
             stats["errors"].append({"error": str(e), "context": "sync_historical_data"})
             return stats
 
-    async def _save_historical_data(self, symbol: str, df) -> int:
+    async def _save_historical_data(self, symbol: str, df, period: str = "daily") -> int:
         """保存历史数据到数据库"""
         try:
             if self.historical_service is None:
                 self.historical_service = await get_historical_data_service()
 
-            # 使用统一历史数据服务保存
+            # 使用统一历史数据服务保存（指定周期）
             saved_count = await self.historical_service.save_historical_data(
                 symbol=symbol,
                 data=df,
                 data_source="tushare",
-                market="CN"
+                market="CN",
+                period=period
             )
 
             return saved_count
 
         except Exception as e:
-            logger.error(f"❌ 保存历史数据失败 {symbol}: {e}")
+            logger.error(f"❌ 保存{period}数据失败 {symbol}: {e}")
             return 0
 
     async def _get_last_sync_date(self, symbol: str = None) -> str:
@@ -473,6 +488,9 @@ class TushareSyncService:
             # 批量处理
             for i, symbol in enumerate(symbols):
                 try:
+                    # 速率限制
+                    await self.rate_limiter.acquire()
+
                     financial_data = await self.provider.get_financial_data(symbol)
 
                     if financial_data:
@@ -489,9 +507,9 @@ class TushareSyncService:
                     if (i + 1) % 20 == 0:
                         logger.info(f"📈 财务数据同步进度: {i + 1}/{len(symbols)} "
                                    f"(成功: {stats['success_count']}, 错误: {stats['error_count']})")
-
-                    # API限流 (财务数据调用频率更严格)
-                    await asyncio.sleep(self.rate_limit_delay * 2)
+                        # 输出速率限制器统计
+                        limiter_stats = self.rate_limiter.get_stats()
+                        logger.info(f"   速率限制: {limiter_stats['current_calls']}/{limiter_stats['max_calls']}次")
 
                 except Exception as e:
                     stats["error_count"] += 1

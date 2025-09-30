@@ -237,25 +237,33 @@ class BaoStockSyncService:
             logger.error(f"❌ 更新行情到数据库失败: {e}")
             raise
     
-    async def sync_historical_data(self, days: int = 30, batch_size: int = 20) -> BaoStockSyncStats:
+    async def sync_historical_data(self, days: int = 30, batch_size: int = 20, period: str = "daily") -> BaoStockSyncStats:
         """
         同步历史数据
-        
+
         Args:
-            days: 同步天数
+            days: 同步天数（如果>=3650则同步全历史）
             batch_size: 批处理大小
-            
+            period: 数据周期 (daily/weekly/monthly)
+
         Returns:
             同步统计信息
         """
         stats = BaoStockSyncStats()
-        
+
         try:
-            logger.info(f"🔄 开始BaoStock历史数据同步 (最近{days}天)...")
-            
+            period_name = {"daily": "日线", "weekly": "周线", "monthly": "月线"}.get(period, "日线")
+
             # 计算日期范围
             end_date = datetime.now().strftime('%Y-%m-%d')
-            start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+
+            # 如果 days 大于等于10年（3650天），则同步全历史
+            if days >= 3650:
+                start_date = "1990-01-01"  # 全历史同步
+                logger.info(f"🔄 开始BaoStock{period_name}历史数据同步 (全历史: 1990-01-01到{end_date})...")
+            else:
+                start_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+                logger.info(f"🔄 开始BaoStock{period_name}历史数据同步 (最近{days}天: {start_date}到{end_date})...")
             
             # 从数据库获取股票列表
             collection = self.db.stock_basic_info
@@ -271,7 +279,7 @@ class BaoStockSyncService:
             # 批量处理
             for i in range(0, len(stock_codes), batch_size):
                 batch = stock_codes[i:i + batch_size]
-                batch_stats = await self._sync_historical_batch(batch, start_date, end_date)
+                batch_stats = await self._sync_historical_batch(batch, start_date, end_date, period)
                 
                 stats.historical_records += batch_stats.historical_records
                 stats.errors.extend(batch_stats.errors)
@@ -291,28 +299,28 @@ class BaoStockSyncService:
             stats.errors.append(str(e))
             return stats
     
-    async def _sync_historical_batch(self, code_batch: List[str], 
-                                   start_date: str, end_date: str) -> BaoStockSyncStats:
+    async def _sync_historical_batch(self, code_batch: List[str],
+                                   start_date: str, end_date: str, period: str = "daily") -> BaoStockSyncStats:
         """同步历史数据批次"""
         stats = BaoStockSyncStats()
-        
+
         for code in code_batch:
             try:
-                hist_data = await self.provider.get_historical_data(code, start_date, end_date)
-                
+                hist_data = await self.provider.get_historical_data(code, start_date, end_date, period)
+
                 if hist_data is not None and not hist_data.empty:
                     # 更新数据库
-                    records_count = await self._update_historical_data(code, hist_data)
+                    records_count = await self._update_historical_data(code, hist_data, period)
                     stats.historical_records += records_count
                 else:
                     stats.errors.append(f"获取{code}历史数据失败")
-                    
+
             except Exception as e:
                 stats.errors.append(f"处理{code}历史数据失败: {e}")
-        
+
         return stats
-    
-    async def _update_historical_data(self, code: str, hist_data) -> int:
+
+    async def _update_historical_data(self, code: str, hist_data, period: str = "daily") -> int:
         """更新历史数据到数据库"""
         try:
             if hist_data is None or hist_data.empty:
@@ -328,7 +336,8 @@ class BaoStockSyncService:
                 symbol=code,
                 data=hist_data,
                 data_source="baostock",
-                market="CN"
+                market="CN",
+                period=period
             )
 
             # 同时更新market_quotes集合的元信息（保持兼容性）

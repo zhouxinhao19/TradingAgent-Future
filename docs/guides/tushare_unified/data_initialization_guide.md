@@ -2,15 +2,16 @@
 
 ## 📋 概述
 
-**文档目的**: 为首次部署Tushare统一方案提供完整的数据初始化指导  
-**适用场景**: 新环境部署、数据重置、系统迁移  
-**更新时间**: 2025-09-29
+**文档目的**: 为首次部署Tushare统一方案提供完整的数据初始化指导
+**适用场景**: 新环境部署、数据重置、系统迁移
+**更新时间**: 2025-09-30
+**版本**: v1.3
 
 ## 🎯 初始化目标
 
 ### 核心数据类型
 1. **股票基础信息** - 股票代码、名称、行业、市场等基础数据
-2. **历史行情数据** - 指定时间范围的历史价格数据
+2. **历史行情数据** - 指定时间范围的历史价格数据（支持日线、周线、月线）
 3. **财务数据** - 财报、指标等财务信息
 4. **实时行情数据** - 最新的股票价格和交易数据
 
@@ -40,18 +41,65 @@ python cli/tushare_init.py --basic-only
 # 自定义历史数据范围（6个月）
 python cli/tushare_init.py --full --historical-days 180
 
+# 全历史数据初始化（从1990年至今，需要>=3650天）
+python cli/tushare_init.py --full --historical-days 10000
+
+# 同步多周期数据（日线、周线、月线）
+python cli/tushare_init.py --full --multi-period
+
+# 全历史多周期初始化（推荐用于生产环境）
+python cli/tushare_init.py --full --multi-period --historical-days 10000
+
 # 强制重新初始化
 python cli/tushare_init.py --full --force
 ```
 
+#### 选择性同步（新功能）🆕
+```bash
+# 仅同步历史数据（日线）
+python cli/tushare_init.py --full --sync-items historical
+
+# 仅同步财务数据
+python cli/tushare_init.py --full --sync-items financial
+
+# 仅同步周线和月线数据
+python cli/tushare_init.py --full --sync-items weekly,monthly
+
+# 同步多个数据类型
+python cli/tushare_init.py --full --sync-items historical,financial,quotes
+
+# 可选的数据类型:
+# - basic_info: 股票基础信息
+# - historical: 历史行情数据（日线）
+# - weekly: 周线数据
+# - monthly: 月线数据
+# - financial: 财务数据
+# - quotes: 最新行情
+```
+
 #### 高级选项
 ```bash
-# 完整参数示例
+# 完整参数示例（默认1年）
 python cli/tushare_init.py \
   --full \
   --historical-days 365 \
+  --multi-period \
   --batch-size 100 \
   --force
+
+# 全历史多周期初始化（推荐生产环境）
+python cli/tushare_init.py \
+  --full \
+  --historical-days 10000 \
+  --multi-period \
+  --batch-size 100
+
+# 多周期数据说明
+# --multi-period: 启用多周期数据同步
+#   - 日线数据 (daily): 每个交易日的OHLCV数据
+#   - 周线数据 (weekly): 每周的OHLCV数据
+#   - 月线数据 (monthly): 每月的OHLCV数据
+# 所有周期数据存储在同一集合 stock_daily_quotes，通过 period 字段区分
 ```
 
 ### 方式二：Web API接口
@@ -110,7 +158,8 @@ POST /api/tushare-init/stop
    - 标准化数据格式
 
 3. **同步历史数据** 📊
-   - 根据指定天数获取历史行情
+   - 根据指定天数获取历史行情（日线）
+   - 可选：同步周线和月线数据（--multi-period）
    - 批量处理和存储
    - 数据完整性验证
 
@@ -134,10 +183,270 @@ POST /api/tushare-init/stop
 | 数据类型 | 数量级 | 预计耗时 | 说明 |
 |---------|--------|----------|------|
 | 基础信息 | 5000+股票 | 5-10分钟 | 取决于网络和API限制 |
-| 历史数据(1年) | 100万+记录 | 30-60分钟 | 批量处理，可并发 |
+| 历史数据(1年)-日线 | 125万+记录 | 30-60分钟 | 批量处理，可并发 |
+| 历史数据(1年)-周线 | 26万+记录 | 10-20分钟 | 启用--multi-period时 |
+| 历史数据(1年)-月线 | 6万+记录 | 5-10分钟 | 启用--multi-period时 |
 | 财务数据 | 5000+公司 | 10-20分钟 | 需要较高API权限 |
 | 实时行情 | 5000+股票 | 3-5分钟 | 快速获取当前数据 |
-| **总计** | - | **50-95分钟** | 首次完整初始化 |
+| **总计（仅日线）** | - | **50-95分钟** | 首次完整初始化 |
+| **总计（多周期）** | - | **65-125分钟** | 包含日线、周线、月线 |
+
+## 🎯 选择性数据同步（新功能）
+
+### 功能说明
+
+选择性数据同步功能允许您只更新特定类型的数据，而不需要重新初始化所有数据。这在以下场景非常有用：
+
+- **增量更新**: 只更新历史数据，不影响其他数据
+- **数据修复**: 只重新同步有问题的数据类型
+- **节省时间**: 避免不必要的全量同步
+- **灵活配置**: 根据需求自由组合数据类型
+
+### 支持的数据类型
+
+| 数据类型 | 标识符 | 说明 |
+|---------|--------|------|
+| 股票基础信息 | `basic_info` | 股票代码、名称、行业等基础信息 |
+| 历史行情（日线） | `historical` | 日线OHLCV数据 |
+| 周线数据 | `weekly` | 周线OHLCV数据 |
+| 月线数据 | `monthly` | 月线OHLCV数据 |
+| 财务数据 | `financial` | 财务报表和指标 |
+| 最新行情 | `quotes` | 实时行情数据 |
+
+### 使用示例
+
+```bash
+# 仅更新历史数据（日线）
+python cli/tushare_init.py --full --sync-items historical --historical-days 30
+
+# 仅更新财务数据
+python cli/tushare_init.py --full --sync-items financial
+
+# 仅更新周线和月线数据
+python cli/tushare_init.py --full --sync-items weekly,monthly --historical-days 90
+
+# 更新历史数据和财务数据
+python cli/tushare_init.py --full --sync-items historical,financial
+
+# 强制重新同步特定数据
+python cli/tushare_init.py --full --sync-items quotes --force
+```
+
+### 应用场景
+
+#### 场景1: 每日增量更新
+```bash
+# 每天收盘后更新最新数据
+python cli/tushare_init.py --full --sync-items historical,quotes --historical-days 5
+```
+
+#### 场景2: 周末更新周线数据
+```bash
+# 每周末更新周线和月线数据
+python cli/tushare_init.py --full --sync-items weekly,monthly --historical-days 30
+```
+
+#### 场景3: 季度更新财务数据
+```bash
+# 每季度财报发布后更新财务数据
+python cli/tushare_init.py --full --sync-items financial --force
+```
+
+#### 场景4: 数据修复
+```bash
+# 发现历史数据有问题，重新同步
+python cli/tushare_init.py --full --sync-items historical --historical-days 365 --force
+```
+
+## 🌐 全历史数据同步
+
+### 功能说明
+
+全历史数据同步功能允许您获取股票从上市以来的完整历史数据（从1990年至今），而不仅仅是最近几年的数据。
+
+### 使用方法
+
+当 `--historical-days` 参数 **大于等于3650天（10年）** 时，系统会自动切换到全历史同步模式：
+
+```bash
+# 全历史数据初始化（从1990-01-01至今）
+python cli/tushare_init.py --full --historical-days 10000
+
+# 全历史多周期初始化（推荐用于生产环境）
+python cli/tushare_init.py --full --multi-period --historical-days 10000
+
+# 全历史选择性同步
+python cli/tushare_init.py --full --sync-items historical --historical-days 10000
+```
+
+### 阈值说明
+
+| historical_days | 同步范围 | 说明 |
+|----------------|---------|------|
+| < 3650 | 指定天数 | 从当前日期往前推算指定天数 |
+| >= 3650 | 全历史 | 从1990-01-01至今的所有数据 |
+
+### 数据量对比
+
+以688788（科思科技，2020-10-22上市）为例：
+
+| 同步模式 | 数据范围 | 记录数 | 说明 |
+|---------|---------|--------|------|
+| 默认1年 | 2024-09-30 ~ 2025-09-29 | ~244条 | 只有最近1年数据 |
+| 全历史 | 2020-10-22 ~ 2025-09-30 | ~1000条 | 完整上市以来数据 |
+
+全市场数据量：
+
+| 同步模式 | 日线记录数 | 存储空间 | 同步耗时 |
+|---------|-----------|---------|---------|
+| 默认1年 | ~1,250,000条 | ~500MB | 30-60分钟 |
+| 全历史 | ~8,000,000条 | 2-5GB | 2-4小时 |
+
+### 应用场景
+
+#### 1. 生产环境首次部署
+```bash
+# 推荐：全历史多周期初始化
+python cli/tushare_init.py --full --multi-period --historical-days 10000
+```
+
+#### 2. 长期回测和研究
+```bash
+# 获取完整历史数据用于回测
+python cli/tushare_init.py --full --historical-days 10000
+```
+
+#### 3. 数据补全
+```bash
+# 补全缺失的历史数据
+python cli/tushare_init.py --full --sync-items historical --historical-days 10000 --force
+```
+
+### 注意事项
+
+1. **耗时较长**: 全历史同步需要2-4小时，建议在非交易时间进行
+2. **API限流**: Tushare每分钟200次调用限制（积分用户）
+3. **存储空间**: 确保有足够的磁盘空间（2-5GB）
+4. **增量更新**: 首次使用全历史初始化，日常使用增量同步
+
+### 推荐策略
+
+| 环境 | 推荐命令 | 说明 |
+|------|---------|------|
+| 生产环境 | `--historical-days 10000 --multi-period` | 完整数据，支持多维度分析 |
+| 开发环境 | `--historical-days 365 --multi-period` | 快速验证，节省时间 |
+| 日常维护 | `--sync-items historical --historical-days 5` | 增量更新，高效快速 |
+
+## 📊 多周期数据同步
+
+### 功能说明
+
+多周期数据同步功能允许您同时获取日线、周线和月线三种周期的历史数据，适用于不同时间维度的技术分析。
+
+### 支持的数据周期
+
+1. **日线数据** (`daily`) - 每个交易日的OHLCV数据
+   - 适用于短期交易和日内分析
+   - 数据量最大，更新频率最高
+
+2. **周线数据** (`weekly`) - 每周的OHLCV数据
+   - 适用于中期趋势分析
+   - 数据量约为日线的1/5
+
+3. **月线数据** (`monthly`) - 每月的OHLCV数据
+   - 适用于长期投资分析
+   - 数据量最小，适合长期回测
+
+### 数据存储结构
+
+所有周期的数据统一存储在 `stock_daily_quotes` 集合中，通过 `period` 字段区分：
+
+```javascript
+// 日线数据
+{
+  "symbol": "000001",
+  "trade_date": "2024-01-02",
+  "period": "daily",
+  "open": 9.21,
+  "close": 9.21,
+  ...
+}
+
+// 周线数据
+{
+  "symbol": "000001",
+  "trade_date": "2024-01-05",  // 周五日期
+  "period": "weekly",
+  "open": 9.27,
+  "close": 9.27,
+  ...
+}
+
+// 月线数据
+{
+  "symbol": "000001",
+  "trade_date": "2024-01-31",  // 月末日期
+  "period": "monthly",
+  "open": 9.46,
+  "close": 9.46,
+  ...
+}
+```
+
+### 使用示例
+
+```bash
+# 初始化1年的多周期数据
+python cli/tushare_init.py --full --multi-period
+
+# 初始化6个月的多周期数据
+python cli/tushare_init.py --full --multi-period --historical-days 180
+
+# 强制重新初始化多周期数据
+python cli/tushare_init.py --full --multi-period --force
+```
+
+### 数据查询示例
+
+```python
+from tradingagents.config.database_manager import get_mongodb_client
+
+client = get_mongodb_client()
+db = client.get_database('tradingagents')
+collection = db.stock_daily_quotes
+
+# 查询日线数据
+daily_data = list(collection.find({
+    'symbol': '000001',
+    'period': 'daily',
+    'trade_date': {'$gte': '2024-01-01', '$lte': '2024-12-31'}
+}).sort('trade_date', 1))
+
+# 查询周线数据
+weekly_data = list(collection.find({
+    'symbol': '000001',
+    'period': 'weekly',
+    'trade_date': {'$gte': '2024-01-01', '$lte': '2024-12-31'}
+}).sort('trade_date', 1))
+
+# 查询月线数据
+monthly_data = list(collection.find({
+    'symbol': '000001',
+    'period': 'monthly',
+    'trade_date': {'$gte': '2024-01-01', '$lte': '2024-12-31'}
+}).sort('trade_date', 1))
+```
+
+### 数据量估算
+
+以5000只股票、1年历史数据为例：
+
+| 周期 | 每股记录数 | 总记录数 | 存储空间 |
+|------|-----------|---------|---------|
+| 日线 | ~250条 | ~125万条 | ~500MB |
+| 周线 | ~52条 | ~26万条 | ~100MB |
+| 月线 | ~12条 | ~6万条 | ~25MB |
+| **总计** | ~314条 | ~157万条 | ~625MB |
 
 ## ⚙️ 配置说明
 
@@ -312,6 +621,6 @@ grep -c "✅" logs/tradingagents.log
 
 ---
 
-**文档维护**: AI Assistant  
-**最后更新**: 2025-09-29  
-**版本**: v1.0
+**文档维护**: AI Assistant
+**最后更新**: 2025-09-30
+**版本**: v1.2 - 新增选择性数据同步功能和多周期数据支持

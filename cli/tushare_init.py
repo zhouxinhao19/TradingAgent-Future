@@ -35,17 +35,38 @@ def print_help():
     print("  --full              运行完整初始化（推荐首次使用）")
     print("  --basic-only        仅初始化基础信息")
     print("  --historical-days   历史数据天数（默认365天）")
+    print("  --multi-period      同步多周期数据（日线、周线、月线）")
+    print("  --sync-items        指定要同步的数据类型（逗号分隔）")
+    print("                      可选值: basic_info,historical,weekly,monthly,financial,quotes")
     print("  --force             强制初始化（覆盖已有数据）")
     print("  --batch-size        批处理大小（默认100）")
     print("  --check-only        仅检查数据库状态")
     print("  --help              显示此帮助信息")
     print()
     print("📝 示例:")
-    print("  # 首次完整初始化（推荐）")
+    print("  # 首次完整初始化（推荐，默认1年历史数据）")
     print("  python cli/tushare_init.py --full")
     print()
     print("  # 初始化最近6个月的历史数据")
     print("  python cli/tushare_init.py --full --historical-days 180")
+    print()
+    print("  # 初始化全历史数据（从1990年至今，需要>=3650天）")
+    print("  python cli/tushare_init.py --full --historical-days 10000")
+    print()
+    print("  # 初始化并同步多周期数据（日线、周线、月线）")
+    print("  python cli/tushare_init.py --full --multi-period")
+    print()
+    print("  # 全历史多周期初始化（推荐用于生产环境）")
+    print("  python cli/tushare_init.py --full --multi-period --historical-days 10000")
+    print()
+    print("  # 仅同步历史数据（日线）")
+    print("  python cli/tushare_init.py --full --sync-items historical")
+    print()
+    print("  # 仅同步财务数据和新闻数据")
+    print("  python cli/tushare_init.py --full --sync-items financial,quotes")
+    print()
+    print("  # 仅更新周线和月线数据")
+    print("  python cli/tushare_init.py --full --sync-items weekly,monthly")
     print()
     print("  # 强制重新初始化所有数据")
     print("  python cli/tushare_init.py --full --force")
@@ -131,16 +152,23 @@ async def run_basic_initialization():
         return False
 
 
-async def run_full_initialization(historical_days: int, force: bool):
+async def run_full_initialization(historical_days: int, force: bool, multi_period: bool = False, sync_items: list = None):
     """运行完整初始化"""
-    print(f"🚀 开始完整数据初始化（历史数据: {historical_days}天）...")
-    
+    if sync_items:
+        print(f"🚀 开始数据初始化（历史数据: {historical_days}天）...")
+        print(f"📋 同步项目: {', '.join(sync_items)}")
+    else:
+        period_info = "日线、周线、月线" if multi_period else "日线"
+        print(f"🚀 开始完整数据初始化（历史数据: {historical_days}天，周期: {period_info}）...")
+
     try:
         service = await get_tushare_init_service()
-        
+
         result = await service.run_full_initialization(
             historical_days=historical_days,
-            skip_if_exists=not force
+            skip_if_exists=not force,
+            enable_multi_period=multi_period,
+            sync_items=sync_items
         )
         
         # 显示结果
@@ -151,10 +179,14 @@ async def run_full_initialization(historical_days: int, force: bool):
         
         print(f"  ⏱️  耗时: {result['duration']:.2f}秒")
         print(f"  📊 进度: {result['progress']}")
-        
+
         data_summary = result["data_summary"]
         print(f"  📋 基础信息: {data_summary['basic_info_count']:,}条")
         print(f"  📊 历史数据: {data_summary['historical_records']:,}条")
+        if multi_period:
+            print(f"     - 日线数据: {data_summary.get('daily_records', 0):,}条")
+            print(f"     - 周线数据: {data_summary.get('weekly_records', 0):,}条")
+            print(f"     - 月线数据: {data_summary.get('monthly_records', 0):,}条")
         print(f"  💰 财务数据: {data_summary['financial_records']:,}条")
         print(f"  📈 行情数据: {data_summary['quotes_count']:,}条")
         
@@ -180,6 +212,8 @@ async def main():
     parser.add_argument("--full", action="store_true", help="运行完整初始化")
     parser.add_argument("--basic-only", action="store_true", help="仅初始化基础信息")
     parser.add_argument("--historical-days", type=int, default=365, help="历史数据天数")
+    parser.add_argument("--multi-period", action="store_true", help="同步多周期数据（日线、周线、月线）")
+    parser.add_argument("--sync-items", type=str, help="指定要同步的数据类型（逗号分隔），可选: basic_info,historical,weekly,monthly,financial,quotes")
     parser.add_argument("--force", action="store_true", help="强制初始化")
     parser.add_argument("--batch-size", type=int, default=100, help="批处理大小")
     parser.add_argument("--check-only", action="store_true", help="仅检查数据库状态")
@@ -217,8 +251,20 @@ async def main():
             if not args.force and db_ok:
                 print("⚠️ 数据库已有数据，使用 --force 强制重新初始化")
                 return
-            
-            success = await run_full_initialization(args.historical_days, args.force)
+
+            # 解析sync_items参数
+            sync_items = None
+            if args.sync_items:
+                sync_items = [item.strip() for item in args.sync_items.split(',')]
+                # 验证sync_items
+                valid_items = ['basic_info', 'historical', 'weekly', 'monthly', 'financial', 'quotes']
+                invalid_items = [item for item in sync_items if item not in valid_items]
+                if invalid_items:
+                    print(f"❌ 无效的同步项目: {', '.join(invalid_items)}")
+                    print(f"   有效选项: {', '.join(valid_items)}")
+                    return
+
+            success = await run_full_initialization(args.historical_days, args.force, args.multi_period, sync_items)
             
         else:
             print("❓ 请指定操作类型，使用 --help-detail 查看详细帮助")

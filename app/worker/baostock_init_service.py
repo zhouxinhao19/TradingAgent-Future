@@ -25,6 +25,8 @@ class BaoStockInitializationStats:
     basic_info_count: int = 0
     quotes_count: int = 0
     historical_records: int = 0
+    weekly_records: int = 0
+    monthly_records: int = 0
     financial_records: int = 0
     errors: List[str] = field(default_factory=list)
     start_time: Optional[datetime] = None
@@ -94,19 +96,22 @@ class BaoStockInitService:
             logger.error(f"❌ 检查数据库状态失败: {e}")
             return {"status": "error", "error": str(e)}
     
-    async def full_initialization(self, historical_days: int = 365, 
-                                force: bool = False) -> BaoStockInitializationStats:
+    async def full_initialization(self, historical_days: int = 365,
+                                force: bool = False,
+                                enable_multi_period: bool = False) -> BaoStockInitializationStats:
         """
         完整数据初始化
-        
+
         Args:
             historical_days: 历史数据天数
             force: 是否强制重新初始化
-            
+            enable_multi_period: 是否启用多周期数据同步（日线、周线、月线）
+
         Returns:
             初始化统计信息
         """
         stats = BaoStockInitializationStats()
+        stats.total_steps = 8 if enable_multi_period else 6
         stats.start_time = datetime.now()
         
         try:
@@ -137,14 +142,40 @@ class BaoStockInitService:
             if stats.basic_info_count == 0:
                 raise Exception("基础信息同步失败，无法继续")
             
-            # 步骤3: 同步历史数据
-            stats.current_step = "同步历史数据"
+            # 步骤3: 同步历史数据（日线）
+            stats.current_step = "同步历史数据（日线）"
             logger.info(f"3️⃣ {stats.current_step} (最近{historical_days}天)...")
-            
-            historical_stats = await self.sync_service.sync_historical_data(days=historical_days)
+
+            historical_stats = await self.sync_service.sync_historical_data(days=historical_days, period="daily")
             stats.historical_records = historical_stats.historical_records
             stats.errors.extend(historical_stats.errors)
             stats.completed_steps += 1
+
+            # 步骤4: 同步多周期数据（如果启用）
+            if enable_multi_period:
+                # 同步周线数据
+                stats.current_step = "同步周线数据"
+                logger.info(f"4️⃣a {stats.current_step} (最近{historical_days}天)...")
+                try:
+                    weekly_stats = await self.sync_service.sync_historical_data(days=historical_days, period="weekly")
+                    stats.weekly_records = weekly_stats.historical_records
+                    stats.errors.extend(weekly_stats.errors)
+                    logger.info(f"✅ 周线数据同步完成: {stats.weekly_records}条记录")
+                except Exception as e:
+                    logger.warning(f"⚠️ 周线数据同步失败: {e}（继续后续步骤）")
+                stats.completed_steps += 1
+
+                # 同步月线数据
+                stats.current_step = "同步月线数据"
+                logger.info(f"4️⃣b {stats.current_step} (最近{historical_days}天)...")
+                try:
+                    monthly_stats = await self.sync_service.sync_historical_data(days=historical_days, period="monthly")
+                    stats.monthly_records = monthly_stats.historical_records
+                    stats.errors.extend(monthly_stats.errors)
+                    logger.info(f"✅ 月线数据同步完成: {stats.monthly_records}条记录")
+                except Exception as e:
+                    logger.warning(f"⚠️ 月线数据同步失败: {e}（继续后续步骤）")
+                stats.completed_steps += 1
             
             # 步骤4: 同步财务数据
             stats.current_step = "同步财务数据"

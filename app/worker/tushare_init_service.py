@@ -24,10 +24,12 @@ class InitializationStats:
     current_step: str = ""
     basic_info_count: int = 0
     historical_records: int = 0
+    weekly_records: int = 0
+    monthly_records: int = 0
     financial_records: int = 0
     quotes_count: int = 0
     errors: List[Dict[str, Any]] = None
-    
+
     def __post_init__(self):
         if self.errors is None:
             self.errors = []
@@ -61,43 +63,88 @@ class TushareInitService:
         self,
         historical_days: int = 365,
         skip_if_exists: bool = True,
-        batch_size: int = 100
+        batch_size: int = 100,
+        enable_multi_period: bool = False,
+        sync_items: List[str] = None
     ) -> Dict[str, Any]:
         """
         运行完整的数据初始化
-        
+
         Args:
             historical_days: 历史数据天数（默认1年）
             skip_if_exists: 如果数据已存在是否跳过
             batch_size: 批处理大小
-            
+            enable_multi_period: 是否启用多周期数据同步（日线、周线、月线）
+            sync_items: 要同步的数据类型列表，可选值：
+                - 'basic_info': 股票基础信息
+                - 'historical': 历史行情数据（日线）
+                - 'weekly': 周线数据
+                - 'monthly': 月线数据
+                - 'financial': 财务数据
+                - 'quotes': 最新行情
+                - None: 同步所有数据（默认）
+
         Returns:
             初始化结果统计
         """
-        logger.info("🚀 开始Tushare数据完整初始化...")
-        
+        # 如果未指定sync_items，则同步所有数据
+        if sync_items is None:
+            sync_items = ['basic_info', 'historical', 'financial', 'quotes']
+            if enable_multi_period:
+                sync_items.extend(['weekly', 'monthly'])
+
+        logger.info(f"🚀 开始Tushare数据初始化...")
+        logger.info(f"📋 同步项目: {', '.join(sync_items)}")
+
+        # 计算总步骤数（检查状态 + 同步项目数 + 验证）
+        total_steps = 1 + len(sync_items) + 1
+
         self.stats = InitializationStats(
             started_at=datetime.utcnow(),
-            total_steps=6
+            total_steps=total_steps
         )
-        
+
         try:
             # 步骤1: 检查数据库状态
             await self._step_check_database_status(skip_if_exists)
-            
+
             # 步骤2: 初始化股票基础信息
-            await self._step_initialize_basic_info()
-            
-            # 步骤3: 同步历史数据
-            await self._step_initialize_historical_data(historical_days)
-            
-            # 步骤4: 同步财务数据
-            await self._step_initialize_financial_data()
-            
-            # 步骤5: 同步最新行情
-            await self._step_initialize_quotes()
-            
-            # 步骤6: 验证数据完整性
+            if 'basic_info' in sync_items:
+                await self._step_initialize_basic_info()
+            else:
+                logger.info("⏭️ 跳过股票基础信息同步")
+
+            # 步骤3: 同步历史数据（日线）
+            if 'historical' in sync_items:
+                await self._step_initialize_historical_data(historical_days)
+            else:
+                logger.info("⏭️ 跳过历史数据（日线）同步")
+
+            # 步骤4: 同步周线数据
+            if 'weekly' in sync_items:
+                await self._step_initialize_weekly_data(historical_days)
+            else:
+                logger.info("⏭️ 跳过周线数据同步")
+
+            # 步骤5: 同步月线数据
+            if 'monthly' in sync_items:
+                await self._step_initialize_monthly_data(historical_days)
+            else:
+                logger.info("⏭️ 跳过月线数据同步")
+
+            # 步骤6: 同步财务数据
+            if 'financial' in sync_items:
+                await self._step_initialize_financial_data()
+            else:
+                logger.info("⏭️ 跳过财务数据同步")
+
+            # 步骤7: 同步最新行情
+            if 'quotes' in sync_items:
+                await self._step_initialize_quotes()
+            else:
+                logger.info("⏭️ 跳过最新行情同步")
+
+            # 最后: 验证数据完整性
             await self._step_verify_data_integrity()
             
             self.stats.finished_at = datetime.utcnow()
@@ -156,13 +203,18 @@ class TushareInitService:
         """步骤3: 同步历史数据"""
         self.stats.current_step = f"同步历史数据({historical_days}天)"
         logger.info(f"📊 {self.stats.current_step}...")
-        
+
         # 计算日期范围
         end_date = datetime.now().strftime('%Y-%m-%d')
-        start_date = (datetime.now() - timedelta(days=historical_days)).strftime('%Y-%m-%d')
-        
-        logger.info(f"  历史数据范围: {start_date} 到 {end_date}")
-        
+
+        # 如果 historical_days 大于等于10年（3650天），则同步全历史
+        if historical_days >= 3650:
+            start_date = "1990-01-01"  # 全历史同步
+            logger.info(f"  历史数据范围: 全历史（从1990-01-01到{end_date}）")
+        else:
+            start_date = (datetime.now() - timedelta(days=historical_days)).strftime('%Y-%m-%d')
+            logger.info(f"  历史数据范围: {start_date} 到 {end_date}")
+
         # 同步历史数据
         result = await self.sync_service.sync_historical_data(
             start_date=start_date,
@@ -177,7 +229,79 @@ class TushareInitService:
             logger.warning("⚠️ 历史数据初始化部分失败，继续后续步骤")
         
         self.stats.completed_steps += 1
-    
+
+    async def _step_initialize_weekly_data(self, historical_days: int):
+        """步骤4a: 同步周线数据"""
+        self.stats.current_step = f"同步周线数据({historical_days}天)"
+        logger.info(f"📊 {self.stats.current_step}...")
+
+        # 计算日期范围
+        end_date = datetime.now().strftime('%Y-%m-%d')
+
+        # 如果 historical_days 大于等于10年（3650天），则同步全历史
+        if historical_days >= 3650:
+            start_date = "1990-01-01"  # 全历史同步
+            logger.info(f"  周线数据范围: 全历史（从1990-01-01到{end_date}）")
+        else:
+            start_date = (datetime.now() - timedelta(days=historical_days)).strftime('%Y-%m-%d')
+            logger.info(f"  周线数据范围: {start_date} 到 {end_date}")
+
+        try:
+            # 同步周线数据
+            result = await self.sync_service.sync_historical_data(
+                start_date=start_date,
+                end_date=end_date,
+                incremental=False,
+                period="weekly"  # 指定周线
+            )
+
+            if result:
+                weekly_records = result.get("total_records", 0)
+                self.stats.weekly_records = weekly_records
+                logger.info(f"✅ 周线数据初始化完成: {weekly_records}条记录")
+            else:
+                logger.warning("⚠️ 周线数据初始化部分失败，继续后续步骤")
+        except Exception as e:
+            logger.warning(f"⚠️ 周线数据初始化失败: {e}（继续后续步骤）")
+
+        self.stats.completed_steps += 1
+
+    async def _step_initialize_monthly_data(self, historical_days: int):
+        """步骤4b: 同步月线数据"""
+        self.stats.current_step = f"同步月线数据({historical_days}天)"
+        logger.info(f"📊 {self.stats.current_step}...")
+
+        # 计算日期范围
+        end_date = datetime.now().strftime('%Y-%m-%d')
+
+        # 如果 historical_days 大于等于10年（3650天），则同步全历史
+        if historical_days >= 3650:
+            start_date = "1990-01-01"  # 全历史同步
+            logger.info(f"  月线数据范围: 全历史（从1990-01-01到{end_date}）")
+        else:
+            start_date = (datetime.now() - timedelta(days=historical_days)).strftime('%Y-%m-%d')
+            logger.info(f"  月线数据范围: {start_date} 到 {end_date}")
+
+        try:
+            # 同步月线数据
+            result = await self.sync_service.sync_historical_data(
+                start_date=start_date,
+                end_date=end_date,
+                incremental=False,
+                period="monthly"  # 指定月线
+            )
+
+            if result:
+                monthly_records = result.get("total_records", 0)
+                self.stats.monthly_records = monthly_records
+                logger.info(f"✅ 月线数据初始化完成: {monthly_records}条记录")
+            else:
+                logger.warning("⚠️ 月线数据初始化部分失败，继续后续步骤")
+        except Exception as e:
+            logger.warning(f"⚠️ 月线数据初始化失败: {e}（继续后续步骤）")
+
+        self.stats.completed_steps += 1
+
     async def _step_initialize_financial_data(self):
         """步骤4: 同步财务数据"""
         self.stats.current_step = "同步财务数据"
@@ -260,6 +384,9 @@ class TushareInitService:
             "data_summary": {
                 "basic_info_count": self.stats.basic_info_count,
                 "historical_records": self.stats.historical_records,
+                "daily_records": self.stats.historical_records,  # 日线数据
+                "weekly_records": self.stats.weekly_records,     # 周线数据
+                "monthly_records": self.stats.monthly_records,   # 月线数据
                 "financial_records": self.stats.financial_records,
                 "quotes_count": self.stats.quotes_count
             },

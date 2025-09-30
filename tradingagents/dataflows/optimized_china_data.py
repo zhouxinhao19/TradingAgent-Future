@@ -19,6 +19,9 @@ from tradingagents.config.runtime_settings import get_float, get_timezone_name
 from tradingagents.utils.logging_manager import get_logger
 logger = get_logger('agents')
 
+# 导入增强数据适配器
+from .enhanced_data_adapter import get_enhanced_data_adapter, get_stock_data_with_fallback, get_financial_data_with_fallback
+
 
 class OptimizedChinaDataProvider:
     """优化的A股数据提供器 - 集成缓存和Tushare数据接口"""
@@ -42,6 +45,62 @@ class OptimizedChinaDataProvider:
 
         self.last_api_call = time.time()
 
+    def _format_financial_data_to_fundamentals(self, financial_data: Dict[str, Any], symbol: str) -> str:
+        """将MongoDB财务数据转换为基本面分析格式"""
+        try:
+            # 提取关键财务指标
+            revenue = financial_data.get('total_revenue', 'N/A')
+            net_profit = financial_data.get('net_profit', 'N/A')
+            total_assets = financial_data.get('total_assets', 'N/A')
+            total_equity = financial_data.get('total_equity', 'N/A')
+            report_period = financial_data.get('report_period', 'N/A')
+
+            # 格式化数值（如果是数字则添加千分位，否则显示原值）
+            def format_number(value):
+                if isinstance(value, (int, float)):
+                    return f"{value:,.2f}"
+                return str(value)
+
+            revenue_str = format_number(revenue)
+            net_profit_str = format_number(net_profit)
+            total_assets_str = format_number(total_assets)
+            total_equity_str = format_number(total_equity)
+
+            # 计算财务比率
+            roe = 'N/A'
+            if isinstance(net_profit, (int, float)) and isinstance(total_equity, (int, float)) and total_equity != 0:
+                roe = f"{(net_profit / total_equity * 100):.2f}%"
+
+            roa = 'N/A'
+            if isinstance(net_profit, (int, float)) and isinstance(total_assets, (int, float)) and total_assets != 0:
+                roa = f"{(net_profit / total_assets * 100):.2f}%"
+
+            # 格式化输出
+            fundamentals_report = f"""
+# {symbol} 基本面数据分析
+
+## 📊 财务概况
+- **报告期**: {report_period}
+- **营业收入**: {revenue_str} 元
+- **净利润**: {net_profit_str} 元
+- **总资产**: {total_assets_str} 元
+- **股东权益**: {total_equity_str} 元
+
+## 📈 财务比率
+- **净资产收益率(ROE)**: {roe}
+- **总资产收益率(ROA)**: {roa}
+
+## 📝 数据说明
+- 数据来源: MongoDB财务数据库
+- 更新时间: {datetime.now(ZoneInfo(get_timezone_name())).strftime('%Y-%m-%d %H:%M:%S')}
+- 数据类型: 同步财务数据
+"""
+            return fundamentals_report.strip()
+
+        except Exception as e:
+            logger.warning(f"⚠️ 格式化财务数据失败: {e}")
+            return f"# {symbol} 基本面数据\n\n❌ 数据格式化失败: {str(e)}"
+
     def get_stock_data(self, symbol: str, start_date: str, end_date: str,
                       force_refresh: bool = False) -> str:
         """
@@ -58,7 +117,16 @@ class OptimizedChinaDataProvider:
         """
         logger.info(f"📈 获取A股数据: {symbol} ({start_date} 到 {end_date})")
 
-        # 检查缓存（除非强制刷新）
+        # 1. 优先尝试从MongoDB获取（如果启用了TA_USE_APP_CACHE）
+        if not force_refresh:
+            adapter = get_enhanced_data_adapter()
+            if adapter.use_app_cache:
+                df = adapter.get_historical_data(symbol, start_date, end_date)
+                if df is not None and not df.empty:
+                    logger.info(f"📊 使用MongoDB历史数据: {symbol}")
+                    return df.to_string()
+
+        # 2. 检查文件缓存（除非强制刷新）
         if not force_refresh:
             cache_key = self.cache.find_cached_stock_data(
                 symbol=symbol,
@@ -139,7 +207,17 @@ class OptimizedChinaDataProvider:
         """
         logger.info(f"📊 获取A股基本面数据: {symbol}")
 
-        # 检查缓存（除非强制刷新）
+        # 1. 优先尝试从MongoDB获取财务数据（如果启用了TA_USE_APP_CACHE）
+        if not force_refresh:
+            adapter = get_enhanced_data_adapter()
+            if adapter.use_app_cache:
+                financial_data = adapter.get_financial_data(symbol)
+                if financial_data:
+                    logger.info(f"💰 使用MongoDB财务数据: {symbol}")
+                    # 将财务数据转换为基本面分析格式
+                    return self._format_financial_data_to_fundamentals(financial_data, symbol)
+
+        # 2. 检查文件缓存（除非强制刷新）
         if not force_refresh:
             # 查找基本面数据缓存
             for metadata_file in self.cache.metadata_dir.glob(f"*_meta.json"):

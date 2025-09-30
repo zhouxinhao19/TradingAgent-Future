@@ -68,10 +68,10 @@ class HistoricalDataService:
             operations = []
             saved_count = 0
             
-            for _, row in data.iterrows():
+            for date_index, row in data.iterrows():
                 try:
-                    # 标准化数据
-                    doc = self._standardize_record(symbol, row, data_source, market, period)
+                    # 标准化数据（传递日期索引）
+                    doc = self._standardize_record(symbol, row, data_source, market, period, date_index)
                     
                     # 创建upsert操作
                     filter_doc = {
@@ -116,17 +116,25 @@ class HistoricalDataService:
         row: pd.Series,
         data_source: str,
         market: str,
-        period: str = "daily"
+        period: str = "daily",
+        date_index = None
     ) -> Dict[str, Any]:
         """标准化单条记录"""
         now = datetime.utcnow()
-        
+
+        # 获取日期 - 优先使用索引，然后尝试从列中获取
+        trade_date = None
+        if date_index is not None:
+            trade_date = self._format_date(date_index)
+        else:
+            trade_date = self._format_date(row.get('date') or row.get('trade_date'))
+
         # 基础字段映射
         doc = {
             "symbol": symbol,
             "full_symbol": self._get_full_symbol(symbol, market),
             "market": market,
-            "trade_date": self._format_date(row.get('date') or row.get('trade_date')),
+            "trade_date": trade_date,
             "period": period,
             "data_source": data_source,
             "created_at": now,

@@ -356,7 +356,8 @@ class AKShareSyncService:
         start_date: str = None,
         end_date: str = None,
         symbols: List[str] = None,
-        incremental: bool = True
+        incremental: bool = True,
+        period: str = "daily"
     ) -> Dict[str, Any]:
         """
         同步历史数据
@@ -366,11 +367,13 @@ class AKShareSyncService:
             end_date: 结束日期
             symbols: 指定股票代码列表
             incremental: 是否增量同步
+            period: 数据周期 (daily/weekly/monthly)
 
         Returns:
             同步结果统计
         """
-        logger.info("🔄 开始同步历史数据...")
+        period_name = {"daily": "日线", "weekly": "周线", "monthly": "月线"}.get(period, "日线")
+        logger.info(f"🔄 开始同步{period_name}历史数据...")
 
         stats = {
             "total_processed": 0,
@@ -410,7 +413,7 @@ class AKShareSyncService:
             # 3. 批量处理
             for i in range(0, len(symbols), self.batch_size):
                 batch = symbols[i:i + self.batch_size]
-                batch_stats = await self._process_historical_batch(batch, start_date, end_date)
+                batch_stats = await self._process_historical_batch(batch, start_date, end_date, period)
 
                 # 更新统计
                 stats["success_count"] += batch_stats["success_count"]
@@ -444,7 +447,7 @@ class AKShareSyncService:
             stats["errors"].append({"error": str(e), "context": "sync_historical_data"})
             return stats
 
-    async def _process_historical_batch(self, batch: List[str], start_date: str, end_date: str) -> Dict[str, Any]:
+    async def _process_historical_batch(self, batch: List[str], start_date: str, end_date: str, period: str = "daily") -> Dict[str, Any]:
         """处理历史数据批次"""
         batch_stats = {
             "success_count": 0,
@@ -456,7 +459,7 @@ class AKShareSyncService:
         for symbol in batch:
             try:
                 # 获取历史数据
-                hist_data = await self.provider.get_historical_data(symbol, start_date, end_date)
+                hist_data = await self.provider.get_historical_data(symbol, start_date, end_date, period)
 
                 if hist_data is not None and not hist_data.empty:
                     # 保存到统一历史数据集合
@@ -467,7 +470,8 @@ class AKShareSyncService:
                         symbol=symbol,
                         data=hist_data,
                         data_source="akshare",
-                        market="CN"
+                        market="CN",
+                        period=period
                     )
 
                     batch_stats["success_count"] += 1

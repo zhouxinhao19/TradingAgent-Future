@@ -158,19 +158,25 @@ def print_help_detail():
 📊 使用示例:
   # 检查数据库状态
   python cli/baostock_init.py --check-only
-  
+
   # 测试连接
   python cli/baostock_init.py --test-connection
-  
-  # 完整初始化（推荐）
+
+  # 完整初始化（推荐，默认1年历史数据）
   python cli/baostock_init.py --full
-  
-  # 自定义历史数据范围
+
+  # 自定义历史数据范围（6个月）
   python cli/baostock_init.py --full --historical-days 180
-  
+
+  # 全历史数据初始化（从1990年至今，需要>=3650天）
+  python cli/baostock_init.py --full --historical-days 10000
+
+  # 全历史多周期初始化（推荐用于生产环境）
+  python cli/baostock_init.py --full --multi-period --historical-days 10000
+
   # 强制重新初始化
   python cli/baostock_init.py --full --force
-  
+
   # 仅基础初始化
   python cli/baostock_init.py --basic-only
 
