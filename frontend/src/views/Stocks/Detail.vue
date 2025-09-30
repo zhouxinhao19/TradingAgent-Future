@@ -317,7 +317,14 @@ async function checkFavorite() {
 }
 onMounted(async () => {
   // 首次加载：打通后端（并行）
-  await Promise.all([fetchQuote(), fetchFundamentals(), fetchKline(), fetchNews(), checkFavorite()])
+  await Promise.all([
+    fetchQuote(),
+    fetchFundamentals(),
+    fetchKline(),
+    fetchNews(),
+    checkFavorite(),
+    fetchLatestAnalysis()  // 获取最新的历史分析报告
+  ])
   // 每30秒刷新一次报价
   timer = setInterval(fetchQuote, 30000)
 })
@@ -544,6 +551,47 @@ async function pollTask(taskId: string) {
 function scrollToDetail() {
   const el = document.getElementById('analysis-detail')
   if (el) el.scrollIntoView({ behavior: 'smooth' })
+}
+
+// 获取最新的历史分析报告
+async function fetchLatestAnalysis() {
+  try {
+    const resp: any = await analysisApi.getHistory({
+      stock_code: code.value,
+      page: 1,
+      page_size: 1,
+      status: 'completed'
+    })
+
+    const data = resp?.data || resp
+    const tasks = data?.tasks || data?.analyses || []
+
+    if (tasks && tasks.length > 0) {
+      const latestTask = tasks[0]
+
+      // 如果有 result 字段，直接使用
+      if (latestTask.result) {
+        lastAnalysis.value = latestTask.result
+        analysisStatus.value = 'completed'
+        console.log('✅ 加载历史分析报告成功:', latestTask.result)
+      }
+      // 否则尝试通过 task_id 获取结果
+      else if (latestTask.task_id) {
+        try {
+          const resultResp: any = await analysisApi.getTaskResult(latestTask.task_id)
+          lastAnalysis.value = resultResp?.data || resultResp
+          analysisStatus.value = 'completed'
+          console.log('✅ 通过 task_id 加载分析报告成功:', lastAnalysis.value)
+        } catch (e) {
+          console.warn('⚠️ 获取任务结果失败:', e)
+        }
+      }
+    } else {
+      console.log('ℹ️ 该股票暂无历史分析报告')
+    }
+  } catch (e) {
+    console.warn('⚠️ 获取历史分析报告失败:', e)
+  }
 }
 
 // 格式化
