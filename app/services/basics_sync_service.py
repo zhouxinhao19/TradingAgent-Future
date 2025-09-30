@@ -140,6 +140,9 @@ class BasicsSyncService:
                     except Exception:
                         pass
 
+                # 生成 full_symbol（完整标准化代码）
+                full_symbol = self._generate_full_symbol(code)
+
                 doc = {
                     "code": code,
                     "name": name,
@@ -151,6 +154,7 @@ class BasicsSyncService:
                     "sec": category,
                     "source": "tushare",
                     "updated_at": now_iso,
+                    "full_symbol": full_symbol,  # 添加完整标准化代码
                 }
 
                 # Add market cap fields
@@ -233,6 +237,29 @@ class BasicsSyncService:
     def _fetch_latest_roe_map(self) -> Dict[str, Dict[str, float]]:
         """Delegate to basics_sync.utils (blocking)"""
         return _fetch_latest_roe_map_util()
+
+    def _generate_full_symbol(self, code: str) -> str:
+        """
+        根据股票代码生成完整标准化代码
+
+        Args:
+            code: 6位股票代码
+
+        Returns:
+            完整标准化代码（如 000001.SZ）
+        """
+        if not code or len(code) != 6:
+            return None
+
+        # 根据代码判断交易所
+        if code.startswith(('60', '68', '90')):
+            return f"{code}.SS"  # 上海证券交易所
+        elif code.startswith(('00', '30', '20')):
+            return f"{code}.SZ"  # 深圳证券交易所
+        elif code.startswith('8') or code.startswith('4'):
+            return f"{code}.BJ"  # 北京证券交易所
+        else:
+            return f"{code}.SZ"  # 默认深圳
 
 
 # Singleton accessor
