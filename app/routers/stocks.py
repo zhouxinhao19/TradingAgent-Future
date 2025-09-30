@@ -80,32 +80,83 @@ async def get_quote(code: str, current_user: dict = Depends(get_current_user)):
 
 @router.get("/{code}/fundamentals", response_model=dict)
 async def get_fundamentals(code: str, current_user: dict = Depends(get_current_user)):
-    """获取基础面快照（来自 stock_basic_info 集合）"""
+    """
+    获取基础面快照（优先从 MongoDB 获取）
+
+    数据来源优先级：
+    1. stock_basic_info 集合（基础信息、估值指标）
+    2. stock_financial_data 集合（财务指标：ROE、负债率等）
+    """
     db = get_mongo_db()
     code6 = _zfill_code(code)
+
+    # 1. 获取基础信息
     b = await db["stock_basic_info"].find_one({"code": code6}, {"_id": 0})
     if not b:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="未找到该股票的基础信息")
 
+    # 2. 尝试从 stock_financial_data 获取最新财务指标
+    financial_data = None
+    try:
+        financial_data = await db["stock_financial_data"].find_one(
+            {"symbol": code6},
+            {"_id": 0},
+            sort=[("report_period", -1)]  # 按报告期降序，获取最新数据
+        )
+    except Exception as e:
+        print(f"获取财务数据失败: {e}")
+
+    # 3. 构建返回数据
     data = {
         "code": code6,
         "name": b.get("name"),
         "industry": b.get("industry"),
         "market": b.get("market"),
-        # 估值/财务与交易指标（若有）
+
+        # 板块信息（优先使用 sse，其次 sec）
+        "sector": b.get("sse") or b.get("sec") or b.get("sector"),
+
+        # 估值指标（来自 stock_basic_info）
         "pe": b.get("pe"),
         "pb": b.get("pb"),
         "pe_ttm": b.get("pe_ttm"),
         "pb_mrq": b.get("pb_mrq"),
-        "roe": b.get("roe"),
+
+        # ROE（优先从 stock_financial_data 获取，其次从 stock_basic_info）
+        "roe": None,
+
+        # 负债率（从 stock_financial_data 获取）
+        "debt_ratio": None,
+
         # 市值：已在同步服务中转换为亿元
         "total_mv": b.get("total_mv"),
         "circ_mv": b.get("circ_mv"),
+
         # 交易指标（可能为空）
         "turnover_rate": b.get("turnover_rate"),
         "volume_ratio": b.get("volume_ratio"),
+
         "updated_at": b.get("updated_at"),
     }
+
+    # 4. 从财务数据中提取 ROE 和负债率
+    if financial_data:
+        # ROE（净资产收益率）
+        if financial_data.get("financial_indicators"):
+            indicators = financial_data["financial_indicators"]
+            data["roe"] = indicators.get("roe")
+            data["debt_ratio"] = indicators.get("debt_to_assets")
+
+        # 如果 financial_indicators 中没有，尝试从顶层字段获取
+        if data["roe"] is None:
+            data["roe"] = financial_data.get("roe")
+        if data["debt_ratio"] is None:
+            data["debt_ratio"] = financial_data.get("debt_to_assets")
+
+    # 5. 如果财务数据中没有 ROE，使用 stock_basic_info 中的
+    if data["roe"] is None:
+        data["roe"] = b.get("roe")
+
     return ok(data)
 
 
