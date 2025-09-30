@@ -123,7 +123,7 @@ class OptimizedChinaDataProvider:
             if adapter.use_app_cache:
                 df = adapter.get_historical_data(symbol, start_date, end_date)
                 if df is not None and not df.empty:
-                    logger.info(f"📊 使用MongoDB历史数据: {symbol}")
+                    logger.info(f"📊 [数据来源: MongoDB] 使用MongoDB历史数据: {symbol} ({len(df)}条记录)")
                     return df.to_string()
 
         # 2. 检查文件缓存（除非强制刷新）
@@ -138,11 +138,11 @@ class OptimizedChinaDataProvider:
             if cache_key:
                 cached_data = self.cache.load_stock_data(cache_key)
                 if cached_data:
-                    logger.info(f"⚡ 从缓存加载A股数据: {symbol}")
+                    logger.info(f"⚡ [数据来源: 文件缓存] 从缓存加载A股数据: {symbol}")
                     return cached_data
 
         # 缓存未命中，从Tushare数据接口获取
-        logger.info(f"🌐 从Tushare数据接口获取数据: {symbol}")
+        logger.info(f"🌐 [数据来源: API调用] 从Tushare数据接口获取数据: {symbol}")
 
         try:
             # API限制处理
@@ -159,14 +159,15 @@ class OptimizedChinaDataProvider:
 
             # 检查是否获取成功
             if "❌" in formatted_data or "错误" in formatted_data:
-                logger.error(f"❌ 数据源API调用失败: {symbol}")
+                logger.error(f"❌ [数据来源: API失败] 数据源API调用失败: {symbol}")
                 # 尝试从旧缓存获取数据
                 old_cache = self._try_get_old_cache(symbol, start_date, end_date)
                 if old_cache:
-                    logger.info(f"📁 使用过期缓存数据: {symbol}")
+                    logger.info(f"📁 [数据来源: 过期缓存] 使用过期缓存数据: {symbol}")
                     return old_cache
 
                 # 生成备用数据
+                logger.warning(f"⚠️ [数据来源: 备用数据] 生成备用数据: {symbol}")
                 return self._generate_fallback_data(symbol, start_date, end_date, "数据源API调用失败")
 
             # 保存到缓存
@@ -178,7 +179,7 @@ class OptimizedChinaDataProvider:
                 data_source="unified"  # 使用统一数据源标识
             )
 
-            logger.info(f"✅ A股数据获取成功: {symbol}")
+            logger.info(f"✅ [数据来源: API调用成功] A股数据获取成功: {symbol}")
             return formatted_data
 
         except Exception as e:
@@ -213,7 +214,7 @@ class OptimizedChinaDataProvider:
             if adapter.use_app_cache:
                 financial_data = adapter.get_financial_data(symbol)
                 if financial_data:
-                    logger.info(f"💰 使用MongoDB财务数据: {symbol}")
+                    logger.info(f"💰 [数据来源: MongoDB财务数据] 使用MongoDB财务数据: {symbol}")
                     # 将财务数据转换为基本面分析格式
                     return self._format_financial_data_to_fundamentals(financial_data, symbol)
 
@@ -234,13 +235,13 @@ class OptimizedChinaDataProvider:
                         if self.cache.is_cache_valid(cache_key, symbol=symbol, data_type='fundamentals'):
                             cached_data = self.cache.load_stock_data(cache_key)
                             if cached_data:
-                                logger.info(f"⚡ 从缓存加载A股基本面数据: {symbol}")
+                                logger.info(f"⚡ [数据来源: 文件缓存] 从缓存加载A股基本面数据: {symbol}")
                                 return cached_data
                 except Exception:
                     continue
 
         # 缓存未命中，生成基本面分析
-        logger.debug(f"🔍 生成A股基本面分析: {symbol}")
+        logger.debug(f"🔍 [数据来源: 生成分析] 生成A股基本面分析: {symbol}")
 
         try:
             # 基本面分析只需要基础信息，不需要完整的历史交易数据
@@ -257,12 +258,13 @@ class OptimizedChinaDataProvider:
                 data_source="tdx_analysis"
             )
 
-            logger.info(f"✅ A股基本面数据生成成功: {symbol}")
+            logger.info(f"✅ [数据来源: 生成分析成功] A股基本面数据生成成功: {symbol}")
             return fundamentals_data
 
         except Exception as e:
             error_msg = f"基本面数据生成失败: {str(e)}"
-            logger.error(f"❌ {error_msg}")
+            logger.error(f"❌ [数据来源: 生成失败] {error_msg}")
+            logger.warning(f"⚠️ [数据来源: 备用数据] 生成备用基本面数据: {symbol}")
             return self._generate_fallback_fundamentals(symbol, error_msg)
 
     def _get_stock_basic_info_only(self, symbol: str) -> str:

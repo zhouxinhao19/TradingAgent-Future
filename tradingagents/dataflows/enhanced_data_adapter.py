@@ -92,10 +92,10 @@ class EnhancedDataAdapter:
             
             if data:
                 df = pd.DataFrame(data)
-                logger.debug(f"✅ 从MongoDB获取历史数据: {symbol}, 记录数: {len(df)}")
+                logger.debug(f"✅ [数据来源: MongoDB-历史数据] 从MongoDB获取历史数据: {symbol}, 记录数: {len(df)}")
                 return df
             else:
-                logger.debug(f"📊 MongoDB中未找到历史数据: {symbol}")
+                logger.debug(f"📊 [数据来源: MongoDB-历史数据] MongoDB中未找到历史数据: {symbol}")
                 return None
                 
         except Exception as e:
@@ -120,14 +120,14 @@ class EnhancedDataAdapter:
             doc = collection.find_one(query, {"_id": 0}, sort=[("report_period", -1)])
             
             if doc:
-                logger.debug(f"✅ 从MongoDB获取财务数据: {symbol}")
+                logger.debug(f"✅ [数据来源: MongoDB-财务数据] 从MongoDB获取财务数据: {symbol}")
                 return doc
             else:
-                logger.debug(f"📊 MongoDB中未找到财务数据: {symbol}")
+                logger.debug(f"📊 [数据来源: MongoDB-财务数据] MongoDB中未找到财务数据: {symbol}")
                 return None
-                
+
         except Exception as e:
-            logger.warning(f"⚠️ 获取财务数据失败: {e}")
+            logger.warning(f"⚠️ [数据来源: MongoDB-财务数据] 获取财务数据失败: {e}")
             return None
     
     def get_news_data(self, symbol: str = None, hours_back: int = 24, limit: int = 20) -> Optional[List[Dict[str, Any]]]:
@@ -154,14 +154,14 @@ class EnhancedDataAdapter:
             data = list(cursor)
             
             if data:
-                logger.debug(f"✅ 从MongoDB获取新闻数据: {len(data)}条")
+                logger.debug(f"✅ [数据来源: MongoDB-新闻数据] 从MongoDB获取新闻数据: {len(data)}条")
                 return data
             else:
-                logger.debug(f"📊 MongoDB中未找到新闻数据")
+                logger.debug(f"📊 [数据来源: MongoDB-新闻数据] MongoDB中未找到新闻数据")
                 return None
-                
+
         except Exception as e:
-            logger.warning(f"⚠️ 获取新闻数据失败: {e}")
+            logger.warning(f"⚠️ [数据来源: MongoDB-新闻数据] 获取新闻数据失败: {e}")
             return None
     
     def get_social_media_data(self, symbol: str = None, hours_back: int = 24, limit: int = 20) -> Optional[List[Dict[str, Any]]]:
