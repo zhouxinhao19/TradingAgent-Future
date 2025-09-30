@@ -446,7 +446,7 @@ class SimpleAnalysisService:
             result = await self._execute_analysis_sync(task_id, user_id, request, progress_tracker)
 
             # 标记进度跟踪器完成
-            progress_tracker.mark_completed("✅ 分析完成")
+            progress_tracker.mark_completed()
 
             # 保存分析结果到文件和数据库
             try:
