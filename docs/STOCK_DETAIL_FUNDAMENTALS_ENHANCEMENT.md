@@ -39,7 +39,8 @@
 
 | 前端字段 | 后端字段 | 数据来源 | 说明 |
 |---------|---------|---------|------|
-| `sector` | `sse` / `sec` / `sector` | `stock_basic_info` | 板块信息，优先使用 sse |
+| `industry` | `industry` | `stock_basic_info` | 所属行业（如：银行、软件服务） |
+| `sector` | `market` | `stock_basic_info` | 板块信息（如：主板、创业板、科创板） |
 | `roe` | `financial_indicators.roe` / `roe` | `stock_financial_data` → `stock_basic_info` | 净资产收益率，优先从财务数据获取 |
 | `debt_ratio` | `financial_indicators.debt_to_assets` / `debt_to_assets` | `stock_financial_data` | 资产负债率 |
 
@@ -74,7 +75,8 @@ async def get_fundamentals(code: str, current_user: dict = Depends(get_current_u
     
     # 3. 构建返回数据
     data = {
-        "sector": b.get("sse") or b.get("sec") or b.get("sector"),
+        "industry": b.get("industry"),  # 行业（如：银行、软件服务）
+        "sector": b.get("market"),      # 板块（如：主板、创业板、科创板）
         "roe": None,
         "debt_ratio": None,
         # ... 其他字段
@@ -104,10 +106,10 @@ async def get_fundamentals(code: str, current_user: dict = Depends(get_current_u
 {
   "code": "000001",
   "name": "平安银行",
-  "industry": "银行",
-  "market": "主板",
-  "sse": "sz",              // 板块信息
-  "sec": "stock_cn",
+  "industry": "银行",       // 所属行业
+  "market": "主板",         // 板块信息（主板/创业板/科创板/北交所）
+  "sse": "sz",              // 技术标识（深圳/上海）
+  "sec": "stock_cn",        // 分类标识
   "total_mv": 2200.63,      // 总市值（亿元）
   "pe": 4.9443,             // 市盈率
   "pb": 0.5,                // 市净率
@@ -196,7 +198,7 @@ async def get_fundamentals(code: str, current_user: dict = Depends(get_current_u
    股票名称: 平安银行
    所属行业: 银行
    交易所: 主板
-   板块: sz ✅
+   板块: 主板 ✅
    总市值: 2200.63112365 亿元
    市盈率(PE): 4.9443
    市净率(PB): 0.5
@@ -205,7 +207,7 @@ async def get_fundamentals(code: str, current_user: dict = Depends(get_current_u
 
 📊 [测试4] 验证结果
 --------------------------------------------------------------------------------
-✅ 板块信息获取成功: sz
+✅ 板块信息获取成功: 主板
 ✅ ROE 获取成功: 4.9497
 ✅ 负债率获取成功: 91.318
 
@@ -322,7 +324,8 @@ http://localhost:5173/stocks/000001
 
 ### 2. 字段映射策略
 
-- **板块**：`sse` → `sec` → `sector`（优先使用 sse）
+- **行业**：`industry`（所属行业，如：银行、软件服务）
+- **板块**：`market`（交易所/板块，如：主板、创业板、科创板）
 - **ROE**：`financial_indicators.roe` → `roe` → `stock_basic_info.roe`
 - **负债率**：`financial_indicators.debt_to_assets` → `debt_to_assets`
 

@@ -101,8 +101,8 @@ async def test_stock_fundamentals(stock_code: str = "000001"):
         "industry": basic_info.get("industry"),
         "market": basic_info.get("market"),
         
-        # 板块信息（优先使用 sse，其次 sec）
-        "sector": basic_info.get("sse") or basic_info.get("sec") or basic_info.get("sector"),
+        # 板块信息：使用 market 字段（主板/创业板/科创板等）
+        "sector": basic_info.get("market"),
         
         # 估值指标
         "pe": basic_info.get("pe"),

@@ -110,11 +110,11 @@ async def get_fundamentals(code: str, current_user: dict = Depends(get_current_u
     data = {
         "code": code6,
         "name": b.get("name"),
-        "industry": b.get("industry"),
-        "market": b.get("market"),
+        "industry": b.get("industry"),  # 行业（如：银行、软件服务）
+        "market": b.get("market"),      # 交易所（如：主板、创业板）
 
-        # 板块信息（优先使用 sse，其次 sec）
-        "sector": b.get("sse") or b.get("sec") or b.get("sector"),
+        # 板块信息：使用 market 字段（主板/创业板/科创板/北交所等）
+        "sector": b.get("market"),
 
         # 估值指标（来自 stock_basic_info）
         "pe": b.get("pe"),
