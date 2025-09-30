@@ -1149,8 +1149,8 @@ def get_china_stock_fundamentals_tushare(
     ticker: Annotated[str, "中国股票代码，如：000001、600036等"]
 ) -> str:
     """
-    使用Tushare获取中国A股基本面数据
-    重定向到data_source_manager，避免循环调用
+    获取中国A股基本面数据（统一接口）
+    支持多数据源：MongoDB → Tushare → AKShare → 生成分析
 
     Args:
         ticker: 股票代码
@@ -1161,14 +1161,15 @@ def get_china_stock_fundamentals_tushare(
     try:
         from .data_source_manager import get_data_source_manager
 
-        logger.debug(f"📊 [Tushare] 获取{ticker}基本面数据...")
-        logger.info(f"🔍 [股票代码追踪] 重定向到data_source_manager")
+        logger.debug(f"📊 获取{ticker}基本面数据...")
+        logger.info(f"🔍 [股票代码追踪] 重定向到data_source_manager.get_fundamentals_data")
 
         manager = get_data_source_manager()
-        return manager.get_china_stock_fundamentals_tushare(ticker)
+        # 使用新的统一接口，支持多数据源和自动降级
+        return manager.get_fundamentals_data(ticker)
 
     except Exception as e:
-        logger.error(f"❌ [Tushare] 获取基本面数据失败: {e}")
+        logger.error(f"❌ 获取基本面数据失败: {e}")
         return f"❌ 获取{ticker}基本面数据失败: {e}"
 
 

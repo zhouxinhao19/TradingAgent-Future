@@ -138,9 +138,10 @@ class DataSourceManager:
             logger.error(f"❌ [Tushare] 搜索股票失败: {e}")
             return f"❌ 搜索股票失败: {e}"
 
-    def get_china_stock_fundamentals_tushare(self, symbol: str) -> str:
+    def get_fundamentals_data(self, symbol: str) -> str:
         """
-        使用Tushare获取中国股票基本面数据
+        获取基本面数据，支持多数据源和自动降级
+        优先级：MongoDB → Tushare → AKShare → 生成分析
 
         Args:
             symbol: 股票代码
@@ -148,22 +149,74 @@ class DataSourceManager:
         Returns:
             str: 基本面分析报告
         """
+        logger.info(f"📊 [数据来源: {self.current_source.value}] 开始获取基本面数据: {symbol}",
+                   extra={
+                       'symbol': symbol,
+                       'data_source': self.current_source.value,
+                       'event_type': 'fundamentals_fetch_start'
+                   })
+
+        start_time = time.time()
+
         try:
-            from .tushare_adapter import get_tushare_adapter
-
-            logger.debug(f"📊 [Tushare] 获取{symbol}基本面数据...")
-
-            adapter = get_tushare_adapter()
-            fundamentals = adapter.get_fundamentals(symbol)
-
-            if fundamentals:
-                return fundamentals
+            # 根据数据源调用相应的获取方法
+            if self.current_source == ChinaDataSource.MONGODB:
+                result = self._get_mongodb_fundamentals(symbol)
+            elif self.current_source == ChinaDataSource.TUSHARE:
+                result = self._get_tushare_fundamentals(symbol)
+            elif self.current_source == ChinaDataSource.AKSHARE:
+                result = self._get_akshare_fundamentals(symbol)
             else:
-                return f"❌ 未获取到{symbol}的基本面数据"
+                # 其他数据源暂不支持基本面数据，生成基本分析
+                result = self._generate_fundamentals_analysis(symbol)
+
+            # 检查结果
+            duration = time.time() - start_time
+            result_length = len(result) if result else 0
+
+            if result and "❌" not in result:
+                logger.info(f"✅ [数据来源: {self.current_source.value}] 成功获取基本面数据: {symbol} ({result_length}字符, 耗时{duration:.2f}秒)",
+                           extra={
+                               'symbol': symbol,
+                               'data_source': self.current_source.value,
+                               'duration': duration,
+                               'result_length': result_length,
+                               'event_type': 'fundamentals_fetch_success'
+                           })
+                return result
+            else:
+                logger.warning(f"⚠️ [数据来源: {self.current_source.value}失败] 基本面数据质量异常，尝试降级: {symbol}",
+                              extra={
+                                  'symbol': symbol,
+                                  'data_source': self.current_source.value,
+                                  'event_type': 'fundamentals_fetch_fallback'
+                              })
+                return self._try_fallback_fundamentals(symbol)
 
         except Exception as e:
-            logger.error(f"❌ [Tushare] 获取基本面数据失败: {e}")
-            return f"❌ 获取{symbol}基本面数据失败: {e}"
+            duration = time.time() - start_time
+            logger.error(f"❌ [数据来源: {self.current_source.value}异常] 获取基本面数据失败: {symbol} - {e}",
+                        extra={
+                            'symbol': symbol,
+                            'data_source': self.current_source.value,
+                            'duration': duration,
+                            'error': str(e),
+                            'event_type': 'fundamentals_fetch_exception'
+                        }, exc_info=True)
+            return self._try_fallback_fundamentals(symbol)
+
+    def get_china_stock_fundamentals_tushare(self, symbol: str) -> str:
+        """
+        使用Tushare获取中国股票基本面数据（兼容旧接口）
+
+        Args:
+            symbol: 股票代码
+
+        Returns:
+            str: 基本面分析报告
+        """
+        # 重定向到统一接口
+        return self._get_tushare_fundamentals(symbol)
 
     def get_china_stock_info_tushare(self, symbol: str) -> str:
         """
@@ -946,6 +999,197 @@ class DataSourceManager:
         except Exception as e:
             logger.error(f"⚠️ 解析股票信息失败: {e}")
             return {'symbol': symbol, 'name': f'股票{symbol}', 'source': self.current_source.value}
+
+    # ==================== 基本面数据获取方法 ====================
+
+    def _get_mongodb_fundamentals(self, symbol: str) -> str:
+        """从 MongoDB 获取财务数据"""
+        logger.debug(f"📊 [MongoDB] 调用参数: symbol={symbol}")
+
+        try:
+            from tradingagents.dataflows.enhanced_data_adapter import get_enhanced_data_adapter
+            import pandas as pd
+            adapter = get_enhanced_data_adapter()
+
+            # 从 MongoDB 获取财务数据
+            financial_data = adapter.get_financial_data(symbol)
+
+            # 检查数据类型和内容
+            if financial_data is not None:
+                # 如果是 DataFrame，转换为字典列表
+                if isinstance(financial_data, pd.DataFrame):
+                    if not financial_data.empty:
+                        logger.info(f"✅ [数据来源: MongoDB-财务数据] 成功获取: {symbol} ({len(financial_data)}条记录)")
+                        # 转换为字典列表
+                        financial_dict_list = financial_data.to_dict('records')
+                        # 格式化财务数据为报告
+                        return self._format_financial_data(symbol, financial_dict_list)
+                    else:
+                        logger.warning(f"⚠️ [数据来源: MongoDB] 财务数据为空: {symbol}，降级到其他数据源")
+                        return self._try_fallback_fundamentals(symbol)
+                # 如果是列表
+                elif isinstance(financial_data, list) and len(financial_data) > 0:
+                    logger.info(f"✅ [数据来源: MongoDB-财务数据] 成功获取: {symbol} ({len(financial_data)}条记录)")
+                    return self._format_financial_data(symbol, financial_data)
+                else:
+                    logger.warning(f"⚠️ [数据来源: MongoDB] 未找到财务数据: {symbol}，降级到其他数据源")
+                    return self._try_fallback_fundamentals(symbol)
+            else:
+                logger.warning(f"⚠️ [数据来源: MongoDB] 未找到财务数据: {symbol}，降级到其他数据源")
+                # MongoDB 没有数据，降级到其他数据源
+                return self._try_fallback_fundamentals(symbol)
+
+        except Exception as e:
+            logger.error(f"❌ [数据来源: MongoDB异常] 获取财务数据失败: {e}", exc_info=True)
+            # MongoDB 异常，降级到其他数据源
+            return self._try_fallback_fundamentals(symbol)
+
+    def _get_tushare_fundamentals(self, symbol: str) -> str:
+        """从 Tushare 获取基本面数据"""
+        logger.debug(f"📊 [Tushare] 调用参数: symbol={symbol}")
+
+        try:
+            from .tushare_adapter import get_tushare_adapter
+            adapter = get_tushare_adapter()
+            fundamentals = adapter.get_fundamentals(symbol)
+
+            if fundamentals and "❌" not in fundamentals:
+                logger.info(f"✅ [数据来源: Tushare-基本面] 成功获取: {symbol}")
+                return fundamentals
+            else:
+                logger.warning(f"⚠️ [数据来源: Tushare] 未找到基本面数据: {symbol}")
+                return f"❌ 未获取到{symbol}的基本面数据"
+
+        except Exception as e:
+            logger.error(f"❌ [数据来源: Tushare异常] 获取基本面数据失败: {e}")
+            return f"❌ 获取{symbol}基本面数据失败: {e}"
+
+    def _get_akshare_fundamentals(self, symbol: str) -> str:
+        """从 AKShare 生成基本面分析"""
+        logger.debug(f"📊 [AKShare] 调用参数: symbol={symbol}")
+
+        try:
+            # AKShare 没有直接的基本面数据接口，使用生成分析
+            logger.info(f"📊 [数据来源: AKShare-生成分析] 生成基本面分析: {symbol}")
+            return self._generate_fundamentals_analysis(symbol)
+
+        except Exception as e:
+            logger.error(f"❌ [数据来源: AKShare异常] 生成基本面分析失败: {e}")
+            return f"❌ 生成{symbol}基本面分析失败: {e}"
+
+    def _format_financial_data(self, symbol: str, financial_data: List[Dict]) -> str:
+        """格式化财务数据为报告"""
+        try:
+            if not financial_data or len(financial_data) == 0:
+                return f"❌ 未找到{symbol}的财务数据"
+
+            # 获取最新的财务数据
+            latest = financial_data[0]
+
+            # 构建报告
+            report = f"📊 {symbol} 基本面数据（来自MongoDB）\n\n"
+
+            # 基本信息
+            report += f"📅 报告期: {latest.get('end_date', '未知')}\n"
+            report += f"📈 数据来源: MongoDB财务数据库\n\n"
+
+            # 财务指标
+            report += "💰 财务指标:\n"
+            if 'total_revenue' in latest:
+                report += f"   营业总收入: {latest.get('total_revenue', 0):,.2f}\n"
+            if 'net_profit' in latest:
+                report += f"   净利润: {latest.get('net_profit', 0):,.2f}\n"
+            if 'total_assets' in latest:
+                report += f"   总资产: {latest.get('total_assets', 0):,.2f}\n"
+            if 'total_liab' in latest:
+                report += f"   总负债: {latest.get('total_liab', 0):,.2f}\n"
+
+            # 估值指标
+            report += "\n📊 估值指标:\n"
+            if 'pe' in latest:
+                report += f"   市盈率(PE): {latest.get('pe', 0):.2f}\n"
+            if 'pb' in latest:
+                report += f"   市净率(PB): {latest.get('pb', 0):.2f}\n"
+            if 'ps' in latest:
+                report += f"   市销率(PS): {latest.get('ps', 0):.2f}\n"
+
+            # 盈利能力
+            report += "\n💹 盈利能力:\n"
+            if 'roe' in latest:
+                report += f"   净资产收益率(ROE): {latest.get('roe', 0):.2f}%\n"
+            if 'roa' in latest:
+                report += f"   总资产收益率(ROA): {latest.get('roa', 0):.2f}%\n"
+            if 'gross_margin' in latest:
+                report += f"   毛利率: {latest.get('gross_margin', 0):.2f}%\n"
+            if 'net_margin' in latest:
+                report += f"   净利率: {latest.get('net_margin', 0):.2f}%\n"
+
+            report += f"\n📝 共有 {len(financial_data)} 期财务数据\n"
+
+            return report
+
+        except Exception as e:
+            logger.error(f"❌ 格式化财务数据失败: {e}")
+            return f"❌ 格式化{symbol}财务数据失败: {e}"
+
+    def _generate_fundamentals_analysis(self, symbol: str) -> str:
+        """生成基本的基本面分析"""
+        try:
+            # 获取股票基本信息
+            stock_info = self.get_stock_info(symbol)
+
+            report = f"📊 {symbol} 基本面分析（生成）\n\n"
+            report += f"📈 股票名称: {stock_info.get('name', '未知')}\n"
+            report += f"🏢 所属行业: {stock_info.get('industry', '未知')}\n"
+            report += f"📍 所属地区: {stock_info.get('area', '未知')}\n"
+            report += f"📅 上市日期: {stock_info.get('list_date', '未知')}\n"
+            report += f"🏛️ 交易所: {stock_info.get('exchange', '未知')}\n\n"
+
+            report += "⚠️ 注意: 详细财务数据需要从数据源获取\n"
+            report += "💡 建议: 启用MongoDB缓存以获取完整的财务数据\n"
+
+            return report
+
+        except Exception as e:
+            logger.error(f"❌ 生成基本面分析失败: {e}")
+            return f"❌ 生成{symbol}基本面分析失败: {e}"
+
+    def _try_fallback_fundamentals(self, symbol: str) -> str:
+        """基本面数据降级处理"""
+        logger.error(f"🔄 {self.current_source.value}失败，尝试备用数据源获取基本面...")
+
+        # 备用数据源优先级: Tushare > AKShare > 生成分析
+        fallback_order = [
+            ChinaDataSource.TUSHARE,
+            ChinaDataSource.AKSHARE,
+        ]
+
+        for source in fallback_order:
+            if source != self.current_source and source in self.available_sources:
+                try:
+                    logger.info(f"🔄 尝试备用数据源获取基本面: {source.value}")
+
+                    # 直接调用具体的数据源方法，避免递归
+                    if source == ChinaDataSource.TUSHARE:
+                        result = self._get_tushare_fundamentals(symbol)
+                    elif source == ChinaDataSource.AKSHARE:
+                        result = self._get_akshare_fundamentals(symbol)
+                    else:
+                        continue
+
+                    if result and "❌" not in result:
+                        logger.info(f"✅ [数据来源: 备用数据源] 降级成功获取基本面: {source.value}")
+                        return result
+                    else:
+                        logger.warning(f"⚠️ 备用数据源{source.value}返回错误结果")
+
+                except Exception as e:
+                    logger.error(f"❌ 备用数据源{source.value}异常: {e}")
+                    continue
+
+        # 所有数据源都失败，生成基本分析
+        logger.warning(f"⚠️ [数据来源: 生成分析] 所有数据源失败，生成基本分析: {symbol}")
+        return self._generate_fundamentals_analysis(symbol)
 
 
 # 全局数据源管理器实例
