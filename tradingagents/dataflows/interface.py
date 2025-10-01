@@ -35,7 +35,7 @@ logger = setup_dataflow_logging()
 
 # 导入港股工具
 try:
-    from .hk_stock_utils import get_hk_stock_data, get_hk_stock_info
+    from .providers.hk.hk_stock import get_hk_stock_data, get_hk_stock_info
     HK_STOCK_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"⚠️ 港股工具不可用: {e}")

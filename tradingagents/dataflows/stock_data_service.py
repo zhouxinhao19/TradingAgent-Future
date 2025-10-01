@@ -26,7 +26,7 @@ except ImportError:
     DATABASE_MANAGER_AVAILABLE = False
 
 try:
-    from .tdx_utils import get_tdx_provider, TongDaXinDataProvider
+    from .providers.china.tdx import get_tdx_provider, TongDaXinDataProvider
     TDX_AVAILABLE = True
 except ImportError:
     TDX_AVAILABLE = False
@@ -297,7 +297,7 @@ class StockDataService:
 
         # 调用现有的get_china_stock_data函数
         try:
-            from .tdx_utils import get_china_stock_data
+            from .providers.china.tdx import get_china_stock_data
 
             return get_china_stock_data(stock_code, start_date, end_date)
         except Exception as e:

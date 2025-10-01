@@ -208,7 +208,7 @@ class ScreeningService:
         后续：切换为 tushare 全量列表（需token与缓存）。
         """
         # 直接复用 tdx_utils 的常见表
-        from tradingagents.dataflows.tdx_utils import _common_stock_names  # type: ignore
+        from tradingagents.dataflows.providers.china.tdx import _common_stock_names  # type: ignore
         base = list(_common_stock_names.keys())
         # 兜底补充：
         extras = ["000001", "000002", "000858", "600519", "600036", "601318", "300750"]

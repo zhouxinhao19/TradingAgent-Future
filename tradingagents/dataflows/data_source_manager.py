@@ -452,7 +452,7 @@ class DataSourceManager:
         """获取TDX适配器 (已弃用)"""
         logger.warning(f"⚠️ 警告: TDX数据源已弃用，建议使用Tushare")
         try:
-            from .tdx_utils import get_tdx_provider
+            from .providers.china.tdx import get_tdx_provider
             return get_tdx_provider()
         except ImportError as e:
             logger.error(f"❌ TDX适配器导入失败: {e}")
@@ -742,7 +742,7 @@ class DataSourceManager:
     def _get_tdx_data(self, symbol: str, start_date: str, end_date: str, period: str = "daily") -> str:
         """使用TDX获取多周期数据 (已弃用)"""
         logger.warning(f"⚠️ 警告: 正在使用已弃用的TDX数据源")
-        from .tdx_utils import get_china_stock_data
+        from .providers.china.tdx import get_china_stock_data
         return get_china_stock_data(symbol, start_date, end_date)
 
     def _get_volume_safely(self, data) -> float:

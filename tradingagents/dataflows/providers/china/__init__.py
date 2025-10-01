@@ -27,6 +27,14 @@ except ImportError:
     BaostockProvider = None
     BAOSTOCK_AVAILABLE = False
 
+# 导入通达信提供器
+try:
+    from .tdx import TongDaXinDataProvider
+    TDX_AVAILABLE = True
+except ImportError:
+    TongDaXinDataProvider = None
+    TDX_AVAILABLE = False
+
 __all__ = [
     'AKShareProvider',
     'AKSHARE_AVAILABLE',
@@ -34,5 +42,7 @@ __all__ = [
     'TUSHARE_AVAILABLE',
     'BaostockProvider',
     'BAOSTOCK_AVAILABLE',
+    'TongDaXinDataProvider',
+    'TDX_AVAILABLE',
 ]
 
