@@ -19,8 +19,8 @@ from tradingagents.config.runtime_settings import get_float, get_timezone_name
 from tradingagents.utils.logging_manager import get_logger
 logger = get_logger('agents')
 
-# 导入增强数据适配器
-from .enhanced_data_adapter import get_enhanced_data_adapter, get_stock_data_with_fallback, get_financial_data_with_fallback
+# 导入 MongoDB 缓存适配器
+from .cache.mongodb_cache_adapter import get_mongodb_cache_adapter, get_stock_data_with_fallback, get_financial_data_with_fallback
 
 
 class OptimizedChinaDataProvider:
@@ -119,7 +119,7 @@ class OptimizedChinaDataProvider:
 
         # 1. 优先尝试从MongoDB获取（如果启用了TA_USE_APP_CACHE）
         if not force_refresh:
-            adapter = get_enhanced_data_adapter()
+            adapter = get_mongodb_cache_adapter()
             if adapter.use_app_cache:
                 df = adapter.get_historical_data(symbol, start_date, end_date)
                 if df is not None and not df.empty:
@@ -210,7 +210,7 @@ class OptimizedChinaDataProvider:
 
         # 1. 优先尝试从MongoDB获取财务数据（如果启用了TA_USE_APP_CACHE）
         if not force_refresh:
-            adapter = get_enhanced_data_adapter()
+            adapter = get_mongodb_cache_adapter()
             if adapter.use_app_cache:
                 financial_data = adapter.get_financial_data(symbol)
                 if financial_data:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-增强数据访问适配器
+MongoDB 缓存适配器
 根据 TA_USE_APP_CACHE 配置，优先使用 MongoDB 中的同步数据
 """
 
@@ -15,8 +15,8 @@ logger = get_logger('agents')
 # 导入配置
 from tradingagents.config.runtime_settings import use_app_cache_enabled
 
-class EnhancedDataAdapter:
-    """增强数据访问适配器"""
+class MongoDBCacheAdapter:
+    """MongoDB 缓存适配器（从 app 的 MongoDB 读取同步数据）"""
     
     def __init__(self):
         self.use_app_cache = use_app_cache_enabled(False)
@@ -25,9 +25,9 @@ class EnhancedDataAdapter:
         
         if self.use_app_cache:
             self._init_mongodb_connection()
-            logger.info("🔄 增强数据适配器已启用 - 优先使用MongoDB数据")
+            logger.info("🔄 MongoDB缓存适配器已启用 - 优先使用MongoDB数据")
         else:
-            logger.info("📁 增强数据适配器使用传统缓存模式")
+            logger.info("📁 MongoDB缓存适配器使用传统缓存模式")
     
     def _init_mongodb_connection(self):
         """初始化MongoDB连接"""
@@ -234,14 +234,19 @@ class EnhancedDataAdapter:
 
 
 # 全局实例
-_enhanced_adapter = None
+_mongodb_cache_adapter = None
 
-def get_enhanced_data_adapter() -> EnhancedDataAdapter:
-    """获取增强数据适配器实例"""
-    global _enhanced_adapter
-    if _enhanced_adapter is None:
-        _enhanced_adapter = EnhancedDataAdapter()
-    return _enhanced_adapter
+def get_mongodb_cache_adapter() -> MongoDBCacheAdapter:
+    """获取 MongoDB 缓存适配器实例"""
+    global _mongodb_cache_adapter
+    if _mongodb_cache_adapter is None:
+        _mongodb_cache_adapter = MongoDBCacheAdapter()
+    return _mongodb_cache_adapter
+
+# 向后兼容的别名
+def get_enhanced_data_adapter() -> MongoDBCacheAdapter:
+    """获取增强数据适配器实例（向后兼容，推荐使用 get_mongodb_cache_adapter）"""
+    return get_mongodb_cache_adapter()
 
 
 def get_stock_data_with_fallback(symbol: str, start_date: str = None, end_date: str = None, 

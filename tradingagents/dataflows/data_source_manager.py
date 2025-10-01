@@ -271,8 +271,8 @@ class DataSourceManager:
         # 检查MongoDB（最高优先级）
         if self.use_mongodb_cache:
             try:
-                from tradingagents.dataflows.enhanced_data_adapter import get_enhanced_data_adapter
-                adapter = get_enhanced_data_adapter()
+                from tradingagents.dataflows.cache.mongodb_cache_adapter import get_mongodb_cache_adapter
+                adapter = get_mongodb_cache_adapter()
                 if adapter.use_app_cache and adapter.db is not None:
                     available.append(ChinaDataSource.MONGODB)
                     logger.info("✅ MongoDB数据源可用（最高优先级）")
@@ -351,8 +351,8 @@ class DataSourceManager:
     def _get_mongodb_adapter(self):
         """获取MongoDB适配器"""
         try:
-            from tradingagents.dataflows.enhanced_data_adapter import get_enhanced_data_adapter
-            return get_enhanced_data_adapter()
+            from tradingagents.dataflows.cache.mongodb_cache_adapter import get_mongodb_cache_adapter
+            return get_mongodb_cache_adapter()
         except ImportError as e:
             logger.error(f"❌ MongoDB适配器导入失败: {e}")
             return None
@@ -620,8 +620,8 @@ class DataSourceManager:
         logger.debug(f"📊 [MongoDB] 调用参数: symbol={symbol}, start_date={start_date}, end_date={end_date}, period={period}")
 
         try:
-            from tradingagents.dataflows.enhanced_data_adapter import get_enhanced_data_adapter
-            adapter = get_enhanced_data_adapter()
+            from tradingagents.dataflows.cache.mongodb_cache_adapter import get_mongodb_cache_adapter
+            adapter = get_mongodb_cache_adapter()
 
             # 从MongoDB获取指定周期的历史数据
             df = adapter.get_historical_data(symbol, start_date, end_date, period=period)
@@ -1137,9 +1137,9 @@ class DataSourceManager:
         logger.debug(f"📊 [MongoDB] 调用参数: symbol={symbol}")
 
         try:
-            from tradingagents.dataflows.enhanced_data_adapter import get_enhanced_data_adapter
+            from tradingagents.dataflows.cache.mongodb_cache_adapter import get_mongodb_cache_adapter
             import pandas as pd
-            adapter = get_enhanced_data_adapter()
+            adapter = get_mongodb_cache_adapter()
 
             # 从 MongoDB 获取财务数据
             financial_data = adapter.get_financial_data(symbol)
@@ -1309,8 +1309,8 @@ class DataSourceManager:
     def _get_mongodb_news(self, symbol: str, hours_back: int, limit: int) -> List[Dict[str, Any]]:
         """从MongoDB获取新闻数据"""
         try:
-            from tradingagents.dataflows.enhanced_data_adapter import get_enhanced_data_adapter
-            adapter = get_enhanced_data_adapter()
+            from tradingagents.dataflows.cache.mongodb_cache_adapter import get_mongodb_cache_adapter
+            adapter = get_mongodb_cache_adapter()
 
             # 从MongoDB获取新闻数据
             news_data = adapter.get_news_data(symbol, hours_back=hours_back, limit=limit)

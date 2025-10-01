@@ -12,10 +12,10 @@ import logging
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 
+import os
 from app.services.stock_data_service import get_stock_data_service
 from app.core.database import get_mongo_db
-from tradingagents.dataflows.example_sdk_provider import ExampleSDKProvider
-from tradingagents.config.runtime_settings import get_setting
+from tradingagents.dataflows.providers.examples.example_sdk import ExampleSDKProvider
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +44,9 @@ class ExampleSDKSyncService:
         self.stock_service = get_stock_data_service()
         
         # 同步配置
-        self.batch_size = int(get_setting("EXAMPLE_SDK_BATCH_SIZE", "100"))
-        self.retry_times = int(get_setting("EXAMPLE_SDK_RETRY_TIMES", "3"))
-        self.retry_delay = int(get_setting("EXAMPLE_SDK_RETRY_DELAY", "5"))
+        self.batch_size = int(os.getenv("EXAMPLE_SDK_BATCH_SIZE", "100"))
+        self.retry_times = int(os.getenv("EXAMPLE_SDK_RETRY_TIMES", "3"))
+        self.retry_delay = int(os.getenv("EXAMPLE_SDK_RETRY_DELAY", "5"))
         
         # 统计信息
         self.sync_stats = {

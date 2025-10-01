@@ -62,6 +62,14 @@ except ImportError:
     AppCacheAdapter = None
     APP_CACHE_AVAILABLE = False
 
+# 导入 MongoDB 缓存适配器
+try:
+    from .mongodb_cache_adapter import MongoDBCacheAdapter
+    MONGODB_CACHE_ADAPTER_AVAILABLE = True
+except ImportError:
+    MongoDBCacheAdapter = None
+    MONGODB_CACHE_ADAPTER_AVAILABLE = False
+
 # 全局缓存实例
 _cache_instance = None
 
@@ -123,5 +131,9 @@ __all__ = [
     # 应用缓存适配器
     'AppCacheAdapter',
     'APP_CACHE_AVAILABLE',
+
+    # MongoDB 缓存适配器
+    'MongoDBCacheAdapter',
+    'MONGODB_CACHE_ADAPTER_AVAILABLE',
 ]
 

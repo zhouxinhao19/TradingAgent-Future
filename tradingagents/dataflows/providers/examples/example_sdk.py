@@ -13,8 +13,8 @@ from typing import Optional, Dict, Any, List, Union
 from datetime import datetime, date
 import pandas as pd
 
-from .providers.base_provider import BaseStockDataProvider
-from tradingagents.config.runtime_settings import get_setting
+import os
+from ..base_provider import BaseStockDataProvider
 
 
 class ExampleSDKProvider(BaseStockDataProvider):
@@ -38,10 +38,10 @@ class ExampleSDKProvider(BaseStockDataProvider):
         super().__init__("ExampleSDK")
         
         # 配置参数
-        self.api_key = api_key or get_setting("EXAMPLE_SDK_API_KEY")
-        self.base_url = base_url or get_setting("EXAMPLE_SDK_BASE_URL", "https://api.example-sdk.com")
-        self.timeout = int(get_setting("EXAMPLE_SDK_TIMEOUT", "30"))
-        self.enabled = get_setting("EXAMPLE_SDK_ENABLED", "false").lower() == "true"
+        self.api_key = api_key or os.getenv("EXAMPLE_SDK_API_KEY")
+        self.base_url = base_url or os.getenv("EXAMPLE_SDK_BASE_URL", "https://api.example-sdk.com")
+        self.timeout = int(os.getenv("EXAMPLE_SDK_TIMEOUT", "30"))
+        self.enabled = os.getenv("EXAMPLE_SDK_ENABLED", "false").lower() == "true"
         
         # HTTP会话
         self.session = None
