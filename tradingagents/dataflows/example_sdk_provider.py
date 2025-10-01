@@ -13,7 +13,7 @@ from typing import Optional, Dict, Any, List, Union
 from datetime import datetime, date
 import pandas as pd
 
-from .base_provider import BaseStockDataProvider
+from .providers.base_provider import BaseStockDataProvider
 from tradingagents.config.runtime_settings import get_setting
 
 
