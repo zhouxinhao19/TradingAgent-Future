@@ -168,7 +168,15 @@ class TushareAdapter(DataSourceAdapter):
             }
             freq = freq_map.get(period, "D")
             adj_arg = adj if adj in (None, "qfq", "hfq") else None
-            df = pro_bar(ts_code=ts_code, api=prov.api, freq=freq, adj=adj_arg, limit=limit, fields="open,high,low,close,vol,amount,trade_date,trade_time")
+
+            # 根据频率决定请求的字段
+            # 日线及以上周期只有 trade_date，分钟线才有 trade_time
+            if freq in ["5min", "15min", "30min", "60min"]:
+                fields = "open,high,low,close,vol,amount,trade_date,trade_time"
+            else:
+                fields = "open,high,low,close,vol,amount,trade_date"
+
+            df = pro_bar(ts_code=ts_code, api=prov.api, freq=freq, adj=adj_arg, limit=limit, fields=fields)
             if df is None or getattr(df, 'empty', True):
                 return None
             # standardize columns
