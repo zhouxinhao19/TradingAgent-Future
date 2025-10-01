@@ -1,0 +1,24 @@
+fix: 修复 Tushare 同步连接问题
+
+## 问题描述
+启动时仍然报错：
+```
+Stock basics sync failed: Tushare not connected
+✅ Tushare连接成功  # 但这个日志在报错之后才出现
+```
+
+## 根本原因
+1. 之前的修复使用了 asyncio.create_task()，这是异步非阻塞的
+2. fetch_stock_basic_df() 是同步函数，在连接完成前就检查了 connected 状态
+3. 导致检查时 connected = False，连接成功时已经太晚了
+
+## 解决方案
+1. 添加 connect_sync() 方法：同步版本的连接方法
+2. 修改 get_tushare_provider()：使用 connect_sync() 而不是异步连接
+3. 保留 connect() 异步方法：供需要异步连接的场景使用
+
+## 验证
+- get_tushare_provider() 返回时 connected = True
+- fetch_stock_basic_df() 可以正常使用
+- 不再有时序问题
+
