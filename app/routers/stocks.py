@@ -162,19 +162,75 @@ async def get_fundamentals(code: str, current_user: dict = Depends(get_current_u
 
 @router.get("/{code}/kline", response_model=dict)
 async def get_kline(code: str, period: str = "day", limit: int = 120, adj: str = "none", current_user: dict = Depends(get_current_user)):
-    """获取K线数据（Tushare主，AkShare兜底）
+    """获取K线数据（MongoDB缓存优先，Tushare/AkShare兜底）
     period: day/week/month/5m/15m/30m/60m
     adj: none/qfq/hfq
     """
-    from app.services.data_sources.manager import DataSourceManager
+    import logging
+    from datetime import datetime, timedelta
+    logger = logging.getLogger(__name__)
+
     valid_periods = {"day","week","month","5m","15m","30m","60m"}
     if period not in valid_periods:
         raise HTTPException(status_code=400, detail=f"不支持的period: {period}")
+
+    code_padded = _zfill_code(code)
     adj_norm = None if adj in (None, "none", "", "null") else adj
-    mgr = DataSourceManager()
-    items, source = mgr.get_kline_with_fallback(code=_zfill_code(code), period=period, limit=limit, adj=adj_norm)
+    items = None
+    source = None
+
+    # 1. 优先从 MongoDB 缓存获取
+    try:
+        from tradingagents.dataflows.cache.mongodb_cache_adapter import get_mongodb_cache_adapter
+        adapter = get_mongodb_cache_adapter()
+
+        # 计算日期范围
+        end_date = datetime.now().strftime("%Y-%m-%d")
+        start_date = (datetime.now() - timedelta(days=limit * 2)).strftime("%Y-%m-d")
+
+        logger.info(f"🔍 尝试从 MongoDB 获取 K 线数据: {code_padded}, period={period}, limit={limit}")
+        df = adapter.get_historical_data(code_padded, start_date, end_date, period=period)
+
+        if df is not None and not df.empty:
+            # 转换 DataFrame 为列表格式
+            items = []
+            for _, row in df.tail(limit).iterrows():
+                items.append({
+                    "date": row.get("trade_date", row.get("date", "")),
+                    "open": float(row.get("open", 0)),
+                    "high": float(row.get("high", 0)),
+                    "low": float(row.get("low", 0)),
+                    "close": float(row.get("close", 0)),
+                    "volume": float(row.get("volume", row.get("vol", 0))),
+                    "amount": float(row.get("amount", 0)) if "amount" in row else None,
+                })
+            source = "mongodb"
+            logger.info(f"✅ 从 MongoDB 获取到 {len(items)} 条 K 线数据")
+    except Exception as e:
+        logger.warning(f"⚠️ MongoDB 获取 K 线失败: {e}")
+
+    # 2. 如果 MongoDB 没有数据，降级到外部 API（带超时保护）
+    if not items:
+        logger.info(f"📡 MongoDB 无数据，降级到外部 API")
+        try:
+            import asyncio
+            from app.services.data_sources.manager import DataSourceManager
+
+            mgr = DataSourceManager()
+            # 添加 10 秒超时保护
+            items, source = await asyncio.wait_for(
+                asyncio.to_thread(mgr.get_kline_with_fallback, code_padded, period, limit, adj_norm),
+                timeout=10.0
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"❌ 外部 API 获取 K 线超时（10秒）")
+            raise HTTPException(status_code=504, detail="获取K线数据超时，请稍后重试")
+        except Exception as e:
+            logger.error(f"❌ 外部 API 获取 K 线失败: {e}")
+            raise HTTPException(status_code=500, detail=f"获取K线数据失败: {str(e)}")
+
     data = {
-        "code": _zfill_code(code),
+        "code": code_padded,
         "period": period,
         "limit": limit,
         "adj": adj if adj else "none",
