@@ -10,12 +10,12 @@ logger = get_logger('agents')
 # Data source manager (priority and availability)
 from .data_source_manager import get_data_source_manager
 
-# Providers / adapters
+# Providers
 try:
-    from .tushare_adapter import get_tushare_adapter
-    TUSHARE_ADAPTER_AVAILABLE = True
+    from .providers.china.tushare import get_tushare_provider
+    TUSHARE_PROVIDER_AVAILABLE = True
 except Exception:
-    TUSHARE_ADAPTER_AVAILABLE = False
+    TUSHARE_PROVIDER_AVAILABLE = False
 
 try:
     from .providers.china.akshare import get_akshare_provider
@@ -24,7 +24,7 @@ except Exception:
     AKSHARE_PROVIDER_AVAILABLE = False
 
 try:
-    from .baostock_utils import get_baostock_provider
+    from .providers.china.baostock import get_baostock_provider
     BAOSTOCK_PROVIDER_AVAILABLE = True
 except Exception:
     BAOSTOCK_PROVIDER_AVAILABLE = False
@@ -64,14 +64,14 @@ def _std_lower_cols(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _try_tushare(symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
-    if not TUSHARE_ADAPTER_AVAILABLE:
+    if not TUSHARE_PROVIDER_AVAILABLE:
         return pd.DataFrame()
     try:
-        adapter = get_tushare_adapter()
-        df = adapter.get_stock_data(symbol, start_date, end_date, data_type="daily")
+        provider = get_tushare_provider()
+        df = provider.get_daily_data(symbol, start_date, end_date)
         return _std_lower_cols(df)
     except Exception as e:
-        logger.warning(f"[unified_df] Tushare adapter failed: {e}")
+        logger.warning(f"[unified_df] Tushare provider failed: {e}")
         return pd.DataFrame()
 
 
