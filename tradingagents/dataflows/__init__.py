@@ -1,7 +1,19 @@
 # 导入基础模块
 from .finnhub_utils import get_data_in_range
-from .googlenews_utils import getNewsData
-from .reddit_utils import fetch_top_from_category
+
+# 导入新闻模块（新路径）
+try:
+    from .news import getNewsData, fetch_top_from_category
+except ImportError:
+    # 向后兼容：尝试从旧路径导入
+    try:
+        from .googlenews_utils import getNewsData
+    except ImportError:
+        getNewsData = None
+    try:
+        from .reddit_utils import fetch_top_from_category
+    except ImportError:
+        fetch_top_from_category = None
 
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
@@ -16,13 +28,18 @@ except ImportError as e:
     YFinanceUtils = None
     YFINANCE_AVAILABLE = False
 
+# 导入技术指标模块（新路径）
 try:
-    from .stockstats_utils import StockstatsUtils
-    STOCKSTATS_AVAILABLE = True
+    from .technical import StockstatsUtils, STOCKSTATS_AVAILABLE
 except ImportError as e:
-    logger.warning(f"⚠️ stockstats模块不可用: {e}")
-    StockstatsUtils = None
-    STOCKSTATS_AVAILABLE = False
+    # 向后兼容：尝试从旧路径导入
+    try:
+        from .stockstats_utils import StockstatsUtils
+        STOCKSTATS_AVAILABLE = True
+    except ImportError as e:
+        logger.warning(f"⚠️ stockstats模块不可用: {e}")
+        StockstatsUtils = None
+        STOCKSTATS_AVAILABLE = False
 
 from .interface import (
 

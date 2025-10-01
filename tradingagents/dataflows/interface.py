@@ -1,9 +1,19 @@
 from typing import Annotated, Dict
 import time
 import os
-from .reddit_utils import fetch_top_from_category
+
+# 导入新闻模块（支持新旧路径）
+try:
+    from .news import fetch_top_from_category
+except ImportError:
+    from .reddit_utils import fetch_top_from_category
+
+try:
+    from .news.google_news import *
+except ImportError:
+    from .googlenews_utils import *
+
 from .chinese_finance_utils import get_chinese_social_sentiment
-from .googlenews_utils import *
 from .finnhub_utils import get_data_in_range
 
 # 导入统一日志系统
@@ -866,10 +876,13 @@ def get_fundamentals_finnhub(ticker, curr_date):
     try:
         import finnhub
         import os
-        from .cache_manager import get_cache
-        
-        # 检查缓存
-        cache = get_cache()
+        # 导入缓存管理器（支持新旧路径）
+        try:
+            from .cache import StockDataCache
+            cache = StockDataCache()
+        except ImportError:
+            from .cache_manager import get_cache
+            cache = get_cache()
         cached_key = cache.find_cached_fundamentals_data(ticker, data_source="finnhub")
         if cached_key:
             cached_data = cache.load_fundamentals_data(cached_key)
@@ -1005,10 +1018,15 @@ def get_fundamentals_openai(ticker, curr_date):
         str: 基本面数据报告
     """
     try:
-        from .cache_manager import get_cache
-        
+        # 导入缓存管理器（支持新旧路径）
+        try:
+            from .cache import StockDataCache
+            cache = StockDataCache()
+        except ImportError:
+            from .cache_manager import get_cache
+            cache = get_cache()
+
         # 检查缓存 - 优先检查OpenAI缓存
-        cache = get_cache()
         cached_key = cache.find_cached_fundamentals_data(ticker, data_source="openai")
         if cached_key:
             cached_data = cache.load_fundamentals_data(cached_key)

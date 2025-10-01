@@ -55,7 +55,8 @@ temp/
 /src/
 
 # 数据缓存目录 (不纳入版本控制)
-cache/
+# 注意：不要忽略 tradingagents/dataflows/cache/ 目录（这是代码模块）
+/cache/
 data/
 web/data/
 dataflows/data_cache/
