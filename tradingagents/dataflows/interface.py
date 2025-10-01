@@ -6,12 +6,16 @@ import os
 try:
     from .news import fetch_top_from_category
 except ImportError:
-    from .reddit_utils import fetch_top_from_category
+    from .news.reddit import fetch_top_from_category
 
 try:
     from .news.google_news import *
 except ImportError:
-    from .googlenews_utils import *
+    # 向后兼容：如果新路径不可用，尝试旧路径
+    try:
+        from .googlenews_utils import *
+    except ImportError:
+        pass
 
 from .chinese_finance_utils import get_chinese_social_sentiment
 
@@ -39,7 +43,7 @@ except ImportError as e:
 
 # 导入AKShare港股工具
 try:
-    from .akshare_utils import get_hk_stock_data_akshare, get_hk_stock_info_akshare
+    from .providers.china.akshare import get_hk_stock_data_akshare, get_hk_stock_info_akshare
     AKSHARE_HK_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"⚠️ AKShare港股工具不可用: {e}")
@@ -54,7 +58,7 @@ except ImportError as e:
     YFIN_AVAILABLE = False
 
 try:
-    from .stockstats_utils import *
+    from .technical.stockstats import *
     STOCKSTATS_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"⚠️ stockstats工具不可用: {e}")

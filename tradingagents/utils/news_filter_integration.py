@@ -151,8 +151,8 @@ def create_filtered_realtime_news_function():
         
         try:
             # 导入原始函数
-            from tradingagents.dataflows.realtime_news_utils import get_realtime_stock_news
-            
+            from tradingagents.dataflows.news.realtime_news import get_realtime_stock_news
+
             # 调用原始函数获取新闻
             original_report = get_realtime_stock_news(ticker, curr_date, hours_back)
             

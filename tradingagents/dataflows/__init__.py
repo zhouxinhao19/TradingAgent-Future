@@ -14,11 +14,11 @@ try:
 except ImportError:
     # 向后兼容：尝试从旧路径导入
     try:
-        from .googlenews_utils import getNewsData
+        from .news.google_news import getNewsData
     except ImportError:
         getNewsData = None
     try:
-        from .reddit_utils import fetch_top_from_category
+        from .news.reddit import fetch_top_from_category
     except ImportError:
         fetch_top_from_category = None
 
@@ -44,7 +44,7 @@ try:
 except ImportError as e:
     # 向后兼容：尝试从旧路径导入
     try:
-        from .stockstats_utils import StockstatsUtils
+        from .technical.stockstats import StockstatsUtils
         STOCKSTATS_AVAILABLE = True
     except ImportError as e:
         logger.warning(f"⚠️ stockstats模块不可用: {e}")

@@ -23,7 +23,7 @@ def _safe_float(x) -> Optional[float]:
 
 def _get_tushare_snapshot(symbol: str) -> Dict[str, Optional[float]]:
     try:
-        from .tushare_utils import get_tushare_provider
+        from .providers.china.tushare import get_tushare_provider
         provider = get_tushare_provider()
         if not getattr(provider, 'connected', False):
             return {}

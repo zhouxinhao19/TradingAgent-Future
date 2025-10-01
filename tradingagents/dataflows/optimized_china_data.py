@@ -740,7 +740,7 @@ class OptimizedChinaDataProvider:
                 logger.info(f"🔄 数据库缓存未启用，直接从AKShare API获取{symbol}财务数据")
 
             # 第二优先级：从AKShare API获取
-            from .akshare_utils import get_akshare_provider
+            from .providers.china.akshare import get_akshare_provider
 
             akshare_provider = get_akshare_provider()
 
@@ -770,7 +770,7 @@ class OptimizedChinaDataProvider:
 
             # 第三优先级：使用Tushare数据源
             logger.info(f"🔄 使用Tushare备用数据源获取{symbol}财务数据")
-            from .tushare_utils import get_tushare_provider
+            from .providers.china.tushare import get_tushare_provider
 
             provider = get_tushare_provider()
             if not provider.connected:

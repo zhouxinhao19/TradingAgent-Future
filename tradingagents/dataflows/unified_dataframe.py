@@ -18,7 +18,7 @@ except Exception:
     TUSHARE_ADAPTER_AVAILABLE = False
 
 try:
-    from .akshare_utils import get_akshare_provider
+    from .providers.china.akshare import get_akshare_provider
     AKSHARE_PROVIDER_AVAILABLE = True
 except Exception:
     AKSHARE_PROVIDER_AVAILABLE = False

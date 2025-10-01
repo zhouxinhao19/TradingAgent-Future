@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from app.services.news_data_service import get_news_data_service
 from tradingagents.dataflows.providers.tushare_provider import get_tushare_provider
 from tradingagents.dataflows.providers.akshare_provider import get_akshare_provider
-from tradingagents.dataflows.realtime_news_utils import RealtimeNewsAggregator
+from tradingagents.dataflows.news.realtime_news import RealtimeNewsAggregator
 
 logger = logging.getLogger(__name__)
 

@@ -22,7 +22,7 @@ _ta_metrics = defaultdict(int)
 
 # 导入Tushare工具
 try:
-    from .tushare_utils import get_tushare_provider
+    from .providers.china.tushare import get_tushare_provider
     TUSHARE_AVAILABLE = True
 except ImportError:
     TUSHARE_AVAILABLE = False

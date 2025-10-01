@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional, Union
 import pandas as pd
 
-from .base_provider import BaseStockDataProvider
+from ..base_provider import BaseStockDataProvider
 
 logger = logging.getLogger(__name__)
 

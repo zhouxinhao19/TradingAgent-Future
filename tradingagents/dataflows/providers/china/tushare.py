@@ -8,8 +8,8 @@ import pandas as pd
 import asyncio
 import logging
 
-from .base_provider import BaseStockDataProvider
-from ..providers_config import get_provider_config
+from ..base_provider import BaseStockDataProvider
+from ...providers_config import get_provider_config
 
 # 尝试导入tushare
 try:

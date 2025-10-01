@@ -433,7 +433,7 @@ class DataSourceManager:
     def _get_akshare_adapter(self):
         """获取AKShare适配器"""
         try:
-            from .akshare_utils import get_akshare_provider
+            from .providers.china.akshare import get_akshare_provider
             return get_akshare_provider()
         except ImportError as e:
             logger.error(f"❌ AKShare适配器导入失败: {e}")
@@ -442,7 +442,7 @@ class DataSourceManager:
     def _get_baostock_adapter(self):
         """获取BaoStock适配器"""
         try:
-            from .baostock_utils import get_baostock_provider
+            from .providers.china.baostock import get_baostock_provider
             return get_baostock_provider()
         except ImportError as e:
             logger.error(f"❌ BaoStock适配器导入失败: {e}")
@@ -664,7 +664,7 @@ class DataSourceManager:
         start_time = time.time()
         try:
             # 这里需要实现AKShare的统一接口
-            from .akshare_utils import get_akshare_provider
+            from .providers.china.akshare import get_akshare_provider
             provider = get_akshare_provider()
             data = provider.get_stock_data(symbol, start_date, end_date)
 
@@ -716,7 +716,7 @@ class DataSourceManager:
     def _get_baostock_data(self, symbol: str, start_date: str, end_date: str, period: str = "daily") -> str:
         """使用BaoStock获取多周期数据"""
         # 这里需要实现BaoStock的统一接口
-        from .baostock_utils import get_baostock_provider
+        from .providers.china.baostock import get_baostock_provider
         provider = get_baostock_provider()
         data = provider.get_stock_data(symbol, start_date, end_date)
 
