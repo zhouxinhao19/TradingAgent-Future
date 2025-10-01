@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo
 
 from typing import Optional, Dict, Any
 from .cache import get_cache
-from .config import get_config
+from tradingagents.config.config_manager import config_manager
 
 from tradingagents.config.runtime_settings import get_float, get_timezone_name
 # 导入日志模块
@@ -28,7 +28,7 @@ class OptimizedChinaDataProvider:
 
     def __init__(self):
         self.cache = get_cache()
-        self.config = get_config()
+        self.config = config_manager.load_settings()
         self.last_api_call = 0
         self.min_api_interval = get_float("TA_CHINA_MIN_API_INTERVAL_SECONDS", "ta_china_min_api_interval_seconds", 0.5)
 

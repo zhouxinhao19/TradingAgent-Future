@@ -80,7 +80,18 @@ except ImportError as e:
     logger.warning(f"⚠️ yfinance库不可用: {e}")
     yf = None
     YF_AVAILABLE = False
-from .config import get_config, set_config, DATA_DIR
+from tradingagents.config.config_manager import config_manager
+
+# 获取数据目录
+DATA_DIR = config_manager.get_data_dir()
+
+def get_config():
+    """获取配置（兼容性包装）"""
+    return config_manager.load_settings()
+
+def set_config(config):
+    """设置配置（兼容性包装）"""
+    config_manager.save_settings(config)
 
 
 def get_finnhub_news(

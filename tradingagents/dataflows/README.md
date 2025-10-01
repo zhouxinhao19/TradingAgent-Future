@@ -39,11 +39,11 @@ tradingagents/dataflows/
 ├── technical/                       # 技术分析模块
 │   └── stockstats.py               # 技术指标计算
 │
-├── config.py                        # Dataflows配置管理
-├── providers_config.py              # 数据源提供器配置
 ├── data_source_manager.py           # ⭐ 核心：数据源管理器（包含 DataFrame 接口）
 ├── interface.py                     # ⭐ 核心：公共接口
 └── optimized_china_data.py          # ⭐ 核心：优化的A股数据提供器
+
+**注**: 配置管理已统一到 `tradingagents/config/` 目录
 ```
 
 ---
