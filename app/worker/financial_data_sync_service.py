@@ -11,9 +11,9 @@ from dataclasses import dataclass, field
 
 from app.core.database import get_mongo_db
 from app.services.financial_data_service import get_financial_data_service
-from tradingagents.dataflows.providers.tushare_provider import get_tushare_provider
-from tradingagents.dataflows.providers.akshare_provider import get_akshare_provider
-from tradingagents.dataflows.providers.baostock_provider import get_baostock_provider
+from tradingagents.dataflows.providers.china.tushare import get_tushare_provider
+from tradingagents.dataflows.providers.china.akshare import get_akshare_provider
+from tradingagents.dataflows.providers.china.baostock import get_baostock_provider
 
 logger = logging.getLogger(__name__)
 

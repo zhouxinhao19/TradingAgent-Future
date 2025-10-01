@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from app.core.config import get_settings
 from app.core.database import get_database
 from app.services.historical_data_service import get_historical_data_service
-from tradingagents.dataflows.providers.baostock_provider import BaoStockProvider
+from tradingagents.dataflows.providers.china.baostock import BaoStockProvider
 
 logger = logging.getLogger(__name__)
 
