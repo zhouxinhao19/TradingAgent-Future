@@ -152,53 +152,20 @@ def create_filtered_realtime_news_function():
                 logger.info(f"[增强实时新闻] 检测到A股代码，尝试使用过滤版东方财富新闻")
                 
                 try:
-                    from tradingagents.dataflows.akshare_utils import get_stock_news_em
-                    
+                    # 注意：akshare_utils 已废弃，使用 AKShareProvider 替代
+                    from tradingagents.dataflows.providers.china.akshare import get_akshare_provider
+
                     # 清理股票代码
                     clean_ticker = ticker.replace('.SH', '').replace('.SZ', '').replace('.SS', '')\
                                     .replace('.XSHE', '').replace('.XSHG', '')
-                    
-                    # 先获取原始新闻
-                    original_news_df = get_stock_news_em(clean_ticker)
-                     
-                    if enable_filter and not original_news_df.empty:
-                         # 应用新闻过滤
-                         from tradingagents.utils.news_filter import create_news_filter
-                         news_filter = create_news_filter(clean_ticker)
-                         filtered_news_df = news_filter.filter_news(original_news_df, min_score=min_score)
-                         
-                         # 记录过滤统计
-                         filter_stats = news_filter.get_filter_statistics(original_news_df, filtered_news_df)
-                         logger.info(f"[新闻过滤集成] 新闻过滤完成:")
-                         logger.info(f"  - 原始新闻: {len(original_news_df)}条")
-                         logger.info(f"  - 过滤后新闻: {len(filtered_news_df)}条")
-                         logger.info(f"  - 过滤率: {filter_stats['filter_rate']:.1f}%")
-                    else:
-                         filtered_news_df = original_news_df
-                    
-                    if not filtered_news_df.empty:
-                        # 构建过滤后的报告
-                        news_count = len(filtered_news_df)
-                        
-                        report = f"# {ticker} 过滤新闻报告\n\n"
-                        report += f"📅 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-                        report += f"📊 过滤后新闻总数: {news_count}条\n"
-                        report += f"🔍 过滤阈值: {min_score}分\n\n"
-                        
-                        # 添加过滤统计信息
-                        if 'final_score' in filtered_news_df.columns:
-                            avg_score = filtered_news_df['final_score'].mean()
-                            max_score = filtered_news_df['final_score'].max()
-                            report += f"📈 平均相关性评分: {avg_score:.1f}分\n"
-                            report += f"🏆 最高相关性评分: {max_score:.1f}分\n\n"
-                        
-                        # 添加新闻内容
-                        for idx, (_, row) in enumerate(filtered_news_df.iterrows()):
-                            report += f"### {row.get('新闻标题', '无标题')}\n"
-                            report += f"📅 {row.get('发布时间', '无时间')}\n"
-                            
-                            if 'final_score' in row:
-                                report += f"⭐ 相关性评分: {row['final_score']:.1f}分\n"
+
+                    # 使用 AKShareProvider 获取新闻（如果有相应方法）
+                    provider = get_akshare_provider()
+                    # TODO: 需要实现 get_stock_news 方法
+                    # original_news_df = provider.get_stock_news(clean_ticker)
+                    # 暂时跳过，返回原始报告
+                    logger.warning(f"[增强实时新闻] AKShare新闻功能暂未实现，返回原始报告")
+                    return original_report
                             
                             report += f"🔗 {row.get('新闻链接', '无链接')}\n\n"
                             report += f"{row.get('新闻内容', '无内容')}\n\n"

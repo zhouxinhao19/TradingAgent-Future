@@ -14,7 +14,7 @@ def fetch_stock_basic_df():
     从 Tushare 获取股票基础列表，要求已正确配置并连接。
     依赖环境变量：TUSHARE_ENABLED=true 且 .env 中提供 TUSHARE_TOKEN。
     """
-    from tradingagents.dataflows.tushare_utils import get_tushare_provider
+    from tradingagents.dataflows.providers.china.tushare import get_tushare_provider
 
     provider = get_tushare_provider()
     if not getattr(provider, "connected", False):
@@ -30,7 +30,7 @@ def find_latest_trade_date() -> str:
     - 从今天起回溯最多 5 天；
     - 如都不可用，回退为昨天日期。
     """
-    from tradingagents.dataflows.tushare_utils import get_tushare_provider
+    from tradingagents.dataflows.providers.china.tushare import get_tushare_provider
 
     provider = get_tushare_provider()
     api = provider.api
@@ -54,7 +54,7 @@ def fetch_daily_basic_mv_map(trade_date: str) -> Dict[str, Dict[str, float]]:
     根据交易日获取日度基础指标映射。
     覆盖字段：total_mv/circ_mv/pe/pb/turnover_rate/volume_ratio/pe_ttm/pb_mrq
     """
-    from tradingagents.dataflows.tushare_utils import get_tushare_provider
+    from tradingagents.dataflows.providers.china.tushare import get_tushare_provider
 
     provider = get_tushare_provider()
     api = provider.api
@@ -98,7 +98,7 @@ def fetch_latest_roe_map() -> Dict[str, Dict[str, float]]:
     获取最近一个可用财报期的 ROE 映射（ts_code -> {"roe": float}）。
     优先按最近季度的 end_date 逆序探测，找到第一期非空数据。
     """
-    from tradingagents.dataflows.tushare_utils import get_tushare_provider
+    from tradingagents.dataflows.providers.china.tushare import get_tushare_provider
     from datetime import datetime
 
     provider = get_tushare_provider()
