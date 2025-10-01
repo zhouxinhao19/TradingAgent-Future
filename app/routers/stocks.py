@@ -179,6 +179,18 @@ async def get_kline(code: str, period: str = "day", limit: int = 120, adj: str =
     items = None
     source = None
 
+    # 周期映射：前端 -> MongoDB
+    period_map = {
+        "day": "daily",
+        "week": "weekly",
+        "month": "monthly",
+        "5m": "5min",
+        "15m": "15min",
+        "30m": "30min",
+        "60m": "60min"
+    }
+    mongodb_period = period_map.get(period, "daily")
+
     # 1. 优先从 MongoDB 缓存获取
     try:
         from tradingagents.dataflows.cache.mongodb_cache_adapter import get_mongodb_cache_adapter
@@ -188,8 +200,8 @@ async def get_kline(code: str, period: str = "day", limit: int = 120, adj: str =
         end_date = datetime.now().strftime("%Y-%m-%d")
         start_date = (datetime.now() - timedelta(days=limit * 2)).strftime("%Y-%m-d")
 
-        logger.info(f"🔍 尝试从 MongoDB 获取 K 线数据: {code_padded}, period={period}, limit={limit}")
-        df = adapter.get_historical_data(code_padded, start_date, end_date, period=period)
+        logger.info(f"🔍 尝试从 MongoDB 获取 K 线数据: {code_padded}, period={period} (MongoDB: {mongodb_period}), limit={limit}")
+        df = adapter.get_historical_data(code_padded, start_date, end_date, period=mongodb_period)
 
         if df is not None and not df.empty:
             # 转换 DataFrame 为列表格式
