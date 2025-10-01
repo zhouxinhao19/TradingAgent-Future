@@ -47,7 +47,38 @@ except ImportError:
     get_improved_hk_provider = None
     HK_PROVIDER_AVAILABLE = False
 
-# 美股提供器（预留）
+# 导入美股提供器
+try:
+    from .us import (
+        YFinanceUtils,
+        OptimizedUSDataProvider,
+        get_data_in_range,
+        YFINANCE_AVAILABLE,
+        OPTIMIZED_US_AVAILABLE,
+        FINNHUB_AVAILABLE
+    )
+except ImportError:
+    # 向后兼容：尝试从旧路径导入
+    try:
+        from ..yfin_utils import YFinanceUtils
+    except ImportError:
+        YFinanceUtils = None
+
+    try:
+        from ..optimized_us_data import OptimizedUSDataProvider
+    except ImportError:
+        OptimizedUSDataProvider = None
+
+    try:
+        from ..finnhub_utils import get_data_in_range
+    except ImportError:
+        get_data_in_range = None
+
+    YFINANCE_AVAILABLE = YFinanceUtils is not None
+    OPTIMIZED_US_AVAILABLE = OptimizedUSDataProvider is not None
+    FINNHUB_AVAILABLE = get_data_in_range is not None
+
+# 其他提供器（预留）
 try:
     from .yahoo_provider import YahooProvider
 except ImportError:
@@ -80,7 +111,15 @@ __all__ = [
     'get_improved_hk_provider',
     'HK_PROVIDER_AVAILABLE',
 
-    # 美股（预留）
+    # 美股
+    'YFinanceUtils',
+    'OptimizedUSDataProvider',
+    'get_data_in_range',
+    'YFINANCE_AVAILABLE',
+    'OPTIMIZED_US_AVAILABLE',
+    'FINNHUB_AVAILABLE',
+
+    # 其他（预留）
     'YahooProvider',
     'FinnhubProvider',
     'TDXProvider'

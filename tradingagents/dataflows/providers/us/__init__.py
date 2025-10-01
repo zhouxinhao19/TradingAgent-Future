@@ -1,10 +1,47 @@
 """
 美股数据提供器
-预留给未来的美股数据源（如 Finnhub, Yahoo Finance 等）
+包含 Finnhub, Yahoo Finance 等美股数据源
 """
 
-# 目前美股数据源仍在根目录的 finnhub_utils.py, yfin_utils.py 等文件中
-# 未来可以迁移到这里
+# 导入 Finnhub 工具
+try:
+    from .finnhub import get_data_in_range
+    FINNHUB_AVAILABLE = True
+except ImportError:
+    get_data_in_range = None
+    FINNHUB_AVAILABLE = False
 
-__all__ = []
+# 导入 Yahoo Finance 工具
+try:
+    from .yfinance import YFinanceUtils
+    YFINANCE_AVAILABLE = True
+except ImportError:
+    YFinanceUtils = None
+    YFINANCE_AVAILABLE = False
+
+# 导入优化的美股数据提供器
+try:
+    from .optimized import OptimizedUSDataProvider
+    OPTIMIZED_US_AVAILABLE = True
+except ImportError:
+    OptimizedUSDataProvider = None
+    OPTIMIZED_US_AVAILABLE = False
+
+# 默认使用优化的提供器
+DefaultUSProvider = OptimizedUSDataProvider
+
+__all__ = [
+    # Finnhub
+    'get_data_in_range',
+    'FINNHUB_AVAILABLE',
+
+    # Yahoo Finance
+    'YFinanceUtils',
+    'YFINANCE_AVAILABLE',
+
+    # 优化的提供器
+    'OptimizedUSDataProvider',
+    'OPTIMIZED_US_AVAILABLE',
+    'DefaultUSProvider',
+]
 

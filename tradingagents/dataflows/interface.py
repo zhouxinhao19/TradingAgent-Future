@@ -14,7 +14,12 @@ except ImportError:
     from .googlenews_utils import *
 
 from .chinese_finance_utils import get_chinese_social_sentiment
-from .finnhub_utils import get_data_in_range
+
+# 导入 Finnhub 工具（支持新旧路径）
+try:
+    from .providers.us import get_data_in_range
+except ImportError:
+    from .finnhub_utils import get_data_in_range
 
 # 导入统一日志系统
 from tradingagents.utils.logging_init import setup_dataflow_logging
@@ -1467,7 +1472,14 @@ def get_hk_stock_data_unified(symbol: str, start_date: str = None, end_date: str
 
         # 备用方案2：使用FINNHUB（付费用户可用）
         try:
-            from .optimized_us_data import get_us_stock_data_cached
+            # 导入美股数据提供器（支持新旧路径）
+            try:
+                from .providers.us import OptimizedUSDataProvider
+                provider = OptimizedUSDataProvider()
+                get_us_stock_data_cached = provider.get_stock_data
+            except ImportError:
+                from .optimized_us_data import get_us_stock_data_cached
+
             logger.info(f"🔄 使用FINNHUB获取港股数据: {symbol}")
             result = get_us_stock_data_cached(symbol, start_date, end_date)
             if result and "❌" not in result:
@@ -1569,9 +1581,14 @@ def get_stock_data_by_market(symbol: str, start_date: str = None, end_date: str 
             return get_hk_stock_data_unified(symbol, start_date, end_date)
         else:
             # 美股或其他
-            from .optimized_us_data import get_us_stock_data_cached
-
-            return get_us_stock_data_cached(symbol, start_date, end_date)
+            # 导入美股数据提供器（支持新旧路径）
+            try:
+                from .providers.us import OptimizedUSDataProvider
+                provider = OptimizedUSDataProvider()
+                return provider.get_stock_data(symbol, start_date, end_date)
+            except ImportError:
+                from .optimized_us_data import get_us_stock_data_cached
+                return get_us_stock_data_cached(symbol, start_date, end_date)
 
     except Exception as e:
         logger.error(f"❌ 获取股票数据失败: {e}")

@@ -13,8 +13,21 @@ from zoneinfo import ZoneInfo
 from typing import Optional, Dict, Any
 import yfinance as yf
 import pandas as pd
-from .cache_manager import get_cache
-from .config import get_config
+
+# 导入缓存管理器（支持新旧路径）
+try:
+    from ...cache import StockDataCache
+    def get_cache():
+        return StockDataCache()
+except ImportError:
+    from ...cache_manager import get_cache
+
+# 导入配置（支持新旧路径）
+try:
+    from ...config import get_config
+except ImportError:
+    def get_config():
+        return {}
 
 from tradingagents.config.runtime_settings import get_float, get_timezone_name
 # 导入日志模块

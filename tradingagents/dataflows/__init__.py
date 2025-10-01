@@ -1,5 +1,12 @@
 # 导入基础模块
-from .finnhub_utils import get_data_in_range
+# Finnhub 工具（支持新旧路径）
+try:
+    from .providers.us import get_data_in_range
+except ImportError:
+    try:
+        from .finnhub_utils import get_data_in_range
+    except ImportError:
+        get_data_in_range = None
 
 # 导入新闻模块（新路径）
 try:
@@ -19,14 +26,17 @@ except ImportError:
 from tradingagents.utils.logging_manager import get_logger
 logger = get_logger('agents')
 
-# 尝试导入yfinance相关模块，如果失败则跳过
+# 尝试导入yfinance相关模块（支持新旧路径）
 try:
-    from .yfin_utils import YFinanceUtils
-    YFINANCE_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"⚠️ yfinance模块不可用: {e}")
-    YFinanceUtils = None
-    YFINANCE_AVAILABLE = False
+    from .providers.us import YFinanceUtils, YFINANCE_AVAILABLE
+except ImportError:
+    try:
+        from .yfin_utils import YFinanceUtils
+        YFINANCE_AVAILABLE = True
+    except ImportError as e:
+        logger.warning(f"⚠️ yfinance模块不可用: {e}")
+        YFinanceUtils = None
+        YFINANCE_AVAILABLE = False
 
 # 导入技术指标模块（新路径）
 try:
