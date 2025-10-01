@@ -965,6 +965,67 @@ class DataSourceManager:
             logger.error(f"❌ [数据来源: {self.current_source.value}异常] 获取股票信息失败: {e}", exc_info=True)
             return self._try_fallback_stock_info(symbol)
 
+    def get_stock_basic_info(self, stock_code: str = None) -> Optional[Dict[str, Any]]:
+        """
+        获取股票基础信息（兼容 stock_data_service 接口）
+
+        Args:
+            stock_code: 股票代码，如果为 None 则返回所有股票列表
+
+        Returns:
+            Dict: 股票信息字典，或包含 error 字段的错误字典
+        """
+        if stock_code is None:
+            # 返回所有股票列表
+            logger.info("📊 获取所有股票列表")
+            try:
+                # 尝试从 MongoDB 获取
+                from tradingagents.config.database_manager import get_database_manager
+                db_manager = get_database_manager()
+                if db_manager and db_manager.is_mongodb_available():
+                    collection = db_manager.mongodb_db['stock_basic_info']
+                    stocks = list(collection.find({}, {'_id': 0}))
+                    if stocks:
+                        logger.info(f"✅ 从MongoDB获取所有股票: {len(stocks)}条")
+                        return stocks
+            except Exception as e:
+                logger.warning(f"⚠️ 从MongoDB获取所有股票失败: {e}")
+
+            # 降级：返回空列表
+            return []
+
+        # 获取单个股票信息
+        try:
+            result = self.get_stock_info(stock_code)
+            if result and result.get('name'):
+                return result
+            else:
+                return {'error': f'未找到股票 {stock_code} 的信息'}
+        except Exception as e:
+            logger.error(f"❌ 获取股票信息失败: {e}")
+            return {'error': str(e)}
+
+    def get_stock_data_with_fallback(self, stock_code: str, start_date: str, end_date: str) -> str:
+        """
+        获取股票数据（兼容 stock_data_service 接口）
+
+        Args:
+            stock_code: 股票代码
+            start_date: 开始日期
+            end_date: 结束日期
+
+        Returns:
+            str: 格式化的股票数据报告
+        """
+        logger.info(f"📊 获取股票数据: {stock_code} ({start_date} 到 {end_date})")
+
+        try:
+            # 使用统一的数据获取接口
+            return self.get_stock_data(stock_code, start_date, end_date)
+        except Exception as e:
+            logger.error(f"❌ 获取股票数据失败: {e}")
+            return f"❌ 获取股票数据失败: {str(e)}\n\n💡 建议：\n1. 检查网络连接\n2. 确认股票代码格式正确\n3. 检查数据源配置"
+
     def _try_fallback_stock_info(self, symbol: str) -> Dict:
         """尝试使用备用数据源获取股票基本信息"""
         logger.error(f"🔄 {self.current_source.value}失败，尝试备用数据源获取股票信息...")
@@ -1457,3 +1518,15 @@ def get_data_source_manager() -> DataSourceManager:
     if _data_source_manager is None:
         _data_source_manager = DataSourceManager()
     return _data_source_manager
+
+# ==================== 兼容性接口 ====================
+# 为了兼容 stock_data_service，提供相同的接口
+
+def get_stock_data_service() -> DataSourceManager:
+    """
+    获取股票数据服务实例（兼容 stock_data_service 接口）
+
+    ⚠️ 此函数为兼容性接口，实际返回 DataSourceManager 实例
+    推荐直接使用 get_data_source_manager()
+    """
+    return get_data_source_manager()

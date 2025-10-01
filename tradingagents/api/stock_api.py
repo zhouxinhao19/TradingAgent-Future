@@ -23,11 +23,11 @@ if dataflows_path not in sys.path:
 from tradingagents.utils.logging_init import get_logger
 
 try:
-    from stock_data_service import get_stock_data_service
+    from tradingagents.dataflows.data_source_manager import get_data_source_manager
 
     SERVICE_AVAILABLE = True
 except ImportError as e:
-    logger.warning(f"⚠️ 股票数据服务不可用: {e}")
+    logger.warning(f"⚠️ 数据源管理器不可用: {e}")
     SERVICE_AVAILABLE = False
 
 def get_stock_info(stock_code: str) -> Dict[str, Any]:
@@ -51,8 +51,8 @@ def get_stock_info(stock_code: str) -> Dict[str, Any]:
             'suggestion': '请检查服务配置'
         }
     
-    service = get_stock_data_service()
-    result = service.get_stock_basic_info(stock_code)
+    manager = get_data_source_manager()
+    result = manager.get_stock_basic_info(stock_code)
     
     if result is None:
         return {
@@ -80,8 +80,8 @@ def get_all_stocks() -> List[Dict[str, Any]]:
             'suggestion': '请检查服务配置'
         }]
     
-    service = get_stock_data_service()
-    result = service.get_stock_basic_info()
+    manager = get_data_source_manager()
+    result = manager.get_stock_basic_info()
     
     if result is None or (isinstance(result, dict) and 'error' in result):
         return [{
@@ -117,8 +117,8 @@ def get_stock_data(stock_code: str, start_date: str = None, end_date: str = None
     if start_date is None:
         start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
     
-    service = get_stock_data_service()
-    return service.get_stock_data_with_fallback(stock_code, start_date, end_date)
+    manager = get_data_source_manager()
+    return manager.get_stock_data_with_fallback(stock_code, start_date, end_date)
 
 def search_stocks(keyword: str) -> List[Dict[str, Any]]:
     """
@@ -221,36 +221,34 @@ def check_service_status() -> Dict[str, Any]:
             'suggestion': '请检查服务配置和依赖'
         }
     
-    service = get_stock_data_service()
-    
+    manager = get_data_source_manager()
+
     # 检查MongoDB状态
     mongodb_status = 'disconnected'
-    if service.db_manager and service.db_manager.mongodb_db:
-        try:
-            # 尝试执行一个简单的查询来测试连接
-            service.db_manager.mongodb_db.list_collection_names()
-            mongodb_status = 'connected'
-        except Exception:
-            mongodb_status = 'error'
-    
-    # 检查Tushare数据接口状态
-    tdx_status = 'unavailable'
-    if service.tdx_provider:
-        try:
-            # 尝试获取一个股票名称来测试API
-            test_name = service.tdx_provider._get_stock_name('000001')
-            if test_name and test_name != '000001':
-                tdx_status = 'available'
-            else:
-                tdx_status = 'limited'
-        except Exception:
-            tdx_status = 'error'
+    try:
+        from tradingagents.config.database_manager import get_database_manager
+        db_manager = get_database_manager()
+        if db_manager and db_manager.mongodb_db:
+            try:
+                # 尝试执行一个简单的查询来测试连接
+                db_manager.mongodb_db.list_collection_names()
+                mongodb_status = 'connected'
+            except Exception:
+                mongodb_status = 'error'
+    except Exception:
+        mongodb_status = 'unavailable'
+
+    # 检查数据源状态
+    available_sources = [s.value for s in manager.available_sources]
+    current_source = manager.current_source.value
+    tdx_status = 'available' if 'tdx' in available_sources else 'unavailable'
     
     return {
         'service_available': True,
         'mongodb_status': mongodb_status,
         'tdx_api_status': tdx_status,
-        'enhanced_fetcher_available': hasattr(service, '_get_from_tdx_api'),
+        'current_source': current_source,
+        'available_sources': available_sources,
         'fallback_available': True,
         'checked_at': datetime.now().isoformat()
     }

@@ -35,7 +35,11 @@ from app.services.progress_log_handler import register_analysis_tracker, unregis
 
 # 股票基础信息获取（用于补充显示名称）
 try:
-    from tradingagents.dataflows.stock_api import get_stock_info as _get_stock_info_safe
+    from tradingagents.dataflows.data_source_manager import get_data_source_manager
+    _data_source_manager = get_data_source_manager()
+    def _get_stock_info_safe(stock_code: str):
+        """获取股票基础信息的安全封装"""
+        return _data_source_manager.get_stock_basic_info(stock_code)
 except Exception:
     _get_stock_info_safe = None
 
