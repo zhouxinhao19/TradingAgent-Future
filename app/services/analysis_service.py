@@ -653,17 +653,12 @@ class AnalysisService:
                     else:
                         # 任务进行中
                         elapsed_time = (datetime.utcnow() - start_time).total_seconds()
-                        # 采用web目录的时间估算逻辑
-                        progress = task.get("progress", 0) / 100
 
-                        # 优先使用默认预估时间
-                        estimated_total_time = 300  # 默认5分钟
+                        # 使用任务的预估时长，如果没有则使用默认值（5分钟）
+                        estimated_total_time = task.get("estimated_duration", 300)
+
+                        # 预计剩余 = 预估总时长 - 已用时间
                         remaining_time = max(0, estimated_total_time - elapsed_time)
-
-                        # 如果已经超过预估时间，根据当前进度动态调整
-                        if remaining_time <= 0 and progress > 0:
-                            estimated_total_time = elapsed_time / progress
-                            remaining_time = max(0, estimated_total_time - elapsed_time)
 
                 return {
                     "task_id": task_id,

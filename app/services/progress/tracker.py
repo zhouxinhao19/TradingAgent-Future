@@ -207,17 +207,18 @@ class RedisProgressTracker:
         start = self.progress_data.get('start_time', now)
         elapsed = now - start
         pct = self.progress_data.get('progress_percentage', 0)
-        prog = pct / 100
         base_total = self._get_base_total_time()
+
         if pct >= 100:
+            # 任务已完成
             est_total = elapsed
             remaining = 0
         else:
+            # 使用预估的总时长（固定值）
             est_total = base_total
+            # 预计剩余 = 预估总时长 - 已用时间
             remaining = max(0, est_total - elapsed)
-            if remaining <= 0 and prog > 0:
-                est_total = elapsed / prog
-                remaining = max(0, est_total - elapsed)
+
         return elapsed, remaining, est_total
 
     @staticmethod
@@ -229,16 +230,17 @@ class RedisProgressTracker:
         elapsed = now - progress_data['start_time']
         progress_data['elapsed_time'] = elapsed
         pct = progress_data.get('progress_percentage', 0)
-        prog = pct / 100
+
         if pct >= 100:
+            # 任务已完成
             est_total = elapsed
             remaining = 0
         else:
+            # 使用预估的总时长（固定值），如果没有则使用默认值
             est_total = progress_data.get('estimated_total_time', 300)
+            # 预计剩余 = 预估总时长 - 已用时间
             remaining = max(0, est_total - elapsed)
-            if remaining <= 0 and prog > 0:
-                est_total = elapsed / prog
-                remaining = max(0, est_total - elapsed)
+
         progress_data['estimated_total_time'] = est_total
         progress_data['remaining_time'] = remaining
         return progress_data

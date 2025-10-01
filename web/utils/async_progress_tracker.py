@@ -484,19 +484,14 @@ class AsyncProgressTracker:
         return min(completed_weight / total_weight, 1.0)
     
     def _estimate_remaining_time(self, progress: float, elapsed_time: float) -> float:
-        """基于总预估时间计算剩余时间"""
+        """基于预估总时长计算剩余时间"""
         # 如果进度已完成，剩余时间为0
         if progress >= 1.0:
             return 0.0
 
-        # 使用简单而准确的方法：总预估时间 - 已花费时间
+        # 使用预估的总时长（固定值）
+        # 预计剩余 = 预估总时长 - 已用时间
         remaining = max(self.estimated_duration - elapsed_time, 0)
-
-        # 如果已经超过预估时间，根据当前进度动态调整
-        if remaining <= 0 and progress > 0:
-            # 基于当前进度重新估算总时间，然后计算剩余
-            estimated_total = elapsed_time / progress
-            remaining = max(estimated_total - elapsed_time, 0)
 
         return remaining
     

@@ -38,10 +38,11 @@ class TaskState:
     
     # 分析参数
     parameters: Optional[Dict[str, Any]] = None
-    
+
     # 性能指标
     execution_time: Optional[float] = None
     tokens_used: Optional[int] = None
+    estimated_duration: Optional[float] = None  # 预估总时长（秒）
     
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典格式"""
@@ -67,25 +68,21 @@ class TaskState:
                 elapsed_time = (datetime.now() - self.start_time).total_seconds()
                 data['elapsed_time'] = elapsed_time
 
-                # 计算预计剩余时间和总时长（采用web目录的逻辑）
+                # 计算预计剩余时间和总时长
                 progress = self.progress / 100 if self.progress > 0 else 0
 
-                # 基础预估时间（默认5分钟）
-                base_estimated_total = 300
+                # 使用任务创建时预估的总时长，如果没有则使用默认值（5分钟）
+                estimated_total = self.estimated_duration if self.estimated_duration else 300
 
                 if progress >= 1.0:
                     # 任务已完成
                     data['remaining_time'] = 0
                     data['estimated_total_time'] = elapsed_time
                 else:
-                    # 优先使用基础预估时间
-                    data['estimated_total_time'] = base_estimated_total
-                    data['remaining_time'] = max(0, base_estimated_total - elapsed_time)
-
-                    # 如果已经超过预估时间，根据当前进度动态调整
-                    if data['remaining_time'] <= 0 and progress > 0:
-                        data['estimated_total_time'] = elapsed_time / progress
-                        data['remaining_time'] = max(0, data['estimated_total_time'] - elapsed_time)
+                    # 使用预估的总时长（固定值）
+                    data['estimated_total_time'] = estimated_total
+                    # 预计剩余 = 预估总时长 - 已用时间
+                    data['remaining_time'] = max(0, estimated_total - elapsed_time)
         else:
             data['elapsed_time'] = 0
             data['remaining_time'] = 300  # 默认5分钟
@@ -115,6 +112,9 @@ class MemoryStateManager:
     ) -> TaskState:
         """创建新任务"""
         async with self._lock:
+            # 计算预估总时长
+            estimated_duration = self._calculate_estimated_duration(parameters or {})
+
             task_state = TaskState(
                 task_id=task_id,
                 user_id=user_id,
@@ -123,13 +123,55 @@ class MemoryStateManager:
                 status=TaskStatus.PENDING,
                 start_time=datetime.now(),
                 parameters=parameters or {},
+                estimated_duration=estimated_duration,
                 message="任务已创建，等待执行..."
             )
             self._tasks[task_id] = task_state
             logger.info(f"📝 创建任务状态: {task_id}")
+            logger.info(f"⏱️ 预估总时长: {estimated_duration:.1f}秒 ({estimated_duration/60:.1f}分钟)")
             logger.info(f"📊 当前内存中任务数量: {len(self._tasks)}")
             logger.info(f"🔍 内存管理器实例ID: {id(self)}")
             return task_state
+
+    def _calculate_estimated_duration(self, parameters: Dict[str, Any]) -> float:
+        """根据分析参数计算预估总时长（秒）"""
+        # 基础时间（秒）- 环境准备、配置等
+        base_time = 60
+
+        # 获取分析参数
+        research_depth = parameters.get('research_depth', '标准')
+        selected_analysts = parameters.get('selected_analysts', [])
+        llm_provider = parameters.get('llm_provider', 'dashscope')
+
+        # 研究深度映射
+        depth_map = {"快速": 1, "标准": 2, "深度": 3}
+        d = depth_map.get(research_depth, 2)
+
+        # 每个分析师的基础耗时（基于真实测试数据）
+        analyst_base_time = {
+            1: 180,  # 快速分析：每个分析师约3分钟
+            2: 360,  # 标准分析：每个分析师约6分钟
+            3: 600   # 深度分析：每个分析师约10分钟
+        }.get(d, 360)
+
+        analyst_time = len(selected_analysts) * analyst_base_time
+
+        # 模型速度影响（基于实际测试）
+        model_multiplier = {
+            'dashscope': 1.0,  # 阿里百炼速度适中
+            'deepseek': 0.7,   # DeepSeek较快
+            'google': 1.3      # Google较慢
+        }.get(llm_provider, 1.0)
+
+        # 研究深度额外影响（工具调用复杂度）
+        depth_multiplier = {
+            1: 0.8,  # 快速分析，较少工具调用
+            2: 1.0,  # 标准分析，标准工具调用
+            3: 1.3   # 深度分析，更多工具调用和推理
+        }.get(d, 1.0)
+
+        total_time = (base_time + analyst_time) * model_multiplier * depth_multiplier
+        return total_time
 
     async def update_task_status(
         self, 
