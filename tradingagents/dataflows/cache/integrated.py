@@ -15,15 +15,17 @@ import pandas as pd
 from tradingagents.utils.logging_init import setup_dataflow_logging
 
 # 导入原有缓存系统
-from .cache_manager import StockDataCache
+from .file_cache import StockDataCache
 
 # 导入自适应缓存系统
 try:
-    from .adaptive_cache import get_cache_system
-    from ..config.database_manager import get_database_manager
+    from .adaptive import AdaptiveCacheSystem
+    from tradingagents.config.database_manager import get_database_manager
     ADAPTIVE_CACHE_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     ADAPTIVE_CACHE_AVAILABLE = False
+    import logging
+    logging.getLogger(__name__).debug(f"自适应缓存不可用: {e}")
 
 class IntegratedCacheManager:
     """集成缓存管理器 - 智能选择缓存策略"""
@@ -40,7 +42,7 @@ class IntegratedCacheManager:
         
         if ADAPTIVE_CACHE_AVAILABLE:
             try:
-                self.adaptive_cache = get_cache_system()
+                self.adaptive_cache = AdaptiveCacheSystem(cache_dir)
                 self.db_manager = get_database_manager()
                 self.use_adaptive = True
                 self.logger.info("✅ 自适应缓存系统已启用")

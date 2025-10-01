@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Union
 import pandas as pd
 
-from ..config.database_manager import get_database_manager
+from tradingagents.config.database_manager import get_database_manager
 
 class AdaptiveCacheSystem:
     """自适应缓存系统"""
