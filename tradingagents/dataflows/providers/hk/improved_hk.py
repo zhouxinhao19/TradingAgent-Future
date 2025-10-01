@@ -181,7 +181,7 @@ class ImprovedHKStockProvider:
 
                 # 优先尝试AKShare获取
                 try:
-                    from tradingagents.dataflows.akshare_utils import get_hk_stock_info_akshare
+                    # 使用本地的兼容性函数，避免循环导入
                     logger.debug(f"📊 [港股API] 优先使用AKShare获取: {symbol}")
 
                     akshare_info = get_hk_stock_info_akshare(symbol)
@@ -306,12 +306,42 @@ def get_hk_company_name_improved(symbol: str) -> str:
 def get_hk_stock_info_improved(symbol: str) -> Dict[str, Any]:
     """
     获取港股信息的改进版本
-    
+
     Args:
         symbol: 港股代码
-        
+
     Returns:
         Dict: 港股信息
     """
     provider = get_improved_hk_provider()
     return provider.get_stock_info(symbol)
+
+
+# 兼容性函数：为了兼容旧的 akshare_utils 导入
+def get_hk_stock_data_akshare(symbol: str, start_date: str = None, end_date: str = None):
+    """
+    兼容性函数：使用改进的港股提供器获取数据
+
+    Args:
+        symbol: 港股代码
+        start_date: 开始日期
+        end_date: 结束日期
+
+    Returns:
+        港股数据
+    """
+    from .hk_stock import get_hk_stock_data
+    return get_hk_stock_data(symbol, start_date, end_date)
+
+
+def get_hk_stock_info_akshare(symbol: str) -> Dict[str, Any]:
+    """
+    兼容性函数：使用改进的港股提供器获取信息
+
+    Args:
+        symbol: 港股代码
+
+    Returns:
+        Dict: 港股信息
+    """
+    return get_hk_stock_info_improved(symbol)

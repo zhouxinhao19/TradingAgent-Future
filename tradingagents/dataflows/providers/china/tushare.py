@@ -1132,10 +1132,30 @@ class TushareProvider(BaseStockDataProvider):
 
 # 全局提供器实例
 _tushare_provider = None
+_tushare_provider_initialized = False
 
 def get_tushare_provider() -> TushareProvider:
     """获取全局Tushare提供器实例"""
-    global _tushare_provider
+    global _tushare_provider, _tushare_provider_initialized
     if _tushare_provider is None:
         _tushare_provider = TushareProvider()
+        # 尝试同步连接（如果在异步上下文中，需要手动调用 await provider.connect()）
+        if not _tushare_provider_initialized:
+            try:
+                import asyncio
+                # 尝试在当前事件循环中运行
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        # 如果事件循环正在运行，创建一个任务
+                        asyncio.create_task(_tushare_provider.connect())
+                    else:
+                        # 如果事件循环未运行，直接运行
+                        loop.run_until_complete(_tushare_provider.connect())
+                except RuntimeError:
+                    # 没有事件循环，创建新的
+                    asyncio.run(_tushare_provider.connect())
+                _tushare_provider_initialized = True
+            except Exception as e:
+                logger.warning(f"⚠️ Tushare自动连接失败: {e}")
     return _tushare_provider
