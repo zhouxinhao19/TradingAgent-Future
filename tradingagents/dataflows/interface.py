@@ -17,7 +17,7 @@ except ImportError:
     except ImportError:
         pass
 
-from .chinese_finance_utils import get_chinese_social_sentiment
+from .news.chinese_finance import get_chinese_social_sentiment
 
 # 导入 Finnhub 工具（支持新旧路径）
 try:

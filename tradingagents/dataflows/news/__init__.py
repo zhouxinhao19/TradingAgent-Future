@@ -33,6 +33,14 @@ except ImportError:
     search_news_by_keyword = None
     REALTIME_NEWS_AVAILABLE = False
 
+# 导入中国财经数据聚合器
+try:
+    from .chinese_finance import ChineseFinanceDataAggregator
+    CHINESE_FINANCE_AVAILABLE = True
+except ImportError:
+    ChineseFinanceDataAggregator = None
+    CHINESE_FINANCE_AVAILABLE = False
+
 __all__ = [
     # Google News
     'getNewsData',
@@ -47,5 +55,9 @@ __all__ = [
     'get_news_with_sentiment',
     'search_news_by_keyword',
     'REALTIME_NEWS_AVAILABLE',
+
+    # Chinese Finance
+    'ChineseFinanceDataAggregator',
+    'CHINESE_FINANCE_AVAILABLE',
 ]
 

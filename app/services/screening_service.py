@@ -11,7 +11,7 @@ import numpy as np
 from tradingagents.tools.analysis.indicators import IndicatorSpec, compute_many
 # 统一多数据源DF接口（按优先级降级）
 from tradingagents.dataflows.unified_dataframe import get_china_daily_df_unified
-from tradingagents.dataflows.fundamentals_snapshot import get_cn_fund_snapshot
+from tradingagents.dataflows.providers.china.fundamentals_snapshot import get_cn_fund_snapshot
 
 
 from app.services.screening.eval_utils import (

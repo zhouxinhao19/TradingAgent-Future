@@ -35,6 +35,14 @@ except ImportError:
     TongDaXinDataProvider = None
     TDX_AVAILABLE = False
 
+# 导入基本面快照工具
+try:
+    from .fundamentals_snapshot import get_fundamentals_snapshot
+    FUNDAMENTALS_SNAPSHOT_AVAILABLE = True
+except ImportError:
+    get_fundamentals_snapshot = None
+    FUNDAMENTALS_SNAPSHOT_AVAILABLE = False
+
 __all__ = [
     'AKShareProvider',
     'AKSHARE_AVAILABLE',
@@ -44,5 +52,7 @@ __all__ = [
     'BAOSTOCK_AVAILABLE',
     'TongDaXinDataProvider',
     'TDX_AVAILABLE',
+    'get_fundamentals_snapshot',
+    'FUNDAMENTALS_SNAPSHOT_AVAILABLE',
 ]
 
