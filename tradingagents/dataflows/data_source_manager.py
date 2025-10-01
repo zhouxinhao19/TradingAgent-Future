@@ -513,6 +513,126 @@ class DataSourceManager:
             logger.error(f"❌ 格式化数据响应失败: {e}")
             return f"❌ 格式化{symbol}数据失败: {e}"
 
+    def get_stock_dataframe(self, symbol: str, start_date: str = None, end_date: str = None, period: str = "daily") -> pd.DataFrame:
+        """
+        获取股票数据的 DataFrame 接口，支持多数据源和自动降级
+
+        Args:
+            symbol: 股票代码
+            start_date: 开始日期
+            end_date: 结束日期
+            period: 数据周期（daily/weekly/monthly），默认为daily
+
+        Returns:
+            pd.DataFrame: 股票数据 DataFrame，列标准：open, high, low, close, vol, amount, date
+        """
+        logger.info(f"📊 [DataFrame接口] 获取股票数据: {symbol} ({start_date} 到 {end_date})")
+
+        try:
+            # 尝试当前数据源
+            df = None
+            if self.current_source == ChinaDataSource.MONGODB:
+                from tradingagents.dataflows.cache.mongodb_cache_adapter import get_mongodb_cache_adapter
+                adapter = get_mongodb_cache_adapter()
+                df = adapter.get_historical_data(symbol, start_date, end_date, period=period)
+            elif self.current_source == ChinaDataSource.TUSHARE:
+                from .providers.china.tushare import get_tushare_provider
+                provider = get_tushare_provider()
+                df = provider.get_daily_data(symbol, start_date, end_date)
+            elif self.current_source == ChinaDataSource.AKSHARE:
+                from .providers.china.akshare import get_akshare_provider
+                provider = get_akshare_provider()
+                df = provider.get_stock_data(symbol, start_date, end_date)
+            elif self.current_source == ChinaDataSource.BAOSTOCK:
+                from .providers.china.baostock import get_baostock_provider
+                provider = get_baostock_provider()
+                df = provider.get_stock_data(symbol, start_date, end_date)
+
+            if df is not None and not df.empty:
+                logger.info(f"✅ [DataFrame接口] 从 {self.current_source.value} 获取成功: {len(df)}条")
+                return self._standardize_dataframe(df)
+
+            # 降级到其他数据源
+            logger.warning(f"⚠️ [DataFrame接口] {self.current_source.value} 失败，尝试降级")
+            for source in self.available_sources:
+                if source == self.current_source:
+                    continue
+                try:
+                    if source == ChinaDataSource.MONGODB:
+                        from tradingagents.dataflows.cache.mongodb_cache_adapter import get_mongodb_cache_adapter
+                        adapter = get_mongodb_cache_adapter()
+                        df = adapter.get_historical_data(symbol, start_date, end_date, period=period)
+                    elif source == ChinaDataSource.TUSHARE:
+                        from .providers.china.tushare import get_tushare_provider
+                        provider = get_tushare_provider()
+                        df = provider.get_daily_data(symbol, start_date, end_date)
+                    elif source == ChinaDataSource.AKSHARE:
+                        from .providers.china.akshare import get_akshare_provider
+                        provider = get_akshare_provider()
+                        df = provider.get_stock_data(symbol, start_date, end_date)
+                    elif source == ChinaDataSource.BAOSTOCK:
+                        from .providers.china.baostock import get_baostock_provider
+                        provider = get_baostock_provider()
+                        df = provider.get_stock_data(symbol, start_date, end_date)
+
+                    if df is not None and not df.empty:
+                        logger.info(f"✅ [DataFrame接口] 降级到 {source.value} 成功: {len(df)}条")
+                        return self._standardize_dataframe(df)
+                except Exception as e:
+                    logger.warning(f"⚠️ [DataFrame接口] {source.value} 失败: {e}")
+                    continue
+
+            logger.error(f"❌ [DataFrame接口] 所有数据源都失败: {symbol}")
+            return pd.DataFrame()
+
+        except Exception as e:
+            logger.error(f"❌ [DataFrame接口] 获取失败: {e}", exc_info=True)
+            return pd.DataFrame()
+
+    def _standardize_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        标准化 DataFrame 列名和格式
+
+        Args:
+            df: 原始 DataFrame
+
+        Returns:
+            pd.DataFrame: 标准化后的 DataFrame
+        """
+        if df is None or df.empty:
+            return pd.DataFrame()
+
+        out = df.copy()
+
+        # 列名映射
+        colmap = {
+            # English
+            'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close',
+            'Volume': 'vol', 'Amount': 'amount', 'symbol': 'code', 'Symbol': 'code',
+            # Already lower
+            'open': 'open', 'high': 'high', 'low': 'low', 'close': 'close',
+            'vol': 'vol', 'volume': 'vol', 'amount': 'amount', 'code': 'code',
+            'date': 'date', 'trade_date': 'date',
+            # Chinese (AKShare common)
+            '日期': 'date', '开盘': 'open', '最高': 'high', '最低': 'low', '收盘': 'close',
+            '成交量': 'vol', '成交额': 'amount', '涨跌幅': 'pct_change', '涨跌额': 'change',
+        }
+        out = out.rename(columns={c: colmap.get(c, c) for c in out.columns})
+
+        # 确保日期排序
+        if 'date' in out.columns:
+            try:
+                out['date'] = pd.to_datetime(out['date'])
+                out = out.sort_values('date')
+            except Exception:
+                pass
+
+        # 计算涨跌幅（如果缺失）
+        if 'pct_change' not in out.columns and 'close' in out.columns:
+            out['pct_change'] = out['close'].pct_change() * 100.0
+
+        return out
+
     def get_stock_data(self, symbol: str, start_date: str = None, end_date: str = None, period: str = "daily") -> str:
         """
         获取股票数据的统一接口，支持多周期数据

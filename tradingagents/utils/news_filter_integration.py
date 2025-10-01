@@ -107,25 +107,10 @@ def integrate_news_filtering(original_get_stock_news_em):
 def patch_akshare_utils():
     """
     为akshare_utils模块的get_stock_news_em函数添加过滤功能
+
+    ⚠️ 已废弃：akshare_utils 模块已被移除，此函数保留仅为向后兼容
     """
-    try:
-        from tradingagents.dataflows import akshare_utils
-        
-        # 保存原始函数
-        if not hasattr(akshare_utils, '_original_get_stock_news_em'):
-            akshare_utils._original_get_stock_news_em = akshare_utils.get_stock_news_em
-            
-            # 应用过滤装饰器
-            akshare_utils.get_stock_news_em = integrate_news_filtering(
-                akshare_utils._original_get_stock_news_em
-            )
-            
-            logger.info("[新闻过滤集成] ✅ 成功为akshare_utils.get_stock_news_em添加过滤功能")
-        else:
-            logger.info("[新闻过滤集成] akshare_utils.get_stock_news_em已经被增强")
-            
-    except Exception as e:
-        logger.error(f"[新闻过滤集成] 无法增强akshare_utils.get_stock_news_em: {e}")
+    logger.warning("[新闻过滤集成] ⚠️ patch_akshare_utils 已废弃：akshare_utils 模块已被移除")
 
 
 def create_filtered_realtime_news_function():

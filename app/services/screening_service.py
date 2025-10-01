@@ -10,7 +10,7 @@ import numpy as np
 # 统一指标库
 from tradingagents.tools.analysis.indicators import IndicatorSpec, compute_many
 # 统一多数据源DF接口（按优先级降级）
-from tradingagents.dataflows.unified_dataframe import get_china_daily_df_unified
+from tradingagents.dataflows.data_source_manager import get_data_source_manager
 from tradingagents.dataflows.providers.china.fundamentals_snapshot import get_cn_fund_snapshot
 
 
@@ -101,7 +101,8 @@ class ScreeningService:
 
                 # 如需要基础行情/技术指标才取K线
                 if need_base:
-                    df = get_china_daily_df_unified(code, start_s, end_s)
+                    manager = get_data_source_manager()
+                    df = manager.get_stock_dataframe(code, start_s, end_s)
                     if df is None or df.empty:
                         continue
                     # 统一列为小写

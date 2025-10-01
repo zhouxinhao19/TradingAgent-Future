@@ -279,5 +279,49 @@
 
 ---
 
+## ✅ 执行结果（2025-10-01）
+
+### 已完成：方案 A - 合并到 data_source_manager
+
+#### 删除的文件
+- ❌ `tradingagents/dataflows/stock_api.py` (3.91 KB)
+- ❌ `tradingagents/dataflows/stock_data_service.py` (12.14 KB)
+
+#### 添加的功能（data_source_manager.py）
+- ✅ `get_stock_basic_info(stock_code)` - 兼容方法
+- ✅ `get_stock_data_with_fallback(stock_code, start_date, end_date)` - 兼容方法
+- ✅ `get_stock_data_service()` - 兼容函数（返回 DataSourceManager 实例）
+
+#### 更新的文件
+- ✅ `tradingagents/api/stock_api.py` - 更新所有引用（5处）
+- ✅ `app/services/simple_analysis_service.py` - 更新引用（1处）
+
+#### 优化效果
+| 指标 | 之前 | 之后 | 改进 |
+|------|------|------|------|
+| 文件数量 | 9 个 | 7 个 | -2 个 |
+| 代码大小 | ~173 KB | ~160 KB | -13 KB |
+| 数据源管理 | 分散 | 统一 | ✅ |
+| 维护成本 | 高 | 低 | ✅ |
+
+#### 测试验证
+```bash
+# DataSourceManager 导入测试
+✅ DataSourceManager 导入成功
+✅ 可用数据源: ['mongodb', 'tushare', 'akshare', 'baostock', 'tdx']
+✅ 当前数据源: mongodb
+
+# API 导入测试
+✅ tradingagents.api.stock_api 导入成功
+```
+
+#### Git 提交
+```
+commit 1f87472
+refactor: 合并 stock_data_service 到 data_source_manager（方案A）
+```
+
+---
+
 **最后更新**: 2025-10-01
 
