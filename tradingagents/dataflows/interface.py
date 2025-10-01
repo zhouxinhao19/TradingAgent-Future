@@ -42,26 +42,32 @@ except ImportError as e:
     HK_STOCK_AVAILABLE = False
 
 # 导入AKShare港股工具
+# 注意：港股功能暂未在 AKShareProvider 中实现
 try:
     from .providers.china.akshare import get_hk_stock_data_akshare, get_hk_stock_info_akshare
     AKSHARE_HK_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"⚠️ AKShare港股工具不可用: {e}")
+except (ImportError, AttributeError) as e:
+    logger.debug(f"ℹ️ AKShare港股工具暂未实现: {e}")
     AKSHARE_HK_AVAILABLE = False
+    # 定义占位函数
+    def get_hk_stock_data_akshare(*args, **kwargs):
+        return None
+    def get_hk_stock_info_akshare(*args, **kwargs):
+        return None
 
 # 尝试导入yfinance相关模块，如果失败则跳过
 try:
     from .yfin_utils import *
     YFIN_AVAILABLE = True
 except ImportError as e:
-    logger.warning(f"⚠️ yfinance工具不可用: {e}")
+    logger.debug(f"ℹ️ yfinance工具不可用（可选功能）: {e}")
     YFIN_AVAILABLE = False
 
 try:
     from .technical.stockstats import *
     STOCKSTATS_AVAILABLE = True
 except ImportError as e:
-    logger.warning(f"⚠️ stockstats工具不可用: {e}")
+    logger.debug(f"ℹ️ stockstats工具不可用（可选功能）: {e}")
     STOCKSTATS_AVAILABLE = False
 from dateutil.relativedelta import relativedelta
 from concurrent.futures import ThreadPoolExecutor
