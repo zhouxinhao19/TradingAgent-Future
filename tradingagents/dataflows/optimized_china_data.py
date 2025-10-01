@@ -288,7 +288,7 @@ class OptimizedChinaDataProvider:
             try:
                 from tradingagents.config.runtime_settings import use_app_cache_enabled
                 if use_app_cache_enabled(False):
-                    from .app_cache_adapter import get_market_quote_dataframe
+                    from .cache.app_adapter import get_market_quote_dataframe
                     df_q = get_market_quote_dataframe(symbol)
                     if df_q is not None and not df_q.empty:
                         row_q = df_q.iloc[-1]
@@ -351,7 +351,7 @@ class OptimizedChinaDataProvider:
             if (current_price == "N/A" or change_pct == "N/A" or volume == "N/A"):
                 from tradingagents.config.runtime_settings import use_app_cache_enabled  # type: ignore
                 if use_app_cache_enabled(False):
-                    from .app_cache_adapter import get_market_quote_dataframe
+                    from .cache.app_adapter import get_market_quote_dataframe
                     df_q = get_market_quote_dataframe(symbol)
                     if df_q is not None and not df_q.empty:
                         row_q = df_q.iloc[-1]
@@ -556,7 +556,7 @@ class OptimizedChinaDataProvider:
 
         # 首先尝试从数据库获取真实的行业信息
         try:
-            from .app_cache_adapter import get_basics_from_cache
+            from .cache.app_adapter import get_basics_from_cache
             doc = get_basics_from_cache(symbol)
             if doc:
                 logger.debug(f"🔍 [股票代码追踪] 从数据库获取到基础信息: {doc}")
@@ -1431,7 +1431,7 @@ def _add_financial_cache_methods():
     def _get_cached_raw_financial_data(self, symbol: str) -> dict:
         """从数据库缓存获取原始财务数据"""
         try:
-            from .app_cache_adapter import get_mongodb_client
+            from .cache.app_adapter import get_mongodb_client
             client = get_mongodb_client()
             if not client:
                 logger.debug(f"📊 [财务缓存] MongoDB客户端不可用")
@@ -1468,7 +1468,7 @@ def _add_financial_cache_methods():
     def _get_cached_stock_info(self, symbol: str) -> dict:
         """从数据库缓存获取股票基本信息"""
         try:
-            from .app_cache_adapter import get_mongodb_client
+            from .cache.app_adapter import get_mongodb_client
             client = get_mongodb_client()
             if not client:
                 return {}
@@ -1517,7 +1517,7 @@ def _add_financial_cache_methods():
                 logger.debug(f"📊 [财务缓存] 应用缓存未启用，跳过缓存保存")
                 return
 
-            from .app_cache_adapter import get_mongodb_client
+            from .cache.app_adapter import get_mongodb_client
             client = get_mongodb_client()
             if not client:
                 logger.debug(f"📊 [财务缓存] MongoDB客户端不可用")

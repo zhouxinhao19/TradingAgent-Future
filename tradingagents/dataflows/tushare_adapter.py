@@ -205,7 +205,7 @@ class TushareDataAdapter:
             enabled = use_app_cache_enabled(False)
             logger.info(f"🔧 [配置] ta_use_app_cache={enabled} (realtime)")
             if enabled:
-                from .app_cache_adapter import get_market_quote_dataframe
+                from .cache.app_adapter import get_market_quote_dataframe
                 df = get_market_quote_dataframe(symbol)
                 if df is not None and not df.empty:
                     _ta_metrics['realtime_cache_hit'] += 1

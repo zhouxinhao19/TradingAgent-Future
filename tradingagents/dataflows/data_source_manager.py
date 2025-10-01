@@ -824,7 +824,7 @@ class DataSourceManager:
             logger.info(f"🔧 [配置] ta_use_app_cache={use_cache}")
 
             try:
-                from .app_cache_adapter import get_basics_from_cache, get_market_quote_dataframe
+                from .cache.app_adapter import get_basics_from_cache, get_market_quote_dataframe
                 doc = get_basics_from_cache(symbol)
                 if doc:
                     name = doc.get('name') or doc.get('stock_name') or ''
