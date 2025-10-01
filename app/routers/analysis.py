@@ -42,7 +42,7 @@ async def submit_single_analysis(
     background_tasks: BackgroundTasks,
     user: dict = Depends(get_current_user)
 ):
-    """提交单股分析任务 - 使用 BackgroundTasks 异步执行"""
+    """提交单股分析任务 - 使用 asyncio.create_task 异步执行"""
     try:
         logger.info(f"🎯 收到单股分析请求")
         logger.info(f"👤 用户信息: {user}")
@@ -52,12 +52,14 @@ async def submit_single_analysis(
         analysis_service = get_simple_analysis_service()
         result = await analysis_service.create_analysis_task(user["id"], request)
 
-        # 在后台执行分析任务
-        background_tasks.add_task(
-            analysis_service.execute_analysis_background,
-            result["task_id"],
-            user["id"],
-            request
+        # 使用 asyncio.create_task 在后台执行分析任务（不等待完成）
+        import asyncio
+        asyncio.create_task(
+            analysis_service.execute_analysis_background(
+                result["task_id"],
+                user["id"],
+                request
+            )
         )
 
         logger.info(f"✅ 分析任务已在后台启动: {result}")
@@ -692,6 +694,7 @@ async def submit_batch_analysis(
         mapping: List[Dict[str, str]] = []
 
         # 为每只股票创建单股分析任务，并在后台执行
+        import asyncio
         for stock_code in request.stock_codes:
             single_req = SingleAnalysisRequest(
                 stock_code=stock_code,
@@ -704,12 +707,13 @@ async def submit_batch_analysis(
             task_ids.append(task_id)
             mapping.append({"stock_code": stock_code, "task_id": task_id})
 
-            # 加入后台执行（与 /analysis/single 相同）
-            background_tasks.add_task(
-                simple_service.execute_analysis_background,
-                task_id,
-                user["id"],
-                single_req
+            # 使用 asyncio.create_task 在后台执行（与 /analysis/single 相同）
+            asyncio.create_task(
+                simple_service.execute_analysis_background(
+                    task_id,
+                    user["id"],
+                    single_req
+                )
             )
 
         return {
