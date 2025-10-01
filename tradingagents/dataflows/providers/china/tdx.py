@@ -33,11 +33,13 @@ except ImportError:
     logger.warning(f"⚠️ pymongo未安装，无法从MongoDB获取股票名称")
 
 try:
-    from .cache import get_cache
+    from ...cache import get_cache
     FILE_CACHE_AVAILABLE = True
 except ImportError:
     FILE_CACHE_AVAILABLE = False
-    logger.warning(f"⚠️ 缓存管理器不可用，将直接从API获取数据")
+    logger.debug(f"缓存管理器不可用，将直接从API获取数据")
+    def get_cache():
+        return None
 
 try:
     # 中国股票数据Python接口
@@ -849,16 +851,16 @@ def get_china_stock_data_enhanced(stock_code: str, start_date: str, end_date: st
         str: 格式化的股票数据
     """
     try:
-        from .stock_data_service import get_stock_data_service
+        from ...data_source_manager import get_data_source_manager
 
-        service = get_stock_data_service()
-        return service.get_stock_data_with_fallback(stock_code, start_date, end_date)
+        manager = get_data_source_manager()
+        return manager.get_stock_data_with_fallback(stock_code, start_date, end_date)
     except ImportError:
         # 如果新服务不可用，降级到原有函数
-        logger.warning(f"⚠️ 增强服务不可用，使用原有函数")
+        logger.debug(f"数据源管理器不可用，使用原有函数")
         return get_china_stock_data(stock_code, start_date, end_date)
     except Exception as e:
-        logger.warning(f"⚠️ 增强服务出错，降级到原有函数: {e}")
+        logger.debug(f"数据源管理器出错，降级到原有函数: {e}")
         return get_china_stock_data(stock_code, start_date, end_date)
 
 # ... existing code ...

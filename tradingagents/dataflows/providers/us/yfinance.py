@@ -12,15 +12,23 @@ from tradingagents.utils.dataflow_utils import save_output, SavePathType, decora
 from tradingagents.utils.logging_manager import get_logger
 logger = get_logger('agents')
 
-# 导入缓存管理器
-try:
-    from ...cache import get_cache
-    CACHE_AVAILABLE = True
-except ImportError:
-    CACHE_AVAILABLE = False
-    logger.warning(f"⚠️ 缓存管理器不可用，将直接从API获取数据")
-    def get_cache():
-        return None
+# 导入缓存管理器（延迟导入，避免循环依赖）
+_cache_module = None
+CACHE_AVAILABLE = True
+
+def get_cache():
+    """延迟导入缓存管理器"""
+    global _cache_module, CACHE_AVAILABLE
+    if _cache_module is None:
+        try:
+            from ...cache import get_cache as _get_cache
+            _cache_module = _get_cache
+            CACHE_AVAILABLE = True
+        except ImportError as e:
+            CACHE_AVAILABLE = False
+            logger.debug(f"缓存管理器不可用（使用直接API调用）: {e}")
+            return None
+    return _cache_module() if _cache_module else None
 
 
 def init_ticker(func: Callable) -> Callable:
