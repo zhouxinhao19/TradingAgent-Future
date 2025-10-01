@@ -6,7 +6,7 @@ from pandas import DataFrame
 import pandas as pd
 from functools import wraps
 
-from ...utils import save_output, SavePathType, decorate_all_methods
+from tradingagents.utils.dataflow_utils import save_output, SavePathType, decorate_all_methods
 
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
