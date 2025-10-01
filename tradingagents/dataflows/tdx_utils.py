@@ -33,11 +33,11 @@ except ImportError:
     logger.warning(f"⚠️ pymongo未安装，无法从MongoDB获取股票名称")
 
 try:
-    from .cache_manager import get_cache
+    from .cache import get_cache
     FILE_CACHE_AVAILABLE = True
 except ImportError:
     FILE_CACHE_AVAILABLE = False
-    logger.warning(f"⚠️ 文件缓存管理器不可用，将直接从API获取数据")
+    logger.warning(f"⚠️ 缓存管理器不可用，将直接从API获取数据")
 
 try:
     # 中国股票数据Python接口

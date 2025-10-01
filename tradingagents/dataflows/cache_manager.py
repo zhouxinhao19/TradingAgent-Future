@@ -635,12 +635,5 @@ class StockDataCache:
         }
 
 
-# 全局缓存实例
-_cache_instance = None
-
-def get_cache() -> StockDataCache:
-    """获取全局缓存实例"""
-    global _cache_instance
-    if _cache_instance is None:
-        _cache_instance = StockDataCache()
-    return _cache_instance
+# 注意：get_cache() 函数已移动到 tradingagents/dataflows/cache/__init__.py
+# 请使用: from tradingagents.dataflows.cache import get_cache

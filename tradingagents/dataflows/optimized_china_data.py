@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from typing import Optional, Dict, Any
-from .cache_manager import get_cache
+from .cache import get_cache
 from .config import get_config
 
 from tradingagents.config.runtime_settings import get_float, get_timezone_name

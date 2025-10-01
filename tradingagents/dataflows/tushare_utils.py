@@ -22,7 +22,7 @@ from tradingagents.utils.logging_init import get_logger
 
 # 导入缓存管理器
 try:
-    from .cache_manager import get_cache
+    from .cache import get_cache
     CACHE_AVAILABLE = True
 except ImportError:
     CACHE_AVAILABLE = False
@@ -56,8 +56,7 @@ class TushareProvider:
         self.cache_manager = None
         if self.enable_cache:
             try:
-                from .cache_manager import get_cache
-
+                from .cache import get_cache
                 self.cache_manager = get_cache()
             except Exception as e:
                 logger.warning(f"⚠️ 缓存管理器初始化失败: {e}")

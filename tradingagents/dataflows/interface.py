@@ -881,13 +881,9 @@ def get_fundamentals_finnhub(ticker, curr_date):
     try:
         import finnhub
         import os
-        # 导入缓存管理器（支持新旧路径）
-        try:
-            from .cache import StockDataCache
-            cache = StockDataCache()
-        except ImportError:
-            from .cache_manager import get_cache
-            cache = get_cache()
+        # 导入缓存管理器（统一入口）
+        from .cache import get_cache
+        cache = get_cache()
         cached_key = cache.find_cached_fundamentals_data(ticker, data_source="finnhub")
         if cached_key:
             cached_data = cache.load_fundamentals_data(cached_key)
@@ -1023,13 +1019,9 @@ def get_fundamentals_openai(ticker, curr_date):
         str: 基本面数据报告
     """
     try:
-        # 导入缓存管理器（支持新旧路径）
-        try:
-            from .cache import StockDataCache
-            cache = StockDataCache()
-        except ImportError:
-            from .cache_manager import get_cache
-            cache = get_cache()
+        # 导入缓存管理器（统一入口）
+        from .cache import get_cache
+        cache = get_cache()
 
         # 检查缓存 - 优先检查OpenAI缓存
         cached_key = cache.find_cached_fundamentals_data(ticker, data_source="openai")
