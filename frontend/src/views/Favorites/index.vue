@@ -12,7 +12,7 @@
 
     <!-- 操作栏 -->
     <el-card class="action-card" shadow="never">
-      <el-row :gutter="16" align="middle">
+      <el-row :gutter="16" align="middle" style="margin-bottom: 16px;">
         <el-col :span="8">
           <el-input
             v-model="searchKeyword"
@@ -25,8 +25,33 @@
           </el-input>
         </el-col>
 
-        <el-col :span="6">
-          <el-select v-model="selectedTag" placeholder="筛选标签" clearable>
+        <el-col :span="4">
+          <el-select v-model="selectedMarket" placeholder="市场" clearable>
+            <el-option label="A股" value="A股" />
+            <el-option label="港股" value="港股" />
+            <el-option label="美股" value="美股" />
+          </el-select>
+        </el-col>
+
+        <el-col :span="4">
+          <el-select v-model="selectedBoard" placeholder="板块" clearable>
+            <el-option label="主板" value="主板" />
+            <el-option label="创业板" value="创业板" />
+            <el-option label="科创板" value="科创板" />
+            <el-option label="北交所" value="北交所" />
+          </el-select>
+        </el-col>
+
+        <el-col :span="4">
+          <el-select v-model="selectedExchange" placeholder="交易所" clearable>
+            <el-option label="上海证券交易所" value="上海证券交易所" />
+            <el-option label="深圳证券交易所" value="深圳证券交易所" />
+            <el-option label="北京证券交易所" value="北京证券交易所" />
+          </el-select>
+        </el-col>
+
+        <el-col :span="4">
+          <el-select v-model="selectedTag" placeholder="标签" clearable>
             <el-option
               v-for="tag in userTags"
               :key="tag"
@@ -35,8 +60,10 @@
             />
           </el-select>
         </el-col>
+      </el-row>
 
-        <el-col :span="10">
+      <el-row :gutter="16" align="middle">
+        <el-col :span="24">
           <div class="action-buttons">
             <el-button @click="refreshData">
               <el-icon><Refresh /></el-icon>
@@ -66,7 +93,21 @@
         </el-table-column>
 
         <el-table-column prop="stock_name" label="股票名称" width="150" />
-        <el-table-column prop="market" label="市场" width="80" />
+        <el-table-column prop="market" label="市场" width="80">
+          <template #default="{ row }">
+            {{ row.market || 'A股' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="board" label="板块" width="100">
+          <template #default="{ row }">
+            {{ row.board || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="exchange" label="交易所" width="140">
+          <template #default="{ row }">
+            {{ row.exchange || '-' }}
+          </template>
+        </el-table-column>
 
         <el-table-column prop="current_price" label="当前价格" width="100">
           <template #default="{ row }">
@@ -389,6 +430,9 @@ const getTagColor = (name: string) => tagColorMap.value[name] || ''
 
 const searchKeyword = ref('')
 const selectedTag = ref('')
+const selectedMarket = ref('')
+const selectedBoard = ref('')
+const selectedExchange = ref('')
 
 // 添加对话框
 const addDialogVisible = ref(false)
@@ -438,6 +482,27 @@ const filteredFavorites = computed<FavoriteItem[]>(() => {
     result = result.filter((item: FavoriteItem) =>
       item.stock_code.toLowerCase().includes(keyword) ||
       item.stock_name.toLowerCase().includes(keyword)
+    )
+  }
+
+  // 市场筛选
+  if (selectedMarket.value) {
+    result = result.filter((item: FavoriteItem) =>
+      item.market === selectedMarket.value
+    )
+  }
+
+  // 板块筛选
+  if (selectedBoard.value) {
+    result = result.filter((item: FavoriteItem) =>
+      item.board === selectedBoard.value
+    )
+  }
+
+  // 交易所筛选
+  if (selectedExchange.value) {
+    result = result.filter((item: FavoriteItem) =>
+      item.exchange === selectedExchange.value
     )
   }
 

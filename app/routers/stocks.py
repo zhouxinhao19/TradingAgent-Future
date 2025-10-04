@@ -208,7 +208,7 @@ async def get_kline(code: str, period: str = "day", limit: int = 120, adj: str =
             items = []
             for _, row in df.tail(limit).iterrows():
                 items.append({
-                    "date": row.get("trade_date", row.get("date", "")),
+                    "time": row.get("trade_date", row.get("date", "")),  # 前端期望 time 字段
                     "open": float(row.get("open", 0)),
                     "high": float(row.get("high", 0)),
                     "low": float(row.get("low", 0)),

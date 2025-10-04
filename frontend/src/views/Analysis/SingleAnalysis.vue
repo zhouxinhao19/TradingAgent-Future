@@ -282,7 +282,7 @@
                         </el-icon>
                         {{ progressInfo.currentStep || '正在初始化分析引擎...' }}
                       </div>
-                      <div class="task-description">{{ progressInfo.message || 'AI正在根据您的要求重点分析相关内容' }}</div>
+                      <div class="task-description">{{ progressInfo.currentStepDescription || progressInfo.message || 'AI正在根据您的要求重点分析相关内容' }}</div>
                     </div>
 
                     <!-- 分析步骤显示 - 已隐藏 -->
@@ -601,6 +601,7 @@ const activeReportTab = ref('') // 当前激活的报告标签页
 const progressInfo = ref({
   progress: 0,
   currentStep: '',
+  currentStepDescription: '',  // 当前步骤描述
   message: '',
   elapsedTime: 0,      // 已用时间（秒）
   remainingTime: 0,    // 预计剩余时间（秒）
@@ -737,6 +738,7 @@ const submitAnalysis = async () => {
     progressInfo.value = {
       progress: 0,
       currentStep: '正在初始化分析...',
+      currentStepDescription: '分析任务已提交，正在启动分析流程',
       message: '分析任务已提交，正在启动分析流程',
       elapsedTime: 0,
       remainingTime: 0,
@@ -902,9 +904,14 @@ const updateProgressInfo = (status: any) => {
     progressInfo.value.progress = status.progress
   }
 
-  if (status.current_step) {
-    console.log('📋 更新步骤:', status.current_step)
-    progressInfo.value.currentStep = status.current_step
+  if (status.current_step_name) {
+    console.log('📋 更新步骤:', status.current_step_name)
+    progressInfo.value.currentStep = status.current_step_name
+  }
+
+  if (status.current_step_description) {
+    console.log('📝 更新步骤描述:', status.current_step_description)
+    progressInfo.value.currentStepDescription = status.current_step_description
   }
 
   if (status.message) {
@@ -955,6 +962,7 @@ const restartAnalysis = () => {
   progressInfo.value = {
     progress: 0,
     currentStep: '',
+    currentStepDescription: '',
     message: '',
     elapsedTime: 0,
     remainingTime: 0,

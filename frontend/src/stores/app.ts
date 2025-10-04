@@ -196,15 +196,25 @@ export const useAppStore = defineStore('app', {
     // 检查API连接状态
     async checkApiConnection() {
       try {
+        // 使用 AbortController 实现超时
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 3000) // 3秒超时
+
         const response = await fetch('/api/health', {
           method: 'GET',
-          timeout: 5000
+          signal: controller.signal
         })
+
+        clearTimeout(timeoutId)
         const connected = response.ok
         this.setApiConnected(connected)
         return connected
       } catch (error) {
-        console.warn('API连接检查失败:', error)
+        if (error.name === 'AbortError') {
+          console.warn('API连接检查超时')
+        } else {
+          console.warn('API连接检查失败:', error)
+        }
         this.setApiConnected(false)
         return false
       }
@@ -213,7 +223,16 @@ export const useAppStore = defineStore('app', {
     // 获取API版本信息
     async fetchApiVersion() {
       try {
-        const response = await fetch('/api/health')
+        // 使用 AbortController 实现超时
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 3000) // 3秒超时
+
+        const response = await fetch('/api/health', {
+          signal: controller.signal
+        })
+
+        clearTimeout(timeoutId)
+
         if (response.ok) {
           const data = await response.json()
           this.apiVersion = data.version || 'unknown'
@@ -222,7 +241,11 @@ export const useAppStore = defineStore('app', {
           this.setApiConnected(false)
         }
       } catch (error) {
-        console.warn('获取API版本失败:', error)
+        if (error.name === 'AbortError') {
+          console.warn('获取API版本超时')
+        } else {
+          console.warn('获取API版本失败:', error)
+        }
         this.apiVersion = 'unknown'
         this.setApiConnected(false)
       }

@@ -68,8 +68,8 @@
                 <el-icon><List /></el-icon>
               </div>
               <div class="action-content">
-                <h3>队列管理</h3>
-                <p>查看和管理分析任务队列</p>
+                <h3>任务中心</h3>
+                <p>查看和管理分析任务列表</p>
               </div>
               <el-icon class="action-arrow"><ArrowRight /></el-icon>
             </div>
@@ -88,9 +88,9 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="created_at" label="创建时间" width="180">
+            <el-table-column prop="start_time" label="创建时间" width="180">
               <template #default="{ row }">
-                {{ formatTime(row.created_at) }}
+                {{ formatTime(row.start_time) }}
               </template>
             </el-table-column>
             <el-table-column label="操作">
@@ -173,8 +173,22 @@
         <MultiSourceSyncCard style="margin-top: 24px;" />
 
         <!-- 市场快讯 -->
-        <el-card class="market-news-card" header="市场快讯" style="margin-top: 24px;">
-          <div class="news-list">
+        <el-card class="market-news-card" style="margin-top: 24px;">
+          <template #header>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span>市场快讯</span>
+              <el-button
+                type="primary"
+                size="small"
+                :loading="syncingNews"
+                @click="syncMarketNews"
+              >
+                <el-icon><Refresh /></el-icon>
+                {{ syncingNews ? '同步中...' : '同步新闻' }}
+              </el-button>
+            </div>
+          </template>
+          <div v-if="marketNews.length > 0" class="news-list">
             <div
               v-for="news in marketNews"
               :key="news.id"
@@ -185,7 +199,14 @@
               <div class="news-time">{{ formatTime(news.time) }}</div>
             </div>
           </div>
-          <div class="news-footer">
+          <div v-else class="empty-state">
+            <el-icon class="empty-icon"><InfoFilled /></el-icon>
+            <p>暂无市场快讯</p>
+            <el-button type="primary" size="small" @click="syncMarketNews" :loading="syncingNews">
+              {{ syncingNews ? '同步中...' : '立即同步' }}
+            </el-button>
+          </div>
+          <div v-if="marketNews.length > 0" class="news-footer">
             <el-button type="text" size="small">
               查看更多 <el-icon><ArrowRight /></el-icon>
             </el-button>
@@ -223,20 +244,25 @@ import {
   Files,
   List,
   ArrowRight,
-  InfoFilled
+  InfoFilled,
+  Refresh
 } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import type { AnalysisTask } from '@/types/analysis'
 import MultiSourceSyncCard from '@/components/Dashboard/MultiSourceSyncCard.vue'
+import { favoritesApi } from '@/api/favorites'
+import { getAnalysisHistory } from '@/api/analysis'
+import { newsApi } from '@/api/news'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
 // 响应式数据
 const userStats = ref({
-  totalAnalyses: 156,
-  successfulAnalyses: 142,
+  totalAnalyses: 0,
+  successfulAnalyses: 0,
   dailyQuota: 1000,
-  dailyUsed: 23,
+  dailyUsed: 0,
   concurrentLimit: 3
 })
 
@@ -247,74 +273,20 @@ const systemStatus = ref({
 })
 
 const queueStats = ref({
-  pending: 5,
-  processing: 2,
-  completed: 1248,
-  failed: 12
+  pending: 0,
+  processing: 0,
+  completed: 0,
+  failed: 0
 })
 
-const recentAnalyses = ref<AnalysisTask[]>([
-  {
-    id: '1',
-    task_id: 'task_001',
-    user_id: 'user_1',
-    stock_code: '000001',
-    stock_name: '平安银行',
-    status: 'completed',
-    priority: 0,
-    progress: 100,
-    created_at: new Date().toISOString(),
-    parameters: {} as any,
-    retry_count: 0,
-    max_retries: 3
-  }
-])
+const recentAnalyses = ref<AnalysisTask[]>([])
 
 // 自选股数据
-const favoriteStocks = ref([
-  {
-    stock_code: '000001',
-    stock_name: '平安银行',
-    current_price: 12.50,
-    change_percent: 2.1
-  },
-  {
-    stock_code: '000002',
-    stock_name: '万科A',
-    current_price: 18.32,
-    change_percent: -1.5
-  },
-  {
-    stock_code: '600036',
-    stock_name: '招商银行',
-    current_price: 35.67,
-    change_percent: 0.8
-  },
-  {
-    stock_code: '600519',
-    stock_name: '贵州茅台',
-    current_price: 1680.00,
-    change_percent: 3.2
-  }
-])
+const favoriteStocks = ref<any[]>([])
 
-const marketNews = ref([
-  {
-    id: 1,
-    title: '央行降准释放流动性，银行股集体上涨',
-    time: new Date().toISOString()
-  },
-  {
-    id: 2,
-    title: '科技股回调，关注估值修复机会',
-    time: new Date(Date.now() - 3600000).toISOString()
-  },
-  {
-    id: 3,
-    title: '新能源汽车销量创新高，产业链受益',
-    time: new Date(Date.now() - 7200000).toISOString()
-  }
-])
+// 市场快讯数据
+const marketNews = ref<any[]>([])
+const syncingNews = ref(false)
 
 
 
@@ -353,8 +325,12 @@ const downloadReport = (analysis: AnalysisTask) => {
 }
 
 const openNews = (news: any) => {
-  // 打开新闻详情
-  console.log('打开新闻:', news.id)
+  // 如果有URL，在新标签页打开新闻链接
+  if (news.url) {
+    window.open(news.url, '_blank')
+  } else {
+    ElMessage.info('该新闻暂无详情链接')
+  }
 }
 
 const getStatusType = (status: string) => {
@@ -403,25 +379,97 @@ const getPriceChangeClass = (changePercent: number) => {
 
 const loadFavoriteStocks = async () => {
   try {
-    // 这里应该调用API获取用户的自选股
-    // const response = await favoritesApi.getFavorites()
-    // favoriteStocks.value = response.data
-
-    // 目前使用模拟数据
-    console.log('加载自选股数据')
+    const response = await favoritesApi.list()
+    if (response.success && response.data) {
+      favoriteStocks.value = response.data.map((item: any) => ({
+        stock_code: item.stock_code,
+        stock_name: item.stock_name,
+        current_price: item.current_price || 0,
+        change_percent: item.change_percent || 0
+      }))
+    }
   } catch (error) {
     console.error('加载自选股失败:', error)
   }
 }
 
+const loadRecentAnalyses = async () => {
+  try {
+    const response = await getAnalysisHistory({
+      page: 1,
+      page_size: 10,  // 获取最近10条
+      status: undefined
+    })
+
+    if (response.success && response.data) {
+      // 后端已经按开始时间倒序排列，直接使用
+      recentAnalyses.value = response.data.tasks || []
+
+      // 更新统计数据
+      userStats.value.totalAnalyses = response.data.total || 0
+      userStats.value.successfulAnalyses = response.data.tasks?.filter(
+        (item: any) => item.status === 'completed'
+      ).length || 0
+    }
+  } catch (error) {
+    console.error('加载最近分析失败:', error)
+  }
+}
+
+const loadMarketNews = async () => {
+  try {
+    const response = await newsApi.getLatestNews(undefined, 10, 24)
+    if (response.success && response.data) {
+      marketNews.value = response.data.news.map((item: any) => ({
+        id: item.id || item.title,
+        title: item.title,
+        time: item.publish_time,
+        url: item.url,
+        source: item.source
+      }))
+    }
+  } catch (error) {
+    console.error('加载市场快讯失败:', error)
+    // 如果加载失败，显示提示信息
+    marketNews.value = []
+  }
+}
+
+const syncMarketNews = async () => {
+  try {
+    syncingNews.value = true
+    ElMessage.info('正在同步市场新闻，请稍候...')
+
+    // 调用同步API（后台任务）
+    const response = await newsApi.syncMarketNews(24, 50)
+
+    if (response.success) {
+      ElMessage.success('新闻同步任务已启动，请稍后刷新查看')
+
+      // 等待3秒后自动刷新新闻列表
+      setTimeout(async () => {
+        await loadMarketNews()
+        if (marketNews.value.length > 0) {
+          ElMessage.success(`成功加载 ${marketNews.value.length} 条市场新闻`)
+        }
+      }, 3000)
+    }
+  } catch (error) {
+    console.error('同步市场快讯失败:', error)
+    ElMessage.error('同步市场新闻失败，请稍后重试')
+  } finally {
+    syncingNews.value = false
+  }
+}
+
 // 生命周期
 onMounted(async () => {
-  // 加载用户统计数据
-  // 加载系统状态
-  // 加载最近分析
-  // 加载市场快讯
   // 加载自选股数据
   await loadFavoriteStocks()
+  // 加载最近分析
+  await loadRecentAnalyses()
+  // 加载市场快讯
+  await loadMarketNews()
 })
 </script>
 

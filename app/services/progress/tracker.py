@@ -61,7 +61,7 @@ class RedisProgressTracker:
             'task_id': task_id,
             'status': 'running',
             'progress_percentage': 0.0,
-            'current_step': 0,
+            'current_step': 0,  # 当前步骤索引（数字）
             'total_steps': 0,
             'current_step_name': '初始化',
             'current_step_description': '准备开始分析',
@@ -260,12 +260,29 @@ class RedisProgressTracker:
                 except Exception:
                     self.progress_data['last_message'] = str(progress_update)
                     self.progress_data['last_update'] = time.time()
-            current_step = self._detect_current_step()
-            self.progress_data['current_step'] = current_step
+
+            # 根据进度百分比自动更新步骤状态
+            progress_pct = self.progress_data.get('progress_percentage', 0)
+            self._update_steps_by_progress(progress_pct)
+
+            # 获取当前步骤索引
+            current_step_index = self._detect_current_step()
+            self.progress_data['current_step'] = current_step_index
+
+            # 更新当前步骤的名称和描述
+            if 0 <= current_step_index < len(self.analysis_steps):
+                current_step_obj = self.analysis_steps[current_step_index]
+                self.progress_data['current_step_name'] = current_step_obj.name
+                self.progress_data['current_step_description'] = current_step_obj.description
+
             elapsed, remaining, est_total = self._calculate_time_estimates()
             self.progress_data['elapsed_time'] = elapsed
             self.progress_data['remaining_time'] = remaining
             self.progress_data['estimated_total_time'] = est_total
+
+            # 更新 progress_data 中的 steps
+            self.progress_data['steps'] = [asdict(step) for step in self.analysis_steps]
+
             self._save_progress()
             logger.debug(f"[RedisProgress] updated: {self.task_id} - {self.progress_data.get('progress_percentage', 0)}%")
             return self.progress_data
@@ -273,22 +290,54 @@ class RedisProgressTracker:
             logger.error(f"[RedisProgress] update failed: {self.task_id} - {e}")
             return self.progress_data
 
-    def _detect_current_step(self) -> Optional[str]:
-        """detect current step name by status"""
+    def _update_steps_by_progress(self, progress_pct: float) -> None:
+        """根据进度百分比自动更新步骤状态"""
         try:
+            cumulative_weight = 0.0
+            current_time = time.time()
+
             for step in self.analysis_steps:
+                step_start_pct = cumulative_weight
+                step_end_pct = cumulative_weight + (step.weight * 100)
+
+                if progress_pct >= step_end_pct:
+                    # 已完成的步骤
+                    if step.status != 'completed':
+                        step.status = 'completed'
+                        step.end_time = current_time
+                elif progress_pct > step_start_pct:
+                    # 当前正在执行的步骤
+                    if step.status != 'current':
+                        step.status = 'current'
+                        step.start_time = current_time
+                else:
+                    # 未开始的步骤
+                    if step.status not in ('pending', 'failed'):
+                        step.status = 'pending'
+
+                cumulative_weight = step_end_pct
+        except Exception as e:
+            logger.debug(f"[RedisProgress] update steps by progress failed: {e}")
+
+    def _detect_current_step(self) -> int:
+        """detect current step index by status"""
+        try:
+            # 优先查找状态为 'current' 的步骤
+            for index, step in enumerate(self.analysis_steps):
                 if step.status == 'current':
-                    return step.name
-            for step in self.analysis_steps:
+                    return index
+            # 如果没有 'current'，查找第一个 'pending' 的步骤
+            for index, step in enumerate(self.analysis_steps):
                 if step.status == 'pending':
-                    return step.name
-            for step in reversed(self.analysis_steps):
+                    return index
+            # 如果都完成了，返回最后一个步骤的索引
+            for index, step in enumerate(reversed(self.analysis_steps)):
                 if step.status == 'completed':
-                    return step.name
-            return None
+                    return len(self.analysis_steps) - 1 - index
+            return 0
         except Exception as e:
             logger.debug(f"[RedisProgress] detect current step failed: {e}")
-            return None
+            return 0
 
     def _find_step_by_name(self, step_name: str) -> Optional[AnalysisStep]:
         for step in self.analysis_steps:

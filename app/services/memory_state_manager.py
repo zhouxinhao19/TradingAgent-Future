@@ -257,9 +257,32 @@ class MemoryStateManager:
         task = await self.get_task(task_id)
         return task.to_dict() if task else None
     
+    async def list_all_tasks(
+        self,
+        status: Optional[TaskStatus] = None,
+        limit: int = 20,
+        offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """获取所有任务列表（不限用户）"""
+        async with self._lock:
+            tasks = []
+            for task in self._tasks.values():
+                if status is None or task.status == status:
+                    item = task.to_dict()
+                    # 兼容前端字段
+                    if 'stock_name' not in item or not item.get('stock_name'):
+                        item['stock_name'] = None
+                    tasks.append(item)
+
+            # 按开始时间倒序排列
+            tasks.sort(key=lambda x: x.get('start_time', ''), reverse=True)
+
+            # 分页
+            return tasks[offset:offset + limit]
+
     async def list_user_tasks(
-        self, 
-        user_id: str, 
+        self,
+        user_id: str,
         status: Optional[TaskStatus] = None,
         limit: int = 20,
         offset: int = 0
@@ -278,7 +301,7 @@ class MemoryStateManager:
 
             # 按开始时间倒序排列
             tasks.sort(key=lambda x: x.get('start_time', ''), reverse=True)
-            
+
             # 分页
             return tasks[offset:offset + limit]
     
@@ -314,17 +337,73 @@ class MemoryStateManager:
         async with self._lock:
             cutoff_time = datetime.now().timestamp() - (max_age_hours * 3600)
             tasks_to_remove = []
-            
+
             for task_id, task in self._tasks.items():
                 if task.start_time and task.start_time.timestamp() < cutoff_time:
                     if task.status in [TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED]:
                         tasks_to_remove.append(task_id)
-            
+
             for task_id in tasks_to_remove:
                 del self._tasks[task_id]
-            
+
             logger.info(f"🧹 清理了 {len(tasks_to_remove)} 个旧任务")
             return len(tasks_to_remove)
+
+    async def cleanup_zombie_tasks(self, max_running_hours: int = 2) -> int:
+        """清理僵尸任务（长时间处于 running 状态的任务）
+
+        Args:
+            max_running_hours: 最大运行时长（小时），超过此时长的 running 任务将被标记为失败
+
+        Returns:
+            清理的任务数量
+        """
+        async with self._lock:
+            cutoff_time = datetime.now().timestamp() - (max_running_hours * 3600)
+            zombie_tasks = []
+
+            for task_id, task in self._tasks.items():
+                # 检查是否是长时间运行的任务
+                if task.status in [TaskStatus.RUNNING, TaskStatus.PENDING]:
+                    if task.start_time and task.start_time.timestamp() < cutoff_time:
+                        zombie_tasks.append(task_id)
+
+            # 将僵尸任务标记为失败
+            for task_id in zombie_tasks:
+                task = self._tasks[task_id]
+                task.status = TaskStatus.FAILED
+                task.end_time = datetime.now()
+                task.error_message = f"任务超时（运行时间超过 {max_running_hours} 小时）"
+                task.message = "任务已超时，自动标记为失败"
+                task.progress = 0
+
+                if task.start_time:
+                    task.execution_time = (task.end_time - task.start_time).total_seconds()
+
+                logger.warning(f"⚠️ 僵尸任务已标记为失败: {task_id} (运行时间: {task.execution_time:.1f}秒)")
+
+            if zombie_tasks:
+                logger.info(f"🧹 清理了 {len(zombie_tasks)} 个僵尸任务")
+
+            return len(zombie_tasks)
+
+    async def remove_task(self, task_id: str) -> bool:
+        """从内存中删除任务
+
+        Args:
+            task_id: 任务ID
+
+        Returns:
+            是否成功删除
+        """
+        async with self._lock:
+            if task_id in self._tasks:
+                del self._tasks[task_id]
+                logger.info(f"🗑️ 任务已从内存中删除: {task_id}")
+                return True
+            else:
+                logger.warning(f"⚠️ 任务不存在于内存中: {task_id}")
+                return False
 
 # 全局实例
 _memory_state_manager = None

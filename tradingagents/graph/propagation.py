@@ -45,9 +45,18 @@ class Propagator:
             "news_report": "",
         }
 
-    def get_graph_args(self) -> Dict[str, Any]:
-        """Get arguments for the graph invocation."""
+    def get_graph_args(self, use_progress_callback: bool = False) -> Dict[str, Any]:
+        """Get arguments for the graph invocation.
+
+        Args:
+            use_progress_callback: If True, use 'updates' mode for node-level progress tracking.
+                                  If False, use 'values' mode for complete state updates.
+        """
+        # 使用 'updates' 模式可以获取节点级别的更新，用于进度跟踪
+        # 使用 'values' 模式可以获取完整的状态更新
+        stream_mode = "updates" if use_progress_callback else "values"
+
         return {
-            "stream_mode": "values",
+            "stream_mode": stream_mode,
             "config": {"recursion_limit": self.max_recur_limit},
         }

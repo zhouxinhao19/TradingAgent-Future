@@ -156,28 +156,7 @@ const routes: RouteRecordRaw[] = [
     ]
   },
 
-  {
-    path: '/queue',
-    name: 'QueueManagement',
-    component: () => import('@/layouts/BasicLayout.vue'),
-    meta: {
-      title: '队列管理',
-      icon: 'List',
-      requiresAuth: true,
-      transition: 'slide-up'
-    },
-    children: [
-      {
-        path: '',
-        name: 'QueueManagementHome',
-        component: () => import('@/views/Queue/index.vue'),
-        meta: {
-          title: '队列管理',
-          requiresAuth: true
-        }
-      }
-    ]
-  },
+
   {
     path: '/tasks',
     name: 'TaskCenter',
@@ -382,28 +361,7 @@ const routes: RouteRecordRaw[] = [
     ]
   },
 
-  {
-    path: '/queue',
-    name: 'QueueManagement',
-    component: () => import('@/layouts/BasicLayout.vue'),
-    meta: {
-      title: '队列管理',
-      icon: 'List',
-      requiresAuth: true,
-      transition: 'slide-up'
-    },
-    children: [
-      {
-        path: '',
-        name: 'QueueManagementHome',
-        component: () => import('@/views/Queue/index.vue'),
-        meta: {
-          title: '队列管理',
-          requiresAuth: true
-        }
-      }
-    ]
-  },
+
   {
     path: '/tasks',
     name: 'TaskCenter',
@@ -536,17 +494,6 @@ const routes: RouteRecordRaw[] = [
         }
       }
     ]
-  },
-
-  {
-    path: '/login',
-    name: 'Login',
-    component: () => import('@/views/Auth/Login.vue'),
-    meta: {
-      title: '登录',
-      hideInMenu: true,
-      transition: 'fade'
-    }
   },
 
   {

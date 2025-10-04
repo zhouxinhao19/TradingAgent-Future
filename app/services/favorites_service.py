@@ -66,8 +66,37 @@ class FavoritesService:
         # 先格式化基础字段
         items = [self._format_favorite(fav) for fav in favorites]
 
-        # 批量获取行情（优先使用入库的 market_quotes，30秒更新）
+        # 批量获取股票基础信息（板块等）
         codes = [it.get("stock_code") for it in items if it.get("stock_code")]
+        if codes:
+            try:
+                # 从 stock_basic_info 获取板块信息
+                basic_info_coll = db["stock_basic_info"]
+                cursor = basic_info_coll.find(
+                    {"code": {"$in": codes}},
+                    {"code": 1, "sse": 1, "market": 1, "_id": 0}
+                )
+                basic_docs = await cursor.to_list(length=None)
+                basic_map = {str(d.get("code")).zfill(6): d for d in (basic_docs or [])}
+
+                for it in items:
+                    code = it.get("stock_code")
+                    basic = basic_map.get(code)
+                    if basic:
+                        # market 字段表示板块（主板、创业板、科创板等）
+                        it["board"] = basic.get("market", "-")
+                        # sse 字段表示交易所（上海证券交易所、深圳证券交易所等）
+                        it["exchange"] = basic.get("sse", "-")
+                    else:
+                        it["board"] = "-"
+                        it["exchange"] = "-"
+            except Exception as e:
+                # 查询失败时设置默认值
+                for it in items:
+                    it["board"] = "-"
+                    it["exchange"] = "-"
+
+        # 批量获取行情（优先使用入库的 market_quotes，30秒更新）
         if codes:
             try:
                 coll = db["market_quotes"]

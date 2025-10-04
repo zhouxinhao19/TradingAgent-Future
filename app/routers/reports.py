@@ -17,21 +17,40 @@ import logging
 
 logger = logging.getLogger("webapi")
 
-# 简单的股票名称映射（可以后续从股票API获取）
-STOCK_NAME_MAP = {
-    "000001": "平安银行",
-    "000002": "万科A",
-    "000006": "深振业A",
-    "000858": "五粮液",
-    "600000": "浦发银行",
-    "600036": "招商银行",
-    "600519": "贵州茅台",
-    "600887": "伊利股份"
-}
+# 股票名称缓存
+_stock_name_cache = {}
 
 def get_stock_name(stock_code: str) -> str:
-    """获取股票名称"""
-    return STOCK_NAME_MAP.get(stock_code, stock_code)
+    """
+    获取股票名称
+    优先级：缓存 -> MongoDB -> 默认返回股票代码
+    """
+    global _stock_name_cache
+
+    # 检查缓存
+    if stock_code in _stock_name_cache:
+        return _stock_name_cache[stock_code]
+
+    try:
+        # 从 MongoDB 获取股票名称
+        from ..core.database import get_mongo_db_sync
+        db = get_mongo_db_sync()
+
+        # 查询 stock_basic_info 集合
+        stock_info = db.stock_basic_info.find_one({"symbol": stock_code})
+
+        if stock_info and stock_info.get("name"):
+            stock_name = stock_info["name"]
+            _stock_name_cache[stock_code] = stock_name
+            return stock_name
+
+        # 如果没有找到，返回股票代码
+        _stock_name_cache[stock_code] = stock_code
+        return stock_code
+
+    except Exception as e:
+        logger.warning(f"⚠️ 获取股票名称失败 {stock_code}: {e}")
+        return stock_code
 
 
 # 统一构建报告查询：支持 _id(ObjectId) / analysis_id / task_id 三种

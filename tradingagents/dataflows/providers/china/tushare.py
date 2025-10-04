@@ -107,19 +107,19 @@ class TushareProvider(BaseStockDataProvider):
         return TUSHARE_AVAILABLE and self.connected and self.api is not None
     
     # ==================== 基础数据接口 ====================
-
-    def get_stock_list(self, market: str = None) -> Optional[pd.DataFrame]:
-        """获取股票列表（同步版本，返回DataFrame）"""
+    
+    async def get_stock_list(self, market: str = None) -> Optional[List[Dict[str, Any]]]:
+        """获取股票列表"""
         if not self.is_available():
             return None
-
+        
         try:
             # 构建查询参数
             params = {
                 'list_status': 'L',  # 只获取上市股票
                 'fields': 'ts_code,symbol,name,area,industry,market,exchange,list_date,is_hs'
             }
-
+            
             if market:
                 # 根据市场筛选
                 if market == "CN":
@@ -128,56 +128,22 @@ class TushareProvider(BaseStockDataProvider):
                     return None  # Tushare港股需要单独处理
                 elif market == "US":
                     return None  # Tushare不支持美股
-
-            # 获取数据（同步）
-            df = self.api.stock_basic(**params)
-
-            if df is None or df.empty:
-                return None
-
-            self.logger.info(f"✅ 获取股票列表: {len(df)}只")
-            return df
-
-        except Exception as e:
-            self.logger.error(f"❌ 获取股票列表失败: {e}")
-            return None
-
-    async def get_stock_list_async(self, market: str = None) -> Optional[List[Dict[str, Any]]]:
-        """获取股票列表（异步版本，返回字典列表）"""
-        if not self.is_available():
-            return None
-
-        try:
-            # 构建查询参数
-            params = {
-                'list_status': 'L',  # 只获取上市股票
-                'fields': 'ts_code,symbol,name,area,industry,market,exchange,list_date,is_hs'
-            }
-
-            if market:
-                # 根据市场筛选
-                if market == "CN":
-                    params['exchange'] = 'SSE,SZSE'  # 沪深交易所
-                elif market == "HK":
-                    return None  # Tushare港股需要单独处理
-                elif market == "US":
-                    return None  # Tushare不支持美股
-
-            # 获取数据（异步）
+            
+            # 获取数据
             df = await asyncio.to_thread(self.api.stock_basic, **params)
-
+            
             if df is None or df.empty:
                 return None
-
+            
             # 转换为标准格式
             stock_list = []
             for _, row in df.iterrows():
                 stock_info = self.standardize_basic_info(row.to_dict())
                 stock_list.append(stock_info)
-
+            
             self.logger.info(f"✅ 获取股票列表: {len(stock_list)}只")
             return stock_list
-
+            
         except Exception as e:
             self.logger.error(f"❌ 获取股票列表失败: {e}")
             return None
@@ -213,19 +179,23 @@ class TushareProvider(BaseStockDataProvider):
         """获取实时行情"""
         if not self.is_available():
             return None
-        
+
         try:
             ts_code = self._normalize_ts_code(symbol)
-            
+
             # 尝试获取实时行情 (需要高级权限)
             try:
                 df = await asyncio.to_thread(self.api.realtime_quote, ts_code=ts_code)
                 if df is not None and not df.empty:
                     return self.standardize_quotes(df.iloc[0].to_dict())
-            except Exception:
+            except Exception as e:
+                # 检查是否为限流错误
+                if self._is_rate_limit_error(str(e)):
+                    self.logger.error(f"❌ 获取实时行情失败 symbol={symbol}: {e}")
+                    raise  # 抛出限流错误，让上层处理
                 # 权限不足，使用最新日线数据
                 pass
-            
+
             # 回退：使用最新日线数据
             end_date = datetime.now().strftime('%Y%m%d')
             df = await asyncio.to_thread(
@@ -234,7 +204,7 @@ class TushareProvider(BaseStockDataProvider):
                 start_date=end_date,
                 end_date=end_date
             )
-            
+
             if df is not None and not df.empty:
                 # 获取每日指标补充数据
                 basic_df = await asyncio.to_thread(
@@ -243,19 +213,37 @@ class TushareProvider(BaseStockDataProvider):
                     trade_date=end_date,
                     fields='ts_code,total_mv,circ_mv,pe,pb,turnover_rate'
                 )
-                
+
                 # 合并数据
                 quote_data = df.iloc[0].to_dict()
                 if basic_df is not None and not basic_df.empty:
                     quote_data.update(basic_df.iloc[0].to_dict())
-                
+
                 return self.standardize_quotes(quote_data)
-            
+
             return None
-            
+
         except Exception as e:
+            # 检查是否为限流错误
+            if self._is_rate_limit_error(str(e)):
+                self.logger.error(f"❌ 获取实时行情失败 symbol={symbol}: {e}")
+                raise  # 抛出限流错误，让上层处理
+
             self.logger.error(f"❌ 获取实时行情失败 symbol={symbol}: {e}")
             return None
+
+    def _is_rate_limit_error(self, error_msg: str) -> bool:
+        """检测是否为 API 限流错误"""
+        rate_limit_keywords = [
+            "每分钟最多访问",
+            "每分钟最多",
+            "rate limit",
+            "too many requests",
+            "访问频率",
+            "请求过于频繁"
+        ]
+        error_msg_lower = error_msg.lower()
+        return any(keyword in error_msg_lower for keyword in rate_limit_keywords)
     
     async def get_historical_data(
         self,
@@ -1204,10 +1192,22 @@ def get_tushare_provider() -> TushareProvider:
     global _tushare_provider, _tushare_provider_initialized
     if _tushare_provider is None:
         _tushare_provider = TushareProvider()
-        # 使用同步连接，避免异步问题
+        # 尝试同步连接（如果在异步上下文中，需要手动调用 await provider.connect()）
         if not _tushare_provider_initialized:
             try:
-                _tushare_provider.connect_sync()
+                import asyncio
+                # 尝试在当前事件循环中运行
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        # 如果事件循环正在运行，创建一个任务
+                        asyncio.create_task(_tushare_provider.connect())
+                    else:
+                        # 如果事件循环未运行，直接运行
+                        loop.run_until_complete(_tushare_provider.connect())
+                except RuntimeError:
+                    # 没有事件循环，创建新的
+                    asyncio.run(_tushare_provider.connect())
                 _tushare_provider_initialized = True
             except Exception as e:
                 logger.warning(f"⚠️ Tushare自动连接失败: {e}")

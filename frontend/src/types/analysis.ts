@@ -107,6 +107,8 @@ export interface StockInfo {
   market: string
   industry?: string
   area?: string
+  board?: string         // 板块（主板、创业板、科创板等）
+  exchange?: string      // 交易所（上海证券交易所、深圳证券交易所等）
 
   // 市值信息（亿元）
   total_mv?: number      // 总市值

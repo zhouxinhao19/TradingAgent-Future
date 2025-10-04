@@ -292,6 +292,17 @@
           </template>
         </el-table-column>
 
+        <el-table-column prop="board" label="板块" width="100">
+          <template #default="{ row }">
+            {{ row.board || '-' }}
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="exchange" label="交易所" width="140">
+          <template #default="{ row }">
+            {{ row.exchange || '-' }}
+          </template>
+        </el-table-column>
 
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
@@ -341,7 +352,7 @@ import { Search, Refresh, Collection, TrendCharts, Download, Star } from '@eleme
 import type { StockInfo } from '@/types/analysis'
 import { screeningApi, type FieldConfigResponse, type FieldInfo } from '@/api/screening'
 import { favoritesApi } from '@/api/favorites'
-import { normalizeMarketForAnalysis } from '@/utils/market'
+import { normalizeMarketForAnalysis, exchangeCodeToMarket, getMarketByStockCode } from '@/utils/market'
 
 // 响应式数据
 const screeningLoading = ref(false)
@@ -453,6 +464,8 @@ const performScreening = async () => {
       market: it.market || 'A股',
       industry: it.industry,
       area: it.area,
+      board: it.board,  // 板块（主板、创业板、科创板等）
+      exchange: it.exchange,  // 交易所（上海证券交易所、深圳证券交易所等）
 
       // 市值信息
       total_mv: it.total_mv,
@@ -586,10 +599,20 @@ const toggleFavorite = async (stock: StockInfo) => {
       ElMessage.success(`已取消自选：${stock.name || code}`)
     } else {
       // 加入自选
+      // 根据股票代码判断市场类型
+      let marketType = 'A股'
+      if ((stock as any).market) {
+        // 如果有 market 字段，尝试转换（可能是交易所代码如 "sz", "sh"）
+        marketType = exchangeCodeToMarket((stock as any).market)
+      } else {
+        // 否则根据股票代码判断
+        marketType = getMarketByStockCode(code)
+      }
+
       const payload = {
         stock_code: code,
         stock_name: stock.name || code,
-        market: (stock as any).market || 'A股'
+        market: marketType
       }
       const res = await favoritesApi.add(payload)
       if ((res as any)?.success === false) throw new Error((res as any)?.message || '添加失败')

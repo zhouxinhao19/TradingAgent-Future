@@ -42,7 +42,7 @@ async def submit_single_analysis(
     background_tasks: BackgroundTasks,
     user: dict = Depends(get_current_user)
 ):
-    """提交单股分析任务 - 使用 asyncio.create_task 异步执行"""
+    """提交单股分析任务 - 使用 BackgroundTasks 异步执行"""
     try:
         logger.info(f"🎯 收到单股分析请求")
         logger.info(f"👤 用户信息: {user}")
@@ -52,15 +52,35 @@ async def submit_single_analysis(
         analysis_service = get_simple_analysis_service()
         result = await analysis_service.create_analysis_task(user["id"], request)
 
-        # 使用 asyncio.create_task 在后台执行分析任务（不等待完成）
-        import asyncio
-        asyncio.create_task(
-            analysis_service.execute_analysis_background(
-                result["task_id"],
-                user["id"],
-                request
-            )
-        )
+        # 提取变量，避免闭包问题
+        task_id = result["task_id"]
+        user_id = user["id"]
+
+        # 定义一个包装函数来运行异步任务
+        async def run_analysis_task():
+            """包装函数：在后台运行分析任务"""
+            try:
+                logger.info(f"🚀 [BackgroundTask] 开始执行分析任务: {task_id}")
+                logger.info(f"📝 [BackgroundTask] task_id={task_id}, user_id={user_id}")
+                logger.info(f"📝 [BackgroundTask] request={request}")
+
+                # 重新获取服务实例，确保在正确的上下文中
+                logger.info(f"🔧 [BackgroundTask] 正在获取服务实例...")
+                service = get_simple_analysis_service()
+                logger.info(f"✅ [BackgroundTask] 服务实例获取成功: {id(service)}")
+
+                logger.info(f"🚀 [BackgroundTask] 准备调用 execute_analysis_background...")
+                await service.execute_analysis_background(
+                    task_id,
+                    user_id,
+                    request
+                )
+                logger.info(f"✅ [BackgroundTask] 分析任务完成: {task_id}")
+            except Exception as e:
+                logger.error(f"❌ [BackgroundTask] 分析任务失败: {task_id}, 错误: {e}", exc_info=True)
+
+        # 使用 BackgroundTasks 执行异步任务
+        background_tasks.add_task(run_analysis_task)
 
         logger.info(f"✅ 分析任务已在后台启动: {result}")
 
@@ -647,6 +667,38 @@ async def get_task_result(
         logger.error(f"❌ [RESULT] 获取任务结果失败: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.get("/tasks/all", response_model=Dict[str, Any])
+async def list_all_tasks(
+    user: dict = Depends(get_current_user),
+    status: Optional[str] = Query(None, description="任务状态过滤"),
+    limit: int = Query(20, ge=1, le=100, description="返回数量限制"),
+    offset: int = Query(0, ge=0, description="偏移量")
+):
+    """获取所有任务列表（不限用户）"""
+    try:
+        logger.info(f"📋 查询所有任务列表")
+
+        tasks = await get_simple_analysis_service().list_all_tasks(
+            status=status,
+            limit=limit,
+            offset=offset
+        )
+
+        return {
+            "success": True,
+            "data": {
+                "tasks": tasks,
+                "total": len(tasks),
+                "limit": limit,
+                "offset": offset
+            },
+            "message": "任务列表获取成功"
+        }
+
+    except Exception as e:
+        logger.error(f"❌ 获取任务列表失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/tasks", response_model=Dict[str, Any])
 async def list_user_tasks(
     user: dict = Depends(get_current_user),
@@ -694,7 +746,6 @@ async def submit_batch_analysis(
         mapping: List[Dict[str, str]] = []
 
         # 为每只股票创建单股分析任务，并在后台执行
-        import asyncio
         for stock_code in request.stock_codes:
             single_req = SingleAnalysisRequest(
                 stock_code=stock_code,
@@ -707,14 +758,18 @@ async def submit_batch_analysis(
             task_ids.append(task_id)
             mapping.append({"stock_code": stock_code, "task_id": task_id})
 
-            # 使用 asyncio.create_task 在后台执行（与 /analysis/single 相同）
-            asyncio.create_task(
-                simple_service.execute_analysis_background(
-                    task_id,
-                    user["id"],
-                    single_req
-                )
-            )
+            # 定义包装函数来运行异步任务
+            async def run_analysis_task_wrapper(tid=task_id, req=single_req):
+                """包装函数：在后台运行分析任务"""
+                try:
+                    logger.info(f"🚀 [BackgroundTask] 开始执行批量分析任务: {tid}")
+                    await simple_service.execute_analysis_background(tid, user["id"], req)
+                    logger.info(f"✅ [BackgroundTask] 批量分析任务完成: {tid}")
+                except Exception as e:
+                    logger.error(f"❌ [BackgroundTask] 批量分析任务失败: {tid}, 错误: {e}", exc_info=True)
+
+            # 使用 BackgroundTasks 执行异步任务（与 /analysis/single 相同）
+            background_tasks.add_task(run_analysis_task_wrapper)
 
         return {
             "success": True,
@@ -960,3 +1015,153 @@ async def get_task_details(
     if not t or t.get("user") != user["id"]:
         raise HTTPException(status_code=404, detail="任务不存在")
     return t
+
+
+# ==================== 僵尸任务管理 ====================
+
+@router.get("/admin/zombie-tasks")
+async def get_zombie_tasks(
+    max_running_hours: int = Query(default=2, ge=1, le=72, description="最大运行时长（小时）"),
+    user: dict = Depends(get_current_user)
+):
+    """获取僵尸任务列表（仅管理员）
+
+    僵尸任务：长时间处于 processing/running/pending 状态的任务
+    """
+    # 检查管理员权限
+    if user.get("username") != "admin":
+        raise HTTPException(status_code=403, detail="仅管理员可访问")
+
+    try:
+        svc = get_simple_analysis_service()
+        zombie_tasks = await svc.get_zombie_tasks(max_running_hours)
+
+        return {
+            "success": True,
+            "data": zombie_tasks,
+            "total": len(zombie_tasks),
+            "max_running_hours": max_running_hours
+        }
+    except Exception as e:
+        logger.error(f"❌ 获取僵尸任务失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取僵尸任务失败: {str(e)}")
+
+
+@router.post("/admin/cleanup-zombie-tasks")
+async def cleanup_zombie_tasks(
+    max_running_hours: int = Query(default=2, ge=1, le=72, description="最大运行时长（小时）"),
+    user: dict = Depends(get_current_user)
+):
+    """清理僵尸任务（仅管理员）
+
+    将长时间处于 processing/running/pending 状态的任务标记为失败
+    """
+    # 检查管理员权限
+    if user.get("username") != "admin":
+        raise HTTPException(status_code=403, detail="仅管理员可访问")
+
+    try:
+        svc = get_simple_analysis_service()
+        result = await svc.cleanup_zombie_tasks(max_running_hours)
+
+        return {
+            "success": True,
+            "data": result,
+            "message": f"已清理 {result.get('total_cleaned', 0)} 个僵尸任务"
+        }
+    except Exception as e:
+        logger.error(f"❌ 清理僵尸任务失败: {e}")
+        raise HTTPException(status_code=500, detail=f"清理僵尸任务失败: {str(e)}")
+
+
+@router.post("/tasks/{task_id}/mark-failed")
+async def mark_task_as_failed(
+    task_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """将指定任务标记为失败
+
+    用于手动清理卡住的任务
+    """
+    try:
+        svc = get_simple_analysis_service()
+
+        # 更新内存中的任务状态
+        from app.services.memory_state_manager import TaskStatus
+        await svc.memory_manager.update_task_status(
+            task_id=task_id,
+            status=TaskStatus.FAILED,
+            message="手动标记为失败",
+            error_message="用户手动标记为失败"
+        )
+
+        # 更新 MongoDB 中的任务状态
+        from app.core.database import get_mongo_db
+        from datetime import datetime
+        db = get_mongo_db()
+
+        result = await db.analysis_tasks.update_one(
+            {"task_id": task_id},
+            {
+                "$set": {
+                    "status": "failed",
+                    "last_error": "用户手动标记为失败",
+                    "completed_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+
+        if result.modified_count > 0:
+            logger.info(f"✅ 任务 {task_id} 已标记为失败")
+            return {
+                "success": True,
+                "message": "任务已标记为失败"
+            }
+        else:
+            logger.warning(f"⚠️ 任务 {task_id} 未找到或已是失败状态")
+            return {
+                "success": True,
+                "message": "任务未找到或已是失败状态"
+            }
+    except Exception as e:
+        logger.error(f"❌ 标记任务失败: {e}")
+        raise HTTPException(status_code=500, detail=f"标记任务失败: {str(e)}")
+
+
+@router.delete("/tasks/{task_id}")
+async def delete_task(
+    task_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """删除指定任务
+
+    从内存和数据库中删除任务记录
+    """
+    try:
+        svc = get_simple_analysis_service()
+
+        # 从内存中删除任务
+        await svc.memory_manager.remove_task(task_id)
+
+        # 从 MongoDB 中删除任务
+        from app.core.database import get_mongo_db
+        db = get_mongo_db()
+
+        result = await db.analysis_tasks.delete_one({"task_id": task_id})
+
+        if result.deleted_count > 0:
+            logger.info(f"✅ 任务 {task_id} 已删除")
+            return {
+                "success": True,
+                "message": "任务已删除"
+            }
+        else:
+            logger.warning(f"⚠️ 任务 {task_id} 未找到")
+            return {
+                "success": True,
+                "message": "任务未找到"
+            }
+    except Exception as e:
+        logger.error(f"❌ 删除任务失败: {e}")
+        raise HTTPException(status_code=500, detail=f"删除任务失败: {str(e)}")

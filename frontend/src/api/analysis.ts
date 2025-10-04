@@ -200,6 +200,16 @@ export const analysisApi = {
     return request.get(`/api/analysis/tasks/${taskId}/result`)
   },
 
+  // 标记任务为失败
+  markTaskAsFailed(taskId: string): Promise<{ success: boolean; message: string }> {
+    return request.post(`/api/analysis/tasks/${taskId}/mark-failed`, {})
+  },
+
+  // 删除任务
+  deleteTask(taskId: string): Promise<{ success: boolean; message: string }> {
+    return request.delete(`/api/analysis/tasks/${taskId}`)
+  },
+
   // 分享分析结果
   shareAnalysis(analysisId: string, options: {
     expires_in?: number // 过期时间（秒）
@@ -385,6 +395,38 @@ export const formatDataSource = (source: string): string => {
     yahoo: 'Yahoo Finance'
   }
   return sourceMap[source] ?? source
+}
+
+/**
+ * 获取分析历史记录（当前用户）
+ */
+export const getAnalysisHistory = async (params: {
+  page?: number
+  page_size?: number
+  status?: string
+}) => {
+  const response = await request.get('/api/analysis/user/history', { params })
+  return response.data
+}
+
+/**
+ * 获取所有任务列表（不限用户）
+ */
+export const getAllTasks = async (params: {
+  limit?: number
+  offset?: number
+  status?: string
+}) => {
+  return request<{
+    tasks: any[]
+    total: number
+    limit: number
+    offset: number
+  }>({
+    url: '/api/analysis/tasks/all',
+    method: 'GET',
+    params
+  })
 }
 
 // 工具函数

@@ -131,13 +131,19 @@ class DatabaseScreeningService:
             
             # 获取结果
             results = []
+            codes = []
             async for doc in cursor:
                 # 转换结果格式
                 result = self._format_result(doc)
                 results.append(result)
-            
+                codes.append(doc.get("code"))
+
+            # 批量查询财务数据（ROE等）
+            if codes:
+                await self._enrich_with_financial_data(results, codes)
+
             logger.info(f"✅ 数据库筛选完成: 总数={total_count}, 返回={len(results)}")
-            
+
             return results, total_count
             
         except Exception as e:
@@ -201,15 +207,82 @@ class DatabaseScreeningService:
         
         return sort_conditions
     
+    async def _enrich_with_financial_data(self, results: List[Dict[str, Any]], codes: List[str]) -> None:
+        """
+        批量查询财务数据并填充到结果中
+
+        Args:
+            results: 筛选结果列表
+            codes: 股票代码列表
+        """
+        try:
+            db = get_mongo_db()
+            financial_collection = db['stock_financial_data']
+
+            # 批量查询最新的财务数据
+            # 按 code 分组，取每个 code 的最新一期数据
+            pipeline = [
+                {"$match": {"code": {"$in": codes}}},
+                {"$sort": {"code": 1, "report_period": -1}},
+                {"$group": {
+                    "_id": "$code",
+                    "roe": {"$first": "$roe"},
+                    "roa": {"$first": "$roa"},
+                    "netprofit_margin": {"$first": "$netprofit_margin"},
+                    "gross_margin": {"$first": "$gross_margin"},
+                }}
+            ]
+
+            financial_data_map = {}
+            async for doc in financial_collection.aggregate(pipeline):
+                code = doc.get("_id")
+                financial_data_map[code] = {
+                    "roe": doc.get("roe"),
+                    "roa": doc.get("roa"),
+                    "netprofit_margin": doc.get("netprofit_margin"),
+                    "gross_margin": doc.get("gross_margin"),
+                }
+
+            # 填充财务数据到结果中
+            for result in results:
+                code = result.get("code")
+                if code in financial_data_map:
+                    financial_data = financial_data_map[code]
+                    # 只更新 ROE（如果 stock_basic_info 中没有的话）
+                    if result.get("roe") is None:
+                        result["roe"] = financial_data.get("roe")
+                    # 可以添加更多财务指标
+                    # result["roa"] = financial_data.get("roa")
+                    # result["netprofit_margin"] = financial_data.get("netprofit_margin")
+
+            logger.debug(f"✅ 已填充 {len(financial_data_map)} 条财务数据")
+
+        except Exception as e:
+            logger.warning(f"⚠️ 填充财务数据失败: {e}")
+            # 不抛出异常，允许继续返回基础数据
+
     def _format_result(self, doc: Dict[str, Any]) -> Dict[str, Any]:
         """格式化查询结果，统一使用后端字段名"""
+        # 根据股票代码推断市场类型
+        code = doc.get("code", "")
+        market_type = "A股"  # 默认A股
+        if code:
+            if code.startswith("6"):
+                market_type = "A股"  # 上海
+            elif code.startswith(("0", "3")):
+                market_type = "A股"  # 深圳
+            elif code.startswith("8") or code.startswith("4"):
+                market_type = "A股"  # 北交所
+
         result = {
             # 基础信息
             "code": doc.get("code"),
             "name": doc.get("name"),
             "industry": doc.get("industry"),
             "area": doc.get("area"),
-            "market": doc.get("market"),
+            "market": market_type,  # 市场类型（A股、美股、港股）
+            "board": doc.get("market"),  # 板块（主板、创业板、科创板等）
+            "exchange": doc.get("sse"),  # 交易所（上海证券交易所、深圳证券交易所等）
             "list_date": doc.get("list_date"),
 
             # 市值信息（亿元）

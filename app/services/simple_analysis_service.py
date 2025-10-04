@@ -400,17 +400,33 @@ class SimpleAnalysisService:
         request: SingleAnalysisRequest
     ):
         """在后台执行分析任务"""
+        # 添加最外层的异常捕获，确保所有异常都被记录
+        try:
+            logger.info(f"🎯🎯🎯 [ENTRY] execute_analysis_background 方法被调用: {task_id}")
+            logger.info(f"🎯🎯🎯 [ENTRY] user_id={user_id}, stock_code={request.stock_code}")
+        except Exception as entry_error:
+            print(f"❌❌❌ [CRITICAL] 日志记录失败: {entry_error}")
+            import traceback
+            traceback.print_exc()
+
         progress_tracker = None
         try:
             logger.info(f"🚀 开始后台执行分析任务: {task_id}")
 
-            # 创建Redis进度跟踪器
-            progress_tracker = RedisProgressTracker(
-                task_id=task_id,
-                analysts=request.parameters.selected_analysts or ["market", "fundamentals"],
-                research_depth=request.parameters.research_depth or "标准",
-                llm_provider="dashscope"
-            )
+            # 在线程池中创建Redis进度跟踪器（避免阻塞事件循环）
+            def create_progress_tracker():
+                """在线程中创建进度跟踪器"""
+                logger.info(f"📊 [线程] 创建进度跟踪器: {task_id}")
+                tracker = RedisProgressTracker(
+                    task_id=task_id,
+                    analysts=request.parameters.selected_analysts or ["market", "fundamentals"],
+                    research_depth=request.parameters.research_depth or "标准",
+                    llm_provider="dashscope"
+                )
+                logger.info(f"✅ [线程] 进度跟踪器创建完成: {task_id}")
+                return tracker
+
+            progress_tracker = await asyncio.to_thread(create_progress_tracker)
 
             # 缓存进度跟踪器
             self._progress_trackers[task_id] = progress_tracker
@@ -418,8 +434,14 @@ class SimpleAnalysisService:
             # 注册到日志监控
             register_analysis_tracker(task_id, progress_tracker)
 
-            # 初始化进度
-            progress_tracker.update_progress("🚀 开始股票分析")
+            # 初始化进度（在线程中执行）
+            await asyncio.to_thread(
+                progress_tracker.update_progress,
+                {
+                    "progress_percentage": 10,
+                    "last_message": "🚀 开始股票分析"
+                }
+            )
 
             # 更新状态为运行中
             await self.memory_manager.update_task_status(
@@ -433,8 +455,14 @@ class SimpleAnalysisService:
             # 同步更新MongoDB状态
             await self._update_task_status(task_id, AnalysisStatus.PROCESSING, 10)
 
-            # 数据准备阶段
-            progress_tracker.update_progress("🔧 检查环境配置")
+            # 数据准备阶段（在线程中执行）
+            await asyncio.to_thread(
+                progress_tracker.update_progress,
+                {
+                    "progress_percentage": 20,
+                    "last_message": "🔧 检查环境配置"
+                }
+            )
             await self.memory_manager.update_task_status(
                 task_id=task_id,
                 status=TaskStatus.RUNNING,
@@ -449,8 +477,8 @@ class SimpleAnalysisService:
             # 执行实际的分析
             result = await self._execute_analysis_sync(task_id, user_id, request, progress_tracker)
 
-            # 标记进度跟踪器完成
-            progress_tracker.mark_completed()
+            # 标记进度跟踪器完成（在线程中执行）
+            await asyncio.to_thread(progress_tracker.mark_completed)
 
             # 保存分析结果到文件和数据库
             try:
@@ -569,12 +597,22 @@ class SimpleAnalysisService:
 
             # 如果有进度跟踪器，更新进度
             if progress_tracker:
-                progress_tracker.update_progress("⚙️ 配置分析参数")
+                progress_tracker.update_progress({
+                    "progress_percentage": 30,
+                    "last_message": "⚙️ 配置分析参数"
+                })
 
             # 异步更新进度（在线程池中调用）
             def update_progress_sync(progress: int, message: str, step: str):
                 """在线程池中同步更新进度"""
                 try:
+                    # 同时更新 Redis 进度跟踪器
+                    if progress_tracker:
+                        progress_tracker.update_progress({
+                            "progress_percentage": progress,
+                            "last_message": message
+                        })
+
                     # 创建新的事件循环来执行异步操作
                     import asyncio
                     loop = asyncio.new_event_loop()
@@ -595,8 +633,6 @@ class SimpleAnalysisService:
                     logger.warning(f"⚠️ 进度更新失败: {e}")
 
             # 配置阶段
-            if progress_tracker:
-                progress_tracker.update_progress("⚙️ 配置分析参数")
             update_progress_sync(30, "配置分析参数...", "configuration")
 
             # 创建分析配置
@@ -610,22 +646,16 @@ class SimpleAnalysisService:
             )
 
             # 初始化分析引擎
-            if progress_tracker:
-                progress_tracker.update_progress("🚀 初始化AI分析引擎")
-            update_progress_sync(40, "初始化分析引擎...", "engine_initialization")
+            update_progress_sync(40, "🚀 初始化AI分析引擎", "engine_initialization")
             trading_graph = self._get_trading_graph(config)
 
             # 开始分析
-            if progress_tracker:
-                progress_tracker.update_progress("📊 开始智能体分析")
-            update_progress_sync(50, "开始股票分析...", "analysis_execution")
+            update_progress_sync(50, "📊 开始智能体分析", "analysis_execution")
             start_time = datetime.now()
             analysis_date = datetime.now().strftime("%Y-%m-%d")
 
             # 调用分析方法 - 添加进度模拟
-            if progress_tracker:
-                progress_tracker.update_progress("🤖 执行多智能体协作分析")
-            update_progress_sync(60, "执行智能体分析...", "agent_analysis")
+            update_progress_sync(60, "🤖 执行多智能体协作分析", "agent_analysis")
 
             # 启动一个异步任务来模拟进度更新
             import threading
@@ -698,8 +728,81 @@ class SimpleAnalysisService:
             progress_thread = threading.Thread(target=simulate_progress, daemon=True)
             progress_thread.start()
 
-            # 执行实际分析
-            state, decision = trading_graph.propagate(request.stock_code, analysis_date)
+            # 定义进度回调函数，用于接收 LangGraph 的实时进度
+            # 节点进度映射表（与 RedisProgressTracker 的步骤权重对应）
+            node_progress_map = {
+                # 分析师阶段 (10% → 45%)
+                "📊 市场分析师": 27.5,      # 10% + 17.5% (假设2个分析师)
+                "💼 基本面分析师": 45,       # 10% + 35%
+                "📰 新闻分析师": 27.5,       # 如果有3个分析师
+                "💬 社交媒体分析师": 27.5,   # 如果有4个分析师
+                # 研究辩论阶段 (45% → 70%)
+                "🐂 看涨研究员": 51.25,      # 45% + 6.25%
+                "🐻 看跌研究员": 57.5,       # 45% + 12.5%
+                "👔 研究经理": 70,           # 45% + 25%
+                # 交易员阶段 (70% → 78%)
+                "💼 交易员决策": 78,         # 70% + 8%
+                # 风险评估阶段 (78% → 93%)
+                "🔥 激进风险评估": 81.75,    # 78% + 3.75%
+                "🛡️ 保守风险评估": 85.5,    # 78% + 7.5%
+                "⚖️ 中性风险评估": 89.25,   # 78% + 11.25%
+                "🎯 风险经理": 93,           # 78% + 15%
+                # 最终阶段 (93% → 100%)
+                "📊 生成报告": 97,           # 93% + 4%
+            }
+
+            def graph_progress_callback(message: str):
+                """接收 LangGraph 的进度更新
+
+                根据节点名称直接映射到进度百分比，确保与 RedisProgressTracker 的步骤权重一致
+                注意：只在进度增加时更新，避免覆盖 RedisProgressTracker 的虚拟步骤进度
+                """
+                try:
+                    logger.info(f"🎯🎯🎯 [Graph进度回调被调用] message={message}")
+                    if not progress_tracker:
+                        logger.warning(f"⚠️ progress_tracker 为 None，无法更新进度")
+                        return
+
+                    # 查找节点对应的进度百分比
+                    progress_pct = node_progress_map.get(message)
+
+                    if progress_pct is not None:
+                        # 获取当前进度（使用 progress_data 属性）
+                        current_progress = progress_tracker.progress_data.get('progress_percentage', 0)
+
+                        # 只在进度增加时更新，避免覆盖虚拟步骤的进度
+                        if int(progress_pct) > current_progress:
+                            progress_tracker.update_progress({
+                                'progress_percentage': int(progress_pct),
+                                'last_message': message
+                            })
+                            logger.info(f"📊 [Graph进度] 进度已更新: {current_progress}% → {int(progress_pct)}% - {message}")
+                        else:
+                            # 进度没有增加，只更新消息
+                            progress_tracker.update_progress({
+                                'last_message': message
+                            })
+                            logger.info(f"📊 [Graph进度] 进度未变化({current_progress}% >= {int(progress_pct)}%)，仅更新消息: {message}")
+                    else:
+                        # 未知节点，只更新消息
+                        logger.warning(f"⚠️ [Graph进度] 未知节点: {message}，仅更新消息")
+                        progress_tracker.update_progress({
+                            'last_message': message
+                        })
+
+                except Exception as e:
+                    logger.error(f"❌ Graph进度回调失败: {e}", exc_info=True)
+
+            logger.info(f"🚀 准备调用 trading_graph.propagate，progress_callback={graph_progress_callback}")
+
+            # 执行实际分析，传递进度回调
+            state, decision = trading_graph.propagate(
+                request.stock_code,
+                analysis_date,
+                progress_callback=graph_progress_callback
+            )
+
+            logger.info(f"✅ trading_graph.propagate 执行完成")
 
             # 🔍 调试：检查decision的结构
             logger.info(f"🔍 [DEBUG] Decision类型: {type(decision)}")
@@ -974,14 +1077,30 @@ class SimpleAnalysisService:
             redis_progress = get_progress_by_id(task_id)
             if redis_progress:
                 logger.info(f"📊 [Redis进度] 获取到详细进度: {task_id}")
+
+                # 从 steps 数组中提取当前步骤的名称和描述
+                current_step_index = redis_progress.get('current_step', 0)
+                steps = redis_progress.get('steps', [])
+                current_step_name = redis_progress.get('current_step_name', '')
+                current_step_description = redis_progress.get('current_step_description', '')
+
+                # 如果 Redis 中的名称/描述为空，从 steps 数组中提取
+                if not current_step_name and steps and 0 <= current_step_index < len(steps):
+                    current_step_info = steps[current_step_index]
+                    current_step_name = current_step_info.get('name', '')
+                    current_step_description = current_step_info.get('description', '')
+                    logger.info(f"📋 从steps数组提取当前步骤信息: index={current_step_index}, name={current_step_name}")
+
                 # 合并Redis进度数据
                 result.update({
                     'progress': redis_progress.get('progress_percentage', result.get('progress', 0)),
-                    'current_step': redis_progress.get('current_step_name', result.get('current_step', '')),
+                    'current_step': current_step_index,  # 使用索引而不是名称
+                    'current_step_name': current_step_name,  # 步骤名称
+                    'current_step_description': current_step_description,  # 步骤描述
                     'message': redis_progress.get('last_message', result.get('message', '')),
                     'elapsed_time': redis_progress.get('elapsed_time', 0),
                     'remaining_time': redis_progress.get('remaining_time', 0),
-                    'steps': redis_progress.get('steps', []),
+                    'steps': steps,
                     'start_time': result.get('start_time'),  # 保持原有格式
                     'last_update': redis_progress.get('last_update', result.get('start_time'))
                 })
@@ -1011,6 +1130,91 @@ class SimpleAnalysisService:
 
         return result
 
+    async def list_all_tasks(
+        self,
+        status: Optional[str] = None,
+        limit: int = 20,
+        offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """获取所有任务列表（不限用户）
+        - 合并内存和 MongoDB 数据
+        - 按开始时间倒序排列
+        """
+        try:
+            task_status = None
+            if status:
+                try:
+                    status_mapping = {
+                        "processing": "running",
+                        "pending": "pending",
+                        "completed": "completed",
+                        "failed": "failed",
+                        "cancelled": "cancelled"
+                    }
+                    mapped_status = status_mapping.get(status, status)
+                    task_status = TaskStatus(mapped_status)
+                except ValueError:
+                    logger.warning(f"⚠️ [Tasks] 无效的状态值: {status}")
+                    task_status = None
+
+            # 1) 从内存读取所有任务
+            logger.info(f"📋 [Tasks] 准备从内存读取所有任务: status={status}, limit={limit}, offset={offset}")
+            tasks_in_mem = await self.memory_manager.list_all_tasks(
+                status=task_status,
+                limit=limit * 2,
+                offset=0
+            )
+            logger.info(f"📋 [Tasks] 内存返回数量: {len(tasks_in_mem)}")
+
+            # 2) 从 MongoDB 读取任务
+            db = get_mongo_db()
+            collection = db["analysis_tasks"]
+
+            query = {}
+            if task_status:
+                query["status"] = task_status.value
+
+            count = await collection.count_documents(query)
+            logger.info(f"📋 [Tasks] MongoDB 任务总数: {count}")
+
+            cursor = collection.find(query).sort("start_time", -1).limit(limit * 2)
+            tasks_from_db = []
+            async for doc in cursor:
+                doc.pop("_id", None)
+                tasks_from_db.append(doc)
+
+            logger.info(f"📋 [Tasks] MongoDB 返回数量: {len(tasks_from_db)}")
+
+            # 3) 合并任务（内存优先）
+            task_dict = {}
+
+            # 先添加 MongoDB 中的任务
+            for task in tasks_from_db:
+                task_id = task.get("task_id")
+                if task_id:
+                    task_dict[task_id] = task
+
+            # 再添加内存中的任务（覆盖 MongoDB 中的同名任务）
+            for task in tasks_in_mem:
+                task_id = task.get("task_id")
+                if task_id:
+                    task_dict[task_id] = task
+
+            # 转换为列表并按时间排序
+            merged_tasks = list(task_dict.values())
+            merged_tasks.sort(key=lambda x: x.get('start_time', ''), reverse=True)
+
+            # 分页
+            results = merged_tasks[offset:offset + limit]
+
+            # 为结果补齐股票名称
+            results = self._enrich_stock_names(results)
+            logger.info(f"📋 [Tasks] 合并后返回数量: {len(results)} (内存: {len(tasks_in_mem)}, MongoDB: {count})")
+            return results
+        except Exception as outer_e:
+            logger.error(f"❌ list_all_tasks 外层异常: {outer_e}", exc_info=True)
+            return []
+
     async def list_user_tasks(
         self,
         user_id: str,
@@ -1019,152 +1223,269 @@ class SimpleAnalysisService:
         offset: int = 0
     ) -> List[Dict[str, Any]]:
         """获取用户任务列表
-        优先返回内存中的实时任务；如为空则从MongoDB中兜底读取历史任务。
+        - 对于 processing 状态：优先从内存读取（实时进度）
+        - 对于 completed/failed/all 状态：合并内存和 MongoDB 数据
         """
-        task_status = None
-        if status:
-            try:
-                task_status = TaskStatus(status)
-            except ValueError:
-                task_status = None
-
-        # 1) 优先从内存读取（包含实时进度）
-        logger.info(f"📋 [Tasks] 准备从内存读取任务: user_id={user_id}, status={task_status}, limit={limit}, offset={offset}")
-        tasks_in_mem = await self.memory_manager.list_user_tasks(
-            user_id=user_id,
-            status=task_status,
-            limit=limit,
-            offset=offset
-        )
-        logger.info(f"📋 [Tasks] 内存返回数量: {len(tasks_in_mem)}")
-        if tasks_in_mem and len(tasks_in_mem) > 0:
-            logger.info(f"📋 [Tasks] 使用内存结果")
-            return self._enrich_stock_names(tasks_in_mem)
-
-        # 2) 兜底：从MongoDB读取历史任务
         try:
-            db = get_mongo_db()
+            task_status = None
+            if status:
+                try:
+                    # 前端传递的是 "processing"，但 TaskStatus 使用的是 "running"
+                    # 需要做映射转换
+                    status_mapping = {
+                        "processing": "running",  # 前端使用 processing，内存使用 running
+                        "pending": "pending",
+                        "completed": "completed",
+                        "failed": "failed",
+                        "cancelled": "cancelled"
+                    }
+                    mapped_status = status_mapping.get(status, status)
+                    task_status = TaskStatus(mapped_status)
+                except ValueError:
+                    logger.warning(f"⚠️ [Tasks] 无效的状态值: {status}")
+                    task_status = None
 
-            # user_id 可能是字符串或 ObjectId，做兼容
-            uid_candidates: List[Any] = [user_id]
+            # 1) 从内存读取任务
+            logger.info(f"📋 [Tasks] 准备从内存读取任务: user_id={user_id}, status={status} (mapped to {task_status}), limit={limit}, offset={offset}")
+            tasks_in_mem = await self.memory_manager.list_user_tasks(
+                user_id=user_id,
+                status=task_status,
+                limit=limit * 2,  # 多读一些，后面合并去重
+                offset=0  # 内存中的任务不多，全部读取
+            )
+            logger.info(f"📋 [Tasks] 内存返回数量: {len(tasks_in_mem)}")
+
+            # 2) 如果只查询 processing/running 状态，且内存中有数据，直接返回
+            if task_status == TaskStatus.RUNNING and tasks_in_mem:
+                logger.info(f"📋 [Tasks] 查询进行中任务，使用内存结果")
+                return self._enrich_stock_names(tasks_in_mem[offset:offset + limit])
+
+            # 3) 从 MongoDB 读取历史任务（用于合并或兜底）
+            logger.info(f"📋 [Tasks] 从 MongoDB 读取历史任务")
+            mongo_tasks: List[Dict[str, Any]] = []
+            count = 0
             try:
-                from bson import ObjectId
-                uid_candidates.append(ObjectId(user_id))
-            except Exception as conv_err:
-                logger.warning(f"⚠️ [Tasks] 用户ID转换ObjectId失败，按字符串匹配: {conv_err}")
-                # 若为admin，加入固定的ObjectId（与提交任务时一致）并加入其字符串形式
-                if str(user_id) == 'admin':
-                    try:
-                        admin_oid_str = '507f1f77bcf86cd799439011'
-                        uid_candidates.append(ObjectId(admin_oid_str))
-                        uid_candidates.append(admin_oid_str)  # 兼容字符串存储
-                        logger.info("📋 [Tasks] 已加入admin固定ObjectId(对象+字符串)用于匹配")
-                    except Exception:
-                        pass
+                db = get_mongo_db()
 
-            # 构造查询条件
-            if str(user_id) == 'admin':
-                # 管理员：精确匹配固定ObjectId（字符串与对象两种形式）
-                admin_oid_str = '507f1f77bcf86cd799439011'
+                # user_id 可能是字符串或 ObjectId，做兼容
+                uid_candidates: List[Any] = [user_id]
                 try:
                     from bson import ObjectId
-                    uid_candidates.extend([admin_oid_str, ObjectId(admin_oid_str)])
-                except Exception:
-                    uid_candidates.append(admin_oid_str)
-                logger.info(f"📋 [Tasks] 管理员用户，使用固定OID匹配: candidates={uid_candidates}")
+                    uid_candidates.append(ObjectId(user_id))
+                except Exception as conv_err:
+                    logger.warning(f"⚠️ [Tasks] 用户ID转换ObjectId失败，按字符串匹配: {conv_err}")
+                    # 若为admin，加入固定的ObjectId（与提交任务时一致）并加入其字符串形式
+                    if str(user_id) == 'admin':
+                        try:
+                            admin_oid_str = '507f1f77bcf86cd799439011'
+                            uid_candidates.append(ObjectId(admin_oid_str))
+                            uid_candidates.append(admin_oid_str)  # 兼容字符串存储
+                            logger.info("📋 [Tasks] 已加入admin固定ObjectId(对象+字符串)用于匹配")
+                        except Exception:
+                            pass
 
-            # 兼容 user_id 与 user 两种字段名
-            base_condition = {"$in": uid_candidates}
-            or_conditions: List[Dict[str, Any]] = [
-                {"user_id": base_condition},
-                {"user": base_condition}
-            ]
-            query = {"$or": or_conditions}
+                # 构造查询条件
+                if str(user_id) == 'admin':
+                    # 管理员：精确匹配固定ObjectId（字符串与对象两种形式）
+                    admin_oid_str = '507f1f77bcf86cd799439011'
+                    try:
+                        from bson import ObjectId
+                        uid_candidates.extend([admin_oid_str, ObjectId(admin_oid_str)])
+                    except Exception:
+                        uid_candidates.append(admin_oid_str)
+                    logger.info(f"📋 [Tasks] 管理员用户，使用固定OID匹配: candidates={uid_candidates}")
 
-            if status:
-                # 这里直接用字符串状态过滤，数据库内通常为字符串
-                query["status"] = status
+                # 兼容 user_id 与 user 两种字段名
+                base_condition = {"$in": uid_candidates}
+                or_conditions: List[Dict[str, Any]] = [
+                    {"user_id": base_condition},
+                    {"user": base_condition}
+                ]
+                query = {"$or": or_conditions}
 
-            logger.info(f"📋 [Tasks] MongoDB 查询条件: {query}")
-            cursor = db.analysis_tasks.find(query).sort("created_at", -1).skip(offset).limit(limit)
-            results: List[Dict[str, Any]] = []
-            count = 0
-            async for doc in cursor:
-                count += 1
-                # 兼容 user_id 或 user 字段
-                user_field_val = doc.get("user_id", doc.get("user"))
-                item = {
-                    "task_id": doc.get("task_id"),
-                    "user_id": str(user_field_val) if user_field_val is not None else None,
-                    "stock_code": doc.get("stock_code") or doc.get("stock_symbol"),
-                    "stock_name": doc.get("stock_name"),
-                    "status": str(doc.get("status", "pending")),
-                    "progress": int(doc.get("progress", 0) or 0),
-                    "message": doc.get("message", ""),
-                    "current_step": doc.get("current_step", ""),
-                    "start_time": doc.get("started_at") or doc.get("created_at"),
-                    "end_time": doc.get("completed_at"),
-                    "parameters": doc.get("parameters", {}),
-                    "execution_time": doc.get("execution_time"),
-                    "tokens_used": doc.get("tokens_used"),
-                    # 为兼容前端，这里沿用 memory_manager 的字段名
-                    "result_data": doc.get("result"),
-                }
-                # 时间格式转为 ISO 字符串
-                for k in ("start_time", "end_time"):
-                    if item.get(k) and hasattr(item[k], "isoformat"):
-                        item[k] = item[k].isoformat()
-                results.append(item)
+                if status:
+                    # 这里直接用字符串状态过滤，数据库内通常为字符串
+                    query["status"] = status
+
+                logger.info(f"📋 [Tasks] MongoDB 查询条件: {query}")
+                # 读取更多数据用于合并
+                cursor = db.analysis_tasks.find(query).sort("created_at", -1).limit(limit * 2)
+                async for doc in cursor:
+                    count += 1
+                    # 兼容 user_id 或 user 字段
+                    user_field_val = doc.get("user_id", doc.get("user"))
+                    item = {
+                        "task_id": doc.get("task_id"),
+                        "user_id": str(user_field_val) if user_field_val is not None else None,
+                        "stock_code": doc.get("stock_code") or doc.get("stock_symbol"),
+                        "stock_name": doc.get("stock_name"),
+                        "status": str(doc.get("status", "pending")),
+                        "progress": int(doc.get("progress", 0) or 0),
+                        "message": doc.get("message", ""),
+                        "current_step": doc.get("current_step", ""),
+                        "start_time": doc.get("started_at") or doc.get("created_at"),
+                        "end_time": doc.get("completed_at"),
+                        "parameters": doc.get("parameters", {}),
+                        "execution_time": doc.get("execution_time"),
+                        "tokens_used": doc.get("tokens_used"),
+                        # 为兼容前端，这里沿用 memory_manager 的字段名
+                        "result_data": doc.get("result"),
+                    }
+                    # 时间格式转为 ISO 字符串
+                    for k in ("start_time", "end_time"):
+                        if item.get(k) and hasattr(item[k], "isoformat"):
+                            item[k] = item[k].isoformat()
+                    mongo_tasks.append(item)
+
+                logger.info(f"📋 [Tasks] MongoDB 返回数量: {count}")
+            except Exception as mongo_e:
+                logger.error(f"❌ MongoDB 查询任务列表失败: {mongo_e}", exc_info=True)
+                # MongoDB 查询失败，继续使用内存数据
+
+            # 4) 合并内存和 MongoDB 数据，去重（优先使用内存中的数据，因为有实时进度）
+            task_dict = {}
+
+            # 先添加 MongoDB 中的任务
+            for task in mongo_tasks:
+                task_id = task.get("task_id")
+                if task_id:
+                    task_dict[task_id] = task
+
+            # 再添加内存中的任务（覆盖 MongoDB 中的同名任务）
+            for task in tasks_in_mem:
+                task_id = task.get("task_id")
+                if task_id:
+                    task_dict[task_id] = task
+
+            # 转换为列表并按时间排序
+            merged_tasks = list(task_dict.values())
+            merged_tasks.sort(key=lambda x: x.get('start_time', ''), reverse=True)
+
+            # 分页
+            results = merged_tasks[offset:offset + limit]
 
             # 为结果补齐股票名称
             results = self._enrich_stock_names(results)
-            logger.info(f"📋 [Tasks] MongoDB 返回数量: {count}")
-            if count == 0:
-                try:
-                    # 二次兜底：完全不加用户过滤，确保重启后也能列出历史任务
-                    fallback_query: Dict[str, Any] = {}
-                    if status:
-                        fallback_query["status"] = status
-                    logger.warning(f"⚠️ [Tasks] 首次查询无结果，进行全量兜底查询: {fallback_query}")
-                    cursor2 = db.analysis_tasks.find(fallback_query).sort("created_at", -1).skip(offset).limit(limit)
-                    results2: List[Dict[str, Any]] = []
-                    count2 = 0
-                    async for doc in cursor2:
-                        count2 += 1
-                        user_field_val = doc.get("user_id", doc.get("user"))
-                        item2 = {
-                            "task_id": doc.get("task_id"),
-                            "user_id": str(user_field_val) if user_field_val is not None else None,
-                            "stock_code": doc.get("stock_code") or doc.get("stock_symbol"),
-                            "stock_name": doc.get("stock_name"),
-                            "status": str(doc.get("status", "pending")),
-                            "progress": int(doc.get("progress", 0) or 0),
-                            "message": doc.get("message", ""),
-                            "current_step": doc.get("current_step", ""),
-                            "start_time": doc.get("started_at") or doc.get("created_at"),
-                            "end_time": doc.get("completed_at"),
-                            "parameters": doc.get("parameters", {}),
-                            "execution_time": doc.get("execution_time"),
-                            "tokens_used": doc.get("tokens_used"),
-                            "result_data": doc.get("result"),
-                        }
-                        for k in ("start_time", "end_time"):
-                            if item2.get(k) and hasattr(item2[k], "isoformat"):
-                                item2[k] = item2[k].isoformat()
-                        results2.append(item2)
-                    # 为结果补齐股票名称
-                    results2 = self._enrich_stock_names(results2)
-
-                    logger.warning(f"⚠️ [Tasks] 兜底全量查询返回数量: {count2}")
-                    return results2
-                except Exception as e2:
-                    logger.error(f"❌ [Tasks] 兜底全量查询失败: {e2}")
+            logger.info(f"📋 [Tasks] 合并后返回数量: {len(results)} (内存: {len(tasks_in_mem)}, MongoDB: {count})")
             return results
-        except Exception as e:
-            logger.error(f"❌ MongoDB 兜底查询任务列表失败: {e}")
+        except Exception as outer_e:
+            logger.error(f"❌ list_user_tasks 外层异常: {outer_e}", exc_info=True)
             return []
 
+    async def cleanup_zombie_tasks(self, max_running_hours: int = 2) -> Dict[str, Any]:
+        """清理僵尸任务（长时间处于 processing/running 状态的任务）
 
+        Args:
+            max_running_hours: 最大运行时长（小时），超过此时长的任务将被标记为失败
+
+        Returns:
+            清理结果统计
+        """
+        try:
+            # 1) 清理内存中的僵尸任务
+            memory_cleaned = await self.memory_manager.cleanup_zombie_tasks(max_running_hours)
+
+            # 2) 清理 MongoDB 中的僵尸任务
+            db = get_mongo_db()
+            from datetime import timedelta
+            cutoff_time = datetime.utcnow() - timedelta(hours=max_running_hours)
+
+            # 查找长时间处于 processing 状态的任务
+            zombie_filter = {
+                "status": {"$in": ["processing", "running", "pending"]},
+                "$or": [
+                    {"started_at": {"$lt": cutoff_time}},
+                    {"created_at": {"$lt": cutoff_time, "started_at": None}}
+                ]
+            }
+
+            # 更新为失败状态
+            update_result = await db.analysis_tasks.update_many(
+                zombie_filter,
+                {
+                    "$set": {
+                        "status": "failed",
+                        "last_error": f"任务超时（运行时间超过 {max_running_hours} 小时）",
+                        "completed_at": datetime.utcnow(),
+                        "updated_at": datetime.utcnow()
+                    }
+                }
+            )
+
+            mongo_cleaned = update_result.modified_count
+
+            logger.info(f"🧹 僵尸任务清理完成: 内存={memory_cleaned}, MongoDB={mongo_cleaned}")
+
+            return {
+                "success": True,
+                "memory_cleaned": memory_cleaned,
+                "mongo_cleaned": mongo_cleaned,
+                "total_cleaned": memory_cleaned + mongo_cleaned,
+                "max_running_hours": max_running_hours
+            }
+
+        except Exception as e:
+            logger.error(f"❌ 清理僵尸任务失败: {e}", exc_info=True)
+            return {
+                "success": False,
+                "error": str(e),
+                "memory_cleaned": 0,
+                "mongo_cleaned": 0,
+                "total_cleaned": 0
+            }
+
+    async def get_zombie_tasks(self, max_running_hours: int = 2) -> List[Dict[str, Any]]:
+        """获取僵尸任务列表（不执行清理，仅查询）
+
+        Args:
+            max_running_hours: 最大运行时长（小时）
+
+        Returns:
+            僵尸任务列表
+        """
+        try:
+            db = get_mongo_db()
+            from datetime import timedelta
+            cutoff_time = datetime.utcnow() - timedelta(hours=max_running_hours)
+
+            # 查找长时间处于 processing 状态的任务
+            zombie_filter = {
+                "status": {"$in": ["processing", "running", "pending"]},
+                "$or": [
+                    {"started_at": {"$lt": cutoff_time}},
+                    {"created_at": {"$lt": cutoff_time, "started_at": None}}
+                ]
+            }
+
+            cursor = db.analysis_tasks.find(zombie_filter).sort("created_at", -1)
+            zombie_tasks = []
+
+            async for doc in cursor:
+                task = {
+                    "task_id": doc.get("task_id"),
+                    "user_id": str(doc.get("user_id", doc.get("user"))),
+                    "stock_code": doc.get("stock_code"),
+                    "stock_name": doc.get("stock_name"),
+                    "status": doc.get("status"),
+                    "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None,
+                    "started_at": doc.get("started_at").isoformat() if doc.get("started_at") else None,
+                    "running_hours": None
+                }
+
+                # 计算运行时长
+                start_time = doc.get("started_at") or doc.get("created_at")
+                if start_time:
+                    running_seconds = (datetime.utcnow() - start_time).total_seconds()
+                    task["running_hours"] = round(running_seconds / 3600, 2)
+
+                zombie_tasks.append(task)
+
+            logger.info(f"📋 查询到 {len(zombie_tasks)} 个僵尸任务")
+            return zombie_tasks
+
+        except Exception as e:
+            logger.error(f"❌ 查询僵尸任务失败: {e}", exc_info=True)
+            return []
 
 
 

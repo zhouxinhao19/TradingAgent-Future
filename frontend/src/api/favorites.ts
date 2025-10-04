@@ -4,6 +4,8 @@ export interface FavoriteItem {
   stock_code: string
   stock_name: string
   market: string
+  board?: string
+  exchange?: string
   added_at?: string
   tags?: string[]
   notes?: string

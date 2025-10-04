@@ -354,32 +354,52 @@ class TradingAgentsGraph:
         )
         logger.debug(f"🔍 [GRAPH DEBUG] 初始状态中的company_of_interest: '{init_agent_state.get('company_of_interest', 'NOT_FOUND')}'")
         logger.debug(f"🔍 [GRAPH DEBUG] 初始状态中的trade_date: '{init_agent_state.get('trade_date', 'NOT_FOUND')}'")
-        args = self.propagator.get_graph_args()
+
+        # 根据是否有进度回调选择不同的stream_mode
+        args = self.propagator.get_graph_args(use_progress_callback=bool(progress_callback))
 
         if self.debug:
             # Debug mode with tracing and progress updates
             trace = []
+            final_state = None
             for chunk in self.graph.stream(init_agent_state, **args):
-                if len(chunk["messages"]) == 0:
-                    pass
+                # 在 updates 模式下，chunk 格式为 {node_name: state_update}
+                # 在 values 模式下，chunk 格式为完整的状态
+                if progress_callback and args.get("stream_mode") == "updates":
+                    # updates 模式：chunk = {"Market Analyst": {...}}
+                    self._send_progress_update(chunk, progress_callback)
+                    # 累积状态更新
+                    if final_state is None:
+                        final_state = init_agent_state.copy()
+                    for node_name, node_update in chunk.items():
+                        if not node_name.startswith('__'):
+                            final_state.update(node_update)
                 else:
-                    chunk["messages"][-1].pretty_print()
+                    # values 模式：chunk = {"messages": [...], ...}
+                    if len(chunk.get("messages", [])) > 0:
+                        chunk["messages"][-1].pretty_print()
                     trace.append(chunk)
+                    final_state = chunk
 
-                    # 发送进度更新
-                    if progress_callback:
-                        self._send_progress_update(chunk, progress_callback)
-
-            final_state = trace[-1]
+            if not trace and final_state:
+                # updates 模式下，使用累积的状态
+                pass
+            elif trace:
+                final_state = trace[-1]
         else:
             # Standard mode without tracing but with progress updates
             if progress_callback:
-                # 使用stream模式以便获取中间状态
+                # 使用 updates 模式以便获取节点级别的进度
                 trace = []
+                final_state = None
                 for chunk in self.graph.stream(init_agent_state, **args):
-                    trace.append(chunk)
                     self._send_progress_update(chunk, progress_callback)
-                final_state = trace[-1]
+                    # 累积状态更新
+                    if final_state is None:
+                        final_state = init_agent_state.copy()
+                    for node_name, node_update in chunk.items():
+                        if not node_name.startswith('__'):
+                            final_state.update(node_update)
             else:
                 # 原有的invoke模式
                 final_state = self.graph.invoke(init_agent_state, **args)
@@ -394,48 +414,89 @@ class TradingAgentsGraph:
         return final_state, self.process_signal(final_state["final_trade_decision"], company_name)
 
     def _send_progress_update(self, chunk, progress_callback):
-        """发送进度更新到回调函数"""
+        """发送进度更新到回调函数
+
+        LangGraph stream 返回的 chunk 格式：{node_name: {...}}
+        节点名称示例：
+        - "Market Analyst", "Fundamentals Analyst", "News Analyst", "Social Analyst"
+        - "tools_market", "tools_fundamentals", "tools_news", "tools_social"
+        - "Msg Clear Market", "Msg Clear Fundamentals", etc.
+        - "Bull Researcher", "Bear Researcher", "Research Manager"
+        - "Trader"
+        - "Risky Analyst", "Safe Analyst", "Neutral Analyst", "Risk Judge"
+        """
         try:
             # 从chunk中提取当前执行的节点信息
-            if isinstance(chunk, dict):
-                # 尝试从不同的字段中获取节点信息
-                node_name = None
+            if not isinstance(chunk, dict):
+                return
 
-                # 检查是否有明确的节点名称
-                if '__end__' in chunk:
-                    progress_callback("📊 生成报告")
-                    return
+            # 获取第一个非特殊键作为节点名
+            node_name = None
+            for key in chunk.keys():
+                if not key.startswith('__'):
+                    node_name = key
+                    break
 
-                # 检查消息内容
-                messages = chunk.get("messages", [])
-                if messages:
-                    last_message = messages[-1]
-                    if hasattr(last_message, 'content'):
-                        content = last_message.content
-                        # 根据消息内容推断当前步骤
-                        if "市场分析" in content or "market" in content.lower():
-                            progress_callback("📊 市场分析师")
-                        elif "基本面" in content or "fundamental" in content.lower():
-                            progress_callback("💼 基本面分析师")
-                        elif "新闻" in content or "news" in content.lower():
-                            progress_callback("📰 新闻分析师")
-                        elif "社交" in content or "social" in content.lower():
-                            progress_callback("💬 社交媒体分析师")
-                        elif "看涨" in content or "bull" in content.lower():
-                            progress_callback("🐂 看涨研究员")
-                        elif "看跌" in content or "bear" in content.lower():
-                            progress_callback("🐻 看跌研究员")
-                        elif "辩论" in content or "debate" in content.lower():
-                            progress_callback("🎯 研究辩论")
-                        elif "研究经理" in content or "research" in content.lower():
-                            progress_callback("👔 研究经理")
-                        elif "交易员" in content or "trader" in content.lower():
-                            progress_callback("💼 交易员决策")
-                        elif "风险" in content or "risk" in content.lower():
-                            progress_callback("🔥 风险评估")
+            if not node_name:
+                return
+
+            logger.info(f"🔍 [Progress] 节点名称: {node_name}")
+
+            # 检查是否为结束节点
+            if '__end__' in chunk:
+                logger.info(f"📊 [Progress] 检测到__end__节点")
+                progress_callback("📊 生成报告")
+                return
+
+            # 节点名称映射表（匹配 LangGraph 实际节点名）
+            node_mapping = {
+                # 分析师节点
+                'Market Analyst': "📊 市场分析师",
+                'Fundamentals Analyst': "💼 基本面分析师",
+                'News Analyst': "📰 新闻分析师",
+                'Social Analyst': "💬 社交媒体分析师",
+                # 工具节点（不发送进度更新，避免重复）
+                'tools_market': None,
+                'tools_fundamentals': None,
+                'tools_news': None,
+                'tools_social': None,
+                # 消息清理节点（不发送进度更新）
+                'Msg Clear Market': None,
+                'Msg Clear Fundamentals': None,
+                'Msg Clear News': None,
+                'Msg Clear Social': None,
+                # 研究员节点
+                'Bull Researcher': "🐂 看涨研究员",
+                'Bear Researcher': "🐻 看跌研究员",
+                'Research Manager': "👔 研究经理",
+                # 交易员节点
+                'Trader': "💼 交易员决策",
+                # 风险评估节点
+                'Risky Analyst': "🔥 激进风险评估",
+                'Safe Analyst': "🛡️ 保守风险评估",
+                'Neutral Analyst': "⚖️ 中性风险评估",
+                'Risk Judge': "🎯 风险经理",
+            }
+
+            # 查找映射的消息
+            message = node_mapping.get(node_name)
+
+            if message is None:
+                # None 表示跳过（工具节点、消息清理节点）
+                logger.debug(f"⏭️ [Progress] 跳过节点: {node_name}")
+                return
+
+            if message:
+                # 发送进度更新
+                logger.info(f"📤 [Progress] 发送进度更新: {message}")
+                progress_callback(message)
+            else:
+                # 未知节点，使用节点名称
+                logger.warning(f"⚠️ [Progress] 未知节点: {node_name}")
+                progress_callback(f"🔍 {node_name}")
 
         except Exception as e:
-            logger.debug(f"进度更新失败: {e}")
+            logger.error(f"❌ 进度更新失败: {e}", exc_info=True)
 
     def _log_state(self, trade_date, final_state):
         """Log the final state to a JSON file."""

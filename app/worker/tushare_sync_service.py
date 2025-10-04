@@ -182,66 +182,82 @@ class TushareSyncService:
     async def sync_realtime_quotes(self, symbols: List[str] = None) -> Dict[str, Any]:
         """
         同步实时行情数据
-        
+
         Args:
             symbols: 指定股票代码列表，为空则同步所有股票
-            
+
         Returns:
             同步结果统计
         """
         logger.info("🔄 开始同步实时行情...")
-        
+
         stats = {
             "total_processed": 0,
             "success_count": 0,
             "error_count": 0,
             "start_time": datetime.utcnow(),
-            "errors": []
+            "errors": [],
+            "stopped_by_rate_limit": False
         }
-        
+
         try:
             # 1. 获取需要同步的股票列表
             if symbols is None:
                 cursor = self.db.stock_basic_info.find(
-                    {"market_info.market": "CN"}, 
+                    {"market_info.market": "CN"},
                     {"code": 1}
                 )
                 symbols = [doc["code"] async for doc in cursor]
-            
+
             stats["total_processed"] = len(symbols)
             logger.info(f"📊 需要同步 {len(symbols)} 只股票行情")
-            
+
             # 2. 批量处理
             for i in range(0, len(symbols), self.batch_size):
                 batch = symbols[i:i + self.batch_size]
                 batch_stats = await self._process_quotes_batch(batch)
-                
+
                 # 更新统计
                 stats["success_count"] += batch_stats["success_count"]
                 stats["error_count"] += batch_stats["error_count"]
                 stats["errors"].extend(batch_stats["errors"])
-                
+
+                # 检查是否遇到 API 限流错误
+                if batch_stats.get("rate_limit_hit"):
+                    stats["stopped_by_rate_limit"] = True
+                    logger.warning(f"⚠️ 检测到 API 限流，停止同步任务")
+                    logger.warning(f"📊 已处理: {min(i + self.batch_size, len(symbols))}/{len(symbols)} "
+                                 f"(成功: {stats['success_count']}, 错误: {stats['error_count']})")
+                    break
+
                 # 进度日志
                 progress = min(i + self.batch_size, len(symbols))
                 logger.info(f"📈 行情同步进度: {progress}/{len(symbols)} "
                            f"(成功: {stats['success_count']}, 错误: {stats['error_count']})")
-                
+
                 # API限流
                 if i + self.batch_size < len(symbols):
                     await asyncio.sleep(self.rate_limit_delay)
-            
+
             # 3. 完成统计
             stats["end_time"] = datetime.utcnow()
             stats["duration"] = (stats["end_time"] - stats["start_time"]).total_seconds()
-            
-            logger.info(f"✅ 实时行情同步完成: "
-                       f"总计 {stats['total_processed']} 只, "
-                       f"成功 {stats['success_count']} 只, "
-                       f"错误 {stats['error_count']} 只, "
-                       f"耗时 {stats['duration']:.2f} 秒")
-            
+
+            if stats["stopped_by_rate_limit"]:
+                logger.warning(f"⚠️ 实时行情同步因 API 限流而停止: "
+                             f"总计 {stats['total_processed']} 只, "
+                             f"成功 {stats['success_count']} 只, "
+                             f"错误 {stats['error_count']} 只, "
+                             f"耗时 {stats['duration']:.2f} 秒")
+            else:
+                logger.info(f"✅ 实时行情同步完成: "
+                           f"总计 {stats['total_processed']} 只, "
+                           f"成功 {stats['success_count']} 只, "
+                           f"错误 {stats['error_count']} 只, "
+                           f"耗时 {stats['duration']:.2f} 秒")
+
             return stats
-            
+
         except Exception as e:
             logger.error(f"❌ 实时行情同步失败: {e}")
             stats["errors"].append({"error": str(e), "context": "sync_realtime_quotes"})
@@ -252,27 +268,35 @@ class TushareSyncService:
         batch_stats = {
             "success_count": 0,
             "error_count": 0,
-            "errors": []
+            "errors": [],
+            "rate_limit_hit": False
         }
-        
+
         # 并发获取行情数据
         tasks = []
         for symbol in batch:
             task = self._get_and_save_quotes(symbol)
             tasks.append(task)
-        
+
         # 等待所有任务完成
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         # 统计结果
         for i, result in enumerate(results):
             if isinstance(result, Exception):
+                error_msg = str(result)
                 batch_stats["error_count"] += 1
                 batch_stats["errors"].append({
                     "code": batch[i],
-                    "error": str(result),
+                    "error": error_msg,
                     "context": "_process_quotes_batch"
                 })
+
+                # 检测 API 限流错误
+                if self._is_rate_limit_error(error_msg):
+                    batch_stats["rate_limit_hit"] = True
+                    logger.warning(f"⚠️ 检测到 API 限流错误: {error_msg}")
+
             elif result:
                 batch_stats["success_count"] += 1
             else:
@@ -282,8 +306,21 @@ class TushareSyncService:
                     "error": "获取行情数据失败",
                     "context": "_process_quotes_batch"
                 })
-        
+
         return batch_stats
+
+    def _is_rate_limit_error(self, error_msg: str) -> bool:
+        """检测是否为 API 限流错误"""
+        rate_limit_keywords = [
+            "每分钟最多访问",
+            "每分钟最多",
+            "rate limit",
+            "too many requests",
+            "访问频率",
+            "请求过于频繁"
+        ]
+        error_msg_lower = error_msg.lower()
+        return any(keyword in error_msg_lower for keyword in rate_limit_keywords)
     
     async def _get_and_save_quotes(self, symbol: str) -> bool:
         """获取并保存单个股票行情"""
@@ -301,6 +338,11 @@ class TushareSyncService:
                 return await self.stock_service.update_market_quotes(symbol, quotes_data)
             return False
         except Exception as e:
+            error_msg = str(e)
+            # 检测限流错误，直接抛出让上层处理
+            if self._is_rate_limit_error(error_msg):
+                logger.error(f"❌ 获取 {symbol} 行情失败（限流）: {e}")
+                raise  # 抛出限流错误
             logger.error(f"❌ 获取 {symbol} 行情失败: {e}")
             return False
 

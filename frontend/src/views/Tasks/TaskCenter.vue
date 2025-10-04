@@ -111,11 +111,13 @@
             {{ formatTime(row.start_time || row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="240" fixed="right">
+        <el-table-column label="操作" width="300" fixed="right">
           <template #default="{ row }">
             <el-button v-if="row.status==='completed'" type="text" size="small" @click="openResult(row)">查看结果</el-button>
             <el-button v-if="row.status==='completed'" type="text" size="small" @click="openReport(row)">报告详情</el-button>
             <el-button v-if="row.status==='failed'" type="text" size="small" @click="retryTask(row)">重试</el-button>
+            <el-button v-if="row.status==='processing' || row.status==='running' || row.status==='pending'" type="text" size="small" @click="markAsFailed(row)">标记失败</el-button>
+            <el-button type="text" size="small" @click="deleteTask(row)" style="color: #f56c6c;">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -149,9 +151,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { List, Refresh, Download, Star, PriceTag } from '@element-plus/icons-vue'
 import { analysisApi } from '@/api/analysis'
 import { marked } from 'marked'
@@ -267,7 +269,14 @@ const filteredList = computed(() => {
 
 const handleSizeChange = (size:number) => { pageSize.value = size; currentPage.value = 1; loadList() }
 const handleCurrentChange = (page:number) => { currentPage.value = page; loadList() }
-const onTabChange = () => { currentPage.value = 1; loadList(); setupPolling() }
+const onTabChange = () => {
+  // 使用 nextTick 确保 activeTab 的值已经更新
+  nextTick(() => {
+    currentPage.value = 1
+    loadList()
+    setupPolling()
+  })
+}
 const refreshList = () => loadList()
 const onSelectionChange = (rows:any[]) => { selectedRows.value = rows }
 
@@ -295,6 +304,70 @@ const openReport = (row:any) => {
 }
 
 const retryTask = (row:any) => { ElMessage.info('重试功能待实现') }
+
+// 标记任务为失败
+const markAsFailed = async (row: any) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要将任务 "${row.stock_name || row.stock_code}" 标记为失败吗？`,
+      '确认操作',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    const taskId = row.task_id || row.analysis_id || row.id
+    if (!taskId) {
+      ElMessage.error('任务ID不存在')
+      return
+    }
+
+    loading.value = true
+    await analysisApi.markTaskAsFailed(taskId)
+    ElMessage.success('任务已标记为失败')
+    await loadList()
+  } catch (e: any) {
+    if (e !== 'cancel') {
+      ElMessage.error(e?.message || '标记失败')
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+// 删除任务
+const deleteTask = async (row: any) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除任务 "${row.stock_name || row.stock_code}" 吗？此操作不可恢复！`,
+      '确认删除',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'error'
+      }
+    )
+
+    const taskId = row.task_id || row.analysis_id || row.id
+    if (!taskId) {
+      ElMessage.error('任务ID不存在')
+      return
+    }
+
+    loading.value = true
+    await analysisApi.deleteTask(taskId)
+    ElMessage.success('任务已删除')
+    await loadList()
+  } catch (e: any) {
+    if (e !== 'cancel') {
+      ElMessage.error(e?.message || '删除失败')
+    }
+  } finally {
+    loading.value = false
+  }
+}
 
 // 批量操作占位
 const batchFavorite = () => { ElMessage.info('批量收藏：后端接口待接入') }

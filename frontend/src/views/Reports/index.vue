@@ -139,9 +139,6 @@
             >
               下载
             </el-button>
-            <el-button type="text" size="small" @click="shareReport(row)">
-              分享
-            </el-button>
             <el-button
               type="text"
               size="small"
@@ -386,11 +383,6 @@ const downloadReport = async (report: any) => {
     console.error('下载报告失败:', error)
     ElMessage.error('下载报告失败')
   }
-}
-
-const shareReport = (report: any) => {
-  // 分享报告
-  ElMessage.info('分享功能开发中...')
 }
 
 const deleteReport = async (report: any) => {

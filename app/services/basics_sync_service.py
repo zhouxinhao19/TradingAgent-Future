@@ -118,7 +118,19 @@ class BasicsSyncService:
                     symbol = row.get("symbol") or ""
                     code = str(symbol).zfill(6) if symbol else ""
 
-                sse = "sh" if (isinstance(ts_code, str) and ts_code.endswith(".SH")) else "sz"
+                # 根据 ts_code 判断交易所
+                if isinstance(ts_code, str):
+                    if ts_code.endswith(".SH"):
+                        sse = "上海证券交易所"
+                    elif ts_code.endswith(".SZ"):
+                        sse = "深圳证券交易所"
+                    elif ts_code.endswith(".BJ"):
+                        sse = "北京证券交易所"
+                    else:
+                        sse = "未知"
+                else:
+                    sse = "未知"
+
                 category = "stock_cn"
 
                 # Extract daily financial metrics - use ts_code directly for matching

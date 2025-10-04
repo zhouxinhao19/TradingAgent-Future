@@ -138,7 +138,7 @@
 | 分析历史 | `/analysis/history` | Analysis/AnalysisHistory.vue | ✅ 正常 |
 | 股票筛选 | `/screening` | Screening/index.vue | ✅ 正常 |
 | 我的自选股 | `/favorites` | Favorites/index.vue | ✅ 正常 |
-| 队列管理 | `/queue` | Queue/index.vue | ✅ 正常 |
+| 任务中心 | `/tasks` | Tasks/TaskCenter.vue | ✅ 正常 |
 | 分析报告 | `/reports` | Reports/index.vue | ✅ 正常 |
 | 个人设置 | `/settings` | Settings/index.vue | ✅ 正常 |
 | **系统配置** | `/settings/config` | Settings/ConfigManagement.vue | ✅ **已修复** |

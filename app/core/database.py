@@ -7,6 +7,8 @@ import logging
 import asyncio
 from typing import Optional
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+from pymongo import MongoClient
+from pymongo.database import Database
 from redis.asyncio import Redis, ConnectionPool
 from pymongo.errors import ServerSelectionTimeoutError, ConnectionFailure
 from redis.exceptions import ConnectionError as RedisConnectionError
@@ -19,6 +21,10 @@ mongo_client: Optional[AsyncIOMotorClient] = None
 mongo_db: Optional[AsyncIOMotorDatabase] = None
 redis_client: Optional[Redis] = None
 redis_pool: Optional[ConnectionPool] = None
+
+# 同步 MongoDB 连接（用于非异步上下文）
+_sync_mongo_client: Optional[MongoClient] = None
+_sync_mongo_db: Optional[Database] = None
 
 
 class DatabaseManager:
@@ -226,6 +232,30 @@ def get_mongo_db() -> AsyncIOMotorDatabase:
     if mongo_db is None:
         raise RuntimeError("MongoDB数据库未初始化")
     return mongo_db
+
+
+def get_mongo_db_sync() -> Database:
+    """
+    获取同步版本的MongoDB数据库实例
+    用于非异步上下文（如普通函数调用）
+    """
+    global _sync_mongo_client, _sync_mongo_db
+
+    if _sync_mongo_db is not None:
+        return _sync_mongo_db
+
+    # 创建同步 MongoDB 客户端
+    if _sync_mongo_client is None:
+        _sync_mongo_client = MongoClient(
+            settings.MONGO_URI,
+            maxPoolSize=settings.MONGO_MAX_CONNECTIONS,
+            minPoolSize=settings.MONGO_MIN_CONNECTIONS,
+            maxIdleTimeMS=30000,
+            serverSelectionTimeoutMS=5000
+        )
+
+    _sync_mongo_db = _sync_mongo_client[settings.MONGO_DB]
+    return _sync_mongo_db
 
 
 def get_redis_client() -> Redis:

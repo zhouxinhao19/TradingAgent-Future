@@ -11,17 +11,41 @@ from typing import Dict
 
 def fetch_stock_basic_df():
     """
-    从 Tushare 获取股票基础列表，要求已正确配置并连接。
+    从 Tushare 获取股票基础列表（DataFrame格式），要求已正确配置并连接。
     依赖环境变量：TUSHARE_ENABLED=true 且 .env 中提供 TUSHARE_TOKEN。
+
+    注意：这是一个同步函数，会等待 Tushare 连接完成。
     """
+    import time
     from tradingagents.dataflows.providers.china.tushare import get_tushare_provider
 
     provider = get_tushare_provider()
-    if not getattr(provider, "connected", False):
+
+    # 等待连接完成（最多等待 5 秒）
+    max_wait_seconds = 5
+    wait_interval = 0.1
+    elapsed = 0.0
+
+    while not getattr(provider, "connected", False) and elapsed < max_wait_seconds:
+        time.sleep(wait_interval)
+        elapsed += wait_interval
+
+    # 检查连接状态和API可用性
+    if not getattr(provider, "connected", False) or provider.api is None:
         raise RuntimeError(
-            "Tushare not connected. Set TUSHARE_ENABLED=true and TUSHARE_TOKEN in .env"
+            f"Tushare not connected after waiting {max_wait_seconds}s. "
+            "Set TUSHARE_ENABLED=true and TUSHARE_TOKEN in .env"
         )
-    return provider.get_stock_list()
+
+    # 直接调用 Tushare API 获取 DataFrame
+    try:
+        df = provider.api.stock_basic(
+            list_status='L',
+            fields='ts_code,symbol,name,area,industry,market,exchange,list_date,is_hs'
+        )
+        return df
+    except Exception as e:
+        raise RuntimeError(f"Failed to fetch stock basic DataFrame: {e}")
 
 
 def find_latest_trade_date() -> str:

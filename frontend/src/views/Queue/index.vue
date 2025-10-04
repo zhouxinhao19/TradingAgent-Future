@@ -4,10 +4,10 @@
     <div class="page-header">
       <h1 class="page-title">
         <el-icon><List /></el-icon>
-        队列管理
+        任务中心
       </h1>
       <p class="page-description">
-        实时监控和管理分析任务队列状态
+        实时监控和管理分析任务状态
       </p>
     </div>
 
