@@ -50,12 +50,75 @@ from app.services.quotes_ingestion_service import QuotesIngestionService
 from app.routers import paper as paper_router
 
 
+async def _print_config_summary(logger):
+    """显示配置摘要"""
+    try:
+        logger.info("=" * 70)
+        logger.info("📋 TradingAgents-CN Configuration Summary")
+        logger.info("=" * 70)
+
+        # 环境信息
+        env = "Production" if settings.is_production else "Development"
+        logger.info(f"Environment: {env}")
+
+        # 数据库连接
+        logger.info(f"MongoDB: {settings.MONGODB_HOST}:{settings.MONGODB_PORT}/{settings.MONGODB_DATABASE}")
+        logger.info(f"Redis: {settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_DB}")
+
+        # 检查大模型配置
+        try:
+            from app.services.config_service import config_service
+            config = await config_service.get_system_config()
+            if config and config.llm_configs:
+                enabled_llms = [llm for llm in config.llm_configs if llm.enabled]
+                logger.info(f"Enabled LLMs: {len(enabled_llms)}")
+                if enabled_llms:
+                    for llm in enabled_llms[:3]:  # 只显示前3个
+                        logger.info(f"  • {llm.provider.value}: {llm.model_name}")
+                    if len(enabled_llms) > 3:
+                        logger.info(f"  • ... and {len(enabled_llms) - 3} more")
+                else:
+                    logger.warning("⚠️  No LLM enabled. Please configure at least one LLM in Web UI.")
+            else:
+                logger.warning("⚠️  No LLM configured. Please configure at least one LLM in Web UI.")
+        except Exception as e:
+            logger.warning(f"⚠️  Failed to check LLM configs: {e}")
+
+        # 检查数据源配置
+        try:
+            if config and config.data_source_configs:
+                enabled_sources = [ds for ds in config.data_source_configs if ds.enabled]
+                logger.info(f"Enabled Data Sources: {len(enabled_sources)}")
+                if enabled_sources:
+                    for ds in enabled_sources[:3]:  # 只显示前3个
+                        logger.info(f"  • {ds.source_type.value}: {ds.source_name}")
+                    if len(enabled_sources) > 3:
+                        logger.info(f"  • ... and {len(enabled_sources) - 3} more")
+            else:
+                logger.info("Data Sources: Using default (AKShare)")
+        except Exception as e:
+            logger.warning(f"⚠️  Failed to check data source configs: {e}")
+
+        logger.info("=" * 70)
+    except Exception as e:
+        logger.error(f"Failed to print config summary: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     # 启动时初始化
     setup_logging()
     logger = logging.getLogger("app.main")
+
+    # 验证启动配置
+    try:
+        from app.core.startup_validator import validate_startup_config
+        validate_startup_config()
+    except Exception as e:
+        logger.error(f"配置验证失败: {e}")
+        raise
+
     await init_db()
     # Apply dynamic settings (log_level, enable_monitoring) from ConfigProvider
     try:
@@ -72,6 +135,9 @@ async def lifespan(app: FastAPI):
             pass
     except Exception as e:
         logging.getLogger("webapi").warning(f"Failed to apply dynamic settings: {e}")
+
+    # 显示配置摘要
+    await _print_config_summary(logger)
 
     logger.info("TradingAgents FastAPI backend started")
 
