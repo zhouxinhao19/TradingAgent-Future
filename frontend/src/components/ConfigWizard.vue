@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <el-dialog
     v-model="visible"
     title="配置向导"
@@ -148,20 +148,17 @@
             :closable="false"
             show-icon
           >
-            <template #default>
-              <div>
-                <div style="margin-bottom: 8px;">{{ getProviderHelp(wizardData.llm.provider) }}</div>
-                <div>
-                  <el-link
-                    :href="getProviderUrl(wizardData.llm.provider)"
-                    type="primary"
-                    target="_blank"
-                  >
-                    前往获取 →
-                  </el-link>
-                </div>
-              </div>
-            </template>
+            <div>
+              <div>{{ getProviderHelp(wizardData.llm.provider) }}</div>
+              <el-link
+                :href="getProviderUrl(wizardData.llm.provider)"
+                type="primary"
+                target="_blank"
+                style="margin-top: 8px;"
+              >
+                前往获取 →
+              </el-link>
+            </div>
           </el-alert>
         </div>
 
@@ -221,22 +218,19 @@
             :closable="false"
             show-icon
           >
-            <template #default>
-              <div>
-                <div>1. 访问 Tushare 官网注册账号</div>
-                <div>2. 邮箱验证后登录</div>
-                <div>3. 在个人中心获取 Token</div>
-                <div style="margin-top: 8px;">
-                  <el-link
-                    href="https://tushare.pro/register?reg=128886"
-                    type="primary"
-                    target="_blank"
-                  >
-                    前往注册 →
-                  </el-link>
-                </div>
-              </div>
-            </template>
+            <div>
+              <div>1. 访问 Tushare 官网注册账号</div>
+              <div>2. 邮箱验证后登录</div>
+              <div>3. 在个人中心获取 Token</div>
+              <el-link
+                href="https://tushare.pro/register?reg=128886"
+                type="primary"
+                target="_blank"
+                style="margin-top: 8px;"
+              >
+                前往注册 →
+              </el-link>
+            </div>
           </el-alert>
         </div>
 
@@ -271,13 +265,11 @@
             :closable="false"
             show-icon
           >
-            <template #default>
-              <div>
-                <div>• 访问"仪表盘"查看系统概览</div>
-                <div>• 访问"单股分析"开始分析股票</div>
-                <div>• 访问"配置管理"调整详细设置</div>
-              </div>
-            </template>
+            <div>
+              <div>• 访问"仪表盘"查看系统概览</div>
+              <div>• 访问"单股分析"开始分析股票</div>
+              <div>• 访问"配置管理"调整详细设置</div>
+            </div>
           </el-alert>
         </div>
       </div>
