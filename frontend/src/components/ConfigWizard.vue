@@ -30,13 +30,17 @@
             这将帮助您快速开始使用股票分析功能。
           </p>
           <el-alert
-            title="提示"
             type="info"
             :closable="false"
             show-icon
           >
-            <p>您可以随时在"配置管理"页面修改这些设置。</p>
-            <p>如果您已经配置过系统，可以跳过此向导。</p>
+            <template #title>
+              <div>提示</div>
+            </template>
+            <div>
+              <p>您可以随时在"配置管理"页面修改这些设置。</p>
+              <p>如果您已经配置过系统，可以跳过此向导。</p>
+            </div>
           </el-alert>
         </div>
 
@@ -90,9 +94,8 @@
             type="warning"
             :closable="false"
             show-icon
-          >
-            数据库配置需要在 .env 文件中设置，此处仅用于验证连接。
-          </el-alert>
+            description="数据库配置需要在 .env 文件中设置，此处仅用于验证连接。"
+          />
         </div>
 
         <!-- 步骤 2: 大模型配置 -->
@@ -147,14 +150,17 @@
             :closable="false"
             show-icon
           >
-            <p>{{ getProviderHelp(wizardData.llm.provider) }}</p>
-            <el-link
-              :href="getProviderUrl(wizardData.llm.provider)"
-              type="primary"
-              target="_blank"
-            >
-              前往获取 →
-            </el-link>
+            <div>
+              <div>{{ getProviderHelp(wizardData.llm.provider) }}</div>
+              <el-link
+                :href="getProviderUrl(wizardData.llm.provider)"
+                type="primary"
+                target="_blank"
+                style="margin-top: 8px;"
+              >
+                前往获取 →
+              </el-link>
+            </div>
           </el-alert>
         </div>
 
@@ -204,9 +210,8 @@
             type="success"
             :closable="false"
             show-icon
-          >
-            AKShare 是免费的数据源，无需 API 密钥即可使用。
-          </el-alert>
+            description="AKShare 是免费的数据源，无需 API 密钥即可使用。"
+          />
 
           <el-alert
             v-if="wizardData.datasource.type === 'tushare'"
@@ -215,16 +220,19 @@
             :closable="false"
             show-icon
           >
-            <p>1. 访问 Tushare 官网注册账号</p>
-            <p>2. 邮箱验证后登录</p>
-            <p>3. 在个人中心获取 Token</p>
-            <el-link
-              href="https://tushare.pro/register?reg=128886"
-              type="primary"
-              target="_blank"
-            >
-              前往注册 →
-            </el-link>
+            <div>
+              <div>1. 访问 Tushare 官网注册账号</div>
+              <div>2. 邮箱验证后登录</div>
+              <div>3. 在个人中心获取 Token</div>
+              <el-link
+                href="https://tushare.pro/register?reg=128886"
+                type="primary"
+                target="_blank"
+                style="margin-top: 8px;"
+              >
+                前往注册 →
+              </el-link>
+            </div>
           </el-alert>
         </div>
 
@@ -259,9 +267,11 @@
             :closable="false"
             show-icon
           >
-            <p>• 访问"仪表盘"查看系统概览</p>
-            <p>• 访问"单股分析"开始分析股票</p>
-            <p>• 访问"配置管理"调整详细设置</p>
+            <div>
+              <div>• 访问"仪表盘"查看系统概览</div>
+              <div>• 访问"单股分析"开始分析股票</div>
+              <div>• 访问"配置管理"调整详细设置</div>
+            </div>
           </el-alert>
         </div>
       </div>
