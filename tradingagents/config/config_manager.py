@@ -2,17 +2,32 @@
 """
 配置管理器
 管理API密钥、模型配置、费率设置等
+
+⚠️ DEPRECATED: 此模块已废弃，将在 2026-03-31 后移除
+   请使用新的配置系统: app.services.config_service.ConfigService
+   迁移指南: docs/DEPRECATION_NOTICE.md
+   迁移脚本: scripts/migrate_config_to_db.py
 """
 
 import json
 import os
 import re
+import warnings
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from dotenv import load_dotenv
+
+# 发出废弃警告
+warnings.warn(
+    "ConfigManager is deprecated and will be removed in version 2.0 (2026-03-31). "
+    "Please use app.services.config_service.ConfigService instead. "
+    "See docs/DEPRECATION_NOTICE.md for migration guide.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 # 导入统一日志系统
 from tradingagents.utils.logging_init import get_logger
