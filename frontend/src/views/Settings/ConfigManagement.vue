@@ -20,6 +20,10 @@
             @select="handleMenuSelect"
             class="config-nav"
           >
+            <el-menu-item index="validation">
+              <el-icon><CircleCheck /></el-icon>
+              <span>配置验证</span>
+            </el-menu-item>
             <el-menu-item index="providers">
               <el-icon><OfficeBuilding /></el-icon>
               <span>厂家管理</span>
@@ -54,6 +58,11 @@
 
       <!-- 右侧：配置内容 -->
       <el-col :span="20">
+        <!-- 配置验证 -->
+        <div v-show="activeTab === 'validation'">
+          <ConfigValidator />
+        </div>
+
         <!-- 厂家管理 -->
         <el-card v-show="activeTab === 'providers'" class="config-content" shadow="never">
           <template #header>
@@ -890,7 +899,8 @@ import {
   Plus,
   Refresh,
   Key,
-  OfficeBuilding
+  OfficeBuilding,
+  CircleCheck
 } from '@element-plus/icons-vue'
 
 import {
@@ -903,6 +913,7 @@ import {
   type DataSourceGrouping,
   type SettingMeta
 } from '@/api/config'
+import ConfigValidator from '@/components/ConfigValidator.vue'
 import LLMConfigDialog from './components/LLMConfigDialog.vue'
 import ProviderDialog from './components/ProviderDialog.vue'
 import DataSourceConfigDialog from './components/DataSourceConfigDialog.vue'
@@ -911,7 +922,7 @@ import DataSourceGroupingDialog from './components/DataSourceGroupingDialog.vue'
 import SortableDataSourceList from './components/SortableDataSourceList.vue'
 
 // 响应式数据
-const activeTab = ref('providers')
+const activeTab = ref('validation')
 const providers = ref<LLMProvider[]>([])
 const llmConfigs = ref<LLMConfig[]>([])
 const llmConfigGroups = ref<any[]>([])

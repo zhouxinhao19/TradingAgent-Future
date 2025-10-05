@@ -15,12 +15,21 @@
         </keep-alive>
       </transition>
     </router-view>
+
+    <!-- 配置向导 -->
+    <ConfigWizard
+      v-model="showConfigWizard"
+      @complete="handleWizardComplete"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import NetworkStatus from '@/components/NetworkStatus.vue'
+import ConfigWizard from '@/components/ConfigWizard.vue'
+import axios from 'axios'
 
 // 需要缓存的组件
 const keepAliveComponents = computed(() => [
@@ -28,6 +37,60 @@ const keepAliveComponents = computed(() => [
   'StockScreening',
   'AnalysisHistory'
 ])
+
+// 配置向导
+const showConfigWizard = ref(false)
+
+// 检查是否需要显示配置向导
+const checkFirstTimeSetup = async () => {
+  try {
+    // 检查是否已经完成过配置向导
+    const wizardCompleted = localStorage.getItem('config_wizard_completed')
+    if (wizardCompleted === 'true') {
+      return
+    }
+
+    // 验证配置完整性
+    const response = await axios.get('/api/system/config/validate')
+    if (response.data.success) {
+      const result = response.data.data
+
+      // 如果有缺少的必需配置，显示配置向导
+      if (!result.success && result.missing_required?.length > 0) {
+        // 延迟显示，等待页面加载完成
+        setTimeout(() => {
+          showConfigWizard.value = true
+        }, 1000)
+      }
+    }
+  } catch (error) {
+    console.error('检查配置失败:', error)
+  }
+}
+
+// 配置向导完成处理
+const handleWizardComplete = async (data: any) => {
+  try {
+    // 标记配置向导已完成
+    localStorage.setItem('config_wizard_completed', 'true')
+
+    ElMessage.success({
+      message: '配置完成！欢迎使用 TradingAgents-CN',
+      duration: 3000
+    })
+
+    // 可以在这里保存配置到后端
+    console.log('配置数据:', data)
+  } catch (error) {
+    console.error('保存配置失败:', error)
+    ElMessage.error('保存配置失败，请稍后重试')
+  }
+}
+
+// 生命周期
+onMounted(() => {
+  checkFirstTimeSetup()
+})
 </script>
 
 <style lang="scss">
