@@ -30,17 +30,15 @@
             这将帮助您快速开始使用股票分析功能。
           </p>
           <el-alert
+            title="提示"
             type="info"
             :closable="false"
             show-icon
           >
-            <template #title>
-              <div>提示</div>
+            <template #default>
+              <div>您可以随时在"配置管理"页面修改这些设置。</div>
+              <div>如果您已经配置过系统，可以跳过此向导。</div>
             </template>
-            <div>
-              <p>您可以随时在"配置管理"页面修改这些设置。</p>
-              <p>如果您已经配置过系统，可以跳过此向导。</p>
-            </div>
           </el-alert>
         </div>
 
@@ -133,12 +131,12 @@
                 v-model="wizardData.llm.modelName"
                 placeholder="请选择模型"
               >
-                <el-option
-                  v-for="model in availableModels"
-                  :key="model.value"
-                  :label="model.label"
-                  :value="model.value"
-                />
+                <template v-for="model in availableModels" :key="model.value">
+                  <el-option
+                    :label="model.label"
+                    :value="model.value"
+                  />
+                </template>
               </el-select>
             </el-form-item>
           </el-form>
