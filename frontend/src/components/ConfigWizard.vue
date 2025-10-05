@@ -182,7 +182,7 @@
             </el-form-item>
 
             <el-form-item
-              v-if="wizardData.datasource.type === 'tushare'"
+              v-if="wizardData.datasource?.type === 'tushare'"
               label="Tushare Token"
             >
               <el-input
@@ -192,7 +192,7 @@
             </el-form-item>
 
             <el-form-item
-              v-if="wizardData.datasource.type === 'finnhub'"
+              v-if="wizardData.datasource?.type === 'finnhub'"
               label="FinnHub API Key"
             >
               <el-input
@@ -203,7 +203,7 @@
           </el-form>
 
           <el-alert
-            v-if="wizardData.datasource.type === 'akshare'"
+            v-if="wizardData.datasource?.type === 'akshare'"
             title="AKShare 无需配置"
             type="success"
             :closable="false"
@@ -212,7 +212,7 @@
           />
 
           <el-alert
-            v-if="wizardData.datasource.type === 'tushare'"
+            v-if="wizardData.datasource?.type === 'tushare'"
             title="如何获取 Tushare Token？"
             type="info"
             :closable="false"
@@ -254,7 +254,7 @@
                 {{ getProviderName(wizardData.llm.provider) }} - {{ wizardData.llm.modelName }}
               </el-descriptions-item>
               <el-descriptions-item label="数据源">
-                {{ getDataSourceName(wizardData.datasource.type) }}
+                {{ getDataSourceName(wizardData.datasource?.type || 'akshare') }}
               </el-descriptions-item>
             </el-descriptions>
           </div>
