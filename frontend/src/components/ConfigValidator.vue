@@ -1,0 +1,444 @@
+<template>
+  <div class="config-validator">
+    <el-card shadow="never">
+      <template #header>
+        <div class="card-header">
+          <h3>
+            <el-icon><CircleCheck /></el-icon>
+            配置验证
+          </h3>
+          <el-button
+            type="primary"
+            size="small"
+            @click="handleValidate"
+            :loading="validating"
+          >
+            <el-icon><Refresh /></el-icon>
+            重新验证
+          </el-button>
+        </div>
+      </template>
+
+      <div v-loading="validating" class="validator-content">
+        <!-- 验证结果摘要 -->
+        <div v-if="validationResult" class="validation-summary">
+          <el-alert
+            :title="validationResult.success ? '配置验证通过' : '配置验证失败'"
+            :type="validationResult.success ? 'success' : 'error'"
+            :closable="false"
+            show-icon
+          >
+            <template v-if="!validationResult.success">
+              <p v-if="validationResult.missing_required?.length">
+                缺少 {{ validationResult.missing_required.length }} 个必需配置
+              </p>
+              <p v-if="validationResult.invalid_configs?.length">
+                {{ validationResult.invalid_configs.length }} 个配置无效
+              </p>
+            </template>
+            <template v-else>
+              <p>所有必需配置已正确设置</p>
+            </template>
+          </el-alert>
+        </div>
+
+        <!-- 必需配置 -->
+        <div class="config-section">
+          <h4>
+            <el-icon><Star /></el-icon>
+            必需配置
+          </h4>
+          <div class="config-items">
+            <div
+              v-for="item in requiredConfigs"
+              :key="item.key"
+              class="config-item"
+              :class="{ 'is-valid': item.valid, 'is-invalid': !item.valid }"
+            >
+              <div class="item-icon">
+                <el-icon v-if="item.valid" color="#67C23A"><CircleCheck /></el-icon>
+                <el-icon v-else color="#F56C6C"><CircleClose /></el-icon>
+              </div>
+              <div class="item-content">
+                <div class="item-name">{{ item.name }}</div>
+                <div class="item-description">{{ item.description }}</div>
+                <div v-if="!item.valid && item.error" class="item-error">
+                  {{ item.error }}
+                </div>
+              </div>
+              <div class="item-status">
+                <el-tag :type="item.valid ? 'success' : 'danger'" size="small">
+                  {{ item.valid ? '已配置' : '未配置' }}
+                </el-tag>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 推荐配置 -->
+        <div class="config-section">
+          <h4>
+            <el-icon><Warning /></el-icon>
+            推荐配置
+          </h4>
+          <div class="config-items">
+            <div
+              v-for="item in recommendedConfigs"
+              :key="item.key"
+              class="config-item"
+              :class="{ 'is-valid': item.valid, 'is-warning': !item.valid }"
+            >
+              <div class="item-icon">
+                <el-icon v-if="item.valid" color="#67C23A"><CircleCheck /></el-icon>
+                <el-icon v-else color="#E6A23C"><Warning /></el-icon>
+              </div>
+              <div class="item-content">
+                <div class="item-name">{{ item.name }}</div>
+                <div class="item-description">{{ item.description }}</div>
+                <div v-if="!item.valid && item.help" class="item-help">
+                  {{ item.help }}
+                </div>
+              </div>
+              <div class="item-status">
+                <el-tag :type="item.valid ? 'success' : 'warning'" size="small">
+                  {{ item.valid ? '已配置' : '未配置' }}
+                </el-tag>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 警告信息 -->
+        <div v-if="validationResult?.warnings?.length" class="warnings-section">
+          <h4>
+            <el-icon><InfoFilled /></el-icon>
+            警告信息
+          </h4>
+          <el-alert
+            v-for="(warning, index) in validationResult.warnings"
+            :key="index"
+            :title="warning"
+            type="warning"
+            :closable="false"
+            show-icon
+            class="warning-item"
+          />
+        </div>
+
+        <!-- 帮助信息 -->
+        <div class="help-section">
+          <el-collapse>
+            <el-collapse-item title="如何修复配置问题？" name="1">
+              <div class="help-content">
+                <h5>必需配置</h5>
+                <p>必需配置需要在 <code>.env</code> 文件中设置：</p>
+                <ol>
+                  <li>在项目根目录找到 <code>.env</code> 文件（如果没有，复制 <code>.env.example</code>）</li>
+                  <li>按照提示填写缺少的配置项</li>
+                  <li>保存文件并重启后端服务</li>
+                </ol>
+
+                <h5>推荐配置</h5>
+                <p>推荐配置可以通过以下方式设置：</p>
+                <ul>
+                  <li>在 <code>.env</code> 文件中设置（推荐）</li>
+                  <li>在"配置管理"页面的"大模型配置"或"数据源配置"中设置</li>
+                </ul>
+
+                <h5>常见问题</h5>
+                <p><strong>Q: 为什么修改后还是显示未配置？</strong></p>
+                <p>A: 环境变量需要重启后端服务才能生效。</p>
+
+                <p><strong>Q: 如何获取 API 密钥？</strong></p>
+                <p>A: 请访问对应服务商的官网注册并获取密钥。详见"配置管理"页面的帮助信息。</p>
+              </div>
+            </el-collapse-item>
+          </el-collapse>
+        </div>
+      </div>
+    </el-card>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
+import {
+  CircleCheck,
+  CircleClose,
+  Refresh,
+  Star,
+  Warning,
+  InfoFilled
+} from '@element-plus/icons-vue'
+import axios from 'axios'
+
+// 类型定义
+interface ConfigItem {
+  key: string
+  name: string
+  description: string
+  valid: boolean
+  error?: string
+  help?: string
+}
+
+interface ValidationResult {
+  success: boolean
+  missing_required?: Array<{ key: string; description: string }>
+  missing_recommended?: Array<{ key: string; description: string }>
+  invalid_configs?: Array<{ key: string; error: string }>
+  warnings?: string[]
+}
+
+// 响应式数据
+const validating = ref(false)
+const validationResult = ref<ValidationResult | null>(null)
+const requiredConfigs = ref<ConfigItem[]>([])
+const recommendedConfigs = ref<ConfigItem[]>([])
+
+// 方法
+const handleValidate = async () => {
+  validating.value = true
+  try {
+    const response = await axios.get('/api/system/config/validate')
+    
+    if (response.data.success) {
+      validationResult.value = response.data.data
+      updateConfigItems()
+      
+      if (validationResult.value.success) {
+        ElMessage.success('配置验证通过')
+      } else {
+        ElMessage.warning('配置验证失败，请检查缺少的配置项')
+      }
+    } else {
+      ElMessage.error(response.data.message || '验证失败')
+    }
+  } catch (error: any) {
+    console.error('配置验证失败:', error)
+    ElMessage.error(error.response?.data?.message || '验证失败')
+  } finally {
+    validating.value = false
+  }
+}
+
+const updateConfigItems = () => {
+  if (!validationResult.value) return
+
+  // 更新必需配置
+  const requiredKeys = [
+    { key: 'MONGODB_HOST', name: 'MongoDB 主机', description: 'MongoDB 数据库主机地址' },
+    { key: 'MONGODB_PORT', name: 'MongoDB 端口', description: 'MongoDB 数据库端口' },
+    { key: 'MONGODB_DATABASE', name: 'MongoDB 数据库', description: 'MongoDB 数据库名称' },
+    { key: 'REDIS_HOST', name: 'Redis 主机', description: 'Redis 缓存主机地址' },
+    { key: 'REDIS_PORT', name: 'Redis 端口', description: 'Redis 缓存端口' },
+    { key: 'JWT_SECRET', name: 'JWT 密钥', description: 'JWT 认证密钥' }
+  ]
+
+  requiredConfigs.value = requiredKeys.map(item => {
+    const missing = validationResult.value?.missing_required?.find(m => m.key === item.key)
+    const invalid = validationResult.value?.invalid_configs?.find(i => i.key === item.key)
+    
+    return {
+      ...item,
+      valid: !missing && !invalid,
+      error: invalid?.error || (missing ? '未配置' : undefined)
+    }
+  })
+
+  // 更新推荐配置
+  const recommendedKeys = [
+    { key: 'DEEPSEEK_API_KEY', name: 'DeepSeek API', description: 'DeepSeek 大模型 API 密钥', help: '用于 AI 分析功能' },
+    { key: 'DASHSCOPE_API_KEY', name: '通义千问 API', description: '阿里云通义千问 API 密钥', help: '用于 AI 分析功能' },
+    { key: 'TUSHARE_TOKEN', name: 'Tushare Token', description: 'Tushare 数据源 Token', help: '用于获取专业A股数据' }
+  ]
+
+  recommendedConfigs.value = recommendedKeys.map(item => {
+    const missing = validationResult.value?.missing_recommended?.find(m => m.key === item.key)
+    
+    return {
+      ...item,
+      valid: !missing
+    }
+  })
+}
+
+// 生命周期
+onMounted(() => {
+  handleValidate()
+})
+</script>
+
+<style scoped lang="scss">
+.config-validator {
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    h3 {
+      margin: 0;
+      font-size: 16px;
+      color: var(--el-text-color-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+  }
+
+  .validator-content {
+    .validation-summary {
+      margin-bottom: 24px;
+    }
+
+    .config-section {
+      margin-bottom: 24px;
+
+      h4 {
+        margin: 0 0 16px 0;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--el-text-color-primary);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .config-items {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .config-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 16px;
+        border-radius: 8px;
+        border: 1px solid var(--el-border-color-light);
+        background: var(--el-fill-color-blank);
+        transition: all 0.3s;
+
+        &.is-valid {
+          border-color: var(--el-color-success-light-5);
+          background: var(--el-color-success-light-9);
+        }
+
+        &.is-invalid {
+          border-color: var(--el-color-danger-light-5);
+          background: var(--el-color-danger-light-9);
+        }
+
+        &.is-warning {
+          border-color: var(--el-color-warning-light-5);
+          background: var(--el-color-warning-light-9);
+        }
+
+        .item-icon {
+          flex-shrink: 0;
+          font-size: 20px;
+        }
+
+        .item-content {
+          flex: 1;
+
+          .item-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--el-text-color-primary);
+            margin-bottom: 4px;
+          }
+
+          .item-description {
+            font-size: 13px;
+            color: var(--el-text-color-regular);
+            margin-bottom: 4px;
+          }
+
+          .item-error {
+            font-size: 12px;
+            color: var(--el-color-danger);
+            margin-top: 4px;
+          }
+
+          .item-help {
+            font-size: 12px;
+            color: var(--el-color-warning);
+            margin-top: 4px;
+          }
+        }
+
+        .item-status {
+          flex-shrink: 0;
+        }
+      }
+    }
+
+    .warnings-section {
+      margin-bottom: 24px;
+
+      h4 {
+        margin: 0 0 16px 0;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--el-text-color-primary);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .warning-item {
+        margin-bottom: 8px;
+
+        &:last-child {
+          margin-bottom: 0;
+        }
+      }
+    }
+
+    .help-section {
+      .help-content {
+        h5 {
+          margin: 16px 0 8px 0;
+          font-size: 14px;
+          color: var(--el-text-color-primary);
+
+          &:first-child {
+            margin-top: 0;
+          }
+        }
+
+        p {
+          margin: 8px 0;
+          font-size: 13px;
+          color: var(--el-text-color-regular);
+          line-height: 1.6;
+        }
+
+        code {
+          padding: 2px 6px;
+          background: var(--el-fill-color-light);
+          border-radius: 4px;
+          font-family: 'Courier New', monospace;
+          font-size: 12px;
+        }
+
+        ol, ul {
+          margin: 8px 0;
+          padding-left: 24px;
+
+          li {
+            margin: 4px 0;
+            font-size: 13px;
+            color: var(--el-text-color-regular);
+            line-height: 1.6;
+          }
+        }
+      }
+    }
+  }
+}
+</style>
+

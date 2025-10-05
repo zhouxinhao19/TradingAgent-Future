@@ -57,3 +57,42 @@ async def get_config_summary(current_user: dict = Depends(get_current_user)) -> 
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
     return {"settings": _build_summary()}
 
+
+@router.get("/config/validate", tags=["system"], summary="验证配置完整性")
+async def validate_config():
+    """
+    验证系统配置的完整性和有效性。
+    返回验证结果，包括缺少的配置项和无效的配置。
+    """
+    from app.core.startup_validator import StartupValidator
+
+    try:
+        validator = StartupValidator()
+        result = validator.validate()
+
+        return {
+            "success": True,
+            "data": {
+                "success": result.success,
+                "missing_required": [
+                    {"key": config.key, "description": config.description}
+                    for config in result.missing_required
+                ],
+                "missing_recommended": [
+                    {"key": config.key, "description": config.description}
+                    for config in result.missing_recommended
+                ],
+                "invalid_configs": [
+                    {"key": config.key, "error": config.description}
+                    for config in result.invalid_configs
+                ],
+                "warnings": result.warnings
+            },
+            "message": "配置验证完成"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "data": None,
+            "message": f"配置验证失败: {str(e)}"
+        }

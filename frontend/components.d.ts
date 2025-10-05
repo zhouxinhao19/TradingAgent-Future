@@ -9,6 +9,8 @@ declare module 'vue' {
   export interface GlobalComponents {
     AppFooter: typeof import('./src/components/Layout/AppFooter.vue')['default']
     Breadcrumb: typeof import('./src/components/Layout/Breadcrumb.vue')['default']
+    ConfigValidator: typeof import('./src/components/ConfigValidator.vue')['default']
+    ConfigWizard: typeof import('./src/components/ConfigWizard.vue')['default']
     DataSourceStatus: typeof import('./src/components/Sync/DataSourceStatus.vue')['default']
     DevPanel: typeof import('./src/components/Dev/DevPanel.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']
