@@ -59,7 +59,7 @@ class BackupResponse(BaseModel):
 # 数据库服务实例
 database_service = DatabaseService()
 
-@router.get("/status", response_model=DatabaseStatusResponse)
+@router.get("/status")
 async def get_database_status(
     current_user: dict = Depends(get_current_user)
 ):
@@ -67,7 +67,11 @@ async def get_database_status(
     try:
         logger.info(f"🔍 用户 {current_user['username']} 请求数据库状态")
         status_info = await database_service.get_database_status()
-        return DatabaseStatusResponse(**status_info)
+        return {
+            "success": True,
+            "message": "获取数据库状态成功",
+            "data": status_info
+        }
     except Exception as e:
         logger.error(f"获取数据库状态失败: {e}")
         raise HTTPException(
@@ -75,7 +79,7 @@ async def get_database_status(
             detail=f"获取数据库状态失败: {str(e)}"
         )
 
-@router.get("/stats", response_model=DatabaseStatsResponse)
+@router.get("/stats")
 async def get_database_stats(
     current_user: dict = Depends(get_current_user)
 ):
@@ -83,7 +87,11 @@ async def get_database_stats(
     try:
         logger.info(f"📊 用户 {current_user['username']} 请求数据库统计")
         stats = await database_service.get_database_stats()
-        return DatabaseStatsResponse(**stats)
+        return {
+            "success": True,
+            "message": "获取数据库统计成功",
+            "data": stats
+        }
     except Exception as e:
         logger.error(f"获取数据库统计失败: {e}")
         raise HTTPException(

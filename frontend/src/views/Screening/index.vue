@@ -21,10 +21,6 @@
               <el-icon><Refresh /></el-icon>
               重置
             </el-button>
-            <el-button type="text" @click="saveFilterTemplate">
-              <el-icon><Collection /></el-icon>
-              保存模板
-            </el-button>
           </div>
         </div>
       </template>
@@ -627,10 +623,6 @@ const toggleFavorite = async (stock: StockInfo) => {
 const exportResults = () => {
   // 导出筛选结果
   ElMessage.info('导出功能开发中...')
-}
-
-const saveFilterTemplate = () => {
-  ElMessage.info('保存模板功能开发中...')
 }
 
 const getChangeClass = (changePercent: number) => {

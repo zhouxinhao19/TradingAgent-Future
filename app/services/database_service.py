@@ -58,25 +58,44 @@ class DatabaseService:
             total_documents = 0
             total_size = 0
 
-            for collection_name in collection_names:
-                collection = db[collection_name]
+            # 并行获取所有集合的统计信息
+            import asyncio
 
-                # 获取集合统计
-                stats = await db.command("collStats", collection_name)
-                doc_count = await collection.count_documents({})
+            async def get_collection_stats(collection_name: str):
+                """获取单个集合的统计信息"""
+                try:
+                    stats = await db.command("collStats", collection_name)
+                    # 使用 collStats 中的 count 字段，避免额外的 count_documents 查询
+                    doc_count = stats.get('count', 0)
 
-                collection_info = {
-                    "name": collection_name,
-                    "documents": doc_count,
-                    "size": stats.get('size', 0),
-                    "storage_size": stats.get('storageSize', 0),
-                    "indexes": stats.get('nindexes', 0),
-                    "index_size": stats.get('totalIndexSize', 0)
-                }
+                    return {
+                        "name": collection_name,
+                        "documents": doc_count,
+                        "size": stats.get('size', 0),
+                        "storage_size": stats.get('storageSize', 0),
+                        "indexes": stats.get('nindexes', 0),
+                        "index_size": stats.get('totalIndexSize', 0)
+                    }
+                except Exception as e:
+                    logger.error(f"获取集合 {collection_name} 统计失败: {e}")
+                    return {
+                        "name": collection_name,
+                        "documents": 0,
+                        "size": 0,
+                        "storage_size": 0,
+                        "indexes": 0,
+                        "index_size": 0
+                    }
 
-                collections_info.append(collection_info)
-                total_documents += doc_count
-                total_size += stats.get('storageSize', 0)
+            # 并行获取所有集合的统计
+            collections_info = await asyncio.gather(
+                *[get_collection_stats(name) for name in collection_names]
+            )
+
+            # 计算总计
+            for collection_info in collections_info:
+                total_documents += collection_info['documents']
+                total_size += collection_info['storage_size']
 
             return {
                 "total_collections": len(collection_names),

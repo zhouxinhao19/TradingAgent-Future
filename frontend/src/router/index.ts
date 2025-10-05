@@ -223,7 +223,7 @@ const routes: RouteRecordRaw[] = [
     name: 'Settings',
     component: () => import('@/layouts/BasicLayout.vue'),
     meta: {
-      title: '个人设置',
+      title: '设置',
       icon: 'Setting',
       requiresAuth: true,
       transition: 'slide-left'
@@ -234,7 +234,7 @@ const routes: RouteRecordRaw[] = [
         name: 'SettingsHome',
         component: () => import('@/views/Settings/index.vue'),
         meta: {
-          title: '个人设置',
+          title: '设置',
           requiresAuth: true
         }
       },
@@ -246,21 +246,7 @@ const routes: RouteRecordRaw[] = [
           title: '配置管理',
           requiresAuth: true
         }
-      }
-    ]
-  },
-
-  {
-    path: '/system',
-    name: 'System',
-    component: () => import('@/layouts/BasicLayout.vue'),
-    meta: {
-      title: '系统管理',
-      icon: 'Tools',
-      requiresAuth: true,
-      transition: 'slide-up'
-    },
-    children: [
+      },
       {
         path: 'database',
         name: 'DatabaseManagement',
@@ -285,6 +271,15 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/System/MultiSourceSync.vue'),
         meta: {
           title: '多数据源同步',
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'cache',
+        name: 'CacheManagement',
+        component: () => import('@/views/Settings/CacheManagement.vue'),
+        meta: {
+          title: '缓存管理',
           requiresAuth: true
         }
       }
@@ -418,78 +413,6 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/Reports/TokenStatistics.vue'),
         meta: {
           title: 'Token统计',
-          requiresAuth: true
-        }
-      }
-    ]
-  },
-  {
-    path: '/settings',
-    name: 'Settings',
-    component: () => import('@/layouts/BasicLayout.vue'),
-    meta: {
-      title: '个人设置',
-      icon: 'Setting',
-      requiresAuth: true,
-      transition: 'slide-left'
-    },
-    children: [
-      {
-        path: '',
-        name: 'SettingsHome',
-        component: () => import('@/views/Settings/index.vue'),
-        meta: {
-          title: '个人设置',
-          requiresAuth: true
-        }
-      },
-      {
-        path: 'config',
-        name: 'ConfigManagement',
-        component: () => import('@/views/Settings/ConfigManagement.vue'),
-        meta: {
-          title: '配置管理',
-          requiresAuth: true
-        }
-      }
-    ]
-  },
-
-  {
-    path: '/system',
-    name: 'System',
-    component: () => import('@/layouts/BasicLayout.vue'),
-    meta: {
-      title: '系统管理',
-      icon: 'Tools',
-      requiresAuth: true,
-      transition: 'slide-up'
-    },
-    children: [
-      {
-        path: 'database',
-        name: 'DatabaseManagement',
-        component: () => import('@/views/System/DatabaseManagement.vue'),
-        meta: {
-          title: '数据库管理',
-          requiresAuth: true
-        }
-      },
-      {
-        path: 'logs',
-        name: 'OperationLogs',
-        component: () => import('@/views/System/OperationLogs.vue'),
-        meta: {
-          title: '操作日志',
-          requiresAuth: true
-        }
-      },
-      {
-        path: 'sync',
-        name: 'MultiSourceSync',
-        component: () => import('@/views/System/MultiSourceSync.vue'),
-        meta: {
-          title: '多数据源同步',
           requiresAuth: true
         }
       }

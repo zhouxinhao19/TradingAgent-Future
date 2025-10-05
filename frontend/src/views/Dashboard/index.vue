@@ -116,6 +116,47 @@
             </el-button>
           </div>
         </el-card>
+
+        <!-- 市场快讯 -->
+        <el-card class="market-news-card" style="margin-top: 24px;">
+          <template #header>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span>市场快讯</span>
+              <el-button
+                type="primary"
+                size="small"
+                :loading="syncingNews"
+                @click="syncMarketNews"
+              >
+                <el-icon><Refresh /></el-icon>
+                {{ syncingNews ? '同步中...' : '同步新闻' }}
+              </el-button>
+            </div>
+          </template>
+          <div v-if="marketNews.length > 0" class="news-list">
+            <div
+              v-for="news in marketNews"
+              :key="news.id"
+              class="news-item"
+              @click="openNews(news)"
+            >
+              <div class="news-title">{{ news.title }}</div>
+              <div class="news-time">{{ formatTime(news.time) }}</div>
+            </div>
+          </div>
+          <div v-else class="empty-state">
+            <el-icon class="empty-icon"><InfoFilled /></el-icon>
+            <p>暂无市场快讯</p>
+            <el-button type="primary" size="small" @click="syncMarketNews" :loading="syncingNews">
+              {{ syncingNews ? '同步中...' : '立即同步' }}
+            </el-button>
+          </div>
+          <div v-if="marketNews.length > 0" class="news-footer">
+            <el-button type="text" size="small">
+              查看更多 <el-icon><ArrowRight /></el-icon>
+            </el-button>
+          </div>
+        </el-card>
       </el-col>
 
       <!-- 右侧：自选股和快讯 -->
@@ -169,65 +210,49 @@
           </div>
         </el-card>
 
-        <!-- 多数据源同步 -->
-        <MultiSourceSyncCard style="margin-top: 24px;" />
-
-        <!-- 市场快讯 -->
-        <el-card class="market-news-card" style="margin-top: 24px;">
+        <!-- 模拟交易账户 -->
+        <el-card class="paper-trading-card" style="margin-top: 24px;">
           <template #header>
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span>市场快讯</span>
-              <el-button
-                type="primary"
-                size="small"
-                :loading="syncingNews"
-                @click="syncMarketNews"
-              >
-                <el-icon><Refresh /></el-icon>
-                {{ syncingNews ? '同步中...' : '同步新闻' }}
+            <div class="card-header">
+              <span>模拟交易账户</span>
+              <el-button type="text" size="small" @click="goToPaperTrading">
+                查看详情 <el-icon><ArrowRight /></el-icon>
               </el-button>
             </div>
           </template>
-          <div v-if="marketNews.length > 0" class="news-list">
-            <div
-              v-for="news in marketNews"
-              :key="news.id"
-              class="news-item"
-              @click="openNews(news)"
-            >
-              <div class="news-title">{{ news.title }}</div>
-              <div class="news-time">{{ formatTime(news.time) }}</div>
+
+          <div v-if="paperAccount" class="paper-account-info">
+            <div class="account-item">
+              <div class="account-label">现金</div>
+              <div class="account-value">¥{{ formatMoney(paperAccount.cash) }}</div>
+            </div>
+            <div class="account-item">
+              <div class="account-label">持仓市值</div>
+              <div class="account-value">¥{{ formatMoney(paperAccount.positions_value) }}</div>
+            </div>
+            <div class="account-item">
+              <div class="account-label">总资产</div>
+              <div class="account-value primary">¥{{ formatMoney(paperAccount.equity) }}</div>
+            </div>
+            <div class="account-item">
+              <div class="account-label">已实现盈亏</div>
+              <div class="account-value" :class="getPnlClass(paperAccount.realized_pnl)">
+                {{ paperAccount.realized_pnl >= 0 ? '+' : '' }}¥{{ formatMoney(paperAccount.realized_pnl) }}
+              </div>
             </div>
           </div>
+
           <div v-else class="empty-state">
             <el-icon class="empty-icon"><InfoFilled /></el-icon>
-            <p>暂无市场快讯</p>
-            <el-button type="primary" size="small" @click="syncMarketNews" :loading="syncingNews">
-              {{ syncingNews ? '同步中...' : '立即同步' }}
-            </el-button>
-          </div>
-          <div v-if="marketNews.length > 0" class="news-footer">
-            <el-button type="text" size="small">
-              查看更多 <el-icon><ArrowRight /></el-icon>
+            <p>暂无账户信息</p>
+            <el-button type="primary" size="small" @click="goToPaperTrading">
+              查看模拟交易
             </el-button>
           </div>
         </el-card>
 
-        <!-- 使用提示 -->
-        <el-card class="tips-card" header="使用提示" style="margin-top: 24px;">
-          <div class="tip-item">
-            <el-icon class="tip-icon"><InfoFilled /></el-icon>
-            <span>每日分析配额：{{ userStats.dailyQuota }}次</span>
-          </div>
-          <div class="tip-item">
-            <el-icon class="tip-icon"><InfoFilled /></el-icon>
-            <span>最大并发任务：3个</span>
-          </div>
-          <div class="tip-item">
-            <el-icon class="tip-icon"><InfoFilled /></el-icon>
-            <span>支持A股、美股、港股分析</span>
-          </div>
-        </el-card>
+        <!-- 多数据源同步 -->
+        <MultiSourceSyncCard style="margin-top: 24px;" />
       </el-col>
     </el-row>
   </div>
@@ -253,6 +278,7 @@ import MultiSourceSyncCard from '@/components/Dashboard/MultiSourceSyncCard.vue'
 import { favoritesApi } from '@/api/favorites'
 import { getAnalysisHistory } from '@/api/analysis'
 import { newsApi } from '@/api/news'
+import { paperApi, type PaperAccountSummary } from '@/api/paper'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -287,6 +313,9 @@ const favoriteStocks = ref<any[]>([])
 // 市场快讯数据
 const marketNews = ref<any[]>([])
 const syncingNews = ref(false)
+
+// 模拟交易账户数据
+const paperAccount = ref<PaperAccountSummary | null>(null)
 
 
 
@@ -435,6 +464,36 @@ const loadMarketNews = async () => {
   }
 }
 
+// 加载模拟交易账户信息
+const loadPaperAccount = async () => {
+  try {
+    const response = await paperApi.getAccount()
+    if (response.success && response.data) {
+      paperAccount.value = response.data.account
+    }
+  } catch (error) {
+    console.error('加载模拟交易账户失败:', error)
+    paperAccount.value = null
+  }
+}
+
+// 跳转到模拟交易页面
+const goToPaperTrading = () => {
+  router.push('/paper')
+}
+
+// 格式化金额
+const formatMoney = (value: number) => {
+  return value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
+// 获取盈亏样式类
+const getPnlClass = (pnl: number) => {
+  if (pnl > 0) return 'price-up'
+  if (pnl < 0) return 'price-down'
+  return 'price-neutral'
+}
+
 const syncMarketNews = async () => {
   try {
     syncingNews.value = true
@@ -470,6 +529,8 @@ onMounted(async () => {
   await loadRecentAnalyses()
   // 加载市场快讯
   await loadMarketNews()
+  // 加载模拟交易账户
+  await loadPaperAccount()
 })
 </script>
 
@@ -741,6 +802,73 @@ onMounted(async () => {
       padding-top: 12px;
       border-top: 1px solid var(--el-border-color-lighter);
       margin-top: 12px;
+    }
+  }
+
+  .paper-trading-card {
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .paper-account-info {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+
+      .account-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px;
+        background-color: var(--el-fill-color-lighter);
+        border-radius: 8px;
+
+        .account-label {
+          font-size: 14px;
+          color: var(--el-text-color-regular);
+        }
+
+        .account-value {
+          font-size: 16px;
+          font-weight: 600;
+          color: var(--el-text-color-primary);
+
+          &.primary {
+            color: var(--el-color-primary);
+            font-size: 18px;
+          }
+
+          &.price-up {
+            color: #f56c6c;
+          }
+
+          &.price-down {
+            color: #67c23a;
+          }
+
+          &.price-neutral {
+            color: var(--el-text-color-regular);
+          }
+        }
+      }
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 20px 0;
+
+      .empty-icon {
+        font-size: 48px;
+        color: var(--el-text-color-placeholder);
+        margin-bottom: 12px;
+      }
+
+      p {
+        color: var(--el-text-color-secondary);
+        margin-bottom: 16px;
+      }
     }
   }
 }

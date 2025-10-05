@@ -79,13 +79,15 @@ export interface ConnectionTestResult {
 // 数据库管理API
 export const databaseApi = {
   // 获取数据库状态
-  getStatus(): Promise<DatabaseStatus> {
-    return ApiClient.get('/api/system/database/status')
+  async getStatus(): Promise<DatabaseStatus> {
+    const response = await ApiClient.get<DatabaseStatus>('/api/system/database/status')
+    return response.data
   },
 
   // 获取数据库统计
-  getStats(): Promise<DatabaseStats> {
-    return ApiClient.get('/api/system/database/stats')
+  async getStats(): Promise<DatabaseStats> {
+    const response = await ApiClient.get<DatabaseStats>('/api/system/database/stats')
+    return response.data
   },
 
   // 测试数据库连接

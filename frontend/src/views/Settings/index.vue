@@ -4,10 +4,10 @@
     <div class="page-header">
       <h1 class="page-title">
         <el-icon><Setting /></el-icon>
-        系统设置
+        {{ pageTitle }}
       </h1>
       <p class="page-description">
-        个性化配置和系统偏好设置
+        {{ pageDescription }}
       </p>
     </div>
 
@@ -20,30 +20,57 @@
             @select="handleMenuSelect"
             class="settings-nav"
           >
-            <el-menu-item index="general">
-              <el-icon><User /></el-icon>
-              <span>通用设置</span>
-            </el-menu-item>
-            <el-menu-item index="appearance">
-              <el-icon><Brush /></el-icon>
-              <span>外观设置</span>
-            </el-menu-item>
-            <el-menu-item index="analysis">
-              <el-icon><TrendCharts /></el-icon>
-              <span>分析偏好</span>
-            </el-menu-item>
-            <el-menu-item index="notifications">
-              <el-icon><Bell /></el-icon>
-              <span>通知设置</span>
-            </el-menu-item>
-            <el-menu-item index="security">
-              <el-icon><Lock /></el-icon>
-              <span>安全设置</span>
-            </el-menu-item>
-            <el-menu-item index="about">
-              <el-icon><InfoFilled /></el-icon>
-              <span>关于系统</span>
-            </el-menu-item>
+            <!-- 个人设置菜单 -->
+            <template v-if="currentSection === 'personal'">
+              <el-menu-item index="general">
+                <el-icon><User /></el-icon>
+                <span>通用设置</span>
+              </el-menu-item>
+              <el-menu-item index="appearance">
+                <el-icon><Brush /></el-icon>
+                <span>外观设置</span>
+              </el-menu-item>
+              <el-menu-item index="analysis">
+                <el-icon><TrendCharts /></el-icon>
+                <span>分析偏好</span>
+              </el-menu-item>
+              <el-menu-item index="notifications">
+                <el-icon><Bell /></el-icon>
+                <span>通知设置</span>
+              </el-menu-item>
+              <el-menu-item index="security">
+                <el-icon><Lock /></el-icon>
+                <span>安全设置</span>
+              </el-menu-item>
+            </template>
+
+            <!-- 系统配置菜单 -->
+            <template v-else-if="currentSection === 'config'">
+              <el-menu-item index="config">
+                <el-icon><Tools /></el-icon>
+                <span>配置管理</span>
+              </el-menu-item>
+              <el-menu-item index="cache">
+                <el-icon><Coin /></el-icon>
+                <span>缓存管理</span>
+              </el-menu-item>
+            </template>
+
+            <!-- 系统管理菜单 -->
+            <template v-else-if="currentSection === 'admin'">
+              <el-menu-item index="database">
+                <el-icon><Monitor /></el-icon>
+                <span>数据库管理</span>
+              </el-menu-item>
+              <el-menu-item index="logs">
+                <el-icon><Document /></el-icon>
+                <span>操作日志</span>
+              </el-menu-item>
+              <el-menu-item index="sync">
+                <el-icon><Refresh /></el-icon>
+                <span>多数据源同步</span>
+              </el-menu-item>
+            </template>
           </el-menu>
         </el-card>
       </el-col>
@@ -102,35 +129,7 @@
                 <el-radio label="auto">跟随系统</el-radio>
               </el-radio-group>
             </el-form-item>
-            
-            <el-form-item label="主色调">
-              <div class="color-picker-group">
-                <div
-                  v-for="color in themeColors"
-                  :key="color.value"
-                  class="color-option"
-                  :class="{ active: appearanceSettings.primaryColor === color.value }"
-                  :style="{ backgroundColor: color.value }"
-                  @click="appearanceSettings.primaryColor = color.value"
-                >
-                  <el-icon v-if="appearanceSettings.primaryColor === color.value">
-                    <Check />
-                  </el-icon>
-                </div>
-              </div>
-            </el-form-item>
-            
-            <el-form-item label="字体大小">
-              <el-slider
-                v-model="appearanceSettings.fontSize"
-                :min="12"
-                :max="18"
-                :step="1"
-                show-stops
-                show-input
-              />
-            </el-form-item>
-            
+
             <el-form-item label="侧边栏宽度">
               <el-slider
                 v-model="appearanceSettings.sidebarWidth"
@@ -140,7 +139,7 @@
                 show-input
               />
             </el-form-item>
-            
+
             <el-form-item>
               <el-button type="primary" @click="saveAppearanceSettings">
                 保存设置
@@ -218,24 +217,15 @@
               <el-switch v-model="notificationSettings.desktop" />
               <span class="setting-description">显示桌面通知</span>
             </el-form-item>
-            
-            <el-form-item label="邮件通知">
-              <el-switch v-model="notificationSettings.email" />
-              <span class="setting-description">发送邮件通知</span>
-            </el-form-item>
-            
+
             <el-form-item label="分析完成通知">
               <el-switch v-model="notificationSettings.analysisComplete" />
             </el-form-item>
-            
+
             <el-form-item label="系统维护通知">
               <el-switch v-model="notificationSettings.systemMaintenance" />
             </el-form-item>
-            
-            <el-form-item label="新功能通知">
-              <el-switch v-model="notificationSettings.newFeatures" />
-            </el-form-item>
-            
+
             <el-form-item>
               <el-button type="primary" @click="saveNotificationSettings">
                 保存设置
@@ -249,29 +239,11 @@
           <template #header>
             <h3>安全设置</h3>
           </template>
-          
+
           <el-form label-width="120px">
             <el-form-item label="修改密码">
-              <el-button @click="showChangePassword">修改密码</el-button>
-            </el-form-item>
-            
-            <el-form-item label="两步验证">
-              <el-switch v-model="securitySettings.twoFactor" />
-              <span class="setting-description">启用两步验证</span>
-            </el-form-item>
-            
-            <el-form-item label="登录通知">
-              <el-switch v-model="securitySettings.loginNotification" />
-              <span class="setting-description">新设备登录时通知</span>
-            </el-form-item>
-            
-            <el-form-item label="会话管理">
-              <el-button @click="showActiveSessions">查看活跃会话</el-button>
-            </el-form-item>
-            
-            <el-form-item>
-              <el-button type="primary" @click="saveSecuritySettings">
-                保存设置
+              <el-button type="primary" @click="changePasswordDialogVisible = true">
+                修改密码
               </el-button>
             </el-form-item>
           </el-form>
@@ -279,56 +251,167 @@
 
 
 
-        <!-- 关于系统 -->
-        <el-card v-show="activeTab === 'about'" class="settings-content" shadow="never">
+        <!-- 配置管理 -->
+        <el-card v-show="activeTab === 'config'" class="settings-content" shadow="never">
           <template #header>
-            <h3>关于系统</h3>
+            <h3>配置管理</h3>
           </template>
-          
-          <div class="about-content">
-            <div class="system-info">
-              <h4>TradingAgents-CN</h4>
-              <p>版本：v0.1.16</p>
-              <p>构建时间：{{ buildTime }}</p>
-              <p>API版本：{{ apiVersion }}</p>
-            </div>
-            
-            <div class="system-status">
-              <h4>系统状态</h4>
-              <el-descriptions :column="2" border>
-                <el-descriptions-item label="API服务">
-                  <el-tag type="success">正常</el-tag>
-                </el-descriptions-item>
-                <el-descriptions-item label="数据库">
-                  <el-tag type="success">正常</el-tag>
-                </el-descriptions-item>
-                <el-descriptions-item label="队列服务">
-                  <el-tag type="success">正常</el-tag>
-                </el-descriptions-item>
-                <el-descriptions-item label="缓存服务">
-                  <el-tag type="success">正常</el-tag>
-                </el-descriptions-item>
-              </el-descriptions>
-            </div>
-            
-            <div class="links">
-              <h4>相关链接</h4>
-              <el-link href="#" type="primary">使用文档</el-link>
-              <el-link href="#" type="primary">API文档</el-link>
-              <el-link href="#" type="primary">问题反馈</el-link>
-              <el-link href="#" type="primary">更新日志</el-link>
-            </div>
+
+          <div class="config-content">
+            <el-alert
+              title="配置管理"
+              type="info"
+              description="管理 LLM 配置、数据源配置和市场分类配置"
+              :closable="false"
+              style="margin-bottom: 20px;"
+            />
+            <el-button type="primary" @click="goToConfigManagement">
+              进入配置管理
+            </el-button>
           </div>
         </el-card>
+
+        <!-- 缓存管理 -->
+        <el-card v-show="activeTab === 'cache'" class="settings-content" shadow="never">
+          <template #header>
+            <h3>缓存管理</h3>
+          </template>
+
+          <div class="cache-content">
+            <el-alert
+              title="缓存管理"
+              type="info"
+              description="管理系统缓存，清理过期数据"
+              :closable="false"
+              style="margin-bottom: 20px;"
+            />
+            <el-button type="primary" @click="goToCacheManagement">
+              进入缓存管理
+            </el-button>
+          </div>
+        </el-card>
+
+        <!-- 数据库管理 -->
+        <el-card v-show="activeTab === 'database'" class="settings-content" shadow="never">
+          <template #header>
+            <h3>数据库管理</h3>
+          </template>
+
+          <div class="database-content">
+            <el-alert
+              title="数据库管理"
+              type="info"
+              description="管理数据库连接、备份和恢复"
+              :closable="false"
+              style="margin-bottom: 20px;"
+            />
+            <el-button type="primary" @click="goToDatabaseManagement">
+              进入数据库管理
+            </el-button>
+          </div>
+        </el-card>
+
+        <!-- 操作日志 -->
+        <el-card v-show="activeTab === 'logs'" class="settings-content" shadow="never">
+          <template #header>
+            <h3>操作日志</h3>
+          </template>
+
+          <div class="logs-content">
+            <el-alert
+              title="操作日志"
+              type="info"
+              description="查看系统操作日志和审计记录"
+              :closable="false"
+              style="margin-bottom: 20px;"
+            />
+            <el-button type="primary" @click="goToOperationLogs">
+              查看操作日志
+            </el-button>
+          </div>
+        </el-card>
+
+        <!-- 多数据源同步 -->
+        <el-card v-show="activeTab === 'sync'" class="settings-content" shadow="never">
+          <template #header>
+            <h3>多数据源同步</h3>
+          </template>
+
+          <div class="sync-content">
+            <el-alert
+              title="多数据源同步"
+              type="info"
+              description="管理多个数据源的同步配置和状态"
+              :closable="false"
+              style="margin-bottom: 20px;"
+            />
+            <el-button type="primary" @click="goToMultiSourceSync">
+              进入同步管理
+            </el-button>
+          </div>
+        </el-card>
+
+
       </el-col>
     </el-row>
+
+    <!-- 修改密码对话框 -->
+    <el-dialog
+      v-model="changePasswordDialogVisible"
+      title="修改密码"
+      width="500px"
+      :close-on-click-modal="false"
+    >
+      <el-form
+        ref="changePasswordFormRef"
+        :model="changePasswordForm"
+        :rules="changePasswordRules"
+        label-width="100px"
+      >
+        <el-form-item label="当前密码" prop="oldPassword">
+          <el-input
+            v-model="changePasswordForm.oldPassword"
+            type="password"
+            placeholder="请输入当前密码"
+            show-password
+          />
+        </el-form-item>
+
+        <el-form-item label="新密码" prop="newPassword">
+          <el-input
+            v-model="changePasswordForm.newPassword"
+            type="password"
+            placeholder="请输入新密码（至少6位）"
+            show-password
+          />
+        </el-form-item>
+
+        <el-form-item label="确认密码" prop="confirmPassword">
+          <el-input
+            v-model="changePasswordForm.confirmPassword"
+            type="password"
+            placeholder="请再次输入新密码"
+            show-password
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="changePasswordDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="changePasswordLoading" @click="handleChangePassword">
+          确认修改
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import {
   Setting,
   User,
@@ -336,26 +419,96 @@ import {
   TrendCharts,
   Bell,
   Lock,
-  InfoFilled,
-  Check
+  Tools,
+  Monitor,
+  Coin,
+  Document,
+  Refresh
 } from '@element-plus/icons-vue'
 
+const router = useRouter()
+const route = useRoute()
 const appStore = useAppStore()
+const authStore = useAuthStore()
+
+// 当前分组：personal（个人设置）、config（系统配置）、admin（系统管理）
+const currentSection = ref('personal')
+
+// 页面标题和描述
+const pageTitle = computed(() => {
+  switch (currentSection.value) {
+    case 'personal':
+      return '个人设置'
+    case 'config':
+      return '系统配置'
+    case 'admin':
+      return '系统管理'
+    default:
+      return '设置'
+  }
+})
+
+const pageDescription = computed(() => {
+  switch (currentSection.value) {
+    case 'personal':
+      return '个性化配置和偏好设置'
+    case 'config':
+      return 'LLM、数据源和缓存配置'
+    case 'admin':
+      return '数据库、日志和同步管理'
+    default:
+      return '个性化配置和系统管理'
+  }
+})
 
 // 响应式数据
-const activeTab = ref('analysis')
+const activeTab = ref('general')
 
+// 根据路由路径和 query 参数确定当前分组和默认激活的标签
+const updateSectionFromRoute = () => {
+  const path = route.path
+  const tab = route.query.tab as string
+
+  if (path === '/settings') {
+    // 个人设置页面
+    currentSection.value = 'personal'
+    // 根据 tab 参数切换标签
+    if (tab) {
+      activeTab.value = tab
+    } else {
+      activeTab.value = 'general'
+    }
+  } else if (path === '/settings/config') {
+    currentSection.value = 'config'
+    activeTab.value = 'config'
+  } else if (path === '/settings/cache') {
+    currentSection.value = 'config'
+    activeTab.value = 'cache'
+  } else if (path === '/settings/database') {
+    currentSection.value = 'admin'
+    activeTab.value = 'database'
+  } else if (path === '/settings/logs') {
+    currentSection.value = 'admin'
+    activeTab.value = 'logs'
+  } else if (path === '/settings/sync') {
+    currentSection.value = 'admin'
+    activeTab.value = 'sync'
+  }
+}
+
+// 监听路由变化（包括 query 参数）
+watch(() => [route.path, route.query.tab], updateSectionFromRoute, { immediate: true })
+
+// 从 authStore 获取用户信息
 const generalSettings = ref({
-  username: 'demo_user',
-  email: 'demo@example.com',
-  language: 'zh-CN',
+  username: authStore.user?.username || 'admin',
+  email: authStore.user?.email || 'admin@example.com',
+  language: authStore.user?.preferences?.language || 'zh-CN',
   timezone: 'Asia/Shanghai'
 })
 
 const appearanceSettings = ref({
   theme: 'auto',
-  primaryColor: '#409EFF',
-  fontSize: 14,
   sidebarWidth: 240
 })
 
@@ -369,30 +522,9 @@ const analysisSettings = ref({
 
 const notificationSettings = ref({
   desktop: true,
-  email: false,
   analysisComplete: true,
-  systemMaintenance: true,
-  newFeatures: true
+  systemMaintenance: true
 })
-
-const securitySettings = ref({
-  twoFactor: false,
-  loginNotification: true
-})
-
-const buildTime = ref(new Date().toLocaleString())
-const apiVersion = ref('v0.1.16')
-
-const themeColors = [
-  { name: '默认蓝', value: '#409EFF' },
-  { name: '成功绿', value: '#67C23A' },
-  { name: '警告橙', value: '#E6A23C' },
-  { name: '危险红', value: '#F56C6C' },
-  { name: '信息灰', value: '#909399' },
-  { name: '紫色', value: '#722ED1' },
-  { name: '青色', value: '#13C2C2' },
-  { name: '粉色', value: '#EB2F96' }
-]
 
 // 方法
 const handleMenuSelect = (index: string) => {
@@ -426,16 +558,93 @@ const saveNotificationSettings = () => {
   ElMessage.success('通知设置已保存')
 }
 
-const saveSecuritySettings = () => {
-  ElMessage.success('安全设置已保存')
+// 导航函数
+const goToConfigManagement = () => {
+  router.push('/settings/config')
 }
 
-const showChangePassword = () => {
-  ElMessage.info('修改密码功能开发中...')
+const goToCacheManagement = () => {
+  router.push('/settings/cache')
 }
 
-const showActiveSessions = () => {
-  ElMessage.info('会话管理功能开发中...')
+const goToDatabaseManagement = () => {
+  router.push('/settings/database')
+}
+
+const goToOperationLogs = () => {
+  router.push('/settings/logs')
+}
+
+const goToMultiSourceSync = () => {
+  router.push('/settings/sync')
+}
+
+// 修改密码相关
+const changePasswordDialogVisible = ref(false)
+const changePasswordLoading = ref(false)
+const changePasswordFormRef = ref()
+const changePasswordForm = ref({
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: ''
+})
+
+const validateConfirmPassword = (rule: any, value: any, callback: any) => {
+  if (value === '') {
+    callback(new Error('请再次输入新密码'))
+  } else if (value !== changePasswordForm.value.newPassword) {
+    callback(new Error('两次输入的密码不一致'))
+  } else {
+    callback()
+  }
+}
+
+const changePasswordRules = {
+  oldPassword: [
+    { required: true, message: '请输入当前密码', trigger: 'blur' }
+  ],
+  newPassword: [
+    { required: true, message: '请输入新密码', trigger: 'blur' },
+    { min: 6, message: '密码长度至少为6位', trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, validator: validateConfirmPassword, trigger: 'blur' }
+  ]
+}
+
+const handleChangePassword = async () => {
+  if (!changePasswordFormRef.value) return
+
+  await changePasswordFormRef.value.validate(async (valid: boolean) => {
+    if (valid) {
+      changePasswordLoading.value = true
+      try {
+        const success = await authStore.changePassword(
+          changePasswordForm.value.oldPassword,
+          changePasswordForm.value.newPassword
+        )
+
+        if (success) {
+          ElMessage.success('密码修改成功，请重新登录')
+          changePasswordDialogVisible.value = false
+          changePasswordForm.value = {
+            oldPassword: '',
+            newPassword: '',
+            confirmPassword: ''
+          }
+          // 延迟跳转到登录页
+          setTimeout(() => {
+            authStore.logout()
+            router.push('/login')
+          }, 1500)
+        }
+      } catch (error: any) {
+        ElMessage.error(error.message || '密码修改失败')
+      } finally {
+        changePasswordLoading.value = false
+      }
+    }
+  })
 }
 
 
@@ -487,38 +696,6 @@ onMounted(() => {
       margin-left: 8px;
       font-size: 12px;
       color: var(--el-text-color-placeholder);
-    }
-
-    .color-picker-group {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-
-      .color-option {
-        width: 32px;
-        height: 32px;
-        border-radius: 6px;
-        cursor: pointer;
-        border: 2px solid transparent;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.3s ease;
-
-        &:hover {
-          transform: scale(1.1);
-        }
-
-        &.active {
-          border-color: var(--el-color-primary);
-          box-shadow: 0 0 0 2px var(--el-color-primary-light-8);
-        }
-
-        .el-icon {
-          color: white;
-          font-size: 16px;
-        }
-      }
     }
 
     .about-content {

@@ -50,10 +50,6 @@
         
         <el-col :span="8">
           <div class="action-buttons">
-            <el-button type="primary" @click="generateReport">
-              <el-icon><Plus /></el-icon>
-              生成报告
-            </el-button>
             <el-button @click="exportSelected" :disabled="selectedReports.length === 0">
               <el-icon><Download /></el-icon>
               批量导出
@@ -164,55 +160,6 @@
         />
       </div>
     </el-card>
-
-    <!-- 生成报告对话框 -->
-    <el-dialog
-      v-model="generateDialogVisible"
-      title="生成分析报告"
-      width="600px"
-    >
-      <el-form :model="reportForm" label-width="120px">
-        <el-form-item label="报告标题">
-          <el-input v-model="reportForm.title" placeholder="请输入报告标题" />
-        </el-form-item>
-        
-        <el-form-item label="股票代码">
-          <el-input v-model="reportForm.stock_code" placeholder="请输入股票代码" />
-        </el-form-item>
-        
-        <el-form-item label="报告类型">
-          <el-select v-model="reportForm.type" placeholder="选择报告类型">
-            <el-option label="单股分析报告" value="single" />
-            <el-option label="批量分析汇总" value="batch" />
-            <el-option label="投资组合报告" value="portfolio" />
-          </el-select>
-        </el-form-item>
-        
-        <el-form-item label="输出格式">
-          <el-checkbox-group v-model="reportForm.formats">
-            <el-checkbox label="pdf">PDF</el-checkbox>
-            <el-checkbox label="html">HTML</el-checkbox>
-            <el-checkbox label="markdown">Markdown</el-checkbox>
-          </el-checkbox-group>
-        </el-form-item>
-        
-        <el-form-item label="包含内容">
-          <el-checkbox-group v-model="reportForm.sections">
-            <el-checkbox label="summary">执行摘要</el-checkbox>
-            <el-checkbox label="analysis">详细分析</el-checkbox>
-            <el-checkbox label="charts">图表数据</el-checkbox>
-            <el-checkbox label="recommendation">投资建议</el-checkbox>
-          </el-checkbox-group>
-        </el-form-item>
-      </el-form>
-      
-      <template #footer>
-        <el-button @click="generateDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmGenerate" :loading="generating">
-          生成报告
-        </el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -223,7 +170,6 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Document,
   Search,
-  Plus,
   Download,
   Refresh
 } from '@element-plus/icons-vue'
@@ -235,8 +181,6 @@ const authStore = useAuthStore()
 
 // 响应式数据
 const loading = ref(false)
-const generating = ref(false)
-const generateDialogVisible = ref(false)
 const searchKeyword = ref('')
 const statusFilter = ref('')
 const dateRange = ref<[string, string] | null>(null)
@@ -244,14 +188,6 @@ const selectedReports = ref([])
 const currentPage = ref(1)
 const pageSize = ref(20)
 const totalReports = ref(0)
-
-const reportForm = ref({
-  title: '',
-  stock_code: '',
-  type: 'single',
-  formats: ['pdf'],
-  sections: ['summary', 'analysis', 'recommendation']
-})
 
 const reports = ref([])
 
@@ -321,34 +257,6 @@ const handleDateChange = () => {
 
 const handleSelectionChange = (selection: any[]) => {
   selectedReports.value = selection
-}
-
-const generateReport = () => {
-  generateDialogVisible.value = true
-  // 重置表单
-  reportForm.value = {
-    title: '',
-    stock_code: '',
-    type: 'single',
-    formats: ['pdf'],
-    sections: ['summary', 'analysis', 'recommendation']
-  }
-}
-
-const confirmGenerate = async () => {
-  generating.value = true
-  try {
-    // TODO: 实现报告生成API调用
-    await new Promise(resolve => setTimeout(resolve, 2000))
-
-    ElMessage.success('报告生成任务已提交')
-    generateDialogVisible.value = false
-    refreshReports()
-  } catch (error) {
-    ElMessage.error('生成报告失败')
-  } finally {
-    generating.value = false
-  }
 }
 
 const viewReport = (report: any) => {

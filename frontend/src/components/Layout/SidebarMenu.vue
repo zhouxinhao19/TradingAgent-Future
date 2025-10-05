@@ -51,20 +51,36 @@
     </el-menu-item>
     -->
 
-    <el-menu-item index="/settings">
-      <el-icon><Setting /></el-icon>
-      <template #title>个人设置</template>
-    </el-menu-item>
-
-    <el-sub-menu index="/system">
+    <el-sub-menu index="/settings">
       <template #title>
-        <el-icon><Tools /></el-icon>
-        <span>系统管理</span>
+        <el-icon><Setting /></el-icon>
+        <span>设置</span>
       </template>
-      <el-menu-item index="/settings/config">系统配置</el-menu-item>
-      <el-menu-item index="/system/sync">多数据源同步</el-menu-item>
-      <el-menu-item index="/system/database">数据库管理</el-menu-item>
-      <el-menu-item index="/system/logs">操作日志</el-menu-item>
+
+      <!-- 个人设置 -->
+      <el-sub-menu index="/settings-personal">
+        <template #title>个人设置</template>
+        <el-menu-item index="/settings">通用设置</el-menu-item>
+        <el-menu-item index="/settings?tab=appearance">外观设置</el-menu-item>
+        <el-menu-item index="/settings?tab=analysis">分析偏好</el-menu-item>
+        <el-menu-item index="/settings?tab=notifications">通知设置</el-menu-item>
+        <el-menu-item index="/settings?tab=security">安全设置</el-menu-item>
+      </el-sub-menu>
+
+      <!-- 系统配置 -->
+      <el-sub-menu index="/settings-config">
+        <template #title>系统配置</template>
+        <el-menu-item index="/settings/config">配置管理</el-menu-item>
+        <el-menu-item index="/settings/cache">缓存管理</el-menu-item>
+      </el-sub-menu>
+
+      <!-- 系统管理 -->
+      <el-sub-menu index="/settings-admin">
+        <template #title>系统管理</template>
+        <el-menu-item index="/settings/database">数据库管理</el-menu-item>
+        <el-menu-item index="/settings/logs">操作日志</el-menu-item>
+        <el-menu-item index="/settings/sync">多数据源同步</el-menu-item>
+      </el-sub-menu>
     </el-sub-menu>
 
     <el-menu-item index="/about">

@@ -56,14 +56,59 @@ async def mark_all_read(user: dict = Depends(get_current_user)):
     return ok(data={"updated": n})
 
 
+@router.get("/notifications/debug/redis_pool")
+async def debug_redis_pool(user: dict = Depends(get_current_user)):
+    """调试端点：查看 Redis 连接池状态"""
+    try:
+        r = get_redis_client()
+        pool = r.connection_pool
+
+        # 获取连接池信息
+        pool_info = {
+            "max_connections": pool.max_connections,
+            "connection_class": str(pool.connection_class),
+            "available_connections": len(pool._available_connections) if hasattr(pool, '_available_connections') else "N/A",
+            "in_use_connections": len(pool._in_use_connections) if hasattr(pool, '_in_use_connections') else "N/A",
+        }
+
+        # 获取 Redis 服务器信息
+        info = await r.info("clients")
+        redis_info = {
+            "connected_clients": info.get("connected_clients", "N/A"),
+            "client_recent_max_input_buffer": info.get("client_recent_max_input_buffer", "N/A"),
+            "client_recent_max_output_buffer": info.get("client_recent_max_output_buffer", "N/A"),
+            "blocked_clients": info.get("blocked_clients", "N/A"),
+        }
+
+        return ok(data={
+            "pool": pool_info,
+            "redis_server": redis_info
+        })
+    except Exception as e:
+        logger.error(f"获取 Redis 连接池信息失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # SSE: 实时通知流
 async def notifications_stream_generator(user_id: str):
+    """
+    SSE 通知流生成器
+
+    注意：确保在所有情况下都正确释放 Redis PubSub 连接
+    """
     r = get_redis_client()
-    pubsub = r.pubsub()
+    pubsub = None
     channel = f"notifications:{user_id}"
+
     try:
+        # 创建 PubSub 连接
+        pubsub = r.pubsub()
+        logger.info(f"📡 [SSE] 创建 PubSub 连接: user={user_id}, channel={channel}")
+
+        # 订阅频道
         await pubsub.subscribe(channel)
         yield f"event: connected\ndata: {{\"channel\": \"{channel}\"}}\n\n"
+
         idle = 0
         while True:
             try:
@@ -81,15 +126,27 @@ async def notifications_stream_generator(user_id: str):
                 idle += 1
                 if idle % 3 == 0:
                     yield f"event: heartbeat\ndata: {{\"ts\": {asyncio.get_event_loop().time()} }}\n\n"
+            except asyncio.CancelledError:
+                # 客户端断开连接
+                logger.info(f"🔌 [SSE] 客户端断开连接: user={user_id}")
+                break
+            except Exception as e:
+                logger.error(f"❌ [SSE] 消息处理错误: {e}", exc_info=True)
+                break
+
     except Exception as e:
-        logger.exception(f"SSE error: {e}")
+        logger.error(f"❌ [SSE] 连接错误: {e}", exc_info=True)
         yield f"event: error\ndata: {{\"error\": \"{str(e)}\"}}\n\n"
     finally:
-        try:
-            await pubsub.unsubscribe(channel)
-            await pubsub.close()
-        except Exception:
-            pass
+        # 确保在所有情况下都释放连接
+        if pubsub:
+            try:
+                logger.info(f"🧹 [SSE] 清理 PubSub 连接: user={user_id}")
+                await pubsub.unsubscribe(channel)
+                await pubsub.close()
+                logger.info(f"✅ [SSE] PubSub 连接已关闭: user={user_id}")
+            except Exception as e:
+                logger.error(f"⚠️ [SSE] 关闭 PubSub 连接失败: {e}", exc_info=True)
 
 
 @router.get("/notifications/stream")

@@ -13,10 +13,6 @@
       
       <template #dropdown>
         <el-dropdown-menu>
-          <el-dropdown-item command="profile">
-            <el-icon><User /></el-icon>
-            个人资料
-          </el-dropdown-item>
           <el-dropdown-item command="settings">
             <el-icon><Setting /></el-icon>
             设置
@@ -52,9 +48,6 @@ const userRole = computed(() => {
 
 const handleCommand = async (command: string) => {
   switch (command) {
-    case 'profile':
-      ElMessage.info('个人资料功能开发中...')
-      break
     case 'settings':
       router.push('/settings')
       break

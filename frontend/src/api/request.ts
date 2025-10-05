@@ -27,7 +27,7 @@ export interface RequestConfig extends AxiosRequestConfig {
 const createAxiosInstance = (): AxiosInstance => {
   const instance = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL || '',
-    timeout: 10000, // 减少超时时间到10秒
+    timeout: 30000, // 增加超时时间到30秒（数据库统计可能需要较长时间）
     headers: {
       'Content-Type': 'application/json'
     }

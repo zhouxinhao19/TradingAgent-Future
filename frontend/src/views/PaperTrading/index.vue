@@ -20,8 +20,12 @@
             <el-descriptions-item label="现金">{{ fmtAmount(account.cash) }}</el-descriptions-item>
             <el-descriptions-item label="持仓市值">{{ fmtAmount(account.positions_value) }}</el-descriptions-item>
             <el-descriptions-item label="总权益">{{ fmtAmount(account.equity) }}</el-descriptions-item>
-            <el-descriptions-item label="已实现盈亏">{{ fmtAmount(account.realized_pnl) }}</el-descriptions-item>
-            <el-descriptions-item label="更新时间">{{ account.updated_at || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="已实现盈亏">
+              <span :style="{ color: account.realized_pnl >= 0 ? '#67C23A' : '#F56C6C' }">
+                {{ fmtAmount(account.realized_pnl) }}
+              </span>
+            </el-descriptions-item>
+            <el-descriptions-item label="更新时间">{{ formatDateTime(account.updated_at) }}</el-descriptions-item>
           </el-descriptions>
           <el-empty v-else description="暂无账户数据" />
         </el-card>
@@ -31,16 +35,34 @@
         <el-card shadow="hover" class="positions-card">
           <template #header><div class="card-hd">持仓</div></template>
           <el-table :data="positions" size="small" v-loading="loading.positions">
-            <el-table-column prop="code" label="代码" width="120" />
-            <el-table-column prop="quantity" label="数量" width="120" />
-            <el-table-column prop="avg_cost" label="均价" width="120">
+            <el-table-column label="代码" width="100">
+              <template #default="{ row }">
+                <el-link type="primary" @click="viewStockDetail(row.code)">{{ row.code }}</el-link>
+              </template>
+            </el-table-column>
+            <el-table-column label="名称" width="100">
+              <template #default="{ row }">{{ row.name || '-' }}</template>
+            </el-table-column>
+            <el-table-column prop="quantity" label="数量" width="100" />
+            <el-table-column label="均价" width="100">
               <template #default="{ row }">{{ fmtPrice(row.avg_cost) }}</template>
             </el-table-column>
-            <el-table-column prop="last_price" label="最新价" width="120">
+            <el-table-column label="最新价" width="100">
               <template #default="{ row }">{{ fmtPrice(row.last_price) }}</template>
             </el-table-column>
-            <el-table-column label="浮盈" width="120">
-              <template #default="{ row }">{{ fmtAmount((Number(row.last_price || 0) - Number(row.avg_cost || 0)) * Number(row.quantity || 0)) }}</template>
+            <el-table-column label="浮盈" width="100">
+              <template #default="{ row }">
+                <span :style="{ color: (Number(row.last_price || 0) - Number(row.avg_cost || 0)) >= 0 ? '#67C23A' : '#F56C6C' }">
+                  {{ fmtAmount((Number(row.last_price || 0) - Number(row.avg_cost || 0)) * Number(row.quantity || 0)) }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="200">
+              <template #default="{ row }">
+                <el-button size="small" type="primary" link @click="viewStockDetail(row.code)">详情</el-button>
+                <el-button size="small" type="success" link @click="goAnalysisWithCode(row.code)">分析</el-button>
+                <el-button size="small" type="danger" link @click="sellPosition(row)">卖出</el-button>
+              </template>
             </el-table-column>
           </el-table>
         </el-card>
@@ -48,19 +70,42 @@
         <el-card shadow="hover" class="orders-card" style="margin-top:16px">
           <template #header><div class="card-hd">订单记录</div></template>
           <el-table :data="orders" size="small" v-loading="loading.orders">
-            <el-table-column prop="created_at" label="时间" width="180" />
-            <el-table-column prop="side" label="方向" width="100" />
-            <el-table-column prop="code" label="代码" width="120" />
-            <el-table-column prop="price" label="成交价" width="120">
+            <el-table-column label="时间" width="160">
+              <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
+            </el-table-column>
+            <el-table-column label="方向" width="80">
+              <template #default="{ row }">
+                <el-tag :type="row.side === 'buy' ? 'success' : 'danger'" size="small">
+                  {{ row.side === 'buy' ? '买入' : '卖出' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="代码" width="100">
+              <template #default="{ row }">
+                <el-link type="primary" @click="viewStockDetail(row.code)">{{ row.code }}</el-link>
+              </template>
+            </el-table-column>
+            <el-table-column label="名称" width="100">
+              <template #default="{ row }">{{ row.name || '-' }}</template>
+            </el-table-column>
+            <el-table-column prop="price" label="成交价" width="100">
               <template #default="{ row }">{{ fmtPrice(row.price) }}</template>
             </el-table-column>
             <el-table-column prop="quantity" label="数量" width="100" />
-            <el-table-column prop="status" label="状态" width="100" />
-            <!-- 新增：关联分析 -->
-            <el-table-column label="分析" width="120">
+            <el-table-column label="状态" width="100">
               <template #default="{ row }">
-                <el-tag v-if="row.analysis_id" size="small" type="success" style="cursor:pointer" @click="goAnalysis(row.analysis_id)">关联分析</el-tag>
-                <span v-else>-</span>
+                <el-tag :type="row.status === 'filled' ? 'success' : 'info'" size="small">
+                  {{ row.status === 'filled' ? '已成交' : row.status }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <!-- 关联分析报告 -->
+            <el-table-column label="关联分析" width="120">
+              <template #default="{ row }">
+                <el-button v-if="row.analysis_id" size="small" type="primary" link @click="viewReport(row.analysis_id)">
+                  查看报告
+                </el-button>
+                <span v-else style="color: #909399;">-</span>
               </template>
             </el-table-column>
           </el-table>
@@ -73,8 +118,8 @@
       <div v-if="(order as any).analysis_id" class="analysis-context" style="margin-bottom:12px">
         <el-alert :closable="false" type="info" show-icon>
           <template #title>
-            来自分析：<span style="font-family:monospace">{{ (order as any).analysis_id }}</span>
-            <el-button link size="small" type="primary" style="margin-left:8px" @click="goAnalysis((order as any).analysis_id)">查看分析</el-button>
+            来自分析报告：<span style="font-family:monospace">{{ (order as any).analysis_id }}</span>
+            <el-button link size="small" type="primary" style="margin-left:8px" @click="viewReport((order as any).analysis_id)">查看报告</el-button>
           </template>
           <div v-if="analysisLoading" style="color:#666">正在加载分析摘要…</div>
           <div v-else-if="analysisContext">
@@ -115,6 +160,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { CreditCard, Refresh, Plus, Delete } from '@element-plus/icons-vue'
 import { paperApi } from '@/api/paper'
 import { analysisApi } from '@/api/analysis'
+import { stocksApi } from '@/api/stocks'
+import { formatDateTime } from '@/utils/datetime'
 
 // 路由与初始化
 const route = useRoute()
@@ -165,6 +212,8 @@ async function fetchPositions() {
     const res = await paperApi.getPositions()
     if (res.success) {
       positions.value = res.data.items || []
+      // 批量获取股票名称
+      await fetchStockNames(positions.value)
     }
   } catch (e: any) {
     ElMessage.error(e?.message || '获取持仓失败')
@@ -179,12 +228,41 @@ async function fetchOrders() {
     const res = await paperApi.getOrders(50)
     if (res.success) {
       orders.value = res.data.items || []
+      // 批量获取股票名称
+      await fetchStockNames(orders.value)
     }
   } catch (e: any) {
     ElMessage.error(e?.message || '获取订单失败')
   } finally {
     loading.value.orders = false
   }
+}
+
+// 批量获取股票名称
+async function fetchStockNames(items: any[]) {
+  if (!items || items.length === 0) return
+
+  // 获取所有唯一的股票代码
+  const codes = [...new Set(items.map(item => item.code).filter(Boolean))]
+
+  // 并行获取所有股票的名称
+  await Promise.all(
+    codes.map(async (code) => {
+      try {
+        const res = await stocksApi.getQuote(code)
+        if (res.success && res.data && res.data.name) {
+          // 更新所有包含该代码的项目
+          items.forEach(item => {
+            if (item.code === code) {
+              item.name = res.data.name
+            }
+          })
+        }
+      } catch (error) {
+        console.warn(`获取股票 ${code} 名称失败:`, error)
+      }
+    })
+  )
 }
 
 function openOrderDialog() {
@@ -225,9 +303,82 @@ async function refreshAll() {
   await Promise.all([fetchAccount(), fetchPositions(), fetchOrders()])
 }
 
-function goAnalysis(analysisId: string) {
+// 查看报告详情（跳转到报告详情页）
+function viewReport(analysisId: string) {
   if (!analysisId) return
-  router.push({ name: 'SingleAnalysis', query: { analysis_id: analysisId } })
+  // 跳转到报告详情页
+  router.push({ name: 'ReportDetail', params: { id: analysisId } })
+}
+
+// 跳转到分析页面（带股票代码和市场）
+function goAnalysisWithCode(stockCode: string) {
+  if (!stockCode) return
+  // 根据股票代码判断市场
+  const market = getMarketByCode(stockCode)
+  router.push({ name: 'SingleAnalysis', query: { stock: stockCode, market } })
+}
+
+// 根据股票代码判断市场
+function getMarketByCode(code: string): string {
+  if (!code) return 'A股'
+
+  // 6位数字 = A股
+  if (/^\d{6}$/.test(code)) {
+    return 'A股'
+  }
+
+  // 包含 .HK = 港股
+  if (code.includes('.HK') || code.includes('.hk')) {
+    return '港股'
+  }
+
+  // 其他 = 美股
+  return '美股'
+}
+
+// 查看股票详情（跳转到股票详情页）
+function viewStockDetail(stockCode: string) {
+  if (!stockCode) return
+  // 跳转到股票详情页
+  router.push({ name: 'StockDetail', params: { code: stockCode } })
+}
+
+// 卖出持仓
+async function sellPosition(position: any) {
+  if (!position || !position.code) return
+
+  try {
+    // 确认卖出
+    await ElMessageBox.confirm(
+      `确认卖出 ${position.name || position.code}？\n\n当前持仓：${position.quantity} 股\n均价：${fmtPrice(position.avg_cost)}\n最新价：${fmtPrice(position.last_price)}`,
+      '卖出确认',
+      {
+        confirmButtonText: '确认卖出',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    // 提交卖出订单
+    const payload = {
+      side: 'sell' as const,
+      code: position.code,
+      quantity: position.quantity
+    }
+
+    const res = await paperApi.placeOrder(payload)
+    if (res.success) {
+      ElMessage.success('卖出成功')
+      await refreshAll()
+    } else {
+      ElMessage.error(res.message || '卖出失败')
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('卖出失败:', error)
+      ElMessage.error(error?.message || '卖出失败')
+    }
+  }
 }
 
 async function fetchAnalysisContext(analysisId: string) {

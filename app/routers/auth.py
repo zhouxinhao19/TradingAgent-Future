@@ -31,6 +31,10 @@ class RefreshTokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int
 
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
 async def get_current_user(authorization: Optional[str] = Header(default=None)) -> dict:
     import logging
     logger = logging.getLogger(__name__)
@@ -71,6 +75,9 @@ async def get_current_user(authorization: Optional[str] = Header(default=None)) 
 @router.post("/login")
 async def login(payload: LoginRequest, request: Request):
     import time
+    import json
+    from pathlib import Path
+
     start_time = time.time()
 
     # 获取客户端信息
@@ -95,8 +102,20 @@ async def login(payload: LoginRequest, request: Request):
             )
             raise HTTPException(status_code=400, detail="用户名和密码不能为空")
 
+        # 读取密码配置
+        config_file = Path("config/admin_password.json")
+        admin_password = "admin123"  # 默认密码
+
+        if config_file.exists():
+            try:
+                with open(config_file, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+                    admin_password = config.get("password", "admin123")
+            except Exception:
+                pass
+
         # 验证admin账号
-        if payload.username != "admin" or payload.password != "admin123":
+        if payload.username != "admin" or payload.password != admin_password:
             # 记录登录失败日志
             await log_operation(
                 user_id="unknown",
@@ -253,6 +272,96 @@ async def me(user: dict = Depends(get_current_user)):
         "data": user,
         "message": "获取用户信息成功"
     }
+
+@router.post("/change-password")
+async def change_password(
+    payload: ChangePasswordRequest,
+    request: Request,
+    user: dict = Depends(get_current_user)
+):
+    """修改密码"""
+    import time
+    import json
+    from pathlib import Path
+
+    start_time = time.time()
+    ip_address = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "")
+
+    try:
+        # 验证旧密码
+        # 读取当前密码配置
+        config_file = Path("config/admin_password.json")
+        current_password = "admin123"  # 默认密码
+
+        if config_file.exists():
+            try:
+                with open(config_file, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+                    current_password = config.get("password", "admin123")
+            except Exception:
+                pass
+
+        # 验证旧密码
+        if payload.old_password != current_password:
+            await log_operation(
+                user_id=user["id"],
+                username=user["username"],
+                action_type=ActionType.USER_MANAGEMENT,
+                action="修改密码",
+                details={"reason": "旧密码错误"},
+                success=False,
+                error_message="旧密码错误",
+                duration_ms=int((time.time() - start_time) * 1000),
+                ip_address=ip_address,
+                user_agent=user_agent
+            )
+            raise HTTPException(status_code=400, detail="旧密码错误")
+
+        # 保存新密码
+        config_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(config_file, "w", encoding="utf-8") as f:
+            json.dump({"password": payload.new_password}, f, ensure_ascii=False, indent=2)
+
+        # 记录操作日志
+        await log_operation(
+            user_id=user["id"],
+            username=user["username"],
+            action_type=ActionType.USER_MANAGEMENT,
+            action="修改密码",
+            details={"success": True},
+            success=True,
+            duration_ms=int((time.time() - start_time) * 1000),
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+
+        return {
+            "success": True,
+            "data": {},
+            "message": "密码修改成功"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"修改密码失败: {e}")
+
+        await log_operation(
+            user_id=user["id"],
+            username=user["username"],
+            action_type=ActionType.USER_MANAGEMENT,
+            action="修改密码",
+            details={"error": str(e)},
+            success=False,
+            error_message=str(e),
+            duration_ms=int((time.time() - start_time) * 1000),
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+
+        raise HTTPException(status_code=500, detail=f"修改密码失败: {str(e)}")
 
 @router.post("/debug-token")
 async def debug_token(payload: dict):
