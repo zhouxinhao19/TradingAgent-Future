@@ -1,6 +1,16 @@
 """
 TradingAgents-CN v0.1.16 FastAPI Backend
 主应用程序入口
+
+Copyright (c) 2025 hsliuping. All rights reserved.
+版权所有 (c) 2025 hsliuping。保留所有权利。
+
+This software is proprietary and confidential. Unauthorized copying, distribution,
+or use of this software, via any medium, is strictly prohibited.
+本软件为专有和机密软件。严禁通过任何媒介未经授权复制、分发或使用本软件。
+
+For commercial licensing, please contact: hsliup@163.com
+商业许可咨询，请联系：hsliup@163.com
 """
 
 from fastapi import FastAPI, Request
