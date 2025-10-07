@@ -187,7 +187,19 @@ export const configApi = {
   getModelCatalog(): Promise<Array<{
     provider: string
     provider_name: string
-    models: Array<{ name: string; display_name: string; description?: string }>
+    models: Array<{
+      name: string
+      display_name: string
+      description?: string
+      context_length?: number
+      max_tokens?: number
+      input_price_per_1k?: number
+      output_price_per_1k?: number
+      currency?: string
+      is_deprecated?: boolean
+      release_date?: string
+      capabilities?: string[]
+    }>
   }>> {
     return ApiClient.get('/api/config/model-catalog')
   },
@@ -196,7 +208,19 @@ export const configApi = {
   getProviderModelCatalog(provider: string): Promise<{
     provider: string
     provider_name: string
-    models: Array<{ name: string; display_name: string; description?: string }>
+    models: Array<{
+      name: string
+      display_name: string
+      description?: string
+      context_length?: number
+      max_tokens?: number
+      input_price_per_1k?: number
+      output_price_per_1k?: number
+      currency?: string
+      is_deprecated?: boolean
+      release_date?: string
+      capabilities?: string[]
+    }>
   }> {
     return ApiClient.get(`/api/config/model-catalog/${provider}`)
   },

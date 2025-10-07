@@ -39,6 +39,7 @@
           placeholder="选择或输入模型名称"
           filterable
           allow-create
+          @change="handleModelChange"
         >
           <el-option
             v-for="model in modelOptions"
@@ -259,15 +260,29 @@ const rules: FormRules = {
 // 模型选项
 const modelOptions = ref<Array<{ label: string; value: string }>>([])
 
-// 从后端获取的模型目录
-const modelCatalog = ref<Record<string, Array<{ name: string; display_name: string }>>>({})
+// 从后端获取的模型目录（包含完整信息）
+interface ModelInfo {
+  name: string
+  display_name: string
+  description?: string
+  context_length?: number
+  max_tokens?: number
+  input_price_per_1k?: number
+  output_price_per_1k?: number
+  currency?: string
+  is_deprecated?: boolean
+  release_date?: string
+  capabilities?: string[]
+}
+
+const modelCatalog = ref<Record<string, Array<ModelInfo>>>({})
 
 // 加载模型目录
 const loadModelCatalog = async () => {
   try {
-    const catalog = await configApi.getAvailableModels()
+    const catalog = await configApi.getModelCatalog()
     // 转换为 provider -> models 的映射
-    const catalogMap: Record<string, Array<{ name: string; display_name: string }>> = {}
+    const catalogMap: Record<string, Array<ModelInfo>> = {}
     catalog.forEach(item => {
       catalogMap[item.provider] = item.models
     })
@@ -296,10 +311,51 @@ const getModelOptions = (provider: string) => {
   return []
 }
 
+// 根据供应商和模型名称获取模型详细信息
+const getModelInfo = (provider: string, modelName: string): ModelInfo | null => {
+  const models = modelCatalog.value[provider]
+  if (!models) return null
+
+  return models.find(m => m.name === modelName) || null
+}
+
 // 处理供应商变更
 const handleProviderChange = (provider: string) => {
   modelOptions.value = getModelOptions(provider)
   formData.value.model_name = ''
+  // 清空价格信息
+  formData.value.input_price_per_1k = 0
+  formData.value.output_price_per_1k = 0
+  formData.value.currency = 'CNY'
+}
+
+// 处理模型变更 - 自动填充价格信息
+const handleModelChange = (modelName: string) => {
+  if (!formData.value.provider || !modelName) return
+
+  const modelInfo = getModelInfo(formData.value.provider, modelName)
+  if (modelInfo) {
+    console.log('📋 自动填充模型信息:', modelInfo)
+
+    // 自动填充价格信息
+    if (modelInfo.input_price_per_1k !== undefined) {
+      formData.value.input_price_per_1k = modelInfo.input_price_per_1k
+    }
+    if (modelInfo.output_price_per_1k !== undefined) {
+      formData.value.output_price_per_1k = modelInfo.output_price_per_1k
+    }
+    if (modelInfo.currency) {
+      formData.value.currency = modelInfo.currency
+    }
+
+    // 可选：自动填充其他信息
+    if (modelInfo.context_length && !formData.value.max_tokens) {
+      // 如果有上下文长度信息，可以作为参考
+      console.log('💡 模型上下文长度:', modelInfo.context_length)
+    }
+
+    ElMessage.success('已自动填充模型价格信息')
+  }
 }
 
 // 监听配置变化
