@@ -8,11 +8,16 @@
 
 [📜 v0.1.16-preview Release Notes](docs/releases/v0.1.16-preview-release-notes.md) · [v0.1.15 Release Notes](docs/releases/v0.1.15-release-notes.md)
 
+
 > 🚀 **最新版本 cn-0.1.16-preview**: 多应用架构预览！新增 FastAPI 后端 + Vite 前端（与现有 Streamlit 并存过渡），统一配置与服务化，文档与脚本体系升级。
 >
 > 🎯 **核心功能**: 原生OpenAI支持 | Google AI全面集成 | 自定义端点配置 | 智能模型选择 | 多LLM提供商支持 | 模型选择持久化 | Docker容器化部署 | 专业报告导出 | 完整A股支持 | 中文本地化
 
 基于多智能体大语言模型的**中文金融交易决策框架**。专为中文用户优化，提供完整的A股/港股/美股分析能力。
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=hsliuping/TradingAgents-CN&type=Date)](https://www.star-history.com/#hsliuping/TradingAgents-CN&Date)
 
 ## 🙏 致敬源项目
 
