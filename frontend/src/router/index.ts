@@ -282,6 +282,15 @@ const routes: RouteRecordRaw[] = [
           title: '缓存管理',
           requiresAuth: true
         }
+      },
+      {
+        path: 'usage',
+        name: 'UsageStatistics',
+        component: () => import('@/views/Settings/UsageStatistics.vue'),
+        meta: {
+          title: '使用统计',
+          requiresAuth: true
+        }
       }
     ]
   },

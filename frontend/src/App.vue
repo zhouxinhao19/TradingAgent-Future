@@ -29,6 +29,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import NetworkStatus from '@/components/NetworkStatus.vue'
 import axios from 'axios'
+import { configApi } from '@/api/config'
 
 // 需要缓存的组件
 const keepAliveComponents = computed(() => [
@@ -70,6 +71,87 @@ const checkFirstTimeSetup = async () => {
 // 配置向导完成处理
 const handleWizardComplete = async (data: any) => {
   try {
+    console.log('配置向导数据:', data)
+
+    // 1. 保存大模型配置
+    if (data.llm?.provider && data.llm?.apiKey) {
+      try {
+        // 先添加厂家（如果不存在）
+        const providerMap: Record<string, { name: string; base_url?: string }> = {
+          deepseek: { name: 'DeepSeek', base_url: 'https://api.deepseek.com' },
+          dashscope: { name: '通义千问', base_url: 'https://dashscope.aliyuncs.com/api/v1' },
+          openai: { name: 'OpenAI', base_url: 'https://api.openai.com/v1' },
+          google: { name: 'Google Gemini', base_url: 'https://generativelanguage.googleapis.com/v1' }
+        }
+
+        const providerInfo = providerMap[data.llm.provider]
+        if (providerInfo) {
+          // 尝试添加厂家（如果已存在会失败，但不影响后续流程）
+          try {
+            await configApi.addLLMProvider({
+              provider_key: data.llm.provider,
+              provider_name: providerInfo.name,
+              api_key: data.llm.apiKey,
+              base_url: providerInfo.base_url,
+              is_active: true
+            })
+          } catch (e) {
+            // 厂家可能已存在，忽略错误
+            console.log('厂家可能已存在:', e)
+          }
+
+          // 添加大模型配置
+          if (data.llm.modelName) {
+            await configApi.updateLLMConfig({
+              provider: data.llm.provider,
+              model_name: data.llm.modelName,
+              enabled: true
+            })
+
+            // 设置为默认大模型
+            await configApi.setDefaultLLM(data.llm.modelName)
+          }
+        }
+      } catch (error) {
+        console.error('保存大模型配置失败:', error)
+        ElMessage.warning('大模型配置保存失败，请稍后在配置管理中手动配置')
+      }
+    }
+
+    // 2. 保存数据源配置
+    if (data.datasource?.type) {
+      try {
+        const dsConfig: any = {
+          name: data.datasource.type,
+          type: data.datasource.type,
+          enabled: true
+        }
+
+        // 根据数据源类型添加认证信息
+        if (data.datasource.type === 'tushare' && data.datasource.token) {
+          dsConfig.api_key = data.datasource.token
+        } else if (data.datasource.type === 'finnhub' && data.datasource.apiKey) {
+          dsConfig.api_key = data.datasource.apiKey
+        }
+
+        await configApi.addDataSourceConfig(dsConfig)
+        await configApi.setDefaultDataSource(data.datasource.type)
+      } catch (error) {
+        console.error('保存数据源配置失败:', error)
+        ElMessage.warning('数据源配置保存失败，请稍后在配置管理中手动配置')
+      }
+    }
+
+    // 3. 数据库配置（MongoDB 和 Redis）
+    // 注意：数据库配置通常在 .env 文件中，这里只是记录用户的选择
+    // 实际的数据库连接需要在后端 .env 文件中配置
+    if (data.mongodb || data.redis) {
+      console.log('数据库配置（需要在 .env 文件中设置）:', {
+        mongodb: data.mongodb,
+        redis: data.redis
+      })
+    }
+
     // 标记配置向导已完成
     localStorage.setItem('config_wizard_completed', 'true')
 
@@ -77,9 +159,6 @@ const handleWizardComplete = async (data: any) => {
       message: '配置完成！欢迎使用 TradingAgents-CN',
       duration: 3000
     })
-
-    // 可以在这里保存配置到后端
-    console.log('配置数据:', data)
   } catch (error) {
     console.error('保存配置失败:', error)
     ElMessage.error('保存配置失败，请稍后重试')
