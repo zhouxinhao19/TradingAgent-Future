@@ -53,6 +53,33 @@ class LLMProvider(BaseModel):
     model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True)
 
 
+class ModelInfo(BaseModel):
+    """模型信息"""
+    name: str = Field(..., description="模型标识名称")
+    display_name: str = Field(..., description="模型显示名称")
+    description: Optional[str] = Field(None, description="模型描述")
+    context_length: Optional[int] = Field(None, description="上下文长度")
+    max_tokens: Optional[int] = Field(None, description="最大输出token数")
+    input_price_per_1k: Optional[float] = Field(None, description="输入价格(每1K tokens)")
+    output_price_per_1k: Optional[float] = Field(None, description="输出价格(每1K tokens)")
+    currency: str = Field(default="CNY", description="货币单位")
+    is_deprecated: bool = Field(default=False, description="是否已废弃")
+    release_date: Optional[str] = Field(None, description="发布日期")
+    capabilities: List[str] = Field(default_factory=list, description="能力标签(如: vision, function_calling)")
+
+
+class ModelCatalog(BaseModel):
+    """模型目录"""
+    id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
+    provider: str = Field(..., description="厂家标识")
+    provider_name: str = Field(..., description="厂家显示名称")
+    models: List[ModelInfo] = Field(default_factory=list, description="模型列表")
+    created_at: Optional[datetime] = Field(default_factory=now_tz)
+    updated_at: Optional[datetime] = Field(default_factory=now_tz)
+
+    model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True)
+
+
 class LLMProviderRequest(BaseModel):
     """大模型厂家请求"""
     name: str = Field(..., description="厂家唯一标识")
@@ -128,6 +155,11 @@ class LLMConfig(BaseModel):
     enable_debug: bool = Field(default=False, description="启用调试模式")
     priority: int = Field(default=0, description="优先级")
 
+    # 定价配置
+    input_price_per_1k: Optional[float] = Field(None, description="输入token价格(每1000个token)")
+    output_price_per_1k: Optional[float] = Field(None, description="输出token价格(每1000个token)")
+    currency: str = Field(default="CNY", description="货币单位(CNY/USD/EUR)")
+
 
 class DataSourceConfig(BaseModel):
     """数据源配置"""
@@ -186,6 +218,30 @@ class DataSourceGrouping(BaseModel):
     enabled: bool = Field(default=True, description="是否启用")
     created_at: Optional[datetime] = Field(default_factory=now_tz, description="创建时间")
     updated_at: Optional[datetime] = Field(default_factory=now_tz, description="更新时间")
+
+
+class UsageRecord(BaseModel):
+    """使用记录"""
+    id: Optional[str] = Field(None, description="记录ID")
+    timestamp: str = Field(..., description="时间戳")
+    provider: str = Field(..., description="供应商")
+    model_name: str = Field(..., description="模型名称")
+    input_tokens: int = Field(..., description="输入token数")
+    output_tokens: int = Field(..., description="输出token数")
+    cost: float = Field(..., description="成本")
+    session_id: str = Field(..., description="会话ID")
+    analysis_type: str = Field(default="stock_analysis", description="分析类型")
+
+
+class UsageStatistics(BaseModel):
+    """使用统计"""
+    total_requests: int = Field(default=0, description="总请求数")
+    total_input_tokens: int = Field(default=0, description="总输入token数")
+    total_output_tokens: int = Field(default=0, description="总输出token数")
+    total_cost: float = Field(default=0.0, description="总成本")
+    by_provider: Dict[str, Any] = Field(default_factory=dict, description="按供应商统计")
+    by_model: Dict[str, Any] = Field(default_factory=dict, description="按模型统计")
+    by_date: Dict[str, Any] = Field(default_factory=dict, description="按日期统计")
 
 
 class SystemConfig(BaseModel):
