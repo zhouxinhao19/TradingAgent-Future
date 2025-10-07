@@ -1,6 +1,6 @@
 # TradingAgents 中文增强版
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License](https://img.shields.io/badge/License-Mixed-blue.svg)](./LICENSING.md)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Version](https://img.shields.io/badge/Version-cn--0.1.16--preview-orange.svg)](./VERSION)
 [![Documentation](https://img.shields.io/badge/docs-中文文档-green.svg)](./docs/)
@@ -1405,11 +1405,21 @@ cost_optimized_config = {
 
 📋 **详细更新日志**: [CHANGELOG.md](./docs/releases/CHANGELOG.md)
 
+## 📄 许可证
+
+TradingAgents-CN 采用**混合许可证策略**：
+
+- 🔓 **开源组件** (Apache 2.0): `tradingagents/`, `cli/`, `scripts/`, `docs/`, `examples/`, `web/` 等
+- 🔒 **专有组件** (Proprietary): `app/` (FastAPI后端), `frontend/` (Vue.js前端)
+
+**商业使用专有组件需要商业许可**。详情请查看 [许可证说明](./LICENSING.md)。
+
 ## 📞 联系方式
 
 - **GitHub Issues**: [提交问题和建议](https://github.com/hsliuping/TradingAgents-CN/issues)
 - **邮箱**: hsliup@163.com
 - 项目ＱＱ群：782124367
+- **商业许可咨询**: hsliup@163.com
 - **原项目**: [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents)
 - **文档**: [完整文档目录](docs/)
 
