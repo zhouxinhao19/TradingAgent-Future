@@ -194,17 +194,40 @@ def create_analysis_config(
             config["quick_think_llm"] = "deepseek-chat"
             config["deep_think_llm"] = "deepseek-chat"
 
-    # 根据LLM提供商设置后端URL
-    if llm_provider == "dashscope":
-        config["backend_url"] = "https://dashscope.aliyuncs.com/api/v1"
-    elif llm_provider == "deepseek":
-        config["backend_url"] = "https://api.deepseek.com"
-    elif llm_provider == "openai":
-        config["backend_url"] = "https://api.openai.com/v1"
-    elif llm_provider == "google":
-        config["backend_url"] = "https://generativelanguage.googleapis.com/v1"
-    elif llm_provider == "qianfan":
-        config["backend_url"] = "https://aip.baidubce.com"
+    # 🔧 从统一配置获取 backend_url（如果有配置的话）
+    try:
+        from app.core.unified_config import unified_config
+
+        # 尝试从统一配置获取模型的 API base URL
+        quick_llm_config = unified_config.get_llm_config_by_name(quick_model)
+        if quick_llm_config and quick_llm_config.api_base:
+            config["backend_url"] = quick_llm_config.api_base
+            logger.info(f"🔧 使用统一配置的 backend_url: {quick_llm_config.api_base}")
+        else:
+            # 回退到默认 URL
+            if llm_provider == "dashscope":
+                config["backend_url"] = "https://dashscope.aliyuncs.com/api/v1"
+            elif llm_provider == "deepseek":
+                config["backend_url"] = "https://api.deepseek.com"
+            elif llm_provider == "openai":
+                config["backend_url"] = "https://api.openai.com/v1"
+            elif llm_provider == "google":
+                config["backend_url"] = "https://generativelanguage.googleapis.com/v1"
+            elif llm_provider == "qianfan":
+                config["backend_url"] = "https://aip.baidubce.com"
+    except Exception as e:
+        logger.warning(f"⚠️  无法从统一配置获取 backend_url: {e}")
+        # 回退到默认 URL
+        if llm_provider == "dashscope":
+            config["backend_url"] = "https://dashscope.aliyuncs.com/api/v1"
+        elif llm_provider == "deepseek":
+            config["backend_url"] = "https://api.deepseek.com"
+        elif llm_provider == "openai":
+            config["backend_url"] = "https://api.openai.com/v1"
+        elif llm_provider == "google":
+            config["backend_url"] = "https://generativelanguage.googleapis.com/v1"
+        elif llm_provider == "qianfan":
+            config["backend_url"] = "https://aip.baidubce.com"
 
     # 添加分析师配置
     config["selected_analysts"] = selected_analysts

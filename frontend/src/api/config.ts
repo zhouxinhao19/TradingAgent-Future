@@ -444,3 +444,8 @@ export const validateDatabaseConfig = (config: Partial<DatabaseConfig>): string[
 
   return errors
 }
+
+// 配置重载
+export const reloadConfig = (): Promise<ApiResponse> => {
+  return client.post('/config/reload')
+}

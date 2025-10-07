@@ -91,7 +91,7 @@ async def _print_config_summary(logger):
                 logger.info(f"Enabled Data Sources: {len(enabled_sources)}")
                 if enabled_sources:
                     for ds in enabled_sources[:3]:  # 只显示前3个
-                        logger.info(f"  • {ds.source_type.value}: {ds.source_name}")
+                        logger.info(f"  • {ds.type.value}: {ds.name}")
                     if len(enabled_sources) > 3:
                         logger.info(f"  • ... and {len(enabled_sources) - 3} more")
             else:
@@ -120,6 +120,15 @@ async def lifespan(app: FastAPI):
         raise
 
     await init_db()
+
+    # 🔧 配置桥接：将统一配置写入环境变量，供 TradingAgents 核心库使用
+    try:
+        from app.core.config_bridge import bridge_config_to_env
+        bridge_config_to_env()
+    except Exception as e:
+        logger.warning(f"⚠️  配置桥接失败: {e}")
+        logger.warning("⚠️  TradingAgents 将使用 .env 文件中的配置")
+
     # Apply dynamic settings (log_level, enable_monitoring) from ConfigProvider
     try:
         from app.services.config_provider import provider as config_provider  # local import to avoid early DB init issues

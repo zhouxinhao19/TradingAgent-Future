@@ -2,13 +2,21 @@
   <div class="config-management">
     <!-- 页面标题 -->
     <div class="page-header">
-      <h1 class="page-title">
-        <el-icon><Setting /></el-icon>
-        配置管理
-      </h1>
-      <p class="page-description">
-        管理系统配置、大模型、数据源等设置
-      </p>
+      <div class="header-left">
+        <h1 class="page-title">
+          <el-icon><Setting /></el-icon>
+          配置管理
+        </h1>
+        <p class="page-description">
+          管理系统配置、大模型、数据源等设置
+        </p>
+      </div>
+      <div class="header-right">
+        <el-button type="success" @click="handleReloadConfig" :loading="reloadLoading">
+          <el-icon><Refresh /></el-icon>
+          重载配置
+        </el-button>
+      </div>
     </div>
 
     <el-row :gutter="24">
@@ -952,6 +960,7 @@ const systemSaving = ref(false)
 const exportLoading = ref(false)
 const importLoading = ref(false)
 const migrateLoading = ref(false)
+const reloadLoading = ref(false)
 
 // 对话框状态
 const providerDialogVisible = ref(false)
@@ -1650,6 +1659,34 @@ const testDatabase = async (config: DatabaseConfig) => {
   }
 }
 
+// 配置重载
+const handleReloadConfig = async () => {
+  try {
+    reloadLoading.value = true
+    const response = await configApi.reloadConfig()
+
+    if (response.success) {
+      ElMessage.success({
+        message: '配置重载成功！新配置已生效',
+        duration: 3000
+      })
+    } else {
+      ElMessage.warning({
+        message: response.message || '配置重载失败',
+        duration: 3000
+      })
+    }
+  } catch (error: any) {
+    console.error('配置重载失败:', error)
+    ElMessage.error({
+      message: error.response?.data?.detail || '配置重载失败',
+      duration: 3000
+    })
+  } finally {
+    reloadLoading.value = false
+  }
+}
+
 // 系统设置相关操作
 const isEditable = (key: string): boolean => {
   const meta = systemSettingsMeta.value[key]
@@ -1800,21 +1837,34 @@ onMounted(async () => {
 <style lang="scss" scoped>
 .config-management {
   .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 24px;
 
-    .page-title {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 24px;
-      font-weight: 600;
-      color: var(--el-text-color-primary);
-      margin: 0 0 8px 0;
+    .header-left {
+      flex: 1;
+
+      .page-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--el-text-color-primary);
+        margin: 0 0 8px 0;
+      }
+
+      .page-description {
+        margin: 0;
+        color: var(--el-text-color-secondary);
+        font-size: 14px;
+      }
     }
 
-    .page-description {
-      color: var(--el-text-color-regular);
-      margin: 0;
+    .header-right {
+      display: flex;
+      gap: 12px;
     }
   }
 
