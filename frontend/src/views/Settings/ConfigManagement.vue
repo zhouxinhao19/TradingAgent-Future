@@ -36,6 +36,10 @@
               <el-icon><OfficeBuilding /></el-icon>
               <span>厂家管理</span>
             </el-menu-item>
+            <el-menu-item index="model-catalog">
+              <el-icon><Collection /></el-icon>
+              <span>模型目录</span>
+            </el-menu-item>
             <el-menu-item index="llm">
               <el-icon><Cpu /></el-icon>
               <span>大模型配置</span>
@@ -69,6 +73,11 @@
         <!-- 配置验证 -->
         <div v-show="activeTab === 'validation'">
           <ConfigValidator />
+        </div>
+
+        <!-- 模型目录管理 -->
+        <div v-show="activeTab === 'model-catalog'">
+          <ModelCatalogManagement />
         </div>
 
         <!-- 厂家管理 -->
@@ -279,6 +288,29 @@
                       <div class="config-row">
                         <span class="config-label">超时:</span>
                         <span class="config-value">{{ model.timeout }}s</span>
+                      </div>
+                    </div>
+
+                    <!-- 定价信息 -->
+                    <div v-if="model.input_price_per_1k || model.output_price_per_1k" class="model-pricing">
+                      <el-divider style="margin: 8px 0;" />
+                      <div class="pricing-row">
+                        <el-icon><Money /></el-icon>
+                        <span class="pricing-label">定价:</span>
+                      </div>
+                      <div class="pricing-details">
+                        <div class="pricing-item">
+                          <span class="pricing-type">输入:</span>
+                          <span class="pricing-value">
+                            {{ model.input_price_per_1k || 0 }} {{ model.currency || 'CNY' }}/1K
+                          </span>
+                        </div>
+                        <div class="pricing-item">
+                          <span class="pricing-type">输出:</span>
+                          <span class="pricing-value">
+                            {{ model.output_price_per_1k || 0 }} {{ model.currency || 'CNY' }}/1K
+                          </span>
+                        </div>
                       </div>
                     </div>
 
@@ -908,7 +940,8 @@ import {
   Refresh,
   Key,
   OfficeBuilding,
-  CircleCheck
+  CircleCheck,
+  Collection
 } from '@element-plus/icons-vue'
 
 import {
@@ -924,6 +957,7 @@ import {
 import ConfigValidator from '@/components/ConfigValidator.vue'
 import LLMConfigDialog from './components/LLMConfigDialog.vue'
 import ProviderDialog from './components/ProviderDialog.vue'
+import ModelCatalogManagement from './components/ModelCatalogManagement.vue'
 import DataSourceConfigDialog from './components/DataSourceConfigDialog.vue'
 import MarketCategoryManagement from './components/MarketCategoryManagement.vue'
 import DataSourceGroupingDialog from './components/DataSourceGroupingDialog.vue'
@@ -2229,6 +2263,45 @@ onMounted(async () => {
       .config-value {
         font-weight: 500;
         color: var(--el-text-color-primary);
+      }
+    }
+  }
+
+  .model-pricing {
+    margin-bottom: 12px;
+    padding: 8px;
+    background: var(--el-fill-color-lighter);
+    border-radius: 4px;
+
+    .pricing-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: var(--el-color-warning);
+      font-weight: 600;
+    }
+
+    .pricing-details {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding-left: 20px;
+
+      .pricing-item {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+
+        .pricing-type {
+          color: var(--el-text-color-regular);
+        }
+
+        .pricing-value {
+          font-weight: 500;
+          color: var(--el-color-warning);
+        }
       }
     }
   }

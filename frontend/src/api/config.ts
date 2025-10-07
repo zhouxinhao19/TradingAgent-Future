@@ -172,6 +172,54 @@ export const configApi = {
     return ApiClient.post(`/api/config/llm/providers/${providerId}/test`)
   },
 
+  // 获取可用的模型列表（按厂家分组）
+  getAvailableModels(): Promise<Array<{
+    provider: string
+    provider_name: string
+    models: Array<{ name: string; display_name: string }>
+  }>> {
+    return ApiClient.get('/api/config/models')
+  },
+
+  // ========== 模型目录管理 ==========
+
+  // 获取所有模型目录
+  getModelCatalog(): Promise<Array<{
+    provider: string
+    provider_name: string
+    models: Array<{ name: string; display_name: string; description?: string }>
+  }>> {
+    return ApiClient.get('/api/config/model-catalog')
+  },
+
+  // 获取指定厂家的模型目录
+  getProviderModelCatalog(provider: string): Promise<{
+    provider: string
+    provider_name: string
+    models: Array<{ name: string; display_name: string; description?: string }>
+  }> {
+    return ApiClient.get(`/api/config/model-catalog/${provider}`)
+  },
+
+  // 保存模型目录
+  saveModelCatalog(catalog: {
+    provider: string
+    provider_name: string
+    models: Array<{ name: string; display_name: string; description?: string }>
+  }): Promise<{ success: boolean; message: string }> {
+    return ApiClient.post('/api/config/model-catalog', catalog)
+  },
+
+  // 删除模型目录
+  deleteModelCatalog(provider: string): Promise<{ success: boolean; message: string }> {
+    return ApiClient.delete(`/api/config/model-catalog/${provider}`)
+  },
+
+  // 初始化默认模型目录
+  initModelCatalog(): Promise<{ success: boolean; message: string }> {
+    return ApiClient.post('/api/config/model-catalog/init')
+  },
+
   // ========== 大模型配置管理 ==========
 
   // 获取所有大模型配置

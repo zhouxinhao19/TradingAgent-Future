@@ -50,6 +50,10 @@
                 <el-icon><Tools /></el-icon>
                 <span>配置管理</span>
               </el-menu-item>
+              <el-menu-item index="usage">
+                <el-icon><DataAnalysis /></el-icon>
+                <span>使用统计</span>
+              </el-menu-item>
               <el-menu-item index="cache">
                 <el-icon><Coin /></el-icon>
                 <span>缓存管理</span>
@@ -271,13 +275,33 @@
           </div>
         </el-card>
 
+        <!-- 使用统计 -->
+        <el-card v-show="activeTab === 'usage'" class="settings-content" shadow="never">
+          <template #header>
+            <h3>使用统计</h3>
+          </template>
+
+          <div class="cache-content">
+            <el-alert
+              title="使用统计与计费"
+              type="info"
+              description="查看模型使用情况、Token 消耗和成本统计"
+              :closable="false"
+              style="margin-bottom: 20px;"
+            />
+            <el-button type="primary" @click="goToUsageStatistics">
+              查看使用统计
+            </el-button>
+          </div>
+        </el-card>
+
         <!-- 缓存管理 -->
         <el-card v-show="activeTab === 'cache'" class="settings-content" shadow="never">
           <template #header>
             <h3>缓存管理</h3>
           </template>
 
-          <div class="cache-content">
+          <div class="settings-section">
             <el-alert
               title="缓存管理"
               type="info"
@@ -423,7 +447,8 @@ import {
   Monitor,
   Coin,
   Document,
-  Refresh
+  Refresh,
+  DataAnalysis
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -453,7 +478,7 @@ const pageDescription = computed(() => {
     case 'personal':
       return '个性化配置和偏好设置'
     case 'config':
-      return 'LLM、数据源和缓存配置'
+      return 'LLM、数据源、使用统计和缓存配置'
     case 'admin':
       return '数据库、日志和同步管理'
     default:
@@ -481,6 +506,9 @@ const updateSectionFromRoute = () => {
   } else if (path === '/settings/config') {
     currentSection.value = 'config'
     activeTab.value = 'config'
+  } else if (path === '/settings/usage') {
+    currentSection.value = 'config'
+    activeTab.value = 'usage'
   } else if (path === '/settings/cache') {
     currentSection.value = 'config'
     activeTab.value = 'cache'
@@ -561,6 +589,10 @@ const saveNotificationSettings = () => {
 // 导航函数
 const goToConfigManagement = () => {
   router.push('/settings/config')
+}
+
+const goToUsageStatistics = () => {
+  router.push('/settings/usage')
 }
 
 const goToCacheManagement = () => {
