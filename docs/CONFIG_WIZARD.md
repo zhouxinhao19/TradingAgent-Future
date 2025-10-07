@@ -321,8 +321,121 @@ npm run dev  # 重启开发服务器
 3. **定期验证配置**：在"配置管理"页面定期检查配置状态
 4. **备份配置**：使用"导出配置"功能定期备份
 
+## 🔌 后端 API 集成
+
+### 配置保存流程
+
+配置向导完成后，会自动调用后端 API 保存配置：
+
+#### 1. 大模型配置保存
+
+```typescript
+// 1.1 添加大模型厂家
+await configApi.addLLMProvider({
+  provider_key: 'deepseek',
+  provider_name: 'DeepSeek',
+  api_key: 'sk-xxx',
+  base_url: 'https://api.deepseek.com',
+  is_active: true
+})
+
+// 1.2 添加大模型配置
+await configApi.updateLLMConfig({
+  provider: 'deepseek',
+  model_name: 'deepseek-chat',
+  enabled: true
+})
+
+// 1.3 设置为默认大模型
+await configApi.setDefaultLLM('deepseek-chat')
+```
+
+**对应后端 API**:
+- `POST /api/config/llm/providers` - 添加厂家
+- `POST /api/config/llm` - 添加模型配置
+- `POST /api/config/llm/set-default` - 设置默认模型
+
+#### 2. 数据源配置保存
+
+```typescript
+// 2.1 添加数据源配置
+await configApi.addDataSourceConfig({
+  name: 'tushare',
+  type: 'tushare',
+  api_key: 'your-token',
+  enabled: true
+})
+
+// 2.2 设置为默认数据源
+await configApi.setDefaultDataSource('tushare')
+```
+
+**对应后端 API**:
+- `POST /api/config/datasource` - 添加数据源
+- `POST /api/config/datasource/set-default` - 设置默认数据源
+
+#### 3. 数据库配置
+
+**注意**：数据库配置（MongoDB、Redis）需要在后端 `.env` 文件中设置，配置向导只是收集用户输入用于验证连接。
+
+实际配置需要在 `.env` 文件中：
+```bash
+# MongoDB
+MONGODB_HOST=localhost
+MONGODB_PORT=27017
+MONGODB_DATABASE=tradingagents
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+```
+
+### 配置验证 API
+
+配置向导触发前会调用验证 API：
+
+```typescript
+const response = await axios.get('/api/system/config/validate')
+```
+
+**响应格式**:
+```json
+{
+  "success": true,
+  "data": {
+    "success": false,
+    "missing_required": [
+      {
+        "key": "MONGODB_HOST",
+        "description": "MongoDB 主机地址"
+      }
+    ],
+    "missing_recommended": [
+      {
+        "key": "DEEPSEEK_API_KEY",
+        "description": "DeepSeek API 密钥"
+      }
+    ],
+    "invalid_configs": [],
+    "warnings": []
+  },
+  "message": "配置验证完成"
+}
+```
+
+### 错误处理
+
+配置保存过程中的错误会被捕获并提示用户：
+
+- **厂家已存在**：忽略错误，继续保存模型配置
+- **模型配置失败**：显示警告，提示用户稍后手动配置
+- **数据源配置失败**：显示警告，提示用户稍后手动配置
+
+用户可以在"配置管理"页面手动完成配置。
+
 ## 🔄 更新日志
 
+- **2025-10-07**: 完善后端 API 集成，配置向导数据自动保存到后端
 - **2025-10-06**: 修复具名插槽位置问题，确保 `<template #footer>` 是 `el-dialog` 的直接子元素
 - **2025-10-06**: 添加自动触发机制，基于后端配置验证 API
 - **2025-10-06**: 完善文档，添加使用说明和常见问题
