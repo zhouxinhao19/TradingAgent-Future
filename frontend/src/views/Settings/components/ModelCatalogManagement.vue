@@ -128,26 +128,34 @@
                 />
               </template>
             </el-table-column>
-            <el-table-column label="输入价格(¥/1K)" width="150">
+            <el-table-column label="输入价格/1K" width="180">
               <template #default="{ row, $index }">
-                <el-input
-                  v-model.number="row.input_price_per_1k"
-                  placeholder="0.001"
-                  size="small"
-                  type="number"
-                  step="0.0001"
-                />
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <el-input
+                    v-model.number="row.input_price_per_1k"
+                    placeholder="0.001"
+                    size="small"
+                    type="number"
+                    step="0.0001"
+                    style="width: 100px;"
+                  />
+                  <span style="color: #909399; font-size: 12px;">{{ row.currency || 'CNY' }}</span>
+                </div>
               </template>
             </el-table-column>
-            <el-table-column label="输出价格(¥/1K)" width="150">
+            <el-table-column label="输出价格/1K" width="180">
               <template #default="{ row, $index }">
-                <el-input
-                  v-model.number="row.output_price_per_1k"
-                  placeholder="0.002"
-                  size="small"
-                  type="number"
-                  step="0.0001"
-                />
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <el-input
+                    v-model.number="row.output_price_per_1k"
+                    placeholder="0.002"
+                    size="small"
+                    type="number"
+                    step="0.0001"
+                    style="width: 100px;"
+                  />
+                  <span style="color: #909399; font-size: 12px;">{{ row.currency || 'CNY' }}</span>
+                </div>
               </template>
             </el-table-column>
             <el-table-column label="上下文长度" width="150">
@@ -158,6 +166,19 @@
                   size="small"
                   type="number"
                 />
+              </template>
+            </el-table-column>
+            <el-table-column label="货币单位" width="120">
+              <template #default="{ row, $index }">
+                <el-select
+                  v-model="row.currency"
+                  size="small"
+                  placeholder="选择货币"
+                >
+                  <el-option label="CNY" value="CNY" />
+                  <el-option label="USD" value="USD" />
+                  <el-option label="EUR" value="EUR" />
+                </el-select>
               </template>
             </el-table-column>
             <el-table-column label="操作" width="100" fixed="right">
