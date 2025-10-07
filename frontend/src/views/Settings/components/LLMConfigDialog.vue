@@ -36,7 +36,7 @@
         <el-select
           v-if="modelOptions.length > 0"
           v-model="formData.model_name"
-          placeholder="选择模型"
+          placeholder="选择或输入模型名称"
           filterable
           allow-create
         >
@@ -52,6 +52,9 @@
           v-model="formData.model_name"
           placeholder="输入模型名称"
         />
+        <div class="form-tip">
+          💡 可以从列表中选择常用模型，也可以直接输入自定义模型名称
+        </div>
       </el-form-item>
 
       <el-form-item label="API基础URL" prop="api_base">
@@ -102,6 +105,39 @@
           :min="0"
           :max="10"
         />
+      </el-form-item>
+
+      <!-- 定价配置 -->
+      <el-divider content-position="left">定价配置</el-divider>
+
+      <el-form-item label="输入价格" prop="input_price_per_1k">
+        <el-input-number
+          v-model="formData.input_price_per_1k"
+          :min="0"
+          :step="0.001"
+          :precision="4"
+          placeholder="每1000个token的价格"
+        />
+        <span class="ml-2 text-gray-500">{{ formData.currency || 'CNY' }}/1K tokens</span>
+      </el-form-item>
+
+      <el-form-item label="输出价格" prop="output_price_per_1k">
+        <el-input-number
+          v-model="formData.output_price_per_1k"
+          :min="0"
+          :step="0.001"
+          :precision="4"
+          placeholder="每1000个token的价格"
+        />
+        <span class="ml-2 text-gray-500">{{ formData.currency || 'CNY' }}/1K tokens</span>
+      </el-form-item>
+
+      <el-form-item label="货币单位" prop="currency">
+        <el-select v-model="formData.currency" placeholder="选择货币单位">
+          <el-option label="人民币 (CNY)" value="CNY" />
+          <el-option label="美元 (USD)" value="USD" />
+          <el-option label="欧元 (EUR)" value="EUR" />
+        </el-select>
       </el-form-item>
 
       <!-- 高级设置 -->
@@ -201,7 +237,10 @@ const defaultFormData = {
   enable_debug: false,
   priority: 0,
   model_category: '',
-  description: ''
+  description: '',
+  input_price_per_1k: 0,
+  output_price_per_1k: 0,
+  currency: 'CNY'
 }
 
 const formData = ref({ ...defaultFormData })
@@ -220,45 +259,41 @@ const rules: FormRules = {
 // 模型选项
 const modelOptions = ref<Array<{ label: string; value: string }>>([])
 
+// 从后端获取的模型目录
+const modelCatalog = ref<Record<string, Array<{ name: string; display_name: string }>>>({})
+
+// 加载模型目录
+const loadModelCatalog = async () => {
+  try {
+    const catalog = await configApi.getAvailableModels()
+    // 转换为 provider -> models 的映射
+    const catalogMap: Record<string, Array<{ name: string; display_name: string }>> = {}
+    catalog.forEach(item => {
+      catalogMap[item.provider] = item.models
+    })
+    modelCatalog.value = catalogMap
+    console.log('✅ 模型目录加载成功:', Object.keys(catalogMap))
+  } catch (error) {
+    console.error('❌ 加载模型目录失败:', error)
+    ElMessage.warning('加载模型列表失败，将使用默认列表')
+    // 失败时使用空目录，允许用户手动输入
+    modelCatalog.value = {}
+  }
+}
+
 // 根据供应商获取模型选项
 const getModelOptions = (provider: string) => {
-  const options: Record<string, Array<{ label: string; value: string }>> = {
-    dashscope: [
-      { label: 'Qwen Turbo - 快速', value: 'qwen-turbo' },
-      { label: 'Qwen Plus - 平衡', value: 'qwen-plus-latest' },
-      { label: 'Qwen Max - 最强', value: 'qwen-max' }
-    ],
-    openai: [
-      { label: 'GPT-4o - 最新旗舰', value: 'gpt-4o' },
-      { label: 'GPT-4o Mini - 轻量旗舰', value: 'gpt-4o-mini' },
-      { label: 'GPT-4 Turbo - 强化版', value: 'gpt-4-turbo' },
-      { label: 'GPT-4 - 经典版', value: 'gpt-4' },
-      { label: 'GPT-3.5 Turbo - 经济版', value: 'gpt-3.5-turbo' }
-    ],
-    google: [
-      { label: 'Gemini 2.5 Pro - 最新旗舰', value: 'gemini-2.5-pro' },
-      { label: 'Gemini 2.5 Flash - 最新快速', value: 'gemini-2.5-flash' },
-      { label: 'Gemini 1.5 Pro - 专业版', value: 'gemini-1.5-pro' },
-      { label: 'Gemini 1.5 Flash - 快速版', value: 'gemini-1.5-flash' }
-    ],
-    deepseek: [
-      { label: 'DeepSeek Chat - 通用对话', value: 'deepseek-chat' }
-    ],
-    anthropic: [
-      { label: 'Claude 3.5 Sonnet - 当前旗舰', value: 'claude-3.5-sonnet' },
-      { label: 'Claude 3 Opus - 强大性能', value: 'claude-3-opus' },
-      { label: 'Claude 3 Sonnet - 平衡版', value: 'claude-3-sonnet' },
-      { label: 'Claude 3 Haiku - 快速版', value: 'claude-3-haiku' }
-    ],
-    qianfan: [
-      { label: 'ERNIE 3.5 8K - 快速高效', value: 'ernie-3.5-8k' },
-      { label: 'ERNIE 4.0 Turbo 8K - 强大推理', value: 'ernie-4.0-turbo-8k' },
-      { label: 'ERNIE Speed 8K - 极速响应', value: 'ERNIE-Speed-8K' },
-      { label: 'ERNIE Lite 8K - 轻量经济', value: 'ERNIE-Lite-8K' }
-    ]
+  // 优先从后端获取的目录中查找
+  const models = modelCatalog.value[provider]
+  if (models && models.length > 0) {
+    return models.map(m => ({
+      label: m.display_name,
+      value: m.name
+    }))
   }
-  
-  return options[provider] || []
+
+  // 如果后端没有数据，返回空数组（允许用户手动输入）
+  return []
 }
 
 // 处理供应商变更
@@ -330,7 +365,10 @@ const handleSubmit = async () => {
 
     // 准备提交数据，移除api_key字段（由后端从厂家配置获取）
     const submitData = { ...formData.value }
-    delete submitData.api_key  // 不发送api_key，让后端从厂家配置获取
+    // 使用类型安全的方式移除api_key字段（如果存在的话）
+    if ('api_key' in submitData) {
+      delete (submitData as any).api_key  // 不发送api_key，让后端从厂家配置获取
+    }
 
     console.log('🚀 提交大模型配置:', submitData)
 
@@ -370,9 +408,10 @@ const loadProviders = async () => {
   }
 }
 
-// 组件挂载时加载厂家数据
+// 组件挂载时加载厂家数据和模型目录
 onMounted(() => {
   loadProviders()
+  loadModelCatalog()
 })
 </script>
 
