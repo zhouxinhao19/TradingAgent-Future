@@ -22,6 +22,7 @@ export default defineConfig({
         enabled: true
       }
     }),
+    // 自动按需组件导入
     Components({
       resolvers: [ElementPlusResolver()],
       dts: true
@@ -41,6 +42,9 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 3000,
+    hmr: {
+      overlay: false
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:8000',

@@ -430,6 +430,7 @@ const routes: RouteRecordRaw[] = [
       transition: 'fade'
     }
   },
+
   {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',

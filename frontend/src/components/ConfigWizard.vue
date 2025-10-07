@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <el-dialog
     v-model="visible"
     title="配置向导"
@@ -148,17 +148,20 @@
             :closable="false"
             show-icon
           >
-            <div>
-              <div>{{ getProviderHelp(wizardData.llm.provider) }}</div>
-              <el-link
-                :href="getProviderUrl(wizardData.llm.provider)"
-                type="primary"
-                target="_blank"
-                style="margin-top: 8px;"
-              >
-                前往获取 →
-              </el-link>
-            </div>
+            <template #default>
+              <div>
+                <div style="margin-bottom: 8px;">{{ getProviderHelp(wizardData.llm.provider) }}</div>
+                <div>
+                  <el-link
+                    :href="getProviderUrl(wizardData.llm.provider)"
+                    type="primary"
+                    target="_blank"
+                  >
+                    前往获取 →
+                  </el-link>
+                </div>
+              </div>
+            </template>
           </el-alert>
         </div>
 
@@ -172,7 +175,7 @@
           <el-form :model="wizardData" label-width="120px">
             <el-form-item label="默认数据源">
               <el-select
-                v-model="wizardData.datasource.type"
+                v-model="datasourceType"
                 placeholder="请选择数据源"
               >
                 <el-option label="AKShare（推荐，免费无需密钥）" value="akshare" />
@@ -182,28 +185,28 @@
             </el-form-item>
 
             <el-form-item
-              v-if="wizardData.datasource?.type === 'tushare'"
+              v-if="datasourceType === 'tushare'"
               label="Tushare Token"
             >
               <el-input
-                v-model="wizardData.datasource.token"
+                v-model="datasourceToken"
                 placeholder="请输入 Tushare Token"
               />
             </el-form-item>
 
             <el-form-item
-              v-if="wizardData.datasource?.type === 'finnhub'"
+              v-if="datasourceType === 'finnhub'"
               label="FinnHub API Key"
             >
               <el-input
-                v-model="wizardData.datasource.apiKey"
+                v-model="datasourceApiKey"
                 placeholder="请输入 FinnHub API Key"
               />
             </el-form-item>
           </el-form>
 
           <el-alert
-            v-if="wizardData.datasource?.type === 'akshare'"
+            v-if="datasourceType === 'akshare'"
             title="AKShare 无需配置"
             type="success"
             :closable="false"
@@ -212,25 +215,28 @@
           />
 
           <el-alert
-            v-if="wizardData.datasource?.type === 'tushare'"
+            v-if="datasourceType === 'tushare'"
             title="如何获取 Tushare Token？"
             type="info"
             :closable="false"
             show-icon
           >
-            <div>
-              <div>1. 访问 Tushare 官网注册账号</div>
-              <div>2. 邮箱验证后登录</div>
-              <div>3. 在个人中心获取 Token</div>
-              <el-link
-                href="https://tushare.pro/register?reg=128886"
-                type="primary"
-                target="_blank"
-                style="margin-top: 8px;"
-              >
-                前往注册 →
-              </el-link>
-            </div>
+            <template #default>
+              <div>
+                <div>1. 访问 Tushare 官网注册账号</div>
+                <div>2. 邮箱验证后登录</div>
+                <div>3. 在个人中心获取 Token</div>
+                <div style="margin-top: 8px;">
+                  <el-link
+                    href="https://tushare.pro/register?reg=128886"
+                    type="primary"
+                    target="_blank"
+                  >
+                    前往注册 →
+                  </el-link>
+                </div>
+              </div>
+            </template>
           </el-alert>
         </div>
 
@@ -254,7 +260,7 @@
                 {{ getProviderName(wizardData.llm.provider) }} - {{ wizardData.llm.modelName }}
               </el-descriptions-item>
               <el-descriptions-item label="数据源">
-                {{ getDataSourceName(wizardData.datasource?.type || 'akshare') }}
+                {{ getDataSourceName(datasourceType) }}
               </el-descriptions-item>
             </el-descriptions>
           </div>
@@ -265,48 +271,50 @@
             :closable="false"
             show-icon
           >
-            <div>
-              <div>• 访问"仪表盘"查看系统概览</div>
-              <div>• 访问"单股分析"开始分析股票</div>
-              <div>• 访问"配置管理"调整详细设置</div>
-            </div>
+            <template #default>
+              <div>
+                <div>• 访问"仪表盘"查看系统概览</div>
+                <div>• 访问"单股分析"开始分析股票</div>
+                <div>• 访问"配置管理"调整详细设置</div>
+              </div>
+            </template>
           </el-alert>
         </div>
       </div>
-
-      <!-- 底部按钮 -->
-      <template #footer>
-        <div class="wizard-footer">
-          <el-button
-            v-if="currentStep > 0 && currentStep < 4"
-            @click="handlePrevious"
-          >
-            上一步
-          </el-button>
-          <el-button
-            v-if="currentStep === 0"
-            @click="handleSkip"
-          >
-            跳过向导
-          </el-button>
-          <el-button
-            v-if="currentStep < 4"
-            type="primary"
-            @click="handleNext"
-            :loading="saving"
-          >
-            {{ currentStep === 0 ? '开始配置' : '下一步' }}
-          </el-button>
-          <el-button
-            v-if="currentStep === 4"
-            type="primary"
-            @click="handleComplete"
-          >
-            完成
-          </el-button>
-        </div>
-      </template>
     </div>
+
+    <!-- 底部按钮（必须是 el-dialog 的直接子元素） -->
+    <template #footer>
+      <div class="wizard-footer">
+        <el-button
+          v-if="currentStep > 0 && currentStep < 4"
+          @click="handlePrevious"
+        >
+          上一步
+        </el-button>
+        <el-button
+          v-if="currentStep === 0"
+          @click="handleSkip"
+        >
+          跳过向导
+        </el-button>
+        <el-button
+          v-if="currentStep < 4"
+          type="primary"
+          @click="handleNext"
+          :loading="saving"
+        >
+          {{ currentStep === 0 ? '开始配置' : '下一步' }}
+        </el-button>
+        <el-button
+          v-if="currentStep === 4"
+          type="primary"
+          @click="handleComplete"
+        >
+          完成
+        </el-button>
+      </div>
+    </template>
   </el-dialog>
 </template>
 
@@ -314,6 +322,31 @@
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Setting, CircleCheck } from '@element-plus/icons-vue'
+
+// 类型定义
+interface DataSourceConfig {
+  type: string
+  token: string
+  apiKey: string
+}
+
+interface WizardData {
+  mongodb: {
+    host: string
+    port: number
+    database: string
+  }
+  redis: {
+    host: string
+    port: number
+  }
+  llm: {
+    provider: string
+    apiKey: string
+    modelName: string
+  }
+  datasource: DataSourceConfig
+}
 
 // Props
 interface Props {
@@ -325,7 +358,7 @@ const props = defineProps<Props>()
 // Emits
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
-  (e: 'complete', data: any): void
+  (e: 'complete', data: WizardData): void
 }>()
 
 // 响应式数据
@@ -337,7 +370,7 @@ const visible = computed({
 const currentStep = ref(0)
 const saving = ref(false)
 
-const wizardData = ref({
+const wizardData = ref<WizardData>({
   mongodb: {
     host: 'localhost',
     port: 27017,
@@ -383,6 +416,28 @@ const availableModels = computed(() => {
     ]
   }
   return models[provider] || []
+})
+
+// 数据源相关的计算属性，用于双向绑定
+const datasourceType = computed({
+  get: () => wizardData.value.datasource.type,
+  set: (value: string) => {
+    wizardData.value.datasource.type = value
+  }
+})
+
+const datasourceToken = computed({
+  get: () => wizardData.value.datasource.token,
+  set: (value: string) => {
+    wizardData.value.datasource.token = value
+  }
+})
+
+const datasourceApiKey = computed({
+  get: () => wizardData.value.datasource.apiKey,
+  set: (value: string) => {
+    wizardData.value.datasource.apiKey = value
+  }
 })
 
 // 方法
@@ -542,4 +597,3 @@ const handleComplete = () => {
   }
 }
 </style>
-

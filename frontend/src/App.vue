@@ -6,7 +6,7 @@
     <!-- 主要内容区域 -->
     <router-view v-slot="{ Component, route }">
       <transition
-        :name="route?.meta?.transition || 'fade'"
+        :name="(route?.meta?.transition as string) || 'fade'"
         mode="out-in"
         appear
       >
@@ -28,7 +28,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import NetworkStatus from '@/components/NetworkStatus.vue'
-import ConfigWizard from '@/components/ConfigWizard.vue'
 import axios from 'axios'
 
 // 需要缓存的组件
@@ -89,6 +88,7 @@ const handleWizardComplete = async (data: any) => {
 
 // 生命周期
 onMounted(() => {
+  // 检查是否需要显示配置向导
   checkFirstTimeSetup()
 })
 </script>
