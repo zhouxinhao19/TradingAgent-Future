@@ -689,7 +689,7 @@ class OptimizedChinaDataProvider:
         }
 
     def _estimate_financial_metrics(self, symbol: str, current_price: str) -> dict:
-        """获取真实财务指标（优先使用Tushare真实数据，失败时使用估算）"""
+        """获取真实财务指标（从 MongoDB、AKShare、Tushare 获取，失败则抛出异常）"""
 
         # 提取价格数值
         try:
@@ -700,57 +700,56 @@ class OptimizedChinaDataProvider:
         # 尝试获取真实财务数据
         real_metrics = self._get_real_financial_metrics(symbol, price_value)
         if real_metrics:
-            logger.debug(f"✅ 使用真实财务数据: {symbol}")
+            logger.info(f"✅ 使用真实财务数据: {symbol}")
             return real_metrics
 
-        # 如果无法获取真实数据，使用估算数据并标注
-        logger.warning(f"⚠️ 无法获取真实财务数据，使用估算数据: {symbol}")
-        estimated_metrics = self._get_estimated_financial_metrics(symbol, price_value)
-
-        # 在所有指标后添加估算标注
-        for key in estimated_metrics:
-            if isinstance(estimated_metrics[key], str) and key not in ['fundamental_score', 'valuation_score', 'growth_score', 'risk_level']:
-                if "（" not in estimated_metrics[key]:
-                    estimated_metrics[key] += "（估算值）"
-
-        return estimated_metrics
+        # 如果无法获取真实数据，抛出异常
+        error_msg = f"无法获取股票 {symbol} 的财务数据。已尝试所有数据源（MongoDB、AKShare、Tushare）均失败。"
+        logger.error(f"❌ {error_msg}")
+        raise ValueError(error_msg)
 
     def _get_real_financial_metrics(self, symbol: str, price_value: float) -> dict:
         """获取真实财务指标 - 优先使用数据库缓存，再使用API"""
         try:
-            # 第一优先级：检查是否启用数据库缓存
+            # 第一优先级：从 MongoDB stock_financial_data 集合获取标准化财务数据
             from tradingagents.config.runtime_settings import use_app_cache_enabled
             if use_app_cache_enabled(False):
-                logger.info(f"🔍 优先从数据库缓存获取{symbol}财务数据")
+                logger.info(f"🔍 优先从 MongoDB stock_financial_data 集合获取{symbol}财务数据")
 
-                # 尝试从数据库获取原始财务数据
-                cached_financial_data = self._get_cached_raw_financial_data(symbol)
-                if cached_financial_data:
-                    logger.info(f"✅ 从数据库缓存获取{symbol}原始财务数据成功")
-                    # 将缓存的数据转换回DataFrame格式
-                    restored_financial_data = self._restore_financial_data_format(cached_financial_data)
-                    # 解析缓存的财务数据
-                    stock_info = self._get_cached_stock_info(symbol)
-                    metrics = self._parse_akshare_financial_data(restored_financial_data, stock_info, price_value)
+                # 直接从 MongoDB 获取标准化的财务数据
+                from tradingagents.dataflows.cache.mongodb_cache_adapter import get_mongodb_cache_adapter
+                adapter = get_mongodb_cache_adapter()
+                financial_data = adapter.get_financial_data(symbol)
+
+                if financial_data:
+                    logger.info(f"✅ [财务数据] 从 stock_financial_data 集合获取{symbol}财务数据")
+                    # 解析 MongoDB 标准化的财务数据
+                    metrics = self._parse_mongodb_financial_data(financial_data, price_value)
                     if metrics:
+                        logger.info(f"✅ MongoDB 财务数据解析成功，返回指标")
                         return metrics
+                    else:
+                        logger.warning(f"⚠️ MongoDB 财务数据解析失败")
                 else:
-                    logger.info(f"🔄 数据库缓存未命中，从AKShare API获取{symbol}财务数据")
+                    logger.info(f"🔄 MongoDB 未找到{symbol}财务数据，尝试从 AKShare API 获取")
             else:
                 logger.info(f"🔄 数据库缓存未启用，直接从AKShare API获取{symbol}财务数据")
 
             # 第二优先级：从AKShare API获取
             from .providers.china.akshare import get_akshare_provider
+            import asyncio
 
             akshare_provider = get_akshare_provider()
 
             if akshare_provider.connected:
-                financial_data = akshare_provider.get_financial_data(symbol)
+                # AKShare的get_financial_data是异步方法，需要使用asyncio运行
+                loop = asyncio.get_event_loop()
+                financial_data = loop.run_until_complete(akshare_provider.get_financial_data(symbol))
 
                 if financial_data and any(not v.empty if hasattr(v, 'empty') else bool(v) for v in financial_data.values()):
                     logger.info(f"✅ AKShare财务数据获取成功: {symbol}")
-                    # 获取股票基本信息
-                    stock_info = akshare_provider.get_stock_info(symbol)
+                    # 获取股票基本信息（也是异步方法）
+                    stock_info = loop.run_until_complete(akshare_provider.get_stock_basic_info(symbol))
 
                     # 解析AKShare财务数据
                     logger.debug(f"🔧 调用AKShare解析函数，股价: {price_value}")
@@ -771,20 +770,22 @@ class OptimizedChinaDataProvider:
             # 第三优先级：使用Tushare数据源
             logger.info(f"🔄 使用Tushare备用数据源获取{symbol}财务数据")
             from .providers.china.tushare import get_tushare_provider
+            import asyncio
 
             provider = get_tushare_provider()
             if not provider.connected:
                 logger.debug(f"Tushare未连接，无法获取{symbol}真实财务数据")
                 return None
 
-            # 获取财务数据
-            financial_data = provider.get_financial_data(symbol)
+            # 获取财务数据（异步方法）
+            loop = asyncio.get_event_loop()
+            financial_data = loop.run_until_complete(provider.get_financial_data(symbol))
             if not financial_data:
                 logger.debug(f"未获取到{symbol}的财务数据")
                 return None
 
-            # 获取股票基本信息
-            stock_info = provider.get_stock_info(symbol)
+            # 获取股票基本信息（异步方法）
+            stock_info = loop.run_until_complete(provider.get_stock_basic_info(symbol))
 
             # 解析Tushare财务数据
             metrics = self._parse_financial_data(financial_data, stock_info, price_value)
@@ -797,6 +798,120 @@ class OptimizedChinaDataProvider:
             logger.debug(f"获取{symbol}真实财务数据失败: {e}")
 
         return None
+
+    def _parse_mongodb_financial_data(self, financial_data: dict, price_value: float) -> dict:
+        """解析 MongoDB 标准化的财务数据为指标"""
+        try:
+            logger.debug(f"📊 [财务数据] 开始解析 MongoDB 财务数据，包含字段: {list(financial_data.keys())}")
+
+            metrics = {}
+
+            # MongoDB 的 financial_data 是扁平化的结构，直接包含所有财务指标
+            # 不再是嵌套的 {balance_sheet, income_statement, ...} 结构
+
+            # 直接从 financial_data 中提取指标
+            latest_indicators = financial_data
+
+            # ROE - 净资产收益率
+            roe = latest_indicators.get('roe') or latest_indicators.get('roe_waa')
+            if roe is not None and str(roe) != 'nan' and roe != '--':
+                try:
+                    metrics["roe"] = f"{float(roe):.1f}%"
+                except (ValueError, TypeError):
+                    metrics["roe"] = "N/A"
+            else:
+                metrics["roe"] = "N/A"
+
+            # ROA - 总资产收益率
+            roa = latest_indicators.get('roa') or latest_indicators.get('roa2')
+            if roa is not None and str(roa) != 'nan' and roa != '--':
+                try:
+                    metrics["roa"] = f"{float(roa):.1f}%"
+                except (ValueError, TypeError):
+                    metrics["roa"] = "N/A"
+            else:
+                metrics["roa"] = "N/A"
+
+            # 毛利率
+            gross_margin = latest_indicators.get('gross_margin')
+            if gross_margin is not None and str(gross_margin) != 'nan' and gross_margin != '--':
+                try:
+                    metrics["gross_margin"] = f"{float(gross_margin):.1f}%"
+                except (ValueError, TypeError):
+                    metrics["gross_margin"] = "N/A"
+            else:
+                metrics["gross_margin"] = "N/A"
+
+            # 净利率
+            net_margin = latest_indicators.get('netprofit_margin')
+            if net_margin is not None and str(net_margin) != 'nan' and net_margin != '--':
+                try:
+                    metrics["net_margin"] = f"{float(net_margin):.1f}%"
+                except (ValueError, TypeError):
+                    metrics["net_margin"] = "N/A"
+            else:
+                metrics["net_margin"] = "N/A"
+
+            # 计算 PE - 使用净利润和总股本
+            net_profit = latest_indicators.get('net_profit')
+            total_equity = latest_indicators.get('total_equity')
+            if net_profit and total_equity and price_value > 0:
+                try:
+                    # 简化计算：假设市值 = 股价 * 总股本（需要从其他地方获取总股本）
+                    # 这里使用 ROE 反推 EPS
+                    roe_val = latest_indicators.get('roe')
+                    if roe_val and float(roe_val) > 0:
+                        # EPS = ROE * 每股净资产
+                        # 每股净资产 = 总股本 / 总股数（假设）
+                        # 简化：直接使用估算
+                        metrics["pe"] = "N/A（需要更多数据）"
+                    else:
+                        metrics["pe"] = "N/A"
+                except (ValueError, TypeError, ZeroDivisionError):
+                    metrics["pe"] = "N/A"
+            else:
+                metrics["pe"] = "N/A"
+
+            # 计算 PB - 使用总股本
+            if total_equity and price_value > 0:
+                try:
+                    # 简化：PB = 市值 / 净资产
+                    # 这里需要知道总股数才能计算
+                    metrics["pb"] = "N/A（需要更多数据）"
+                except (ValueError, TypeError, ZeroDivisionError):
+                    metrics["pb"] = "N/A"
+            else:
+                metrics["pb"] = "N/A"
+
+            # 资产负债率
+            debt_ratio = latest_indicators.get('debt_to_assets')
+            if debt_ratio is not None and str(debt_ratio) != 'nan' and debt_ratio != '--':
+                try:
+                    metrics["debt_ratio"] = f"{float(debt_ratio):.1f}%"
+                except (ValueError, TypeError):
+                    metrics["debt_ratio"] = "N/A"
+            else:
+                metrics["debt_ratio"] = "N/A"
+
+            # 添加其他必需的字段（使用 N/A 占位）
+            metrics["ps"] = "N/A"
+            metrics["dividend_yield"] = "N/A"
+            metrics["current_ratio"] = latest_indicators.get('current_ratio', 'N/A')
+            metrics["quick_ratio"] = latest_indicators.get('quick_ratio', 'N/A')
+            metrics["cash_ratio"] = latest_indicators.get('cash_ratio', 'N/A')
+
+            # 添加评分字段（使用默认值）
+            metrics["fundamental_score"] = 7.0  # 基于真实数据的默认评分
+            metrics["valuation_score"] = 6.5
+            metrics["growth_score"] = 7.0
+            metrics["risk_level"] = "中等"
+
+            logger.info(f"✅ MongoDB 财务数据解析成功: ROE={metrics.get('roe')}, ROA={metrics.get('roa')}, 毛利率={metrics.get('gross_margin')}, 净利率={metrics.get('net_margin')}")
+            return metrics
+
+        except Exception as e:
+            logger.error(f"❌ MongoDB财务数据解析失败: {e}", exc_info=True)
+            return None
 
     def _parse_akshare_financial_data(self, financial_data: dict, stock_info: dict, price_value: float) -> dict:
         """解析AKShare财务数据为指标"""
@@ -1438,6 +1553,71 @@ def _add_financial_cache_methods():
                 return None
 
             db = client.get_database('tradingagents')
+
+            # 第一优先级：从 stock_financial_data 集合读取（定时任务同步的持久化数据）
+            stock_financial_collection = db.stock_financial_data
+
+            # 尝试使用 symbol 或 code 字段查询（兼容不同的同步服务）
+            financial_doc = stock_financial_collection.find_one({
+                '$or': [
+                    {'symbol': symbol},
+                    {'code': symbol}
+                ]
+            }, sort=[('updated_at', -1)])
+
+            if financial_doc:
+                logger.info(f"✅ [财务数据] 从 stock_financial_data 集合获取{symbol}财务数据")
+                # 将数据库文档转换为财务数据格式
+                financial_data = {}
+
+                # 提取各类财务数据
+                # 第一优先级：检查 raw_data 字段（Tushare 同步服务使用的结构）
+                if 'raw_data' in financial_doc and isinstance(financial_doc['raw_data'], dict):
+                    raw_data = financial_doc['raw_data']
+                    # 映射字段名：raw_data 中使用 cashflow_statement，我们需要 cash_flow
+                    if 'balance_sheet' in raw_data and raw_data['balance_sheet']:
+                        financial_data['balance_sheet'] = raw_data['balance_sheet']
+                    if 'income_statement' in raw_data and raw_data['income_statement']:
+                        financial_data['income_statement'] = raw_data['income_statement']
+                    if 'cashflow_statement' in raw_data and raw_data['cashflow_statement']:
+                        financial_data['cash_flow'] = raw_data['cashflow_statement']  # 注意字段名映射
+                    if 'financial_indicators' in raw_data and raw_data['financial_indicators']:
+                        financial_data['main_indicators'] = raw_data['financial_indicators']  # 注意字段名映射
+                    if 'main_business' in raw_data and raw_data['main_business']:
+                        financial_data['main_business'] = raw_data['main_business']
+
+                # 第二优先级：检查 financial_data 嵌套字段
+                elif 'financial_data' in financial_doc and isinstance(financial_doc['financial_data'], dict):
+                    nested_data = financial_doc['financial_data']
+                    if 'balance_sheet' in nested_data:
+                        financial_data['balance_sheet'] = nested_data['balance_sheet']
+                    if 'income_statement' in nested_data:
+                        financial_data['income_statement'] = nested_data['income_statement']
+                    if 'cash_flow' in nested_data:
+                        financial_data['cash_flow'] = nested_data['cash_flow']
+                    if 'main_indicators' in nested_data:
+                        financial_data['main_indicators'] = nested_data['main_indicators']
+
+                # 第三优先级：直接从文档根级别读取
+                else:
+                    if 'balance_sheet' in financial_doc and financial_doc['balance_sheet']:
+                        financial_data['balance_sheet'] = financial_doc['balance_sheet']
+                    if 'income_statement' in financial_doc and financial_doc['income_statement']:
+                        financial_data['income_statement'] = financial_doc['income_statement']
+                    if 'cash_flow' in financial_doc and financial_doc['cash_flow']:
+                        financial_data['cash_flow'] = financial_doc['cash_flow']
+                    if 'main_indicators' in financial_doc and financial_doc['main_indicators']:
+                        financial_data['main_indicators'] = financial_doc['main_indicators']
+
+                if financial_data:
+                    logger.info(f"📊 [财务数据] 成功提取{symbol}的财务数据，包含字段: {list(financial_data.keys())}")
+                    return financial_data
+                else:
+                    logger.warning(f"⚠️ [财务数据] {symbol}的 stock_financial_data 记录存在但无有效财务数据字段")
+            else:
+                logger.debug(f"📊 [财务数据] stock_financial_data 集合中未找到{symbol}的记录")
+
+            # 第二优先级：从 financial_data_cache 集合读取（临时缓存）
             collection = db.financial_data_cache
 
             # 查找缓存的原始财务数据
@@ -1453,7 +1633,7 @@ def _add_financial_cache_methods():
                 if cache_time and datetime.now() - cache_time < timedelta(hours=24):
                     financial_data = cache_doc.get('financial_data', {})
                     if financial_data:
-                        logger.info(f"✅ [财务缓存] 从数据库缓存获取{symbol}原始财务数据")
+                        logger.info(f"✅ [财务缓存] 从 financial_data_cache 获取{symbol}原始财务数据")
                         return financial_data
                 else:
                     logger.debug(f"📊 [财务缓存] {symbol}原始财务数据缓存已过期")

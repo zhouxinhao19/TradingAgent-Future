@@ -121,17 +121,18 @@ class MongoDBCacheAdapter:
         try:
             code6 = str(symbol).zfill(6)
             collection = self.db.stock_financial_data  # 修正集合名称
-            
-            # 构建查询条件
-            query = {"symbol": code6}
+
+            # 构建查询条件 - 使用 code 字段而不是 symbol
+            query = {"code": code6}
             if report_period:
                 query["report_period"] = report_period
-            
+
             # 获取最新的财务数据
             doc = collection.find_one(query, {"_id": 0}, sort=[("report_period", -1)])
-            
+
             if doc:
-                logger.debug(f"✅ [数据来源: MongoDB-财务数据] 从MongoDB获取财务数据: {symbol}")
+                logger.info(f"✅ [财务数据] 从 stock_financial_data 集合获取{symbol}财务数据")
+                logger.debug(f"📊 [财务数据] 成功提取{symbol}的财务数据，包含字段: {list(doc.keys())}")
                 return doc
             else:
                 logger.debug(f"📊 [数据来源: MongoDB-财务数据] MongoDB中未找到财务数据: {symbol}")
