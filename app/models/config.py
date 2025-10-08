@@ -138,7 +138,8 @@ class DatabaseType(str, Enum):
 class LLMConfig(BaseModel):
     """大模型配置"""
     provider: ModelProvider = ModelProvider.OPENAI
-    model_name: str = Field(..., description="模型名称")
+    model_name: str = Field(..., description="模型名称/代码")
+    model_display_name: Optional[str] = Field(None, description="模型显示名称")
     api_key: Optional[str] = Field(None, description="API密钥(可选，优先从厂家配置获取)")
     api_base: Optional[str] = Field(None, description="API基础URL")
     max_tokens: int = Field(default=4000, description="最大token数")
@@ -231,6 +232,7 @@ class UsageRecord(BaseModel):
     cost: float = Field(..., description="成本")
     session_id: str = Field(..., description="会话ID")
     analysis_type: str = Field(default="stock_analysis", description="分析类型")
+    stock_code: Optional[str] = Field(None, description="股票代码")
 
 
 class UsageStatistics(BaseModel):
@@ -238,7 +240,8 @@ class UsageStatistics(BaseModel):
     total_requests: int = Field(default=0, description="总请求数")
     total_input_tokens: int = Field(default=0, description="总输入token数")
     total_output_tokens: int = Field(default=0, description="总输出token数")
-    total_cost: float = Field(default=0.0, description="总成本")
+    total_cost: float = Field(default=0.0, description="总成本（已废弃，使用 cost_by_currency）")
+    cost_by_currency: Dict[str, float] = Field(default_factory=dict, description="按货币统计的成本")
     by_provider: Dict[str, Any] = Field(default_factory=dict, description="按供应商统计")
     by_model: Dict[str, Any] = Field(default_factory=dict, description="按模型统计")
     by_date: Dict[str, Any] = Field(default_factory=dict, description="按日期统计")
@@ -281,6 +284,7 @@ class LLMConfigRequest(BaseModel):
     """大模型配置请求"""
     provider: ModelProvider
     model_name: str
+    model_display_name: Optional[str] = None  # 新增：模型显示名称
     api_key: Optional[str] = None  # 可选，优先从厂家配置获取
     api_base: Optional[str] = None
     max_tokens: int = 4000
@@ -295,6 +299,11 @@ class LLMConfigRequest(BaseModel):
     enable_debug: bool = False
     priority: int = 0
     model_category: Optional[str] = None
+
+    # 定价配置
+    input_price_per_1k: Optional[float] = None
+    output_price_per_1k: Optional[float] = None
+    currency: str = "CNY"
 
 
 class DataSourceConfigRequest(BaseModel):

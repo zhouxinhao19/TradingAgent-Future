@@ -25,6 +25,7 @@ export interface LLMProvider {
 export interface LLMConfig {
   provider: string
   model_name: string
+  model_display_name?: string  // 新增：模型显示名称
   api_key?: string  // 可选，优先从厂家配置获取
   api_base?: string
   max_tokens: number
@@ -33,6 +34,15 @@ export interface LLMConfig {
   retry_times: number
   enabled: boolean
   description?: string
+  // 定价配置
+  input_price_per_1k?: number
+  output_price_per_1k?: number
+  currency?: string
+  // 高级配置
+  enable_memory?: boolean
+  enable_debug?: boolean
+  priority?: number
+  model_category?: string
 }
 
 export interface DataSourceConfig {

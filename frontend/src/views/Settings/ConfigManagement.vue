@@ -258,7 +258,10 @@
                     <div class="model-header">
                       <div class="model-title">
                         <el-icon class="model-icon"><Cpu /></el-icon>
-                        <span class="model-name">{{ model.model_name }}</span>
+                        <div class="model-name-wrapper">
+                          <span class="model-name">{{ model.model_display_name || model.model_name }}</span>
+                          <span v-if="model.model_display_name" class="model-code">{{ model.model_name }}</span>
+                        </div>
                         <el-tag
                           v-if="model.model_name === defaultLLM"
                           type="primary"
@@ -491,23 +494,69 @@
             <!-- 基础设置 -->
             <el-divider content-position="left">基础设置</el-divider>
 
-            <el-form-item label="默认供应商">
-              <el-select v-model="systemSettings.default_provider" :disabled="!isEditable('default_provider')">
-                <el-option label="阿里百炼" value="dashscope" />
-                <el-option label="OpenAI" value="openai" />
-                <el-option label="Google" value="google" />
-                <el-option label="DeepSeek" value="deepseek" />
-                <el-option label="Anthropic" value="anthropic" />
+            <el-form-item label="数据供应商">
+              <el-select
+                v-model="systemSettings.default_provider"
+                :disabled="!isEditable('default_provider')"
+                placeholder="选择已启用的厂家"
+                filterable
+              >
+                <el-option
+                  v-for="provider in enabledProviders"
+                  :key="provider.id"
+                  :label="provider.display_name"
+                  :value="provider.name"
+                >
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>{{ provider.display_name }}</span>
+                    <el-tag v-if="provider.is_active" type="success" size="small">已启用</el-tag>
+                  </div>
+                </el-option>
               </el-select>
+              <div class="setting-description">从已配置的厂家中选择默认供应商</div>
             </el-form-item>
 
             <el-form-item label="快速分析模型">
-              <el-input v-model="systemSettings.quick_analysis_model" placeholder="例如: qwen-turbo" :disabled="!isEditable('quick_analysis_model')" />
+              <el-select
+                v-model="systemSettings.quick_analysis_model"
+                :disabled="!isEditable('quick_analysis_model')"
+                placeholder="选择快速分析模型"
+                filterable
+              >
+                <el-option
+                  v-for="model in availableModelsForProvider(systemSettings.default_provider)"
+                  :key="`${model.provider}/${model.model_name}`"
+                  :label="model.model_display_name || model.model_name"
+                  :value="model.model_name"
+                >
+                  <div style="display: flex; flex-direction: column;">
+                    <span>{{ model.model_display_name || model.model_name }}</span>
+                    <span style="font-size: 12px; color: #909399;">{{ model.model_name }}</span>
+                  </div>
+                </el-option>
+              </el-select>
               <div class="setting-description">用于市场分析、新闻分析、基本面分析、研究员等，响应速度快（推荐：qwen-turbo）</div>
             </el-form-item>
 
             <el-form-item label="深度决策模型">
-              <el-input v-model="systemSettings.deep_analysis_model" placeholder="例如: qwen-max" :disabled="!isEditable('deep_analysis_model')" />
+              <el-select
+                v-model="systemSettings.deep_analysis_model"
+                :disabled="!isEditable('deep_analysis_model')"
+                placeholder="选择深度决策模型"
+                filterable
+              >
+                <el-option
+                  v-for="model in availableModelsForProvider(systemSettings.default_provider)"
+                  :key="`${model.provider}/${model.model_name}`"
+                  :label="model.model_display_name || model.model_name"
+                  :value="model.model_name"
+                >
+                  <div style="display: flex; flex-direction: column;">
+                    <span>{{ model.model_display_name || model.model_name }}</span>
+                    <span style="font-size: 12px; color: #909399;">{{ model.model_name }}</span>
+                  </div>
+                </el-option>
+              </el-select>
               <div class="setting-description">用于研究管理者综合决策、风险管理者最终评估，推理能力强（推荐：qwen-max）</div>
             </el-form-item>
 
@@ -542,6 +591,7 @@
 
             <el-form-item label="最大并发任务">
               <el-input-number v-model="systemSettings.max_concurrent_tasks" :min="1" :max="10" :disabled="!isEditable('max_concurrent_tasks')" />
+              <div class="setting-description">同时执行的分析任务数量上限（建议3-5）</div>
             </el-form-item>
 
             <el-form-item label="分析超时时间">
@@ -926,7 +976,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Setting,
@@ -1031,6 +1081,9 @@ const loadTabData = async (tab: string) => {
       await loadDatabaseConfigs()
       break
     case 'system':
+      // 系统设置需要加载厂家和大模型配置，用于模型选择下拉框
+      await loadProviders()
+      await loadLLMConfigs()
       await loadSystemSettings()
       break
     case 'api-keys':
@@ -1038,6 +1091,27 @@ const loadTabData = async (tab: string) => {
       await loadLLMConfigs()
       break
   }
+}
+
+// 计算属性：获取已启用的厂家
+const enabledProviders = computed(() => {
+  return providers.value.filter(p => p.is_active)
+})
+
+// 函数：根据厂家获取可用的模型
+const availableModelsForProvider = (providerId: string) => {
+  console.log('🔍 获取厂家模型:', providerId)
+  console.log('📊 所有大模型配置:', llmConfigs.value)
+  if (!providerId) {
+    console.log('⚠️ 厂家ID为空')
+    return []
+  }
+  const models = llmConfigs.value.filter(config => {
+    console.log(`检查模型: ${config.model_name}, provider: ${config.provider}, enabled: ${config.enabled}`)
+    return config.provider === providerId && config.enabled
+  })
+  console.log(`✅ 找到 ${models.length} 个可用模型:`, models)
+  return models
 }
 
 // 加载厂家列表
@@ -1859,6 +1933,28 @@ const migrateLegacyConfig = async () => {
   }
 }
 
+// 监听供应商变化，自动清空不匹配的模型选择
+watch(
+  () => systemSettings.value.default_provider,
+  (newProvider, oldProvider) => {
+    if (newProvider !== oldProvider && newProvider) {
+      const availableModels = availableModelsForProvider(newProvider)
+      const quickModel = systemSettings.value.quick_analysis_model
+      const deepModel = systemSettings.value.deep_analysis_model
+
+      // 如果当前选择的快速分析模型不属于新供应商，清空
+      if (quickModel && !availableModels.find(m => m.model_name === quickModel)) {
+        systemSettings.value.quick_analysis_model = ''
+      }
+
+      // 如果当前选择的深度决策模型不属于新供应商，清空
+      if (deepModel && !availableModels.find(m => m.model_name === deepModel)) {
+        systemSettings.value.deep_analysis_model = ''
+      }
+    }
+  }
+)
+
 // 生命周期
 onMounted(async () => {
   // 先加载厂家信息，再加载其他数据
@@ -2236,9 +2332,21 @@ onMounted(async () => {
         color: var(--el-color-primary);
       }
 
-      .model-name {
-        font-weight: 600;
-        font-size: 16px;
+      .model-name-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+
+        .model-name {
+          font-weight: 600;
+          font-size: 16px;
+        }
+
+        .model-code {
+          font-size: 12px;
+          color: #909399;
+          font-family: 'Courier New', monospace;
+        }
       }
 
       .default-tag {

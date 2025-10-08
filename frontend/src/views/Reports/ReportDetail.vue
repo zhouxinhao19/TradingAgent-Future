@@ -50,6 +50,24 @@
         </div>
       </el-card>
 
+      <!-- 风险提示 -->
+      <div class="risk-disclaimer">
+        <el-alert
+          type="warning"
+          :closable="false"
+          show-icon
+        >
+          <template #title>
+            <div class="disclaimer-content">
+              <el-icon class="disclaimer-icon"><WarningFilled /></el-icon>
+              <span class="disclaimer-text">
+                <strong>风险提示：</strong>本报告依据真实交易数据使用AI分析生成，仅供参考，不构成任何投资建议。市场有风险，投资需谨慎。
+              </span>
+            </div>
+          </template>
+        </el-alert>
+      </div>
+
       <!-- 报告摘要 -->
       <el-card v-if="report.summary" class="summary-card" shadow="never">
         <template #header>
@@ -161,7 +179,8 @@ import {
   InfoFilled,
   TrendCharts,
   Files,
-  ShoppingCart
+  ShoppingCart,
+  WarningFilled
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { marked } from 'marked'
@@ -595,6 +614,73 @@ onMounted(() => {
           display: flex;
           gap: 8px;
         }
+      }
+    }
+
+    /* 风险提示样式 */
+    .risk-disclaimer {
+      margin-bottom: 24px;
+      animation: fadeInDown 0.5s ease-out;
+    }
+
+    .risk-disclaimer :deep(.el-alert) {
+      background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
+      border: 2px solid #ffc107;
+      border-radius: 12px;
+      padding: 16px 20px;
+      box-shadow: 0 4px 12px rgba(255, 193, 7, 0.2);
+    }
+
+    .risk-disclaimer :deep(.el-alert__icon) {
+      font-size: 24px;
+      color: #ff6b00;
+    }
+
+    .disclaimer-content {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    .disclaimer-icon {
+      font-size: 24px;
+      color: #ff6b00;
+      flex-shrink: 0;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .disclaimer-text {
+      color: #856404;
+      flex: 1;
+    }
+
+    .disclaimer-text strong {
+      color: #d63031;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+      50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+      }
+    }
+
+    @keyframes fadeInDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
       }
     }
 

@@ -291,6 +291,15 @@ const routes: RouteRecordRaw[] = [
           title: '使用统计',
           requiresAuth: true
         }
+      },
+      {
+        path: 'scheduler',
+        name: 'SchedulerManagement',
+        component: () => import('@/views/System/SchedulerManagement.vue'),
+        meta: {
+          title: '定时任务',
+          requiresAuth: true
+        }
       }
     ]
   },

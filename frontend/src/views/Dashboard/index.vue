@@ -197,7 +197,7 @@
                   class="change-percent"
                   :class="getPriceChangeClass(stock.change_percent)"
                 >
-                  {{ stock.change_percent > 0 ? '+' : '' }}{{ stock.change_percent }}%
+                  {{ stock.change_percent > 0 ? '+' : '' }}{{ Number(stock.change_percent).toFixed(2) }}%
                 </div>
               </div>
             </div>

@@ -182,12 +182,62 @@ class UnifiedConfigManager:
         return self._load_json_file(self.paths.settings_json, "settings")
     
     def save_system_settings(self, settings: Dict[str, Any]) -> bool:
-        """保存系统设置"""
+        """保存系统设置（保留现有字段，添加新字段映射）"""
         try:
-            self._save_json_file(self.paths.settings_json, settings, "settings")
+            print(f"📝 [unified_config] save_system_settings 被调用")
+            print(f"📝 [unified_config] 接收到的 settings 包含 {len(settings)} 项")
+
+            # 检查关键字段
+            if "quick_analysis_model" in settings:
+                print(f"  ✓ [unified_config] 包含 quick_analysis_model: {settings['quick_analysis_model']}")
+            else:
+                print(f"  ⚠️  [unified_config] 不包含 quick_analysis_model")
+
+            if "deep_analysis_model" in settings:
+                print(f"  ✓ [unified_config] 包含 deep_analysis_model: {settings['deep_analysis_model']}")
+            else:
+                print(f"  ⚠️  [unified_config] 不包含 deep_analysis_model")
+
+            # 读取现有配置
+            print(f"📖 [unified_config] 读取现有配置文件: {self.paths.settings_json}")
+            current_settings = self.get_system_settings()
+            print(f"📖 [unified_config] 现有配置包含 {len(current_settings)} 项")
+
+            # 合并配置（新配置覆盖旧配置）
+            merged_settings = current_settings.copy()
+            merged_settings.update(settings)
+            print(f"🔀 [unified_config] 合并后配置包含 {len(merged_settings)} 项")
+
+            # 添加字段名映射（新字段名 -> 旧字段名）
+            if "quick_analysis_model" in settings:
+                merged_settings["quick_think_llm"] = settings["quick_analysis_model"]
+                print(f"  ✓ [unified_config] 映射 quick_analysis_model -> quick_think_llm: {settings['quick_analysis_model']}")
+
+            if "deep_analysis_model" in settings:
+                merged_settings["deep_think_llm"] = settings["deep_analysis_model"]
+                print(f"  ✓ [unified_config] 映射 deep_analysis_model -> deep_think_llm: {settings['deep_analysis_model']}")
+
+            # 打印最终要保存的配置
+            print(f"💾 [unified_config] 即将保存到文件:")
+            if "quick_think_llm" in merged_settings:
+                print(f"  ✓ quick_think_llm: {merged_settings['quick_think_llm']}")
+            if "deep_think_llm" in merged_settings:
+                print(f"  ✓ deep_think_llm: {merged_settings['deep_think_llm']}")
+            if "quick_analysis_model" in merged_settings:
+                print(f"  ✓ quick_analysis_model: {merged_settings['quick_analysis_model']}")
+            if "deep_analysis_model" in merged_settings:
+                print(f"  ✓ deep_analysis_model: {merged_settings['deep_analysis_model']}")
+
+            # 保存合并后的配置
+            print(f"💾 [unified_config] 保存到文件: {self.paths.settings_json}")
+            self._save_json_file(self.paths.settings_json, merged_settings, "settings")
+            print(f"✅ [unified_config] 配置保存成功")
+
             return True
         except Exception as e:
-            print(f"保存系统设置失败: {e}")
+            print(f"❌ [unified_config] 保存系统设置失败: {e}")
+            import traceback
+            print(traceback.format_exc())
             return False
     
     def get_default_model(self) -> str:
@@ -205,12 +255,14 @@ class UnifiedConfigManager:
     def get_quick_analysis_model(self) -> str:
         """获取快速分析模型"""
         settings = self.get_system_settings()
-        return settings.get("quick_analysis_model", "qwen-turbo")
+        # 优先读取新字段名，如果不存在则读取旧字段名（向后兼容）
+        return settings.get("quick_analysis_model") or settings.get("quick_think_llm", "qwen-turbo")
 
     def get_deep_analysis_model(self) -> str:
         """获取深度分析模型"""
         settings = self.get_system_settings()
-        return settings.get("deep_analysis_model", "qwen-max")
+        # 优先读取新字段名，如果不存在则读取旧字段名（向后兼容）
+        return settings.get("deep_analysis_model") or settings.get("deep_think_llm", "qwen-max")
 
     def set_analysis_models(self, quick_model: str, deep_model: str) -> bool:
         """设置分析模型"""
@@ -333,14 +385,27 @@ class UnifiedConfigManager:
             # 同步模型配置
             for llm_config in system_config.llm_configs:
                 self.save_llm_config(llm_config)
-            
-            # 同步系统设置
-            settings = system_config.system_settings.copy()
+
+            # 读取现有的 settings.json
+            current_settings = self.get_system_settings()
+
+            # 同步系统设置（保留现有字段，只更新需要的字段）
+            settings = current_settings.copy()
+
+            # 映射新字段名到旧字段名
+            if "quick_analysis_model" in system_config.system_settings:
+                settings["quick_think_llm"] = system_config.system_settings["quick_analysis_model"]
+                settings["quick_analysis_model"] = system_config.system_settings["quick_analysis_model"]
+
+            if "deep_analysis_model" in system_config.system_settings:
+                settings["deep_think_llm"] = system_config.system_settings["deep_analysis_model"]
+                settings["deep_analysis_model"] = system_config.system_settings["deep_analysis_model"]
+
             if system_config.default_llm:
                 settings["default_model"] = system_config.default_llm
-            
+
             self.save_system_settings(settings)
-            
+
             return True
         except Exception as e:
             print(f"同步配置到传统格式失败: {e}")

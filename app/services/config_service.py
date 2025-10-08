@@ -437,6 +437,18 @@ class ConfigService:
             if '_id' in config_dict:
                 del config_dict['_id']  # 移除旧的_id，让MongoDB生成新的
 
+            # 打印即将保存的 system_settings
+            system_settings = config_dict.get('system_settings', {})
+            print(f"📝 即将保存的 system_settings 包含 {len(system_settings)} 项")
+            if 'quick_analysis_model' in system_settings:
+                print(f"  ✓ 包含 quick_analysis_model: {system_settings['quick_analysis_model']}")
+            else:
+                print(f"  ⚠️  不包含 quick_analysis_model")
+            if 'deep_analysis_model' in system_settings:
+                print(f"  ✓ 包含 deep_analysis_model: {system_settings['deep_analysis_model']}")
+            else:
+                print(f"  ⚠️  不包含 deep_analysis_model")
+
             insert_result = await config_collection.insert_one(config_dict)
             print(f"📝 新配置ID: {insert_result.inserted_id}")
 
@@ -554,9 +566,39 @@ class ConfigService:
             if not config:
                 return False
 
+            # 打印更新前的系统设置
+            print(f"📝 更新前 system_settings 包含 {len(config.system_settings)} 项")
+            if 'quick_analysis_model' in config.system_settings:
+                print(f"  ✓ 更新前包含 quick_analysis_model: {config.system_settings['quick_analysis_model']}")
+            else:
+                print(f"  ⚠️  更新前不包含 quick_analysis_model")
+
             # 更新系统设置
             config.system_settings.update(settings)
-            return await self.save_system_config(config)
+
+            # 打印更新后的系统设置
+            print(f"📝 更新后 system_settings 包含 {len(config.system_settings)} 项")
+            if 'quick_analysis_model' in config.system_settings:
+                print(f"  ✓ 更新后包含 quick_analysis_model: {config.system_settings['quick_analysis_model']}")
+            else:
+                print(f"  ⚠️  更新后不包含 quick_analysis_model")
+            if 'deep_analysis_model' in config.system_settings:
+                print(f"  ✓ 更新后包含 deep_analysis_model: {config.system_settings['deep_analysis_model']}")
+            else:
+                print(f"  ⚠️  更新后不包含 deep_analysis_model")
+
+            result = await self.save_system_config(config)
+
+            # 同步到文件系统（供 unified_config 使用）
+            if result:
+                try:
+                    from app.core.unified_config import unified_config
+                    unified_config.sync_to_legacy_format(config)
+                    print(f"✅ 系统设置已同步到文件系统")
+                except Exception as e:
+                    print(f"⚠️  同步系统设置到文件系统失败: {e}")
+
+            return result
 
         except Exception as e:
             print(f"更新系统设置失败: {e}")

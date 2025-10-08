@@ -160,13 +160,9 @@ def create_analysis_config(
         config["online_tools"] = True
         logger.info(f"🔧 [快速分析] {market_type}使用统一工具，确保数据源正确和稳定性")
 
-        # 根据供应商优化模型选择
-        if llm_provider == "dashscope":
-            config["quick_think_llm"] = "qwen-turbo"  # 使用最快模型
-            config["deep_think_llm"] = "qwen-plus"
-        elif llm_provider == "deepseek":
-            config["quick_think_llm"] = "deepseek-chat"
-            config["deep_think_llm"] = "deepseek-chat"
+        # 注意：不再强制覆盖模型，尊重用户配置
+        # 用户已经通过 quick_model 和 deep_model 参数传入了配置的模型
+        logger.info(f"🔧 [快速分析] 使用用户配置的模型: quick={quick_model}, deep={deep_model}")
 
     elif research_depth == "标准":
         config["max_debate_rounds"] = 1
@@ -174,12 +170,8 @@ def create_analysis_config(
         config["memory_enabled"] = True
         config["online_tools"] = True
 
-        if llm_provider == "dashscope":
-            config["quick_think_llm"] = "qwen-plus"
-            config["deep_think_llm"] = "qwen-max"
-        elif llm_provider == "deepseek":
-            config["quick_think_llm"] = "deepseek-chat"
-            config["deep_think_llm"] = "deepseek-chat"
+        # 注意：不再强制覆盖模型，尊重用户配置
+        logger.info(f"🔧 [标准分析] 使用用户配置的模型: quick={quick_model}, deep={deep_model}")
 
     elif research_depth == "深度":
         config["max_debate_rounds"] = 2
@@ -187,19 +179,21 @@ def create_analysis_config(
         config["memory_enabled"] = True
         config["online_tools"] = True
 
-        if llm_provider == "dashscope":
-            config["quick_think_llm"] = "qwen-max"
-            config["deep_think_llm"] = "qwen-max"
-        elif llm_provider == "deepseek":
-            config["quick_think_llm"] = "deepseek-chat"
-            config["deep_think_llm"] = "deepseek-chat"
+        # 注意：不再强制覆盖模型，尊重用户配置
+        logger.info(f"🔧 [深度分析] 使用用户配置的模型: quick={quick_model}, deep={deep_model}")
 
     # 🔧 从统一配置获取 backend_url（如果有配置的话）
     try:
         from app.core.unified_config import unified_config
 
         # 尝试从统一配置获取模型的 API base URL
-        quick_llm_config = unified_config.get_llm_config_by_name(quick_model)
+        # 遍历所有 LLM 配置，找到匹配的模型
+        quick_llm_config = None
+        for llm_config in unified_config.get_llm_configs():
+            if llm_config.model_name == quick_model:
+                quick_llm_config = llm_config
+                break
+
         if quick_llm_config and quick_llm_config.api_base:
             config["backend_url"] = quick_llm_config.api_base
             logger.info(f"🔧 使用统一配置的 backend_url: {quick_llm_config.api_base}")
@@ -658,12 +652,19 @@ class SimpleAnalysisService:
             # 配置阶段
             update_progress_sync(30, "配置分析参数...", "configuration")
 
+            # 从统一配置读取模型配置
+            from app.core.unified_config import unified_config
+            quick_model = unified_config.get_quick_analysis_model()
+            deep_model = unified_config.get_deep_analysis_model()
+
+            logger.info(f"📝 [分析服务] 从配置读取模型: quick={quick_model}, deep={deep_model}")
+
             # 创建分析配置
             config = create_analysis_config(
                 research_depth=request.parameters.research_depth if request.parameters else 2,
                 selected_analysts=request.parameters.selected_analysts if request.parameters else ["market", "fundamentals"],
-                quick_model="qwen-turbo",
-                deep_model="qwen-plus",
+                quick_model=quick_model,
+                deep_model=deep_model,
                 llm_provider="dashscope",
                 market_type="A股"
             )
@@ -1087,14 +1088,14 @@ class SimpleAnalysisService:
 
             # 🔍 调试：检查从内存获取的result_data
             result_data = result.get('result_data')
-            logger.info(f"🔍 [GET_STATUS] result_data存在: {bool(result_data)}")
+            logger.debug(f"🔍 [GET_STATUS] result_data存在: {bool(result_data)}")
             if result_data:
-                logger.info(f"🔍 [GET_STATUS] result_data键: {list(result_data.keys())}")
-                logger.info(f"🔍 [GET_STATUS] result_data中有decision: {bool(result_data.get('decision'))}")
+                logger.debug(f"🔍 [GET_STATUS] result_data键: {list(result_data.keys())}")
+                logger.debug(f"🔍 [GET_STATUS] result_data中有decision: {bool(result_data.get('decision'))}")
                 if result_data.get('decision'):
-                    logger.info(f"🔍 [GET_STATUS] decision内容: {result_data['decision']}")
+                    logger.debug(f"🔍 [GET_STATUS] decision内容: {result_data['decision']}")
             else:
-                logger.warning(f"⚠️ [GET_STATUS] result_data为空或不存在")
+                logger.debug(f"🔍 [GET_STATUS] result_data为空或不存在（任务运行中，这是正常的）")
 
             # 优先从Redis获取详细进度信息
             redis_progress = get_progress_by_id(task_id)

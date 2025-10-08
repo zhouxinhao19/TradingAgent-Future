@@ -42,11 +42,22 @@
           </el-statistic>
         </el-col>
         <el-col :span="6">
-          <el-statistic title="总成本" :value="statistics.total_cost" :precision="4" suffix="元">
-            <template #prefix>
+          <div class="cost-statistic">
+            <div class="cost-label">
               <el-icon><Money /></el-icon>
-            </template>
-          </el-statistic>
+              <span>总成本</span>
+            </div>
+            <div class="cost-values">
+              <div v-for="(cost, currency) in statistics.cost_by_currency" :key="currency" class="cost-item">
+                <span class="cost-amount">{{ cost.toFixed(4) }}</span>
+                <span class="cost-currency">{{ getCurrencySymbol(currency) }}</span>
+              </div>
+              <div v-if="Object.keys(statistics.cost_by_currency || {}).length === 0" class="cost-item">
+                <span class="cost-amount">0.0000</span>
+                <span class="cost-currency">元</span>
+              </div>
+            </div>
+          </div>
         </el-col>
       </el-row>
     </el-card>
@@ -103,9 +114,9 @@
         <el-table-column prop="model_name" label="模型" width="180" />
         <el-table-column prop="input_tokens" label="输入 Token" width="120" align="right" />
         <el-table-column prop="output_tokens" label="输出 Token" width="120" align="right" />
-        <el-table-column prop="cost" label="成本(元)" width="120" align="right">
+        <el-table-column prop="cost" label="成本" width="140" align="right">
           <template #default="{ row }">
-            {{ row.cost.toFixed(4) }}
+            {{ row.cost.toFixed(4) }} {{ getCurrencySymbol(row.currency || 'CNY') }}
           </template>
         </el-table-column>
         <el-table-column prop="analysis_type" label="分析类型" width="150" />
@@ -147,6 +158,7 @@ const statistics = ref<UsageStatistics>({
   total_input_tokens: 0,
   total_output_tokens: 0,
   total_cost: 0,
+  cost_by_currency: {},
   by_provider: {},
   by_model: {},
   by_date: {}
@@ -169,6 +181,18 @@ let dailyChart: echarts.ECharts | null = null
 // 格式化时间戳
 const formatTimestamp = (timestamp: string) => {
   return new Date(timestamp).toLocaleString('zh-CN')
+}
+
+// 获取货币符号
+const getCurrencySymbol = (currency: string) => {
+  const symbols: Record<string, string> = {
+    'CNY': '元',
+    'USD': '$',
+    'EUR': '€',
+    'GBP': '£',
+    'JPY': '¥'
+  }
+  return symbols[currency] || currency
 }
 
 // 加载统计数据
@@ -403,6 +427,42 @@ onMounted(() => {
     .header-actions {
       display: flex;
       align-items: center;
+    }
+  }
+}
+
+.cost-statistic {
+  padding: 20px;
+
+  .cost-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #909399;
+    font-size: 14px;
+    margin-bottom: 12px;
+  }
+
+  .cost-values {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    .cost-item {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+
+      .cost-amount {
+        font-size: 24px;
+        font-weight: 600;
+        color: #303133;
+      }
+
+      .cost-currency {
+        font-size: 14px;
+        color: #909399;
+      }
     }
   }
 }

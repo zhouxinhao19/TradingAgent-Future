@@ -487,6 +487,15 @@ async def add_llm_config(
 
         if success:
             logger.info(f"✅ 大模型配置更新成功: {llm_config.provider}/{llm_config.model_name}")
+
+            # 同步定价配置到 tradingagents
+            try:
+                from app.core.config_bridge import sync_pricing_config_now
+                sync_pricing_config_now()
+                logger.info(f"✅ 定价配置已同步到 tradingagents")
+            except Exception as e:
+                logger.warning(f"⚠️  同步定价配置失败: {e}")
+
             # 审计日志（忽略异常）
             try:
                 await log_operation(
@@ -698,6 +707,15 @@ async def delete_llm_config(
 
         if success:
             logger.info(f"✅ 大模型配置删除成功 - {provider}/{model_name}")
+
+            # 同步定价配置到 tradingagents
+            try:
+                from app.core.config_bridge import sync_pricing_config_now
+                sync_pricing_config_now()
+                logger.info(f"✅ 定价配置已同步到 tradingagents")
+            except Exception as e:
+                logger.warning(f"⚠️  同步定价配置失败: {e}")
+
             # 审计日志（忽略异常）
             try:
                 await log_operation(
@@ -1272,6 +1290,17 @@ async def update_system_settings(
 ):
     """更新系统设置"""
     try:
+        # 打印接收到的设置（用于调试）
+        logger.info(f"📝 接收到的系统设置更新请求，包含 {len(settings)} 项")
+        if 'quick_analysis_model' in settings:
+            logger.info(f"  ✓ quick_analysis_model: {settings['quick_analysis_model']}")
+        else:
+            logger.warning(f"  ⚠️  未包含 quick_analysis_model")
+        if 'deep_analysis_model' in settings:
+            logger.info(f"  ✓ deep_analysis_model: {settings['deep_analysis_model']}")
+        else:
+            logger.warning(f"  ⚠️  未包含 deep_analysis_model")
+
         success = await config_service.update_system_settings(settings)
         if success:
             # 审计日志（忽略日志异常，不影响主流程）

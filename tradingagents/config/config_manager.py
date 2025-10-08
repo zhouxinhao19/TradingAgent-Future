@@ -77,8 +77,9 @@ class UsageRecord:
     input_tokens: int  # 输入token数
     output_tokens: int  # 输出token数
     cost: float  # 成本
-    session_id: str  # 会话ID
-    analysis_type: str  # 分析类型
+    currency: str = "CNY"  # 货币单位
+    session_id: str = ""  # 会话ID
+    analysis_type: str = "stock_analysis"  # 分析类型
 
 
 class ConfigManager:
@@ -387,9 +388,9 @@ class ConfigManager:
     def add_usage_record(self, provider: str, model_name: str, input_tokens: int,
                         output_tokens: int, session_id: str, analysis_type: str = "stock_analysis"):
         """添加使用记录"""
-        # 计算成本
-        cost = self.calculate_cost(provider, model_name, input_tokens, output_tokens)
-        
+        # 计算成本和货币单位
+        cost, currency = self.calculate_cost(provider, model_name, input_tokens, output_tokens)
+
         record = UsageRecord(
             timestamp=datetime.now(ZoneInfo(get_timezone_name())).isoformat(),
             provider=provider,
@@ -397,6 +398,7 @@ class ConfigManager:
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             cost=cost,
+            currency=currency,
             session_id=session_id,
             analysis_type=analysis_type
         )
@@ -422,8 +424,13 @@ class ConfigManager:
         self.save_usage_records(records)
         return record
     
-    def calculate_cost(self, provider: str, model_name: str, input_tokens: int, output_tokens: int) -> float:
-        """计算使用成本"""
+    def calculate_cost(self, provider: str, model_name: str, input_tokens: int, output_tokens: int) -> tuple[float, str]:
+        """
+        计算使用成本
+
+        Returns:
+            tuple[float, str]: (成本, 货币单位)
+        """
         pricing_configs = self.load_pricing()
 
         for pricing in pricing_configs:
@@ -431,7 +438,7 @@ class ConfigManager:
                 input_cost = (input_tokens / 1000) * pricing.input_price_per_1k
                 output_cost = (output_tokens / 1000) * pricing.output_price_per_1k
                 total_cost = input_cost + output_cost
-                return round(total_cost, 6)
+                return round(total_cost, 6), pricing.currency
 
         # 只在找不到配置时输出调试信息
         logger.warning(f"⚠️ [calculate_cost] 未找到匹配的定价配置: {provider}/{model_name}")
@@ -439,7 +446,7 @@ class ConfigManager:
         for pricing in pricing_configs:
             logger.debug(f"⚠️ [calculate_cost]   - {pricing.provider}/{pricing.model_name}")
 
-        return 0.0
+        return 0.0, "CNY"
     
     def load_settings(self) -> Dict[str, Any]:
         """加载设置，合并.env中的配置"""
@@ -723,8 +730,13 @@ class TokenTracker:
         return session_cost
 
     def estimate_cost(self, provider: str, model_name: str, estimated_input_tokens: int,
-                     estimated_output_tokens: int) -> float:
-        """估算成本"""
+                     estimated_output_tokens: int) -> tuple[float, str]:
+        """
+        估算成本
+
+        Returns:
+            tuple[float, str]: (成本, 货币单位)
+        """
         return self.config_manager.calculate_cost(
             provider, model_name, estimated_input_tokens, estimated_output_tokens
         )

@@ -32,29 +32,48 @@
         </div>
       </el-form-item>
 
-      <el-form-item label="模型名称" prop="model_name">
+      <el-form-item label="选择模型" v-if="modelOptions.length > 0">
         <el-select
-          v-if="modelOptions.length > 0"
-          v-model="formData.model_name"
-          placeholder="选择或输入模型名称"
+          v-model="selectedModelKey"
+          placeholder="从列表中选择模型"
           filterable
-          allow-create
-          @change="handleModelChange"
+          clearable
+          @change="handleModelSelect"
         >
           <el-option
             v-for="model in modelOptions"
             :key="model.value"
             :label="model.label"
             :value="model.value"
-          />
+          >
+            <div style="display: flex; flex-direction: column;">
+              <span>{{ model.label }}</span>
+              <span style="font-size: 12px; color: #909399;">代码: {{ model.value }}</span>
+            </div>
+          </el-option>
         </el-select>
+        <div class="form-tip">
+          💡 从列表中选择模型，会自动填充下方的显示名称和模型代码
+        </div>
+      </el-form-item>
+
+      <el-form-item label="模型显示名称" prop="model_display_name">
         <el-input
-          v-else
-          v-model="formData.model_name"
-          placeholder="输入模型名称"
+          v-model="formData.model_display_name"
+          placeholder="输入模型的显示名称，如：Qwen3系列Flash模型 - 快速经济"
         />
         <div class="form-tip">
-          💡 可以从列表中选择常用模型，也可以直接输入自定义模型名称
+          💡 用于在界面上显示的友好名称
+        </div>
+      </el-form-item>
+
+      <el-form-item label="模型代码" prop="model_name">
+        <el-input
+          v-model="formData.model_name"
+          placeholder="输入模型的API调用代码，如：qwen-turbo"
+        />
+        <div class="form-tip">
+          💡 实际调用API时使用的模型标识符
         </div>
       </el-form-item>
 
@@ -228,6 +247,7 @@ const isEdit = computed(() => !!props.config)
 const defaultFormData = {
   provider: '',
   model_name: '',
+  model_display_name: '',  // 新增：模型显示名称
   api_base: '',
   max_tokens: 4000,
   temperature: 0.7,
@@ -245,6 +265,9 @@ const defaultFormData = {
 }
 
 const formData = ref({ ...defaultFormData })
+
+// 用于跟踪当前选择的模型（用于下拉列表）
+const selectedModelKey = ref<string>('')
 
 // 表单验证规则
 const rules: FormRules = {
@@ -329,32 +352,45 @@ const handleProviderChange = (provider: string) => {
   formData.value.currency = 'CNY'
 }
 
-// 处理模型变更 - 自动填充价格信息
-const handleModelChange = (modelName: string) => {
-  if (!formData.value.provider || !modelName) return
+// 处理从下拉列表选择模型
+const handleModelSelect = (modelCode: string) => {
+  if (!modelCode) {
+    // 清空选择
+    selectedModelKey.value = ''
+    return
+  }
 
-  const modelInfo = getModelInfo(formData.value.provider, modelName)
-  if (modelInfo) {
-    console.log('📋 自动填充模型信息:', modelInfo)
+  // 查找选中的模型信息
+  const selectedModel = modelOptions.value.find(m => m.value === modelCode)
+  if (selectedModel) {
+    // 自动填充模型代码和显示名称
+    formData.value.model_name = selectedModel.value
+    formData.value.model_display_name = selectedModel.label
+
+    console.log('📋 选择模型:', {
+      code: selectedModel.value,
+      display_name: selectedModel.label
+    })
 
     // 自动填充价格信息
-    if (modelInfo.input_price_per_1k !== undefined) {
-      formData.value.input_price_per_1k = modelInfo.input_price_per_1k
-    }
-    if (modelInfo.output_price_per_1k !== undefined) {
-      formData.value.output_price_per_1k = modelInfo.output_price_per_1k
-    }
-    if (modelInfo.currency) {
-      formData.value.currency = modelInfo.currency
-    }
+    const modelInfo = getModelInfo(formData.value.provider, modelCode)
+    if (modelInfo) {
+      console.log('📋 自动填充模型信息:', modelInfo)
 
-    // 可选：自动填充其他信息
-    if (modelInfo.context_length && !formData.value.max_tokens) {
-      // 如果有上下文长度信息，可以作为参考
-      console.log('💡 模型上下文长度:', modelInfo.context_length)
-    }
+      if (modelInfo.input_price_per_1k !== undefined) {
+        formData.value.input_price_per_1k = modelInfo.input_price_per_1k
+      }
+      if (modelInfo.output_price_per_1k !== undefined) {
+        formData.value.output_price_per_1k = modelInfo.output_price_per_1k
+      }
+      if (modelInfo.currency) {
+        formData.value.currency = modelInfo.currency
+      }
 
-    ElMessage.success('已自动填充模型价格信息')
+      ElMessage.success('已自动填充模型信息和价格')
+    } else {
+      ElMessage.success('已填充模型名称')
+    }
   }
 }
 
@@ -363,12 +399,30 @@ watch(
   () => props.config,
   (config) => {
     if (config) {
-      // 合并默认值和传入的配置，确保所有字段都有值
-      formData.value = { ...defaultFormData, ...config }
+      // 编辑模式：先使用默认值，再用配置覆盖
+      // 注意：对于数字类型的字段，即使是 0 也应该保留
+      formData.value = {
+        ...defaultFormData,
+        ...config,
+        // 确保价格字段正确加载，即使是 0 也要保留
+        input_price_per_1k: config.input_price_per_1k ?? defaultFormData.input_price_per_1k,
+        output_price_per_1k: config.output_price_per_1k ?? defaultFormData.output_price_per_1k,
+        currency: config.currency || defaultFormData.currency,
+        // 确保显示名称正确加载
+        model_display_name: config.model_display_name || ''
+      }
       modelOptions.value = getModelOptions(config.provider)
+
+      // 如果有 model_name，尝试在下拉列表中选中它
+      if (config.model_name) {
+        selectedModelKey.value = config.model_name
+      }
+
+      console.log('📝 编辑模式加载配置:', formData.value)
     } else {
       formData.value = { ...defaultFormData }
       modelOptions.value = getModelOptions('dashscope')
+      selectedModelKey.value = ''
     }
   },
   { immediate: true }
@@ -380,13 +434,30 @@ watch(
   (visible) => {
     if (visible) {
       if (props.config) {
-        // 编辑模式：合并默认值和传入的配置
-        formData.value = { ...defaultFormData, ...props.config }
+        // 编辑模式：先使用默认值，再用配置覆盖
+        formData.value = {
+          ...defaultFormData,
+          ...props.config,
+          // 确保价格字段正确加载，即使是 0 也要保留
+          input_price_per_1k: props.config.input_price_per_1k ?? defaultFormData.input_price_per_1k,
+          output_price_per_1k: props.config.output_price_per_1k ?? defaultFormData.output_price_per_1k,
+          currency: props.config.currency || defaultFormData.currency,
+          // 确保显示名称正确加载
+          model_display_name: props.config.model_display_name || ''
+        }
         modelOptions.value = getModelOptions(props.config.provider)
+
+        // 如果有 model_name，尝试在下拉列表中选中它
+        if (props.config.model_name) {
+          selectedModelKey.value = props.config.model_name
+        }
+
+        console.log('📝 对话框打开，加载配置:', formData.value)
       } else {
         // 新增模式：使用默认值
         formData.value = { ...defaultFormData }
         modelOptions.value = getModelOptions('dashscope')
+        selectedModelKey.value = ''
       }
     }
   }

@@ -89,11 +89,12 @@ const handleWizardComplete = async (data: any) => {
           // 尝试添加厂家（如果已存在会失败，但不影响后续流程）
           try {
             await configApi.addLLMProvider({
-              provider_key: data.llm.provider,
-              provider_name: providerInfo.name,
-              api_key: data.llm.apiKey,
-              base_url: providerInfo.base_url,
-              is_active: true
+              id: data.llm.provider,
+              name: data.llm.provider,
+              display_name: providerInfo.name,
+              default_base_url: providerInfo.base_url,
+              is_active: true,
+              supported_features: ['chat', 'completion'] // 添加默认支持的功能
             })
           } catch (e) {
             // 厂家可能已存在，忽略错误

@@ -29,17 +29,17 @@ class AuthService:
         logger = logging.getLogger(__name__)
 
         try:
-            logger.info(f"🔍 开始验证token")
-            logger.info(f"📝 Token长度: {len(token)}")
-            logger.info(f"🔑 JWT密钥: {settings.JWT_SECRET[:10]}...")
-            logger.info(f"🔧 JWT算法: {settings.JWT_ALGORITHM}")
+            logger.debug(f"🔍 开始验证token")
+            logger.debug(f"📝 Token长度: {len(token)}")
+            logger.debug(f"🔑 JWT密钥: {settings.JWT_SECRET[:10]}...")
+            logger.debug(f"🔧 JWT算法: {settings.JWT_ALGORITHM}")
 
             payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
-            logger.info(f"✅ Token解码成功")
-            logger.info(f"📋 Payload: {payload}")
+            logger.debug(f"✅ Token解码成功")
+            logger.debug(f"📋 Payload: {payload}")
 
             token_data = TokenData(sub=payload.get("sub"), exp=int(payload.get("exp", time.time())))
-            logger.info(f"🎯 Token数据: sub={token_data.sub}, exp={token_data.exp}")
+            logger.debug(f"🎯 Token数据: sub={token_data.sub}, exp={token_data.exp}")
 
             # 检查是否过期
             current_time = int(time.time())
@@ -47,7 +47,7 @@ class AuthService:
                 logger.warning(f"⏰ Token已过期: exp={token_data.exp}, now={current_time}")
                 return None
 
-            logger.info(f"✅ Token验证成功")
+            logger.debug(f"✅ Token验证成功")
             return token_data
 
         except jwt.ExpiredSignatureError:

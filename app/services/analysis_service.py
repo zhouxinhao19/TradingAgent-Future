@@ -36,6 +36,8 @@ from app.core.database import get_redis_client
 from app.services.redis_progress_tracker import RedisProgressTracker
 from app.services.config_provider import provider as config_provider
 from app.services.queue import DEFAULT_USER_CONCURRENT_LIMIT, GLOBAL_CONCURRENT_LIMIT, VISIBILITY_TIMEOUT_SECONDS
+from app.services.usage_statistics_service import UsageStatisticsService
+from app.models.config import UsageRecord
 
 import logging
 logger = logging.getLogger(__name__)
@@ -43,11 +45,13 @@ logger = logging.getLogger(__name__)
 
 class AnalysisService:
     """股票分析服务类"""
-    
+
     def __init__(self):
         # 获取Redis客户端
         redis_client = get_redis_client()
         self.queue_service = QueueService(redis_client)
+        # 初始化使用统计服务
+        self.usage_service = UsageStatisticsService()
         self._trading_graph_cache = {}
         # 进度跟踪器缓存
         self._progress_trackers: Dict[str, RedisProgressTracker] = {}
@@ -272,6 +276,24 @@ class AnalysisService:
             # 标记完成
             progress_tracker.mark_completed("✅ 分析完成")
             await self._update_task_status_with_tracker(task.task_id, AnalysisStatus.COMPLETED, progress_tracker, result)
+
+            # 记录 token 使用
+            try:
+                # 获取使用的模型信息
+                quick_model = getattr(task.parameters, 'quick_analysis_model', None)
+                deep_model = getattr(task.parameters, 'deep_analysis_model', None)
+
+                # 优先使用深度分析模型，如果没有则使用快速分析模型
+                model_name = deep_model or quick_model or "qwen-plus"
+
+                # 根据模型名称确定供应商
+                from app.services.simple_analysis_service import get_provider_by_model_name
+                provider = get_provider_by_model_name(model_name)
+
+                # 记录使用情况
+                await self._record_token_usage(task, result, provider, model_name)
+            except Exception as e:
+                logger.error(f"⚠️  记录 token 使用失败: {e}")
 
             logger.info(f"✅ 分析任务完成: {task.task_id}")
 
@@ -543,12 +565,19 @@ class AnalysisService:
             
             if progress_callback:
                 progress_callback(100, "分析完成")
-            
+
             # 更新任务状态
             await self._update_task_status(task.task_id, AnalysisStatus.COMPLETED, 100, result)
-            
+
+            # 记录 token 使用
+            try:
+                # 记录使用情况
+                await self._record_token_usage(task, result, llm_provider, deep_model or quick_model)
+            except Exception as e:
+                logger.error(f"⚠️  记录 token 使用失败: {e}")
+
             logger.info(f"分析任务完成: {task.task_id} - 耗时{execution_time:.2f}秒")
-            
+
             return result
             
         except Exception as e:
@@ -695,6 +724,70 @@ class AnalysisService:
         except Exception as e:
             logger.error(f"取消任务失败: {task_id} - {e}")
             return False
+
+    async def _record_token_usage(
+        self,
+        task: AnalysisTask,
+        result: AnalysisResult,
+        provider: str,
+        model_name: str
+    ):
+        """记录 token 使用情况"""
+        try:
+            # 从结果中提取 token 使用信息
+            # 注意：这里需要从 LLM 响应中获取实际的 token 使用量
+            # 目前使用估算值
+            input_tokens = result.tokens_used // 2 if result.tokens_used > 0 else 0
+            output_tokens = result.tokens_used - input_tokens if result.tokens_used > 0 else 0
+
+            # 如果没有 token 使用信息，使用默认估算
+            if result.tokens_used == 0:
+                # 根据分析类型估算
+                input_tokens = 2000  # 默认输入 token
+                output_tokens = 1000  # 默认输出 token
+
+            # 获取模型价格配置
+            from app.services.config_service import config_service
+            config = await config_service.get_system_config()
+
+            # 查找对应的 LLM 配置
+            llm_config = None
+            if config and config.llm_configs:
+                for cfg in config.llm_configs:
+                    if cfg.provider == provider and cfg.model_name == model_name:
+                        llm_config = cfg
+                        break
+
+            # 计算成本
+            cost = 0.0
+            if llm_config:
+                input_price = llm_config.input_price_per_1k or 0.0
+                output_price = llm_config.output_price_per_1k or 0.0
+                cost = (input_tokens / 1000 * input_price) + (output_tokens / 1000 * output_price)
+
+            # 创建使用记录
+            usage_record = UsageRecord(
+                timestamp=datetime.now().isoformat(),
+                provider=provider,
+                model_name=model_name,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cost=cost,
+                session_id=task.task_id,
+                analysis_type="stock_analysis",
+                stock_code=task.stock_code
+            )
+
+            # 保存到数据库
+            success = await self.usage_service.add_usage_record(usage_record)
+
+            if success:
+                logger.info(f"💰 记录使用成本: {provider}/{model_name} - ¥{cost:.4f}")
+            else:
+                logger.warning(f"⚠️  记录使用成本失败")
+
+        except Exception as e:
+            logger.error(f"❌ 记录 token 使用失败: {e}")
 
 
 # 全局分析服务实例（延迟初始化）

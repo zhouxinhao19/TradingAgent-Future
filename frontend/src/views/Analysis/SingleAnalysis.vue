@@ -348,14 +348,18 @@
                         <el-icon class="help-icon"><InfoFilled /></el-icon>
                       </el-tooltip>
                     </div>
-                    <el-select v-model="modelSettings.quickAnalysisModel" size="small" style="width: 100%">
-                      <el-option-group label="阿里百炼">
-                        <el-option label="Qwen Turbo (推荐)" value="qwen-turbo" />
-                        <el-option label="Qwen Plus" value="qwen-plus" />
-                      </el-option-group>
-                      <el-option-group label="Google AI">
-                        <el-option label="Gemini 2.0 Flash" value="gemini-2.0-flash" />
-                      </el-option-group>
+                    <el-select v-model="modelSettings.quickAnalysisModel" size="small" style="width: 100%" filterable>
+                      <el-option
+                        v-for="model in availableModels"
+                        :key="`quick-${model.provider}/${model.model_name}`"
+                        :label="model.model_display_name || model.model_name"
+                        :value="model.model_name"
+                      >
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                          <span>{{ model.model_display_name || model.model_name }}</span>
+                          <span style="font-size: 12px; color: #909399; margin-left: 8px;">{{ model.provider }}</span>
+                        </div>
+                      </el-option>
                     </el-select>
                   </div>
 
@@ -366,14 +370,18 @@
                         <el-icon class="help-icon"><InfoFilled /></el-icon>
                       </el-tooltip>
                     </div>
-                    <el-select v-model="modelSettings.deepAnalysisModel" size="small" style="width: 100%">
-                      <el-option-group label="阿里百炼">
-                        <el-option label="Qwen Max (推荐)" value="qwen-max" />
-                        <el-option label="Qwen Plus" value="qwen-plus" />
-                      </el-option-group>
-                      <el-option-group label="Google AI">
-                        <el-option label="Gemini 2.0 Flash Thinking" value="gemini-2.0-flash-thinking-exp" />
-                      </el-option-group>
+                    <el-select v-model="modelSettings.deepAnalysisModel" size="small" style="width: 100%" filterable>
+                      <el-option
+                        v-for="model in availableModels"
+                        :key="`deep-${model.provider}/${model.model_name}`"
+                        :label="model.model_display_name || model.model_name"
+                        :value="model.model_name"
+                      >
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                          <span>{{ model.model_display_name || model.model_name }}</span>
+                          <span style="font-size: 12px; color: #909399; margin-left: 8px;">{{ model.provider }}</span>
+                        </div>
+                      </el-option>
                     </el-select>
                   </div>
                 </div>
@@ -432,6 +440,24 @@
               </template>
 
               <div class="results-content">
+                <!-- 风险提示 -->
+                <div class="risk-disclaimer">
+                  <el-alert
+                    type="warning"
+                    :closable="false"
+                    show-icon
+                  >
+                    <template #title>
+                      <div class="disclaimer-content">
+                        <el-icon class="disclaimer-icon"><WarningFilled /></el-icon>
+                        <span class="disclaimer-text">
+                          <strong>风险提示：</strong>本报告依据真实交易数据使用AI分析生成，仅供参考，不构成任何投资建议。市场有风险，投资需谨慎。
+                        </span>
+                      </div>
+                    </template>
+                  </el-alert>
+                </div>
+
                 <!-- 最终决策 -->
                 <div v-if="analysisResults.decision" class="decision-section">
                   <h4>🎯 投资建议</h4>
@@ -542,11 +568,19 @@
                     <el-icon><Download /></el-icon>
                     下载报告
                   </el-button>
-                  <el-button @click="shareResults">
-                    <el-icon><Share /></el-icon>
-                    分享结果
-                  </el-button>
                 </div>
+
+                <!-- 风险提示 -->
+                <el-alert
+                  type="warning"
+                  :closable="false"
+                  show-icon
+                  class="risk-disclaimer"
+                >
+                  <template #title>
+                    <span style="font-weight: bold;">报告依据真实交易数据使用AI分析生成，仅供参考，不构成任何投资建议。市场有风险，投资需谨慎。</span>
+                  </template>
+                </el-alert>
               </div>
             </el-card>
           </el-col>
@@ -557,9 +591,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed, h } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox, ElInputNumber } from 'element-plus'
 import {
   Document,
   TrendCharts,
@@ -568,10 +602,12 @@ import {
   Loading,
   Refresh,
   Download,
-  Share,
   CreditCard,
+  WarningFilled,
 } from '@element-plus/icons-vue'
 import { analysisApi, type SingleAnalysisRequest } from '@/api/analysis'
+import { paperApi } from '@/api/paper'
+import { stocksApi } from '@/api/stocks'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { configApi } from '@/api/config'
@@ -632,6 +668,9 @@ const modelSettings = ref({
   deepAnalysisModel: 'qwen-max'
 })
 
+// 可用的模型列表（从配置中获取）
+const availableModels = ref<any[]>([])
+
 // 分析表单
 const analysisForm = reactive({
   stockCode: '',
@@ -691,11 +730,16 @@ const submitAnalysis = async () => {
   submitting.value = true
 
   try {
+    // 确保 analysisDate 是 Date 对象
+    const analysisDate = analysisForm.analysisDate instanceof Date
+      ? analysisForm.analysisDate
+      : new Date(analysisForm.analysisDate)
+
     const request: SingleAnalysisRequest = {
       stock_code: analysisForm.stockCode.trim().toUpperCase(),
       parameters: {
         market_type: analysisForm.market,
-        analysis_date: analysisForm.analysisDate.toISOString().split('T')[0],
+        analysis_date: analysisDate.toISOString().split('T')[0],
         research_depth: getDepthDescription(analysisForm.researchDepth),
         selected_analysts: convertAnalystNamesToIds(analysisForm.selectedAnalysts),
         custom_prompt: analysisForm.customPrompt || undefined,
@@ -1133,13 +1177,59 @@ const downloadReport = () => {
   ElMessage.info('下载功能开发中...')
 }
 
-// 分享结果
-const shareResults = () => {
-  ElMessage.info('分享功能开发中...')
+// 解析投资建议
+const parseRecommendation = () => {
+  if (!analysisResults.value) return null
+
+  // 从多个可能的字段中提取投资建议
+  const rec = analysisResults.value.recommendation ||
+              analysisResults.value.summary ||
+              analysisResults.value.decision?.action || ''
+
+  const traderPlan = analysisResults.value.reports?.trader_investment_plan || ''
+  const allReports = Object.values(analysisResults.value.reports || {}).join(' ')
+
+  // 解析操作类型
+  let action: 'buy' | 'sell' | null = null
+  const recStr = String(rec).toLowerCase()
+  const allText = (recStr + ' ' + String(traderPlan).toLowerCase() + ' ' + allReports.toLowerCase())
+
+  if (allText.includes('买入') || allText.includes('buy') || allText.includes('增持')) {
+    action = 'buy'
+  } else if (allText.includes('卖出') || allText.includes('sell') || allText.includes('减持')) {
+    action = 'sell'
+  }
+
+  if (!action) return null
+
+  // 解析目标价格
+  let targetPrice: number | null = null
+  const priceMatch = allText.match(/目标价[格]?[：:]\s*([0-9.]+)/) ||
+                     allText.match(/价格[：:]\s*([0-9.]+)/)
+  if (priceMatch) {
+    targetPrice = parseFloat(priceMatch[1])
+  }
+
+  // 解析置信度
+  const confidence = analysisResults.value.decision?.confidence ||
+                    analysisResults.value.confidence_score ||
+                    0
+
+  // 解析风险等级
+  const riskLevel = analysisResults.value.risk_level ||
+                   analysisResults.value.decision?.risk_level ||
+                   '中等'
+
+  return {
+    action,
+    targetPrice,
+    confidence: typeof confidence === 'number' ? confidence : 0,
+    riskLevel: String(riskLevel)
+  }
 }
 
-// 一键模拟下单：根据分析结果预填参数跳转到模拟交易页
-const goSimOrder = () => {
+// 一键模拟下单（应用到交易）
+const goSimOrder = async () => {
   try {
     if (!analysisResults.value) {
       ElMessage.warning('暂无可用的分析结果')
@@ -1152,26 +1242,202 @@ const goSimOrder = () => {
       return
     }
 
-    const action = (analysisResults.value.decision?.action || '').toString().toLowerCase()
-    const side = action.includes('sell') || action.includes('减持') || action.includes('卖') ? 'sell' : 'buy'
+    // 解析投资建议
+    const recommendation = parseRecommendation()
+    if (!recommendation) {
+      ElMessage.warning('无法解析投资建议，请检查分析结果')
+      return
+    }
 
-    const conf = Number(analysisResults.value.decision?.confidence || 0)
-    const qty = conf > 0 ? Math.round(100 + conf * 400) : 100
+    // 获取账户信息
+    const accountRes = await paperApi.getAccount()
+    if (!accountRes.success || !accountRes.data) {
+      ElMessage.error('获取账户信息失败')
+      return
+    }
 
-    const analysisId = analysisResults.value.id || currentTaskId.value
+    const account = accountRes.data.account
+    const positions = accountRes.data.positions
 
-    router.push({
-      name: 'PaperTradingHome',
-      query: {
-        code,
-        side,
-        qty: String(qty),
-        analysis_id: analysisId ? String(analysisId) : undefined,
+    // 查找当前持仓
+    const currentPosition = positions.find(p => p.code === code)
+
+    // 获取当前实时价格
+    let currentPrice = 10 // 默认价格
+    try {
+      const quoteRes = await stocksApi.getQuote(code)
+      if (quoteRes.success && quoteRes.data && quoteRes.data.price) {
+        currentPrice = quoteRes.data.price
+      }
+    } catch (error) {
+      console.warn('获取实时价格失败，使用默认价格')
+    }
+
+    // 计算建议交易数量
+    let suggestedQuantity = 0
+    let maxQuantity = 0
+
+    if (recommendation.action === 'buy') {
+      // 买入：根据可用资金和当前价格计算
+      const availableCash = account.cash
+      maxQuantity = Math.floor(availableCash / currentPrice / 100) * 100 // 100股为单位
+      const suggested = Math.floor(maxQuantity * 0.2) // 建议使用20%资金
+      suggestedQuantity = Math.floor(suggested / 100) * 100 // 向下取整到100的倍数
+      suggestedQuantity = Math.max(100, suggestedQuantity) // 至少100股
+    } else {
+      // 卖出：根据当前持仓计算
+      if (!currentPosition || currentPosition.quantity === 0) {
+        ElMessage.warning('当前没有持仓，无法卖出')
+        return
+      }
+      maxQuantity = currentPosition.quantity
+      suggestedQuantity = Math.floor(maxQuantity / 100) * 100 // 向下取整到100的倍数
+      suggestedQuantity = Math.max(100, suggestedQuantity) // 至少100股
+    }
+
+    // 用户可修改的价格和数量（使用reactive）
+    const tradeForm = reactive({
+      price: currentPrice,
+      quantity: suggestedQuantity
+    })
+
+    // 显示可编辑的确认对话框
+    const actionText = recommendation.action === 'buy' ? '买入' : '卖出'
+    const actionColor = recommendation.action === 'buy' ? '#67C23A' : '#F56C6C'
+
+    // 创建一个响应式的消息组件
+    const MessageComponent = {
+      setup() {
+        // 计算预计金额
+        const estimatedAmount = computed(() => {
+          return (tradeForm.price * tradeForm.quantity).toFixed(2)
+        })
+
+        return () => h('div', { style: 'line-height: 2;' }, [
+          h('p', [
+            h('strong', '股票代码：'),
+            h('span', code)
+          ]),
+          h('p', [
+            h('strong', '操作类型：'),
+            h('span', { style: `color: ${actionColor}; font-weight: bold;` }, actionText)
+          ]),
+          h('p', [
+            h('strong', '当前价格：'),
+            h('span', `${currentPrice.toFixed(2)}元`)
+          ]),
+          h('div', { style: 'margin: 16px 0;' }, [
+            h('p', { style: 'margin-bottom: 8px;' }, [
+              h('strong', '交易价格：'),
+              h('span', { style: 'color: #909399; font-size: 12px; margin-left: 8px;' }, '(可修改)')
+            ]),
+            h(ElInputNumber, {
+              modelValue: tradeForm.price,
+              'onUpdate:modelValue': (val: number) => { tradeForm.price = val },
+              min: 0.01,
+              max: 9999,
+              precision: 2,
+              step: 0.01,
+              style: 'width: 200px;',
+              controls: true
+            })
+          ]),
+          h('div', { style: 'margin: 16px 0;' }, [
+            h('p', { style: 'margin-bottom: 8px;' }, [
+              h('strong', '交易数量：'),
+              h('span', { style: 'color: #909399; font-size: 12px; margin-left: 8px;' }, '(可修改，100股为单位)')
+            ]),
+            h(ElInputNumber, {
+              modelValue: tradeForm.quantity,
+              'onUpdate:modelValue': (val: number) => { tradeForm.quantity = val },
+              min: 100,
+              max: maxQuantity,
+              step: 100,
+              style: 'width: 200px;',
+              controls: true
+            })
+          ]),
+          h('p', [
+            h('strong', '预计金额：'),
+            h('span', { style: 'color: #409EFF; font-weight: bold;' }, `${estimatedAmount.value}元`)
+          ]),
+          h('p', [
+            h('strong', '置信度：'),
+            h('span', `${(recommendation.confidence * 100).toFixed(1)}%`)
+          ]),
+          h('p', [
+            h('strong', '风险等级：'),
+            h('span', recommendation.riskLevel)
+          ]),
+          recommendation.action === 'buy' ? h('p', { style: 'color: #909399; font-size: 12px; margin-top: 12px;' },
+            `可用资金：${account.cash.toFixed(2)}元，最大可买：${maxQuantity}股`
+          ) : null,
+          recommendation.action === 'sell' ? h('p', { style: 'color: #909399; font-size: 12px; margin-top: 12px;' },
+            `当前持仓：${maxQuantity}股`
+          ) : null
+        ])
+      }
+    }
+
+    await ElMessageBox({
+      title: '确认交易',
+      message: h(MessageComponent),
+      confirmButtonText: '确认下单',
+      cancelButtonText: '取消',
+      type: 'warning',
+      beforeClose: (action, instance, done) => {
+        if (action === 'confirm') {
+          // 验证输入
+          if (tradeForm.quantity < 100 || tradeForm.quantity % 100 !== 0) {
+            ElMessage.error('交易数量必须是100的整数倍')
+            return
+          }
+          if (tradeForm.quantity > maxQuantity) {
+            ElMessage.error(`交易数量不能超过${maxQuantity}股`)
+            return
+          }
+          if (tradeForm.price <= 0) {
+            ElMessage.error('交易价格必须大于0')
+            return
+          }
+
+          // 检查资金是否充足
+          if (recommendation.action === 'buy') {
+            const totalAmount = tradeForm.price * tradeForm.quantity
+            if (totalAmount > account.cash) {
+              ElMessage.error('可用资金不足')
+              return
+            }
+          }
+        }
+        done()
       }
     })
-  } catch (e) {
-    console.error('goSimOrder error:', e)
-    ElMessage.error('跳转模拟交易失败，请稍后重试')
+
+    // 执行交易
+    const analysisId = analysisResults.value.id || currentTaskId.value
+    const orderRes = await paperApi.placeOrder({
+      code: code,
+      side: recommendation.action,
+      quantity: tradeForm.quantity,
+      analysis_id: analysisId ? String(analysisId) : undefined
+    })
+
+    if (orderRes.success) {
+      ElMessage.success(`${actionText}订单已提交成功！`)
+      // 可选：跳转到模拟交易页面
+      setTimeout(() => {
+        router.push('/paper-trading')
+      }, 1500)
+    } else {
+      ElMessage.error(orderRes.message || '下单失败')
+    }
+
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('一键模拟下单失败:', error)
+      ElMessage.error(error.message || '操作失败')
+    }
   }
 }
 
@@ -1300,9 +1566,20 @@ const updateAnalysisSteps = (status: any) => {
 // 初始化模型设置
 const initializeModelSettings = async () => {
   try {
+    // 获取默认模型
     const defaultModels = await configApi.getDefaultModels()
     modelSettings.value.quickAnalysisModel = defaultModels.quick_analysis_model
     modelSettings.value.deepAnalysisModel = defaultModels.deep_analysis_model
+
+    // 获取所有可用的模型列表
+    const llmConfigs = await configApi.getLLMConfigs()
+    availableModels.value = llmConfigs.filter((config: any) => config.enabled)
+
+    console.log('✅ 加载模型配置成功:', {
+      quick: modelSettings.value.quickAnalysisModel,
+      deep: modelSettings.value.deepAnalysisModel,
+      available: availableModels.value.length
+    })
   } catch (error) {
     console.error('加载默认模型配置失败:', error)
     modelSettings.value.quickAnalysisModel = 'qwen-turbo'
@@ -2183,6 +2460,73 @@ onMounted(async () => {
   gap: 8px;
 }
 
+/* 风险提示样式 */
+.risk-disclaimer {
+  margin-bottom: 24px;
+  animation: fadeInDown 0.5s ease-out;
+}
+
+.risk-disclaimer :deep(.el-alert) {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
+  border: 2px solid #ffc107;
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 4px 12px rgba(255, 193, 7, 0.2);
+}
+
+.risk-disclaimer :deep(.el-alert__icon) {
+  font-size: 24px;
+  color: #ff6b00;
+}
+
+.disclaimer-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.disclaimer-icon {
+  font-size: 24px;
+  color: #ff6b00;
+  flex-shrink: 0;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.disclaimer-text {
+  color: #856404;
+  flex: 1;
+}
+
+.disclaimer-text strong {
+  color: #d63031;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .decision-section {
   margin-bottom: 32px;
 }
@@ -2479,6 +2823,22 @@ onMounted(async () => {
     border-radius: 0 8px 8px 0 !important;
     font-style: italic !important;
     color: #4b5563 !important;
+  }
+}
+
+/* 风险提示样式 */
+.risk-disclaimer {
+  margin-top: 24px;
+  border-radius: 8px;
+
+  :deep(.el-alert__content) {
+    width: 100%;
+  }
+
+  :deep(.el-alert__title) {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #e6a23c;
   }
 }
 </style>

@@ -12,6 +12,7 @@ export interface UsageRecord {
   input_tokens: number
   output_tokens: number
   cost: number
+  currency?: string
   session_id: string
   analysis_type: string
 }
@@ -21,6 +22,7 @@ export interface UsageStatistics {
   total_input_tokens: number
   total_output_tokens: number
   total_cost: number
+  cost_by_currency: Record<string, number>
   by_provider: Record<string, any>
   by_model: Record<string, any>
   by_date: Record<string, any>

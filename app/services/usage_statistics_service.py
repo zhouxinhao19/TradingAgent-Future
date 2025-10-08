@@ -18,17 +18,18 @@ class UsageStatisticsService:
     """使用统计服务"""
     
     def __init__(self):
-        self.collection_name = "usage_records"
+        # 使用 tradingagents 的集合名称
+        self.collection_name = "token_usage"
     
     async def add_usage_record(self, record: UsageRecord) -> bool:
         """添加使用记录"""
         try:
-            db = await get_mongo_db()
+            db = get_mongo_db()
             collection = db[self.collection_name]
-            
+
             record_dict = record.model_dump(exclude={"id"})
             result = await collection.insert_one(record_dict)
-            
+
             logger.info(f"✅ 添加使用记录成功: {record.provider}/{record.model_name}")
             return True
         except Exception as e:
@@ -45,7 +46,7 @@ class UsageStatisticsService:
     ) -> List[UsageRecord]:
         """获取使用记录"""
         try:
-            db = await get_mongo_db()
+            db = get_mongo_db()
             collection = db[self.collection_name]
             
             # 构建查询条件
@@ -83,7 +84,7 @@ class UsageStatisticsService:
     ) -> UsageStatistics:
         """获取使用统计"""
         try:
-            db = await get_mongo_db()
+            db = get_mongo_db()
             collection = db[self.collection_name]
             
             # 计算时间范围
@@ -111,46 +112,58 @@ class UsageStatisticsService:
             # 统计数据
             stats = UsageStatistics()
             stats.total_requests = len(records)
-            
+
+            # 按货币统计成本
+            cost_by_currency = defaultdict(float)
+
             by_provider = defaultdict(lambda: {
                 "requests": 0,
                 "input_tokens": 0,
                 "output_tokens": 0,
-                "cost": 0.0
+                "cost": 0.0,
+                "cost_by_currency": defaultdict(float)
             })
             by_model = defaultdict(lambda: {
                 "requests": 0,
                 "input_tokens": 0,
                 "output_tokens": 0,
-                "cost": 0.0
+                "cost": 0.0,
+                "cost_by_currency": defaultdict(float)
             })
             by_date = defaultdict(lambda: {
                 "requests": 0,
                 "input_tokens": 0,
                 "output_tokens": 0,
-                "cost": 0.0
+                "cost": 0.0,
+                "cost_by_currency": defaultdict(float)
             })
-            
+
             for record in records:
+                cost = record.get("cost", 0.0)
+                currency = record.get("currency", "CNY")
+
                 # 总计
                 stats.total_input_tokens += record.get("input_tokens", 0)
                 stats.total_output_tokens += record.get("output_tokens", 0)
-                stats.total_cost += record.get("cost", 0.0)
-                
+                stats.total_cost += cost  # 保留向后兼容
+                cost_by_currency[currency] += cost
+
                 # 按供应商统计
                 provider_key = record.get("provider", "unknown")
                 by_provider[provider_key]["requests"] += 1
                 by_provider[provider_key]["input_tokens"] += record.get("input_tokens", 0)
                 by_provider[provider_key]["output_tokens"] += record.get("output_tokens", 0)
-                by_provider[provider_key]["cost"] += record.get("cost", 0.0)
-                
+                by_provider[provider_key]["cost"] += cost
+                by_provider[provider_key]["cost_by_currency"][currency] += cost
+
                 # 按模型统计
                 model_key = f"{record.get('provider', 'unknown')}/{record.get('model_name', 'unknown')}"
                 by_model[model_key]["requests"] += 1
                 by_model[model_key]["input_tokens"] += record.get("input_tokens", 0)
                 by_model[model_key]["output_tokens"] += record.get("output_tokens", 0)
-                by_model[model_key]["cost"] += record.get("cost", 0.0)
-                
+                by_model[model_key]["cost"] += cost
+                by_model[model_key]["cost_by_currency"][currency] += cost
+
                 # 按日期统计
                 timestamp = record.get("timestamp", "")
                 if timestamp:
@@ -158,11 +171,14 @@ class UsageStatisticsService:
                     by_date[date_key]["requests"] += 1
                     by_date[date_key]["input_tokens"] += record.get("input_tokens", 0)
                     by_date[date_key]["output_tokens"] += record.get("output_tokens", 0)
-                    by_date[date_key]["cost"] += record.get("cost", 0.0)
-            
-            stats.by_provider = dict(by_provider)
-            stats.by_model = dict(by_model)
-            stats.by_date = dict(by_date)
+                    by_date[date_key]["cost"] += cost
+                    by_date[date_key]["cost_by_currency"][currency] += cost
+
+            # 转换 defaultdict 为普通 dict（包括嵌套的 cost_by_currency）
+            stats.cost_by_currency = dict(cost_by_currency)
+            stats.by_provider = {k: {**v, "cost_by_currency": dict(v["cost_by_currency"])} for k, v in by_provider.items()}
+            stats.by_model = {k: {**v, "cost_by_currency": dict(v["cost_by_currency"])} for k, v in by_model.items()}
+            stats.by_date = {k: {**v, "cost_by_currency": dict(v["cost_by_currency"])} for k, v in by_date.items()}
             
             logger.info(f"✅ 获取使用统计成功: {stats.total_requests} 条记录")
             return stats
@@ -197,7 +213,7 @@ class UsageStatisticsService:
     async def delete_old_records(self, days: int = 90) -> int:
         """删除旧记录"""
         try:
-            db = await get_mongo_db()
+            db = get_mongo_db()
             collection = db[self.collection_name]
             
             # 计算截止日期

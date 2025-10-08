@@ -39,8 +39,8 @@ async def get_current_user(authorization: Optional[str] = Header(default=None)) 
     import logging
     logger = logging.getLogger(__name__)
 
-    logger.info(f"🔐 认证检查开始")
-    logger.info(f"📋 Authorization header: {authorization[:50] if authorization else 'None'}...")
+    logger.debug(f"🔐 认证检查开始")
+    logger.debug(f"📋 Authorization header: {authorization[:50] if authorization else 'None'}...")
 
     if not authorization:
         logger.warning("❌ 没有Authorization header")
@@ -51,17 +51,17 @@ async def get_current_user(authorization: Optional[str] = Header(default=None)) 
         raise HTTPException(status_code=401, detail="Invalid authorization format")
 
     token = authorization.split(" ", 1)[1]
-    logger.info(f"🎫 提取的token长度: {len(token)}")
-    logger.info(f"🎫 Token前20位: {token[:20]}...")
+    logger.debug(f"🎫 提取的token长度: {len(token)}")
+    logger.debug(f"🎫 Token前20位: {token[:20]}...")
 
     token_data = AuthService.verify_token(token)
-    logger.info(f"🔍 Token验证结果: {token_data is not None}")
+    logger.debug(f"🔍 Token验证结果: {token_data is not None}")
 
     if not token_data:
         logger.warning("❌ Token验证失败")
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    logger.info(f"✅ 认证成功，用户: {token_data.sub}")
+    logger.debug(f"✅ 认证成功，用户: {token_data.sub}")
 
     # 开源版只有admin用户
     return {
@@ -187,8 +187,8 @@ async def refresh_token(payload: RefreshTokenRequest):
     logger = logging.getLogger(__name__)
 
     try:
-        logger.info(f"🔄 收到refresh token请求")
-        logger.info(f"📝 Refresh token长度: {len(payload.refresh_token) if payload.refresh_token else 0}")
+        logger.debug(f"🔄 收到refresh token请求")
+        logger.debug(f"📝 Refresh token长度: {len(payload.refresh_token) if payload.refresh_token else 0}")
 
         if not payload.refresh_token:
             logger.warning("❌ Refresh token为空")
@@ -196,19 +196,19 @@ async def refresh_token(payload: RefreshTokenRequest):
 
         # 验证refresh token
         token_data = AuthService.verify_token(payload.refresh_token)
-        logger.info(f"🔍 Token验证结果: {token_data is not None}")
+        logger.debug(f"🔍 Token验证结果: {token_data is not None}")
 
         if not token_data:
             logger.warning("❌ Refresh token验证失败")
             raise HTTPException(status_code=401, detail="Invalid refresh token")
 
-        logger.info(f"✅ Token验证成功，用户: {token_data.sub}")
+        logger.debug(f"✅ Token验证成功，用户: {token_data.sub}")
 
         # 生成新的tokens
         new_token = AuthService.create_access_token(sub=token_data.sub)
         new_refresh_token = AuthService.create_access_token(sub=token_data.sub, expires_delta=60*60*24*7)
 
-        logger.info(f"🎉 新token生成成功")
+        logger.debug(f"🎉 新token生成成功")
 
         return {
             "success": True,
@@ -371,20 +371,20 @@ async def debug_token(payload: dict):
 
     try:
         refresh_token = payload.get("refresh_token", "")
-        logger.info(f"🔍 调试token信息:")
-        logger.info(f"  - Token长度: {len(refresh_token)}")
-        logger.info(f"  - Token前10位: {refresh_token[:10] if refresh_token else 'None'}")
+        logger.debug(f"🔍 调试token信息:")
+        logger.debug(f"  - Token长度: {len(refresh_token)}")
+        logger.debug(f"  - Token前10位: {refresh_token[:10] if refresh_token else 'None'}")
 
         if refresh_token:
             token_data = AuthService.verify_token(refresh_token)
-            logger.info(f"  - 验证结果: {token_data is not None}")
+            logger.debug(f"  - 验证结果: {token_data is not None}")
             if token_data:
-                logger.info(f"  - 用户: {token_data.sub}")
-                logger.info(f"  - 过期时间: {token_data.exp}")
+                logger.debug(f"  - 用户: {token_data.sub}")
+                logger.debug(f"  - 过期时间: {token_data.exp}")
                 import time
                 current_time = int(time.time())
-                logger.info(f"  - 当前时间: {current_time}")
-                logger.info(f"  - 是否过期: {token_data.exp < current_time}")
+                logger.debug(f"  - 当前时间: {current_time}")
+                logger.debug(f"  - 是否过期: {token_data.exp < current_time}")
 
         return {
             "success": True,

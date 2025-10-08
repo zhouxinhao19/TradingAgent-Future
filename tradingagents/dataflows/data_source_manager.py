@@ -780,7 +780,9 @@ class DataSourceManager:
                 # 获取股票基本信息
                 provider = self._get_tushare_adapter()
                 if provider:
-                    stock_info = provider.get_stock_basic_info(symbol)
+                    import asyncio
+                    loop = asyncio.get_event_loop()
+                    stock_info = loop.run_until_complete(provider.get_stock_basic_info(symbol))
                     stock_name = stock_info.get('name', f'股票{symbol}') if stock_info else f'股票{symbol}'
                 else:
                     stock_name = f'股票{symbol}'
@@ -796,14 +798,17 @@ class DataSourceManager:
             if not provider:
                 return f"❌ Tushare提供器不可用"
 
-            data = provider.get_daily_data(symbol, start_date, end_date)
+            # 使用异步方法获取历史数据
+            import asyncio
+            loop = asyncio.get_event_loop()
+            data = loop.run_until_complete(provider.get_historical_data(symbol, start_date, end_date))
 
             if data is not None and not data.empty:
                 # 保存到缓存
                 self._save_to_cache(symbol, data, start_date, end_date)
 
-                # 获取股票基本信息
-                stock_info = provider.get_stock_basic_info(symbol)
+                # 获取股票基本信息（异步）
+                stock_info = loop.run_until_complete(provider.get_stock_basic_info(symbol))
                 stock_name = stock_info.get('name', f'股票{symbol}') if stock_info else f'股票{symbol}'
 
                 # 格式化返回
@@ -835,10 +840,14 @@ class DataSourceManager:
 
         start_time = time.time()
         try:
-            # 这里需要实现AKShare的统一接口
+            # 使用AKShare的统一接口
             from .providers.china.akshare import get_akshare_provider
             provider = get_akshare_provider()
-            data = provider.get_stock_data(symbol, start_date, end_date)
+
+            # 使用异步方法获取历史数据
+            import asyncio
+            loop = asyncio.get_event_loop()
+            data = loop.run_until_complete(provider.get_historical_data(symbol, start_date, end_date, period))
 
             duration = time.time() - start_time
 
@@ -887,10 +896,14 @@ class DataSourceManager:
 
     def _get_baostock_data(self, symbol: str, start_date: str, end_date: str, period: str = "daily") -> str:
         """使用BaoStock获取多周期数据"""
-        # 这里需要实现BaoStock的统一接口
+        # 使用BaoStock的统一接口
         from .providers.china.baostock import get_baostock_provider
         provider = get_baostock_provider()
-        data = provider.get_stock_data(symbol, start_date, end_date)
+
+        # 使用异步方法获取历史数据
+        import asyncio
+        loop = asyncio.get_event_loop()
+        data = loop.run_until_complete(provider.get_historical_data(symbol, start_date, end_date, period))
 
         if data is not None and not data.empty:
             result = f"股票代码: {symbol}\n"

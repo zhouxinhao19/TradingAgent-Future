@@ -163,3 +163,67 @@ export function formatTime(dateStr: string | number | null | undefined): string 
   })
 }
 
+/**
+ * 格式化相对时间（距离现在多久）
+ * @param dateStr - 时间字符串或时间戳
+ * @returns 相对时间描述
+ */
+export function formatRelativeTime(dateStr: string | number | null | undefined): string {
+  if (!dateStr) return '-'
+
+  try {
+    let timeStr: string
+
+    // 处理时间戳
+    if (typeof dateStr === 'number') {
+      const timestamp = dateStr < 10000000000 ? dateStr * 1000 : dateStr
+      timeStr = new Date(timestamp).toISOString()
+    } else {
+      timeStr = String(dateStr).trim()
+    }
+
+    // 如果时间字符串没有时区标识，假定为UTC时间，添加Z后缀
+    if (timeStr.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/) && !timeStr.endsWith('Z') && !timeStr.includes('+')) {
+      timeStr += 'Z'
+    }
+
+    const targetDate = new Date(timeStr)
+
+    if (isNaN(targetDate.getTime())) {
+      console.warn('无效的时间格式:', dateStr)
+      return String(dateStr)
+    }
+
+    // 获取当前时间
+    const now = new Date()
+
+    // 计算时间差（毫秒）
+    const diff = targetDate.getTime() - now.getTime()
+    const absDiff = Math.abs(diff)
+
+    // 转换为各种时间单位
+    const seconds = Math.floor(absDiff / 1000)
+    const minutes = Math.floor(seconds / 60)
+    const hours = Math.floor(minutes / 60)
+    const days = Math.floor(hours / 24)
+
+    // 判断是过去还是将来
+    const isPast = diff < 0
+
+    // 格式化相对时间
+    if (days > 0) {
+      return isPast ? `${days}天前` : `${days}天后`
+    } else if (hours > 0) {
+      return isPast ? `${hours}小时前` : `${hours}小时后`
+    } else if (minutes > 0) {
+      return isPast ? `${minutes}分钟前` : `${minutes}分钟后`
+    } else if (seconds > 10) {
+      return isPast ? `${seconds}秒前` : `${seconds}秒后`
+    } else {
+      return isPast ? '刚刚' : '即将执行'
+    }
+  } catch (e) {
+    console.error('相对时间格式化错误:', e, dateStr)
+    return String(dateStr)
+  }
+}

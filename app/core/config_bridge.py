@@ -4,7 +4,9 @@
 """
 
 import os
+import json
 import logging
+from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger("app.config_bridge")
@@ -29,6 +31,26 @@ def bridge_config_to_env():
 
         logger.info("🔧 开始桥接配置到环境变量...")
         bridged_count = 0
+
+        # 强制启用 MongoDB 存储（用于 Token 使用统计）
+        # 从 .env 文件读取配置，如果未设置则默认启用
+        use_mongodb_storage = os.getenv("USE_MONGODB_STORAGE", "true")
+        os.environ["USE_MONGODB_STORAGE"] = use_mongodb_storage
+        logger.info(f"  ✓ 桥接 USE_MONGODB_STORAGE: {use_mongodb_storage}")
+        bridged_count += 1
+
+        # 桥接 MongoDB 连接字符串
+        mongodb_conn_str = os.getenv("MONGODB_CONNECTION_STRING")
+        if mongodb_conn_str:
+            os.environ["MONGODB_CONNECTION_STRING"] = mongodb_conn_str
+            logger.info(f"  ✓ 桥接 MONGODB_CONNECTION_STRING (长度: {len(mongodb_conn_str)})")
+            bridged_count += 1
+
+        # 桥接 MongoDB 数据库名称
+        mongodb_db_name = os.getenv("MONGODB_DATABASE_NAME", "tradingagents")
+        os.environ["MONGODB_DATABASE_NAME"] = mongodb_db_name
+        logger.info(f"  ✓ 桥接 MONGODB_DATABASE_NAME: {mongodb_db_name}")
+        bridged_count += 1
 
         # 1. 桥接大模型配置（基础 API 密钥）
         llm_configs = unified_config.get_llm_configs()
@@ -79,6 +101,60 @@ def bridge_config_to_env():
 
         # 5. 桥接系统运行时配置
         bridged_count += _bridge_system_settings()
+
+        # 6. 重新初始化 tradingagents 库的 MongoDB 存储
+        # 因为全局 config_manager 实例是在模块导入时创建的，那时环境变量还没有被桥接
+        try:
+            from tradingagents.config.config_manager import config_manager
+            from tradingagents.config.mongodb_storage import MongoDBStorage
+            logger.info("🔄 重新初始化 tradingagents MongoDB 存储...")
+
+            # 调试：检查环境变量
+            use_mongodb = os.getenv("USE_MONGODB_STORAGE", "false")
+            mongodb_conn = os.getenv("MONGODB_CONNECTION_STRING", "未设置")
+            mongodb_db = os.getenv("MONGODB_DATABASE_NAME", "tradingagents")
+            logger.info(f"  📋 USE_MONGODB_STORAGE: {use_mongodb}")
+            logger.info(f"  📋 MONGODB_CONNECTION_STRING: {mongodb_conn[:30]}..." if len(mongodb_conn) > 30 else f"  📋 MONGODB_CONNECTION_STRING: {mongodb_conn}")
+            logger.info(f"  📋 MONGODB_DATABASE_NAME: {mongodb_db}")
+
+            # 直接创建 MongoDBStorage 实例，而不是调用 _init_mongodb_storage()
+            # 这样可以捕获更详细的错误信息
+            if use_mongodb.lower() == "true":
+                try:
+                    config_manager.mongodb_storage = MongoDBStorage(
+                        connection_string=mongodb_conn,
+                        database_name=mongodb_db
+                    )
+                    if config_manager.mongodb_storage.is_connected():
+                        logger.info("✅ tradingagents MongoDB 存储已启用")
+                    else:
+                        logger.warning("⚠️ tradingagents MongoDB 连接失败，将使用 JSON 文件存储")
+                        config_manager.mongodb_storage = None
+                except Exception as e:
+                    logger.error(f"❌ 创建 MongoDBStorage 实例失败: {e}")
+                    import traceback
+                    logger.error(traceback.format_exc())
+                    config_manager.mongodb_storage = None
+            else:
+                logger.info("ℹ️ USE_MONGODB_STORAGE 未启用，将使用 JSON 文件存储")
+        except Exception as e:
+            logger.error(f"❌ 重新初始化 tradingagents MongoDB 存储失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+
+        # 7. 同步定价配置到 tradingagents 的 config/pricing.json
+        # 注意：这里需要从数据库读取配置，因为文件中的配置没有定价信息
+        # 使用异步方式同步定价配置
+        import asyncio
+        try:
+            loop = asyncio.get_running_loop()
+            # 在异步上下文中，创建后台任务
+            task = loop.create_task(_sync_pricing_config_from_db())
+            task.add_done_callback(_handle_sync_task_result)
+            logger.info("🔄 定价配置同步任务已创建（后台执行）")
+        except RuntimeError:
+            # 不在异步上下文中，使用 asyncio.run
+            asyncio.run(_sync_pricing_config_from_db())
 
         logger.info(f"✅ 配置桥接完成，共桥接 {bridged_count} 项配置")
         return True
@@ -157,29 +233,40 @@ def _bridge_system_settings() -> int:
         int: 桥接的配置项数量
     """
     try:
-        from app.core.database import get_mongo_db
+        # 使用同步的 MongoDB 客户端
+        from pymongo import MongoClient
+        from app.core.config import settings
 
-        # 直接从数据库读取系统设置（同步方式）
+        # 创建同步客户端
+        client = MongoClient(
+            settings.MONGO_URI,
+            serverSelectionTimeoutMS=5000,
+            connectTimeoutMS=5000
+        )
+
         try:
-            import asyncio
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            db = client[settings.MONGO_DB]
+            # 从 system_configs 集合中读取激活的配置
+            config_doc = db.system_configs.find_one({"is_active": True})
 
-            async def get_settings():
-                db = get_mongo_db()
-                settings_doc = await db.system_settings.find_one({})
-                return settings_doc if settings_doc else {}
+            if not config_doc or 'system_settings' not in config_doc:
+                logger.debug("  ⚠️  系统设置为空，跳过桥接")
+                return 0
 
-            system_settings = loop.run_until_complete(get_settings())
-            loop.close()
+            system_settings = config_doc['system_settings']
         except Exception as e:
             logger.debug(f"  ⚠️  无法从数据库获取系统设置: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
             return 0
+        finally:
+            client.close()
 
         if not system_settings:
             logger.debug("  ⚠️  系统设置为空，跳过桥接")
             return 0
 
+        logger.debug(f"  📋 获取到 {len(system_settings)} 个系统设置")
         bridged_count = 0
 
         # TradingAgents 运行时配置
@@ -192,12 +279,37 @@ def _bridge_system_settings() -> int:
             'ta_use_app_cache': 'TA_USE_APP_CACHE',
         }
 
+        # Token 使用统计配置
+        token_tracking_settings = {
+            'enable_cost_tracking': 'ENABLE_COST_TRACKING',
+            'auto_save_usage': 'AUTO_SAVE_USAGE',
+        }
+
         for setting_key, env_key in ta_settings.items():
+            # 检查 .env 文件中是否已经设置了该环境变量
+            env_value = os.getenv(env_key)
+            if env_value is not None:
+                # .env 文件中已设置，优先使用 .env 的值
+                logger.info(f"  ✓ 使用 .env 文件中的 {env_key}: {env_value}")
+                bridged_count += 1
+            elif setting_key in system_settings:
+                # .env 文件中未设置，使用数据库中的值
+                value = system_settings[setting_key]
+                os.environ[env_key] = str(value).lower() if isinstance(value, bool) else str(value)
+                logger.info(f"  ✓ 桥接 {env_key}: {value}")
+                bridged_count += 1
+            else:
+                logger.debug(f"  ⚠️  配置键 {setting_key} 不存在于系统设置中")
+
+        # 桥接 Token 使用统计配置
+        for setting_key, env_key in token_tracking_settings.items():
             if setting_key in system_settings:
                 value = system_settings[setting_key]
                 os.environ[env_key] = str(value).lower() if isinstance(value, bool) else str(value)
-                logger.debug(f"  ✓ 桥接 {env_key}: {value}")
+                logger.info(f"  ✓ 桥接 {env_key}: {value}")
                 bridged_count += 1
+            else:
+                logger.debug(f"  ⚠️  配置键 {setting_key} 不存在于系统设置中")
 
         # 时区配置
         if 'app_timezone' in system_settings:
@@ -213,6 +325,37 @@ def _bridge_system_settings() -> int:
 
         if bridged_count > 0:
             logger.info(f"  ✓ 桥接系统运行时配置: {bridged_count} 项")
+
+        # 同步到文件系统（供 unified_config 使用）
+        try:
+            print(f"🔄 [config_bridge] 准备同步系统设置到文件系统")
+            print(f"🔄 [config_bridge] system_settings 包含 {len(system_settings)} 项")
+
+            # 检查关键字段
+            if "quick_analysis_model" in system_settings:
+                print(f"  ✓ [config_bridge] 包含 quick_analysis_model: {system_settings['quick_analysis_model']}")
+            else:
+                print(f"  ⚠️  [config_bridge] 不包含 quick_analysis_model")
+
+            if "deep_analysis_model" in system_settings:
+                print(f"  ✓ [config_bridge] 包含 deep_analysis_model: {system_settings['deep_analysis_model']}")
+            else:
+                print(f"  ⚠️  [config_bridge] 不包含 deep_analysis_model")
+
+            from app.core.unified_config import unified_config
+            result = unified_config.save_system_settings(system_settings)
+
+            if result:
+                logger.info(f"  ✓ 系统设置已同步到文件系统")
+                print(f"✅ [config_bridge] 系统设置同步成功")
+            else:
+                logger.warning(f"  ⚠️  系统设置同步返回 False")
+                print(f"⚠️  [config_bridge] 系统设置同步返回 False")
+        except Exception as e:
+            logger.warning(f"  ⚠️  同步系统设置到文件系统失败: {e}")
+            print(f"❌ [config_bridge] 同步系统设置到文件系统失败: {e}")
+            import traceback
+            print(traceback.format_exc())
 
         return bridged_count
 
@@ -310,12 +453,148 @@ def clear_bridged_config():
 def reload_bridged_config():
     """
     重新加载桥接的配置
-    
+
     用于配置更新后重新桥接
     """
     logger.info("🔄 重新加载配置桥接...")
     clear_bridged_config()
     return bridge_config_to_env()
+
+
+def _sync_pricing_config(llm_configs):
+    """
+    同步定价配置到 tradingagents 的 config/pricing.json
+
+    Args:
+        llm_configs: LLM 配置列表
+    """
+    try:
+        # 获取项目根目录的 config 目录
+        project_root = Path(__file__).parent.parent.parent
+        config_dir = project_root / "config"
+        config_dir.mkdir(exist_ok=True)
+
+        pricing_file = config_dir / "pricing.json"
+
+        # 构建定价配置列表
+        pricing_configs = []
+        for llm_config in llm_configs:
+            if llm_config.enabled:
+                pricing_config = {
+                    "provider": llm_config.provider.value,
+                    "model_name": llm_config.model_name,
+                    "input_price_per_1k": llm_config.input_price_per_1k or 0.0,
+                    "output_price_per_1k": llm_config.output_price_per_1k or 0.0,
+                    "currency": llm_config.currency or "CNY"
+                }
+                pricing_configs.append(pricing_config)
+
+        # 保存到文件
+        with open(pricing_file, 'w', encoding='utf-8') as f:
+            json.dump(pricing_configs, f, ensure_ascii=False, indent=2)
+
+        logger.info(f"  ✓ 同步定价配置到 {pricing_file}: {len(pricing_configs)} 个模型")
+
+    except Exception as e:
+        logger.warning(f"  ⚠️  同步定价配置失败: {e}")
+
+
+def sync_pricing_config_now():
+    """
+    立即同步定价配置（用于配置更新后实时同步）
+
+    注意：这个函数会在后台异步执行同步操作
+    """
+    import asyncio
+
+    try:
+        # 如果在异步上下文中，创建后台任务
+        try:
+            loop = asyncio.get_running_loop()
+            # 在异步上下文中，创建一个后台任务（不等待完成）
+            task = loop.create_task(_sync_pricing_config_from_db())
+            # 添加回调来记录错误
+            task.add_done_callback(_handle_sync_task_result)
+            logger.info("🔄 定价配置同步任务已创建（后台执行）")
+            return True
+        except RuntimeError:
+            # 不在异步上下文中，使用 asyncio.run
+            asyncio.run(_sync_pricing_config_from_db())
+            return True
+    except Exception as e:
+        logger.error(f"❌ 立即同步定价配置失败: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return False
+
+
+def _handle_sync_task_result(task):
+    """处理同步任务的结果"""
+    try:
+        task.result()
+    except Exception as e:
+        logger.error(f"❌ 定价配置同步任务执行失败: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+
+
+async def _sync_pricing_config_from_db():
+    """
+    从数据库同步定价配置（异步版本）
+    """
+    try:
+        from app.core.database import get_mongo_db
+        from app.models.config import LLMConfig
+
+        db = get_mongo_db()
+
+        # 获取最新的激活配置
+        config = await db['system_configs'].find_one(
+            {'is_active': True},
+            sort=[('version', -1)]
+        )
+
+        if not config:
+            logger.warning("⚠️  未找到激活的配置")
+            return
+
+        # 获取项目根目录的 config 目录
+        project_root = Path(__file__).parent.parent.parent
+        config_dir = project_root / "config"
+        config_dir.mkdir(exist_ok=True)
+
+        pricing_file = config_dir / "pricing.json"
+
+        # 构建定价配置列表
+        pricing_configs = []
+        for llm_config in config.get('llm_configs', []):
+            if llm_config.get('enabled', False):
+                # 从数据库读取的是字典，直接使用字符串 provider
+                provider = llm_config.get('provider')
+
+                # 如果 provider 是枚举类型，转换为字符串
+                if hasattr(provider, 'value'):
+                    provider = provider.value
+
+                pricing_config = {
+                    "provider": provider,
+                    "model_name": llm_config.get('model_name'),
+                    "input_price_per_1k": llm_config.get('input_price_per_1k') or 0.0,
+                    "output_price_per_1k": llm_config.get('output_price_per_1k') or 0.0,
+                    "currency": llm_config.get('currency') or "CNY"
+                }
+                pricing_configs.append(pricing_config)
+
+        # 保存到文件
+        with open(pricing_file, 'w', encoding='utf-8') as f:
+            json.dump(pricing_configs, f, ensure_ascii=False, indent=2)
+
+        logger.info(f"✅ 同步定价配置到 {pricing_file}: {len(pricing_configs)} 个模型")
+
+    except Exception as e:
+        logger.error(f"❌ 从数据库同步定价配置失败: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
 
 
 # 导出函数
@@ -325,5 +604,6 @@ __all__ = [
     'get_bridged_model',
     'clear_bridged_config',
     'reload_bridged_config',
+    'sync_pricing_config_now',
 ]
 

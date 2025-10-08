@@ -89,14 +89,117 @@ class UnifiedNewsAnalyzer:
         # 默认按A股处理
         else:
             return "A股"
-    
+
+    def _get_news_from_database(self, stock_code: str, max_news: int = 10) -> str:
+        """
+        从数据库获取新闻
+
+        Args:
+            stock_code: 股票代码
+            max_news: 最大新闻数量
+
+        Returns:
+            str: 格式化的新闻内容，如果没有新闻则返回空字符串
+        """
+        try:
+            from tradingagents.dataflows.cache.app_adapter import get_mongodb_client
+            from datetime import timedelta
+
+            client = get_mongodb_client()
+            if not client:
+                logger.warning(f"[统一新闻工具] 无法连接到MongoDB")
+                return ""
+
+            db = client.get_database('tradingagents')
+            collection = db.stock_news
+
+            # 标准化股票代码（去除后缀）
+            clean_code = stock_code.replace('.SH', '').replace('.SZ', '').replace('.SS', '')\
+                                   .replace('.XSHE', '').replace('.XSHG', '').replace('.HK', '')
+
+            # 查询最近30天的新闻（扩大时间范围）
+            thirty_days_ago = datetime.now() - timedelta(days=30)
+
+            # 尝试多种查询方式（使用 symbol 字段）
+            query_list = [
+                {'symbol': clean_code, 'publish_time': {'$gte': thirty_days_ago}},
+                {'symbol': stock_code, 'publish_time': {'$gte': thirty_days_ago}},
+                {'symbols': clean_code, 'publish_time': {'$gte': thirty_days_ago}},
+                # 如果最近30天没有新闻，则查询所有新闻（不限时间）
+                {'symbol': clean_code},
+                {'symbols': clean_code},
+            ]
+
+            news_items = []
+            for query in query_list:
+                cursor = collection.find(query).sort('publish_time', -1).limit(max_news)
+                news_items = list(cursor)
+                if news_items:
+                    logger.info(f"[统一新闻工具] 📊 使用查询 {query} 找到 {len(news_items)} 条新闻")
+                    break
+
+            if not news_items:
+                logger.info(f"[统一新闻工具] 数据库中没有找到 {stock_code} 的新闻")
+                return ""
+
+            # 格式化新闻
+            report = f"# {stock_code} 最新新闻 (数据库缓存)\n\n"
+            report += f"📅 查询时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            report += f"📊 新闻数量: {len(news_items)} 条\n\n"
+
+            for i, news in enumerate(news_items, 1):
+                title = news.get('title', '无标题')
+                content = news.get('content', '') or news.get('summary', '')
+                source = news.get('source', '未知来源')
+                publish_time = news.get('publish_time', datetime.now())
+                sentiment = news.get('sentiment', 'neutral')
+
+                # 情绪图标
+                sentiment_icon = {
+                    'positive': '📈',
+                    'negative': '📉',
+                    'neutral': '➖'
+                }.get(sentiment, '➖')
+
+                report += f"## {i}. {sentiment_icon} {title}\n\n"
+                report += f"**来源**: {source} | **时间**: {publish_time.strftime('%Y-%m-%d %H:%M') if isinstance(publish_time, datetime) else publish_time}\n"
+                report += f"**情绪**: {sentiment}\n\n"
+
+                if content:
+                    # 限制内容长度
+                    content_preview = content[:500] + '...' if len(content) > 500 else content
+                    report += f"{content_preview}\n\n"
+
+                report += "---\n\n"
+
+            logger.info(f"[统一新闻工具] ✅ 成功从数据库获取并格式化 {len(news_items)} 条新闻")
+            return report
+
+        except Exception as e:
+            logger.error(f"[统一新闻工具] 从数据库获取新闻失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return ""
+
     def _get_a_share_news(self, stock_code: str, max_news: int, model_info: str = "") -> str:
         """获取A股新闻"""
         logger.info(f"[统一新闻工具] 获取A股 {stock_code} 新闻")
-        
+
         # 获取当前日期
         curr_date = datetime.now().strftime("%Y-%m-%d")
-        
+
+        # 优先级0: 从数据库获取新闻（最高优先级）
+        try:
+            logger.info(f"[统一新闻工具] 🔍 优先从数据库获取 {stock_code} 的新闻...")
+            db_news = self._get_news_from_database(stock_code, max_news)
+            if db_news:
+                logger.info(f"[统一新闻工具] ✅ 数据库新闻获取成功: {len(db_news)} 字符")
+                return self._format_news_result(db_news, "数据库缓存", model_info)
+            else:
+                logger.info(f"[统一新闻工具] ⚠️ 数据库中没有 {stock_code} 的新闻，尝试其他数据源...")
+        except Exception as e:
+            logger.warning(f"[统一新闻工具] 数据库新闻获取失败: {e}")
+
         # 优先级1: 东方财富实时新闻
         try:
             if hasattr(self.toolkit, 'get_realtime_stock_news'):
