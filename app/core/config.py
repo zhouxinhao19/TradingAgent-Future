@@ -218,6 +218,12 @@ class Settings(BaseSettings):
         """获取日志目录"""
         return os.path.dirname(self.LOG_FILE)
 
+    # ===== 新闻数据同步服务配置 =====
+    NEWS_SYNC_ENABLED: bool = Field(default=True)
+    NEWS_SYNC_CRON: str = Field(default="0 */2 * * *")  # 每2小时
+    NEWS_SYNC_HOURS_BACK: int = Field(default=24)
+    NEWS_SYNC_MAX_PER_SOURCE: int = Field(default=50)
+
     @property
     def is_production(self) -> bool:
         """是否为生产环境"""

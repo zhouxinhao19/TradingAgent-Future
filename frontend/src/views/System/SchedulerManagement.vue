@@ -1,0 +1,584 @@
+<template>
+  <div class="scheduler-management">
+    <!-- 页面标题和统计信息 -->
+    <el-card class="header-card" shadow="never">
+      <div class="header-content">
+        <div class="title-section">
+          <h2>
+            <el-icon><Timer /></el-icon>
+            定时任务管理
+          </h2>
+          <p class="subtitle">管理系统中的所有定时任务，支持暂停、恢复和手动触发</p>
+        </div>
+        
+        <div class="stats-section" v-if="stats">
+          <el-statistic title="总任务数" :value="stats.total_jobs">
+            <template #prefix>
+              <el-icon><List /></el-icon>
+            </template>
+          </el-statistic>
+          <el-statistic title="运行中" :value="stats.running_jobs">
+            <template #prefix>
+              <el-icon color="#67C23A"><VideoPlay /></el-icon>
+            </template>
+          </el-statistic>
+          <el-statistic title="已暂停" :value="stats.paused_jobs">
+            <template #prefix>
+              <el-icon color="#E6A23C"><VideoPause /></el-icon>
+            </template>
+          </el-statistic>
+        </div>
+      </div>
+      
+      <div class="actions">
+        <el-button @click="loadJobs" :loading="loading" :icon="Refresh">刷新</el-button>
+        <el-button @click="showHistoryDialog" :icon="Document">执行历史</el-button>
+      </div>
+    </el-card>
+
+    <!-- 任务列表 -->
+    <el-card class="table-card" shadow="never">
+      <el-table
+        :data="filteredJobs"
+        v-loading="loading"
+        stripe
+        style="width: 100%"
+        :default-sort="{ prop: 'name', order: 'ascending' }"
+      >
+        <el-table-column prop="name" label="任务名称" min-width="200" sortable>
+          <template #default="{ row }">
+            <div class="job-name">
+              <el-tag :type="row.paused ? 'warning' : 'success'" size="small">
+                {{ row.paused ? '已暂停' : '运行中' }}
+              </el-tag>
+              <span class="name-text">{{ row.name }}</span>
+            </div>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="display_name" label="触发器名称" min-width="150">
+          <template #default="{ row }">
+            <el-text v-if="row.display_name" size="small">{{ row.display_name }}</el-text>
+            <el-text v-else type="info" size="small">-</el-text>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="trigger" label="触发器" min-width="180">
+          <template #default="{ row }">
+            <el-text size="small" type="info">{{ formatTrigger(row.trigger) }}</el-text>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="description" label="备注" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">
+            <el-text v-if="row.description" size="small">{{ row.description }}</el-text>
+            <el-text v-else type="info" size="small">-</el-text>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="next_run_time" label="下次执行时间" min-width="180" sortable>
+          <template #default="{ row }">
+            <div v-if="row.next_run_time">
+              <el-text size="small">{{ formatDateTime(row.next_run_time) }}</el-text>
+              <br />
+              <el-text size="small" type="info">{{ formatRelativeTime(row.next_run_time) }}</el-text>
+            </div>
+            <el-text v-else type="warning" size="small">已暂停</el-text>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="操作" width="340" fixed="right">
+          <template #default="{ row }">
+            <el-button-group>
+              <el-button
+                size="small"
+                :icon="Edit"
+                @click="showEditDialog(row)"
+              >
+                编辑
+              </el-button>
+              <el-button
+                v-if="!row.paused"
+                size="small"
+                type="warning"
+                :icon="VideoPause"
+                @click="handlePause(row)"
+                :loading="actionLoading[row.id]"
+              >
+                暂停
+              </el-button>
+              <el-button
+                v-else
+                size="small"
+                type="success"
+                :icon="VideoPlay"
+                @click="handleResume(row)"
+                :loading="actionLoading[row.id]"
+              >
+                恢复
+              </el-button>
+              <el-button
+                size="small"
+                type="primary"
+                :icon="Promotion"
+                @click="handleTrigger(row)"
+                :loading="actionLoading[row.id]"
+              >
+                立即执行
+              </el-button>
+              <el-button
+                size="small"
+                :icon="View"
+                @click="showJobDetail(row)"
+              >
+                详情
+              </el-button>
+            </el-button-group>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <!-- 编辑任务元数据对话框 -->
+    <el-dialog
+      v-model="editDialogVisible"
+      title="编辑任务信息"
+      width="600px"
+      :close-on-click-modal="false"
+    >
+      <el-form v-if="editingJob" :model="editForm" label-width="120px">
+        <el-form-item label="任务ID">
+          <el-text>{{ editingJob.id }}</el-text>
+        </el-form-item>
+        <el-form-item label="任务名称">
+          <el-text>{{ editingJob.name }}</el-text>
+        </el-form-item>
+        <el-form-item label="触发器名称">
+          <el-input
+            v-model="editForm.display_name"
+            placeholder="请输入触发器名称（可选）"
+            clearable
+            maxlength="50"
+            show-word-limit
+          />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input
+            v-model="editForm.description"
+            type="textarea"
+            :rows="4"
+            placeholder="请输入备注信息（可选）"
+            clearable
+            maxlength="200"
+            show-word-limit
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="editDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSaveMetadata" :loading="saveLoading">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 任务详情对话框 -->
+    <el-dialog
+      v-model="detailDialogVisible"
+      title="任务详情"
+      width="700px"
+      :close-on-click-modal="false"
+    >
+      <el-descriptions v-if="currentJob" :column="1" border>
+        <el-descriptions-item label="任务ID">{{ currentJob.id }}</el-descriptions-item>
+        <el-descriptions-item label="任务名称">{{ currentJob.name }}</el-descriptions-item>
+        <el-descriptions-item label="状态">
+          <el-tag :type="currentJob.paused ? 'warning' : 'success'">
+            {{ currentJob.paused ? '已暂停' : '运行中' }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="触发器">{{ currentJob.trigger }}</el-descriptions-item>
+        <el-descriptions-item label="下次执行时间">
+          {{ currentJob.next_run_time ? formatDateTime(currentJob.next_run_time) : '已暂停' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="执行函数" v-if="currentJob.func">
+          <el-text size="small" type="info">{{ currentJob.func }}</el-text>
+        </el-descriptions-item>
+        <el-descriptions-item label="参数" v-if="currentJob.kwargs">
+          <pre class="code-block">{{ JSON.stringify(currentJob.kwargs, null, 2) }}</pre>
+        </el-descriptions-item>
+      </el-descriptions>
+
+      <template #footer>
+        <el-button @click="detailDialogVisible = false">关闭</el-button>
+        <el-button type="primary" @click="showJobHistory(currentJob!)">查看执行历史</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 执行历史对话框 -->
+    <el-dialog
+      v-model="historyDialogVisible"
+      title="执行历史"
+      width="900px"
+      :close-on-click-modal="false"
+    >
+      <el-table :data="historyList" v-loading="historyLoading" stripe max-height="500">
+        <el-table-column prop="job_id" label="任务ID" width="200" />
+        <el-table-column prop="action" label="操作" width="100">
+          <template #default="{ row }">
+            <el-tag size="small">{{ formatAction(row.action) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 'success' ? 'success' : 'danger'" size="small">
+              {{ row.status === 'success' ? '成功' : '失败' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="timestamp" label="时间" width="180">
+          <template #default="{ row }">
+            {{ formatDateTime(row.timestamp) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="error_message" label="错误信息" min-width="200">
+          <template #default="{ row }">
+            <el-text v-if="row.error_message" type="danger" size="small">
+              {{ row.error_message }}
+            </el-text>
+            <el-text v-else type="info" size="small">-</el-text>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <el-pagination
+        v-if="historyTotal > historyPageSize"
+        class="pagination"
+        :current-page="historyPage"
+        :page-size="historyPageSize"
+        :total="historyTotal"
+        layout="total, prev, pager, next"
+        @current-change="handleHistoryPageChange"
+      />
+
+      <template #footer>
+        <el-button @click="historyDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted, reactive } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  Timer,
+  List,
+  VideoPlay,
+  VideoPause,
+  Refresh,
+  Document,
+  Promotion,
+  View,
+  Edit
+} from '@element-plus/icons-vue'
+import {
+  getJobs,
+  getJobDetail,
+  pauseJob,
+  resumeJob,
+  triggerJob,
+  getJobHistory,
+  getAllHistory,
+  updateJobMetadata,
+  getSchedulerStats,
+  type Job,
+  type JobHistory,
+  type SchedulerStats
+} from '@/api/scheduler'
+import { formatDateTime, formatRelativeTime } from '@/utils/datetime'
+
+// 数据
+const loading = ref(false)
+const jobs = ref<Job[]>([])
+const stats = ref<SchedulerStats | null>(null)
+const actionLoading = reactive<Record<string, boolean>>({})
+
+// 编辑任务元数据
+const editDialogVisible = ref(false)
+const editingJob = ref<Job | null>(null)
+const editForm = reactive({
+  display_name: '',
+  description: ''
+})
+const saveLoading = ref(false)
+
+// 任务详情
+const detailDialogVisible = ref(false)
+const currentJob = ref<Job | null>(null)
+
+// 执行历史
+const historyDialogVisible = ref(false)
+const historyLoading = ref(false)
+const historyList = ref<JobHistory[]>([])
+const historyTotal = ref(0)
+const historyPage = ref(1)
+const historyPageSize = ref(20)
+const currentHistoryJobId = ref<string | null>(null)
+
+// 计算属性
+const filteredJobs = computed(() => {
+  return jobs.value
+})
+
+// 方法
+const loadJobs = async () => {
+  loading.value = true
+  try {
+    const [jobsRes, statsRes] = await Promise.all([getJobs(), getSchedulerStats()])
+    // ApiClient.get 返回 ApiResponse<T>，其中 data 字段就是我们需要的数据
+    jobs.value = Array.isArray(jobsRes.data) ? jobsRes.data : []
+    stats.value = statsRes.data || null
+  } catch (error: any) {
+    ElMessage.error(error.message || '加载任务列表失败')
+    jobs.value = []
+    stats.value = null
+  } finally {
+    loading.value = false
+  }
+}
+
+const showEditDialog = (job: Job) => {
+  editingJob.value = job
+  editForm.display_name = job.display_name || ''
+  editForm.description = job.description || ''
+  editDialogVisible.value = true
+}
+
+const handleSaveMetadata = async () => {
+  if (!editingJob.value) return
+
+  try {
+    saveLoading.value = true
+    await updateJobMetadata(editingJob.value.id, {
+      display_name: editForm.display_name || undefined,
+      description: editForm.description || undefined
+    })
+    ElMessage.success('任务信息已更新')
+    editDialogVisible.value = false
+    await loadJobs()
+  } catch (error: any) {
+    ElMessage.error(error.message || '更新任务信息失败')
+  } finally {
+    saveLoading.value = false
+  }
+}
+
+const showJobDetail = async (job: Job) => {
+  try {
+    const res = await getJobDetail(job.id)
+    // request.get 已经返回了 response.data
+    currentJob.value = res.data || null
+    detailDialogVisible.value = true
+  } catch (error: any) {
+    ElMessage.error(error.message || '获取任务详情失败')
+  }
+}
+
+const handlePause = async (job: Job) => {
+  try {
+    await ElMessageBox.confirm(`确定要暂停任务"${job.name}"吗？`, '确认暂停', {
+      type: 'warning'
+    })
+
+    actionLoading[job.id] = true
+    await pauseJob(job.id)
+    ElMessage.success('任务已暂停')
+    await loadJobs()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '暂停任务失败')
+    }
+  } finally {
+    actionLoading[job.id] = false
+  }
+}
+
+const handleResume = async (job: Job) => {
+  try {
+    actionLoading[job.id] = true
+    await resumeJob(job.id)
+    ElMessage.success('任务已恢复')
+    await loadJobs()
+  } catch (error: any) {
+    ElMessage.error(error.message || '恢复任务失败')
+  } finally {
+    actionLoading[job.id] = false
+  }
+}
+
+const handleTrigger = async (job: Job) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要立即执行任务"${job.name}"吗？任务将在后台执行。`,
+      '确认执行',
+      {
+        type: 'warning'
+      }
+    )
+
+    actionLoading[job.id] = true
+    await triggerJob(job.id)
+    ElMessage.success('任务已触发执行')
+    await loadJobs()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '触发任务失败')
+    }
+  } finally {
+    actionLoading[job.id] = false
+  }
+}
+
+const showJobHistory = async (job: Job) => {
+  currentHistoryJobId.value = job.id
+  historyPage.value = 1
+  detailDialogVisible.value = false
+  historyDialogVisible.value = true
+  await loadHistory()
+}
+
+const showHistoryDialog = async () => {
+  currentHistoryJobId.value = null
+  historyPage.value = 1
+  historyDialogVisible.value = true
+  await loadHistory()
+}
+
+const loadHistory = async () => {
+  historyLoading.value = true
+  try {
+    const params = {
+      limit: historyPageSize.value,
+      offset: (historyPage.value - 1) * historyPageSize.value,
+      ...(currentHistoryJobId.value ? { job_id: currentHistoryJobId.value } : {})
+    }
+
+    const res = currentHistoryJobId.value
+      ? await getJobHistory(currentHistoryJobId.value, params)
+      : await getAllHistory(params)
+
+    // request.get 已经返回了 response.data
+    historyList.value = Array.isArray(res.data?.history) ? res.data.history : []
+    historyTotal.value = res.data?.total || 0
+  } catch (error: any) {
+    ElMessage.error(error.message || '加载执行历史失败')
+    historyList.value = []
+    historyTotal.value = 0
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+const handleHistoryPageChange = (page: number) => {
+  historyPage.value = page
+  loadHistory()
+}
+
+const formatTrigger = (trigger: string) => {
+  // 简化触发器显示
+  if (trigger.includes('cron')) {
+    return trigger.replace(/cron\[|\]/g, '')
+  }
+  if (trigger.includes('interval')) {
+    return trigger.replace(/interval\[|\]/g, '')
+  }
+  return trigger
+}
+
+const formatAction = (action: string) => {
+  const actionMap: Record<string, string> = {
+    pause: '暂停',
+    resume: '恢复',
+    trigger: '手动触发',
+    execute: '执行'
+  }
+  return actionMap[action] || action
+}
+
+// 生命周期
+onMounted(() => {
+  loadJobs()
+})
+</script>
+
+<style scoped lang="scss">
+.scheduler-management {
+  padding: 20px;
+
+  .header-card {
+    margin-bottom: 20px;
+
+    .header-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+
+      .title-section {
+        h2 {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin: 0 0 8px 0;
+          font-size: 24px;
+          font-weight: 600;
+        }
+
+        .subtitle {
+          margin: 0;
+          color: var(--el-text-color-secondary);
+          font-size: 14px;
+        }
+      }
+
+      .stats-section {
+        display: flex;
+        gap: 40px;
+      }
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+    }
+  }
+
+  .table-card {
+    .job-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      .name-text {
+        font-weight: 500;
+      }
+    }
+  }
+
+  .code-block {
+    background: var(--el-fill-color-light);
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: 'Courier New', monospace;
+    overflow-x: auto;
+  }
+
+  .pagination {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+  }
+}
+</style>
+
