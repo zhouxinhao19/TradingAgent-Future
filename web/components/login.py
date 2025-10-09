@@ -235,26 +235,6 @@ def render_login_form():
         with col2:
             st.markdown("### 🔐 用户登录")
 
-            # 添加首次使用提示
-            st.markdown("""
-            <div style="background: linear-gradient(135deg, #e6fffa 0%, #f0fff4 100%);
-                        border: 1px solid #9ae6b4;
-                        border-radius: 12px;
-                        padding: 1rem;
-                        margin-bottom: 1rem;">
-                <div style="color: #2d3748; font-weight: 600; margin-bottom: 0.5rem;">
-                    💡 首次使用提示
-                </div>
-                <div style="color: #4a5568; font-size: 0.9rem;">
-                    默认管理员账号：
-                    <ul style="margin: 0.5rem 0 0 0; padding-left: 1.5rem;">
-                        <li>用户名：<code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">admin</code></li>
-                        <li>密码：<code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">admin123</code></li>
-                    </ul>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
             username = st.text_input(
                 "用户名",
                 placeholder="请输入您的用户名（首次使用：admin）",
