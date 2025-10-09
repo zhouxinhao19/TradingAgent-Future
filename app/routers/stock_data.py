@@ -20,36 +20,36 @@ from app.models import (
 router = APIRouter(prefix="/api/stock-data", tags=["股票数据"])
 
 
-@router.get("/basic-info/{code}", response_model=StockBasicInfoResponse)
+@router.get("/basic-info/{symbol}", response_model=StockBasicInfoResponse)
 async def get_stock_basic_info(
-    code: str,
+    symbol: str,
     current_user: dict = Depends(get_current_user)
 ):
     """
     获取股票基础信息
-    
+
     Args:
-        code: 股票代码 (支持6位A股代码)
-        
+        symbol: 股票代码 (支持6位A股代码)
+
     Returns:
         StockBasicInfoResponse: 包含扩展字段的股票基础信息
     """
     try:
         service = get_stock_data_service()
-        stock_info = await service.get_stock_basic_info(code)
-        
+        stock_info = await service.get_stock_basic_info(symbol)
+
         if not stock_info:
             return StockBasicInfoResponse(
                 success=False,
-                message=f"未找到股票代码 {code} 的基础信息"
+                message=f"未找到股票代码 {symbol} 的基础信息"
             )
-        
+
         return StockBasicInfoResponse(
             success=True,
             data=stock_info,
             message="获取成功"
         )
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -57,36 +57,36 @@ async def get_stock_basic_info(
         )
 
 
-@router.get("/quotes/{code}", response_model=MarketQuotesResponse)
+@router.get("/quotes/{symbol}", response_model=MarketQuotesResponse)
 async def get_market_quotes(
-    code: str,
+    symbol: str,
     current_user: dict = Depends(get_current_user)
 ):
     """
     获取实时行情数据
-    
+
     Args:
-        code: 股票代码 (支持6位A股代码)
-        
+        symbol: 股票代码 (支持6位A股代码)
+
     Returns:
         MarketQuotesResponse: 包含扩展字段的实时行情数据
     """
     try:
         service = get_stock_data_service()
-        quotes = await service.get_market_quotes(code)
-        
+        quotes = await service.get_market_quotes(symbol)
+
         if not quotes:
             return MarketQuotesResponse(
                 success=False,
-                message=f"未找到股票代码 {code} 的行情数据"
+                message=f"未找到股票代码 {symbol} 的行情数据"
             )
-        
+
         return MarketQuotesResponse(
             success=True,
             data=quotes,
             message="获取成功"
         )
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -142,57 +142,57 @@ async def get_stock_list(
         )
 
 
-@router.get("/combined/{code}")
+@router.get("/combined/{symbol}")
 async def get_combined_stock_data(
-    code: str,
+    symbol: str,
     current_user: dict = Depends(get_current_user)
 ):
     """
     获取股票综合数据 (基础信息 + 实时行情)
-    
+
     Args:
-        code: 股票代码
-        
+        symbol: 股票代码
+
     Returns:
         dict: 包含基础信息和实时行情的综合数据
     """
     try:
         service = get_stock_data_service()
-        
+
         # 并行获取基础信息和行情数据
         import asyncio
-        basic_info_task = service.get_stock_basic_info(code)
-        quotes_task = service.get_market_quotes(code)
-        
+        basic_info_task = service.get_stock_basic_info(symbol)
+        quotes_task = service.get_market_quotes(symbol)
+
         basic_info, quotes = await asyncio.gather(
-            basic_info_task, 
+            basic_info_task,
             quotes_task,
             return_exceptions=True
         )
-        
+
         # 处理异常
         if isinstance(basic_info, Exception):
             basic_info = None
         if isinstance(quotes, Exception):
             quotes = None
-        
+
         if not basic_info and not quotes:
             return {
                 "success": False,
-                "message": f"未找到股票代码 {code} 的任何数据"
+                "message": f"未找到股票代码 {symbol} 的任何数据"
             }
-        
+
         return {
             "success": True,
             "data": {
                 "basic_info": basic_info.dict() if basic_info else None,
                 "quotes": quotes.dict() if quotes else None,
-                "code": code,
+                "symbol": symbol,
                 "timestamp": quotes.updated_at if quotes else None
             },
             "message": "获取成功"
         }
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -224,16 +224,16 @@ async def search_stocks(
         
         # 构建搜索条件
         search_conditions = []
-        
+
         # 如果是6位数字，按代码精确匹配
         if keyword.isdigit() and len(keyword) == 6:
-            search_conditions.append({"code": keyword})
+            search_conditions.append({"symbol": keyword})
         else:
             # 按名称模糊匹配
             search_conditions.append({"name": {"$regex": keyword, "$options": "i"}})
             # 如果包含数字，也尝试代码匹配
             if any(c.isdigit() for c in keyword):
-                search_conditions.append({"code": {"$regex": keyword}})
+                search_conditions.append({"symbol": {"$regex": keyword}})
         
         # 执行搜索
         cursor = collection.find(

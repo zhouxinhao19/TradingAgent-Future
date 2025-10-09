@@ -102,12 +102,20 @@ class FieldStatistics(BaseModel):
 
 # 预定义的字段信息
 BASIC_FIELDS_INFO = {
-    "code": FieldInfo(
-        name="code",
+    "symbol": FieldInfo(
+        name="symbol",
         display_name="股票代码",
         field_type=FieldType.BASIC,
         data_type="string",
         description="6位股票代码",
+        supported_operators=[OperatorType.EQ, OperatorType.NE, OperatorType.IN, OperatorType.NOT_IN, OperatorType.CONTAINS]
+    ),
+    "code": FieldInfo(  # 兼容旧字段
+        name="code",
+        display_name="股票代码(已废弃)",
+        field_type=FieldType.BASIC,
+        data_type="string",
+        description="6位股票代码(已废弃,使用symbol)",
         supported_operators=[OperatorType.EQ, OperatorType.NE, OperatorType.IN, OperatorType.NOT_IN, OperatorType.CONTAINS]
     ),
     "name": FieldInfo(

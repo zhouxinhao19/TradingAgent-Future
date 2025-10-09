@@ -49,7 +49,8 @@ export interface AnalysisTask {
   task_id: string
   batch_id?: string
   user_id: string
-  stock_code: string
+  symbol?: string  // 主字段：6位股票代码
+  stock_code?: string  // 兼容字段（已废弃）
   stock_name?: string
   status: AnalysisStatus
   priority: number
@@ -102,7 +103,9 @@ export interface AnalysisBatch {
 // 股票信息（统一前后端字段名）
 export interface StockInfo {
   // 基础信息
-  code: string
+  symbol: string  // 主字段：6位股票代码
+  code?: string   // 兼容字段（已废弃）
+  full_symbol?: string  // 完整代码（如 000001.SZ）
   name: string
   market: string
   industry?: string
@@ -141,7 +144,8 @@ export interface StockInfo {
 
 // 单股分析请求
 export interface SingleAnalysisRequest {
-  stock_code: string
+  symbol?: string  // 主字段：6位股票代码
+  stock_code?: string  // 兼容字段（已废弃）
   parameters?: AnalysisParameters
 }
 
@@ -149,7 +153,8 @@ export interface SingleAnalysisRequest {
 export interface BatchAnalysisRequest {
   title: string
   description?: string
-  stock_codes: string[]
+  symbols?: string[]  // 主字段：股票代码列表
+  stock_codes?: string[]  // 兼容字段（已废弃）
   parameters?: AnalysisParameters
 }
 
@@ -157,7 +162,8 @@ export interface BatchAnalysisRequest {
 export interface AnalysisTaskResponse {
   task_id: string
   batch_id?: string
-  stock_code: string
+  symbol?: string  // 主字段：6位股票代码
+  stock_code?: string  // 兼容字段（已废弃）
   stock_name?: string
   status: AnalysisStatus
   progress: number
@@ -188,7 +194,8 @@ export interface AnalysisHistoryQuery {
   status?: AnalysisStatus
   start_date?: string
   end_date?: string
-  stock_code?: string
+  symbol?: string  // 主字段：股票代码
+  stock_code?: string  // 兼容字段（已废弃）
   batch_id?: string
   page: number
   page_size: number

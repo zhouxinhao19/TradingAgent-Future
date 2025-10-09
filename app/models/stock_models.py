@@ -54,11 +54,17 @@ class TechnicalIndicators(BaseModel):
 class StockBasicInfoExtended(BaseModel):
     """
     股票基础信息扩展模型 - 基于现有 stock_basic_info 集合
-    保持现有字段不变，新增标准化字段
+    统一使用 symbol 作为主要股票代码字段
     """
-    # === 现有字段 (保持不变) ===
-    code: str = Field(..., description="6位股票代码", pattern=r"^\d{6}$")
+    # === 标准化字段 (主要字段) ===
+    symbol: str = Field(..., description="6位股票代码", pattern=r"^\d{6}$")
+    full_symbol: str = Field(..., description="完整标准化代码(如 000001.SZ)")
     name: str = Field(..., description="股票名称")
+
+    # === 兼容字段 (保持向后兼容) ===
+    code: Optional[str] = Field(None, description="6位股票代码(已废弃,使用symbol)")
+
+    # === 基础信息字段 ===
     area: Optional[str] = Field(None, description="所在地区")
     industry: Optional[str] = Field(None, description="行业")
     market: Optional[str] = Field(None, description="交易所名称")
@@ -67,25 +73,23 @@ class StockBasicInfoExtended(BaseModel):
     sec: Optional[str] = Field(None, description="所属板块")
     source: Optional[str] = Field(None, description="数据来源")
     updated_at: Optional[datetime] = Field(None, description="更新时间")
-    
-    # 现有市值字段
+
+    # 市值字段
     total_mv: Optional[float] = Field(None, description="总市值(亿元)")
     circ_mv: Optional[float] = Field(None, description="流通市值(亿元)")
-    
-    # 现有财务指标
+
+    # 财务指标
     pe: Optional[float] = Field(None, description="市盈率")
     pb: Optional[float] = Field(None, description="市净率")
     pe_ttm: Optional[float] = Field(None, description="滚动市盈率")
     pb_mrq: Optional[float] = Field(None, description="最新市净率")
     roe: Optional[float] = Field(None, description="净资产收益率")
-    
-    # 现有交易指标
+
+    # 交易指标
     turnover_rate: Optional[float] = Field(None, description="换手率%")
     volume_ratio: Optional[float] = Field(None, description="量比")
-    
-    # === 新增标准化字段 ===
-    symbol: Optional[str] = Field(None, description="标准化股票代码(与code相同)")
-    full_symbol: Optional[str] = Field(None, description="完整标准化代码")
+
+    # === 扩展字段 ===
     name_en: Optional[str] = Field(None, description="英文名称")
     
     # 新增市场信息
@@ -112,9 +116,12 @@ class StockBasicInfoExtended(BaseModel):
         # 示例数据
         json_schema_extra = {
             "example": {
-                # 现有字段
-                "code": "000001",
+                # 标准化字段
+                "symbol": "000001",
+                "full_symbol": "000001.SZ",
                 "name": "平安银行",
+
+                # 基础信息
                 "area": "深圳",
                 "industry": "银行",
                 "market": "深圳证券交易所",
@@ -122,10 +129,8 @@ class StockBasicInfoExtended(BaseModel):
                 "total_mv": 2500.0,
                 "pe": 5.2,
                 "pb": 0.8,
-                
-                # 新增字段
-                "symbol": "000001",
-                "full_symbol": "000001.SZ",
+
+                # 扩展字段
                 "market_info": {
                     "market": "CN",
                     "exchange": "SZSE",
@@ -142,10 +147,17 @@ class StockBasicInfoExtended(BaseModel):
 class MarketQuotesExtended(BaseModel):
     """
     实时行情扩展模型 - 基于现有 market_quotes 集合
-    保持现有字段不变，新增标准化字段
+    统一使用 symbol 作为主要股票代码字段
     """
-    # === 现有字段 (保持不变) ===
-    code: str = Field(..., description="6位股票代码", pattern=r"^\d{6}$")
+    # === 标准化字段 (主要字段) ===
+    symbol: str = Field(..., description="6位股票代码", pattern=r"^\d{6}$")
+    full_symbol: Optional[str] = Field(None, description="完整标准化代码")
+    market: Optional[MarketType] = Field(None, description="市场标识")
+
+    # === 兼容字段 (保持向后兼容) ===
+    code: Optional[str] = Field(None, description="6位股票代码(已废弃,使用symbol)")
+
+    # === 行情字段 ===
     close: Optional[float] = Field(None, description="收盘价")
     pct_chg: Optional[float] = Field(None, description="涨跌幅%")
     amount: Optional[float] = Field(None, description="成交额")
@@ -155,11 +167,6 @@ class MarketQuotesExtended(BaseModel):
     pre_close: Optional[float] = Field(None, description="前收盘价")
     trade_date: Optional[str] = Field(None, description="交易日期")
     updated_at: Optional[datetime] = Field(None, description="更新时间")
-    
-    # === 新增标准化字段 ===
-    symbol: Optional[str] = Field(None, description="标准化股票代码(与code相同)")
-    full_symbol: Optional[str] = Field(None, description="完整标准化代码")
-    market: Optional[MarketType] = Field(None, description="市场标识")
     
     # 新增行情字段
     current_price: Optional[float] = Field(None, description="当前价格(与close相同)")
@@ -185,8 +192,12 @@ class MarketQuotesExtended(BaseModel):
         extra = "allow"
         json_schema_extra = {
             "example": {
-                # 现有字段
-                "code": "000001",
+                # 标准化字段
+                "symbol": "000001",
+                "full_symbol": "000001.SZ",
+                "market": "CN",
+
+                # 行情字段
                 "close": 12.65,
                 "pct_chg": 1.61,
                 "amount": 1580000000,
@@ -194,11 +205,8 @@ class MarketQuotesExtended(BaseModel):
                 "high": 12.80,
                 "low": 12.30,
                 "trade_date": "2024-01-15",
-                
-                # 新增字段
-                "symbol": "000001",
-                "full_symbol": "000001.SZ",
-                "market": "CN",
+
+                # 扩展字段
                 "current_price": 12.65,
                 "change": 0.20,
                 "volume": 125000000

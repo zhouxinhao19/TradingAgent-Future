@@ -316,7 +316,8 @@ import { useRouter, useRoute } from 'vue-router'
 
 const submitting = ref(false)
 const stockInput = ref('')
-const stockCodes = ref<string[]>([])
+const stockCodes = ref<string[]>([])  // 保留用于表单绑定
+const symbols = ref<string[]>([])     // 标准化后的代码列表
 const invalidCodes = ref<string[]>([])
 
 // 模型设置
@@ -344,11 +345,19 @@ const parseStockCodes = () => {
     .filter((code, index, arr) => arr.indexOf(code) === index) // 去重
 
   stockCodes.value = codes
+
+  // 标准化股票代码（移除市场后缀，统一大写）
+  symbols.value = codes.map(code => {
+    // 移除 .SZ, .SH, .BJ, .HK 等后缀
+    const cleanCode = code.split('.')[0].toUpperCase()
+    return cleanCode
+  })
 }
 
 const clearStocks = () => {
   stockInput.value = ''
   stockCodes.value = []
+  symbols.value = []
   invalidCodes.value = []
 }
 
@@ -377,6 +386,8 @@ onMounted(() => {
     const parts = String(q.stocks).split(',').map((s) => s.trim()).filter(Boolean)
     stockCodes.value = parts
     stockInput.value = parts.join('\n')
+    // 触发解析以更新 symbols
+    parseStockCodes()
   }
   if (q?.market) {
     const m = String(q.market)
@@ -449,7 +460,8 @@ const submitBatchAnalysis = async () => {
     const batchRequest = {
       title: batchForm.title,
       description: batchForm.description,
-      stock_codes: stockCodes.value,
+      symbols: symbols.value,
+      stock_codes: symbols.value,  // 兼容字段
       parameters: {
         market_type: batchForm.market,
         research_depth: batchForm.depth,

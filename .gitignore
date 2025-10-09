@@ -94,6 +94,9 @@ site/
 # 贡献相关文档 (不纳入版本控制)
 docs/contribution/
 
+# 版本预览文档 (不纳入版本控制)
+docs/v1.0.0-preview/
+
 # AI工具目录 (不纳入版本控制)
 .trae/
 .augment/

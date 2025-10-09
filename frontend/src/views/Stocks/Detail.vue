@@ -287,7 +287,9 @@ const lastAnalysisTagType = computed(() => {
   return 'info'
 })
 
+// 股票代码（从路由参数获取）
 const code = computed(() => String(route.params.code || '').toUpperCase())
+const symbol = computed(() => code.value.split('.')[0])  // 提取6位代码
 const stockName = ref('')
 const market = ref('')
 const isFav = ref(false)
@@ -545,7 +547,12 @@ function onAnalyze() {
 async function onToggleFavorite() {
   try {
     if (!isFav.value) {
-      const payload = { stock_code: code.value, stock_name: stockName.value, market: market.value }
+      const payload = {
+        symbol: symbol.value,
+        stock_code: symbol.value,  // 兼容字段
+        stock_name: stockName.value,
+        market: market.value
+      }
       await favoritesApi.add(payload)
       isFav.value = true
       ElMessage.success('已加入自选')
@@ -577,7 +584,8 @@ async function onQuickAnalyze() {
 
     const today = new Date().toISOString().slice(0, 10)
     const resp: any = await analysisApi.startSingleAnalysis({
-      stock_code: code.value,
+      symbol: symbol.value,
+      stock_code: symbol.value,  // 兼容字段
       parameters: {
         market_type: market.value || 'A股',
         analysis_date: today,
@@ -648,10 +656,11 @@ function scrollToDetail() {
 // 获取最新的历史分析报告
 async function fetchLatestAnalysis() {
   try {
-    console.log('🔍 [fetchLatestAnalysis] 开始获取历史分析报告, stock_code:', code.value)
+    console.log('🔍 [fetchLatestAnalysis] 开始获取历史分析报告, symbol:', symbol.value)
 
     const resp: any = await analysisApi.getHistory({
-      stock_code: code.value,
+      symbol: symbol.value,
+      stock_code: symbol.value,  // 兼容字段
       page: 1,
       page_size: 1,
       status: 'completed'

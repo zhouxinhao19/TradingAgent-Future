@@ -65,7 +65,8 @@ class AnalysisTask(BaseModel):
     task_id: str = Field(..., description="任务唯一标识")
     batch_id: Optional[str] = None
     user_id: PyObjectId
-    stock_code: str = Field(..., description="股票代码")
+    symbol: str = Field(..., description="6位股票代码")
+    stock_code: Optional[str] = Field(None, description="股票代码(已废弃,使用symbol)")
     stock_name: Optional[str] = None
     status: AnalysisStatus = AnalysisStatus.PENDING
 
@@ -127,7 +128,8 @@ class AnalysisBatch(BaseModel):
 
 class StockInfo(BaseModel):
     """股票信息模型"""
-    code: str = Field(..., description="股票代码")
+    symbol: str = Field(..., description="6位股票代码")
+    code: Optional[str] = Field(None, description="股票代码(已废弃,使用symbol)")
     name: str = Field(..., description="股票名称")
     market: str = Field(..., description="市场类型")
     industry: Optional[str] = None
@@ -141,23 +143,34 @@ class StockInfo(BaseModel):
 
 class SingleAnalysisRequest(BaseModel):
     """单股分析请求"""
-    stock_code: str = Field(..., description="股票代码")
+    symbol: Optional[str] = Field(None, description="6位股票代码")
+    stock_code: Optional[str] = Field(None, description="股票代码(已废弃,使用symbol)")
     parameters: Optional[AnalysisParameters] = None
+
+    def get_symbol(self) -> str:
+        """获取股票代码(兼容旧字段)"""
+        return self.symbol or self.stock_code or ""
 
 
 class BatchAnalysisRequest(BaseModel):
     """批量分析请求"""
     title: str = Field(..., description="批次标题")
     description: Optional[str] = None
-    stock_codes: List[str] = Field(..., min_items=1, max_items=100, description="股票代码列表")
+    symbols: Optional[List[str]] = Field(None, min_items=1, max_items=100, description="股票代码列表")
+    stock_codes: Optional[List[str]] = Field(None, min_items=1, max_items=100, description="股票代码列表(已废弃,使用symbols)")
     parameters: Optional[AnalysisParameters] = None
+
+    def get_symbols(self) -> List[str]:
+        """获取股票代码列表(兼容旧字段)"""
+        return self.symbols or self.stock_codes or []
 
 
 class AnalysisTaskResponse(BaseModel):
     """分析任务响应"""
     task_id: str
     batch_id: Optional[str]
-    stock_code: str
+    symbol: str
+    stock_code: Optional[str] = None  # 兼容字段
     stock_name: Optional[str]
     status: AnalysisStatus
     progress: int
@@ -188,7 +201,12 @@ class AnalysisHistoryQuery(BaseModel):
     status: Optional[AnalysisStatus] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
-    stock_code: Optional[str] = None
+    symbol: Optional[str] = None
+    stock_code: Optional[str] = None  # 兼容字段
     batch_id: Optional[str] = None
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
+
+    def get_symbol(self) -> Optional[str]:
+        """获取股票代码(兼容旧字段)"""
+        return self.symbol or self.stock_code

@@ -158,8 +158,9 @@ async def get_task_status_new(
                     "elapsed_time": elapsed_time,
                     "remaining_time": 0,  # 无法准确估算
                     "estimated_total_time": 0,
-                    "stock_code": task_result.get("stock_code"),
-                    "stock_symbol": task_result.get("stock_code"),
+                    "symbol": task_result.get("symbol") or task_result.get("stock_code"),
+                    "stock_code": task_result.get("symbol") or task_result.get("stock_code"),  # 兼容字段
+                    "stock_symbol": task_result.get("symbol") or task_result.get("stock_code"),
                     "source": "mongodb_tasks"  # 标记数据来源
                 }
 
@@ -302,14 +303,20 @@ async def get_task_result(
                     logger.info(f"📊 [RESULT] MongoDB decision内容: action={decision.get('action')}, target_price={decision.get('target_price')}, confidence={decision.get('confidence')}")
             else:
                 # 兜底：analysis_tasks 集合中的 result 字段
-                tasks_doc = await db.analysis_tasks.find_one({"task_id": task_id}, {"result": 1, "stock_code": 1, "created_at": 1, "completed_at": 1})
+                tasks_doc = await db.analysis_tasks.find_one(
+                    {"task_id": task_id},
+                    {"result": 1, "symbol": 1, "stock_code": 1, "created_at": 1, "completed_at": 1}
+                )
                 if tasks_doc and tasks_doc.get("result"):
                     r = tasks_doc["result"] or {}
                     logger.info("✅ [RESULT] 从analysis_tasks.result 找到结果")
+                    # 获取股票代码 (优先使用symbol)
+                    symbol = (tasks_doc.get("symbol") or tasks_doc.get("stock_code") or
+                             r.get("stock_symbol") or r.get("stock_code"))
                     result_data = {
                         "analysis_id": r.get("analysis_id"),
-                        "stock_symbol": r.get("stock_symbol", r.get("stock_code", tasks_doc.get("stock_code"))),
-                        "stock_code": r.get("stock_code", tasks_doc.get("stock_code")),
+                        "stock_symbol": symbol,
+                        "stock_code": symbol,  # 兼容字段
                         "analysis_date": r.get("analysis_date"),
                         "summary": r.get("summary", ""),
                         "recommendation": r.get("recommendation", ""),
@@ -745,10 +752,14 @@ async def submit_batch_analysis(
         task_ids: List[str] = []
         mapping: List[Dict[str, str]] = []
 
+        # 获取股票代码列表 (兼容旧字段)
+        stock_symbols = request.get_symbols()
+
         # 为每只股票创建单股分析任务，并在后台执行
-        for stock_code in request.stock_codes:
+        for symbol in stock_symbols:
             single_req = SingleAnalysisRequest(
-                stock_code=stock_code,
+                symbol=symbol,
+                stock_code=symbol,  # 兼容字段
                 parameters=request.parameters
             )
             create_res = await simple_service.create_analysis_task(user["id"], single_req)
@@ -756,7 +767,7 @@ async def submit_batch_analysis(
             if not task_id:
                 raise RuntimeError("创建任务失败：未返回task_id")
             task_ids.append(task_id)
-            mapping.append({"stock_code": stock_code, "task_id": task_id})
+            mapping.append({"symbol": symbol, "stock_code": symbol, "task_id": task_id})
 
             # 定义包装函数来运行异步任务
             async def run_analysis_task_wrapper(tid=task_id, req=single_req):
@@ -901,7 +912,8 @@ async def get_user_analysis_history(
     status: Optional[str] = Query(None, description="任务状态过滤"),
     start_date: Optional[str] = Query(None, description="开始日期，YYYY-MM-DD"),
     end_date: Optional[str] = Query(None, description="结束日期，YYYY-MM-DD"),
-    stock_code: Optional[str] = Query(None, description="股票代码"),
+    symbol: Optional[str] = Query(None, description="股票代码"),
+    stock_code: Optional[str] = Query(None, description="股票代码(已废弃,使用symbol)"),
     market_type: Optional[str] = Query(None, description="市场类型"),
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页大小")
@@ -938,10 +950,15 @@ async def get_user_analysis_history(
                     pass
             return ok
 
+        # 获取查询的股票代码 (兼容旧字段)
+        query_symbol = symbol or stock_code
+
         filtered = []
         for x in raw_tasks:
-            if stock_code and (x.get("stock_code") or x.get("stock_symbol")) not in [stock_code]:
-                continue
+            if query_symbol:
+                task_symbol = x.get("symbol") or x.get("stock_code") or x.get("stock_symbol")
+                if task_symbol not in [query_symbol]:
+                    continue
             # 市场类型暂时从参数内判断（如有）
             if market_type:
                 params = x.get("parameters") or {}

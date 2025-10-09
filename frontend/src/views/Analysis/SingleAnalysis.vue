@@ -433,7 +433,7 @@
                 <div class="results-header">
                   <h3>📊 分析结果</h3>
                   <div class="result-meta">
-                    <el-tag type="success">{{ analysisResults.stock_symbol || analysisForm.stockCode }}</el-tag>
+                    <el-tag type="success">{{ analysisResults.symbol || analysisResults.stock_symbol || analysisForm.symbol || analysisForm.stockCode }}</el-tag>
                     <el-tag>{{ analysisResults.analysis_date }}</el-tag>
                   </div>
                 </div>
@@ -673,7 +673,8 @@ const availableModels = ref<any[]>([])
 
 // 分析表单
 const analysisForm = reactive({
-  stockCode: '',
+  stockCode: '',  // 保留用于表单绑定
+  symbol: '',     // 标准化后的代码
   market: 'A股',
   analysisDate: new Date(),
   researchDepth: 2, // 默认选中标准分析
@@ -717,10 +718,14 @@ const toggleAnalyst = (analystName: string) => {
 
 // 提交分析
 const submitAnalysis = async () => {
-  if (!analysisForm.stockCode.trim()) {
+  const stockCode = analysisForm.stockCode.trim()
+  if (!stockCode) {
     ElMessage.warning('请输入股票代码')
     return
   }
+
+  // 标准化股票代码
+  analysisForm.symbol = stockCode.toUpperCase()
 
   if (analysisForm.selectedAnalysts.length === 0) {
     ElMessage.warning('请至少选择一个分析师')
@@ -736,7 +741,8 @@ const submitAnalysis = async () => {
       : new Date(analysisForm.analysisDate)
 
     const request: SingleAnalysisRequest = {
-      stock_code: analysisForm.stockCode.trim().toUpperCase(),
+      symbol: analysisForm.symbol,
+      stock_code: analysisForm.symbol,  // 兼容字段
       parameters: {
         market_type: analysisForm.market,
         analysis_date: analysisDate.toISOString().split('T')[0],
@@ -1236,7 +1242,12 @@ const goSimOrder = async () => {
       return
     }
 
-    const code = analysisResults.value.stock_symbol || analysisResults.value.stock_code || analysisForm.stockCode
+    // 获取股票代码（兼容新旧字段）
+    const code = analysisResults.value.symbol ||
+                 analysisResults.value.stock_symbol ||
+                 analysisResults.value.stock_code ||
+                 analysisForm.symbol ||
+                 analysisForm.stockCode
     if (!code) {
       ElMessage.warning('未识别到股票代码')
       return

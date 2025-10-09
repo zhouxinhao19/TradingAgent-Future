@@ -1,7 +1,9 @@
 import { ApiClient } from './request'
 
 export interface QuoteResponse {
-  code: string
+  symbol: string  // 主字段：6位股票代码
+  code?: string   // 兼容字段（已废弃）
+  full_symbol?: string  // 完整代码（如 000001.SZ）
   name?: string
   market?: string
   price?: number
@@ -15,7 +17,9 @@ export interface QuoteResponse {
 }
 
 export interface FundamentalsResponse {
-  code: string
+  symbol: string  // 主字段：6位股票代码
+  code?: string   // 兼容字段（已废弃）
+  full_symbol?: string  // 完整代码（如 000001.SZ）
   name?: string
   industry?: string
   market?: string
@@ -42,7 +46,8 @@ export interface KlineBar {
 }
 
 export interface KlineResponse {
-  code: string
+  symbol: string  // 主字段：6位股票代码
+  code?: string   // 兼容字段（已废弃）
   period: 'day'|'week'|'month'|'5m'|'15m'|'30m'|'60m'
   limit: number
   adj: 'none'|'qfq'|'hfq'
@@ -59,7 +64,8 @@ export interface NewsItem {
 }
 
 export interface NewsResponse {
-  code: string
+  symbol: string  // 主字段：6位股票代码
+  code?: string   // 兼容字段（已废弃）
   days: number
   limit: number
   include_announcements: boolean
@@ -68,17 +74,42 @@ export interface NewsResponse {
 }
 
 export const stocksApi = {
-  async getQuote(code: string) {
-    return ApiClient.get<QuoteResponse>(`/api/stocks/${code}/quote`)
+  /**
+   * 获取股票行情
+   * @param symbol 6位股票代码
+   */
+  async getQuote(symbol: string) {
+    return ApiClient.get<QuoteResponse>(`/api/stocks/${symbol}/quote`)
   },
-  async getFundamentals(code: string) {
-    return ApiClient.get<FundamentalsResponse>(`/api/stocks/${code}/fundamentals`)
+
+  /**
+   * 获取股票基本面数据
+   * @param symbol 6位股票代码
+   */
+  async getFundamentals(symbol: string) {
+    return ApiClient.get<FundamentalsResponse>(`/api/stocks/${symbol}/fundamentals`)
   },
-  async getKline(code: string, period: KlineResponse['period'] = 'day', limit = 120, adj: KlineResponse['adj'] = 'none') {
-    return ApiClient.get<KlineResponse>(`/api/stocks/${code}/kline`, { period, limit, adj })
+
+  /**
+   * 获取K线数据
+   * @param symbol 6位股票代码
+   * @param period K线周期
+   * @param limit 数据条数
+   * @param adj 复权方式
+   */
+  async getKline(symbol: string, period: KlineResponse['period'] = 'day', limit = 120, adj: KlineResponse['adj'] = 'none') {
+    return ApiClient.get<KlineResponse>(`/api/stocks/${symbol}/kline`, { period, limit, adj })
   },
-  async getNews(code: string, days = 2, limit = 50, includeAnnouncements = true) {
-    return ApiClient.get<NewsResponse>(`/api/stocks/${code}/news`, { days, limit, include_announcements: includeAnnouncements })
+
+  /**
+   * 获取股票新闻
+   * @param symbol 6位股票代码
+   * @param days 天数
+   * @param limit 数量限制
+   * @param includeAnnouncements 是否包含公告
+   */
+  async getNews(symbol: string, days = 2, limit = 50, includeAnnouncements = true) {
+    return ApiClient.get<NewsResponse>(`/api/stocks/${symbol}/news`, { days, limit, include_announcements: includeAnnouncements })
   }
 }
 

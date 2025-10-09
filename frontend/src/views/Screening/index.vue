@@ -455,8 +455,9 @@ const performScreening = async () => {
 
     // 直接使用后端返回的数据，字段名已统一
     screeningResults.value = items.map((it: any) => ({
-      code: it.code,
-      name: it.name || it.code,  // 使用股票名称，如果没有则用代码
+      symbol: it.symbol || it.code,  // 主字段
+      code: it.symbol || it.code,    // 兼容字段
+      name: it.name || it.symbol || it.code,  // 使用股票名称，如果没有则用代码
       market: it.market || 'A股',
       industry: it.industry,
       area: it.area,
@@ -606,7 +607,8 @@ const toggleFavorite = async (stock: StockInfo) => {
       }
 
       const payload = {
-        stock_code: code,
+        symbol: code,
+        stock_code: code,  // 兼容字段
         stock_name: stock.name || code,
         market: marketType
       }
@@ -693,7 +695,8 @@ const loadFavorites = async () => {
     const list = (resp as any)?.data || resp
     const set = new Set<string>()
     ;(list || []).forEach((item: any) => {
-      const code = item.stock_code || item.code
+      // 兼容新旧字段
+      const code = item.symbol || item.stock_code || item.code
       if (code) set.add(code)
     })
     favoriteSet.value = set

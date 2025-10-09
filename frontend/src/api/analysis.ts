@@ -21,7 +21,8 @@ export interface AnalysisRequest {
 
 // 后端期望的请求格式
 export interface SingleAnalysisRequest {
-  stock_code: string
+  symbol?: string  // 主字段：6位股票代码
+  stock_code?: string  // 兼容字段（已废弃）
   parameters?: {
     market_type?: string
     analysis_date?: string
@@ -61,7 +62,9 @@ export interface AnalysisStep {
 
 export interface AnalysisResult {
   analysis_id: string
-  stock_symbol: string
+  symbol?: string  // 主字段：6位股票代码
+  stock_symbol: string  // 兼容字段
+  stock_code?: string  // 兼容字段（已废弃）
   stock_name: string
   market_type: string
   analysis_date: string
@@ -149,7 +152,8 @@ export const analysisApi = {
     page?: number
     page_size?: number
     market_type?: string
-    stock_code?: string
+    symbol?: string  // 主字段：股票代码
+    stock_code?: string  // 兼容字段（已废弃）
     start_date?: string
     end_date?: string
     status?: string
@@ -174,7 +178,8 @@ export const analysisApi = {
   startBatchAnalysis(batchRequest: {
     title: string
     description?: string
-    stock_codes: string[]
+    symbols?: string[]  // 主字段：股票代码列表
+    stock_codes?: string[]  // 兼容字段（已废弃）
     parameters?: SingleAnalysisRequest['parameters']
   }): Promise<{ success: boolean; data: { batch_id: string; total_tasks: number; task_ids: string[]; status: string }; message: string }>{
     return request.post('/api/analysis/batch', batchRequest)

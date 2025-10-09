@@ -104,8 +104,8 @@ class AnalysisService:
             init_logging()
             thread_logger = get_logger('analysis_thread')
 
-            thread_logger.info(f"🔄 [线程池] 开始执行分析任务: {task.task_id} - {task.stock_code}")
-            logger.info(f"🔄 [线程池] 开始执行分析任务: {task.task_id} - {task.stock_code}")
+            thread_logger.info(f"🔄 [线程池] 开始执行分析任务: {task.task_id} - {task.symbol}")
+            logger.info(f"🔄 [线程池] 开始执行分析任务: {task.task_id} - {task.symbol}")
 
             # 环境检查
             progress_tracker.update_progress("🔧 检查环境配置")
@@ -152,7 +152,7 @@ class AnalysisService:
                 progress_tracker.update_progress(message)
 
             # 调用现有的分析方法（同步调用，传递进度回调）
-            _, decision = trading_graph.propagate(task.stock_code, analysis_date, progress_callback)
+            _, decision = trading_graph.propagate(task.symbol, analysis_date, progress_callback)
 
             execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
 
@@ -182,7 +182,7 @@ class AnalysisService:
     def _execute_analysis_sync(self, task: AnalysisTask) -> AnalysisResult:
         """同步执行分析任务（在线程池中运行）"""
         try:
-            logger.info(f"🔄 [线程池] 开始执行分析任务: {task.task_id} - {task.stock_code}")
+            logger.info(f"🔄 [线程池] 开始执行分析任务: {task.task_id} - {task.symbol}")
 
             # 使用标准配置函数创建完整配置
             from app.core.unified_config import unified_config
@@ -213,7 +213,7 @@ class AnalysisService:
             analysis_date = task.parameters.analysis_date or datetime.now().strftime("%Y-%m-%d")
 
             # 调用现有的分析方法（同步调用）
-            _, decision = trading_graph.propagate(task.stock_code, analysis_date)
+            _, decision = trading_graph.propagate(task.symbol, analysis_date)
 
             execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
 
@@ -241,7 +241,7 @@ class AnalysisService:
         """异步执行单股分析任务（在后台运行，不阻塞主线程）"""
         progress_tracker = None
         try:
-            logger.info(f"🔄 开始执行分析任务: {task.task_id} - {task.stock_code}")
+            logger.info(f"🔄 开始执行分析任务: {task.task_id} - {task.symbol}")
 
             # 创建进度跟踪器
             progress_tracker = RedisProgressTracker(
@@ -320,7 +320,10 @@ class AnalysisService:
         try:
             logger.info(f"📝 开始提交单股分析任务")
             logger.info(f"👤 用户ID: {user_id} (类型: {type(user_id)})")
-            logger.info(f"📊 股票代码: {request.stock_code}")
+
+            # 获取股票代码 (兼容旧字段)
+            stock_symbol = request.get_symbol()
+            logger.info(f"📊 股票代码: {stock_symbol}")
             logger.info(f"⚙️ 分析参数: {request.parameters}")
 
             # 生成任务ID
@@ -359,7 +362,8 @@ class AnalysisService:
             task = AnalysisTask(
                 task_id=task_id,
                 user_id=converted_user_id,
-                stock_code=request.stock_code,
+                symbol=stock_symbol,
+                stock_code=stock_symbol,  # 兼容字段
                 parameters=params,
                 status=AnalysisStatus.PENDING
             )
@@ -385,11 +389,12 @@ class AnalysisService:
             # 不等待任务完成，让它在后台运行
             logger.info(f"✅ 后台任务已启动，任务ID: {task_id}")
 
-            logger.info(f"🎉 单股分析任务提交完成: {task_id} - {request.stock_code}")
+            logger.info(f"🎉 单股分析任务提交完成: {task_id} - {stock_symbol}")
 
             return {
                 "task_id": task_id,
-                "stock_code": request.stock_code,
+                "symbol": stock_symbol,
+                "stock_code": stock_symbol,  # 兼容字段
                 "status": AnalysisStatus.PENDING,
                 "message": "任务已在后台启动"
             }
@@ -431,25 +436,29 @@ class AnalysisService:
                 pass
 
             # 创建批次记录
+            # 获取股票代码列表 (兼容旧字段)
+            stock_symbols = request.get_symbols()
+
             batch = AnalysisBatch(
                 batch_id=batch_id,
                 user_id=converted_user_id,
                 title=request.title,
                 description=request.description,
-                total_tasks=len(request.stock_codes),
+                total_tasks=len(stock_symbols),
                 parameters=params,
                 status=BatchStatus.PENDING
             )
 
             # 创建任务列表
             tasks = []
-            for stock_code in request.stock_codes:
+            for symbol in stock_symbols:
                 task_id = str(uuid.uuid4())
                 task = AnalysisTask(
                     task_id=task_id,
                     batch_id=batch_id,
                     user_id=converted_user_id,
-                    stock_code=stock_code,
+                    symbol=symbol,
+                    stock_code=symbol,  # 兼容字段
                     parameters=batch.parameters,
                     status=AnalysisStatus.PENDING
                 )
@@ -468,7 +477,8 @@ class AnalysisService:
                 # 添加任务元数据
                 queue_params.update({
                     "task_id": task.task_id,
-                    "stock_code": task.stock_code,
+                    "symbol": task.symbol,
+                    "stock_code": task.symbol,  # 兼容字段
                     "user_id": str(task.user_id),
                     "batch_id": task.batch_id,
                     "created_at": task.created_at.isoformat() if task.created_at else None
@@ -477,7 +487,7 @@ class AnalysisService:
                 # 调用队列服务
                 await self.queue_service.enqueue_task(
                     user_id=str(converted_user_id),
-                    symbol=task.stock_code,
+                    symbol=task.symbol,
                     params=queue_params,
                     batch_id=task.batch_id
                 )
@@ -502,7 +512,7 @@ class AnalysisService:
     ) -> AnalysisResult:
         """执行单个分析任务"""
         try:
-            logger.info(f"开始执行分析任务: {task.task_id} - {task.stock_code}")
+            logger.info(f"开始执行分析任务: {task.task_id} - {task.symbol}")
             
             # 更新任务状态
             await self._update_task_status(task.task_id, AnalysisStatus.PROCESSING, 0)
@@ -543,7 +553,7 @@ class AnalysisService:
             analysis_date = task.parameters.analysis_date or datetime.now().strftime("%Y-%m-%d")
             
             # 调用现有的分析方法
-            _, decision = trading_graph.propagate(task.stock_code, analysis_date)
+            _, decision = trading_graph.propagate(task.symbol, analysis_date)
             
             execution_time = (datetime.utcnow() - start_time).total_seconds()
             
@@ -634,7 +644,8 @@ class AnalysisService:
                     return {
                         "task_id": task_id,
                         "user_id": task.get("user_id"),
-                        "stock_code": task.get("stock_symbol"),
+                        "symbol": task.get("stock_symbol") or task.get("symbol"),
+                        "stock_code": task.get("stock_symbol") or task.get("symbol"),  # 兼容字段
                         "status": progress_data["status"],
                         "progress": progress_data["progress"],
                         "current_step": progress_data["current_step"],
@@ -775,7 +786,7 @@ class AnalysisService:
                 cost=cost,
                 session_id=task.task_id,
                 analysis_type="stock_analysis",
-                stock_code=task.stock_code
+                stock_code=task.symbol
             )
 
             # 保存到数据库

@@ -327,7 +327,7 @@ const loadAnalysisHistory = async () => {
     const list = body.tasks || []
     historyList.value = list.map((x: any) => ({
       task_id: x.task_id || x.analysis_id || x.id || '-',
-      stock_code: x.stock_code || x.stock_symbol || '-',
+      stock_code: x.symbol || x.stock_code || x.stock_symbol || '-',  // 兼容新旧字段
       stock_name: x.stock_name || x.name || '',
       status: x.status || 'pending',
       created_at: x.start_time || x.created_at || new Date().toISOString(),

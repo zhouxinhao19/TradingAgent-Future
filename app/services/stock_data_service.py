@@ -30,64 +30,64 @@ class StockDataService:
         self.basic_info_collection = "stock_basic_info"
         self.market_quotes_collection = "market_quotes"
     
-    async def get_stock_basic_info(self, code: str) -> Optional[StockBasicInfoExtended]:
+    async def get_stock_basic_info(self, symbol: str) -> Optional[StockBasicInfoExtended]:
         """
         获取股票基础信息
         Args:
-            code: 6位股票代码
+            symbol: 6位股票代码
         Returns:
             StockBasicInfoExtended: 扩展的股票基础信息
         """
         try:
             db = get_mongo_db()
-            code6 = str(code).zfill(6)
-            
-            # 从现有集合查询
+            symbol6 = str(symbol).zfill(6)
+
+            # 从现有集合查询 (优先使用symbol字段，兼容code字段)
             doc = await db[self.basic_info_collection].find_one(
-                {"code": code6}, 
+                {"$or": [{"symbol": symbol6}, {"code": symbol6}]},
                 {"_id": 0}
             )
-            
+
             if not doc:
                 return None
-            
+
             # 数据标准化处理
             standardized_doc = self._standardize_basic_info(doc)
-            
+
             return StockBasicInfoExtended(**standardized_doc)
-            
+
         except Exception as e:
-            logger.error(f"获取股票基础信息失败 code={code}: {e}")
+            logger.error(f"获取股票基础信息失败 symbol={symbol}: {e}")
             return None
     
-    async def get_market_quotes(self, code: str) -> Optional[MarketQuotesExtended]:
+    async def get_market_quotes(self, symbol: str) -> Optional[MarketQuotesExtended]:
         """
         获取实时行情数据
         Args:
-            code: 6位股票代码
+            symbol: 6位股票代码
         Returns:
             MarketQuotesExtended: 扩展的实时行情数据
         """
         try:
             db = get_mongo_db()
-            code6 = str(code).zfill(6)
-            
-            # 从现有集合查询
+            symbol6 = str(symbol).zfill(6)
+
+            # 从现有集合查询 (优先使用symbol字段，兼容code字段)
             doc = await db[self.market_quotes_collection].find_one(
-                {"code": code6},
+                {"$or": [{"symbol": symbol6}, {"code": symbol6}]},
                 {"_id": 0}
             )
-            
+
             if not doc:
                 return None
-            
+
             # 数据标准化处理
             standardized_doc = self._standardize_market_quotes(doc)
-            
+
             return MarketQuotesExtended(**standardized_doc)
-            
+
         except Exception as e:
-            logger.error(f"获取实时行情失败 code={code}: {e}")
+            logger.error(f"获取实时行情失败 symbol={symbol}: {e}")
             return None
     
     async def get_stock_list(
@@ -139,69 +139,77 @@ class StockDataService:
             return []
     
     async def update_stock_basic_info(
-        self, 
-        code: str, 
+        self,
+        symbol: str,
         update_data: Dict[str, Any]
     ) -> bool:
         """
         更新股票基础信息
         Args:
-            code: 6位股票代码
+            symbol: 6位股票代码
             update_data: 更新数据
         Returns:
             bool: 更新是否成功
         """
         try:
             db = get_mongo_db()
-            code6 = str(code).zfill(6)
-            
+            symbol6 = str(symbol).zfill(6)
+
             # 添加更新时间
             update_data["updated_at"] = datetime.utcnow()
-            
-            # 执行更新
+
+            # 确保symbol字段存在
+            if "symbol" not in update_data:
+                update_data["symbol"] = symbol6
+
+            # 执行更新 (使用symbol字段)
             result = await db[self.basic_info_collection].update_one(
-                {"code": code6},
+                {"symbol": symbol6},
                 {"$set": update_data},
                 upsert=True
             )
-            
+
             return result.modified_count > 0 or result.upserted_id is not None
-            
+
         except Exception as e:
-            logger.error(f"更新股票基础信息失败 code={code}: {e}")
+            logger.error(f"更新股票基础信息失败 symbol={symbol}: {e}")
             return False
     
     async def update_market_quotes(
         self,
-        code: str,
+        symbol: str,
         quote_data: Dict[str, Any]
     ) -> bool:
         """
         更新实时行情数据
         Args:
-            code: 6位股票代码
+            symbol: 6位股票代码
             quote_data: 行情数据
         Returns:
             bool: 更新是否成功
         """
         try:
             db = get_mongo_db()
-            code6 = str(code).zfill(6)
-            
+            symbol6 = str(symbol).zfill(6)
+
             # 添加更新时间
             quote_data["updated_at"] = datetime.utcnow()
-            
-            # 执行更新
+
+            # 确保symbol字段存在
+            if "symbol" not in quote_data:
+                quote_data["symbol"] = symbol6
+
+            # 执行更新 (使用symbol字段)
             result = await db[self.market_quotes_collection].update_one(
-                {"code": code6},
+                {"symbol": symbol6},
                 {"$set": quote_data},
                 upsert=True
             )
-            
+
             return result.modified_count > 0 or result.upserted_id is not None
-            
+
         except Exception as e:
-            logger.error(f"更新实时行情失败 code={code}: {e}")
+            logger.error(f"更新实时行情失败 symbol={symbol}: {e}")
             return False
     
     def _standardize_basic_info(self, doc: Dict[str, Any]) -> Dict[str, Any]:
@@ -211,24 +219,41 @@ class StockDataService:
         """
         # 保持现有字段不变
         result = doc.copy()
+
+        # 获取股票代码 (优先使用symbol，兼容code)
+        symbol = doc.get("symbol") or doc.get("code", "")
+        result["symbol"] = symbol
+
+        # 兼容旧字段
+        if "code" in doc and "symbol" not in doc:
+            result["code"] = doc["code"]
         
-        # 添加标准化字段
-        code = doc.get("code", "")
-        result["symbol"] = code
-        
-        # 生成完整代码
-        if code and len(code) == 6:
-            # 根据代码判断交易所
-            if code.startswith(('60', '68', '90')):
-                result["full_symbol"] = f"{code}.SS"
-                exchange = "SSE"
-                exchange_name = "上海证券交易所"
-            elif code.startswith(('00', '30', '20')):
-                result["full_symbol"] = f"{code}.SZ"
+        # 生成完整代码 (优先使用已有的full_symbol)
+        if "full_symbol" not in result or not result["full_symbol"]:
+            if symbol and len(symbol) == 6:
+                # 根据代码判断交易所
+                if symbol.startswith(('60', '68', '90')):
+                    result["full_symbol"] = f"{symbol}.SS"
+                    exchange = "SSE"
+                    exchange_name = "上海证券交易所"
+                elif symbol.startswith(('00', '30', '20')):
+                    result["full_symbol"] = f"{symbol}.SZ"
+                    exchange = "SZSE"
+                    exchange_name = "深圳证券交易所"
+                else:
+                    result["full_symbol"] = f"{symbol}.SZ"  # 默认深交所
+                    exchange = "SZSE"
+                    exchange_name = "深圳证券交易所"
+            else:
                 exchange = "SZSE"
                 exchange_name = "深圳证券交易所"
+        else:
+            # 从full_symbol解析交易所
+            full_symbol = result["full_symbol"]
+            if ".SS" in full_symbol or ".SH" in full_symbol:
+                exchange = "SSE"
+                exchange_name = "上海证券交易所"
             else:
-                result["full_symbol"] = f"{code}.SZ"  # 默认深交所
                 exchange = "SZSE"
                 exchange_name = "深圳证券交易所"
             
@@ -274,16 +299,23 @@ class StockDataService:
         # 保持现有字段不变
         result = doc.copy()
         
-        # 添加标准化字段
-        code = doc.get("code", "")
-        result["symbol"] = code
-        
-        # 生成完整代码和市场标识
-        if code and len(code) == 6:
-            if code.startswith(('60', '68', '90')):
-                result["full_symbol"] = f"{code}.SS"
-            else:
-                result["full_symbol"] = f"{code}.SZ"
+        # 获取股票代码 (优先使用symbol，兼容code)
+        symbol = doc.get("symbol") or doc.get("code", "")
+        result["symbol"] = symbol
+
+        # 兼容旧字段
+        if "code" in doc and "symbol" not in doc:
+            result["code"] = doc["code"]
+
+        # 生成完整代码和市场标识 (优先使用已有的full_symbol)
+        if "full_symbol" not in result or not result["full_symbol"]:
+            if symbol and len(symbol) == 6:
+                if symbol.startswith(('60', '68', '90')):
+                    result["full_symbol"] = f"{symbol}.SS"
+                else:
+                    result["full_symbol"] = f"{symbol}.SZ"
+
+        if "market" not in result:
             result["market"] = "CN"
         
         # 字段映射

@@ -1,7 +1,8 @@
 import { ApiClient } from './request'
 
 export interface FavoriteItem {
-  stock_code: string
+  symbol?: string  // 主字段：6位股票代码
+  stock_code?: string  // 兼容字段（已废弃）
   stock_name: string
   market: string
   board?: string
@@ -17,7 +18,8 @@ export interface FavoriteItem {
 }
 
 export interface AddFavoriteReq {
-  stock_code: string
+  symbol?: string  // 主字段：6位股票代码
+  stock_code?: string  // 兼容字段（已废弃）
   stock_name: string
   market?: string
   tags?: string[]
@@ -27,12 +29,40 @@ export interface AddFavoriteReq {
 }
 
 export const favoritesApi = {
+  /**
+   * 获取收藏列表
+   */
   list: () => ApiClient.get<FavoriteItem[]>('/api/favorites/'),
-  add: (payload: AddFavoriteReq) => ApiClient.post<{ message: string; stock_code: string }>('/api/favorites/', payload),
-  update: (stock_code: string, payload: Partial<Pick<FavoriteItem, 'tags' | 'notes' | 'alert_price_high' | 'alert_price_low'>>) =>
-    ApiClient.put<{ message: string; stock_code: string }>(`/api/favorites/${stock_code}`, payload),
-  remove: (stock_code: string) => ApiClient.delete<{ message: string; stock_code: string }>(`/api/favorites/${stock_code}`),
-  check: (stock_code: string) => ApiClient.get<{ stock_code: string; is_favorite: boolean }>(`/api/favorites/check/${stock_code}`),
+
+  /**
+   * 添加收藏
+   * @param payload 收藏信息（需包含 symbol 或 stock_code）
+   */
+  add: (payload: AddFavoriteReq) => ApiClient.post<{ message: string; symbol?: string; stock_code?: string }>('/api/favorites/', payload),
+
+  /**
+   * 更新收藏
+   * @param symbol 股票代码（6位）
+   * @param payload 更新内容
+   */
+  update: (symbol: string, payload: Partial<Pick<FavoriteItem, 'tags' | 'notes' | 'alert_price_high' | 'alert_price_low'>>) =>
+    ApiClient.put<{ message: string; symbol?: string; stock_code?: string }>(`/api/favorites/${symbol}`, payload),
+
+  /**
+   * 删除收藏
+   * @param symbol 股票代码（6位）
+   */
+  remove: (symbol: string) => ApiClient.delete<{ message: string; symbol?: string; stock_code?: string }>(`/api/favorites/${symbol}`),
+
+  /**
+   * 检查是否已收藏
+   * @param symbol 股票代码（6位）
+   */
+  check: (symbol: string) => ApiClient.get<{ symbol?: string; stock_code?: string; is_favorite: boolean }>(`/api/favorites/check/${symbol}`),
+
+  /**
+   * 获取所有标签
+   */
   tags: () => ApiClient.get<string[]>('/api/favorites/tags')
 }
 
