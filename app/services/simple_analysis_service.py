@@ -152,35 +152,59 @@ def create_analysis_config(
     config["deep_think_llm"] = deep_model
     config["quick_think_llm"] = quick_model
 
-    # 根据研究深度调整配置 - 方案C：自定义映射
+    # 根据研究深度调整配置 - 支持5个级别（与Web界面保持一致）
     if research_depth == "快速":
+        # 1级 - 快速分析
+        config["max_debate_rounds"] = 1
+        config["max_risk_discuss_rounds"] = 1
+        config["memory_enabled"] = False  # 禁用记忆以加速
+        config["online_tools"] = False  # 使用缓存数据
+        logger.info(f"🔧 [1级-快速分析] {market_type}使用缓存数据，最快速度")
+        logger.info(f"🔧 [1级-快速分析] 使用用户配置的模型: quick={quick_model}, deep={deep_model}")
+
+    elif research_depth == "基础":
+        # 2级 - 基础分析
         config["max_debate_rounds"] = 1
         config["max_risk_discuss_rounds"] = 1
         config["memory_enabled"] = True
         config["online_tools"] = True
-        logger.info(f"🔧 [快速分析] {market_type}使用统一工具，确保数据源正确和稳定性")
-
-        # 注意：不再强制覆盖模型，尊重用户配置
-        # 用户已经通过 quick_model 和 deep_model 参数传入了配置的模型
-        logger.info(f"🔧 [快速分析] 使用用户配置的模型: quick={quick_model}, deep={deep_model}")
+        logger.info(f"🔧 [2级-基础分析] {market_type}使用在线工具，获取最新数据")
+        logger.info(f"🔧 [2级-基础分析] 使用用户配置的模型: quick={quick_model}, deep={deep_model}")
 
     elif research_depth == "标准":
+        # 3级 - 标准分析（推荐）
         config["max_debate_rounds"] = 1
         config["max_risk_discuss_rounds"] = 2
         config["memory_enabled"] = True
         config["online_tools"] = True
-
-        # 注意：不再强制覆盖模型，尊重用户配置
-        logger.info(f"🔧 [标准分析] 使用用户配置的模型: quick={quick_model}, deep={deep_model}")
+        logger.info(f"🔧 [3级-标准分析] {market_type}平衡速度和质量（推荐）")
+        logger.info(f"🔧 [3级-标准分析] 使用用户配置的模型: quick={quick_model}, deep={deep_model}")
 
     elif research_depth == "深度":
+        # 4级 - 深度分析
         config["max_debate_rounds"] = 2
+        config["max_risk_discuss_rounds"] = 2
+        config["memory_enabled"] = True
+        config["online_tools"] = True
+        logger.info(f"🔧 [4级-深度分析] {market_type}多轮辩论，深度研究")
+        logger.info(f"🔧 [4级-深度分析] 使用用户配置的模型: quick={quick_model}, deep={deep_model}")
+
+    elif research_depth == "全面":
+        # 5级 - 全面分析
+        config["max_debate_rounds"] = 3
         config["max_risk_discuss_rounds"] = 3
         config["memory_enabled"] = True
         config["online_tools"] = True
+        logger.info(f"🔧 [5级-全面分析] {market_type}最全面的分析，最高质量")
+        logger.info(f"🔧 [5级-全面分析] 使用用户配置的模型: quick={quick_model}, deep={deep_model}")
 
-        # 注意：不再强制覆盖模型，尊重用户配置
-        logger.info(f"🔧 [深度分析] 使用用户配置的模型: quick={quick_model}, deep={deep_model}")
+    else:
+        # 默认使用标准分析
+        logger.warning(f"⚠️ 未知的研究深度: {research_depth}，使用标准分析")
+        config["max_debate_rounds"] = 1
+        config["max_risk_discuss_rounds"] = 2
+        config["memory_enabled"] = True
+        config["online_tools"] = True
 
     # 🔧 从统一配置获取 backend_url（如果有配置的话）
     try:
@@ -713,9 +737,20 @@ class SimpleAnalysisService:
                     time.sleep(8)
                     progress_tracker.update_progress("🐻 看跌研究员识别风险")
 
-                    # 辩论阶段
-                    research_depth = request.parameters.research_depth if request.parameters else "快速"
-                    debate_rounds = 1 if research_depth == "快速" else (2 if research_depth == "标准" else 3)
+                    # 辩论阶段 - 根据5个级别确定辩论轮次
+                    research_depth = request.parameters.research_depth if request.parameters else "标准"
+                    if research_depth == "快速":
+                        debate_rounds = 1
+                    elif research_depth == "基础":
+                        debate_rounds = 1
+                    elif research_depth == "标准":
+                        debate_rounds = 1
+                    elif research_depth == "深度":
+                        debate_rounds = 2
+                    elif research_depth == "全面":
+                        debate_rounds = 3
+                    else:
+                        debate_rounds = 1  # 默认
 
                     for round_num in range(debate_rounds):
                         time.sleep(12)

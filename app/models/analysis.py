@@ -30,10 +30,18 @@ class BatchStatus(str, Enum):
 
 
 class AnalysisParameters(BaseModel):
-    """分析参数模型"""
+    """分析参数模型
+
+    研究深度说明：
+    - 快速: 1级 - 快速分析 (2-4分钟)
+    - 基础: 2级 - 基础分析 (4-6分钟)
+    - 标准: 3级 - 标准分析 (6-10分钟，推荐)
+    - 深度: 4级 - 深度分析 (10-15分钟)
+    - 全面: 5级 - 全面分析 (15-25分钟)
+    """
     market_type: str = "A股"
     analysis_date: Optional[datetime] = None
-    research_depth: str = "深度"
+    research_depth: str = "标准"  # 默认使用3级标准分析（推荐）
     selected_analysts: List[str] = Field(default_factory=lambda: ["market", "fundamentals", "news", "social"])
     custom_prompt: Optional[str] = None
     include_sentiment: bool = True
