@@ -98,8 +98,9 @@ async def get_fundamentals(code: str, current_user: dict = Depends(get_current_u
     # 2. 尝试从 stock_financial_data 获取最新财务指标
     financial_data = None
     try:
+        # 优先使用 symbol 字段查询，如果没有则使用 code 字段（向后兼容）
         financial_data = await db["stock_financial_data"].find_one(
-            {"symbol": code6},
+            {"$or": [{"symbol": code6}, {"code": code6}]},
             {"_id": 0},
             sort=[("report_period", -1)]  # 按报告期降序，获取最新数据
         )
