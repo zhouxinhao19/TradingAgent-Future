@@ -182,14 +182,15 @@ class TushareSyncService:
     async def sync_realtime_quotes(self, symbols: List[str] = None) -> Dict[str, Any]:
         """
         同步实时行情数据
+        使用 Tushare rt_k 接口批量获取全市场行情（一次性获取，避免限流）
 
         Args:
-            symbols: 指定股票代码列表，为空则同步所有股票
+            symbols: 指定股票代码列表，为空则同步所有股票（实际会忽略此参数，直接获取全市场）
 
         Returns:
             同步结果统计
         """
-        logger.info("🔄 开始同步实时行情...")
+        logger.info("🔄 开始同步实时行情（使用 rt_k 批量接口）...")
 
         stats = {
             "total_processed": 0,
@@ -197,69 +198,76 @@ class TushareSyncService:
             "error_count": 0,
             "start_time": datetime.utcnow(),
             "errors": [],
-            "stopped_by_rate_limit": False
+            "stopped_by_rate_limit": False,
+            "skipped_non_trading_time": False
         }
 
         try:
-            # 1. 获取需要同步的股票列表
-            if symbols is None:
-                cursor = self.db.stock_basic_info.find(
-                    {"market_info.market": "CN"},
-                    {"code": 1}
-                )
-                symbols = [doc["code"] async for doc in cursor]
+            # 检查是否在交易时间
+            if not self._is_trading_time():
+                logger.info("⏸️ 当前不在交易时间，跳过实时行情同步")
+                stats["skipped_non_trading_time"] = True
+                return stats
+            # 使用批量接口一次性获取全市场行情
+            logger.info("📡 调用 rt_k 接口获取全市场实时行情...")
+            quotes_map = await self.provider.get_realtime_quotes_batch()
 
-            stats["total_processed"] = len(symbols)
-            logger.info(f"📊 需要同步 {len(symbols)} 只股票行情")
+            if not quotes_map:
+                logger.warning("⚠️ 未获取到实时行情数据")
+                return stats
 
-            # 2. 批量处理
-            for i in range(0, len(symbols), self.batch_size):
-                batch = symbols[i:i + self.batch_size]
-                batch_stats = await self._process_quotes_batch(batch)
+            stats["total_processed"] = len(quotes_map)
+            logger.info(f"✅ 获取到 {len(quotes_map)} 只股票的实时行情")
 
-                # 更新统计
-                stats["success_count"] += batch_stats["success_count"]
-                stats["error_count"] += batch_stats["error_count"]
-                stats["errors"].extend(batch_stats["errors"])
+            # 批量保存到数据库
+            success_count = 0
+            error_count = 0
 
-                # 检查是否遇到 API 限流错误
-                if batch_stats.get("rate_limit_hit"):
-                    stats["stopped_by_rate_limit"] = True
-                    logger.warning(f"⚠️ 检测到 API 限流，停止同步任务")
-                    logger.warning(f"📊 已处理: {min(i + self.batch_size, len(symbols))}/{len(symbols)} "
-                                 f"(成功: {stats['success_count']}, 错误: {stats['error_count']})")
-                    break
+            for symbol, quote_data in quotes_map.items():
+                try:
+                    # 保存到数据库
+                    result = await self.stock_service.update_market_quotes(symbol, quote_data)
+                    if result:
+                        success_count += 1
+                    else:
+                        error_count += 1
+                        stats["errors"].append({
+                            "code": symbol,
+                            "error": "更新数据库失败",
+                            "context": "sync_realtime_quotes"
+                        })
+                except Exception as e:
+                    error_count += 1
+                    stats["errors"].append({
+                        "code": symbol,
+                        "error": str(e),
+                        "context": "sync_realtime_quotes"
+                    })
 
-                # 进度日志
-                progress = min(i + self.batch_size, len(symbols))
-                logger.info(f"📈 行情同步进度: {progress}/{len(symbols)} "
-                           f"(成功: {stats['success_count']}, 错误: {stats['error_count']})")
+            stats["success_count"] = success_count
+            stats["error_count"] = error_count
 
-                # API限流
-                if i + self.batch_size < len(symbols):
-                    await asyncio.sleep(self.rate_limit_delay)
-
-            # 3. 完成统计
+            # 完成统计
             stats["end_time"] = datetime.utcnow()
             stats["duration"] = (stats["end_time"] - stats["start_time"]).total_seconds()
 
-            if stats["stopped_by_rate_limit"]:
-                logger.warning(f"⚠️ 实时行情同步因 API 限流而停止: "
-                             f"总计 {stats['total_processed']} 只, "
-                             f"成功 {stats['success_count']} 只, "
-                             f"错误 {stats['error_count']} 只, "
-                             f"耗时 {stats['duration']:.2f} 秒")
-            else:
-                logger.info(f"✅ 实时行情同步完成: "
-                           f"总计 {stats['total_processed']} 只, "
-                           f"成功 {stats['success_count']} 只, "
-                           f"错误 {stats['error_count']} 只, "
-                           f"耗时 {stats['duration']:.2f} 秒")
+            logger.info(f"✅ 实时行情同步完成: "
+                      f"总计 {stats['total_processed']} 只, "
+                      f"成功 {stats['success_count']} 只, "
+                      f"错误 {stats['error_count']} 只, "
+                      f"耗时 {stats['duration']:.2f} 秒")
 
             return stats
 
         except Exception as e:
-            logger.error(f"❌ 实时行情同步失败: {e}")
+            # 检查是否为限流错误
+            error_msg = str(e)
+            if self._is_rate_limit_error(error_msg):
+                stats["stopped_by_rate_limit"] = True
+                logger.error(f"❌ 实时行情同步失败（API限流）: {e}")
+            else:
+                logger.error(f"❌ 实时行情同步失败: {e}")
+
             stats["errors"].append({"error": str(e), "context": "sync_realtime_quotes"})
             return stats
     
@@ -321,7 +329,45 @@ class TushareSyncService:
         ]
         error_msg_lower = error_msg.lower()
         return any(keyword in error_msg_lower for keyword in rate_limit_keywords)
-    
+
+    def _is_trading_time(self) -> bool:
+        """
+        判断当前是否在交易时间
+        A股交易时间：
+        - 周一到周五（排除节假日）
+        - 上午：9:30-11:30
+        - 下午：13:00-15:00
+
+        注意：此方法不检查节假日，仅检查时间段
+        """
+        from datetime import datetime
+        import pytz
+
+        # 使用上海时区
+        tz = pytz.timezone('Asia/Shanghai')
+        now = datetime.now(tz)
+
+        # 检查是否是周末
+        if now.weekday() >= 5:  # 5=周六, 6=周日
+            return False
+
+        # 检查时间段
+        current_time = now.time()
+
+        # 上午交易时间：9:30-11:30
+        morning_start = datetime.strptime("09:30", "%H:%M").time()
+        morning_end = datetime.strptime("11:30", "%H:%M").time()
+
+        # 下午交易时间：13:00-15:00
+        afternoon_start = datetime.strptime("13:00", "%H:%M").time()
+        afternoon_end = datetime.strptime("15:00", "%H:%M").time()
+
+        # 判断是否在交易时间段内
+        is_morning = morning_start <= current_time <= morning_end
+        is_afternoon = afternoon_start <= current_time <= afternoon_end
+
+        return is_morning or is_afternoon
+
     async def _get_and_save_quotes(self, symbol: str) -> bool:
         """获取并保存单个股票行情"""
         try:

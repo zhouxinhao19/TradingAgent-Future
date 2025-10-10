@@ -176,48 +176,50 @@ class TushareProvider(BaseStockDataProvider):
             return None
     
     async def get_stock_quotes(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """获取实时行情"""
+        """
+        获取单只股票实时行情
+        使用 rt_k 接口（实时日线）
+        注意：此方法逐个获取，建议使用 get_realtime_quotes_batch() 批量获取
+        """
         if not self.is_available():
             return None
 
         try:
             ts_code = self._normalize_ts_code(symbol)
 
-            # 尝试获取实时行情 (需要高级权限)
-            try:
-                df = await asyncio.to_thread(self.api.realtime_quote, ts_code=ts_code)
-                if df is not None and not df.empty:
-                    return self.standardize_quotes(df.iloc[0].to_dict())
-            except Exception as e:
-                # 检查是否为限流错误
-                if self._is_rate_limit_error(str(e)):
-                    self.logger.error(f"❌ 获取实时行情失败 symbol={symbol}: {e}")
-                    raise  # 抛出限流错误，让上层处理
-                # 权限不足，使用最新日线数据
-                pass
-
-            # 回退：使用最新日线数据
-            end_date = datetime.now().strftime('%Y%m%d')
-            df = await asyncio.to_thread(
-                self.api.daily,
-                ts_code=ts_code,
-                start_date=end_date,
-                end_date=end_date
-            )
+            # 使用 rt_k 接口获取实时行情
+            df = await asyncio.to_thread(self.api.rt_k, ts_code=ts_code)
 
             if df is not None and not df.empty:
-                # 获取每日指标补充数据
-                basic_df = await asyncio.to_thread(
-                    self.api.daily_basic,
-                    ts_code=ts_code,
-                    trade_date=end_date,
-                    fields='ts_code,total_mv,circ_mv,pe,pb,turnover_rate'
-                )
+                # rt_k 返回的字段：ts_code, name, pre_close, high, open, low, close, vol, amount, num
+                row = df.iloc[0].to_dict()
 
-                # 合并数据
-                quote_data = df.iloc[0].to_dict()
-                if basic_df is not None and not basic_df.empty:
-                    quote_data.update(basic_df.iloc[0].to_dict())
+                # 标准化字段
+                quote_data = {
+                    'ts_code': row.get('ts_code'),
+                    'symbol': symbol,
+                    'name': row.get('name'),
+                    'open': row.get('open'),
+                    'high': row.get('high'),
+                    'low': row.get('low'),
+                    'close': row.get('close'),  # 当前价
+                    'pre_close': row.get('pre_close'),
+                    'volume': row.get('vol'),  # 成交量（股）
+                    'amount': row.get('amount'),  # 成交额（元）
+                    'num': row.get('num'),  # 成交笔数
+                }
+
+                # 计算涨跌幅
+                if quote_data.get('close') and quote_data.get('pre_close'):
+                    try:
+                        close = float(quote_data['close'])
+                        pre_close = float(quote_data['pre_close'])
+                        if pre_close > 0:
+                            pct_chg = ((close - pre_close) / pre_close) * 100
+                            quote_data['pct_chg'] = round(pct_chg, 2)
+                            quote_data['change'] = round(close - pre_close, 2)
+                    except (ValueError, TypeError):
+                        pass
 
                 return self.standardize_quotes(quote_data)
 
@@ -226,10 +228,86 @@ class TushareProvider(BaseStockDataProvider):
         except Exception as e:
             # 检查是否为限流错误
             if self._is_rate_limit_error(str(e)):
-                self.logger.error(f"❌ 获取实时行情失败 symbol={symbol}: {e}")
+                self.logger.error(f"❌ 获取实时行情失败（限流） symbol={symbol}: {e}")
                 raise  # 抛出限流错误，让上层处理
 
             self.logger.error(f"❌ 获取实时行情失败 symbol={symbol}: {e}")
+            return None
+
+    async def get_realtime_quotes_batch(self) -> Optional[Dict[str, Dict[str, Any]]]:
+        """
+        批量获取全市场实时行情
+        使用 rt_k 接口的通配符功能，一次性获取所有A股实时行情
+
+        Returns:
+            Dict[str, Dict]: {symbol: quote_data}
+            例如: {'000001': {'close': 10.5, 'pct_chg': 1.2, ...}, ...}
+        """
+        if not self.is_available():
+            return None
+
+        try:
+            # 使用通配符一次性获取全市场行情
+            # 3*.SZ: 创业板  6*.SH: 上交所  0*.SZ: 深交所主板  9*.BJ: 北交所
+            df = await asyncio.to_thread(
+                self.api.rt_k,
+                ts_code='3*.SZ,6*.SH,0*.SZ,9*.BJ'
+            )
+
+            if df is None or df.empty:
+                self.logger.warning("⚠️ rt_k 接口返回空数据")
+                return None
+
+            self.logger.info(f"✅ 获取到 {len(df)} 只股票的实时行情")
+
+            # 转换为字典格式
+            result = {}
+            for _, row in df.iterrows():
+                ts_code = row.get('ts_code')
+                if not ts_code or '.' not in ts_code:
+                    continue
+
+                # 提取6位代码
+                symbol = ts_code.split('.')[0]
+
+                # 构建行情数据
+                quote_data = {
+                    'ts_code': ts_code,
+                    'symbol': symbol,
+                    'name': row.get('name'),
+                    'open': row.get('open'),
+                    'high': row.get('high'),
+                    'low': row.get('low'),
+                    'close': row.get('close'),  # 当前价
+                    'pre_close': row.get('pre_close'),
+                    'volume': row.get('vol'),  # 成交量（股）
+                    'amount': row.get('amount'),  # 成交额（元）
+                    'num': row.get('num'),  # 成交笔数
+                }
+
+                # 计算涨跌幅
+                if quote_data.get('close') and quote_data.get('pre_close'):
+                    try:
+                        close = float(quote_data['close'])
+                        pre_close = float(quote_data['pre_close'])
+                        if pre_close > 0:
+                            pct_chg = ((close - pre_close) / pre_close) * 100
+                            quote_data['pct_chg'] = round(pct_chg, 2)
+                            quote_data['change'] = round(close - pre_close, 2)
+                    except (ValueError, TypeError):
+                        pass
+
+                result[symbol] = quote_data
+
+            return result
+
+        except Exception as e:
+            # 检查是否为限流错误
+            if self._is_rate_limit_error(str(e)):
+                self.logger.error(f"❌ 批量获取实时行情失败（限流）: {e}")
+                raise  # 抛出限流错误，让上层处理
+
+            self.logger.error(f"❌ 批量获取实时行情失败: {e}")
             return None
 
     def _is_rate_limit_error(self, error_msg: str) -> bool:
