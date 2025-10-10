@@ -2,14 +2,14 @@
 
 [![License](https://img.shields.io/badge/License-Mixed-blue.svg)](./LICENSING.md)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/Version-cn--0.1.16--preview-orange.svg)](./VERSION)
+[![Version](https://img.shields.io/badge/Version-v1.0.0--preview-orange.svg)](./VERSION)
 [![Documentation](https://img.shields.io/badge/docs-中文文档-green.svg)](./docs/)
 [![Original](https://img.shields.io/badge/基于-TauricResearch/TradingAgents-orange.svg)](https://github.com/TauricResearch/TradingAgents)
 
-[📜 v0.1.16-preview Release Notes](docs/releases/v0.1.16-preview-release-notes.md) · [v0.1.15 Release Notes](docs/releases/v0.1.15-release-notes.md)
+[📜 v1.0.0-preview Release Notes](docs/releases/v1.0.0-preview-release-notes.md) · [v1.0.0-preview Release Notes](docs/releases/v1.0.0-preview-release-notes.md)
 
 
-> 🚀 **最新版本 cn-0.1.16-preview**: 多应用架构预览！新增 FastAPI 后端 + Vite 前端（与现有 Streamlit 并存过渡），统一配置与服务化，文档与脚本体系升级。
+> 🚀 **最新版本 v1.0.0-preview**: 个人用户简化部署！新增一键安装脚本、交互式配置向导、系统诊断工具，5分钟完成部署。明确双许可证模式，开源组件完全免费，专有组件个人免费商业需授权。
 >
 > 🎯 **核心功能**: 原生OpenAI支持 | Google AI全面集成 | 自定义端点配置 | 智能模型选择 | 多LLM提供商支持 | 模型选择持久化 | Docker容器化部署 | 专业报告导出 | 完整A股支持 | 中文本地化
 
@@ -1446,7 +1446,7 @@ cost_optimized_config = {
 
 ## 📈 版本历史
 
-- **v0.1.16-preview** (2025-08-XX): 🧭 多应用架构预览（FastAPI + Vite + Streamlit）
+- **v1.0.0-preview** (2025-08-XX): 🧭 多应用架构预览（FastAPI + Vite + Streamlit）
 - **v0.1.15** (2025-08-XX): 🔧 开发者体验与 LLM 生态系统升级
 - **v0.1.14-preview** (2025-08-14): 👥 用户权限管理与 Web 认证系统预览
 - **v0.1.13** (2025-08-02): 🤖 原生 OpenAI 支持与 Google AI 生态系统全面集成
@@ -1485,14 +1485,41 @@ TradingAgents-CN 采用**混合许可证策略**：
 
 ## ⚠️ 重要声明
 
-### 软件性质
+### 软件许可证
 
-本项目是**开源软件**，遵循Apache 2.0许可证：
-- ✅ 提供源代码供学习和研究
-- ✅ 提供安装脚本供用户自行部署
-- ✅ 用户需自行下载、安装、配置和使用
-- ❌ 不提供预编译的可执行安装包
-- ❌ 不提供商业化的技术支持服务
+本项目采用**双许可证（混合许可证）模式**：
+
+#### 🔓 开源组件（Apache 2.0）- 完全免费
+
+以下组件完全开源，可自由商业使用：
+- `tradingagents/` - 核心交易智能体库
+- `cli/` - 命令行工具
+- `scripts/` - 运维脚本和安装脚本
+- `web/` - Streamlit Web应用
+- `docs/` - 文档
+- `examples/` - 示例代码
+
+**权限**：
+- ✅ 自由使用、修改、分发（包括商业使用）
+- ✅ 提供源代码和安装脚本
+- ✅ 用户自行下载、安装、配置
+- ❌ 不提供预编译安装包（保持透明性）
+
+#### 🔒 专有组件 - 个人免费，商业需授权
+
+以下组件源代码可见，但商业使用需授权：
+- `app/` - FastAPI后端应用
+- `frontend/` - Vue.js前端应用
+
+**个人用户**：
+- ✅ 免费用于学习、研究、测试
+- ✅ 免费用于个人非商业用途
+
+**商业用户**：
+- ❌ 商业使用需获取商业许可证
+- 📧 联系获取授权：hsliup@163.com
+
+详见：[许可证说明](./LICENSING.md)
 
 ### 使用责任
 
@@ -1501,11 +1528,13 @@ TradingAgents-CN 采用**混合许可证策略**：
 - 用户自行承担使用本软件的所有风险
 - 用户需遵守所在地区的法律法规
 - 用户需自行配置API密钥和数据源
+- 商业使用专有组件需获取授权
 
 **开发者责任**：
 - 提供可用的源代码和文档
 - 修复已知的技术问题
-- 根据Apache 2.0许可证，不对使用结果承担责任
+- 开源组件：按Apache 2.0许可证，不对使用结果承担责任
+- 专有组件商业许可：提供专业技术支持
 
 ### 投资风险提示
 

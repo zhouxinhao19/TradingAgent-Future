@@ -224,7 +224,7 @@ def mark_completed(self, message: str = "分析完成", results: Any = None):
 
 **Commit**: `7fd2d92`  
 **Message**: `fix: 修复单股票分析卡住的问题 - RedisProgressTracker.mark_completed()方法调用参数错误`  
-**Branch**: `v0.1.16-preview`  
+**Branch**: `v1.0.0-preview`  
 **Date**: 2025-09-30
 
 ---

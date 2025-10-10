@@ -145,7 +145,7 @@ COMMIT_SUMMARY.md
 *.pyc.*
 *.pyo.*
 
-# ----- Repository hygiene additions (v0.1.16-preview) -----
+# ----- Repository hygiene additions (v1.0.0-preview) -----
 # Node/TS build artifacts
 node_modules/
 *.tsbuildinfo

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tradingagents"
-version = "0.1.16-preview"
-description = "Add your description here"
+version = "1.0.0-preview"
+description = "AI-powered multi-agent trading analysis framework with Chinese market support"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

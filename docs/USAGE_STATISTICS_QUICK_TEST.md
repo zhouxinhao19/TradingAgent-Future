@@ -300,8 +300,8 @@ if __name__ == "__main__":
 ## 测试环境
 - 操作系统: Windows 11
 - 浏览器: Chrome 120
-- 后端版本: v0.1.16-preview
-- 前端版本: v0.1.16-preview
+- 后端版本: v1.0.0-preview
+- 前端版本: v1.0.0-preview
 
 ## 测试结果
 
