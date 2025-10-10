@@ -27,7 +27,7 @@ class ChinaDataSource(Enum):
     TUSHARE = "tushare"
     AKSHARE = "akshare"
     BAOSTOCK = "baostock"
-    TDX = "tdx"  # 中国股票数据，将被逐步淘汰
+    # TDX = "tdx"  # 已移除：通达信数据源不再支持
 
 
 
@@ -81,7 +81,7 @@ class DataSourceManager:
             'tushare': ChinaDataSource.TUSHARE,
             'akshare': ChinaDataSource.AKSHARE,
             'baostock': ChinaDataSource.BAOSTOCK,
-            'tdx': ChinaDataSource.TDX
+            # 'tdx': ChinaDataSource.TDX  # 已移除：TDX不再支持
         }
 
         return source_mapping.get(env_source, ChinaDataSource.AKSHARE)
@@ -309,13 +309,8 @@ class DataSourceManager:
         except ImportError:
             logger.warning(f"⚠️ BaoStock数据源不可用: 库未安装")
 
-        # 检查TDX (通达信)
-        try:
-            import pytdx
-            available.append(ChinaDataSource.TDX)
-            logger.warning(f"⚠️ TDX数据源可用 (将被淘汰)")
-        except ImportError:
-            logger.info(f"ℹ️ TDX数据源不可用: 库未安装")
+        # TDX (通达信) 已移除
+        # 不再检查和支持 TDX 数据源
 
         return available
 
@@ -343,8 +338,7 @@ class DataSourceManager:
             return self._get_akshare_adapter()
         elif self.current_source == ChinaDataSource.BAOSTOCK:
             return self._get_baostock_adapter()
-        elif self.current_source == ChinaDataSource.TDX:
-            return self._get_tdx_adapter()
+        # TDX 已移除
         else:
             raise ValueError(f"不支持的数据源: {self.current_source}")
 
@@ -384,15 +378,11 @@ class DataSourceManager:
             logger.error(f"❌ BaoStock适配器导入失败: {e}")
             return None
 
-    def _get_tdx_adapter(self):
-        """获取TDX适配器 (已弃用)"""
-        logger.warning(f"⚠️ 警告: TDX数据源已弃用，建议使用Tushare")
-        try:
-            from .providers.china.tdx import get_tdx_provider
-            return get_tdx_provider()
-        except ImportError as e:
-            logger.error(f"❌ TDX适配器导入失败: {e}")
-            return None
+    # TDX 适配器已移除
+    # def _get_tdx_adapter(self):
+    #     """获取TDX适配器 (已移除)"""
+    #     logger.error(f"❌ TDX数据源已不再支持")
+    #     return None
 
     def _get_cached_data(self, symbol: str, start_date: str = None, end_date: str = None, max_age_hours: int = 24) -> Optional[pd.DataFrame]:
         """
@@ -676,8 +666,7 @@ class DataSourceManager:
                 result = self._get_akshare_data(symbol, start_date, end_date, period)
             elif self.current_source == ChinaDataSource.BAOSTOCK:
                 result = self._get_baostock_data(symbol, start_date, end_date, period)
-            elif self.current_source == ChinaDataSource.TDX:
-                result = self._get_tdx_data(symbol, start_date, end_date, period)
+            # TDX 已移除
             else:
                 result = f"❌ 不支持的数据源: {self.current_source.value}"
 
@@ -924,11 +913,11 @@ class DataSourceManager:
         else:
             return f"❌ 未能获取{symbol}的股票数据"
 
-    def _get_tdx_data(self, symbol: str, start_date: str, end_date: str, period: str = "daily") -> str:
-        """使用TDX获取多周期数据 (已弃用)"""
-        logger.warning(f"⚠️ 警告: 正在使用已弃用的TDX数据源")
-        from .providers.china.tdx import get_china_stock_data
-        return get_china_stock_data(symbol, start_date, end_date)
+    # TDX 数据获取方法已移除
+    # def _get_tdx_data(self, symbol: str, start_date: str, end_date: str, period: str = "daily") -> str:
+    #     """使用TDX获取多周期数据 (已移除)"""
+    #     logger.error(f"❌ TDX数据源已不再支持")
+    #     return f"❌ TDX数据源已不再支持"
 
     def _get_volume_safely(self, data) -> float:
         """安全地获取成交量数据，支持多种列名"""
@@ -953,13 +942,13 @@ class DataSourceManager:
         """尝试备用数据源 - 避免递归调用"""
         logger.error(f"🔄 {self.current_source.value}失败，尝试备用数据源获取{period}数据...")
 
-        # 备用数据源优先级: AKShare > Tushare > BaoStock > TDX
+        # 备用数据源优先级: AKShare > Tushare > BaoStock
         # 注意：不包含MongoDB，因为MongoDB是最高优先级，如果失败了就不再尝试
+        # TDX 已移除
         fallback_order = [
             ChinaDataSource.AKSHARE,
             ChinaDataSource.TUSHARE,
             ChinaDataSource.BAOSTOCK,
-            ChinaDataSource.TDX
         ]
 
         for source in fallback_order:
@@ -974,8 +963,7 @@ class DataSourceManager:
                         result = self._get_akshare_data(symbol, start_date, end_date, period)
                     elif source == ChinaDataSource.BAOSTOCK:
                         result = self._get_baostock_data(symbol, start_date, end_date, period)
-                    elif source == ChinaDataSource.TDX:
-                        result = self._get_tdx_data(symbol, start_date, end_date, period)
+                    # TDX 已移除
                     else:
                         logger.warning(f"⚠️ 未知数据源: {source.value}")
                         continue

@@ -47,41 +47,22 @@ const routes: RouteRecordRaw[] = [
     path: '/analysis',
     name: 'Analysis',
     component: () => import('@/layouts/BasicLayout.vue'),
-    meta: {
-      title: '股票分析',
-      icon: 'TrendCharts',
-      requiresAuth: true
-    },
+    redirect: '/analysis/single',
     children: [
       {
         path: 'single',
         name: 'SingleAnalysis',
-        component: () => import('@/views/Analysis/SingleAnalysis.vue'),
-        meta: {
-          title: '单股分析',
-          requiresAuth: true,
-          transition: 'slide-left'
-        }
+        component: () => import('@/views/Analysis/SingleAnalysis.vue')
       },
       {
         path: 'batch',
         name: 'BatchAnalysis',
-        component: () => import('@/views/Analysis/BatchAnalysis.vue'),
-        meta: {
-          title: '批量分析',
-          requiresAuth: true,
-          transition: 'slide-left'
-        }
+        component: () => import('@/views/Analysis/BatchAnalysis.vue')
       },
       {
         path: 'history',
         name: 'AnalysisHistory',
-        component: () => import('@/views/Analysis/AnalysisHistory.vue'),
-        meta: {
-          title: '分析历史',
-          requiresAuth: true,
-          transition: 'slide-left'
-        }
+        component: () => import('@/views/Analysis/AnalysisHistory.vue')
       }
     ]
   },
@@ -347,106 +328,6 @@ const routes: RouteRecordRaw[] = [
         }
       }
     ]
-  },
-  {
-    path: '/stocks',
-    name: 'Stocks',
-    component: () => import('@/layouts/BasicLayout.vue'),
-    meta: {
-      title: '股票详情',
-      icon: 'TrendCharts',
-      requiresAuth: true,
-      hideInMenu: true,
-      transition: 'fade'
-    },
-    children: [
-      {
-        path: ':code',
-        name: 'StockDetail',
-        component: () => import('@/views/Stocks/Detail.vue'),
-        meta: {
-          title: '股票详情',
-          requiresAuth: true,
-          hideInMenu: true,
-          transition: 'fade'
-        }
-      }
-    ]
-  },
-
-
-  {
-    path: '/tasks',
-    name: 'TaskCenter',
-    component: () => import('@/layouts/BasicLayout.vue'),
-    meta: {
-      title: '任务中心',
-      icon: 'List',
-      requiresAuth: true,
-      transition: 'slide-up'
-    },
-    children: [
-      {
-        path: '',
-        name: 'TaskCenterHome',
-        component: () => import('@/views/Tasks/TaskCenter.vue'),
-        meta: { title: '任务中心', requiresAuth: true }
-      }
-    ]
-  },
-  { path: '/queue', redirect: '/tasks' },
-  { path: '/analysis/history', redirect: '/tasks?tab=completed' },
-  {
-    path: '/reports',
-    name: 'Reports',
-    component: () => import('@/layouts/BasicLayout.vue'),
-    meta: {
-      title: '分析报告',
-      icon: 'Document',
-      requiresAuth: true,
-      transition: 'fade'
-    },
-    children: [
-      {
-        path: '',
-        name: 'ReportsHome',
-        component: () => import('@/views/Reports/index.vue'),
-        meta: {
-          title: '分析报告',
-          requiresAuth: true
-        }
-      },
-      {
-        path: 'view/:id',
-        name: 'ReportDetail',
-        component: () => import('@/views/Reports/ReportDetail.vue'),
-        meta: {
-          title: '报告详情',
-          requiresAuth: true
-        }
-      },
-      {
-        path: 'token',
-        name: 'TokenStatistics',
-        component: () => import('@/views/Reports/TokenStatistics.vue'),
-        meta: {
-          title: 'Token统计',
-          requiresAuth: true
-        }
-      }
-    ]
-  },
-
-  {
-    path: '/about',
-    name: 'About',
-    component: () => import('@/views/About/index.vue'),
-    meta: {
-      title: '关于',
-      icon: 'InfoFilled',
-      requiresAuth: true,
-      transition: 'fade'
-    }
   },
 
   {

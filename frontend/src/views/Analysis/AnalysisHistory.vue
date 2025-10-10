@@ -183,7 +183,14 @@
 
     <!-- 历史记录列表 -->
     <el-card class="history-list-card" shadow="never">
-      <el-table :data="historyList" v-loading="loading" style="width: 100%">
+      <el-table 
+        :data="historyList" 
+        v-loading="loading" 
+        style="width: 100%"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="55" />
+        
         <el-table-column prop="task_id" label="任务ID" width="180">
           <template #default="{ row }">
             <el-link type="primary" @click="viewTaskDetail(row)">
@@ -267,9 +274,18 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Clock, Search, Refresh, Download } from '@element-plus/icons-vue'
+import { 
+  Clock, 
+  Search, 
+  Refresh, 
+  Download, 
+  Star, 
+  PriceTag, 
+  Operation 
+} from '@element-plus/icons-vue'
 import { analysisApi } from '@/api/analysis'
 import { useRouter } from 'vue-router'
+import { formatDateTime } from '@/utils/datetime'
 
 // 列表与分页状态
 const loading = ref(false)
@@ -295,9 +311,15 @@ const availableTags = ref<string[]>([])
 const selectAll = ref(false)
 const selectedAnalyses = ref<any[]>([])
 
-const handleSelectAll = (val: boolean) => {
-  if (val) selectedAnalyses.value = [...historyList.value]
+const handleSelectAll = (val: string | number | boolean) => {
+  const isChecked = Boolean(val)
+  if (isChecked) selectedAnalyses.value = [...historyList.value]
   else selectedAnalyses.value = []
+}
+
+const handleSelectionChange = (selection: any[]) => {
+  selectedAnalyses.value = selection
+  selectAll.value = selection.length === historyList.value.length && historyList.value.length > 0
 }
 
 // 加载历史
@@ -410,8 +432,8 @@ const deleteRecord = async (task: any) => {
   }
 }
 
-const getStatusType = (status: string) => {
-  const statusMap: Record<string, string> = {
+const getStatusType = (status: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' => {
+  const statusMap: Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = {
     pending: 'info',
     processing: 'warning',
     completed: 'success',
@@ -432,10 +454,35 @@ const getStatusText = (status: string) => {
   return statusMap[status] || status
 }
 
-import { formatDateTime } from '@/utils/datetime'
-
 const formatTime = (time: string) => {
   return formatDateTime(time)
+}
+
+// 统计数据
+const stats = ref({
+  totalAnalyses: 0,
+  favoriteCount: 0,
+  uniqueStocks: 0,
+  avgScore: 0
+})
+
+// 视图模式
+const viewMode = ref('list')
+
+const batchAddToFavorites = () => {
+  ElMessage.info('批量收藏功能开发中...')
+}
+
+const batchAddTags = () => {
+  ElMessage.info('批量标签功能开发中...')
+}
+
+const batchExport = () => {
+  ElMessage.info('批量导出功能开发中...')
+}
+
+const compareAnalyses = () => {
+  ElMessage.info('对比分析功能开发中...')
 }
 </script>
 
@@ -462,6 +509,69 @@ const formatTime = (time: string) => {
 
   .filter-card {
     margin-bottom: 24px;
+
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+  }
+
+  .toolbar {
+    .toolbar-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      .toolbar-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+
+        .selected-count {
+          color: var(--el-text-color-regular);
+          font-size: 14px;
+        }
+      }
+
+      .toolbar-right {
+        display: flex;
+        gap: 8px;
+      }
+    }
+  }
+
+  .stat-card {
+    .stat-content {
+      text-align: center;
+      padding: 16px;
+
+      .stat-value {
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--el-color-primary);
+        margin-bottom: 8px;
+      }
+
+      .stat-label {
+        font-size: 14px;
+        color: var(--el-text-color-regular);
+      }
+    }
+  }
+
+  .results-list {
+    .list-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+      }
+    }
 
     .action-buttons {
       display: flex;

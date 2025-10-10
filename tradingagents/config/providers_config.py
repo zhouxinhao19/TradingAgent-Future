@@ -72,16 +72,12 @@ class DataSourceConfig:
             "cache_ttl": self._get_int_env("FINNHUB_CACHE_TTL", 300),
         }
         
-        # 通达信配置
-        self._configs["tdx"] = {
-            "enabled": self._get_bool_env("TDX_ENABLED", False),
-            "timeout": self._get_int_env("TDX_TIMEOUT", 30),
-            "rate_limit": self._get_float_env("TDX_RATE_LIMIT", 0.1),
-            "max_retries": self._get_int_env("TDX_MAX_RETRIES", 3),
-            "cache_enabled": self._get_bool_env("TDX_CACHE_ENABLED", True),
-            "cache_ttl": self._get_int_env("TDX_CACHE_TTL", 300),
-        }
-        
+        # 通达信配置 - 已移除
+        # TDX 数据源已不再支持
+        # self._configs["tdx"] = {
+        #     "enabled": False,
+        # }
+
         logger.debug("✅ 数据源配置加载完成")
     
     def get_provider_config(self, provider_name: str) -> Dict[str, Any]:

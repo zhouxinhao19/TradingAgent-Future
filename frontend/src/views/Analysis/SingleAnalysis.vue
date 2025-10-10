@@ -1346,7 +1346,7 @@ const goSimOrder = async () => {
             ]),
             h(ElInputNumber, {
               modelValue: tradeForm.price,
-              'onUpdate:modelValue': (val: number) => { tradeForm.price = val },
+              'onUpdate:modelValue': (val: number | undefined) => { tradeForm.price = val ?? 0 },
               min: 0.01,
               max: 9999,
               precision: 2,
@@ -1362,7 +1362,7 @@ const goSimOrder = async () => {
             ]),
             h(ElInputNumber, {
               modelValue: tradeForm.quantity,
-              'onUpdate:modelValue': (val: number) => { tradeForm.quantity = val },
+              'onUpdate:modelValue': (val: number | undefined) => { tradeForm.quantity = val ?? 0 },
               min: 100,
               max: maxQuantity,
               step: 100,
