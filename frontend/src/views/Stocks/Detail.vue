@@ -8,14 +8,8 @@
         <el-tag size="small">{{ market || '-' }}</el-tag>
       </div>
       <div class="actions">
-        <el-button type="primary" plain @click="onQuickAnalyze">
-          <el-icon><TrendCharts /></el-icon> 一键分析
-        </el-button>
         <el-button @click="onToggleFavorite">
           <el-icon><Star /></el-icon> {{ isFav ? '已自选' : '加自选' }}
-        </el-button>
-        <el-button @click="onSetAlert">
-          <el-icon><Bell /></el-icon> 预警
         </el-button>
         <el-button type="success" @click="goPaperTrading">
           <el-icon><CreditCard /></el-icon> 模拟交易
@@ -201,7 +195,6 @@
           <div class="quick-actions">
             <el-button type="primary" @click="onAnalyze" :icon="TrendCharts" plain>发起分析</el-button>
             <el-button @click="onToggleFavorite" :icon="Star">{{ isFav ? '移出自选' : '加入自选' }}</el-button>
-            <el-button @click="onSetAlert" :icon="Bell">添加预警</el-button>
             <el-button type="success" :icon="CreditCard" @click="goPaperTrading">模拟交易</el-button>
           </div>
         </el-card>
@@ -243,7 +236,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { TrendCharts, Star, Bell, Refresh, Link, Document, Clock, Reading } from '@element-plus/icons-vue'
+import { TrendCharts, Star, Refresh, Link, Document, Clock, Reading } from '@element-plus/icons-vue'
 import { CreditCard } from '@element-plus/icons-vue'
 import { marked } from 'marked'
 import { stocksApi } from '@/api/stocks'
@@ -566,86 +559,9 @@ async function onToggleFavorite() {
     ElMessage.error(e?.message || '自选操作失败')
   }
 }
-function onSetAlert() { ElMessage.info('前端占位：待接入预警接口') }
 
 function goPaperTrading() {
   router.push({ name: 'PaperTradingHome', query: { code: code.value } })
-}
-
-
-
-// 一键分析（快速）
-async function onQuickAnalyze() {
-  try {
-    analysisStatus.value = 'running'
-    analysisProgress.value = 1
-    analysisMessage.value = '正在启动分析…'
-    lastAnalysis.value = null
-
-    const today = new Date().toISOString().slice(0, 10)
-    const resp: any = await analysisApi.startSingleAnalysis({
-      symbol: symbol.value,
-      stock_code: symbol.value,  // 兼容字段
-      parameters: {
-        market_type: market.value || 'A股',
-        analysis_date: today,
-        research_depth: '快速',
-        selected_analysts: ['market','fundamentals'],
-        include_sentiment: false,
-        include_risk: true,
-        language: 'zh-CN'
-      }
-    })
-    const taskId = resp?.data?.task_id || resp?.data?.id || resp?.data?.taskId || resp?.data?.analysis_id
-    if (!taskId) {
-      analysisStatus.value = 'failed'
-      analysisMessage.value = resp?.message || '创建任务失败'
-      ElMessage.error(analysisMessage.value)
-      return
-    }
-    currentTaskId.value = String(taskId)
-    await pollTask(String(taskId))
-  } catch (e: any) {
-    analysisStatus.value = 'failed'
-    analysisMessage.value = e?.message || '启动分析失败'
-    ElMessage.error(analysisMessage.value)
-  }
-}
-
-async function pollTask(taskId: string) {
-  for (let i = 0; i < 600; i++) {
-    try {
-      const s: any = await analysisApi.getTaskStatus(taskId)
-      const d: any = s?.data || s
-      const status = String(d.status || d.state || '').toLowerCase()
-      const p = Number(d.progress ?? d.percent ?? 0)
-      if (Number.isFinite(p)) analysisProgress.value = Math.max(0, Math.min(100, p))
-      analysisMessage.value = d.current_step || d.message || analysisMessage.value
-      if (status === 'completed' || status === 'success' || status === 'done') {
-        analysisStatus.value = 'completed'
-        const r: any = await analysisApi.getTaskResult(taskId)
-        lastAnalysis.value = r?.data || r
-        // 新通知：分析完成
-        try {
-          const summary = String(lastAnalysis.value?.summary || '').slice(0, 120)
-          notifStore.addNotification({
-            title: `${code.value} 分析完成`,
-            content: summary,
-            type: 'analysis',
-            link: `/stocks/${code.value}`
-          })
-        } catch {}
-        return
-
-      }
-      if (status === 'failed' || status === 'error') {
-        analysisStatus.value = 'failed'
-        analysisMessage.value = d.error || d.message || '分析失败'
-        return
-      }
-    } catch {}
-    await new Promise(r => setTimeout(r, 2000))
-  }
 }
 
 function scrollToDetail() {
