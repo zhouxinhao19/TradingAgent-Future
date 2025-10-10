@@ -308,7 +308,60 @@
 
 ## 🚀 快速开始
 
-### 🐳 Docker部署 (推荐)
+### 🎯 方式一：一键安装（推荐个人用户）⭐
+
+**零基础友好，5分钟完成部署！**
+
+#### Windows 用户
+
+```powershell
+# 1. 下载项目
+git clone https://github.com/hsliuping/TradingAgents-CN.git
+cd TradingAgents-CN
+
+# 2. 运行一键安装脚本
+powershell -ExecutionPolicy Bypass -File scripts\easy_install.ps1
+
+# 3. 按照提示完成配置（选择LLM提供商，输入API密钥）
+# 4. 自动启动，浏览器打开 http://localhost:8501
+```
+
+#### Linux/Mac 用户
+
+```bash
+# 1. 下载项目
+git clone https://github.com/hsliuping/TradingAgents-CN.git
+cd TradingAgents-CN
+
+# 2. 运行一键安装脚本
+chmod +x scripts/easy_install.sh
+./scripts/easy_install.sh
+
+# 3. 按照提示完成配置
+# 4. 自动启动，浏览器打开 http://localhost:8501
+```
+
+**特点**：
+- ✅ 自动检测Python环境
+- ✅ 自动安装所有依赖
+- ✅ 交互式配置API密钥
+- ✅ 无需数据库（自动使用文件存储）
+- ✅ 一键启动应用
+
+**日常使用**：
+```bash
+# Windows
+.\start_simple.bat
+
+# Linux/Mac
+./start_simple.sh
+```
+
+📖 **详细指南**: [个人用户简化部署指南](docs/SIMPLE_DEPLOYMENT_GUIDE.md)
+
+---
+
+### 🐳 方式二：Docker部署（推荐有Docker用户）
 
 ```bash
 # 1. 克隆项目
@@ -337,7 +390,9 @@ chmod +x scripts/smart_start.sh && ./scripts/smart_start.sh
 # Web界面: http://localhost:8501
 ```
 
-### 💻 本地部署
+---
+
+### 💻 方式三：本地部署（开发者）
 
 ```bash
 # 1. 升级pip (重要！避免安装错误)
