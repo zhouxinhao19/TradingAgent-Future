@@ -297,12 +297,12 @@ const rules: FormRules = {
   analysis_type: [{ required: true, message: '请选择分析类型', trigger: 'change' }]
 }
 
-// 深度标记
+// 深度标记（与Web界面保持一致）
 const depthMarks = {
-  1: '简单',
+  1: '快速',
   2: '基础',
   3: '标准',
-  4: '深入',
+  4: '深度',
   5: '全面'
 }
 

@@ -132,9 +132,11 @@
 
                 <el-form-item label="分析深度">
                   <el-select v-model="batchForm.depth" placeholder="选择深度" size="large" style="width: 100%">
-                    <el-option label="⚡ 快速分析 (1-3分钟/只)" value="快速" />
-                    <el-option label="📊 标准分析 (3-8分钟/只)" value="标准" />
-                    <el-option label="🔍 深度分析 (8-15分钟/只)" value="深度" />
+                    <el-option label="⚡ 1级 - 快速分析 (2-4分钟/只)" value="快速" />
+                    <el-option label="📈 2级 - 基础分析 (4-6分钟/只)" value="基础" />
+                    <el-option label="🎯 3级 - 标准分析 (6-10分钟/只，推荐)" value="标准" />
+                    <el-option label="🔍 4级 - 深度分析 (10-15分钟/只)" value="深度" />
+                    <el-option label="🏆 5级 - 全面分析 (15-25分钟/只)" value="全面" />
                   </el-select>
                 </el-form-item>
               </div>

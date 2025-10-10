@@ -677,7 +677,7 @@ const analysisForm = reactive({
   symbol: '',     // 标准化后的代码
   market: 'A股',
   analysisDate: new Date(),
-  researchDepth: 2, // 默认选中标准分析
+  researchDepth: 3, // 默认选中3级标准分析（推荐）
   selectedAnalysts: ['市场分析师', '基本面分析师'],
   includeSentiment: true,
   includeRisk: true,
@@ -685,11 +685,13 @@ const analysisForm = reactive({
   customPrompt: ''
 })
 
-// 深度选项（开源版本）
+// 深度选项（5个级别，与Web界面保持一致）
 const depthOptions = [
-  { icon: '⚡', name: '快速分析', description: '基础数据概览', time: '1-3分钟' },
-  { icon: '📊', name: '标准分析', description: '技术+基本面', time: '3-8分钟' },
-  { icon: '🔍', name: '深度分析', description: '多维度综合', time: '8-15分钟' }
+  { icon: '⚡', name: '1级 - 快速分析', description: '基础数据概览，快速决策', time: '2-4分钟' },
+  { icon: '📈', name: '2级 - 基础分析', description: '常规投资决策', time: '4-6分钟' },
+  { icon: '🎯', name: '3级 - 标准分析', description: '技术+基本面，推荐', time: '6-10分钟' },
+  { icon: '🔍', name: '4级 - 深度分析', description: '多轮辩论，深度研究', time: '10-15分钟' },
+  { icon: '🏆', name: '5级 - 全面分析', description: '最全面的分析报告', time: '15-25分钟' }
 ]
 
 // 禁用日期
