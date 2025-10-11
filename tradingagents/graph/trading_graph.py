@@ -5,6 +5,7 @@ from pathlib import Path
 import json
 from datetime import date
 from typing import Dict, Any, Tuple, List, Optional
+import time
 
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
@@ -369,6 +370,12 @@ class TradingAgentsGraph:
         logger.debug(f"🔍 [GRAPH DEBUG] 初始状态中的company_of_interest: '{init_agent_state.get('company_of_interest', 'NOT_FOUND')}'")
         logger.debug(f"🔍 [GRAPH DEBUG] 初始状态中的trade_date: '{init_agent_state.get('trade_date', 'NOT_FOUND')}'")
 
+        # 初始化计时器
+        node_timings = {}  # 记录每个节点的执行时间
+        total_start_time = time.time()  # 总体开始时间
+        current_node_start = None  # 当前节点开始时间
+        current_node_name = None  # 当前节点名称
+
         # 根据是否有进度回调选择不同的stream_mode
         args = self.propagator.get_graph_args(use_progress_callback=bool(progress_callback))
 
@@ -377,6 +384,20 @@ class TradingAgentsGraph:
             trace = []
             final_state = None
             for chunk in self.graph.stream(init_agent_state, **args):
+                # 记录节点计时
+                for node_name in chunk.keys():
+                    if not node_name.startswith('__'):
+                        # 如果有上一个节点，记录其结束时间
+                        if current_node_name and current_node_start:
+                            elapsed = time.time() - current_node_start
+                            node_timings[current_node_name] = elapsed
+                            logger.info(f"⏱️ [{current_node_name}] 耗时: {elapsed:.2f}秒")
+
+                        # 开始新节点计时
+                        current_node_name = node_name
+                        current_node_start = time.time()
+                        break
+
                 # 在 updates 模式下，chunk 格式为 {node_name: state_update}
                 # 在 values 模式下，chunk 格式为完整的状态
                 if progress_callback and args.get("stream_mode") == "updates":
@@ -407,6 +428,20 @@ class TradingAgentsGraph:
                 trace = []
                 final_state = None
                 for chunk in self.graph.stream(init_agent_state, **args):
+                    # 记录节点计时
+                    for node_name in chunk.keys():
+                        if not node_name.startswith('__'):
+                            # 如果有上一个节点，记录其结束时间
+                            if current_node_name and current_node_start:
+                                elapsed = time.time() - current_node_start
+                                node_timings[current_node_name] = elapsed
+                                logger.info(f"⏱️ [{current_node_name}] 耗时: {elapsed:.2f}秒")
+
+                            # 开始新节点计时
+                            current_node_name = node_name
+                            current_node_start = time.time()
+                            break
+
                     self._send_progress_update(chunk, progress_callback)
                     # 累积状态更新
                     if final_state is None:
@@ -417,6 +452,18 @@ class TradingAgentsGraph:
             else:
                 # 原有的invoke模式
                 final_state = self.graph.invoke(init_agent_state, **args)
+
+        # 记录最后一个节点的时间
+        if current_node_name and current_node_start:
+            elapsed = time.time() - current_node_start
+            node_timings[current_node_name] = elapsed
+            logger.info(f"⏱️ [{current_node_name}] 耗时: {elapsed:.2f}秒")
+
+        # 计算总时间
+        total_elapsed = time.time() - total_start_time
+
+        # 打印详细的时间统计
+        self._print_timing_summary(node_timings, total_elapsed)
 
         # Store current state for reflection
         self.curr_state = final_state
@@ -511,6 +558,81 @@ class TradingAgentsGraph:
 
         except Exception as e:
             logger.error(f"❌ 进度更新失败: {e}", exc_info=True)
+
+    def _print_timing_summary(self, node_timings: Dict[str, float], total_elapsed: float):
+        """打印详细的时间统计报告
+
+        Args:
+            node_timings: 每个节点的执行时间字典
+            total_elapsed: 总执行时间
+        """
+        logger.info("=" * 80)
+        logger.info("⏱️  分析性能统计报告")
+        logger.info("=" * 80)
+
+        # 节点分类
+        analyst_nodes = []
+        tool_nodes = []
+        msg_clear_nodes = []
+        research_nodes = []
+        trader_nodes = []
+        risk_nodes = []
+        other_nodes = []
+
+        for node_name, elapsed in node_timings.items():
+            if 'Analyst' in node_name:
+                analyst_nodes.append((node_name, elapsed))
+            elif node_name.startswith('tools_'):
+                tool_nodes.append((node_name, elapsed))
+            elif node_name.startswith('Msg Clear'):
+                msg_clear_nodes.append((node_name, elapsed))
+            elif 'Researcher' in node_name or 'Research Manager' in node_name:
+                research_nodes.append((node_name, elapsed))
+            elif 'Trader' in node_name:
+                trader_nodes.append((node_name, elapsed))
+            elif 'Risky' in node_name or 'Safe' in node_name or 'Neutral' in node_name or 'Risk Judge' in node_name:
+                risk_nodes.append((node_name, elapsed))
+            else:
+                other_nodes.append((node_name, elapsed))
+
+        # 打印分类统计
+        def print_category(title: str, nodes: List[Tuple[str, float]]):
+            if not nodes:
+                return
+            logger.info(f"\n📊 {title}")
+            logger.info("-" * 80)
+            total_category_time = sum(t for _, t in nodes)
+            for node_name, elapsed in sorted(nodes, key=lambda x: x[1], reverse=True):
+                percentage = (elapsed / total_elapsed * 100) if total_elapsed > 0 else 0
+                logger.info(f"  • {node_name:40s} {elapsed:8.2f}秒  ({percentage:5.1f}%)")
+            logger.info(f"  {'小计':40s} {total_category_time:8.2f}秒  ({total_category_time/total_elapsed*100:5.1f}%)")
+
+        print_category("分析师团队", analyst_nodes)
+        print_category("工具调用", tool_nodes)
+        print_category("消息清理", msg_clear_nodes)
+        print_category("研究团队", research_nodes)
+        print_category("交易团队", trader_nodes)
+        print_category("风险管理团队", risk_nodes)
+        print_category("其他节点", other_nodes)
+
+        # 打印总体统计
+        logger.info("\n" + "=" * 80)
+        logger.info(f"🎯 总执行时间: {total_elapsed:.2f}秒 ({total_elapsed/60:.2f}分钟)")
+        logger.info(f"📈 节点总数: {len(node_timings)}")
+        if node_timings:
+            avg_time = sum(node_timings.values()) / len(node_timings)
+            logger.info(f"⏱️  平均节点耗时: {avg_time:.2f}秒")
+            slowest_node = max(node_timings.items(), key=lambda x: x[1])
+            logger.info(f"🐌 最慢节点: {slowest_node[0]} ({slowest_node[1]:.2f}秒)")
+            fastest_node = min(node_timings.items(), key=lambda x: x[1])
+            logger.info(f"⚡ 最快节点: {fastest_node[0]} ({fastest_node[1]:.2f}秒)")
+
+        # 打印LLM配置信息
+        logger.info(f"\n🤖 LLM配置:")
+        logger.info(f"  • 提供商: {self.config.get('llm_provider', 'unknown')}")
+        logger.info(f"  • 深度思考模型: {self.config.get('deep_think_llm', 'unknown')}")
+        logger.info(f"  • 快速思考模型: {self.config.get('quick_think_llm', 'unknown')}")
+        logger.info("=" * 80)
 
     def _log_state(self, trade_date, final_state):
         """Log the final state to a JSON file."""
