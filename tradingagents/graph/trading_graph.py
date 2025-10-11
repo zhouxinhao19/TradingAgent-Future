@@ -441,10 +441,12 @@ class TradingAgentsGraph:
                                 elapsed = time.time() - current_node_start
                                 node_timings[current_node_name] = elapsed
                                 logger.info(f"⏱️ [{current_node_name}] 耗时: {elapsed:.2f}秒")
+                                logger.info(f"🔍 [TIMING] 节点切换: {current_node_name} → {node_name}")
 
                             # 开始新节点计时
                             current_node_name = node_name
                             current_node_start = time.time()
+                            logger.info(f"🔍 [TIMING] 开始计时: {node_name}")
                             break
 
                     self._send_progress_update(chunk, progress_callback)
