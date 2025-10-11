@@ -101,28 +101,22 @@ def create_market_analyst(llm, toolkit):
         company_name = _get_company_name(ticker, market_info)
         logger.debug(f"📈 [DEBUG] 公司名称: {ticker} -> {company_name}")
 
-        if toolkit.config["online_tools"]:
-            # 使用统一的市场数据工具，工具内部会自动识别股票类型
-            logger.info(f"📊 [市场分析师] 使用统一市场数据工具，自动识别股票类型")
-            logger.info(f"📊 [市场分析师] 配置: online_tools={toolkit.config['online_tools']}")
-            tools = [toolkit.get_stock_market_data_unified]
-            # 安全地获取工具名称用于调试
-            tool_names_debug = []
-            for tool in tools:
-                if hasattr(tool, 'name'):
-                    tool_names_debug.append(tool.name)
-                elif hasattr(tool, '__name__'):
-                    tool_names_debug.append(tool.__name__)
-                else:
-                    tool_names_debug.append(str(tool))
-            logger.info(f"📊 [市场分析师] 绑定的工具: {tool_names_debug}")
-            logger.info(f"📊 [市场分析师] 目标市场: {market_info['market_name']}")
-        else:
-            logger.info(f"📊 [市场分析师] 使用离线工具")
-            tools = [
-                toolkit.get_YFin_data,
-                toolkit.get_stockstats_indicators_report,
-            ]
+        # 统一使用 get_stock_market_data_unified 工具
+        # 该工具内部会自动识别股票类型（A股/港股/美股）并调用相应的数据源
+        logger.info(f"📊 [市场分析师] 使用统一市场数据工具，自动识别股票类型")
+        tools = [toolkit.get_stock_market_data_unified]
+
+        # 安全地获取工具名称用于调试
+        tool_names_debug = []
+        for tool in tools:
+            if hasattr(tool, 'name'):
+                tool_names_debug.append(tool.name)
+            elif hasattr(tool, '__name__'):
+                tool_names_debug.append(tool.__name__)
+            else:
+                tool_names_debug.append(str(tool))
+        logger.info(f"📊 [市场分析师] 绑定的工具: {tool_names_debug}")
+        logger.info(f"📊 [市场分析师] 目标市场: {market_info['market_name']}")
 
         # 统一的系统提示，适用于所有股票类型
         system_message = (

@@ -114,41 +114,23 @@ def create_fundamentals_analyst(llm, toolkit):
         company_name = _get_company_name_for_fundamentals(ticker, market_info)
         logger.debug(f"📊 [DEBUG] 公司名称: {ticker} -> {company_name}")
 
-        # 选择工具
-        if toolkit.config["online_tools"]:
-            # 使用统一的基本面分析工具，工具内部会自动识别股票类型
-            logger.info(f"📊 [基本面分析师] 使用统一基本面分析工具，自动识别股票类型")
-            logger.info(f"📊 [基本面分析师] 配置: online_tools={toolkit.config['online_tools']}")
-            tools = [toolkit.get_stock_fundamentals_unified]
-            # 安全地获取工具名称用于调试
-            tool_names_debug = []
-            for tool in tools:
-                if hasattr(tool, 'name'):
-                    tool_names_debug.append(tool.name)
-                elif hasattr(tool, '__name__'):
-                    tool_names_debug.append(tool.__name__)
-                else:
-                    tool_names_debug.append(str(tool))
-            logger.info(f"📊 [基本面分析师] 绑定的工具: {tool_names_debug}")
-            logger.info(f"📊 [基本面分析师] 目标市场: {market_info['market_name']}")
-        else:
-            # 离线模式：优先使用FinnHub数据，SimFin作为补充
-            if market_info['is_china']:
-                # A股使用本地缓存数据
-                tools = [
-                    toolkit.get_china_stock_data,
-                    toolkit.get_china_fundamentals
-                ]
+        # 统一使用 get_stock_fundamentals_unified 工具
+        # 该工具内部会自动识别股票类型（A股/港股/美股）并调用相应的数据源
+        # 对于A股，它会自动获取价格数据和基本面数据，无需LLM调用多个工具
+        logger.info(f"📊 [基本面分析师] 使用统一基本面分析工具，自动识别股票类型")
+        tools = [toolkit.get_stock_fundamentals_unified]
+
+        # 安全地获取工具名称用于调试
+        tool_names_debug = []
+        for tool in tools:
+            if hasattr(tool, 'name'):
+                tool_names_debug.append(tool.name)
+            elif hasattr(tool, '__name__'):
+                tool_names_debug.append(tool.__name__)
             else:
-                # 美股/港股：优先FinnHub，SimFin作为补充
-                tools = [
-                    toolkit.get_fundamentals_openai,  # 使用现有的OpenAI基本面数据工具
-                    toolkit.get_finnhub_company_insider_sentiment,
-                    toolkit.get_finnhub_company_insider_transactions,
-                    toolkit.get_simfin_balance_sheet,
-                    toolkit.get_simfin_cashflow,
-                    toolkit.get_simfin_income_stmt,
-                ]
+                tool_names_debug.append(str(tool))
+        logger.info(f"📊 [基本面分析师] 绑定的工具: {tool_names_debug}")
+        logger.info(f"📊 [基本面分析师] 目标市场: {market_info['market_name']}")
 
         # 统一的系统提示，适用于所有股票类型
         system_message = (
