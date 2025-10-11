@@ -1057,20 +1057,35 @@ const getAnalysisReports = (data: any) => {
     return reports
   }
 
-  // 定义报告映射
+  // 定义报告映射（按照完整的分析流程顺序）
   const reportMappings = [
-    { key: 'market_report', title: '📈 市场技术分析' },
-    { key: 'fundamentals_report', title: '💰 基本面分析' },
-    { key: 'news_report', title: '📰 新闻事件分析' },
-    { key: 'sentiment_report', title: '💭 市场情绪分析' },
-    { key: 'investment_plan', title: '📋 投资建议' },
-    { key: 'trader_investment_plan', title: '💼 交易团队计划' },
-    { key: 'final_trade_decision', title: '🎯 最终交易决策' },
-    { key: 'research_team_decision', title: '🔬 研究团队决策' },
-    { key: 'risk_management_decision', title: '⚖️ 风险管理团队' },
+    // 分析师团队 (4个)
+    { key: 'market_report', title: '📈 市场技术分析', category: '分析师团队' },
+    { key: 'sentiment_report', title: '💭 市场情绪分析', category: '分析师团队' },
+    { key: 'news_report', title: '📰 新闻事件分析', category: '分析师团队' },
+    { key: 'fundamentals_report', title: '💰 基本面分析', category: '分析师团队' },
+
+    // 研究团队 (3个)
+    { key: 'bull_researcher', title: '🐂 多头研究员', category: '研究团队' },
+    { key: 'bear_researcher', title: '🐻 空头研究员', category: '研究团队' },
+    { key: 'research_team_decision', title: '🔬 研究经理决策', category: '研究团队' },
+
+    // 交易团队 (1个)
+    { key: 'trader_investment_plan', title: '💼 交易员计划', category: '交易团队' },
+
+    // 风险管理团队 (4个)
+    { key: 'risky_analyst', title: '⚡ 激进分析师', category: '风险管理团队' },
+    { key: 'safe_analyst', title: '🛡️ 保守分析师', category: '风险管理团队' },
+    { key: 'neutral_analyst', title: '⚖️ 中性分析师', category: '风险管理团队' },
+    { key: 'risk_management_decision', title: '👔 投资组合经理', category: '风险管理团队' },
+
+    // 最终决策 (1个)
+    { key: 'final_trade_decision', title: '🎯 最终交易决策', category: '最终决策' },
+
     // 兼容旧格式
-    { key: 'investment_debate_state', title: '🔬 研究团队决策' },
-    { key: 'risk_debate_state', title: '⚖️ 风险管理团队' }
+    { key: 'investment_plan', title: '📋 投资建议', category: '其他' },
+    { key: 'investment_debate_state', title: '🔬 研究团队决策（旧）', category: '其他' },
+    { key: 'risk_debate_state', title: '⚖️ 风险管理团队（旧）', category: '其他' }
   ]
 
   // 遍历所有可能的报告
