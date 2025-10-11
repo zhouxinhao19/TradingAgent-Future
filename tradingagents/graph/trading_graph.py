@@ -611,7 +611,7 @@ class TradingAgentsGraph:
         Returns:
             性能数据字典
         """
-        # 节点分类
+        # 节点分类（注意：风险管理节点要先于分析师节点判断，因为它们也包含'Analyst'）
         analyst_nodes = {}
         tool_nodes = {}
         msg_clear_nodes = {}
@@ -621,18 +621,25 @@ class TradingAgentsGraph:
         other_nodes = {}
 
         for node_name, elapsed in node_timings.items():
-            if 'Analyst' in node_name:
+            # 优先匹配风险管理团队（因为它们也包含'Analyst'）
+            if 'Risky' in node_name or 'Safe' in node_name or 'Neutral' in node_name or 'Risk Judge' in node_name:
+                risk_nodes[node_name] = elapsed
+            # 然后匹配分析师团队
+            elif 'Analyst' in node_name:
                 analyst_nodes[node_name] = elapsed
+            # 工具节点
             elif node_name.startswith('tools_'):
                 tool_nodes[node_name] = elapsed
+            # 消息清理节点
             elif node_name.startswith('Msg Clear'):
                 msg_clear_nodes[node_name] = elapsed
+            # 研究团队
             elif 'Researcher' in node_name or 'Research Manager' in node_name:
                 research_nodes[node_name] = elapsed
+            # 交易团队
             elif 'Trader' in node_name:
                 trader_nodes[node_name] = elapsed
-            elif 'Risky' in node_name or 'Safe' in node_name or 'Neutral' in node_name or 'Risk Judge' in node_name:
-                risk_nodes[node_name] = elapsed
+            # 其他节点
             else:
                 other_nodes[node_name] = elapsed
 
@@ -714,7 +721,7 @@ class TradingAgentsGraph:
         logger.info("⏱️  分析性能统计报告")
         logger.info("=" * 80)
 
-        # 节点分类
+        # 节点分类（注意：风险管理节点要先于分析师节点判断，因为它们也包含'Analyst'）
         analyst_nodes = []
         tool_nodes = []
         msg_clear_nodes = []
@@ -724,18 +731,25 @@ class TradingAgentsGraph:
         other_nodes = []
 
         for node_name, elapsed in node_timings.items():
-            if 'Analyst' in node_name:
+            # 优先匹配风险管理团队（因为它们也包含'Analyst'）
+            if 'Risky' in node_name or 'Safe' in node_name or 'Neutral' in node_name or 'Risk Judge' in node_name:
+                risk_nodes.append((node_name, elapsed))
+            # 然后匹配分析师团队
+            elif 'Analyst' in node_name:
                 analyst_nodes.append((node_name, elapsed))
+            # 工具节点
             elif node_name.startswith('tools_'):
                 tool_nodes.append((node_name, elapsed))
+            # 消息清理节点
             elif node_name.startswith('Msg Clear'):
                 msg_clear_nodes.append((node_name, elapsed))
+            # 研究团队
             elif 'Researcher' in node_name or 'Research Manager' in node_name:
                 research_nodes.append((node_name, elapsed))
+            # 交易团队
             elif 'Trader' in node_name:
                 trader_nodes.append((node_name, elapsed))
-            elif 'Risky' in node_name or 'Safe' in node_name or 'Neutral' in node_name or 'Risk Judge' in node_name:
-                risk_nodes.append((node_name, elapsed))
+            # 其他节点
             else:
                 other_nodes.append((node_name, elapsed))
 
