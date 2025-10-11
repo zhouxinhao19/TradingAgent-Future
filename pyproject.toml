@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tradingagents"
-version = "1.0.0-preview"
-description = "AI-powered multi-agent trading analysis framework with Chinese market support"
+version = "0.1.13-preview"
+description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -16,35 +16,26 @@ dependencies = [
     "chromadb>=1.0.12",
     "dashscope>=1.20.0",
     "eodhd>=1.0.32",
-    "fastapi>=0.115.0",
     "feedparser>=6.0.11",
     "finnhub-python>=2.4.23",
-    # unify on LangChain; drop legacy direct SDK to avoid dependency conflicts
-    # "google-generativeai>=0.8.0",
-    # ensure base API library stays in the range supported by langchain-google-genai
-    "google-ai-generativelanguage>=0.6.18,<0.7.0",
+    "google-genai>=0.1.0",
+    "google-generativeai>=0.8.0",
     "langchain-anthropic>=0.3.15",
     "langchain-experimental>=0.3.4",
     "langchain-google-genai>=2.1.5",
     "langchain-openai>=0.3.23",
     "langgraph>=0.4.8",
     "markdown>=3.4.0",
-    "motor>=3.0.0",
-    "PyJWT>=2.8.0",
-    "pydantic-settings>=2.4.0",
     "openai>=1.0.0,<2.0.0",
-    "openpyxl>=3.1.0",
     "pandas>=2.3.0",
     "parsel>=1.10.0",
     "plotly>=5.0.0",
     "praw>=7.8.1",
     "psutil>=6.1.0",
-    "APScheduler>=3.10.4",
     "pymongo>=4.0.0",
     "pypandoc>=1.11",
     "python-dotenv>=1.0.0",
-    "pytdx>=1.72",
-    "pytz>=2024.1",
+    "pytz>=2025.2",
     "questionary>=2.1.0",
     "redis>=6.2.0",
     "requests>=2.32.4",
@@ -52,10 +43,10 @@ dependencies = [
     "setuptools>=80.9.0",
     "stockstats>=0.6.5",
     "streamlit>=1.28.0",
+    "toml>=0.10.2",
     "tqdm>=4.67.1",
     "tushare>=1.4.21",
     "typing-extensions>=4.14.0",
-    "uvicorn>=0.32.0",
     "yfinance>=0.2.63",
 ]
 

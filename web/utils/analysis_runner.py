@@ -195,7 +195,14 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
     if TOKEN_TRACKING_ENABLED:
         estimated_input = 2000 * len(analysts)  # 估算每个分析师2000个输入token
         estimated_output = 1000 * len(analysts)  # 估算每个分析师1000个输出token
-        estimated_cost = token_tracker.estimate_cost(llm_provider, llm_model, estimated_input, estimated_output)
+        estimated_cost_result = token_tracker.estimate_cost(llm_provider, llm_model, estimated_input, estimated_output)
+
+        # estimate_cost 返回 tuple (cost, currency)
+        if isinstance(estimated_cost_result, tuple):
+            estimated_cost, currency = estimated_cost_result
+        else:
+            estimated_cost = estimated_cost_result
+            currency = "CNY"
 
         update_progress(f"💰 预估分析成本: ¥{estimated_cost:.4f}")
 
