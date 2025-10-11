@@ -118,6 +118,7 @@ def create_fundamentals_analyst(llm, toolkit):
         if toolkit.config["online_tools"]:
             # 使用统一的基本面分析工具，工具内部会自动识别股票类型
             logger.info(f"📊 [基本面分析师] 使用统一基本面分析工具，自动识别股票类型")
+            logger.info(f"📊 [基本面分析师] 配置: online_tools={toolkit.config['online_tools']}")
             tools = [toolkit.get_stock_fundamentals_unified]
             # 安全地获取工具名称用于调试
             tool_names_debug = []
@@ -128,8 +129,8 @@ def create_fundamentals_analyst(llm, toolkit):
                     tool_names_debug.append(tool.__name__)
                 else:
                     tool_names_debug.append(str(tool))
-            logger.debug(f"📊 [DEBUG] 选择的工具: {tool_names_debug}")
-            logger.debug(f"📊 [DEBUG] 🔧 统一工具将自动处理: {market_info['market_name']}")
+            logger.info(f"📊 [基本面分析师] 绑定的工具: {tool_names_debug}")
+            logger.info(f"📊 [基本面分析师] 目标市场: {market_info['market_name']}")
         else:
             # 离线模式：优先使用FinnHub数据，SimFin作为补充
             if market_info['is_china']:
@@ -242,31 +243,32 @@ def create_fundamentals_analyst(llm, toolkit):
         logger.debug(f"📊 [DEBUG] 绑定的工具列表: {debug_tool_names}")
         logger.debug(f"📊 [DEBUG] 创建工具链，让模型自主决定是否调用工具")
 
+        # 添加详细日志
+        logger.info(f"📊 [基本面分析师] LLM类型: {fresh_llm.__class__.__name__}")
+        logger.info(f"📊 [基本面分析师] LLM模型: {getattr(fresh_llm, 'model_name', 'unknown')}")
+        logger.info(f"📊 [基本面分析师] 消息历史数量: {len(state['messages'])}")
+
         try:
             chain = prompt | fresh_llm.bind_tools(tools)
-            logger.debug(f"📊 [DEBUG] ✅ 工具绑定成功，绑定了 {len(tools)} 个工具")
+            logger.info(f"📊 [基本面分析师] ✅ 工具绑定成功，绑定了 {len(tools)} 个工具")
         except Exception as e:
-            logger.error(f"📊 [DEBUG] ❌ 工具绑定失败: {e}")
+            logger.error(f"📊 [基本面分析师] ❌ 工具绑定失败: {e}")
             raise e
 
-        logger.debug(f"📊 [DEBUG] 调用LLM链...")
+        logger.info(f"📊 [基本面分析师] 开始调用LLM...")
 
         # 添加详细的股票代码追踪日志
         logger.info(f"🔍 [股票代码追踪] LLM调用前，ticker参数: '{ticker}'")
         logger.info(f"🔍 [股票代码追踪] 传递给LLM的消息数量: {len(state['messages'])}")
 
-        # 检查消息内容中是否有其他股票代码
-        for i, msg in enumerate(state["messages"]):
-            if hasattr(msg, 'content') and msg.content:
-                content = str(msg.content)
-                if "002021" in content:
-                    logger.warning(f"🔍 [股票代码追踪] 警告：消息 {i} 中包含错误股票代码 002021")
-                    logger.warning(f"🔍 [股票代码追踪] 消息内容: {content[:200]}...")
-                if "002027" in content:
-                    logger.info(f"🔍 [股票代码追踪] 消息 {i} 中包含正确股票代码 002027")
-
         result = chain.invoke(state["messages"])
-        logger.debug(f"📊 [DEBUG] LLM调用完成")
+        logger.info(f"📊 [基本面分析师] LLM调用完成")
+        logger.info(f"📊 [基本面分析师] - 是否有tool_calls: {hasattr(result, 'tool_calls')}")
+        if hasattr(result, 'tool_calls'):
+            logger.info(f"📊 [基本面分析师] - tool_calls数量: {len(result.tool_calls)}")
+            if result.tool_calls:
+                for i, tc in enumerate(result.tool_calls):
+                    logger.info(f"📊 [基本面分析师] - tool_call[{i}]: {tc.get('name', 'unknown')}")
 
         # 使用统一的Google工具调用处理器
         if GoogleToolCallHandler.is_google_model(fresh_llm):

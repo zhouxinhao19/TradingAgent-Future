@@ -1,6 +1,4 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.agents import create_react_agent, AgentExecutor
-from langchain import hub
 import time
 import json
 import traceback
@@ -80,189 +78,6 @@ def _get_company_name(ticker: str, market_info: dict) -> str:
         return f"股票{ticker}"
 
 
-def create_market_analyst_react(llm, toolkit):
-    """使用ReAct Agent模式的市场分析师（适用于通义千问）"""
-    @log_analyst_module("market_react")
-    def market_analyst_react_node(state):
-        logger.debug(f"📈 [DEBUG] ===== ReAct市场分析师节点开始 =====")
-
-        current_date = state["trade_date"]
-        ticker = state["company_of_interest"]
-
-        logger.debug(f"📈 [DEBUG] 输入参数: ticker={ticker}, date={current_date}")
-
-        # 检查是否为中国股票
-        def is_china_stock(ticker_code):
-            import re
-            return re.match(r'^\d{6}$', str(ticker_code))
-
-        is_china = is_china_stock(ticker)
-        logger.debug(f"📈 [DEBUG] 股票类型检查: {ticker} -> 中国A股: {is_china}")
-
-        if toolkit.config["online_tools"]:
-            # 在线模式，使用ReAct Agent
-            if is_china:
-                logger.info(f"📈 [市场分析师] 使用ReAct Agent分析中国股票")
-
-                # 创建中国股票数据工具
-                from langchain_core.tools import BaseTool
-
-                class ChinaStockDataTool(BaseTool):
-                    name: str = "get_china_stock_data"
-                    description: str = f"获取中国A股股票{ticker}的市场数据和技术指标（优化缓存版本）。直接调用，无需参数。"
-
-                    def _run(self, query: str = "") -> str:
-                        try:
-                            logger.debug(f"📈 [DEBUG] ChinaStockDataTool调用，股票代码: {ticker}")
-                            # 使用优化的缓存数据获取
-                            from tradingagents.dataflows.optimized_china_data import get_china_stock_data_cached
-                            return get_china_stock_data_cached(
-                                symbol=ticker,
-                                start_date='2025-05-28',
-                                end_date=current_date,
-                                force_refresh=False
-                            )
-                        except Exception as e:
-                            logger.error(f"❌ 优化A股数据获取失败: {e}")
-                            # 备用方案：使用原始API
-                            try:
-                                return toolkit.get_china_stock_data.invoke({
-                                    'stock_code': ticker,
-                                    'start_date': '2025-05-28',
-                                    'end_date': current_date
-                                })
-                            except Exception as e2:
-                                return f"获取股票数据失败: {str(e2)}"
-
-                tools = [ChinaStockDataTool()]
-                query = f"""请对中国A股股票{ticker}进行详细的技术分析。
-
-执行步骤：
-1. 使用get_china_stock_data工具获取股票市场数据
-2. 基于获取的真实数据进行深入的技术指标分析
-3. 直接输出完整的技术分析报告内容
-
-重要要求：
-- 必须输出完整的技术分析报告内容，不要只是描述报告已完成
-- 报告必须基于工具获取的真实数据进行分析
-- 报告长度不少于800字
-- 包含具体的数据、指标数值和专业分析
-
-报告格式应包含：
-## 股票基本信息
-## 技术指标分析
-## 价格趋势分析
-## 成交量分析
-## 市场情绪分析
-## 投资建议"""
-            else:
-                logger.info(f"📈 [市场分析师] 使用ReAct Agent分析美股/港股")
-
-                # 创建美股数据工具
-                from langchain_core.tools import BaseTool
-
-                class USStockDataTool(BaseTool):
-                    name: str = "get_us_stock_data"
-                    description: str = f"获取美股/港股{ticker}的市场数据和技术指标（优化缓存版本）。直接调用，无需参数。"
-
-                    def _run(self, query: str = "") -> str:
-                        try:
-                            logger.debug(f"📈 [DEBUG] USStockDataTool调用，股票代码: {ticker}")
-                            # 使用优化的缓存数据获取
-                            from tradingagents.dataflows.optimized_us_data import get_us_stock_data_cached
-                            return get_us_stock_data_cached(
-                                symbol=ticker,
-                                start_date='2025-05-28',
-                                end_date=current_date,
-                                force_refresh=False
-                            )
-                        except Exception as e:
-                            logger.error(f"❌ 优化美股数据获取失败: {e}")
-                            # 备用方案：使用原始API
-                            try:
-                                return toolkit.get_YFin_data_online.invoke({
-                                    'symbol': ticker,
-                                    'start_date': '2025-05-28',
-                                    'end_date': current_date
-                                })
-                            except Exception as e2:
-                                return f"获取股票数据失败: {str(e2)}"
-
-                class FinnhubNewsTool(BaseTool):
-                    name: str = "get_finnhub_news"
-                    description: str = f"获取美股{ticker}的最新新闻和市场情绪（通过FINNHUB API）。直接调用，无需参数。"
-
-                    def _run(self, query: str = "") -> str:
-                        try:
-                            logger.debug(f"📈 [DEBUG] FinnhubNewsTool调用，股票代码: {ticker}")
-                            return toolkit.get_finnhub_news.invoke({
-                                'ticker': ticker,
-                                'start_date': '2025-05-28',
-                                'end_date': current_date
-                            })
-                        except Exception as e:
-                            return f"获取新闻数据失败: {str(e)}"
-
-                tools = [USStockDataTool(), FinnhubNewsTool()]
-                query = f"""请对美股{ticker}进行详细的技术分析。
-
-执行步骤：
-1. 使用get_us_stock_data工具获取股票市场数据和技术指标（通过FINNHUB API）
-2. 使用get_finnhub_news工具获取最新新闻和市场情绪
-3. 基于获取的真实数据进行深入的技术指标分析
-4. 直接输出完整的技术分析报告内容
-
-重要要求：
-- 必须输出完整的技术分析报告内容，不要只是描述报告已完成
-- 报告必须基于工具获取的真实数据进行分析
-- 报告长度不少于800字
-- 包含具体的数据、指标数值和专业分析
-- 结合新闻信息分析市场情绪
-
-报告格式应包含：
-## 股票基本信息
-## 技术指标分析
-## 价格趋势分析
-## 成交量分析
-## 新闻和市场情绪分析
-## 投资建议"""
-
-            try:
-                # 创建ReAct Agent
-                prompt = hub.pull("hwchase17/react")
-                agent = create_react_agent(llm, tools, prompt)
-                agent_executor = AgentExecutor(
-                    agent=agent,
-                    tools=tools,
-                    verbose=True,
-                    handle_parsing_errors=True,
-                    max_iterations=10,  # 增加到10次迭代，确保有足够时间完成分析
-                    max_execution_time=180  # 增加到3分钟，给更多时间生成详细报告
-                )
-
-                logger.debug(f"📈 [DEBUG] 执行ReAct Agent查询...")
-                result = agent_executor.invoke({'input': query})
-
-                report = result['output']
-                logger.info(f"📈 [市场分析师] ReAct Agent完成，报告长度: {len(report)}")
-
-            except Exception as e:
-                logger.error(f"❌ [DEBUG] ReAct Agent失败: {str(e)}")
-                report = f"ReAct Agent市场分析失败: {str(e)}"
-        else:
-            # 离线模式，使用原有逻辑
-            report = "离线模式，暂不支持"
-
-        logger.debug(f"📈 [DEBUG] ===== ReAct市场分析师节点结束 =====")
-
-        return {
-            "messages": [("assistant", report)],
-            "market_report": report,
-        }
-
-    return market_analyst_react_node
-
-
 def create_market_analyst(llm, toolkit):
 
     def market_analyst_node(state):
@@ -289,6 +104,7 @@ def create_market_analyst(llm, toolkit):
         if toolkit.config["online_tools"]:
             # 使用统一的市场数据工具，工具内部会自动识别股票类型
             logger.info(f"📊 [市场分析师] 使用统一市场数据工具，自动识别股票类型")
+            logger.info(f"📊 [市场分析师] 配置: online_tools={toolkit.config['online_tools']}")
             tools = [toolkit.get_stock_market_data_unified]
             # 安全地获取工具名称用于调试
             tool_names_debug = []
@@ -299,9 +115,10 @@ def create_market_analyst(llm, toolkit):
                     tool_names_debug.append(tool.__name__)
                 else:
                     tool_names_debug.append(str(tool))
-            logger.debug(f"📊 [DEBUG] 选择的工具: {tool_names_debug}")
-            logger.debug(f"📊 [DEBUG] 🔧 统一工具将自动处理: {market_info['market_name']}")
+            logger.info(f"📊 [市场分析师] 绑定的工具: {tool_names_debug}")
+            logger.info(f"📊 [市场分析师] 目标市场: {market_info['market_name']}")
         else:
+            logger.info(f"📊 [市场分析师] 使用离线工具")
             tools = [
                 toolkit.get_YFin_data,
                 toolkit.get_stockstats_indicators_report,
@@ -378,9 +195,16 @@ def create_market_analyst(llm, toolkit):
         prompt = prompt.partial(ticker=ticker)
         prompt = prompt.partial(company_name=company_name)
 
+        # 添加详细日志
+        logger.info(f"📊 [市场分析师] LLM类型: {llm.__class__.__name__}")
+        logger.info(f"📊 [市场分析师] LLM模型: {getattr(llm, 'model_name', 'unknown')}")
+        logger.info(f"📊 [市场分析师] 消息历史数量: {len(state['messages'])}")
+
         chain = prompt | llm.bind_tools(tools)
 
+        logger.info(f"📊 [市场分析师] 开始调用LLM...")
         result = chain.invoke(state["messages"])
+        logger.info(f"📊 [市场分析师] LLM调用完成")
 
         # 使用统一的Google工具调用处理器
         if GoogleToolCallHandler.is_google_model(llm):
@@ -410,17 +234,24 @@ def create_market_analyst(llm, toolkit):
             }
         else:
             # 非Google模型的处理逻辑
-            logger.debug(f"📊 [DEBUG] 非Google模型 ({llm.__class__.__name__})，使用标准处理逻辑")
-            
+            logger.info(f"📊 [市场分析师] 非Google模型 ({llm.__class__.__name__})，使用标准处理逻辑")
+            logger.info(f"📊 [市场分析师] 检查LLM返回结果...")
+            logger.info(f"📊 [市场分析师] - 是否有tool_calls: {hasattr(result, 'tool_calls')}")
+            if hasattr(result, 'tool_calls'):
+                logger.info(f"📊 [市场分析师] - tool_calls数量: {len(result.tool_calls)}")
+                if result.tool_calls:
+                    for i, tc in enumerate(result.tool_calls):
+                        logger.info(f"📊 [市场分析师] - tool_call[{i}]: {tc.get('name', 'unknown')}")
+
             # 处理市场分析报告
             if len(result.tool_calls) == 0:
                 # 没有工具调用，直接使用LLM的回复
                 report = result.content
-                logger.info(f"📊 [市场分析师] 直接回复，长度: {len(report)}")
+                logger.info(f"📊 [市场分析师] ✅ 直接回复（无工具调用），长度: {len(report)}")
                 logger.debug(f"📊 [DEBUG] 直接回复内容预览: {report[:200]}...")
             else:
                 # 有工具调用，执行工具并生成完整分析报告
-                logger.info(f"📊 [市场分析师] 工具调用: {[call.get('name', 'unknown') for call in result.tool_calls]}")
+                logger.info(f"📊 [市场分析师] 🔧 检测到工具调用: {[call.get('name', 'unknown') for call in result.tool_calls]}")
 
                 try:
                     # 执行工具调用

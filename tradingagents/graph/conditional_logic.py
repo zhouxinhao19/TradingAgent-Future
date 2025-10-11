@@ -17,19 +17,37 @@ class ConditionalLogic:
 
     def should_continue_market(self, state: AgentState):
         """Determine if market analysis should continue."""
+        from tradingagents.utils.logging_init import get_logger
+        logger = get_logger("agents")
+
         messages = state["messages"]
         last_message = messages[-1]
 
         # 检查是否已经有市场分析报告
         market_report = state.get("market_report", "")
 
+        logger.info(f"🔀 [条件判断] should_continue_market")
+        logger.info(f"🔀 [条件判断] - 消息数量: {len(messages)}")
+        logger.info(f"🔀 [条件判断] - 报告长度: {len(market_report)}")
+        logger.info(f"🔀 [条件判断] - 最后消息类型: {type(last_message).__name__}")
+        logger.info(f"🔀 [条件判断] - 是否有tool_calls: {hasattr(last_message, 'tool_calls')}")
+        if hasattr(last_message, 'tool_calls'):
+            logger.info(f"🔀 [条件判断] - tool_calls数量: {len(last_message.tool_calls) if last_message.tool_calls else 0}")
+            if last_message.tool_calls:
+                for i, tc in enumerate(last_message.tool_calls):
+                    logger.info(f"🔀 [条件判断] - tool_call[{i}]: {tc.get('name', 'unknown')}")
+
         # 如果已经有报告内容，说明分析已完成，不再循环
         if market_report and len(market_report) > 100:
+            logger.info(f"🔀 [条件判断] ✅ 报告已完成，返回: Msg Clear Market")
             return "Msg Clear Market"
 
         # 只有AIMessage才有tool_calls属性
         if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
+            logger.info(f"🔀 [条件判断] 🔧 检测到tool_calls，返回: tools_market")
             return "tools_market"
+
+        logger.info(f"🔀 [条件判断] ✅ 无tool_calls，返回: Msg Clear Market")
         return "Msg Clear Market"
 
     def should_continue_social(self, state: AgentState):
@@ -68,19 +86,34 @@ class ConditionalLogic:
 
     def should_continue_fundamentals(self, state: AgentState):
         """Determine if fundamentals analysis should continue."""
+        from tradingagents.utils.logging_init import get_logger
+        logger = get_logger("agents")
+
         messages = state["messages"]
         last_message = messages[-1]
 
         # 检查是否已经有基本面报告
         fundamentals_report = state.get("fundamentals_report", "")
 
+        logger.info(f"🔀 [条件判断] should_continue_fundamentals")
+        logger.info(f"🔀 [条件判断] - 消息数量: {len(messages)}")
+        logger.info(f"🔀 [条件判断] - 报告长度: {len(fundamentals_report)}")
+        logger.info(f"🔀 [条件判断] - 最后消息类型: {type(last_message).__name__}")
+        logger.info(f"🔀 [条件判断] - 是否有tool_calls: {hasattr(last_message, 'tool_calls')}")
+        if hasattr(last_message, 'tool_calls'):
+            logger.info(f"🔀 [条件判断] - tool_calls数量: {len(last_message.tool_calls) if last_message.tool_calls else 0}")
+
         # 如果已经有报告内容，说明分析已完成，不再循环
         if fundamentals_report and len(fundamentals_report) > 100:
+            logger.info(f"🔀 [条件判断] ✅ 报告已完成，返回: Msg Clear Fundamentals")
             return "Msg Clear Fundamentals"
 
         # 只有AIMessage才有tool_calls属性
         if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
+            logger.info(f"🔀 [条件判断] 🔧 检测到tool_calls，返回: tools_fundamentals")
             return "tools_fundamentals"
+
+        logger.info(f"🔀 [条件判断] ✅ 无tool_calls，返回: Msg Clear Fundamentals")
         return "Msg Clear Fundamentals"
 
     def should_continue_debate(self, state: AgentState) -> str:
