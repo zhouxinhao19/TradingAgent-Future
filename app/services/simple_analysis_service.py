@@ -854,11 +854,12 @@ class SimpleAnalysisService:
 
             logger.info(f"🚀 准备调用 trading_graph.propagate，progress_callback={graph_progress_callback}")
 
-            # 执行实际分析，传递进度回调
+            # 执行实际分析，传递进度回调和task_id
             state, decision = trading_graph.propagate(
                 request.stock_code,
                 analysis_date,
-                progress_callback=graph_progress_callback
+                progress_callback=graph_progress_callback,
+                task_id=task_id
             )
 
             logger.info(f"✅ trading_graph.propagate 执行完成")
@@ -1153,7 +1154,9 @@ class SimpleAnalysisService:
                 # 添加提取的报告内容
                 "reports": reports,
                 # 🔥 关键修复：添加格式化后的decision字段！
-                "decision": formatted_decision
+                "decision": formatted_decision,
+                # 🆕 性能指标数据
+                "performance_metrics": state.get("performance_metrics", {}) if isinstance(state, dict) else {}
             }
 
             logger.info(f"✅ [线程池] 分析完成: {task_id} - 耗时{execution_time:.2f}秒")
@@ -1776,7 +1779,10 @@ class SimpleAnalysisService:
                 "risk_level": result.get("risk_level", "中等"),
                 "key_points": result.get("key_points", []),
                 "execution_time": result.get("execution_time", 0),
-                "tokens_used": result.get("tokens_used", 0)
+                "tokens_used": result.get("tokens_used", 0),
+
+                # 🆕 性能指标数据
+                "performance_metrics": result.get("performance_metrics", {})
             }
 
             # 保存到analysis_reports集合（与web目录保持一致）

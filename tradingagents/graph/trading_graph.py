@@ -345,19 +345,21 @@ class TradingAgentsGraph:
             ),
         }
 
-    def propagate(self, company_name, trade_date, progress_callback=None):
+    def propagate(self, company_name, trade_date, progress_callback=None, task_id=None):
         """Run the trading agents graph for a company on a specific date.
 
         Args:
             company_name: Company name or stock symbol
             trade_date: Date for analysis
             progress_callback: Optional callback function for progress updates
+            task_id: Optional task ID for tracking performance data
         """
 
         # 添加详细的接收日志
         logger.debug(f"🔍 [GRAPH DEBUG] ===== TradingAgentsGraph.propagate 接收参数 =====")
         logger.debug(f"🔍 [GRAPH DEBUG] 接收到的company_name: '{company_name}' (类型: {type(company_name)})")
         logger.debug(f"🔍 [GRAPH DEBUG] 接收到的trade_date: '{trade_date}' (类型: {type(trade_date)})")
+        logger.debug(f"🔍 [GRAPH DEBUG] 接收到的task_id: '{task_id}'")
 
         self.ticker = company_name
         logger.debug(f"🔍 [GRAPH DEBUG] 设置self.ticker: '{self.ticker}'")
@@ -375,6 +377,9 @@ class TradingAgentsGraph:
         total_start_time = time.time()  # 总体开始时间
         current_node_start = None  # 当前节点开始时间
         current_node_name = None  # 当前节点名称
+
+        # 保存task_id用于后续保存性能数据
+        self._current_task_id = task_id
 
         # 根据是否有进度回调选择不同的stream_mode
         args = self.propagator.get_graph_args(use_progress_callback=bool(progress_callback))
@@ -464,6 +469,12 @@ class TradingAgentsGraph:
 
         # 打印详细的时间统计
         self._print_timing_summary(node_timings, total_elapsed)
+
+        # 构建性能数据
+        performance_data = self._build_performance_data(node_timings, total_elapsed)
+
+        # 将性能数据添加到状态中
+        final_state['performance_metrics'] = performance_data
 
         # Store current state for reflection
         self.curr_state = final_state
@@ -558,6 +569,104 @@ class TradingAgentsGraph:
 
         except Exception as e:
             logger.error(f"❌ 进度更新失败: {e}", exc_info=True)
+
+    def _build_performance_data(self, node_timings: Dict[str, float], total_elapsed: float) -> Dict[str, Any]:
+        """构建性能数据结构
+
+        Args:
+            node_timings: 每个节点的执行时间字典
+            total_elapsed: 总执行时间
+
+        Returns:
+            性能数据字典
+        """
+        # 节点分类
+        analyst_nodes = {}
+        tool_nodes = {}
+        msg_clear_nodes = {}
+        research_nodes = {}
+        trader_nodes = {}
+        risk_nodes = {}
+        other_nodes = {}
+
+        for node_name, elapsed in node_timings.items():
+            if 'Analyst' in node_name:
+                analyst_nodes[node_name] = elapsed
+            elif node_name.startswith('tools_'):
+                tool_nodes[node_name] = elapsed
+            elif node_name.startswith('Msg Clear'):
+                msg_clear_nodes[node_name] = elapsed
+            elif 'Researcher' in node_name or 'Research Manager' in node_name:
+                research_nodes[node_name] = elapsed
+            elif 'Trader' in node_name:
+                trader_nodes[node_name] = elapsed
+            elif 'Risky' in node_name or 'Safe' in node_name or 'Neutral' in node_name or 'Risk Judge' in node_name:
+                risk_nodes[node_name] = elapsed
+            else:
+                other_nodes[node_name] = elapsed
+
+        # 计算统计数据
+        slowest_node = max(node_timings.items(), key=lambda x: x[1]) if node_timings else (None, 0)
+        fastest_node = min(node_timings.items(), key=lambda x: x[1]) if node_timings else (None, 0)
+        avg_time = sum(node_timings.values()) / len(node_timings) if node_timings else 0
+
+        return {
+            "total_time": round(total_elapsed, 2),
+            "total_time_minutes": round(total_elapsed / 60, 2),
+            "node_count": len(node_timings),
+            "average_node_time": round(avg_time, 2),
+            "slowest_node": {
+                "name": slowest_node[0],
+                "time": round(slowest_node[1], 2)
+            } if slowest_node[0] else None,
+            "fastest_node": {
+                "name": fastest_node[0],
+                "time": round(fastest_node[1], 2)
+            } if fastest_node[0] else None,
+            "node_timings": {k: round(v, 2) for k, v in node_timings.items()},
+            "category_timings": {
+                "analyst_team": {
+                    "nodes": {k: round(v, 2) for k, v in analyst_nodes.items()},
+                    "total": round(sum(analyst_nodes.values()), 2),
+                    "percentage": round(sum(analyst_nodes.values()) / total_elapsed * 100, 1) if total_elapsed > 0 else 0
+                },
+                "tool_calls": {
+                    "nodes": {k: round(v, 2) for k, v in tool_nodes.items()},
+                    "total": round(sum(tool_nodes.values()), 2),
+                    "percentage": round(sum(tool_nodes.values()) / total_elapsed * 100, 1) if total_elapsed > 0 else 0
+                },
+                "message_clearing": {
+                    "nodes": {k: round(v, 2) for k, v in msg_clear_nodes.items()},
+                    "total": round(sum(msg_clear_nodes.values()), 2),
+                    "percentage": round(sum(msg_clear_nodes.values()) / total_elapsed * 100, 1) if total_elapsed > 0 else 0
+                },
+                "research_team": {
+                    "nodes": {k: round(v, 2) for k, v in research_nodes.items()},
+                    "total": round(sum(research_nodes.values()), 2),
+                    "percentage": round(sum(research_nodes.values()) / total_elapsed * 100, 1) if total_elapsed > 0 else 0
+                },
+                "trader_team": {
+                    "nodes": {k: round(v, 2) for k, v in trader_nodes.items()},
+                    "total": round(sum(trader_nodes.values()), 2),
+                    "percentage": round(sum(trader_nodes.values()) / total_elapsed * 100, 1) if total_elapsed > 0 else 0
+                },
+                "risk_management_team": {
+                    "nodes": {k: round(v, 2) for k, v in risk_nodes.items()},
+                    "total": round(sum(risk_nodes.values()), 2),
+                    "percentage": round(sum(risk_nodes.values()) / total_elapsed * 100, 1) if total_elapsed > 0 else 0
+                },
+                "other": {
+                    "nodes": {k: round(v, 2) for k, v in other_nodes.items()},
+                    "total": round(sum(other_nodes.values()), 2),
+                    "percentage": round(sum(other_nodes.values()) / total_elapsed * 100, 1) if total_elapsed > 0 else 0
+                }
+            },
+            "llm_config": {
+                "provider": self.config.get('llm_provider', 'unknown'),
+                "deep_think_model": self.config.get('deep_think_llm', 'unknown'),
+                "quick_think_model": self.config.get('quick_think_llm', 'unknown')
+            }
+        }
 
     def _print_timing_summary(self, node_timings: Dict[str, float], total_elapsed: float):
         """打印详细的时间统计报告
