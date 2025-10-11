@@ -284,48 +284,59 @@ class TradingAgentsGraph:
         self.graph = self.graph_setup.setup_graph(selected_analysts)
 
     def _create_tool_nodes(self) -> Dict[str, ToolNode]:
-        """Create tool nodes for different data sources."""
+        """Create tool nodes for different data sources.
+
+        注意：ToolNode 包含所有可能的工具，但 LLM 只会调用它绑定的工具。
+        ToolNode 的作用是执行 LLM 生成的 tool_calls，而不是限制 LLM 可以调用哪些工具。
+        """
         return {
             "market": ToolNode(
                 [
-                    # 统一工具
+                    # 统一工具（推荐）
                     self.toolkit.get_stock_market_data_unified,
-                    # online tools
+                    # 在线工具（备用）
                     self.toolkit.get_YFin_data_online,
                     self.toolkit.get_stockstats_indicators_report_online,
-                    # offline tools
+                    # 离线工具（备用）
                     self.toolkit.get_YFin_data,
                     self.toolkit.get_stockstats_indicators_report,
                 ]
             ),
             "social": ToolNode(
                 [
-                    # online tools
+                    # 统一工具（推荐）
+                    self.toolkit.get_stock_sentiment_unified,
+                    # 在线工具（备用）
                     self.toolkit.get_stock_news_openai,
-                    # offline tools
+                    # 离线工具（备用）
                     self.toolkit.get_reddit_stock_info,
                 ]
             ),
             "news": ToolNode(
                 [
-                    # online tools
+                    # 统一工具（推荐）
+                    self.toolkit.get_stock_news_unified,
+                    # 在线工具（备用）
                     self.toolkit.get_global_news_openai,
                     self.toolkit.get_google_news,
-                    # offline tools
+                    # 离线工具（备用）
                     self.toolkit.get_finnhub_news,
                     self.toolkit.get_reddit_news,
                 ]
             ),
             "fundamentals": ToolNode(
                 [
-                    # 统一工具
+                    # 统一工具（推荐）
                     self.toolkit.get_stock_fundamentals_unified,
-                    # offline tools
+                    # 离线工具（备用）
                     self.toolkit.get_finnhub_company_insider_sentiment,
                     self.toolkit.get_finnhub_company_insider_transactions,
                     self.toolkit.get_simfin_balance_sheet,
                     self.toolkit.get_simfin_cashflow,
                     self.toolkit.get_simfin_income_stmt,
+                    # 中国市场工具（备用）
+                    self.toolkit.get_china_stock_data,
+                    self.toolkit.get_china_fundamentals,
                 ]
             ),
         }

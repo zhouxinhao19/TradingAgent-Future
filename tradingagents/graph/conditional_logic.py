@@ -20,6 +20,13 @@ class ConditionalLogic:
         messages = state["messages"]
         last_message = messages[-1]
 
+        # 检查是否已经有市场分析报告
+        market_report = state.get("market_report", "")
+
+        # 如果已经有报告内容，说明分析已完成，不再循环
+        if market_report and len(market_report) > 100:
+            return "Msg Clear Market"
+
         # 只有AIMessage才有tool_calls属性
         if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
             return "tools_market"
@@ -29,6 +36,13 @@ class ConditionalLogic:
         """Determine if social media analysis should continue."""
         messages = state["messages"]
         last_message = messages[-1]
+
+        # 检查是否已经有情绪分析报告
+        sentiment_report = state.get("sentiment_report", "")
+
+        # 如果已经有报告内容，说明分析已完成，不再循环
+        if sentiment_report and len(sentiment_report) > 100:
+            return "Msg Clear Social"
 
         # 只有AIMessage才有tool_calls属性
         if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
@@ -40,6 +54,13 @@ class ConditionalLogic:
         messages = state["messages"]
         last_message = messages[-1]
 
+        # 检查是否已经有新闻分析报告
+        news_report = state.get("news_report", "")
+
+        # 如果已经有报告内容，说明分析已完成，不再循环
+        if news_report and len(news_report) > 100:
+            return "Msg Clear News"
+
         # 只有AIMessage才有tool_calls属性
         if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
             return "tools_news"
@@ -49,6 +70,13 @@ class ConditionalLogic:
         """Determine if fundamentals analysis should continue."""
         messages = state["messages"]
         last_message = messages[-1]
+
+        # 检查是否已经有基本面报告
+        fundamentals_report = state.get("fundamentals_report", "")
+
+        # 如果已经有报告内容，说明分析已完成，不再循环
+        if fundamentals_report and len(fundamentals_report) > 100:
+            return "Msg Clear Fundamentals"
 
         # 只有AIMessage才有tool_calls属性
         if hasattr(last_message, 'tool_calls') and last_message.tool_calls:

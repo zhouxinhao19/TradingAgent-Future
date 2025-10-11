@@ -132,7 +132,7 @@ def create_fundamentals_analyst(llm, toolkit):
             logger.debug(f"📊 [DEBUG] 🔧 统一工具将自动处理: {market_info['market_name']}")
         else:
             # 离线模式：优先使用FinnHub数据，SimFin作为补充
-            if is_china:
+            if market_info['is_china']:
                 # A股使用本地缓存数据
                 tools = [
                     toolkit.get_china_stock_data,

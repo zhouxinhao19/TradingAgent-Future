@@ -770,7 +770,16 @@ class DataSourceManager:
                 provider = self._get_tushare_adapter()
                 if provider:
                     import asyncio
-                    loop = asyncio.get_event_loop()
+                    try:
+                        loop = asyncio.get_event_loop()
+                        if loop.is_closed():
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
+                    except RuntimeError:
+                        # 在线程池中没有事件循环，创建新的
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+
                     stock_info = loop.run_until_complete(provider.get_stock_basic_info(symbol))
                     stock_name = stock_info.get('name', f'股票{symbol}') if stock_info else f'股票{symbol}'
                 else:
@@ -789,7 +798,16 @@ class DataSourceManager:
 
             # 使用异步方法获取历史数据
             import asyncio
-            loop = asyncio.get_event_loop()
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_closed():
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+            except RuntimeError:
+                # 在线程池中没有事件循环，创建新的
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
             data = loop.run_until_complete(provider.get_historical_data(symbol, start_date, end_date))
 
             if data is not None and not data.empty:
@@ -835,7 +853,16 @@ class DataSourceManager:
 
             # 使用异步方法获取历史数据
             import asyncio
-            loop = asyncio.get_event_loop()
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_closed():
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+            except RuntimeError:
+                # 在线程池中没有事件循环，创建新的
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
             data = loop.run_until_complete(provider.get_historical_data(symbol, start_date, end_date, period))
 
             duration = time.time() - start_time
@@ -891,7 +918,16 @@ class DataSourceManager:
 
         # 使用异步方法获取历史数据
         import asyncio
-        loop = asyncio.get_event_loop()
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_closed():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+        except RuntimeError:
+            # 在线程池中没有事件循环，创建新的
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
         data = loop.run_until_complete(provider.get_historical_data(symbol, start_date, end_date, period))
 
         if data is not None and not data.empty:
