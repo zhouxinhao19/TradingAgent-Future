@@ -533,20 +533,35 @@ const formatTime = (time: string) => {
 }
 
 const getModuleDisplayName = (moduleName: string) => {
-  // 统一与单股分析的中文标签映射
+  // 统一与单股分析的中文标签映射（完整的13个报告）
   const nameMap: Record<string, string> = {
+    // 分析师团队 (4个)
     market_report: '📈 市场技术分析',
-    fundamentals_report: '💰 基本面分析',
-    news_report: '📰 新闻事件分析',
     sentiment_report: '💭 市场情绪分析',
-    investment_plan: '📋 投资建议',
-    trader_investment_plan: '💼 交易团队计划',
+    news_report: '📰 新闻事件分析',
+    fundamentals_report: '💰 基本面分析',
+
+    // 研究团队 (3个)
+    bull_researcher: '🐂 多头研究员',
+    bear_researcher: '🐻 空头研究员',
+    research_team_decision: '🔬 研究经理决策',
+
+    // 交易团队 (1个)
+    trader_investment_plan: '💼 交易员计划',
+
+    // 风险管理团队 (4个)
+    risky_analyst: '⚡ 激进分析师',
+    safe_analyst: '🛡️ 保守分析师',
+    neutral_analyst: '⚖️ 中性分析师',
+    risk_management_decision: '👔 投资组合经理',
+
+    // 最终决策 (1个)
     final_trade_decision: '🎯 最终交易决策',
-    research_team_decision: '🔬 研究团队决策',
-    risk_management_decision: '⚖️ 风险管理团队',
+
     // 兼容旧字段
-    investment_debate_state: '🔬 研究团队决策',
-    risk_debate_state: '⚖️ 风险管理团队',
+    investment_plan: '📋 投资建议',
+    investment_debate_state: '🔬 研究团队决策（旧）',
+    risk_debate_state: '⚖️ 风险管理团队（旧）',
     detailed_analysis: '📄 详细分析'
   }
   // 未匹配到时，做一个友好的回退：下划线转空格
