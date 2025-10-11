@@ -455,8 +455,32 @@ class TradingAgentsGraph:
                         if not node_name.startswith('__'):
                             final_state.update(node_update)
             else:
-                # 原有的invoke模式
-                final_state = self.graph.invoke(init_agent_state, **args)
+                # 原有的invoke模式（也需要计时）
+                logger.info("⏱️ 使用 invoke 模式执行分析（无进度回调）")
+                # 使用stream模式以便计时，但不发送进度更新
+                trace = []
+                final_state = None
+                for chunk in self.graph.stream(init_agent_state, **args):
+                    # 记录节点计时
+                    for node_name in chunk.keys():
+                        if not node_name.startswith('__'):
+                            # 如果有上一个节点，记录其结束时间
+                            if current_node_name and current_node_start:
+                                elapsed = time.time() - current_node_start
+                                node_timings[current_node_name] = elapsed
+                                logger.info(f"⏱️ [{current_node_name}] 耗时: {elapsed:.2f}秒")
+
+                            # 开始新节点计时
+                            current_node_name = node_name
+                            current_node_start = time.time()
+                            break
+
+                    # 累积状态更新
+                    if final_state is None:
+                        final_state = init_agent_state.copy()
+                    for node_name, node_update in chunk.items():
+                        if not node_name.startswith('__'):
+                            final_state.update(node_update)
 
         # 记录最后一个节点的时间
         if current_node_name and current_node_start:
@@ -467,8 +491,15 @@ class TradingAgentsGraph:
         # 计算总时间
         total_elapsed = time.time() - total_start_time
 
+        # 调试日志
+        logger.info(f"🔍 [TIMING DEBUG] 节点计时数量: {len(node_timings)}")
+        logger.info(f"🔍 [TIMING DEBUG] 总耗时: {total_elapsed:.2f}秒")
+        logger.info(f"🔍 [TIMING DEBUG] 节点列表: {list(node_timings.keys())}")
+
         # 打印详细的时间统计
+        logger.info("🔍 [TIMING DEBUG] 准备调用 _print_timing_summary")
         self._print_timing_summary(node_timings, total_elapsed)
+        logger.info("🔍 [TIMING DEBUG] _print_timing_summary 调用完成")
 
         # 构建性能数据
         performance_data = self._build_performance_data(node_timings, total_elapsed)
@@ -675,6 +706,10 @@ class TradingAgentsGraph:
             node_timings: 每个节点的执行时间字典
             total_elapsed: 总执行时间
         """
+        logger.info("🔍 [_print_timing_summary] 方法被调用")
+        logger.info("🔍 [_print_timing_summary] node_timings 数量: " + str(len(node_timings)))
+        logger.info("🔍 [_print_timing_summary] total_elapsed: " + str(total_elapsed))
+
         logger.info("=" * 80)
         logger.info("⏱️  分析性能统计报告")
         logger.info("=" * 80)
