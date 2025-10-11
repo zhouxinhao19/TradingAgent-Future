@@ -171,7 +171,11 @@ def create_fundamentals_analyst(llm, toolkit):
         system_prompt = (
             "🔴 强制要求：你必须调用工具获取真实数据！"
             "🚫 绝对禁止：不允许假设、编造或直接回答任何问题！"
-            "✅ 你必须：立即调用提供的工具获取真实数据，然后基于真实数据进行分析。"
+            "✅ 工作流程："
+            "1. 如果消息历史中没有工具结果，立即调用 get_stock_fundamentals_unified 工具"
+            "2. 如果消息历史中已经有工具结果（ToolMessage），立即基于工具数据生成最终分析报告"
+            "3. 不要重复调用工具！一次工具调用就足够了！"
+            "4. 接收到工具数据后，必须立即生成完整的分析报告，不要再调用任何工具"
             "可用工具：{tool_names}。\n{system_message}"
             "当前日期：{current_date}。"
             "分析目标：{company_name}（股票代码：{ticker}）。"
@@ -289,11 +293,12 @@ def create_fundamentals_analyst(llm, toolkit):
                 for tc in result.tool_calls:
                     tool_calls_info.append(tc['name'])
                     logger.debug(f"📊 [DEBUG] 工具调用 {len(tool_calls_info)}: {tc}")
-                
+
                 logger.info(f"📊 [基本面分析师] 工具调用: {tool_calls_info}")
+                # ⚠️ 重要：当有tool_calls时，不设置fundamentals_report
+                # 让它保持为空，这样条件判断会继续循环到工具节点
                 return {
-                    "messages": [result],
-                    "fundamentals_report": result.content if hasattr(result, 'content') else str(result)
+                    "messages": [result]
                 }
             else:
                 # 没有工具调用，使用强制工具调用修复
