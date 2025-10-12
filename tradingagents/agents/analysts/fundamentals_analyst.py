@@ -249,12 +249,30 @@ def create_fundamentals_analyst(llm, toolkit):
 
         result = chain.invoke(state["messages"])
         logger.info(f"📊 [基本面分析师] LLM调用完成")
+        
+        # 🔍 [调试日志] 打印AIMessage的详细内容
+        logger.info(f"🤖 [基本面分析师] AIMessage详细内容:")
+        logger.info(f"🤖 [基本面分析师] - 消息类型: {type(result).__name__}")
+        logger.info(f"🤖 [基本面分析师] - 内容长度: {len(result.content) if hasattr(result, 'content') else 0}")
+        if hasattr(result, 'content') and result.content:
+            # 截取前500字符避免日志过长
+            content_preview = result.content[:500] + "..." if len(result.content) > 500 else result.content
+            logger.info(f"🤖 [基本面分析师] - 内容预览: {content_preview}")
+        
+        # 🔍 [调试日志] 打印tool_calls的详细信息
         logger.info(f"📊 [基本面分析师] - 是否有tool_calls: {hasattr(result, 'tool_calls')}")
         if hasattr(result, 'tool_calls'):
             logger.info(f"📊 [基本面分析师] - tool_calls数量: {len(result.tool_calls)}")
             if result.tool_calls:
+                logger.info(f"🔧 [基本面分析师] 检测到 {len(result.tool_calls)} 个工具调用:")
                 for i, tc in enumerate(result.tool_calls):
-                    logger.info(f"📊 [基本面分析师] - tool_call[{i}]: {tc.get('name', 'unknown')}")
+                    logger.info(f"🔧 [基本面分析师] - 工具调用 {i+1}: {tc.get('name', 'unknown')} (ID: {tc.get('id', 'unknown')})")
+                    if 'args' in tc:
+                        logger.info(f"🔧 [基本面分析师] - 参数: {tc['args']}")
+            else:
+                logger.info(f"🔧 [基本面分析师] tool_calls为空列表")
+        else:
+            logger.info(f"🔧 [基本面分析师] 无tool_calls属性")
 
         # 使用统一的Google工具调用处理器
         if GoogleToolCallHandler.is_google_model(fresh_llm):

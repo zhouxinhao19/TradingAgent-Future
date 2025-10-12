@@ -237,8 +237,8 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
         if research_depth == 1:  # 1级 - 快速分析
             config["max_debate_rounds"] = 1
             config["max_risk_discuss_rounds"] = 1
-            # 保持内存功能启用，因为内存操作开销很小但能显著提升分析质量
-            config["memory_enabled"] = True
+            # 禁用记忆以加速
+            config["memory_enabled"] = False
 
             # 统一使用在线工具，避免离线工具的各种问题
             config["online_tools"] = True  # 所有市场都使用统一工具

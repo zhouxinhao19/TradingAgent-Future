@@ -1379,6 +1379,12 @@ class DataSourceManager:
                 elif isinstance(financial_data, list) and len(financial_data) > 0:
                     logger.info(f"✅ [数据来源: MongoDB-财务数据] 成功获取: {symbol} ({len(financial_data)}条记录)")
                     return self._format_financial_data(symbol, financial_data)
+                # 如果是单个字典（这是MongoDB实际返回的格式）
+                elif isinstance(financial_data, dict):
+                    logger.info(f"✅ [数据来源: MongoDB-财务数据] 成功获取: {symbol} (单条记录)")
+                    # 将单个字典包装成列表
+                    financial_dict_list = [financial_data]
+                    return self._format_financial_data(symbol, financial_dict_list)
                 else:
                     logger.warning(f"⚠️ [数据来源: MongoDB] 未找到财务数据: {symbol}，降级到其他数据源")
                     return self._try_fallback_fundamentals(symbol)
@@ -1410,6 +1416,34 @@ class DataSourceManager:
             logger.error(f"❌ [数据来源: AKShare异常] 生成基本面分析失败: {e}")
             return f"❌ 生成{symbol}基本面分析失败: {e}"
 
+    def _get_valuation_indicators(self, symbol: str) -> Dict:
+        """从stock_basic_info集合获取估值指标"""
+        try:
+            db_manager = get_database_manager()
+            if not db_manager.is_mongodb_available():
+                return {}
+                
+            client = db_manager.get_mongodb_client()
+            db = client[db_manager.config.mongodb_config.database_name]
+            
+            # 从stock_basic_info集合获取估值指标
+            collection = db['stock_basic_info']
+            result = collection.find_one({'ts_code': symbol})
+            
+            if result:
+                return {
+                    'pe': result.get('pe'),
+                    'pb': result.get('pb'),
+                    'pe_ttm': result.get('pe_ttm'),
+                    'total_mv': result.get('total_mv'),
+                    'circ_mv': result.get('circ_mv')
+                }
+            return {}
+            
+        except Exception as e:
+            logger.error(f"获取{symbol}估值指标失败: {e}")
+            return {}
+
     def _format_financial_data(self, symbol: str, financial_data: List[Dict]) -> str:
         """格式化财务数据为报告"""
         try:
@@ -1423,39 +1457,99 @@ class DataSourceManager:
             report = f"📊 {symbol} 基本面数据（来自MongoDB）\n\n"
 
             # 基本信息
-            report += f"📅 报告期: {latest.get('end_date', '未知')}\n"
+            report += f"📅 报告期: {latest.get('report_period', latest.get('end_date', '未知'))}\n"
             report += f"📈 数据来源: MongoDB财务数据库\n\n"
 
             # 财务指标
             report += "💰 财务指标:\n"
-            if 'total_revenue' in latest:
-                report += f"   营业总收入: {latest.get('total_revenue', 0):,.2f}\n"
-            if 'net_profit' in latest:
-                report += f"   净利润: {latest.get('net_profit', 0):,.2f}\n"
-            if 'total_assets' in latest:
-                report += f"   总资产: {latest.get('total_assets', 0):,.2f}\n"
-            if 'total_liab' in latest:
-                report += f"   总负债: {latest.get('total_liab', 0):,.2f}\n"
+            revenue = latest.get('revenue') or latest.get('total_revenue')
+            if revenue is not None:
+                report += f"   营业总收入: {revenue:,.2f}\n"
+            
+            net_profit = latest.get('net_profit') or latest.get('net_income')
+            if net_profit is not None:
+                report += f"   净利润: {net_profit:,.2f}\n"
+                
+            total_assets = latest.get('total_assets')
+            if total_assets is not None:
+                report += f"   总资产: {total_assets:,.2f}\n"
+                
+            total_liab = latest.get('total_liab')
+            if total_liab is not None:
+                report += f"   总负债: {total_liab:,.2f}\n"
+                
+            total_equity = latest.get('total_equity')
+            if total_equity is not None:
+                report += f"   股东权益: {total_equity:,.2f}\n"
 
-            # 估值指标
+            # 估值指标 - 从stock_basic_info集合获取
             report += "\n📊 估值指标:\n"
-            if 'pe' in latest:
-                report += f"   市盈率(PE): {latest.get('pe', 0):.2f}\n"
-            if 'pb' in latest:
-                report += f"   市净率(PB): {latest.get('pb', 0):.2f}\n"
-            if 'ps' in latest:
-                report += f"   市销率(PS): {latest.get('ps', 0):.2f}\n"
+            valuation_data = self._get_valuation_indicators(symbol)
+            if valuation_data:
+                pe = valuation_data.get('pe')
+                if pe is not None:
+                    report += f"   市盈率(PE): {pe:.2f}\n"
+                    
+                pb = valuation_data.get('pb')
+                if pb is not None:
+                    report += f"   市净率(PB): {pb:.2f}\n"
+                    
+                pe_ttm = valuation_data.get('pe_ttm')
+                if pe_ttm is not None:
+                    report += f"   市盈率TTM(PE_TTM): {pe_ttm:.2f}\n"
+                    
+                total_mv = valuation_data.get('total_mv')
+                if total_mv is not None:
+                    report += f"   总市值: {total_mv:.2f}亿元\n"
+                    
+                circ_mv = valuation_data.get('circ_mv')
+                if circ_mv is not None:
+                    report += f"   流通市值: {circ_mv:.2f}亿元\n"
+            else:
+                # 如果无法从stock_basic_info获取，尝试从财务数据计算
+                pe = latest.get('pe')
+                if pe is not None:
+                    report += f"   市盈率(PE): {pe:.2f}\n"
+                    
+                pb = latest.get('pb')
+                if pb is not None:
+                    report += f"   市净率(PB): {pb:.2f}\n"
+                    
+                ps = latest.get('ps')
+                if ps is not None:
+                    report += f"   市销率(PS): {ps:.2f}\n"
 
             # 盈利能力
             report += "\n💹 盈利能力:\n"
-            if 'roe' in latest:
-                report += f"   净资产收益率(ROE): {latest.get('roe', 0):.2f}%\n"
-            if 'roa' in latest:
-                report += f"   总资产收益率(ROA): {latest.get('roa', 0):.2f}%\n"
-            if 'gross_margin' in latest:
-                report += f"   毛利率: {latest.get('gross_margin', 0):.2f}%\n"
-            if 'net_margin' in latest:
-                report += f"   净利率: {latest.get('net_margin', 0):.2f}%\n"
+            roe = latest.get('roe')
+            if roe is not None:
+                report += f"   净资产收益率(ROE): {roe:.2f}%\n"
+                
+            roa = latest.get('roa')
+            if roa is not None:
+                report += f"   总资产收益率(ROA): {roa:.2f}%\n"
+                
+            gross_margin = latest.get('gross_margin')
+            if gross_margin is not None:
+                report += f"   毛利率: {gross_margin:.2f}%\n"
+                
+            netprofit_margin = latest.get('netprofit_margin') or latest.get('net_margin')
+            if netprofit_margin is not None:
+                report += f"   净利率: {netprofit_margin:.2f}%\n"
+
+            # 现金流
+            n_cashflow_act = latest.get('n_cashflow_act')
+            if n_cashflow_act is not None:
+                report += "\n💰 现金流:\n"
+                report += f"   经营活动现金流: {n_cashflow_act:,.2f}\n"
+                
+                n_cashflow_inv_act = latest.get('n_cashflow_inv_act')
+                if n_cashflow_inv_act is not None:
+                    report += f"   投资活动现金流: {n_cashflow_inv_act:,.2f}\n"
+                    
+                c_cash_equ_end_period = latest.get('c_cash_equ_end_period')
+                if c_cash_equ_end_period is not None:
+                    report += f"   期末现金及等价物: {c_cash_equ_end_period:,.2f}\n"
 
             report += f"\n📝 共有 {len(financial_data)} 期财务数据\n"
 

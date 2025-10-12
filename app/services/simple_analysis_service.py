@@ -125,7 +125,7 @@ def _get_default_provider_by_model(model_name: str) -> str:
 
 
 def create_analysis_config(
-    research_depth: str,
+    research_depth,  # 支持数字(1-5)或字符串("快速", "标准", "深度")
     selected_analysts: list,
     quick_model: str,
     deep_model: str,
@@ -133,10 +133,10 @@ def create_analysis_config(
     market_type: str = "A股"
 ) -> dict:
     """
-    创建分析配置 - 完全复制web目录的配置逻辑
+    创建分析配置 - 支持数字等级和中文等级
 
     Args:
-        research_depth: 研究深度 ("快速", "标准", "深度")
+        research_depth: 研究深度，支持数字(1-5)或中文("快速", "基础", "标准", "深度", "全面")
         selected_analysts: 选中的分析师列表
         quick_model: 快速分析模型
         deep_model: 深度分析模型
@@ -146,6 +146,49 @@ def create_analysis_config(
     Returns:
         dict: 完整的分析配置
     """
+    # 🔍 [调试] 记录接收到的原始参数
+    logger.info(f"🔍 [配置创建] 接收到的research_depth参数: {research_depth} (类型: {type(research_depth).__name__})")
+
+    # 数字等级到中文等级的映射
+    numeric_to_chinese = {
+        1: "快速",
+        2: "基础",
+        3: "标准",
+        4: "深度",
+        5: "全面"
+    }
+
+    # 标准化研究深度：支持数字输入
+    if isinstance(research_depth, (int, float)):
+        research_depth = int(research_depth)
+        if research_depth in numeric_to_chinese:
+            chinese_depth = numeric_to_chinese[research_depth]
+            logger.info(f"🔢 [等级转换] 数字等级 {research_depth} → 中文等级 '{chinese_depth}'")
+            research_depth = chinese_depth
+        else:
+            logger.warning(f"⚠️ 无效的数字等级: {research_depth}，使用默认标准分析")
+            research_depth = "标准"
+    elif isinstance(research_depth, str):
+        # 如果是字符串形式的数字，转换为整数
+        if research_depth.isdigit():
+            numeric_level = int(research_depth)
+            if numeric_level in numeric_to_chinese:
+                chinese_depth = numeric_to_chinese[numeric_level]
+                logger.info(f"🔢 [等级转换] 字符串数字 '{research_depth}' → 中文等级 '{chinese_depth}'")
+                research_depth = chinese_depth
+            else:
+                logger.warning(f"⚠️ 无效的字符串数字等级: {research_depth}，使用默认标准分析")
+                research_depth = "标准"
+        # 如果已经是中文等级，直接使用
+        elif research_depth in ["快速", "基础", "标准", "深度", "全面"]:
+            logger.info(f"📝 [等级确认] 使用中文等级: '{research_depth}'")
+        else:
+            logger.warning(f"⚠️ 未知的研究深度: {research_depth}，使用默认标准分析")
+            research_depth = "标准"
+    else:
+        logger.warning(f"⚠️ 无效的研究深度类型: {type(research_depth)}，使用默认标准分析")
+        research_depth = "标准"
+
     # 从DEFAULT_CONFIG开始，完全复制web目录的逻辑
     config = DEFAULT_CONFIG.copy()
     config["llm_provider"] = llm_provider
@@ -158,8 +201,8 @@ def create_analysis_config(
         config["max_debate_rounds"] = 1
         config["max_risk_discuss_rounds"] = 1
         config["memory_enabled"] = False  # 禁用记忆以加速
-        config["online_tools"] = False  # 使用缓存数据
-        logger.info(f"🔧 [1级-快速分析] {market_type}使用缓存数据，最快速度")
+        config["online_tools"] = True  # 统一使用在线工具，避免离线工具的各种问题
+        logger.info(f"🔧 [1级-快速分析] {market_type}使用统一工具，确保数据源正确和稳定性")
         logger.info(f"🔧 [1级-快速分析] 使用用户配置的模型: quick={quick_model}, deep={deep_model}")
 
     elif research_depth == "基础":
@@ -250,14 +293,20 @@ def create_analysis_config(
     # 添加分析师配置
     config["selected_analysts"] = selected_analysts
     config["debug"] = False
+    
+    # 🔧 添加research_depth到配置中，使工具函数能够访问分析级别信息
+    config["research_depth"] = research_depth
 
-    logger.info(f"📋 创建分析配置完成:")
-    logger.info(f"   研究深度: {research_depth}")
-    logger.info(f"   辩论轮次: {config['max_debate_rounds']}")
-    logger.info(f"   风险讨论轮次: {config['max_risk_discuss_rounds']}")
-    logger.info(f"   LLM供应商: {llm_provider}")
-    logger.info(f"   快速模型: {config['quick_think_llm']}")
-    logger.info(f"   深度模型: {config['deep_think_llm']}")
+    logger.info(f"📋 ========== 创建分析配置完成 ==========")
+    logger.info(f"   🎯 研究深度: {research_depth}")
+    logger.info(f"   🔥 辩论轮次: {config['max_debate_rounds']}")
+    logger.info(f"   ⚖️ 风险讨论轮次: {config['max_risk_discuss_rounds']}")
+    logger.info(f"   💾 记忆功能: {config['memory_enabled']}")
+    logger.info(f"   🌐 在线工具: {config['online_tools']}")
+    logger.info(f"   🤖 LLM供应商: {llm_provider}")
+    logger.info(f"   ⚡ 快速模型: {config['quick_think_llm']}")
+    logger.info(f"   🧠 深度模型: {config['deep_think_llm']}")
+    logger.info(f"📋 ========================================")
 
     return config
 

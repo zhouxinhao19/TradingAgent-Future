@@ -134,18 +134,7 @@
                 />
               </div>
 
-              <!-- 自定义要求 -->
-              <div class="form-section">
-                <h4 class="section-title">📝 自定义要求</h4>
-                <el-input
-                  v-model="analysisForm.customPrompt"
-                  type="textarea"
-                  :rows="3"
-                  placeholder="输入特定的分析要求或关注点..."
-                  class="custom-input"
-                />
-                <div class="input-help">AI会根据您的要求重点分析相关内容</div>
-              </div>
+
 
               <!-- 操作按钮 -->
               <div class="form-section">
@@ -681,8 +670,7 @@ const analysisForm = reactive({
   selectedAnalysts: ['市场分析师', '基本面分析师'],
   includeSentiment: true,
   includeRisk: true,
-  language: 'zh-CN',
-  customPrompt: ''
+  language: 'zh-CN'
 })
 
 // 深度选项（5个级别，与Web界面保持一致）
@@ -750,7 +738,6 @@ const submitAnalysis = async () => {
         analysis_date: analysisDate.toISOString().split('T')[0],
         research_depth: getDepthDescription(analysisForm.researchDepth),
         selected_analysts: convertAnalystNamesToIds(analysisForm.selectedAnalysts),
-        custom_prompt: analysisForm.customPrompt || undefined,
         include_sentiment: analysisForm.includeSentiment,
         include_risk: analysisForm.includeRisk,
         language: analysisForm.language,
@@ -1507,7 +1494,7 @@ document.addEventListener('visibilitychange', handleVisibilityChange)
 
 // 获取深度描述
 const getDepthDescription = (depth: number) => {
-  const descriptions = ['快速', '快速', '标准', '深度', '深度']
+  const descriptions = ['快速', '基础', '标准', '深度', '全面']
   return descriptions[depth - 1] || '标准'
 }
 

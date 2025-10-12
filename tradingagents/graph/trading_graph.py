@@ -144,19 +144,33 @@ class TradingAgentsGraph:
               "阿里百炼" in self.config["llm_provider"]):
             # 使用 OpenAI 兼容适配器，支持原生 Function Calling
             logger.info(f"🔧 使用阿里百炼 OpenAI 兼容适配器 (支持原生工具调用)")
+            # 🔧 根据研究深度动态调整超时时间
+            research_depth = self.config.get("research_depth", "标准")
+            max_debate_rounds = self.config.get("max_debate_rounds", 1)
+            max_risk_discuss_rounds = self.config.get("max_risk_discuss_rounds", 1)
+
+            # 计算合理的超时时间：基础300秒 + 每轮辩论额外60秒
+            base_timeout = 300
+            debate_timeout = max_debate_rounds * 30  # 投资辩论每轮30秒
+            risk_timeout = max_risk_discuss_rounds * 60  # 风险讨论每轮60秒（3个分析师，内容更多）
+            total_timeout = base_timeout + debate_timeout + risk_timeout
+
+            logger.info(f"⏱️ [阿里百炼] 研究深度: {research_depth}, 辩论轮次: {max_debate_rounds}, 风险讨论轮次: {max_risk_discuss_rounds}")
+            logger.info(f"⏱️ [阿里百炼] 计算超时时间: {base_timeout}s (基础) + {debate_timeout}s (辩论) + {risk_timeout}s (风险) = {total_timeout}s")
+
             self.deep_thinking_llm = ChatDashScopeOpenAI(
                 model=self.config["deep_think_llm"],
                 temperature=0.1,
                 max_tokens=2000,
-                request_timeout=120  # 设置120秒超时
+                request_timeout=total_timeout  # 动态超时
             )
             self.quick_thinking_llm = ChatDashScopeOpenAI(
                 model=self.config["quick_think_llm"],
                 temperature=0.1,
                 max_tokens=2000,
-                request_timeout=120  # 设置120秒超时
+                request_timeout=total_timeout  # 动态超时
             )
-            logger.info(f"⏱️ [阿里百炼] 已设置请求超时: 120秒")
+            logger.info(f"✅ [阿里百炼] 已设置动态请求超时: {total_timeout}秒")
         elif (self.config["llm_provider"].lower() == "deepseek" or
               "deepseek" in self.config["llm_provider"].lower()):
             # DeepSeek V3配置 - 使用支持token统计的适配器
@@ -259,7 +273,15 @@ class TradingAgentsGraph:
         self.tool_nodes = self._create_tool_nodes()
 
         # Initialize components
-        self.conditional_logic = ConditionalLogic()
+        # 🔥 [修复] 从配置中读取辩论轮次参数
+        self.conditional_logic = ConditionalLogic(
+            max_debate_rounds=self.config.get("max_debate_rounds", 1),
+            max_risk_discuss_rounds=self.config.get("max_risk_discuss_rounds", 1)
+        )
+        logger.info(f"🔧 [ConditionalLogic] 初始化完成:")
+        logger.info(f"   - max_debate_rounds: {self.conditional_logic.max_debate_rounds}")
+        logger.info(f"   - max_risk_discuss_rounds: {self.conditional_logic.max_risk_discuss_rounds}")
+
         self.graph_setup = GraphSetup(
             self.quick_thinking_llm,
             self.deep_thinking_llm,

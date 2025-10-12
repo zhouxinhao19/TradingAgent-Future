@@ -8,10 +8,33 @@ from dataclasses import dataclass, field
 import logging
 from pymongo import ReplaceOne
 from pymongo.errors import BulkWriteError
+from bson import ObjectId
 
 from app.core.database import get_database
 
 logger = logging.getLogger(__name__)
+
+
+def convert_objectid_to_str(data: Union[Dict, List[Dict]]) -> Union[Dict, List[Dict]]:
+    """
+    转换 MongoDB ObjectId 为字符串，避免 JSON 序列化错误
+
+    Args:
+        data: 单个文档或文档列表
+
+    Returns:
+        转换后的数据
+    """
+    if isinstance(data, list):
+        for item in data:
+            if isinstance(item, dict) and '_id' in item:
+                item['_id'] = str(item['_id'])
+        return data
+    elif isinstance(data, dict):
+        if '_id' in data:
+            data['_id'] = str(data['_id'])
+        return data
+    return data
 
 
 @dataclass
@@ -208,7 +231,10 @@ class InternalMessageService:
             
             # 获取结果
             messages = await cursor.to_list(length=params.limit)
-            
+
+            # 🔧 转换 ObjectId 为字符串，避免 JSON 序列化错误
+            messages = convert_objectid_to_str(messages)
+
             self.logger.debug(f"📊 查询到 {len(messages)} 条内部消息")
             return messages
             

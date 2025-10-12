@@ -85,12 +85,15 @@ def create_bull_researcher(llm, memory):
 
         argument = f"Bull Analyst: {response.content}"
 
+        new_count = investment_debate_state["count"] + 1
+        logger.info(f"🐂 [多头研究员] 发言完成，计数: {investment_debate_state['count']} -> {new_count}")
+
         new_investment_debate_state = {
             "history": history + "\n" + argument,
             "bull_history": bull_history + "\n" + argument,
             "bear_history": investment_debate_state.get("bear_history", ""),
             "current_response": argument,
-            "count": investment_debate_state["count"] + 1,
+            "count": new_count,
         }
 
         return {"investment_debate_state": new_investment_debate_state}

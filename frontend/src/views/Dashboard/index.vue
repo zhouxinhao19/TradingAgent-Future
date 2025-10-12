@@ -120,25 +120,14 @@
         <!-- 市场快讯 -->
         <el-card class="market-news-card" style="margin-top: 24px;">
           <template #header>
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span>市场快讯</span>
-              <el-button
-                type="primary"
-                size="small"
-                :loading="syncingNews"
-                @click="syncMarketNews"
-              >
-                <el-icon><Refresh /></el-icon>
-                {{ syncingNews ? '同步中...' : '同步新闻' }}
-              </el-button>
-            </div>
+            <span>市场快讯</span>
           </template>
           <div v-if="marketNews.length > 0" class="news-list">
             <div
               v-for="news in marketNews"
               :key="news.id"
               class="news-item"
-              @click="openNews(news)"
+              @click="openNewsUrl(news.url)"
             >
               <div class="news-title">{{ news.title }}</div>
               <div class="news-time">{{ formatTime(news.time) }}</div>
@@ -147,12 +136,9 @@
           <div v-else class="empty-state">
             <el-icon class="empty-icon"><InfoFilled /></el-icon>
             <p>暂无市场快讯</p>
-            <el-button type="primary" size="small" @click="syncMarketNews" :loading="syncingNews">
-              {{ syncingNews ? '同步中...' : '立即同步' }}
-            </el-button>
           </div>
           <div v-if="marketNews.length > 0" class="news-footer">
-            <el-button type="text" size="small">
+            <el-button type="text" size="small" @click="goToNewsCenter">
               查看更多 <el-icon><ArrowRight /></el-icon>
             </el-button>
           </div>
@@ -353,13 +339,18 @@ const downloadReport = (analysis: AnalysisTask) => {
   console.log('下载报告:', analysis.task_id)
 }
 
-const openNews = (news: any) => {
-  // 如果有URL，在新标签页打开新闻链接
-  if (news.url) {
-    window.open(news.url, '_blank')
+const openNewsUrl = (url?: string) => {
+  if (url) {
+    window.open(url, '_blank')
   } else {
     ElMessage.info('该新闻暂无详情链接')
   }
+}
+
+const goToNewsCenter = () => {
+  // 跳转到新闻中心页面（如果有的话）
+  ElMessage.info('新闻中心功能开发中...')
+  // router.push('/news')
 }
 
 const getStatusType = (status: string) => {

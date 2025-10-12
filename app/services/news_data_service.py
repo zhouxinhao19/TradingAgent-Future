@@ -8,10 +8,33 @@ from dataclasses import dataclass
 import logging
 from pymongo import ReplaceOne
 from pymongo.errors import BulkWriteError
+from bson import ObjectId
 
 from app.core.database import get_database
 
 logger = logging.getLogger(__name__)
+
+
+def convert_objectid_to_str(data: Union[Dict, List[Dict]]) -> Union[Dict, List[Dict]]:
+    """
+    转换 MongoDB ObjectId 为字符串，避免 JSON 序列化错误
+
+    Args:
+        data: 单个文档或文档列表
+
+    Returns:
+        转换后的数据
+    """
+    if isinstance(data, list):
+        for item in data:
+            if isinstance(item, dict) and '_id' in item:
+                item['_id'] = str(item['_id'])
+        return data
+    elif isinstance(data, dict):
+        if '_id' in data:
+            data['_id'] = str(data['_id'])
+        return data
+    return data
 
 
 @dataclass
@@ -321,7 +344,10 @@ class NewsDataService:
             
             # 获取结果
             results = await cursor.to_list(length=None)
-            
+
+            # 🔧 转换 ObjectId 为字符串，避免 JSON 序列化错误
+            results = convert_objectid_to_str(results)
+
             self.logger.info(f"📊 查询新闻数据返回 {len(results)} 条记录")
             return results
             
@@ -522,6 +548,9 @@ class NewsDataService:
 
             cursor = cursor.limit(limit)
             results = await cursor.to_list(length=None)
+
+            # 🔧 转换 ObjectId 为字符串，避免 JSON 序列化错误
+            results = convert_objectid_to_str(results)
 
             self.logger.info(f"🔍 全文搜索返回 {len(results)} 条结果")
             return results

@@ -61,6 +61,9 @@ def create_safe_debator(llm):
 
         argument = f"Safe Analyst: {response.content}"
 
+        new_count = risk_debate_state["count"] + 1
+        logger.info(f"🛡️ [保守风险分析师] 发言完成，计数: {risk_debate_state['count']} -> {new_count}")
+
         new_risk_debate_state = {
             "history": history + "\n" + argument,
             "risky_history": risk_debate_state.get("risky_history", ""),
@@ -74,7 +77,7 @@ def create_safe_debator(llm):
             "current_neutral_response": risk_debate_state.get(
                 "current_neutral_response", ""
             ),
-            "count": risk_debate_state["count"] + 1,
+            "count": new_count,
         }
 
         return {"risk_debate_state": new_risk_debate_state}

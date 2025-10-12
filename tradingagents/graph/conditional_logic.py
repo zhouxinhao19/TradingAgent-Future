@@ -85,23 +85,52 @@ class ConditionalLogic:
         return "Msg Clear News"
 
     def should_continue_fundamentals(self, state: AgentState):
-        """Determine if fundamentals analysis should continue."""
+        """判断基本面分析是否应该继续"""
         from tradingagents.utils.logging_init import get_logger
         logger = get_logger("agents")
 
         messages = state["messages"]
         last_message = messages[-1]
 
+        # 死循环修复: 添加工具调用次数检查
+        tool_call_count = state.get("fundamentals_tool_call_count", 0)
+        max_tool_calls = 3
+        
         # 检查是否已经有基本面报告
         fundamentals_report = state.get("fundamentals_report", "")
 
         logger.info(f"🔀 [条件判断] should_continue_fundamentals")
         logger.info(f"🔀 [条件判断] - 消息数量: {len(messages)}")
         logger.info(f"🔀 [条件判断] - 报告长度: {len(fundamentals_report)}")
+        logger.info(f"🔧 [死循环修复] - 工具调用次数: {tool_call_count}/{max_tool_calls}")
         logger.info(f"🔀 [条件判断] - 最后消息类型: {type(last_message).__name__}")
+        
+        # 🔍 [调试日志] 打印最后一条消息的详细内容
+        logger.info(f"🤖 [条件判断] 最后一条消息详细内容:")
+        logger.info(f"🤖 [条件判断] - 消息类型: {type(last_message).__name__}")
+        if hasattr(last_message, 'content'):
+            content_preview = last_message.content[:300] + "..." if len(last_message.content) > 300 else last_message.content
+            logger.info(f"🤖 [条件判断] - 内容预览: {content_preview}")
+        
+        # 🔍 [调试日志] 打印tool_calls的详细信息
         logger.info(f"🔀 [条件判断] - 是否有tool_calls: {hasattr(last_message, 'tool_calls')}")
         if hasattr(last_message, 'tool_calls'):
             logger.info(f"🔀 [条件判断] - tool_calls数量: {len(last_message.tool_calls) if last_message.tool_calls else 0}")
+            if last_message.tool_calls:
+                logger.info(f"🔧 [条件判断] 检测到 {len(last_message.tool_calls)} 个工具调用:")
+                for i, tc in enumerate(last_message.tool_calls):
+                    logger.info(f"🔧 [条件判断] - 工具调用 {i+1}: {tc.get('name', 'unknown')} (ID: {tc.get('id', 'unknown')})")
+                    if 'args' in tc:
+                        logger.info(f"🔧 [条件判断] - 参数: {tc['args']}")
+            else:
+                logger.info(f"🔧 [条件判断] tool_calls为空列表")
+        else:
+            logger.info(f"🔧 [条件判断] 无tool_calls属性")
+
+        # 死循环修复: 如果达到最大工具调用次数，强制结束
+        if tool_call_count >= max_tool_calls:
+            logger.warning(f"🔧 [死循环修复] 达到最大工具调用次数，强制结束: Msg Clear Fundamentals")
+            return "Msg Clear Fundamentals"
 
         # 如果已经有报告内容，说明分析已完成，不再循环
         if fundamentals_report and len(fundamentals_report) > 100:
@@ -118,23 +147,43 @@ class ConditionalLogic:
 
     def should_continue_debate(self, state: AgentState) -> str:
         """Determine if debate should continue."""
+        current_count = state["investment_debate_state"]["count"]
+        max_count = 2 * self.max_debate_rounds
+        current_speaker = state["investment_debate_state"]["current_response"]
 
-        if (
-            state["investment_debate_state"]["count"] >= 2 * self.max_debate_rounds
-        ):  # 3 rounds of back-and-forth between 2 agents
+        # 🔍 详细日志
+        logger.info(f"🔍 [投资辩论控制] 当前发言次数: {current_count}, 最大次数: {max_count} (配置轮次: {self.max_debate_rounds})")
+        logger.info(f"🔍 [投资辩论控制] 当前发言者: {current_speaker}")
+
+        if current_count >= max_count:
+            logger.info(f"✅ [投资辩论控制] 达到最大次数，结束辩论 -> Research Manager")
             return "Research Manager"
-        if state["investment_debate_state"]["current_response"].startswith("Bull"):
-            return "Bear Researcher"
-        return "Bull Researcher"
+
+        next_speaker = "Bear Researcher" if current_speaker.startswith("Bull") else "Bull Researcher"
+        logger.info(f"🔄 [投资辩论控制] 继续辩论 -> {next_speaker}")
+        return next_speaker
 
     def should_continue_risk_analysis(self, state: AgentState) -> str:
         """Determine if risk analysis should continue."""
-        if (
-            state["risk_debate_state"]["count"] >= 3 * self.max_risk_discuss_rounds
-        ):  # 3 rounds of back-and-forth between 3 agents
+        current_count = state["risk_debate_state"]["count"]
+        max_count = 3 * self.max_risk_discuss_rounds
+        latest_speaker = state["risk_debate_state"]["latest_speaker"]
+
+        # 🔍 详细日志
+        logger.info(f"🔍 [风险讨论控制] 当前发言次数: {current_count}, 最大次数: {max_count} (配置轮次: {self.max_risk_discuss_rounds})")
+        logger.info(f"🔍 [风险讨论控制] 最后发言者: {latest_speaker}")
+
+        if current_count >= max_count:
+            logger.info(f"✅ [风险讨论控制] 达到最大次数，结束讨论 -> Risk Judge")
             return "Risk Judge"
-        if state["risk_debate_state"]["latest_speaker"].startswith("Risky"):
-            return "Safe Analyst"
-        if state["risk_debate_state"]["latest_speaker"].startswith("Safe"):
-            return "Neutral Analyst"
-        return "Risky Analyst"
+
+        # 确定下一个发言者
+        if latest_speaker.startswith("Risky"):
+            next_speaker = "Safe Analyst"
+        elif latest_speaker.startswith("Safe"):
+            next_speaker = "Neutral Analyst"
+        else:
+            next_speaker = "Risky Analyst"
+
+        logger.info(f"🔄 [风险讨论控制] 继续讨论 -> {next_speaker}")
+        return next_speaker

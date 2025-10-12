@@ -314,8 +314,14 @@ class OptimizedChinaDataProvider:
             logger.warning(f"⚠️ [基本面优化] 获取{symbol}基础信息失败: {e}")
             return f"股票代码: {symbol}\n股票名称: 未知公司\n当前价格: N/A\n涨跌幅: N/A\n成交量: N/A"
 
-    def _generate_fundamentals_report(self, symbol: str, stock_data: str) -> str:
-        """基于股票数据生成真实的基本面分析报告"""
+    def _generate_fundamentals_report(self, symbol: str, stock_data: str, analysis_modules: str = "standard") -> str:
+        """基于股票数据生成真实的基本面分析报告
+        
+        Args:
+            symbol: 股票代码
+            stock_data: 股票数据
+            analysis_modules: 分析模块级别 ("basic", "standard", "full", "detailed", "comprehensive")
+        """
 
         # 添加详细的股票代码追踪日志
         logger.debug(f"🔍 [股票代码追踪] _generate_fundamentals_report 接收到的股票代码: '{symbol}' (类型: {type(symbol)})")
@@ -437,7 +443,95 @@ class OptimizedChinaDataProvider:
         else:
             data_source_note = "\n✅ **数据说明**: 财务指标基于真实财务数据计算"
 
-        report = f"""# 中国A股基本面分析报告 - {symbol}
+        # 根据分析模块级别调整报告内容
+        logger.debug(f"🔍 [基本面分析] 使用分析模块级别: {analysis_modules}")
+        
+        if analysis_modules == "basic":
+            # 基础模式：只包含核心财务指标
+            report = f"""# 中国A股基本面分析报告 - {symbol} (基础版)
+
+## 📊 股票基本信息
+- **股票代码**: {symbol}
+- **股票名称**: {company_name}
+- **当前股价**: {current_price}
+- **涨跌幅**: {change_pct}
+- **分析日期**: {datetime.now(ZoneInfo(get_timezone_name())).strftime('%Y年%m月%d日')}{data_source_note}
+
+## 💰 核心财务指标
+- **市盈率(PE)**: {financial_estimates['pe']}
+- **市净率(PB)**: {financial_estimates['pb']}
+- **净资产收益率(ROE)**: {financial_estimates['roe']}
+- **资产负债率**: {financial_estimates['debt_ratio']}
+
+## 💡 基础评估
+- **基本面评分**: {financial_estimates['fundamental_score']}/10
+- **风险等级**: {financial_estimates['risk_level']}
+
+---
+**重要声明**: 本报告基于公开数据和模型估算生成，仅供参考，不构成投资建议。
+**数据来源**: {data_source if data_source else "多源数据"}数据接口
+**生成时间**: {datetime.now(ZoneInfo(get_timezone_name())).strftime('%Y-%m-%d %H:%M:%S')}
+"""
+        elif analysis_modules in ["standard", "full"]:
+            # 标准/完整模式：包含详细分析
+            report = f"""# 中国A股基本面分析报告 - {symbol}
+
+## 📊 股票基本信息
+- **股票代码**: {symbol}
+- **股票名称**: {company_name}
+- **所属行业**: {industry_info['industry']}
+- **市场板块**: {industry_info['market']}
+- **当前股价**: {current_price}
+- **涨跌幅**: {change_pct}
+- **成交量**: {volume}
+- **分析日期**: {datetime.now(ZoneInfo(get_timezone_name())).strftime('%Y年%m月%d日')}{data_source_note}
+
+## 💰 财务数据分析
+
+### 估值指标
+- **市盈率(PE)**: {financial_estimates['pe']}
+- **市净率(PB)**: {financial_estimates['pb']}
+- **市销率(PS)**: {financial_estimates['ps']}
+- **股息收益率**: {financial_estimates['dividend_yield']}
+
+### 盈利能力指标
+- **净资产收益率(ROE)**: {financial_estimates['roe']}
+- **总资产收益率(ROA)**: {financial_estimates['roa']}
+- **毛利率**: {financial_estimates['gross_margin']}
+- **净利率**: {financial_estimates['net_margin']}
+
+### 财务健康度
+- **资产负债率**: {financial_estimates['debt_ratio']}
+- **流动比率**: {financial_estimates['current_ratio']}
+- **速动比率**: {financial_estimates['quick_ratio']}
+- **现金比率**: {financial_estimates['cash_ratio']}
+
+## 📈 行业分析
+{industry_info['analysis']}
+
+## 🎯 投资价值评估
+### 估值水平分析
+{self._analyze_valuation(financial_estimates)}
+
+### 成长性分析
+{self._analyze_growth_potential(symbol, industry_info)}
+
+## 💡 投资建议
+- **基本面评分**: {financial_estimates['fundamental_score']}/10
+- **估值吸引力**: {financial_estimates['valuation_score']}/10
+- **成长潜力**: {financial_estimates['growth_score']}/10
+- **风险等级**: {financial_estimates['risk_level']}
+
+{self._generate_investment_advice(financial_estimates, industry_info)}
+
+---
+**重要声明**: 本报告基于公开数据和模型估算生成，仅供参考，不构成投资建议。
+**数据来源**: {data_source if data_source else "多源数据"}数据接口
+**生成时间**: {datetime.now(ZoneInfo(get_timezone_name())).strftime('%Y-%m-%d %H:%M:%S')}
+"""
+        else:  # detailed, comprehensive
+            # 详细/全面模式：包含最完整的分析
+            report = f"""# 中国A股基本面分析报告 - {symbol} (全面版)
 
 ## 📊 股票基本信息
 - **股票代码**: {symbol}
@@ -852,36 +946,85 @@ class OptimizedChinaDataProvider:
             else:
                 metrics["net_margin"] = "N/A"
 
-            # 计算 PE - 使用净利润和总股本
-            net_profit = latest_indicators.get('net_profit')
-            total_equity = latest_indicators.get('total_equity')
-            if net_profit and total_equity and price_value > 0:
-                try:
-                    # 简化计算：假设市值 = 股价 * 总股本（需要从其他地方获取总股本）
-                    # 这里使用 ROE 反推 EPS
-                    roe_val = latest_indicators.get('roe')
-                    if roe_val and float(roe_val) > 0:
-                        # EPS = ROE * 每股净资产
-                        # 每股净资产 = 总股本 / 总股数（假设）
-                        # 简化：直接使用估算
-                        metrics["pe"] = "N/A（需要更多数据）"
-                    else:
+            # 计算 PE - 优先从stock_basic_info获取，否则尝试计算
+            pe_value = None
+            try:
+                # 尝试从stock_basic_info获取PE
+                from tradingagents.config.database_manager import get_database_manager
+                db_manager = get_database_manager()
+                if db_manager.is_mongodb_available():
+                    client = db_manager.get_mongodb_client()
+                    db = client['tradingagents']
+                    basic_info_collection = db['stock_basic_info']
+                    # 从symbol中提取股票代码
+                    stock_code = latest_indicators.get('code') or latest_indicators.get('symbol', '').replace('.SZ', '').replace('.SH', '')
+                    if stock_code:
+                        basic_info = basic_info_collection.find_one({'code': stock_code})
+                        if basic_info:
+                            pe_value = basic_info.get('pe')
+                            if pe_value is not None and pe_value > 0:
+                                metrics["pe"] = f"{pe_value:.1f}倍"
+                                logger.debug(f"✅ 从stock_basic_info获取PE: {metrics['pe']}")
+                            else:
+                                pe_value = None
+            except Exception as e:
+                logger.debug(f"从stock_basic_info获取PE失败: {e}")
+                pe_value = None
+            
+            # 如果无法从stock_basic_info获取，尝试计算
+            if pe_value is None:
+                net_profit = latest_indicators.get('net_profit')
+                if net_profit and net_profit > 0:
+                    try:
+                        # 使用市值/净利润计算PE
+                        money_cap = latest_indicators.get('money_cap')
+                        if money_cap and money_cap > 0:
+                            pe_calculated = money_cap / net_profit
+                            metrics["pe"] = f"{pe_calculated:.1f}倍"
+                            logger.debug(f"✅ 计算PE: 市值{money_cap} / 净利润{net_profit} = {metrics['pe']}")
+                        else:
+                            metrics["pe"] = "N/A"
+                    except (ValueError, TypeError, ZeroDivisionError):
                         metrics["pe"] = "N/A"
-                except (ValueError, TypeError, ZeroDivisionError):
+                else:
                     metrics["pe"] = "N/A"
-            else:
-                metrics["pe"] = "N/A"
 
-            # 计算 PB - 使用总股本
-            if total_equity and price_value > 0:
-                try:
-                    # 简化：PB = 市值 / 净资产
-                    # 这里需要知道总股数才能计算
-                    metrics["pb"] = "N/A（需要更多数据）"
-                except (ValueError, TypeError, ZeroDivisionError):
+            # 计算 PB - 优先从stock_basic_info获取，否则尝试计算
+            pb_value = None
+            try:
+                # 尝试从stock_basic_info获取PB
+                if db_manager.is_mongodb_available():
+                    stock_code = latest_indicators.get('code') or latest_indicators.get('symbol', '').replace('.SZ', '').replace('.SH', '')
+                    if stock_code:
+                        basic_info = basic_info_collection.find_one({'code': stock_code})
+                        if basic_info:
+                            pb_value = basic_info.get('pb')
+                            if pb_value is not None and pb_value > 0:
+                                metrics["pb"] = f"{pb_value:.2f}倍"
+                                logger.debug(f"✅ 从stock_basic_info获取PB: {metrics['pb']}")
+                            else:
+                                pb_value = None
+            except Exception as e:
+                logger.debug(f"从stock_basic_info获取PB失败: {e}")
+                pb_value = None
+            
+            # 如果无法从stock_basic_info获取，尝试计算
+            if pb_value is None:
+                total_equity = latest_indicators.get('total_hldr_eqy_exc_min_int')
+                if total_equity and total_equity > 0:
+                    try:
+                        # 使用市值/净资产计算PB
+                        money_cap = latest_indicators.get('money_cap')
+                        if money_cap and money_cap > 0:
+                            pb_calculated = money_cap / total_equity
+                            metrics["pb"] = f"{pb_calculated:.2f}倍"
+                            logger.debug(f"✅ 计算PB: 市值{money_cap} / 净资产{total_equity} = {metrics['pb']}")
+                        else:
+                            metrics["pb"] = "N/A"
+                    except (ValueError, TypeError, ZeroDivisionError):
+                        metrics["pb"] = "N/A"
+                else:
                     metrics["pb"] = "N/A"
-            else:
-                metrics["pb"] = "N/A"
 
             # 资产负债率
             debt_ratio = latest_indicators.get('debt_to_assets')
@@ -893,8 +1036,24 @@ class OptimizedChinaDataProvider:
             else:
                 metrics["debt_ratio"] = "N/A"
 
-            # 添加其他必需的字段（使用 N/A 占位）
-            metrics["ps"] = "N/A"
+            # 计算 PS - 市销率
+            revenue = latest_indicators.get('revenue')
+            if revenue and revenue > 0:
+                try:
+                    # 使用市值/营业收入计算PS
+                    money_cap = latest_indicators.get('money_cap')
+                    if money_cap and money_cap > 0:
+                        ps_calculated = money_cap / revenue
+                        metrics["ps"] = f"{ps_calculated:.2f}倍"
+                        logger.debug(f"✅ 计算PS: 市值{money_cap} / 营业收入{revenue} = {metrics['ps']}")
+                    else:
+                        metrics["ps"] = "N/A"
+                except (ValueError, TypeError, ZeroDivisionError):
+                    metrics["ps"] = "N/A"
+            else:
+                metrics["ps"] = "N/A"
+
+            # 股息收益率 - 暂时设为N/A，需要股息数据
             metrics["dividend_yield"] = "N/A"
             metrics["current_ratio"] = latest_indicators.get('current_ratio', 'N/A')
             metrics["quick_ratio"] = latest_indicators.get('quick_ratio', 'N/A')
