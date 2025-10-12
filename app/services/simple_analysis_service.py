@@ -725,16 +725,57 @@ class SimpleAnalysisService:
             # 配置阶段
             update_progress_sync(30, "配置分析参数...", "configuration")
 
-            # 从统一配置读取模型配置
-            from app.core.unified_config import unified_config
-            quick_model = unified_config.get_quick_analysis_model()
-            deep_model = unified_config.get_deep_analysis_model()
+            # 🆕 智能模型选择逻辑
+            from app.services.model_capability_service import get_model_capability_service
+            capability_service = get_model_capability_service()
 
-            logger.info(f"📝 [分析服务] 从配置读取模型: quick={quick_model}, deep={deep_model}")
+            research_depth = request.parameters.research_depth if request.parameters else "标准"
+
+            # 1. 检查前端是否指定了模型
+            if (request.parameters and
+                hasattr(request.parameters, 'quick_analysis_model') and
+                hasattr(request.parameters, 'deep_analysis_model') and
+                request.parameters.quick_analysis_model and
+                request.parameters.deep_analysis_model):
+
+                # 使用前端指定的模型
+                quick_model = request.parameters.quick_analysis_model
+                deep_model = request.parameters.deep_analysis_model
+
+                logger.info(f"📝 [分析服务] 用户指定模型: quick={quick_model}, deep={deep_model}")
+
+                # 验证模型是否合适
+                validation = capability_service.validate_model_pair(
+                    quick_model, deep_model, research_depth
+                )
+
+                if not validation["valid"]:
+                    # 记录警告
+                    for warning in validation["warnings"]:
+                        logger.warning(warning)
+
+                    # 如果模型不合适，自动切换到推荐模型
+                    logger.info(f"🔄 自动切换到推荐模型...")
+                    quick_model, deep_model = capability_service.recommend_models_for_depth(
+                        research_depth
+                    )
+                    logger.info(f"✅ 已切换: quick={quick_model}, deep={deep_model}")
+                else:
+                    # 即使验证通过，也记录警告信息
+                    for warning in validation["warnings"]:
+                        logger.info(warning)
+                    logger.info(f"✅ 用户选择的模型验证通过: quick={quick_model}, deep={deep_model}")
+
+            else:
+                # 2. 自动推荐模型
+                quick_model, deep_model = capability_service.recommend_models_for_depth(
+                    research_depth
+                )
+                logger.info(f"🤖 自动推荐模型: quick={quick_model}, deep={deep_model}")
 
             # 创建分析配置
             config = create_analysis_config(
-                research_depth=request.parameters.research_depth if request.parameters else 2,
+                research_depth=research_depth,
                 selected_analysts=request.parameters.selected_analysts if request.parameters else ["market", "fundamentals"],
                 quick_model=quick_model,
                 deep_model=deep_model,
