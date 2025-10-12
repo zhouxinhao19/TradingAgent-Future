@@ -344,9 +344,29 @@
                         :label="model.model_display_name || model.model_name"
                         :value="model.model_name"
                       >
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                          <span>{{ model.model_display_name || model.model_name }}</span>
-                          <span style="font-size: 12px; color: #909399; margin-left: 8px;">{{ model.provider }}</span>
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                          <span style="flex: 1;">{{ model.model_display_name || model.model_name }}</span>
+                          <div style="display: flex; align-items: center; gap: 4px;">
+                            <!-- 能力等级徽章 -->
+                            <el-tag
+                              v-if="model.capability_level"
+                              :type="getCapabilityTagType(model.capability_level)"
+                              size="small"
+                              effect="plain"
+                            >
+                              {{ getCapabilityText(model.capability_level) }}
+                            </el-tag>
+                            <!-- 角色标签 -->
+                            <el-tag
+                              v-if="isQuickAnalysisRole(model.suitable_roles)"
+                              type="success"
+                              size="small"
+                              effect="plain"
+                            >
+                              ⚡快速
+                            </el-tag>
+                            <span style="font-size: 12px; color: #909399;">{{ model.provider }}</span>
+                          </div>
                         </div>
                       </el-option>
                     </el-select>
@@ -366,14 +386,49 @@
                         :label="model.model_display_name || model.model_name"
                         :value="model.model_name"
                       >
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                          <span>{{ model.model_display_name || model.model_name }}</span>
-                          <span style="font-size: 12px; color: #909399; margin-left: 8px;">{{ model.provider }}</span>
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                          <span style="flex: 1;">{{ model.model_display_name || model.model_name }}</span>
+                          <div style="display: flex; align-items: center; gap: 4px;">
+                            <!-- 能力等级徽章 -->
+                            <el-tag
+                              v-if="model.capability_level"
+                              :type="getCapabilityTagType(model.capability_level)"
+                              size="small"
+                              effect="plain"
+                            >
+                              {{ getCapabilityText(model.capability_level) }}
+                            </el-tag>
+                            <!-- 角色标签 -->
+                            <el-tag
+                              v-if="isDeepAnalysisRole(model.suitable_roles)"
+                              type="warning"
+                              size="small"
+                              effect="plain"
+                            >
+                              🧠深度
+                            </el-tag>
+                            <span style="font-size: 12px; color: #909399;">{{ model.provider }}</span>
+                          </div>
                         </div>
                       </el-option>
                     </el-select>
                   </div>
                 </div>
+
+                <!-- 🆕 模型推荐提示 -->
+                <el-alert
+                  v-if="modelRecommendation"
+                  :title="modelRecommendation.title"
+                  :type="modelRecommendation.type"
+                  :closable="false"
+                  style="margin-top: 12px;"
+                >
+                  <template #default>
+                    <div style="font-size: 13px; line-height: 1.6;">
+                      {{ modelRecommendation.message }}
+                    </div>
+                  </template>
+                </el-alert>
               </div>
 
               <!-- 分析选项 -->
@@ -602,6 +657,7 @@ import { useAuthStore } from '@/stores/auth'
 import { configApi } from '@/api/config'
 import { ANALYSTS, convertAnalystNamesToIds } from '@/constants/analysts'
 import { marked } from 'marked'
+import { recommendModels, validateModels, type ModelRecommendationResponse } from '@/api/modelCapabilities'
 
 // 配置marked选项
 marked.setOptions({
@@ -659,6 +715,13 @@ const modelSettings = ref({
 
 // 可用的模型列表（从配置中获取）
 const availableModels = ref<any[]>([])
+
+// 🆕 模型推荐提示
+const modelRecommendation = ref<{
+  title: string
+  message: string
+  type: 'success' | 'warning' | 'info' | 'error'
+} | null>(null)
 
 // 分析表单
 const analysisForm = reactive({
@@ -1725,6 +1788,110 @@ const restoreTaskFromCache = async () => {
   }
 }
 
+// 🆕 模型能力相关辅助函数
+
+/**
+ * 获取能力等级文本
+ */
+const getCapabilityText = (level: number): string => {
+  const texts: Record<number, string> = {
+    1: '⚡基础',
+    2: '📊标准',
+    3: '🎯高级',
+    4: '🔥专业',
+    5: '👑旗舰'
+  }
+  return texts[level] || '📊标准'
+}
+
+/**
+ * 获取能力等级标签类型
+ */
+const getCapabilityTagType = (level: number): 'success' | 'info' | 'warning' | 'danger' => {
+  if (level >= 4) return 'danger'
+  if (level >= 3) return 'warning'
+  if (level >= 2) return 'success'
+  return 'info'
+}
+
+/**
+ * 判断是否适合快速分析
+ */
+const isQuickAnalysisRole = (roles: string[] | undefined): boolean => {
+  if (!roles || !Array.isArray(roles)) return false
+  return roles.includes('quick_analysis') || roles.includes('both')
+}
+
+/**
+ * 判断是否适合深度分析
+ */
+const isDeepAnalysisRole = (roles: string[] | undefined): boolean => {
+  if (!roles || !Array.isArray(roles)) return false
+  return roles.includes('deep_analysis') || roles.includes('both')
+}
+
+/**
+ * 检查模型适用性并显示推荐
+ */
+const checkModelSuitability = async () => {
+  const depthNames: Record<number, string> = {
+    1: '快速',
+    2: '基础',
+    3: '标准',
+    4: '深度',
+    5: '全面'
+  }
+  const depthName = depthNames[analysisForm.researchDepth] || '标准'
+
+  try {
+    // 验证当前选择的模型
+    const validateRes = await validateModels(
+      modelSettings.value.quickAnalysisModel,
+      modelSettings.value.deepAnalysisModel,
+      depthName
+    )
+
+    if (validateRes.data && !validateRes.data.valid) {
+      // 模型不合适，显示警告
+      modelRecommendation.value = {
+        title: '⚠️ 模型选择建议',
+        message: validateRes.data.warnings.join('\n'),
+        type: 'warning'
+      }
+
+      // 获取推荐模型
+      const recommendRes = await recommendModels(depthName)
+      if (recommendRes.data) {
+        modelRecommendation.value.message += `\n\n推荐使用：\n快速模型：${recommendRes.data.quick_model}\n深度模型：${recommendRes.data.deep_model}`
+      }
+    } else if (validateRes.data && validateRes.data.warnings.length > 0) {
+      // 有警告但可以使用
+      modelRecommendation.value = {
+        title: '💡 提示',
+        message: validateRes.data.warnings.join('\n'),
+        type: 'info'
+      }
+    } else {
+      // 模型合适
+      modelRecommendation.value = null
+    }
+  } catch (error) {
+    console.error('检查模型适用性失败:', error)
+    // 静默失败，不影响用户体验
+  }
+}
+
+// 监听分析深度变化
+import { watch } from 'vue'
+watch(() => analysisForm.researchDepth, () => {
+  checkModelSuitability()
+})
+
+// 监听模型选择变化
+watch([() => modelSettings.value.quickAnalysisModel, () => modelSettings.value.deepAnalysisModel], () => {
+  checkModelSuitability()
+})
+
 // 页面初始化
 onMounted(async () => {
   initializeModelSettings()
@@ -1736,6 +1903,9 @@ onMounted(async () => {
 
   // 尝试恢复任务状态
   await restoreTaskFromCache()
+
+  // 🆕 初始检查模型适用性
+  await checkModelSuitability()
 })
 </script>
 
