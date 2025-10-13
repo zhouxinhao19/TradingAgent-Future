@@ -1,5 +1,5 @@
 """
-TradingAgents-CN v0.1.16 FastAPI Backend
+TradingAgents-CN v1.0.0-preview FastAPI Backend
 主应用程序入口
 
 Copyright (c) 2025 hsliuping. All rights reserved.

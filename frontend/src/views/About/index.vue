@@ -18,7 +18,7 @@
       
       <div class="intro-content">
         <div class="intro-text">
-          <h4>TradingAgents-CN v0.1.16</h4>
+          <h4>TradingAgents-CN v1.0.0-preview</h4>
           <p>
             TradingAgents-CN是一个现代化的多智能体股票分析平台，基于先进的AI技术，
             为投资者提供专业、准确、及时的股票分析服务。
@@ -138,8 +138,6 @@
           <ul>
             <li>多智能体协作</li>
             <li>大语言模型集成</li>
-            <li>自然语言处理</li>
-            <li>机器学习算法</li>
           </ul>
         </div>
       </div>
@@ -152,10 +150,10 @@
       </template>
       
       <el-descriptions :column="2" border>
-        <el-descriptions-item label="当前版本">v0.1.16</el-descriptions-item>
+        <el-descriptions-item label="当前版本">v1.0.0-preview</el-descriptions-item>
         <el-descriptions-item label="发布日期">2024-01-15</el-descriptions-item>
         <el-descriptions-item label="构建时间">{{ buildTime }}</el-descriptions-item>
-        <el-descriptions-item label="API版本">v0.1.16</el-descriptions-item>
+        <el-descriptions-item label="API版本">v1.0.0-preview</el-descriptions-item>
         <el-descriptions-item label="前端框架">Vue 3.4.0</el-descriptions-item>
         <el-descriptions-item label="UI组件">Element Plus 2.4.4</el-descriptions-item>
       </el-descriptions>

@@ -1,7 +1,7 @@
 <template>
   <div class="app-footer">
     <div class="footer-content">
-      <span>&copy; 2024 TradingAgents-CN v0.1.16</span>
+      <span>&copy; 2025 TradingAgents-CN v1.0.0-preview</span>
     </div>
   </div>
 </template>
