@@ -635,6 +635,68 @@ class SimpleAnalysisService:
         try:
             logger.info(f"🚀 开始后台执行分析任务: {task_id}")
 
+            # 🔍 验证股票代码是否存在
+            logger.info(f"🔍 开始验证股票代码: {request.stock_code}")
+            from tradingagents.utils.stock_validator import prepare_stock_data
+            from datetime import datetime
+
+            # 获取市场类型
+            market_type = request.parameters.market_type if request.parameters else "A股"
+
+            # 获取分析日期并转换为字符串格式
+            analysis_date = request.parameters.analysis_date if request.parameters else None
+            if analysis_date:
+                # 如果是 datetime 对象，转换为字符串
+                if isinstance(analysis_date, datetime):
+                    analysis_date = analysis_date.strftime('%Y-%m-%d')
+                # 如果是字符串，确保格式正确
+                elif isinstance(analysis_date, str):
+                    # 尝试解析并重新格式化，确保格式统一
+                    try:
+                        parsed_date = datetime.strptime(analysis_date, '%Y-%m-%d')
+                        analysis_date = parsed_date.strftime('%Y-%m-%d')
+                    except ValueError:
+                        # 如果格式不对，使用今天
+                        analysis_date = datetime.now().strftime('%Y-%m-%d')
+                        logger.warning(f"⚠️ 分析日期格式不正确，使用今天: {analysis_date}")
+
+            # 验证股票代码并预获取数据
+            validation_result = await asyncio.to_thread(
+                prepare_stock_data,
+                stock_code=request.stock_code,
+                market_type=market_type,
+                period_days=30,
+                analysis_date=analysis_date
+            )
+
+            if not validation_result.is_valid:
+                error_msg = f"❌ 股票代码验证失败: {validation_result.error_message}"
+                logger.error(error_msg)
+                logger.error(f"💡 建议: {validation_result.suggestion}")
+
+                # 更新任务状态为失败
+                await self.memory_manager.update_task_status(
+                    task_id=task_id,
+                    status=AnalysisStatus.FAILED,
+                    progress=0,
+                    error_message=validation_result.error_message
+                )
+
+                # 更新MongoDB状态
+                await self._update_task_status(
+                    task_id,
+                    AnalysisStatus.FAILED,
+                    0,
+                    error_message=validation_result.error_message
+                )
+
+                return
+
+            logger.info(f"✅ 股票代码验证通过: {request.stock_code} - {validation_result.stock_name}")
+            logger.info(f"📊 市场类型: {validation_result.market_type}")
+            logger.info(f"📈 历史数据: {'有' if validation_result.has_historical_data else '无'}")
+            logger.info(f"📋 基本信息: {'有' if validation_result.has_basic_info else '无'}")
+
             # 在线程池中创建Redis进度跟踪器（避免阻塞事件循环）
             def create_progress_tracker():
                 """在线程中创建进度跟踪器"""
@@ -922,6 +984,10 @@ class SimpleAnalysisService:
             else:
                 logger.info(f"✅ [混合模式] 快速模型({quick_provider}) 和 深度模型({deep_provider}) 来自不同厂家")
 
+            # 获取市场类型
+            market_type = request.parameters.market_type if request.parameters else "A股"
+            logger.info(f"📊 [市场类型] 使用市场类型: {market_type}")
+
             # 创建分析配置（支持混合模式）
             config = create_analysis_config(
                 research_depth=research_depth,
@@ -929,7 +995,7 @@ class SimpleAnalysisService:
                 quick_model=quick_model,
                 deep_model=deep_model,
                 llm_provider=quick_provider,  # 主要使用快速模型的供应商
-                market_type="A股"
+                market_type=market_type  # 使用前端传递的市场类型
             )
 
             # 🔧 添加混合模式配置
@@ -1677,31 +1743,26 @@ class SimpleAnalysisService:
 
                 # user_id 可能是字符串或 ObjectId，做兼容
                 uid_candidates: List[Any] = [user_id]
-                try:
-                    from bson import ObjectId
-                    uid_candidates.append(ObjectId(user_id))
-                except Exception as conv_err:
-                    logger.warning(f"⚠️ [Tasks] 用户ID转换ObjectId失败，按字符串匹配: {conv_err}")
-                    # 若为admin，加入固定的ObjectId（与提交任务时一致）并加入其字符串形式
-                    if str(user_id) == 'admin':
-                        try:
-                            admin_oid_str = '507f1f77bcf86cd799439011'
-                            uid_candidates.append(ObjectId(admin_oid_str))
-                            uid_candidates.append(admin_oid_str)  # 兼容字符串存储
-                            logger.info("📋 [Tasks] 已加入admin固定ObjectId(对象+字符串)用于匹配")
-                        except Exception:
-                            pass
 
-                # 构造查询条件
+                # 特殊处理 admin 用户
                 if str(user_id) == 'admin':
-                    # 管理员：精确匹配固定ObjectId（字符串与对象两种形式）
-                    admin_oid_str = '507f1f77bcf86cd799439011'
+                    # admin 用户：添加固定的 ObjectId 和字符串形式
                     try:
                         from bson import ObjectId
-                        uid_candidates.extend([admin_oid_str, ObjectId(admin_oid_str)])
-                    except Exception:
-                        uid_candidates.append(admin_oid_str)
-                    logger.info(f"📋 [Tasks] 管理员用户，使用固定OID匹配: candidates={uid_candidates}")
+                        admin_oid_str = '507f1f77bcf86cd799439011'
+                        uid_candidates.append(ObjectId(admin_oid_str))
+                        uid_candidates.append(admin_oid_str)  # 兼容字符串存储
+                        logger.info(f"📋 [Tasks] admin用户查询，候选ID: ['admin', ObjectId('{admin_oid_str}'), '{admin_oid_str}']")
+                    except Exception as e:
+                        logger.warning(f"⚠️ [Tasks] admin用户ObjectId创建失败: {e}")
+                else:
+                    # 普通用户：尝试转换为 ObjectId
+                    try:
+                        from bson import ObjectId
+                        uid_candidates.append(ObjectId(user_id))
+                        logger.debug(f"📋 [Tasks] 用户ID已转换为ObjectId: {user_id}")
+                    except Exception as conv_err:
+                        logger.warning(f"⚠️ [Tasks] 用户ID转换ObjectId失败，按字符串匹配: {conv_err}")
 
                 # 兼容 user_id 与 user 两种字段名
                 base_condition = {"$in": uid_candidates}

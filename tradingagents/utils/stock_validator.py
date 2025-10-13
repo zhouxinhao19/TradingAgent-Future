@@ -425,7 +425,10 @@ class StockDataPreparer:
 
         # 标准化港股代码格式
         if not stock_code.upper().endswith('.HK'):
-            formatted_code = f"{stock_code.zfill(4)}.HK"
+            # 移除前导0，然后补齐到4位
+            clean_code = stock_code.lstrip('0') or '0'  # 如果全是0，保留一个0
+            formatted_code = f"{clean_code.zfill(4)}.HK"
+            logger.debug(f"🔍 [港股数据] 代码格式化: {stock_code} → {formatted_code}")
         else:
             formatted_code = stock_code.upper()
 
@@ -434,6 +437,8 @@ class StockDataPreparer:
         start_date = end_date - timedelta(days=period_days)
         start_date_str = start_date.strftime('%Y-%m-%d')
         end_date_str = end_date.strftime('%Y-%m-%d')
+
+        logger.debug(f"📅 [港股数据] 日期范围: {start_date_str} → {end_date_str}")
 
         has_historical_data = False
         has_basic_info = False
@@ -599,6 +604,8 @@ class StockDataPreparer:
         start_date = end_date - timedelta(days=period_days)
         start_date_str = start_date.strftime('%Y-%m-%d')
         end_date_str = end_date.strftime('%Y-%m-%d')
+
+        logger.debug(f"📅 [美股数据] 日期范围: {start_date_str} → {end_date_str}")
 
         has_historical_data = False
         has_basic_info = False

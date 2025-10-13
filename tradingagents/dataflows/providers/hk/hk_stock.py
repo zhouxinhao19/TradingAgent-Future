@@ -208,29 +208,30 @@ class HKStockProvider:
         """
         标准化港股代码格式
 
+        Yahoo Finance 期望的格式：0700.HK（4位数字）
+        输入可能的格式：00700, 700, 0700, 0700.HK, 00700.HK
+
         Args:
             symbol: 原始港股代码
 
         Returns:
-            str: 标准化后的港股代码
+            str: 标准化后的港股代码（格式：0700.HK）
         """
         if not symbol:
             return symbol
 
         symbol = str(symbol).strip().upper()
 
-        # 如果是纯4-5位数字，添加.HK后缀
-        if symbol.isdigit() and 4 <= len(symbol) <= 5:
-            return f"{symbol}.HK"
+        # 如果已经有.HK后缀，先移除
+        if symbol.endswith('.HK'):
+            symbol = symbol[:-3]
 
-        # 如果已经是正确格式，直接返回
-        if symbol.endswith('.HK') and 7 <= len(symbol) <= 8:
-            return symbol
-
-        # 处理其他可能的格式
-        if '.' not in symbol and symbol.isdigit():
-            # 保持原有位数，不强制填充到4位
-            return f"{symbol}.HK"
+        # 如果是纯数字，标准化为4位数字
+        if symbol.isdigit():
+            # 移除前导0，然后补齐到4位
+            clean_code = symbol.lstrip('0') or '0'  # 如果全是0，保留一个0
+            normalized_code = clean_code.zfill(4)
+            return f"{normalized_code}.HK"
 
         return symbol
 

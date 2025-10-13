@@ -37,24 +37,49 @@
                     <el-form-item label="股票代码" required>
                       <el-input
                         v-model="analysisForm.stockCode"
-                        placeholder="如：000001、AAPL"
+                        placeholder="如：000001、AAPL、00700"
                         clearable
                         size="large"
                         class="stock-input"
-                        @blur="fetchStockInfo"
+                        :class="{ 'is-error': stockCodeError }"
+                        @blur="validateStockCodeInput"
+                        @input="onStockCodeInput"
                       >
                         <template #prefix>
                           <el-icon><TrendCharts /></el-icon>
                         </template>
                       </el-input>
+                      <div v-if="stockCodeError" class="error-message">
+                        <el-icon><WarningFilled /></el-icon>
+                        {{ stockCodeError }}
+                      </div>
+                      <div v-else-if="stockCodeHelp" class="help-message">
+                        <el-icon><InfoFilled /></el-icon>
+                        {{ stockCodeHelp }}
+                      </div>
                     </el-form-item>
                   </el-col>
                   <el-col :span="12">
                     <el-form-item label="市场类型">
-                      <el-select v-model="analysisForm.market" placeholder="选择市场" size="large" style="width: 100%">
-                        <el-option label="🇨🇳 A股市场" value="A股" />
-                        <el-option label="🇺🇸 美股市场" value="美股" />
-                        <el-option label="🇭🇰 港股市场" value="港股" />
+                      <el-select
+                        v-model="analysisForm.market"
+                        placeholder="选择市场"
+                        size="large"
+                        style="width: 100%"
+                        @change="onMarketChange"
+                      >
+                        <el-option label="🇨🇳 A股市场" value="A股">
+                          <span>🇨🇳 A股市场</span>
+                          <span style="color: #909399; font-size: 12px; margin-left: 8px;">（6位数字）</span>
+                        </el-option>
+                        <el-option label="🇺🇸 美股市场" value="美股">
+                          <span>🇺🇸 美股市场</span>
+                          <span style="color: #909399; font-size: 12px; margin-left: 8px;">（1-5个字母）</span>
+                        </el-option>
+                        <el-option label="🇭🇰 港股市场" value="港股">
+                          <span>🇭🇰 港股市场</span>
+                          <span style="color: #909399; font-size: 12px; margin-left: 8px;">（1-5位数字）</span>
+                        </el-option>
                       </el-select>
                     </el-form-item>
                   </el-col>
@@ -669,6 +694,7 @@ import { configApi } from '@/api/config'
 import { ANALYSTS, convertAnalystNamesToIds } from '@/constants/analysts'
 import { marked } from 'marked'
 import { recommendModels, validateModels, type ModelRecommendationResponse } from '@/api/modelCapabilities'
+import { validateStockCode, getStockCodeFormatHelp, getStockCodeExamples } from '@/utils/stockValidator'
 
 // 配置marked选项
 marked.setOptions({
@@ -749,6 +775,10 @@ const analysisForm = reactive({
   language: 'zh-CN'
 })
 
+// 股票代码验证相关
+const stockCodeError = ref<string>('')
+const stockCodeHelp = ref<string>('')
+
 // 深度选项（5个级别，基于实际测试数据更新）
 const depthOptions = [
   { icon: '⚡', name: '1级 - 快速分析', description: '基础数据概览，快速决策', time: '2-5分钟' },
@@ -761,6 +791,61 @@ const depthOptions = [
 // 禁用日期
 const disabledDate = (time: Date) => {
   return time.getTime() > Date.now()
+}
+
+// 股票代码输入时的处理
+const onStockCodeInput = () => {
+  // 清除错误信息
+  stockCodeError.value = ''
+  // 显示格式提示
+  stockCodeHelp.value = getStockCodeFormatHelp(analysisForm.market)
+}
+
+// 市场类型变更时的处理
+const onMarketChange = () => {
+  // 重新验证股票代码
+  if (analysisForm.stockCode.trim()) {
+    validateStockCodeInput()
+  } else {
+    // 显示新市场的格式提示
+    stockCodeHelp.value = getStockCodeFormatHelp(analysisForm.market)
+  }
+}
+
+// 验证股票代码输入
+const validateStockCodeInput = () => {
+  const code = analysisForm.stockCode.trim()
+
+  if (!code) {
+    stockCodeError.value = ''
+    stockCodeHelp.value = ''
+    return
+  }
+
+  // 验证股票代码格式
+  const validation = validateStockCode(code, analysisForm.market)
+
+  if (!validation.valid) {
+    stockCodeError.value = validation.message || '股票代码格式不正确'
+    stockCodeHelp.value = ''
+  } else {
+    stockCodeError.value = ''
+    stockCodeHelp.value = `✓ ${validation.market}代码格式正确`
+
+    // 自动更新市场类型（如果识别出的市场与当前选择不同）
+    if (validation.market && validation.market !== analysisForm.market) {
+      analysisForm.market = validation.market
+      ElMessage.success(`已自动识别为${validation.market}`)
+    }
+
+    // 标准化代码
+    if (validation.normalizedCode) {
+      analysisForm.stockCode = validation.normalizedCode
+    }
+  }
+
+  // 获取股票信息
+  fetchStockInfo()
 }
 
 // 获取股票信息
@@ -790,8 +875,16 @@ const submitAnalysis = async () => {
     return
   }
 
-  // 标准化股票代码
-  analysisForm.symbol = stockCode.toUpperCase()
+  // 验证股票代码格式
+  const validation = validateStockCode(stockCode, analysisForm.market)
+  if (!validation.valid) {
+    ElMessage.error(validation.message || '股票代码格式不正确')
+    stockCodeError.value = validation.message || '股票代码格式不正确'
+    return
+  }
+
+  // 使用标准化后的代码
+  analysisForm.symbol = validation.normalizedCode || stockCode.toUpperCase()
 
   if (analysisForm.selectedAnalysts.length === 0) {
     ElMessage.warning('请至少选择一个分析师')
@@ -2064,6 +2157,38 @@ onMounted(async () => {
         :deep(.el-input__inner) {
           font-weight: 600;
           text-transform: uppercase;
+        }
+
+        &.is-error {
+          :deep(.el-input__inner) {
+            border-color: #f56c6c;
+          }
+        }
+      }
+
+      .error-message {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 8px;
+        font-size: 12px;
+        color: #f56c6c;
+
+        .el-icon {
+          font-size: 14px;
+        }
+      }
+
+      .help-message {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 8px;
+        font-size: 12px;
+        color: #67c23a;
+
+        .el-icon {
+          font-size: 14px;
         }
       }
 

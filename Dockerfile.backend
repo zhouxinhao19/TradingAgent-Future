@@ -1,0 +1,37 @@
+# Backend Dockerfile for FastAPI service (front/back split)
+# Use CN mirror to improve pull reliability in mainland networks
+FROM registry.cn-hangzhou.aliyuncs.com/library/python:3.11-slim AS backend
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    TZ=Asia/Shanghai
+
+WORKDIR /app
+
+# System deps (curl for healthchecks/logs)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python deps
+COPY requirements.txt ./
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt && \
+    pip install uvicorn[standard]
+
+# Copy backend code and required modules
+COPY app ./app
+COPY tradingagents ./tradingagents
+COPY utils ./utils
+COPY config ./config
+
+# Expose backend port
+EXPOSE 8001
+
+# Environment overrides for Docker, can also be set via compose env_file
+ENV DOCKER_CONTAINER=true
+
+# Start FastAPI using uvicorn
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
