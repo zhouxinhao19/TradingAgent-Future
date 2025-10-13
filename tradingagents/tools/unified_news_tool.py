@@ -105,6 +105,9 @@ class UnifiedNewsAnalyzer:
             from tradingagents.dataflows.cache.app_adapter import get_mongodb_client
             from datetime import timedelta
 
+            # 🔧 确保 max_news 是整数（防止传入浮点数）
+            max_news = int(max_news)
+
             client = get_mongodb_client()
             if not client:
                 logger.warning(f"[统一新闻工具] 无法连接到MongoDB")

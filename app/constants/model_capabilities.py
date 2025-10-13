@@ -3,6 +3,11 @@
 
 定义模型的能力等级、适用角色、特性标签等元数据，
 用于智能匹配分析深度和模型选择。
+
+🆕 聚合渠道支持：
+- 支持 302.AI、OpenRouter、One API 等聚合渠道
+- 聚合渠道的模型名称格式：{provider}/{model}（如 openai/gpt-4）
+- 系统会自动映射到原厂模型的能力配置
 """
 
 from enum import IntEnum, Enum
@@ -378,4 +383,76 @@ def get_feature_badge(feature: ModelFeature) -> Dict[str, str]:
         ModelFeature.COST_EFFECTIVE: {"text": "经济", "color": "success", "icon": "💰"}
     }
     return badges.get(feature, {"text": str(feature), "color": "info", "icon": "✨"})
+
+
+# ==================== 聚合渠道配置 ====================
+
+# 聚合渠道的默认配置
+AGGREGATOR_PROVIDERS = {
+    "302ai": {
+        "display_name": "302.AI",
+        "description": "302.AI 聚合平台，提供多厂商模型统一接口",
+        "website": "https://302.ai",
+        "api_doc_url": "https://doc.302.ai",
+        "default_base_url": "https://api.302.ai/v1",
+        "model_name_format": "{provider}/{model}",  # 如: openai/gpt-4
+        "supported_providers": ["openai", "anthropic", "google", "deepseek", "qwen"]
+    },
+    "openrouter": {
+        "display_name": "OpenRouter",
+        "description": "OpenRouter 聚合平台，支持多种 AI 模型",
+        "website": "https://openrouter.ai",
+        "api_doc_url": "https://openrouter.ai/docs",
+        "default_base_url": "https://openrouter.ai/api/v1",
+        "model_name_format": "{provider}/{model}",
+        "supported_providers": ["openai", "anthropic", "google", "meta", "mistral"]
+    },
+    "oneapi": {
+        "display_name": "One API",
+        "description": "One API 开源聚合平台",
+        "website": "https://github.com/songquanpeng/one-api",
+        "api_doc_url": "https://github.com/songquanpeng/one-api",
+        "default_base_url": "http://localhost:3000/v1",  # 需要用户自行部署
+        "model_name_format": "{model}",  # One API 通常不需要前缀
+        "supported_providers": ["openai", "anthropic", "google", "azure", "claude"]
+    },
+    "newapi": {
+        "display_name": "New API",
+        "description": "New API 聚合平台",
+        "website": "https://github.com/Calcium-Ion/new-api",
+        "api_doc_url": "https://github.com/Calcium-Ion/new-api",
+        "default_base_url": "http://localhost:3000/v1",
+        "model_name_format": "{model}",
+        "supported_providers": ["openai", "anthropic", "google", "azure", "claude"]
+    }
+}
+
+
+def is_aggregator_model(model_name: str) -> bool:
+    """
+    判断是否为聚合渠道模型名称
+
+    Args:
+        model_name: 模型名称
+
+    Returns:
+        是否为聚合渠道模型
+    """
+    return "/" in model_name
+
+
+def parse_aggregator_model(model_name: str) -> Tuple[str, str]:
+    """
+    解析聚合渠道模型名称
+
+    Args:
+        model_name: 模型名称（如 openai/gpt-4）
+
+    Returns:
+        (provider, model) 元组
+    """
+    if "/" in model_name:
+        parts = model_name.split("/", 1)
+        return parts[0], parts[1]
+    return "", model_name
 

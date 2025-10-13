@@ -242,9 +242,13 @@ async def update_llm_provider(
 ):
     """更新大模型厂家"""
     try:
-        update_data = request.model_dump()
+        update_data = request.model_dump(exclude_unset=True)
+        # 安全措施：不允许通过REST API更新敏感字段
+        # 如果前端发送了这些字段，则从更新数据中移除（保持数据库中的原值）
         if 'api_key' in update_data:
-            update_data['api_key'] = ""
+            del update_data['api_key']
+        if 'api_secret' in update_data:
+            del update_data['api_secret']
         success = await config_service.update_llm_provider(provider_id, update_data)
 
         if success:
@@ -363,6 +367,27 @@ async def toggle_llm_provider(
         )
 
 
+@router.post("/llm/providers/{provider_id}/fetch-models", response_model=dict)
+async def fetch_provider_models(
+    provider_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """从厂家 API 获取模型列表"""
+    try:
+        result = await config_service.fetch_provider_models(provider_id)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"获取模型列表失败: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取模型列表失败: {str(e)}"
+        )
+
+
 @router.post("/llm/providers/migrate-env", response_model=dict)
 async def migrate_env_to_providers(
     current_user: User = Depends(get_current_user)
@@ -398,6 +423,45 @@ async def migrate_env_to_providers(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"环境变量迁移失败: {str(e)}"
+        )
+
+
+@router.post("/llm/providers/init-aggregators", response_model=dict)
+async def init_aggregator_providers(
+    current_user: User = Depends(get_current_user)
+):
+    """初始化聚合渠道厂家配置（302.AI、OpenRouter等）"""
+    try:
+        result = await config_service.init_aggregator_providers()
+
+        # 审计日志（忽略异常）
+        try:
+            await log_operation(
+                user_id=str(getattr(current_user, "id", "")),
+                username=getattr(current_user, "username", "unknown"),
+                action_type=ActionType.CONFIG_MANAGEMENT,
+                action="init_aggregator_providers",
+                details={
+                    "added_count": result.get("added", 0),
+                    "skipped_count": result.get("skipped", 0)
+                },
+                success=bool(result.get("success", False)),
+            )
+        except Exception:
+            pass
+
+        return {
+            "success": result["success"],
+            "message": result["message"],
+            "data": {
+                "added_count": result.get("added", 0),
+                "skipped_count": result.get("skipped", 0)
+            }
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"初始化聚合渠道失败: {str(e)}"
         )
 
 

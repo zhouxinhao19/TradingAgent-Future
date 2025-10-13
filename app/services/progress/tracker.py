@@ -78,6 +78,11 @@ class RedisProgressTracker:
         self.progress_data['total_steps'] = len(self.analysis_steps)
         self.progress_data['steps'] = [asdict(step) for step in self.analysis_steps]
 
+        # 🔧 计算并设置预估总时长
+        base_total_time = self._get_base_total_time()
+        self.progress_data['estimated_total_time'] = base_total_time
+        self.progress_data['remaining_time'] = base_total_time  # 初始时剩余时间 = 总时长
+
         # 保存初始状态
         self._save_progress()
 
@@ -191,15 +196,62 @@ class RedisProgressTracker:
         return self._get_base_total_time() * step.weight
 
     def _get_base_total_time(self) -> float:
-        """根据分析师数量、研究深度、模型类型预估总时长（秒）"""
-        base = 60
-        depth_map = {"快速": 1, "标准": 2, "深度": 3}
-        d = depth_map.get(self.research_depth, 2)
-        analyst_base = {1: 180, 2: 360, 3: 600}.get(d, 360)
-        analyst_time = len(self.analysts) * analyst_base
-        model_mult = {'dashscope': 1.0, 'deepseek': 0.7, 'google': 1.3}.get(self.llm_provider, 1.0)
-        depth_mult = {1: 0.8, 2: 1.0, 3: 1.3}.get(d, 1.0)
-        return (base + analyst_time) * model_mult * depth_mult
+        """
+        根据分析师数量、研究深度、模型类型预估总时长（秒）
+
+        算法设计思路（基于实际测试数据）：
+        1. 实测：4级深度 + 3个分析师 = 11分钟（661秒）
+        2. 实测：1级快速 = 4-5分钟
+        3. 实测：2级基础 = 5-6分钟
+        4. 分析师之间有并行处理，不是线性叠加
+        """
+
+        # 🔧 支持5个级别的分析深度
+        depth_map = {
+            "快速": 1,  # 1级 - 快速分析
+            "基础": 2,  # 2级 - 基础分析
+            "标准": 3,  # 3级 - 标准分析（推荐）
+            "深度": 4,  # 4级 - 深度分析
+            "全面": 5   # 5级 - 全面分析
+        }
+        d = depth_map.get(self.research_depth, 3)  # 默认标准分析
+
+        # 📊 基于实际测试数据的基础时间（秒）
+        # 这是单个分析师的基础耗时
+        base_time_per_depth = {
+            1: 150,  # 1级：2.5分钟（实测4-5分钟是多个分析师的情况）
+            2: 180,  # 2级：3分钟（实测5-6分钟是多个分析师的情况）
+            3: 240,  # 3级：4分钟（前端显示：6-10分钟）
+            4: 330,  # 4级：5.5分钟（实测：3个分析师11分钟，反推单个约5.5分钟）
+            5: 480   # 5级：8分钟（前端显示：15-25分钟）
+        }.get(d, 240)
+
+        # 📈 分析师数量影响系数（基于实际测试数据）
+        # 实测：4级 + 3个分析师 = 11分钟 = 660秒
+        # 反推：330秒 * multiplier = 660秒 => multiplier = 2.0
+        analyst_count = len(self.analysts)
+        if analyst_count == 1:
+            analyst_multiplier = 1.0
+        elif analyst_count == 2:
+            analyst_multiplier = 1.5  # 2个分析师约1.5倍时间
+        elif analyst_count == 3:
+            analyst_multiplier = 2.0  # 3个分析师约2倍时间（实测验证）
+        elif analyst_count == 4:
+            analyst_multiplier = 2.4  # 4个分析师约2.4倍时间
+        else:
+            analyst_multiplier = 2.4 + (analyst_count - 4) * 0.3  # 每增加1个分析师增加30%
+
+        # 🚀 模型速度影响（基于实际测试）
+        model_mult = {
+            'dashscope': 1.0,  # 阿里百炼速度适中
+            'deepseek': 0.8,   # DeepSeek较快
+            'google': 1.2      # Google较慢
+        }.get(self.llm_provider, 1.0)
+
+        # 计算总时间
+        total_time = base_time_per_depth * analyst_multiplier * model_mult
+
+        return total_time
 
     def _calculate_time_estimates(self) -> tuple[float, float, float]:
         """返回 (elapsed, remaining, estimated_total)"""

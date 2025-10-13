@@ -210,14 +210,10 @@ class Toolkit:
         """
         try:
             # 使用Tushare获取主要指数数据
-            from tradingagents.dataflows.tushare_adapter import get_tushare_adapter
+            from tradingagents.dataflows.providers.china.tushare import get_tushare_adapter
 
             adapter = get_tushare_adapter()
-            if not adapter.provider or not adapter.provider.connected:
-                # 如果Tushare不可用，回退到TDX
-                logger.warning(f"⚠️ Tushare不可用，回退到TDX获取市场概览")
-                from tradingagents.dataflows.tdx_utils import get_china_market_overview
-                return get_china_market_overview()
+
 
             # 使用Tushare获取主要指数信息
             # 这里可以扩展为获取具体的指数数据
@@ -763,6 +759,7 @@ class Toolkit:
             research_depth = "标准"
         
         # 根据分析级别调整数据获取策略
+        # 🔧 修正映射关系：data_depth 应该与 research_depth 保持一致
         if research_depth == "快速":
             # 快速分析：获取基础数据，减少数据源调用
             data_depth = "basic"
@@ -772,20 +769,20 @@ class Toolkit:
             data_depth = "standard"
             logger.info(f"🔧 [分析级别] 基础分析模式：获取标准数据")
         elif research_depth == "标准":
-            # 标准分析：获取完整数据
-            data_depth = "full"
-            logger.info(f"🔧 [分析级别] 标准分析模式：获取完整数据")
+            # 标准分析：获取标准数据（不是full！）
+            data_depth = "standard"
+            logger.info(f"🔧 [分析级别] 标准分析模式：获取标准数据")
         elif research_depth == "深度":
-            # 深度分析：获取详细数据，包含更多历史数据
-            data_depth = "detailed"
-            logger.info(f"🔧 [分析级别] 深度分析模式：获取详细数据")
+            # 深度分析：获取完整数据
+            data_depth = "full"
+            logger.info(f"🔧 [分析级别] 深度分析模式：获取完整数据")
         elif research_depth == "全面":
             # 全面分析：获取最全面的数据，包含所有可用数据源
             data_depth = "comprehensive"
             logger.info(f"🔧 [分析级别] 全面分析模式：获取最全面数据")
         else:
             # 默认使用标准分析
-            data_depth = "full"
+            data_depth = "standard"
             logger.info(f"🔧 [分析级别] 未知级别，使用标准分析模式")
 
         # 添加详细的股票代码追踪日志
@@ -820,24 +817,22 @@ class Toolkit:
         
             # 基本面分析优化：不需要大量历史数据，只需要当前价格和财务数据
             # 根据数据深度级别设置不同的分析模块数量，而非历史数据范围
+            # 🔧 修正映射关系：analysis_modules 应该与 data_depth 保持一致
             if data_depth == "basic":  # 快速分析：基础模块
                 analysis_modules = "basic"
                 logger.info(f"📊 [基本面策略] 快速分析模式：获取基础财务指标")
-            elif data_depth == "standard":  # 基础分析：标准模块
+            elif data_depth == "standard":  # 基础/标准分析：标准模块
                 analysis_modules = "standard"
-                logger.info(f"📊 [基本面策略] 基础分析模式：获取标准财务分析")
-            elif data_depth == "full":  # 标准分析：完整模块
+                logger.info(f"📊 [基本面策略] 标准分析模式：获取标准财务分析")
+            elif data_depth == "full":  # 深度分析：完整模块
                 analysis_modules = "full"
-                logger.info(f"📊 [基本面策略] 标准分析模式：获取完整基本面分析")
-            elif data_depth == "detailed":  # 深度分析：详细模块
-                analysis_modules = "detailed"
-                logger.info(f"📊 [基本面策略] 深度分析模式：获取详细基本面分析")
+                logger.info(f"📊 [基本面策略] 深度分析模式：获取完整基本面分析")
             elif data_depth == "comprehensive":  # 全面分析：综合模块
                 analysis_modules = "comprehensive"
                 logger.info(f"📊 [基本面策略] 全面分析模式：获取综合基本面分析")
             else:
-                analysis_modules = "full"  # 默认完整分析
-                logger.info(f"📊 [基本面策略] 默认模式：获取完整基本面分析")
+                analysis_modules = "standard"  # 默认标准分析
+                logger.info(f"📊 [基本面策略] 默认模式：获取标准基本面分析")
             
             # 基本面分析只需要最近1-2天的价格数据即可
             days_back = 2  # 固定为2天，足够获取当前价格信息
@@ -1226,7 +1221,7 @@ class Toolkit:
                 logger.info(f"🇺🇸 [统一市场工具] 处理美股市场数据...")
 
                 try:
-                    from tradingagents.dataflows.optimized_us_data import get_us_stock_data_cached
+                    from tradingagents.dataflows.providers.us.optimized import get_us_stock_data_cached
                     us_data = get_us_stock_data_cached(ticker, start_date, end_date)
                     result_data.append(f"## 美股市场数据\n{us_data}")
                 except Exception as e:
@@ -1303,21 +1298,24 @@ class Toolkit:
                                    .replace('.HK', '').replace('.XSHE', '').replace('.XSHG', '')
                     
                     logger.info(f"🇨🇳🇭🇰 [统一新闻工具] 尝试获取东方财富新闻: {clean_ticker}")
-                    
-                    # 导入AKShare新闻获取函数
-                    from tradingagents.dataflows.akshare_utils import get_stock_news_em
-                    
+
+                    # 通过 AKShare Provider 获取新闻
+                    from tradingagents.dataflows.providers.china.akshare import AKShareProvider
+
+                    provider = AKShareProvider()
+
                     # 获取东方财富新闻
-                    news_df = get_stock_news_em(clean_ticker)
-                    
-                    if not news_df.empty:
+                    news_df = provider.get_stock_news_sync(symbol=clean_ticker)
+
+                    if news_df is not None and not news_df.empty:
                         # 格式化东方财富新闻
                         em_news_items = []
                         for _, row in news_df.iterrows():
-                            news_title = row.get('标题', '')
-                            news_time = row.get('时间', '')
-                            news_url = row.get('链接', '')
-                            
+                            # AKShare 返回的字段名
+                            news_title = row.get('新闻标题', '') or row.get('标题', '')
+                            news_time = row.get('发布时间', '') or row.get('时间', '')
+                            news_url = row.get('新闻链接', '') or row.get('链接', '')
+
                             news_item = f"- **{news_title}** [{news_time}]({news_url})"
                             em_news_items.append(news_item)
                         

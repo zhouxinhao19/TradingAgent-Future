@@ -474,6 +474,14 @@ class DataSourceManager:
             str: 格式化的数据报告
         """
         try:
+            # 🔧 优化：只保留最后3天的数据，减少token消耗
+            # 获取了10天的数据是为了确保能拿到数据（处理周末/节假日）
+            # 但给AI分析时只需要最后2-3天的数据
+            original_data_count = len(data)
+            if len(data) > 3:
+                logger.info(f"📊 [数据优化] 原始数据: {original_data_count}条，保留最后3条以减少token消耗")
+                data = data.tail(3)
+
             # 计算最新价格和涨跌幅
             latest_data = data.iloc[-1]
             latest_price = latest_data.get('close', 0)
@@ -484,13 +492,13 @@ class DataSourceManager:
             # 格式化数据报告
             result = f"📊 {stock_name}({symbol}) - 数据\n"
             result += f"数据期间: {start_date} 至 {end_date}\n"
-            result += f"数据条数: {len(data)}条\n\n"
+            result += f"数据条数: {len(data)}条 (最近{len(data)}个交易日)\n\n"
 
             result += f"💰 最新价格: ¥{latest_price:.2f}\n"
             result += f"📈 涨跌额: {change:+.2f} ({change_pct:+.2f}%)\n\n"
 
-            # 添加统计信息
-            result += f"📊 价格统计:\n"
+            # 添加统计信息（基于保留的数据）
+            result += f"📊 价格统计 (最近{len(data)}个交易日):\n"
             result += f"   最高价: ¥{data['high'].max():.2f}\n"
             result += f"   最低价: ¥{data['low'].min():.2f}\n"
             result += f"   平均价: ¥{data['close'].mean():.2f}\n"

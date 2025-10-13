@@ -15,6 +15,12 @@ export interface LLMProvider {
   api_key?: string
   api_secret?: string
   extra_config?: Record<string, any>
+
+  // 🆕 聚合渠道支持
+  is_aggregator?: boolean
+  aggregator_type?: string
+  model_name_format?: string
+
   created_at?: string
   updated_at?: string
 }

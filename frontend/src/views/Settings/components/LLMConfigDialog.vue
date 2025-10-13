@@ -134,8 +134,8 @@
         <el-input-number
           v-model="formData.input_price_per_1k"
           :min="0"
-          :step="0.001"
-          :precision="4"
+          :step="0.000001"
+          :precision="6"
           placeholder="每1000个token的价格"
         />
         <span class="ml-2 text-gray-500">{{ formData.currency || 'CNY' }}/1K tokens</span>
@@ -145,8 +145,8 @@
         <el-input-number
           v-model="formData.output_price_per_1k"
           :min="0"
-          :step="0.001"
-          :precision="4"
+          :step="0.000001"
+          :precision="6"
           placeholder="每1000个token的价格"
         />
         <span class="ml-2 text-gray-500">{{ formData.currency || 'CNY' }}/1K tokens</span>
@@ -198,6 +198,132 @@
           :rows="3"
           placeholder="可选，配置描述"
         />
+      </el-form-item>
+
+      <!-- 🆕 模型能力配置 -->
+      <el-divider content-position="left">模型能力配置</el-divider>
+
+      <el-form-item label="能力等级" prop="capability_level">
+        <el-select v-model="formData.capability_level" placeholder="选择模型能力等级">
+          <el-option :value="1" label="1级 - 基础模型（快速分析）">
+            <span>1级 - 基础模型</span>
+            <span class="text-gray-400 text-xs ml-2">适合快速分析和简单任务</span>
+          </el-option>
+          <el-option :value="2" label="2级 - 标准模型（日常使用）">
+            <span>2级 - 标准模型</span>
+            <span class="text-gray-400 text-xs ml-2">适合日常分析和常规任务</span>
+          </el-option>
+          <el-option :value="3" label="3级 - 高级模型（深度分析）">
+            <span>3级 - 高级模型</span>
+            <span class="text-gray-400 text-xs ml-2">适合深度分析和复杂推理</span>
+          </el-option>
+          <el-option :value="4" label="4级 - 专业模型（专业分析）">
+            <span>4级 - 专业模型</span>
+            <span class="text-gray-400 text-xs ml-2">适合专业级分析和多轮辩论</span>
+          </el-option>
+          <el-option :value="5" label="5级 - 旗舰模型（全面分析）">
+            <span>5级 - 旗舰模型</span>
+            <span class="text-gray-400 text-xs ml-2">最强能力，适合全面分析</span>
+          </el-option>
+        </el-select>
+        <div class="form-tip">
+          💡 能力等级决定模型可以处理的分析深度上限
+        </div>
+      </el-form-item>
+
+      <el-form-item label="适用角色" prop="suitable_roles">
+        <el-select
+          v-model="formData.suitable_roles"
+          multiple
+          placeholder="选择模型适用的角色"
+          style="width: 100%"
+        >
+          <el-option value="quick_analysis" label="快速分析">
+            <span>快速分析</span>
+            <span class="text-gray-400 text-xs ml-2">数据收集、工具调用</span>
+          </el-option>
+          <el-option value="deep_analysis" label="深度分析">
+            <span>深度分析</span>
+            <span class="text-gray-400 text-xs ml-2">推理、决策</span>
+          </el-option>
+          <el-option value="both" label="两者都适合">
+            <span>两者都适合</span>
+            <span class="text-gray-400 text-xs ml-2">全能型模型</span>
+          </el-option>
+        </el-select>
+        <div class="form-tip">
+          💡 快速分析侧重数据收集，深度分析侧重推理决策
+        </div>
+      </el-form-item>
+
+      <el-form-item label="推荐分析深度" prop="recommended_depths">
+        <el-select
+          v-model="formData.recommended_depths"
+          multiple
+          placeholder="选择推荐的分析深度级别"
+          style="width: 100%"
+        >
+          <el-option value="快速" label="快速（1级）">
+            <span>快速（1级）</span>
+            <span class="text-gray-400 text-xs ml-2">任何模型都可以</span>
+          </el-option>
+          <el-option value="基础" label="基础（2级）">
+            <span>基础（2级）</span>
+            <span class="text-gray-400 text-xs ml-2">基础级以上</span>
+          </el-option>
+          <el-option value="标准" label="标准（3级）">
+            <span>标准（3级）</span>
+            <span class="text-gray-400 text-xs ml-2">标准级以上</span>
+          </el-option>
+          <el-option value="深度" label="深度（4级）">
+            <span>深度（4级）</span>
+            <span class="text-gray-400 text-xs ml-2">高级以上，需推理能力</span>
+          </el-option>
+          <el-option value="全面" label="全面（5级）">
+            <span>全面（5级）</span>
+            <span class="text-gray-400 text-xs ml-2">专业级以上，强推理能力</span>
+          </el-option>
+        </el-select>
+        <div class="form-tip">
+          💡 根据模型能力等级，系统会自动推荐合适的分析深度
+        </div>
+      </el-form-item>
+
+      <el-form-item label="模型特性" prop="features">
+        <el-select
+          v-model="formData.features"
+          multiple
+          placeholder="选择模型支持的特性"
+          style="width: 100%"
+        >
+          <el-option value="tool_calling" label="工具调用">
+            <span>工具调用</span>
+            <span class="text-gray-400 text-xs ml-2">必需特性</span>
+          </el-option>
+          <el-option value="long_context" label="长上下文">
+            <span>长上下文</span>
+            <span class="text-gray-400 text-xs ml-2">支持大量历史信息</span>
+          </el-option>
+          <el-option value="reasoning" label="强推理能力">
+            <span>强推理能力</span>
+            <span class="text-gray-400 text-xs ml-2">深度分析必需</span>
+          </el-option>
+          <el-option value="vision" label="视觉输入">
+            <span>视觉输入</span>
+            <span class="text-gray-400 text-xs ml-2">支持图表分析</span>
+          </el-option>
+          <el-option value="fast_response" label="快速响应">
+            <span>快速响应</span>
+            <span class="text-gray-400 text-xs ml-2">响应速度快</span>
+          </el-option>
+          <el-option value="cost_effective" label="成本效益高">
+            <span>成本效益高</span>
+            <span class="text-gray-400 text-xs ml-2">性价比高</span>
+          </el-option>
+        </el-select>
+        <div class="form-tip">
+          💡 工具调用是必需特性，推理能力对深度分析很重要
+        </div>
       </el-form-item>
     </el-form>
 
@@ -251,7 +377,7 @@ const defaultFormData = {
   api_base: '',
   max_tokens: 4000,
   temperature: 0.7,
-  timeout: 60,
+  timeout: 180,  // 默认超时时间改为180秒
   retry_times: 3,
   enabled: true,
   enable_memory: false,
@@ -261,7 +387,17 @@ const defaultFormData = {
   description: '',
   input_price_per_1k: 0,
   output_price_per_1k: 0,
-  currency: 'CNY'
+  currency: 'CNY',
+  // 🆕 模型能力配置
+  capability_level: 2,  // 默认标准级
+  suitable_roles: ['both'],  // 默认两者都适合
+  features: ['tool_calling'],  // 默认支持工具调用
+  recommended_depths: ['快速', '基础', '标准'],  // 默认推荐1-3级分析
+  performance_metrics: {
+    speed: 3,
+    cost: 3,
+    quality: 3
+  }
 }
 
 const formData = ref({ ...defaultFormData })
@@ -409,7 +545,13 @@ watch(
         output_price_per_1k: config.output_price_per_1k ?? defaultFormData.output_price_per_1k,
         currency: config.currency || defaultFormData.currency,
         // 确保显示名称正确加载
-        model_display_name: config.model_display_name || ''
+        model_display_name: config.model_display_name || '',
+        // 🆕 确保模型能力字段正确加载
+        capability_level: config.capability_level ?? defaultFormData.capability_level,
+        suitable_roles: config.suitable_roles || defaultFormData.suitable_roles,
+        features: config.features || defaultFormData.features,
+        recommended_depths: config.recommended_depths || defaultFormData.recommended_depths,
+        performance_metrics: config.performance_metrics || defaultFormData.performance_metrics
       }
       modelOptions.value = getModelOptions(config.provider)
 
@@ -443,7 +585,13 @@ watch(
           output_price_per_1k: props.config.output_price_per_1k ?? defaultFormData.output_price_per_1k,
           currency: props.config.currency || defaultFormData.currency,
           // 确保显示名称正确加载
-          model_display_name: props.config.model_display_name || ''
+          model_display_name: props.config.model_display_name || '',
+          // 🆕 确保模型能力字段正确加载
+          capability_level: props.config.capability_level ?? defaultFormData.capability_level,
+          suitable_roles: props.config.suitable_roles || defaultFormData.suitable_roles,
+          features: props.config.features || defaultFormData.features,
+          recommended_depths: props.config.recommended_depths || defaultFormData.recommended_depths,
+          performance_metrics: props.config.performance_metrics || defaultFormData.performance_metrics
         }
         modelOptions.value = getModelOptions(props.config.provider)
 
@@ -556,9 +704,28 @@ onMounted(() => {
   font-size: 12px;
 }
 
+.text-gray-400 {
+  color: #9ca3af;
+}
+
+.text-xs {
+  font-size: 11px;
+}
+
 .form-tip {
   font-size: 12px;
   color: var(--el-text-color-placeholder);
   margin-top: 4px;
+}
+
+// 🆕 模型能力配置样式
+:deep(.el-select-dropdown__item) {
+  height: auto;
+  line-height: 1.5;
+  padding: 8px 20px;
+
+  span {
+    display: inline-block;
+  }
 }
 </style>

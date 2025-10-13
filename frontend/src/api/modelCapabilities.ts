@@ -2,7 +2,7 @@
  * 模型能力管理 API
  */
 
-import request from '@/utils/request'
+import { request } from './request'
 
 /**
  * 模型能力信息

@@ -184,20 +184,35 @@ async def recommend_models(request: ModelRecommendationRequest):
             request.research_depth
         )
 
+        logger.info(f"🔍 推荐模型: quick={quick_model}, deep={deep_model}")
+
         # 获取模型详细信息
         quick_info = capability_service.get_model_config(quick_model)
         deep_info = capability_service.get_model_config(deep_model)
+
+        logger.info(f"🔍 模型详细信息: quick_info={quick_info}, deep_info={deep_info}")
 
         # 生成推荐理由
         depth_req = ANALYSIS_DEPTH_REQUIREMENTS.get(
             request.research_depth,
             ANALYSIS_DEPTH_REQUIREMENTS["标准"]
         )
+
+        # 获取能力等级描述
+        capability_desc = {
+            1: "基础级",
+            2: "标准级",
+            3: "高级",
+            4: "专业级",
+            5: "旗舰级"
+        }
+
+        quick_level_desc = capability_desc.get(quick_info['capability_level'], "标准级")
+        deep_level_desc = capability_desc.get(deep_info['capability_level'], "标准级")
+
         reason = (
-            f"{request.research_depth}分析推荐：\n"
-            f"快速模型 {quick_model}（等级{quick_info['capability_level']}）适合数据收集，"
-            f"深度模型 {deep_model}（等级{deep_info['capability_level']}）适合推理决策。\n"
-            f"{depth_req['description']}"
+            f"• 快速模型：{quick_level_desc}，注重速度和成本，适合数据收集\n"
+            f"• 深度模型：{deep_level_desc}，注重质量和推理，适合分析决策"
         )
 
         response_data = {
@@ -207,6 +222,8 @@ async def recommend_models(request: ModelRecommendationRequest):
             "deep_model_info": deep_info,
             "reason": reason
         }
+
+        logger.info(f"🔍 返回的响应数据: {response_data}")
 
         return ok(response_data, "模型推荐成功")
     except Exception as e:

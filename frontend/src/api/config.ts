@@ -43,6 +43,16 @@ export interface LLMConfig {
   enable_debug?: boolean
   priority?: number
   model_category?: string
+  // 🆕 模型能力分级系统
+  capability_level?: number  // 模型能力等级(1-5): 1=基础, 2=标准, 3=高级, 4=专业, 5=旗舰
+  suitable_roles?: string[]  // 适用角色: quick_analysis(快速分析), deep_analysis(深度分析), both(两者都适合)
+  features?: string[]  // 模型特性: tool_calling, long_context, reasoning, vision, fast_response, cost_effective
+  recommended_depths?: string[]  // 推荐的分析深度级别: 快速, 基础, 标准, 深度, 全面
+  performance_metrics?: {  // 性能指标
+    speed?: number  // 速度(1-5)
+    cost?: number  // 成本(1-5)
+    quality?: number  // 质量(1-5)
+  }
 }
 
 export interface DataSourceConfig {
@@ -177,6 +187,11 @@ export const configApi = {
     return ApiClient.post('/api/config/llm/providers/migrate-env')
   },
 
+  // 🆕 初始化聚合渠道厂家配置
+  initAggregatorProviders(): Promise<{ success: boolean; message: string; data: { added_count: number; skipped_count: number } }> {
+    return ApiClient.post('/api/config/llm/providers/init-aggregators')
+  },
+
   // 测试厂家API
   testProviderAPI(providerId: string): Promise<{ success: boolean; message: string; data?: any }> {
     return ApiClient.post(`/api/config/llm/providers/${providerId}/test`)
@@ -252,6 +267,19 @@ export const configApi = {
   // 初始化默认模型目录
   initModelCatalog(): Promise<{ success: boolean; message: string }> {
     return ApiClient.post('/api/config/model-catalog/init')
+  },
+
+  // 从厂家 API 获取模型列表
+  fetchProviderModels(provider: string): Promise<{
+    success: boolean
+    message?: string
+    models?: Array<{
+      id: string
+      name: string
+      context_length?: number
+    }>
+  }> {
+    return ApiClient.post(`/api/config/llm/providers/${provider}/fetch-models`)
   },
 
   // ========== 大模型配置管理 ==========

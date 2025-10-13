@@ -116,6 +116,32 @@ class AnalysisService:
             quick_model = getattr(task.parameters, 'quick_analysis_model', None) or unified_config.get_quick_analysis_model()
             deep_model = getattr(task.parameters, 'deep_analysis_model', None) or unified_config.get_deep_analysis_model()
 
+            # 🔧 从数据库读取模型的完整配置参数
+            quick_model_config = None
+            deep_model_config = None
+            llm_configs = unified_config.get_llm_configs()
+
+            for llm_config in llm_configs:
+                if llm_config.model_name == quick_model:
+                    quick_model_config = {
+                        "max_tokens": llm_config.max_tokens,
+                        "temperature": llm_config.temperature,
+                        "timeout": llm_config.timeout,
+                        "retry_times": llm_config.retry_times,
+                        "api_base": llm_config.api_base
+                    }
+                    logger.info(f"✅ 读取快速模型配置: {quick_model} - {quick_model_config}")
+
+                if llm_config.model_name == deep_model:
+                    deep_model_config = {
+                        "max_tokens": llm_config.max_tokens,
+                        "temperature": llm_config.temperature,
+                        "timeout": llm_config.timeout,
+                        "retry_times": llm_config.retry_times,
+                        "api_base": llm_config.api_base
+                    }
+                    logger.info(f"✅ 读取深度模型配置: {deep_model} - {deep_model_config}")
+
             # 成本估算
             progress_tracker.update_progress("💰 预估分析成本")
 
@@ -133,7 +159,9 @@ class AnalysisService:
                 quick_model=quick_model,
                 deep_model=deep_model,
                 llm_provider=llm_provider,
-                market_type=getattr(task.parameters, 'market_type', "A股")
+                market_type=getattr(task.parameters, 'market_type', "A股"),
+                quick_model_config=quick_model_config,  # 传递模型配置
+                deep_model_config=deep_model_config     # 传递模型配置
             )
 
             # 启动引擎
@@ -190,6 +218,30 @@ class AnalysisService:
             quick_model = getattr(task.parameters, 'quick_analysis_model', None) or unified_config.get_quick_analysis_model()
             deep_model = getattr(task.parameters, 'deep_analysis_model', None) or unified_config.get_deep_analysis_model()
 
+            # 🔧 从数据库读取模型的完整配置参数
+            quick_model_config = None
+            deep_model_config = None
+            llm_configs = unified_config.get_llm_configs()
+
+            for llm_config in llm_configs:
+                if llm_config.model_name == quick_model:
+                    quick_model_config = {
+                        "max_tokens": llm_config.max_tokens,
+                        "temperature": llm_config.temperature,
+                        "timeout": llm_config.timeout,
+                        "retry_times": llm_config.retry_times,
+                        "api_base": llm_config.api_base
+                    }
+
+                if llm_config.model_name == deep_model:
+                    deep_model_config = {
+                        "max_tokens": llm_config.max_tokens,
+                        "temperature": llm_config.temperature,
+                        "timeout": llm_config.timeout,
+                        "retry_times": llm_config.retry_times,
+                        "api_base": llm_config.api_base
+                    }
+
             # 根据模型名称动态查找供应商（同步版本）
             llm_provider = "dashscope"  # 默认使用dashscope
 
@@ -201,7 +253,9 @@ class AnalysisService:
                 quick_model=quick_model,
                 deep_model=deep_model,
                 llm_provider=llm_provider,
-                market_type=getattr(task.parameters, 'market_type', "A股")
+                market_type=getattr(task.parameters, 'market_type', "A股"),
+                quick_model_config=quick_model_config,  # 传递模型配置
+                deep_model_config=deep_model_config     # 传递模型配置
             )
 
             # 获取TradingAgents实例
@@ -526,6 +580,30 @@ class AnalysisService:
             quick_model = getattr(task.parameters, 'quick_analysis_model', None) or unified_config.get_quick_analysis_model()
             deep_model = getattr(task.parameters, 'deep_analysis_model', None) or unified_config.get_deep_analysis_model()
 
+            # 🔧 从数据库读取模型的完整配置参数
+            quick_model_config = None
+            deep_model_config = None
+            llm_configs = unified_config.get_llm_configs()
+
+            for llm_config in llm_configs:
+                if llm_config.model_name == quick_model:
+                    quick_model_config = {
+                        "max_tokens": llm_config.max_tokens,
+                        "temperature": llm_config.temperature,
+                        "timeout": llm_config.timeout,
+                        "retry_times": llm_config.retry_times,
+                        "api_base": llm_config.api_base
+                    }
+
+                if llm_config.model_name == deep_model:
+                    deep_model_config = {
+                        "max_tokens": llm_config.max_tokens,
+                        "temperature": llm_config.temperature,
+                        "timeout": llm_config.timeout,
+                        "retry_times": llm_config.retry_times,
+                        "api_base": llm_config.api_base
+                    }
+
             # 根据模型名称动态查找供应商
             llm_provider = await get_provider_by_model_name(quick_model)
 
@@ -536,7 +614,9 @@ class AnalysisService:
                 quick_model=quick_model,
                 deep_model=deep_model,
                 llm_provider=llm_provider,
-                market_type=getattr(task.parameters, 'market_type', "A股")
+                market_type=getattr(task.parameters, 'market_type', "A股"),
+                quick_model_config=quick_model_config,  # 传递模型配置
+                deep_model_config=deep_model_config     # 传递模型配置
             )
             
             if progress_callback:

@@ -424,8 +424,19 @@
                   style="margin-top: 12px;"
                 >
                   <template #default>
-                    <div style="font-size: 13px; line-height: 1.6;">
-                      {{ modelRecommendation.message }}
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+                      <div style="font-size: 13px; line-height: 1.8; flex: 1; white-space: pre-line;">
+                        {{ modelRecommendation.message }}
+                      </div>
+                      <el-button
+                        v-if="modelRecommendation.quickModel && modelRecommendation.deepModel"
+                        type="primary"
+                        size="small"
+                        @click="applyRecommendedModels"
+                        style="flex-shrink: 0;"
+                      >
+                        应用推荐
+                      </el-button>
                     </div>
                   </template>
                 </el-alert>
@@ -721,6 +732,8 @@ const modelRecommendation = ref<{
   title: string
   message: string
   type: 'success' | 'warning' | 'info' | 'error'
+  quickModel?: string
+  deepModel?: string
 } | null>(null)
 
 // 分析表单
@@ -736,13 +749,13 @@ const analysisForm = reactive({
   language: 'zh-CN'
 })
 
-// 深度选项（5个级别，与Web界面保持一致）
+// 深度选项（5个级别，基于实际测试数据更新）
 const depthOptions = [
-  { icon: '⚡', name: '1级 - 快速分析', description: '基础数据概览，快速决策', time: '2-4分钟' },
-  { icon: '📈', name: '2级 - 基础分析', description: '常规投资决策', time: '4-6分钟' },
-  { icon: '🎯', name: '3级 - 标准分析', description: '技术+基本面，推荐', time: '6-10分钟' },
-  { icon: '🔍', name: '4级 - 深度分析', description: '多轮辩论，深度研究', time: '10-15分钟' },
-  { icon: '🏆', name: '5级 - 全面分析', description: '最全面的分析报告', time: '15-25分钟' }
+  { icon: '⚡', name: '1级 - 快速分析', description: '基础数据概览，快速决策', time: '2-5分钟' },
+  { icon: '📈', name: '2级 - 基础分析', description: '常规投资决策', time: '3-6分钟' },
+  { icon: '🎯', name: '3级 - 标准分析', description: '技术+基本面，推荐', time: '4-8分钟' },
+  { icon: '🔍', name: '4级 - 深度分析', description: '多轮辩论，深度研究', time: '6-11分钟' },
+  { icon: '🏆', name: '5级 - 全面分析', description: '最全面的分析报告', time: '8-16分钟' }
 ]
 
 // 禁用日期
@@ -1658,6 +1671,11 @@ const initializeModelSettings = async () => {
       deep: modelSettings.value.deepAnalysisModel,
       available: availableModels.value.length
     })
+    console.log('🔍 可用模型详细信息:', availableModels.value.map(m => ({
+      model_name: m.model_name,
+      model_display_name: m.model_display_name,
+      provider: m.provider
+    })))
   } catch (error) {
     console.error('加载默认模型配置失败:', error)
     modelSettings.value.quickAnalysisModel = 'qwen-turbo'
@@ -1831,7 +1849,7 @@ const isDeepAnalysisRole = (roles: string[] | undefined): boolean => {
 }
 
 /**
- * 检查模型适用性并显示推荐
+ * 显示分析深度的模型推荐说明
  */
 const checkModelSuitability = async () => {
   const depthNames: Record<number, string> = {
@@ -1844,40 +1862,87 @@ const checkModelSuitability = async () => {
   const depthName = depthNames[analysisForm.researchDepth] || '标准'
 
   try {
-    // 验证当前选择的模型
-    const validateRes = await validateModels(
-      modelSettings.value.quickAnalysisModel,
-      modelSettings.value.deepAnalysisModel,
-      depthName
-    )
+    // 获取推荐模型
+    const recommendRes = await recommendModels(depthName)
+    const responseData = recommendRes?.data?.data
 
-    if (validateRes.data && !validateRes.data.valid) {
-      // 模型不合适，显示警告
-      modelRecommendation.value = {
-        title: '⚠️ 模型选择建议',
-        message: validateRes.data.warnings.join('\n'),
-        type: 'warning'
+    if (responseData) {
+      const quickModel = responseData.quick_model || '未知'
+      const deepModel = responseData.deep_model || '未知'
+
+      // 获取模型的显示名称
+      const quickModelInfo = availableModels.value.find(m => m.model_name === quickModel)
+      const deepModelInfo = availableModels.value.find(m => m.model_name === deepModel)
+
+      const quickDisplayName = quickModelInfo?.model_display_name || quickModel
+      const deepDisplayName = deepModelInfo?.model_display_name || deepModel
+
+      // 获取推荐理由
+      const reason = responseData.reason || ''
+
+      // 构建推荐说明
+      const depthDescriptions: Record<number, string> = {
+        1: '快速浏览，获取基本信息',
+        2: '基础分析，了解主要指标',
+        3: '标准分析，全面评估股票',
+        4: '深度研究，挖掘投资机会',
+        5: '全面分析，专业投资决策'
       }
 
-      // 获取推荐模型
-      const recommendRes = await recommendModels(depthName)
-      if (recommendRes.data) {
-        modelRecommendation.value.message += `\n\n推荐使用：\n快速模型：${recommendRes.data.quick_model}\n深度模型：${recommendRes.data.deep_model}`
-      }
-    } else if (validateRes.data && validateRes.data.warnings.length > 0) {
-      // 有警告但可以使用
+      const message = `${depthDescriptions[analysisForm.researchDepth] || '标准分析'}\n\n推荐模型配置：\n• 快速模型：${quickDisplayName}\n• 深度模型：${deepDisplayName}\n\n${reason}`
+
       modelRecommendation.value = {
-        title: '💡 提示',
-        message: validateRes.data.warnings.join('\n'),
-        type: 'info'
+        title: '💡 模型推荐',
+        message,
+        type: 'info',
+        quickModel,
+        deepModel
       }
     } else {
-      // 模型合适
-      modelRecommendation.value = null
+      // 如果没有推荐数据，显示通用说明
+      const generalDescriptions: Record<number, string> = {
+        1: '快速分析：使用基础模型即可，注重速度和成本',
+        2: '基础分析：快速模型用基础级，深度模型用标准级',
+        3: '标准分析：快速模型用基础级，深度模型用标准级以上',
+        4: '深度分析：快速模型用标准级，深度模型用高级以上，需要推理能力',
+        5: '全面分析：快速模型用标准级，深度模型用专业级以上，强推理能力'
+      }
+
+      modelRecommendation.value = {
+        title: '💡 模型推荐',
+        message: generalDescriptions[analysisForm.researchDepth] || generalDescriptions[3],
+        type: 'info'
+      }
     }
   } catch (error) {
-    console.error('检查模型适用性失败:', error)
-    // 静默失败，不影响用户体验
+    console.error('获取模型推荐失败:', error)
+    // 显示通用说明
+    const generalDescriptions: Record<number, string> = {
+      1: '快速分析：使用基础模型即可，注重速度和成本',
+      2: '基础分析：快速模型用基础级，深度模型用标准级',
+      3: '标准分析：快速模型用基础级，深度模型用标准级以上',
+      4: '深度分析：快速模型用标准级，深度模型用高级以上，需要推理能力',
+      5: '全面分析：快速模型用标准级，深度模型用专业级以上，强推理能力'
+    }
+
+    modelRecommendation.value = {
+      title: '💡 模型推荐',
+      message: generalDescriptions[analysisForm.researchDepth] || generalDescriptions[3],
+      type: 'info'
+    }
+  }
+}
+
+// 应用推荐的模型配置
+const applyRecommendedModels = () => {
+  if (modelRecommendation.value?.quickModel && modelRecommendation.value?.deepModel) {
+    modelSettings.value.quickAnalysisModel = modelRecommendation.value.quickModel
+    modelSettings.value.deepAnalysisModel = modelRecommendation.value.deepModel
+
+    // 清除推荐提示
+    modelRecommendation.value = null
+
+    ElMessage.success('已应用推荐的模型配置')
   }
 }
 

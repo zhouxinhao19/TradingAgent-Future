@@ -199,7 +199,7 @@ async def get_kline(code: str, period: str = "day", limit: int = 120, adj: str =
 
         # 计算日期范围
         end_date = datetime.now().strftime("%Y-%m-%d")
-        start_date = (datetime.now() - timedelta(days=limit * 2)).strftime("%Y-%m-d")
+        start_date = (datetime.now() - timedelta(days=limit * 2)).strftime("%Y-%m-%d")
 
         logger.info(f"🔍 尝试从 MongoDB 获取 K 线数据: {code_padded}, period={period} (MongoDB: {mongodb_period}), limit={limit}")
         df = adapter.get_historical_data(code_padded, start_date, end_date, period=mongodb_period)

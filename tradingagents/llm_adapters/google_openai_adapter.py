@@ -24,14 +24,14 @@ class ChatGoogleOpenAI(ChatGoogleGenerativeAI):
     继承 ChatGoogleGenerativeAI，优化工具调用和内容格式处理
     解决Google模型工具调用返回格式与系统期望不匹配的问题
     """
-    
+
     def __init__(self, **kwargs):
         """初始化 Google AI OpenAI 兼容客户端"""
-        
+
         # 设置 Google AI 的默认配置
         kwargs.setdefault("temperature", 0.1)
         kwargs.setdefault("max_tokens", 2000)
-        
+
         # 检查 API 密钥
         google_api_key = kwargs.get("google_api_key") or os.getenv("GOOGLE_API_KEY")
         if not google_api_key:
@@ -39,9 +39,9 @@ class ChatGoogleOpenAI(ChatGoogleGenerativeAI):
                 "Google API key not found. Please set GOOGLE_API_KEY environment variable "
                 "or pass google_api_key parameter."
             )
-        
+
         kwargs["google_api_key"] = google_api_key
-        
+
         # 调用父类初始化
         super().__init__(**kwargs)
 
@@ -49,31 +49,50 @@ class ChatGoogleOpenAI(ChatGoogleGenerativeAI):
         logger.info(f"   模型: {kwargs.get('model', 'gemini-pro')}")
         logger.info(f"   温度: {kwargs.get('temperature', 0.1)}")
         logger.info(f"   最大Token: {kwargs.get('max_tokens', 2000)}")
+
+    @property
+    def model_name(self) -> str:
+        """
+        返回模型名称（兼容性属性）
+        移除 'models/' 前缀，返回纯模型名称
+        """
+        model = self.model
+        if model and model.startswith("models/"):
+            return model[7:]  # 移除 "models/" 前缀
+        return model or "unknown"
     
     def _generate(self, messages: List[BaseMessage], stop: Optional[List[str]] = None, **kwargs) -> LLMResult:
         """重写生成方法，优化工具调用处理和内容格式"""
-        
+
         try:
             # 调用父类的生成方法
             result = super()._generate(messages, stop, **kwargs)
-            
+
             # 优化返回内容格式
+            # 注意：result.generations 是二维列表 [[ChatGeneration]]
             if result and result.generations:
-                for generation in result.generations:
-                    if hasattr(generation, 'message') and generation.message:
-                        # 优化消息内容格式
-                        self._optimize_message_content(generation.message)
-            
+                for generation_list in result.generations:
+                    if isinstance(generation_list, list):
+                        for generation in generation_list:
+                            if hasattr(generation, 'message') and generation.message:
+                                # 优化消息内容格式
+                                self._optimize_message_content(generation.message)
+                    else:
+                        # 兼容性处理：如果不是列表，直接处理
+                        if hasattr(generation_list, 'message') and generation_list.message:
+                            self._optimize_message_content(generation_list.message)
+
             # 追踪 token 使用量
             self._track_token_usage(result, kwargs)
-            
+
             return result
-            
+
         except Exception as e:
             logger.error(f"❌ Google AI 生成失败: {e}")
+            logger.exception(e)  # 打印完整的堆栈跟踪
             # 返回一个包含错误信息的结果，而不是抛出异常
             from langchain_core.outputs import ChatGeneration
-            error_message = AIMessage(content=f"Google AI 调用失败: {str(e)}")
+            error_message = AIMessage(content=f"Google AI 调用失败: {str(e)}\n\n请检查：\n1. 网络连接是否正常\n2. 是否需要科学上网\n3. GOOGLE_API_KEY 是否有效")
             error_generation = ChatGeneration(message=error_message)
             return LLMResult(generations=[[error_generation]])
     

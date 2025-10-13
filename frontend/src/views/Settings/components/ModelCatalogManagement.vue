@@ -87,28 +87,83 @@
         label-width="120px"
       >
         <el-form-item label="厂家标识" prop="provider">
-          <el-input
+          <el-select
             v-model="formData.provider"
-            placeholder="如: dashscope"
+            placeholder="请选择厂家"
             :disabled="isEdit"
-          />
+            filterable
+            @change="handleProviderChange"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="provider in availableProviders"
+              :key="provider.name"
+              :label="`${provider.display_name} (${provider.name})`"
+              :value="provider.name"
+            />
+          </el-select>
+          <div class="form-tip">
+            选择已配置的厂家，如果没有找到需要的厂家，请先在"厂家管理"中添加
+          </div>
         </el-form-item>
         <el-form-item label="厂家名称" prop="provider_name">
           <el-input
             v-model="formData.provider_name"
             placeholder="如: 通义千问"
+            :disabled="true"
           />
+          <div class="form-tip">
+            自动从选择的厂家中获取
+          </div>
         </el-form-item>
         <el-form-item label="模型列表">
-          <el-button
-            type="primary"
-            size="small"
-            @click="handleAddModel"
+          <div style="margin-bottom: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
+            <el-button
+              type="primary"
+              size="small"
+              @click="handleAddModel"
+            >
+              <el-icon><Plus /></el-icon>
+              手动添加模型
+            </el-button>
+
+            <!-- 聚合平台特殊功能 -->
+            <template v-if="isAggregatorProvider">
+              <el-button
+                type="success"
+                size="small"
+                @click="handleFetchModelsFromAPI"
+                :loading="fetchingModels"
+              >
+                <el-icon><Refresh /></el-icon>
+                从 API 获取模型列表
+              </el-button>
+              <el-button
+                type="warning"
+                size="small"
+                @click="handleUsePresetModels"
+              >
+                <el-icon><Document /></el-icon>
+                使用预设模板
+              </el-button>
+            </template>
+          </div>
+
+          <el-alert
+            v-if="isAggregatorProvider"
+            title="💡 提示"
+            type="info"
+            :closable="false"
             style="margin-bottom: 10px"
           >
-            <el-icon><Plus /></el-icon>
-            添加模型
-          </el-button>
+            聚合平台支持多个厂家的模型。您可以：
+            <ul style="margin: 5px 0 0 20px; padding: 0;">
+              <li>点击"从 API 获取模型列表"自动获取（需要配置 API Key）</li>
+              <li>点击"使用预设模板"快速导入常用模型</li>
+              <li>点击"手动添加模型"逐个添加</li>
+            </ul>
+          </el-alert>
+
           <el-table :data="formData.models" border max-height="400">
             <el-table-column label="模型名称" width="200">
               <template #default="{ row, $index }">
@@ -206,10 +261,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
-import { configApi } from '@/api/config'
+import { Plus, Refresh, Document } from '@element-plus/icons-vue'
+import { configApi, type LLMProvider } from '@/api/config'
+import axios from 'axios'
 
 // 数据
 const loading = ref(false)
@@ -218,6 +274,17 @@ const dialogVisible = ref(false)
 const isEdit = ref(false)
 const saving = ref(false)
 const formRef = ref<FormInstance>()
+const availableProviders = ref<LLMProvider[]>([])
+const providersLoading = ref(false)
+const fetchingModels = ref(false)
+
+// 聚合平台列表
+const aggregatorProviders = ['302ai', 'oneapi', 'newapi', 'openrouter', 'custom_aggregator']
+
+// 计算属性：判断当前选择的是否为聚合平台
+const isAggregatorProvider = computed(() => {
+  return aggregatorProviders.includes(formData.value.provider)
+})
 
 interface ModelInfo {
   name: string
@@ -255,6 +322,29 @@ const loadCatalogs = async () => {
     ElMessage.error('加载模型目录失败')
   } finally {
     loading.value = false
+  }
+}
+
+// 加载可用的厂家列表
+const loadProviders = async () => {
+  providersLoading.value = true
+  try {
+    const providers = await configApi.getLLMProviders()
+    availableProviders.value = providers
+    console.log('✅ 加载厂家列表成功:', availableProviders.value.length)
+  } catch (error) {
+    console.error('❌ 加载厂家列表失败:', error)
+    ElMessage.error('加载厂家列表失败')
+  } finally {
+    providersLoading.value = false
+  }
+}
+
+// 处理厂家选择
+const handleProviderChange = (providerName: string) => {
+  const provider = availableProviders.value.find(p => p.name === providerName)
+  if (provider) {
+    formData.value.provider_name = provider.display_name
   }
 }
 
@@ -314,6 +404,160 @@ const handleRemoveModel = (index: number) => {
   formData.value.models.splice(index, 1)
 }
 
+// 从 API 获取模型列表
+const handleFetchModelsFromAPI = async () => {
+  try {
+    // 检查是否选择了厂家
+    if (!formData.value.provider) {
+      ElMessage.warning('请先选择厂家')
+      return
+    }
+
+    // 获取厂家信息
+    const provider = availableProviders.value.find(p => p.name === formData.value.provider)
+    if (!provider) {
+      ElMessage.error('未找到厂家信息')
+      return
+    }
+
+    // 检查是否配置了 base_url
+    if (!provider.default_base_url) {
+      ElMessage.warning('该厂家未配置 API 基础地址')
+      return
+    }
+
+    // 提示：某些聚合平台（如 OpenRouter）不需要 API Key
+    if (!provider.extra_config?.has_api_key) {
+      console.log('⚠️ 该厂家未配置 API Key，尝试无认证访问')
+    }
+
+    await ElMessageBox.confirm(
+      '此操作将从 API 获取模型列表并覆盖当前的模型列表，是否继续？',
+      '确认操作',
+      { type: 'warning' }
+    )
+
+    fetchingModels.value = true
+
+    // 构建 API URL
+    let baseUrl = provider.default_base_url
+    if (!baseUrl.endsWith('/v1')) {
+      baseUrl = baseUrl.replace(/\/$/, '') + '/v1'
+    }
+    const apiUrl = `${baseUrl}/models`
+
+    console.log('🔍 获取模型列表:', apiUrl)
+    console.log('🔍 厂家信息:', provider)
+
+    // 调用后端 API 来获取模型列表（避免 CORS 问题）
+    // 注意：需要传递厂家的 ID，而不是 name
+    const response = await configApi.fetchProviderModels(provider.id)
+
+    console.log('📊 API 响应:', response)
+
+    if (response.success && response.models && response.models.length > 0) {
+      // 转换模型格式，包含价格信息
+      formData.value.models = response.models.map((model: any) => ({
+        name: model.id || model.name,
+        display_name: model.name || model.id,
+        // 使用 API 返回的价格信息（USD），如果没有则为 null
+        input_price_per_1k: model.input_price_per_1k || null,
+        output_price_per_1k: model.output_price_per_1k || null,
+        context_length: model.context_length || null,
+        // OpenRouter 的价格是 USD
+        currency: 'USD'
+      }))
+
+      // 统计有价格信息的模型数量
+      const modelsWithPricing = formData.value.models.filter(m => m.input_price_per_1k || m.output_price_per_1k).length
+
+      ElMessage.success(`成功获取 ${formData.value.models.length} 个模型（${modelsWithPricing} 个包含价格信息）`)
+    } else {
+      // 显示详细的错误信息
+      const errorMsg = response.message || '获取模型列表失败或列表为空'
+      console.error('❌ 获取失败:', errorMsg)
+      ElMessage.error(errorMsg)
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('获取模型列表失败:', error)
+      const errorMsg = error.response?.data?.detail || error.message || '获取模型列表失败'
+      ElMessage.error(errorMsg)
+    }
+  } finally {
+    fetchingModels.value = false
+  }
+}
+
+// 使用预设模板
+const handleUsePresetModels = async () => {
+  try {
+    if (!formData.value.provider) {
+      ElMessage.warning('请先选择厂家')
+      return
+    }
+
+    await ElMessageBox.confirm(
+      '此操作将使用预设模板并覆盖当前的模型列表，是否继续？',
+      '确认操作',
+      { type: 'warning' }
+    )
+
+    // 根据不同的聚合平台提供不同的预设模板
+    const presetModels = getPresetModels(formData.value.provider)
+
+    if (presetModels.length > 0) {
+      formData.value.models = presetModels
+      ElMessage.success(`已导入 ${presetModels.length} 个预设模型`)
+    } else {
+      ElMessage.warning('该厂家暂无预设模板')
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('导入预设模板失败:', error)
+    }
+  }
+}
+
+// 获取预设模型列表
+const getPresetModels = (providerName: string): ModelInfo[] => {
+  const presets: Record<string, ModelInfo[]> = {
+    '302ai': [
+      // OpenAI 模型
+      { name: 'gpt-4o', display_name: 'GPT-4o', input_price_per_1k: 0.005, output_price_per_1k: 0.015, context_length: 128000, currency: 'USD' },
+      { name: 'gpt-4o-mini', display_name: 'GPT-4o Mini', input_price_per_1k: 0.00015, output_price_per_1k: 0.0006, context_length: 128000, currency: 'USD' },
+      { name: 'gpt-4-turbo', display_name: 'GPT-4 Turbo', input_price_per_1k: 0.01, output_price_per_1k: 0.03, context_length: 128000, currency: 'USD' },
+      { name: 'gpt-3.5-turbo', display_name: 'GPT-3.5 Turbo', input_price_per_1k: 0.0005, output_price_per_1k: 0.0015, context_length: 16385, currency: 'USD' },
+
+      // Anthropic 模型
+      { name: 'claude-3-5-sonnet-20241022', display_name: 'Claude 3.5 Sonnet', input_price_per_1k: 0.003, output_price_per_1k: 0.015, context_length: 200000, currency: 'USD' },
+      { name: 'claude-3-5-haiku-20241022', display_name: 'Claude 3.5 Haiku', input_price_per_1k: 0.001, output_price_per_1k: 0.005, context_length: 200000, currency: 'USD' },
+      { name: 'claude-3-opus-20240229', display_name: 'Claude 3 Opus', input_price_per_1k: 0.015, output_price_per_1k: 0.075, context_length: 200000, currency: 'USD' },
+
+      // Google 模型
+      { name: 'gemini-2.0-flash-exp', display_name: 'Gemini 2.0 Flash', input_price_per_1k: 0, output_price_per_1k: 0, context_length: 1000000, currency: 'USD' },
+      { name: 'gemini-1.5-pro', display_name: 'Gemini 1.5 Pro', input_price_per_1k: 0.00125, output_price_per_1k: 0.005, context_length: 2000000, currency: 'USD' },
+      { name: 'gemini-1.5-flash', display_name: 'Gemini 1.5 Flash', input_price_per_1k: 0.000075, output_price_per_1k: 0.0003, context_length: 1000000, currency: 'USD' },
+    ],
+    'openrouter': [
+      // OpenAI 模型
+      { name: 'openai/gpt-4o', display_name: 'GPT-4o', input_price_per_1k: 0.005, output_price_per_1k: 0.015, context_length: 128000, currency: 'USD' },
+      { name: 'openai/gpt-4o-mini', display_name: 'GPT-4o Mini', input_price_per_1k: 0.00015, output_price_per_1k: 0.0006, context_length: 128000, currency: 'USD' },
+      { name: 'openai/gpt-3.5-turbo', display_name: 'GPT-3.5 Turbo', input_price_per_1k: 0.0005, output_price_per_1k: 0.0015, context_length: 16385, currency: 'USD' },
+
+      // Anthropic 模型
+      { name: 'anthropic/claude-3.5-sonnet', display_name: 'Claude 3.5 Sonnet', input_price_per_1k: 0.003, output_price_per_1k: 0.015, context_length: 200000, currency: 'USD' },
+      { name: 'anthropic/claude-3-opus', display_name: 'Claude 3 Opus', input_price_per_1k: 0.015, output_price_per_1k: 0.075, context_length: 200000, currency: 'USD' },
+
+      // Google 模型
+      { name: 'google/gemini-2.0-flash-exp', display_name: 'Gemini 2.0 Flash', input_price_per_1k: 0, output_price_per_1k: 0, context_length: 1000000, currency: 'USD' },
+      { name: 'google/gemini-pro-1.5', display_name: 'Gemini 1.5 Pro', input_price_per_1k: 0.00125, output_price_per_1k: 0.005, context_length: 2000000, currency: 'USD' },
+    ]
+  }
+
+  return presets[providerName] || []
+}
+
 const handleSave = async () => {
   if (!formRef.value) return
   
@@ -347,6 +591,7 @@ const formatDate = (date: string) => {
 
 onMounted(() => {
   loadCatalogs()
+  loadProviders()
 })
 </script>
 
@@ -356,6 +601,12 @@ onMounted(() => {
     display: flex;
     justify-content: space-between;
     align-items: center;
+  }
+
+  .form-tip {
+    font-size: 12px;
+    color: var(--el-text-color-placeholder);
+    margin-top: 4px;
   }
 }
 </style>

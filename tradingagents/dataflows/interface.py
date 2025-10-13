@@ -8,22 +8,15 @@ try:
 except ImportError:
     from .news.reddit import fetch_top_from_category
 
-try:
-    from .news.google_news import *
-except ImportError:
-    # 向后兼容：如果新路径不可用，尝试旧路径
-    try:
-        from .googlenews_utils import *
-    except ImportError:
-        pass
+from .news.google_news import *
+
 
 from .news.chinese_finance import get_chinese_social_sentiment
 
 # 导入 Finnhub 工具（支持新旧路径）
-try:
-    from .providers.us import get_data_in_range
-except ImportError:
-    from .finnhub_utils import get_data_in_range
+
+from .providers.us import get_data_in_range
+
 
 # 导入统一日志系统
 from tradingagents.utils.logging_init import setup_dataflow_logging
@@ -1201,6 +1194,18 @@ def get_china_stock_data_unified(
     Returns:
         str: 格式化的股票数据报告
     """
+    # 🔧 智能日期范围处理：自动扩展到最近10天，处理周末/节假日
+    from tradingagents.utils.dataflow_utils import get_trading_date_range
+    original_start_date = start_date
+    original_end_date = end_date
+
+    # 使用 end_date 作为目标日期，向前回溯10天
+    start_date, end_date = get_trading_date_range(end_date, lookback_days=10)
+
+    logger.info(f"📅 [智能日期] 原始日期范围: {original_start_date} 至 {original_end_date}")
+    logger.info(f"📅 [智能日期] 调整后范围: {start_date} 至 {end_date} (回溯10天)")
+    logger.info(f"💡 [智能日期] 说明: 自动扩展日期范围以处理周末、节假日和数据延迟")
+
     # 记录详细的输入参数
     logger.info(f"📊 [统一接口] 开始获取中国股票数据",
                extra={
@@ -1437,7 +1442,7 @@ def get_hk_stock_data_unified(symbol: str, start_date: str = None, end_date: str
                 provider = OptimizedUSDataProvider()
                 get_us_stock_data_cached = provider.get_stock_data
             except ImportError:
-                from .optimized_us_data import get_us_stock_data_cached
+                from tradingagents.dataflows.providers.us.optimized import get_us_stock_data_cached
 
             logger.info(f"🔄 使用FINNHUB获取港股数据: {symbol}")
             result = get_us_stock_data_cached(symbol, start_date, end_date)
@@ -1528,7 +1533,7 @@ def get_stock_data_by_market(symbol: str, start_date: str = None, end_date: str 
         str: 格式化的股票数据
     """
     try:
-        from .utils.stock_utils import StockUtils
+        from tradingagents.utils.stock_utils import StockUtils
 
         market_info = StockUtils.get_market_info(symbol)
 
@@ -1546,7 +1551,7 @@ def get_stock_data_by_market(symbol: str, start_date: str = None, end_date: str 
                 provider = OptimizedUSDataProvider()
                 return provider.get_stock_data(symbol, start_date, end_date)
             except ImportError:
-                from .optimized_us_data import get_us_stock_data_cached
+                from tradingagents.dataflows.providers.us.optimized import get_us_stock_data_cached
                 return get_us_stock_data_cached(symbol, start_date, end_date)
 
     except Exception as e:

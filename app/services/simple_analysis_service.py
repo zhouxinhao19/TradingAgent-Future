@@ -52,7 +52,7 @@ config_service = ConfigService()
 
 async def get_provider_by_model_name(model_name: str) -> str:
     """
-    根据模型名称从数据库配置中查找对应的供应商
+    根据模型名称从数据库配置中查找对应的供应商（异步版本）
 
     Args:
         model_name: 模型名称，如 'qwen-turbo', 'gpt-4' 等
@@ -81,6 +81,119 @@ async def get_provider_by_model_name(model_name: str) -> str:
     except Exception as e:
         logger.error(f"❌ 查找模型供应商失败: {e}")
         return _get_default_provider_by_model(model_name)
+
+
+def get_provider_by_model_name_sync(model_name: str) -> str:
+    """
+    根据模型名称从数据库配置中查找对应的供应商（同步版本）
+
+    Args:
+        model_name: 模型名称，如 'qwen-turbo', 'gpt-4' 等
+
+    Returns:
+        str: 供应商名称，如 'dashscope', 'openai' 等
+    """
+    provider_info = get_provider_and_url_by_model_sync(model_name)
+    return provider_info["provider"]
+
+
+def get_provider_and_url_by_model_sync(model_name: str) -> dict:
+    """
+    根据模型名称从数据库配置中查找对应的供应商和 API URL（同步版本）
+
+    Args:
+        model_name: 模型名称，如 'qwen-turbo', 'gpt-4' 等
+
+    Returns:
+        dict: {"provider": "google", "backend_url": "https://..."}
+    """
+    try:
+        # 使用同步 MongoDB 客户端直接查询
+        from pymongo import MongoClient
+        from app.core.config import settings
+
+        client = MongoClient(settings.MONGO_URI)
+        db = client[settings.MONGO_DB]
+
+        # 查询最新的活跃配置
+        configs_collection = db.system_configs
+        doc = configs_collection.find_one({"is_active": True}, sort=[("version", -1)])
+
+        if doc and "llm_configs" in doc:
+            llm_configs = doc["llm_configs"]
+
+            for config_dict in llm_configs:
+                if config_dict.get("model_name") == model_name:
+                    provider = config_dict.get("provider")
+                    api_base = config_dict.get("api_base")
+
+                    # 如果模型配置中有自定义 API 地址，直接使用
+                    if api_base:
+                        logger.info(f"✅ [同步查询] 模型 {model_name} 使用自定义 API: {api_base}")
+                        client.close()
+                        return {"provider": provider, "backend_url": api_base}
+
+                    # 否则从 llm_providers 集合中查找默认 URL
+                    providers_collection = db.llm_providers
+                    provider_doc = providers_collection.find_one({"name": provider})
+
+                    if provider_doc and provider_doc.get("default_base_url"):
+                        backend_url = provider_doc["default_base_url"]
+                        logger.info(f"✅ [同步查询] 模型 {model_name} 使用厂家默认 API: {backend_url}")
+                        client.close()
+                        return {"provider": provider, "backend_url": backend_url}
+                    else:
+                        logger.warning(f"⚠️ [同步查询] 厂家 {provider} 没有配置 default_base_url")
+                        client.close()
+                        # 使用硬编码的默认 URL
+                        return {
+                            "provider": provider,
+                            "backend_url": _get_default_backend_url(provider)
+                        }
+
+        client.close()
+
+        # 如果数据库中没有找到，使用默认映射
+        logger.warning(f"⚠️ [同步查询] 数据库中未找到模型 {model_name}，使用默认映射")
+        provider = _get_default_provider_by_model(model_name)
+        return {
+            "provider": provider,
+            "backend_url": _get_default_backend_url(provider)
+        }
+
+    except Exception as e:
+        logger.error(f"❌ [同步查询] 查找模型供应商失败: {e}")
+        provider = _get_default_provider_by_model(model_name)
+        return {
+            "provider": provider,
+            "backend_url": _get_default_backend_url(provider)
+        }
+
+
+def _get_default_backend_url(provider: str) -> str:
+    """
+    根据供应商名称返回默认的 backend_url
+
+    Args:
+        provider: 供应商名称，如 'google', 'dashscope' 等
+
+    Returns:
+        str: 默认的 backend_url
+    """
+    default_urls = {
+        "google": "https://generativelanguage.googleapis.com/v1",
+        "dashscope": "https://dashscope.aliyuncs.com/api/v1",
+        "openai": "https://api.openai.com/v1",
+        "deepseek": "https://api.deepseek.com",
+        "anthropic": "https://api.anthropic.com",
+        "openrouter": "https://openrouter.ai/api/v1",
+        "qianfan": "https://qianfan.baidubce.com/v2",
+        "302ai": "https://api.302.ai/v1",
+    }
+
+    url = default_urls.get(provider, "https://dashscope.aliyuncs.com/api/v1")
+    logger.info(f"🔧 [默认URL] {provider} -> {url}")
+    return url
 
 
 def _get_default_provider_by_model(model_name: str) -> str:
@@ -130,7 +243,9 @@ def create_analysis_config(
     quick_model: str,
     deep_model: str,
     llm_provider: str,
-    market_type: str = "A股"
+    market_type: str = "A股",
+    quick_model_config: dict = None,  # 新增：快速模型的完整配置
+    deep_model_config: dict = None    # 新增：深度模型的完整配置
 ) -> dict:
     """
     创建分析配置 - 支持数字等级和中文等级
@@ -142,6 +257,8 @@ def create_analysis_config(
         deep_model: 深度分析模型
         llm_provider: LLM供应商
         market_type: 市场类型
+        quick_model_config: 快速模型的完整配置（包含 max_tokens、temperature、timeout 等）
+        deep_model_config: 深度模型的完整配置（包含 max_tokens、temperature、timeout 等）
 
     Returns:
         dict: 完整的分析配置
@@ -293,9 +410,24 @@ def create_analysis_config(
     # 添加分析师配置
     config["selected_analysts"] = selected_analysts
     config["debug"] = False
-    
+
     # 🔧 添加research_depth到配置中，使工具函数能够访问分析级别信息
     config["research_depth"] = research_depth
+
+    # 🔧 添加模型配置参数（max_tokens、temperature、timeout、retry_times）
+    if quick_model_config:
+        config["quick_model_config"] = quick_model_config
+        logger.info(f"🔧 [快速模型配置] max_tokens={quick_model_config.get('max_tokens')}, "
+                   f"temperature={quick_model_config.get('temperature')}, "
+                   f"timeout={quick_model_config.get('timeout')}, "
+                   f"retry_times={quick_model_config.get('retry_times')}")
+
+    if deep_model_config:
+        config["deep_model_config"] = deep_model_config
+        logger.info(f"🔧 [深度模型配置] max_tokens={deep_model_config.get('max_tokens')}, "
+                   f"temperature={deep_model_config.get('temperature')}, "
+                   f"timeout={deep_model_config.get('timeout')}, "
+                   f"retry_times={deep_model_config.get('retry_times')}")
 
     logger.info(f"📋 ========== 创建分析配置完成 ==========")
     logger.info(f"   🎯 研究深度: {research_depth}")
@@ -685,12 +817,9 @@ class SimpleAnalysisService:
             thread_logger.info(f"🔄 [线程池] 开始执行分析: {task_id} - {request.stock_code}")
             logger.info(f"🔄 [线程池] 开始执行分析: {task_id} - {request.stock_code}")
 
-            # 如果有进度跟踪器，更新进度
-            if progress_tracker:
-                progress_tracker.update_progress({
-                    "progress_percentage": 30,
-                    "last_message": "⚙️ 配置分析参数"
-                })
+            # 🔧 根据 RedisProgressTracker 的步骤权重计算准确的进度
+            # 基础准备阶段 (10%): 0.03 + 0.02 + 0.01 + 0.02 + 0.02 = 0.10
+            # 步骤索引 0-4 对应 0-10%
 
             # 异步更新进度（在线程池中调用）
             def update_progress_sync(progress: int, message: str, step: str):
@@ -722,8 +851,8 @@ class SimpleAnalysisService:
                 except Exception as e:
                     logger.warning(f"⚠️ 进度更新失败: {e}")
 
-            # 配置阶段
-            update_progress_sync(30, "配置分析参数...", "configuration")
+            # 配置阶段 - 对应步骤3 "⚙️ 参数设置" (6-8%)
+            update_progress_sync(7, "⚙️ 配置分析参数", "configuration")
 
             # 🆕 智能模型选择逻辑
             from app.services.model_capability_service import get_model_capability_service
@@ -773,27 +902,85 @@ class SimpleAnalysisService:
                 )
                 logger.info(f"🤖 自动推荐模型: quick={quick_model}, deep={deep_model}")
 
-            # 创建分析配置
+            # 🔧 根据快速模型和深度模型分别查找对应的供应商和 API URL
+            quick_provider_info = get_provider_and_url_by_model_sync(quick_model)
+            deep_provider_info = get_provider_and_url_by_model_sync(deep_model)
+
+            quick_provider = quick_provider_info["provider"]
+            deep_provider = deep_provider_info["provider"]
+            quick_backend_url = quick_provider_info["backend_url"]
+            deep_backend_url = deep_provider_info["backend_url"]
+
+            logger.info(f"🔍 [供应商查找] 快速模型 {quick_model} 对应的供应商: {quick_provider}")
+            logger.info(f"🔍 [API地址] 快速模型使用 backend_url: {quick_backend_url}")
+            logger.info(f"🔍 [供应商查找] 深度模型 {deep_model} 对应的供应商: {deep_provider}")
+            logger.info(f"🔍 [API地址] 深度模型使用 backend_url: {deep_backend_url}")
+
+            # 检查两个模型是否来自同一个厂家
+            if quick_provider == deep_provider:
+                logger.info(f"✅ [供应商验证] 两个模型来自同一厂家: {quick_provider}")
+            else:
+                logger.info(f"✅ [混合模式] 快速模型({quick_provider}) 和 深度模型({deep_provider}) 来自不同厂家")
+
+            # 创建分析配置（支持混合模式）
             config = create_analysis_config(
                 research_depth=research_depth,
                 selected_analysts=request.parameters.selected_analysts if request.parameters else ["market", "fundamentals"],
                 quick_model=quick_model,
                 deep_model=deep_model,
-                llm_provider="dashscope",
+                llm_provider=quick_provider,  # 主要使用快速模型的供应商
                 market_type="A股"
             )
 
-            # 初始化分析引擎
-            update_progress_sync(40, "🚀 初始化AI分析引擎", "engine_initialization")
+            # 🔧 添加混合模式配置
+            config["quick_provider"] = quick_provider
+            config["deep_provider"] = deep_provider
+            config["quick_backend_url"] = quick_backend_url
+            config["deep_backend_url"] = deep_backend_url
+            config["backend_url"] = quick_backend_url  # 保持向后兼容
+
+            # 🔍 验证配置中的模型
+            logger.info(f"🔍 [模型验证] 配置中的快速模型: {config.get('quick_think_llm')}")
+            logger.info(f"🔍 [模型验证] 配置中的深度模型: {config.get('deep_think_llm')}")
+            logger.info(f"🔍 [模型验证] 配置中的LLM供应商: {config.get('llm_provider')}")
+
+            # 初始化分析引擎 - 对应步骤4 "🚀 启动引擎" (8-10%)
+            update_progress_sync(9, "🚀 初始化AI分析引擎", "engine_initialization")
             trading_graph = self._get_trading_graph(config)
 
-            # 开始分析
-            update_progress_sync(50, "📊 开始智能体分析", "analysis_execution")
-            start_time = datetime.now()
-            analysis_date = datetime.now().strftime("%Y-%m-%d")
+            # 🔍 验证TradingGraph实例中的配置
+            logger.info(f"🔍 [引擎验证] TradingGraph配置中的快速模型: {trading_graph.config.get('quick_think_llm')}")
+            logger.info(f"🔍 [引擎验证] TradingGraph配置中的深度模型: {trading_graph.config.get('deep_think_llm')}")
 
-            # 调用分析方法 - 添加进度模拟
-            update_progress_sync(60, "🤖 执行多智能体协作分析", "agent_analysis")
+            # 准备分析数据
+            start_time = datetime.now()
+
+            # 🔧 使用前端传递的分析日期，如果没有则使用当前日期
+            if request.parameters and hasattr(request.parameters, 'analysis_date') and request.parameters.analysis_date:
+                # 前端传递的是 datetime 对象或字符串
+                if isinstance(request.parameters.analysis_date, datetime):
+                    analysis_date = request.parameters.analysis_date.strftime("%Y-%m-%d")
+                elif isinstance(request.parameters.analysis_date, str):
+                    analysis_date = request.parameters.analysis_date
+                else:
+                    analysis_date = datetime.now().strftime("%Y-%m-%d")
+                logger.info(f"📅 使用前端指定的分析日期: {analysis_date}")
+            else:
+                analysis_date = datetime.now().strftime("%Y-%m-%d")
+                logger.info(f"📅 使用当前日期作为分析日期: {analysis_date}")
+
+            # 🔧 智能日期范围处理：获取最近10天的数据，自动处理周末/节假日
+            # 这样可以确保即使是周末或节假日，也能获取到最后一个交易日的数据
+            from tradingagents.utils.dataflow_utils import get_trading_date_range
+            data_start_date, data_end_date = get_trading_date_range(analysis_date, lookback_days=10)
+
+            logger.info(f"📅 分析目标日期: {analysis_date}")
+            logger.info(f"📅 数据查询范围: {data_start_date} 至 {data_end_date} (最近10天)")
+            logger.info(f"💡 说明: 获取10天数据可自动处理周末、节假日和数据延迟问题")
+
+            # 开始分析 - 进度10%，即将进入分析师阶段
+            # 注意：不要手动设置过高的进度，让 graph_progress_callback 来更新实际的分析进度
+            update_progress_sync(10, "🤖 开始多智能体协作分析", "agent_analysis")
 
             # 启动一个异步任务来模拟进度更新
             import threading
@@ -1320,6 +1507,7 @@ class SimpleAnalysisService:
                     'message': redis_progress.get('last_message', result.get('message', '')),
                     'elapsed_time': redis_progress.get('elapsed_time', 0),
                     'remaining_time': redis_progress.get('remaining_time', 0),
+                    'estimated_total_time': redis_progress.get('estimated_total_time', result.get('estimated_duration', 300)),  # 🔧 修复：使用Redis中的预估总时长
                     'steps': steps,
                     'start_time': result.get('start_time'),  # 保持原有格式
                     'last_update': redis_progress.get('last_update', result.get('start_time'))

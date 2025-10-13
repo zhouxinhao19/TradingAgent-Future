@@ -31,6 +31,13 @@ class ModelProvider(str, Enum):
     QIANFAN = "qianfan"
     LOCAL = "local"
 
+    # 🆕 聚合渠道
+    AI302 = "302ai"              # 302.AI
+    ONEAPI = "oneapi"            # One API
+    NEWAPI = "newapi"            # New API
+    FASTGPT = "fastgpt"          # FastGPT
+    CUSTOM_AGGREGATOR = "custom_aggregator"  # 自定义聚合渠道
+
 
 class LLMProvider(BaseModel):
     """大模型厂家配置"""
@@ -47,6 +54,12 @@ class LLMProvider(BaseModel):
     api_key: Optional[str] = Field(None, description="API密钥")
     api_secret: Optional[str] = Field(None, description="API密钥（某些厂家需要）")
     extra_config: Dict[str, Any] = Field(default_factory=dict, description="额外配置参数")
+
+    # 🆕 聚合渠道支持
+    is_aggregator: bool = Field(default=False, description="是否为聚合渠道（如302.AI、OpenRouter）")
+    aggregator_type: Optional[str] = Field(None, description="聚合渠道类型（openai_compatible/custom）")
+    model_name_format: Optional[str] = Field(None, description="模型名称格式（如：{provider}/{model}）")
+
     created_at: Optional[datetime] = Field(default_factory=now_tz)
     updated_at: Optional[datetime] = Field(default_factory=now_tz)
 
@@ -66,6 +79,10 @@ class ModelInfo(BaseModel):
     is_deprecated: bool = Field(default=False, description="是否已废弃")
     release_date: Optional[str] = Field(None, description="发布日期")
     capabilities: List[str] = Field(default_factory=list, description="能力标签(如: vision, function_calling)")
+
+    # 🆕 聚合渠道模型映射支持
+    original_provider: Optional[str] = Field(None, description="原厂商标识（用于聚合渠道）")
+    original_model: Optional[str] = Field(None, description="原厂商模型名（用于能力映射）")
 
 
 class ModelCatalog(BaseModel):
@@ -95,6 +112,11 @@ class LLMProviderRequest(BaseModel):
     api_secret: Optional[str] = Field(None, description="API密钥（某些厂家需要）")
     extra_config: Dict[str, Any] = Field(default_factory=dict, description="额外配置参数")
 
+    # 🆕 聚合渠道支持
+    is_aggregator: bool = Field(default=False, description="是否为聚合渠道")
+    aggregator_type: Optional[str] = Field(None, description="聚合渠道类型")
+    model_name_format: Optional[str] = Field(None, description="模型名称格式")
+
 
 class LLMProviderResponse(BaseModel):
     """大模型厂家响应"""
@@ -111,6 +133,12 @@ class LLMProviderResponse(BaseModel):
     api_key: Optional[str] = None
     api_secret: Optional[str] = None
     extra_config: Dict[str, Any] = Field(default_factory=dict)
+
+    # 🆕 聚合渠道支持
+    is_aggregator: bool = False
+    aggregator_type: Optional[str] = None
+    model_name_format: Optional[str] = None
+
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -144,7 +172,7 @@ class LLMConfig(BaseModel):
     api_base: Optional[str] = Field(None, description="API基础URL")
     max_tokens: int = Field(default=4000, description="最大token数")
     temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="温度参数")
-    timeout: int = Field(default=60, description="请求超时时间(秒)")
+    timeout: int = Field(default=180, description="请求超时时间(秒)")
     retry_times: int = Field(default=3, description="重试次数")
     enabled: bool = Field(default=True, description="是否启用")
     description: Optional[str] = Field(None, description="配置描述")
@@ -313,7 +341,7 @@ class LLMConfigRequest(BaseModel):
     api_base: Optional[str] = None
     max_tokens: int = 4000
     temperature: float = 0.7
-    timeout: int = 60
+    timeout: int = 180  # 默认超时时间改为180秒
     retry_times: int = 3
     enabled: bool = True
     description: Optional[str] = None

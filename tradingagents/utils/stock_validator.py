@@ -619,7 +619,7 @@ class StockDataPreparer:
                     end_date_str
                 )
             except ImportError:
-                from tradingagents.dataflows.optimized_us_data import get_us_stock_data_cached
+                from tradingagents.dataflows.providers.us.optimized import get_us_stock_data_cached
                 historical_data = get_us_stock_data_cached(
                     formatted_code,
                     start_date_str,

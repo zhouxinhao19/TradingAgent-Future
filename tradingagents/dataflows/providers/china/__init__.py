@@ -27,14 +27,6 @@ except ImportError:
     BaostockProvider = None
     BAOSTOCK_AVAILABLE = False
 
-# 导入通达信提供器
-try:
-    from .tdx import TongDaXinDataProvider
-    TDX_AVAILABLE = True
-except ImportError:
-    TongDaXinDataProvider = None
-    TDX_AVAILABLE = False
-
 # 导入基本面快照工具
 try:
     from .fundamentals_snapshot import get_fundamentals_snapshot
@@ -50,8 +42,6 @@ __all__ = [
     'TUSHARE_AVAILABLE',
     'BaostockProvider',
     'BAOSTOCK_AVAILABLE',
-    'TongDaXinDataProvider',
-    'TDX_AVAILABLE',
     'get_fundamentals_snapshot',
     'FUNDAMENTALS_SNAPSHOT_AVAILABLE',
 ]

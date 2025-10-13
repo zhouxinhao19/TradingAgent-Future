@@ -636,9 +636,58 @@ class AKShareProvider(BaseStockDataProvider):
                 "error": str(e)
             }
 
+    def get_stock_news_sync(self, symbol: str = None, limit: int = 10) -> Optional[pd.DataFrame]:
+        """
+        获取股票新闻（同步版本，返回原始 DataFrame）
+
+        Args:
+            symbol: 股票代码，为None时获取市场新闻
+            limit: 返回数量限制
+
+        Returns:
+            新闻 DataFrame 或 None
+        """
+        if not self.is_available():
+            return None
+
+        try:
+            import akshare as ak
+
+            if symbol:
+                # 获取个股新闻
+                self.logger.debug(f"📰 获取AKShare个股新闻: {symbol}")
+
+                # 标准化股票代码
+                symbol_6 = symbol.zfill(6)
+
+                # 获取东方财富个股新闻
+                news_df = ak.stock_news_em(symbol=symbol_6)
+
+                if news_df is not None and not news_df.empty:
+                    self.logger.info(f"✅ {symbol} AKShare新闻获取成功: {len(news_df)} 条")
+                    return news_df.head(limit) if limit else news_df
+                else:
+                    self.logger.warning(f"⚠️ {symbol} 未获取到AKShare新闻数据")
+                    return None
+            else:
+                # 获取市场新闻
+                self.logger.debug("📰 获取AKShare市场新闻")
+                news_df = ak.news_cctv()
+
+                if news_df is not None and not news_df.empty:
+                    self.logger.info(f"✅ AKShare市场新闻获取成功: {len(news_df)} 条")
+                    return news_df.head(limit) if limit else news_df
+                else:
+                    self.logger.warning("⚠️ 未获取到AKShare市场新闻数据")
+                    return None
+
+        except Exception as e:
+            self.logger.error(f"❌ AKShare新闻获取失败: {e}")
+            return None
+
     async def get_stock_news(self, symbol: str = None, limit: int = 10) -> Optional[List[Dict[str, Any]]]:
         """
-        获取股票新闻
+        获取股票新闻（异步版本，返回结构化列表）
 
         Args:
             symbol: 股票代码，为None时获取市场新闻

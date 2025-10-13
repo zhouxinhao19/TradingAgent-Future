@@ -311,8 +311,10 @@ class RealtimeNewsAggregator:
 
             # 1. 尝试使用AKShare获取东方财富个股新闻
             try:
-                logger.info(f"[中文财经新闻] 尝试导入 AKShare 工具")
-                from .akshare_utils import get_stock_news_em
+                logger.info(f"[中文财经新闻] 尝试通过 AKShare Provider 获取新闻")
+                from tradingagents.dataflows.providers.china.akshare import AKShareProvider
+
+                provider = AKShareProvider()
 
                 # 处理股票代码格式
                 # 如果是美股代码，不使用东方财富新闻
@@ -326,7 +328,7 @@ class RealtimeNewsAggregator:
                     # 获取东方财富新闻
                     logger.info(f"[中文财经新闻] 开始获取 {clean_ticker} 的东方财富新闻")
                     em_start_time = datetime.now(ZoneInfo(get_timezone_name()))
-                    news_df = get_stock_news_em(clean_ticker)
+                    news_df = provider.get_stock_news_sync(symbol=clean_ticker)
 
                     if not news_df.empty:
                         logger.info(f"[中文财经新闻] 东方财富返回 {len(news_df)} 条新闻数据，开始处理")
@@ -737,21 +739,23 @@ def get_realtime_stock_news(ticker: str, curr_date: str, hours_back: int = 6) ->
         logger.info(f"[新闻分析] ========== 步骤2: A股东方财富新闻获取 ==========")
         logger.info(f"[新闻分析] 检测到A股股票 {ticker}，优先尝试使用东方财富新闻源")
         try:
-            logger.info(f"[新闻分析] 尝试导入 akshare_utils.get_stock_news_em")
-            from .akshare_utils import get_stock_news_em
-            logger.info(f"[新闻分析] 成功导入 get_stock_news_em 函数")
+            logger.info(f"[新闻分析] 尝试通过 AKShare Provider 获取新闻")
+            from tradingagents.dataflows.providers.china.akshare import AKShareProvider
+
+            provider = AKShareProvider()
+            logger.info(f"[新闻分析] 成功创建 AKShare Provider 实例")
 
             # 处理A股代码
             clean_ticker = ticker.replace('.SH', '').replace('.SZ', '').replace('.SS', '')\
                             .replace('.XSHE', '').replace('.XSHG', '')
             logger.info(f"[新闻分析] 原始ticker: {ticker} -> 清理后ticker: {clean_ticker}")
 
-            logger.info(f"[新闻分析] 准备调用 get_stock_news_em({clean_ticker}, max_news=10)")
+            logger.info(f"[新闻分析] 准备调用 provider.get_stock_news_sync({clean_ticker})")
             logger.info(f"[新闻分析] 开始从东方财富获取 {clean_ticker} 的新闻数据")
             start_time = datetime.now(ZoneInfo(get_timezone_name()))
             logger.info(f"[新闻分析] 东方财富API调用开始时间: {start_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}")
 
-            news_df = get_stock_news_em(clean_ticker, max_news=10)
+            news_df = provider.get_stock_news_sync(symbol=clean_ticker, limit=10)
 
             end_time = datetime.now(ZoneInfo(get_timezone_name()))
             time_taken = (end_time - start_time).total_seconds()
@@ -857,14 +861,16 @@ def get_realtime_stock_news(ticker: str, curr_date: str, hours_back: int = 6) ->
     if not is_china_stock and '.HK' in ticker:
         logger.info(f"[新闻分析] 检测到港股代码 {ticker}，尝试使用东方财富新闻源")
         try:
-            from .akshare_utils import get_stock_news_em
+            from tradingagents.dataflows.providers.china.akshare import AKShareProvider
+
+            provider = AKShareProvider()
 
             # 处理港股代码
             clean_ticker = ticker.replace('.HK', '')
 
             logger.info(f"[新闻分析] 开始从东方财富获取港股 {clean_ticker} 的新闻数据")
             start_time = datetime.now(ZoneInfo(get_timezone_name()))
-            news_df = get_stock_news_em(clean_ticker, max_news=10)
+            news_df = provider.get_stock_news_sync(symbol=clean_ticker, limit=10)
             end_time = datetime.now(ZoneInfo(get_timezone_name()))
             time_taken = (end_time - start_time).total_seconds()
 

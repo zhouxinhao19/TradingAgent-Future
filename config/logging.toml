@@ -30,6 +30,15 @@ max_size = "10MB"
 backup_count = 5
 directory = "./logs"
 
+# 错误日志处理器（只记录WARNING及以上级别）
+[logging.handlers.error]
+enabled = true
+level = "WARNING"  # 只记录WARNING, ERROR, CRITICAL
+max_size = "10MB"
+backup_count = 5
+directory = "./logs"
+filename = "error.log"
+
 # 结构化日志处理器（JSON格式）
 [logging.handlers.structured]
 enabled = false  # 默认关闭，生产环境可启用

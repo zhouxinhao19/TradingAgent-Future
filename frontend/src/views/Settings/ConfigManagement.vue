@@ -247,110 +247,111 @@
                   </div>
                 </div>
 
-                <!-- 模型列表 -->
-                <div class="models-grid">
-                  <div
-                    v-for="model in group.models"
-                    :key="model.model_name"
-                    class="model-card"
-                    :class="{ 'is-default': model.model_name === defaultLLM }"
-                  >
-                    <div class="model-header">
-                      <div class="model-title">
-                        <el-icon class="model-icon"><Cpu /></el-icon>
-                        <div class="model-name-wrapper">
-                          <span class="model-name">{{ model.model_display_name || model.model_name }}</span>
-                          <span v-if="model.model_display_name" class="model-code">{{ model.model_name }}</span>
+                <!-- 模型列表 - 表格式布局 -->
+                <el-table :data="group.models" style="width: 100%" stripe>
+                  <!-- 模型名称 -->
+                  <el-table-column label="模型名称" width="200">
+                    <template #default="{ row }">
+                      <div class="model-name-cell">
+                        <div class="model-display-name">
+                          {{ row.model_display_name || row.model_name }}
                         </div>
-                        <el-tag
-                          v-if="model.model_name === defaultLLM"
-                          type="primary"
-                          size="small"
-                          class="default-tag"
-                        >
-                          默认
-                        </el-tag>
+                        <div v-if="row.model_display_name" class="model-code-text">{{ row.model_name }}</div>
                       </div>
-                      <el-tag
-                        :type="model.enabled ? 'success' : 'danger'"
-                        size="small"
-                      >
-                        {{ model.enabled ? '启用' : '禁用' }}
+                    </template>
+                  </el-table-column>
+
+                  <!-- 状态 -->
+                  <el-table-column label="状态" width="80" align="center">
+                    <template #default="{ row }">
+                      <el-tag :type="row.enabled ? 'success' : 'danger'" size="small">
+                        {{ row.enabled ? '启用' : '禁用' }}
                       </el-tag>
-                    </div>
+                    </template>
+                  </el-table-column>
 
-                    <div class="model-config">
-                      <div class="config-row">
-                        <span class="config-label">Token:</span>
-                        <span class="config-value">{{ model.max_tokens }}</span>
+                  <!-- 基础配置 -->
+                  <el-table-column label="基础配置" width="200">
+                    <template #default="{ row }">
+                      <div class="config-cell">
+                        <div>Token: {{ row.max_tokens }}</div>
+                        <div>温度: {{ row.temperature }} | 超时: {{ row.timeout }}s</div>
                       </div>
-                      <div class="config-row">
-                        <span class="config-label">温度:</span>
-                        <span class="config-value">{{ model.temperature }}</span>
-                      </div>
-                      <div class="config-row">
-                        <span class="config-label">超时:</span>
-                        <span class="config-value">{{ model.timeout }}s</span>
-                      </div>
-                    </div>
+                    </template>
+                  </el-table-column>
 
-                    <!-- 定价信息 -->
-                    <div v-if="model.input_price_per_1k || model.output_price_per_1k" class="model-pricing">
-                      <el-divider style="margin: 8px 0;" />
-                      <div class="pricing-row">
-                        <el-icon><Money /></el-icon>
-                        <span class="pricing-label">定价:</span>
+                  <!-- 定价 -->
+                  <el-table-column label="定价" width="180">
+                    <template #default="{ row }">
+                      <div v-if="row.input_price_per_1k || row.output_price_per_1k" class="pricing-cell">
+                        <div>输入: {{ formatPrice(row.input_price_per_1k) }} {{ row.currency || 'CNY' }}/1K</div>
+                        <div>输出: {{ formatPrice(row.output_price_per_1k) }} {{ row.currency || 'CNY' }}/1K</div>
                       </div>
-                      <div class="pricing-details">
-                        <div class="pricing-item">
-                          <span class="pricing-type">输入:</span>
-                          <span class="pricing-value">
-                            {{ model.input_price_per_1k || 0 }} {{ model.currency || 'CNY' }}/1K
-                          </span>
+                      <span v-else class="text-muted">-</span>
+                    </template>
+                  </el-table-column>
+
+                  <!-- 模型能力 -->
+                  <el-table-column label="模型能力" width="280">
+                    <template #default="{ row }">
+                      <div class="capability-cell">
+                        <div v-if="row.capability_level" class="capability-row-item">
+                          <span class="label">等级:</span>
+                          <el-tag :type="getCapabilityLevelType(row.capability_level)" size="small">
+                            {{ getCapabilityLevelText(row.capability_level) }}
+                          </el-tag>
                         </div>
-                        <div class="pricing-item">
-                          <span class="pricing-type">输出:</span>
-                          <span class="pricing-value">
-                            {{ model.output_price_per_1k || 0 }} {{ model.currency || 'CNY' }}/1K
-                          </span>
+                        <div v-if="row.suitable_roles && row.suitable_roles.length > 0" class="capability-row-item">
+                          <span class="label">角色:</span>
+                          <el-tag
+                            v-for="role in row.suitable_roles"
+                            :key="role"
+                            type="info"
+                            size="small"
+                            style="margin-right: 4px;"
+                          >
+                            {{ getRoleText(role) }}
+                          </el-tag>
+                        </div>
+                        <div v-if="row.recommended_depths && row.recommended_depths.length > 0" class="capability-row-item">
+                          <span class="label">深度:</span>
+                          <el-tag
+                            v-for="depth in row.recommended_depths"
+                            :key="depth"
+                            type="success"
+                            size="small"
+                            style="margin-right: 4px;"
+                          >
+                            {{ depth }}
+                          </el-tag>
                         </div>
                       </div>
-                    </div>
+                    </template>
+                  </el-table-column>
 
-                    <div class="model-features">
-                      <el-tag v-if="model.enable_memory" type="info" size="small">记忆</el-tag>
-                      <el-tag v-if="model.enable_debug" type="warning" size="small">调试</el-tag>
-                    </div>
-
-                    <div class="model-actions">
-                      <el-button size="small" @click="editLLMConfig(model)">
+                  <!-- 操作 -->
+                  <el-table-column label="操作" width="200" fixed="right">
+                    <template #default="{ row }">
+                      <el-button size="small" @click="editLLMConfig(row)">
                         编辑
                       </el-button>
                       <el-button
                         size="small"
-                        type="success"
-                        @click="setDefaultLLM(model.model_name)"
-                        :disabled="model.model_name === defaultLLM"
-                      >
-                        设为默认
-                      </el-button>
-                      <el-button
-                        size="small"
                         type="primary"
-                        @click="testLLMConfig(model)"
+                        @click="testLLMConfig(row)"
                       >
                         测试
                       </el-button>
                       <el-button
                         size="small"
                         type="danger"
-                        @click="deleteLLMConfig(model)"
+                        @click="deleteLLMConfig(row)"
                       >
                         删除
                       </el-button>
-                    </div>
-                  </div>
-                </div>
+                    </template>
+                  </el-table-column>
+                </el-table>
               </div>
             </div>
           </div>
@@ -991,7 +992,9 @@ import {
   Key,
   OfficeBuilding,
   CircleCheck,
-  Collection
+  Collection,
+  Star,
+  Money
 } from '@element-plus/icons-vue'
 
 import {
@@ -1450,6 +1453,48 @@ const getProviderTagType = (provider: string) => {
     'qianfan': 'success'
   }
   return typeMap[provider.toLowerCase()] || 'info'
+}
+
+// 🆕 获取能力等级文本
+const getCapabilityLevelText = (level: number) => {
+  const levelMap: Record<number, string> = {
+    1: '1级-基础',
+    2: '2级-标准',
+    3: '3级-高级',
+    4: '4级-专业',
+    5: '5级-旗舰'
+  }
+  return levelMap[level] || `${level}级`
+}
+
+// 🆕 获取能力等级标签类型
+const getCapabilityLevelType = (level: number) => {
+  const typeMap: Record<number, string> = {
+    1: 'info',
+    2: '',
+    3: 'success',
+    4: 'warning',
+    5: 'danger'
+  }
+  return typeMap[level] || ''
+}
+
+// 🆕 获取角色文本
+const getRoleText = (role: string) => {
+  const roleMap: Record<string, string> = {
+    'quick_analysis': '快速分析',
+    'deep_analysis': '深度分析',
+    'both': '全能型'
+  }
+  return roleMap[role] || role
+}
+
+// 🆕 格式化价格显示（保持6位小数）
+const formatPrice = (price: number | undefined | null) => {
+  if (price === undefined || price === null) {
+    return '0.000000'
+  }
+  return price.toFixed(6)
 }
 
 // 为厂家添加模型
@@ -2292,31 +2337,59 @@ onMounted(async () => {
     }
   }
 
-  .models-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 16px;
-    padding: 20px;
-  }
-
-  .model-card {
-    border: 1px solid var(--el-border-color-light);
-    border-radius: 6px;
-    padding: 16px;
-    background: var(--el-bg-color);
-    transition: all 0.2s ease;
-
-    &:hover {
-      border-color: var(--el-color-primary);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  // 表格式布局样式
+  .model-name-cell {
+    .model-display-name {
+      font-weight: 500;
+      color: var(--el-text-color-primary);
+      display: flex;
+      align-items: center;
     }
 
-    &.is-default {
-      border-color: var(--el-color-primary);
-      background: var(--el-color-primary-light-9);
+    .model-code-text {
+      font-size: 12px;
+      color: var(--el-text-color-placeholder);
+      font-family: 'Courier New', monospace;
+      margin-top: 4px;
     }
   }
 
+  .config-cell {
+    font-size: 13px;
+    color: var(--el-text-color-regular);
+    line-height: 1.6;
+  }
+
+  .pricing-cell {
+    font-size: 13px;
+    color: var(--el-text-color-regular);
+    line-height: 1.6;
+  }
+
+  .capability-cell {
+    .capability-row-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      .label {
+        font-size: 12px;
+        color: var(--el-text-color-secondary);
+        min-width: 40px;
+      }
+    }
+  }
+
+  .text-muted {
+    color: var(--el-text-color-placeholder);
+  }
+
+  // 保留旧的卡片样式（如果其他地方还在使用）
   .model-header {
     display: flex;
     justify-content: space-between;
@@ -2409,6 +2482,43 @@ onMounted(async () => {
         .pricing-value {
           font-weight: 500;
           color: var(--el-color-warning);
+        }
+      }
+    }
+  }
+
+  // 🆕 模型能力信息样式
+  .model-capability {
+    margin-bottom: 12px;
+    padding: 8px;
+    background: var(--el-fill-color-lighter);
+    border-radius: 4px;
+
+    .capability-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: var(--el-color-primary);
+      font-weight: 600;
+    }
+
+    .capability-details {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding-left: 20px;
+
+      .capability-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+
+        .capability-type {
+          color: var(--el-text-color-regular);
+          min-width: 60px;
         }
       }
     }

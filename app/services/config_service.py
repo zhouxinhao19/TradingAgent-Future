@@ -1349,7 +1349,12 @@ class ConfigService:
             "qianfan": "QIANFAN_API_KEY",
             "azure": "AZURE_OPENAI_API_KEY",
             "siliconflow": "SILICONFLOW_API_KEY",
-            "openrouter": "OPENROUTER_API_KEY"
+            "openrouter": "OPENROUTER_API_KEY",
+            # 🆕 聚合渠道
+            "302ai": "AI302_API_KEY",
+            "oneapi": "ONEAPI_API_KEY",
+            "newapi": "NEWAPI_API_KEY",
+            "custom_aggregator": "CUSTOM_AGGREGATOR_API_KEY"
         }
 
         env_var = env_key_mapping.get(provider_name)
@@ -1375,7 +1380,12 @@ class ConfigService:
             provider.created_at = now_tz()
             provider.updated_at = now_tz()
 
-            result = await providers_collection.insert_one(provider.model_dump(by_alias=True))
+            # 修复：删除 _id 字段，让 MongoDB 自动生成 ObjectId
+            provider_data = provider.model_dump(by_alias=True, exclude_unset=True)
+            if "_id" in provider_data:
+                del provider_data["_id"]
+
+            result = await providers_collection.insert_one(provider_data)
             return str(result.inserted_id)
         except Exception as e:
             print(f"添加厂家失败: {e}")
@@ -1389,14 +1399,36 @@ class ConfigService:
 
             update_data["updated_at"] = now_tz()
 
-            result = await providers_collection.update_one(
-                {"_id": ObjectId(provider_id)},
-                {"$set": update_data}
-            )
+            # 兼容处理：尝试 ObjectId 和字符串两种类型
+            # 原因：历史数据可能混用了 ObjectId 和字符串作为 _id
+            try:
+                # 先尝试作为 ObjectId 查询
+                result = await providers_collection.update_one(
+                    {"_id": ObjectId(provider_id)},
+                    {"$set": update_data}
+                )
 
-            return result.modified_count > 0
+                # 如果没有匹配到，再尝试作为字符串查询
+                if result.matched_count == 0:
+                    result = await providers_collection.update_one(
+                        {"_id": provider_id},
+                        {"$set": update_data}
+                    )
+            except Exception:
+                # 如果 ObjectId 转换失败，直接用字符串查询
+                result = await providers_collection.update_one(
+                    {"_id": provider_id},
+                    {"$set": update_data}
+                )
+
+            # 修复：matched_count > 0 表示找到了记录（即使没有修改）
+            # modified_count > 0 只有在实际修改了字段时才为真
+            # 如果记录存在但值相同，modified_count 为 0，但这不应该返回 404
+            return result.matched_count > 0
         except Exception as e:
             print(f"更新厂家失败: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     async def delete_llm_provider(self, provider_id: str) -> bool:
@@ -1457,15 +1489,136 @@ class ConfigService:
             db = await self._get_db()
             providers_collection = db.llm_providers
 
-            result = await providers_collection.update_one(
-                {"_id": ObjectId(provider_id)},
-                {"$set": {"is_active": is_active, "updated_at": now_tz()}}
-            )
+            # 兼容处理：尝试 ObjectId 和字符串两种类型
+            try:
+                # 先尝试作为 ObjectId 查询
+                result = await providers_collection.update_one(
+                    {"_id": ObjectId(provider_id)},
+                    {"$set": {"is_active": is_active, "updated_at": now_tz()}}
+                )
 
-            return result.modified_count > 0
+                # 如果没有匹配到，再尝试作为字符串查询
+                if result.matched_count == 0:
+                    result = await providers_collection.update_one(
+                        {"_id": provider_id},
+                        {"$set": {"is_active": is_active, "updated_at": now_tz()}}
+                    )
+            except Exception:
+                # 如果 ObjectId 转换失败，直接用字符串查询
+                result = await providers_collection.update_one(
+                    {"_id": provider_id},
+                    {"$set": {"is_active": is_active, "updated_at": now_tz()}}
+                )
+
+            return result.matched_count > 0
         except Exception as e:
             print(f"切换厂家状态失败: {e}")
             return False
+
+    async def init_aggregator_providers(self) -> Dict[str, Any]:
+        """
+        初始化聚合渠道厂家配置
+
+        Returns:
+            初始化结果统计
+        """
+        from app.constants.model_capabilities import AGGREGATOR_PROVIDERS
+
+        try:
+            db = await self._get_db()
+            providers_collection = db.llm_providers
+
+            added_count = 0
+            skipped_count = 0
+            updated_count = 0
+
+            for provider_name, config in AGGREGATOR_PROVIDERS.items():
+                # 从环境变量获取 API Key
+                api_key = self._get_env_api_key(provider_name)
+
+                # 检查是否已存在
+                existing = await providers_collection.find_one({"name": provider_name})
+
+                if existing:
+                    # 如果已存在但没有 API Key，且环境变量中有，则更新
+                    if not existing.get("api_key") and api_key:
+                        update_data = {
+                            "api_key": api_key,
+                            "is_active": True,  # 有 API Key 则自动启用
+                            "updated_at": now_tz()
+                        }
+                        await providers_collection.update_one(
+                            {"name": provider_name},
+                            {"$set": update_data}
+                        )
+                        updated_count += 1
+                        print(f"✅ 更新聚合渠道 {config['display_name']} 的 API Key")
+                    else:
+                        skipped_count += 1
+                        print(f"⏭️ 聚合渠道 {config['display_name']} 已存在，跳过")
+                    continue
+
+                # 创建聚合渠道厂家配置
+                provider_data = {
+                    "name": provider_name,
+                    "display_name": config["display_name"],
+                    "description": config["description"],
+                    "website": config.get("website"),
+                    "api_doc_url": config.get("api_doc_url"),
+                    "default_base_url": config["default_base_url"],
+                    "is_active": bool(api_key),  # 有 API Key 则自动启用
+                    "supported_features": ["chat", "completion", "function_calling", "streaming"],
+                    "api_key": api_key or "",
+                    "extra_config": {
+                        "supported_providers": config.get("supported_providers", []),
+                        "source": "environment" if api_key else "manual"
+                    },
+                    # 🆕 聚合渠道标识
+                    "is_aggregator": True,
+                    "aggregator_type": "openai_compatible",
+                    "model_name_format": config.get("model_name_format", "{provider}/{model}"),
+                    "created_at": now_tz(),
+                    "updated_at": now_tz()
+                }
+
+                provider = LLMProvider(**provider_data)
+                # 修复：删除 _id 字段，让 MongoDB 自动生成 ObjectId
+                insert_data = provider.model_dump(by_alias=True, exclude_unset=True)
+                if "_id" in insert_data:
+                    del insert_data["_id"]
+                await providers_collection.insert_one(insert_data)
+                added_count += 1
+
+                if api_key:
+                    print(f"✅ 添加聚合渠道: {config['display_name']} (已从环境变量获取 API Key)")
+                else:
+                    print(f"✅ 添加聚合渠道: {config['display_name']} (需手动配置 API Key)")
+
+            message_parts = []
+            if added_count > 0:
+                message_parts.append(f"成功添加 {added_count} 个聚合渠道")
+            if updated_count > 0:
+                message_parts.append(f"更新 {updated_count} 个")
+            if skipped_count > 0:
+                message_parts.append(f"跳过 {skipped_count} 个已存在的")
+
+            return {
+                "success": True,
+                "added": added_count,
+                "updated": updated_count,
+                "skipped": skipped_count,
+                "message": "，".join(message_parts) if message_parts else "无变更"
+            }
+
+        except Exception as e:
+            print(f"❌ 初始化聚合渠道失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                "success": False,
+                "error": str(e),
+                "message": "初始化聚合渠道失败"
+            }
 
     async def migrate_env_to_providers(self) -> Dict[str, Any]:
         """将环境变量配置迁移到厂家管理"""
@@ -1598,24 +1751,20 @@ class ConfigService:
             db = await self._get_db()
             providers_collection = db.llm_providers
 
-            # 查找厂家
+            # 兼容处理：尝试 ObjectId 和字符串两种类型
             from bson import ObjectId
+            provider_data = None
             try:
+                # 先尝试作为 ObjectId 查询
                 provider_data = await providers_collection.find_one({"_id": ObjectId(provider_id)})
-            except Exception as e:
-                print(f"❌ ObjectId转换失败: {e}")
-                return {
-                    "success": False,
-                    "message": f"无效的厂家ID格式: {provider_id}"
-                }
+            except Exception:
+                pass
+
+            # 如果没有找到，再尝试作为字符串查询
+            if not provider_data:
+                provider_data = await providers_collection.find_one({"_id": provider_id})
 
             if not provider_data:
-                # 尝试查找所有厂家，看看数据库中有什么
-                all_providers = await providers_collection.find().to_list(length=None)
-                print(f"📊 数据库中的所有厂家:")
-                for p in all_providers:
-                    print(f"   - ID: {p['_id']}, name: {p.get('name')}, display_name: {p.get('display_name')}")
-
                 return {
                     "success": False,
                     "message": f"厂家不存在 (ID: {provider_id})"
@@ -1625,11 +1774,17 @@ class ConfigService:
             api_key = provider_data.get("api_key")
             display_name = provider_data.get("display_name", provider_name)
 
+            # 如果数据库中没有 API Key，尝试从环境变量读取
             if not api_key:
-                return {
-                    "success": False,
-                    "message": f"{display_name} 未配置API密钥"
-                }
+                env_api_key = self._get_env_api_key(provider_name)
+                if env_api_key:
+                    api_key = env_api_key
+                    print(f"✅ 从环境变量读取到 {display_name} 的 API Key")
+                else:
+                    return {
+                        "success": False,
+                        "message": f"{display_name} 未配置API密钥（数据库和环境变量中都未找到）"
+                    }
 
             # 根据厂家类型调用相应的测试函数
             test_result = await self._test_provider_connection(provider_name, api_key, display_name)
@@ -1648,7 +1803,17 @@ class ConfigService:
         import asyncio
 
         try:
-            if provider_name == "google":
+            # 聚合渠道（使用 OpenAI 兼容 API）
+            if provider_name in ["302ai", "oneapi", "newapi", "custom_aggregator"]:
+                # 获取厂家的 base_url
+                db = await self._get_db()
+                providers_collection = db.llm_providers
+                provider_data = await providers_collection.find_one({"name": provider_name})
+                base_url = provider_data.get("default_base_url") if provider_data else None
+                return await asyncio.get_event_loop().run_in_executor(
+                    None, self._test_openai_compatible_api, api_key, display_name, base_url
+                )
+            elif provider_name == "google":
                 return await asyncio.get_event_loop().run_in_executor(None, self._test_google_api, api_key, display_name)
             elif provider_name == "deepseek":
                 return await asyncio.get_event_loop().run_in_executor(None, self._test_deepseek_api, api_key, display_name)
@@ -2047,6 +2212,352 @@ class ConfigService:
                     {"role": "user", "content": "你好，请简单介绍一下你自己。"}
                 ],
                 "max_tokens": 50,
+                "temperature": 0.1
+            }
+
+            response = requests.post(url, json=data, headers=headers, timeout=15)
+
+            if response.status_code == 200:
+                result = response.json()
+                if "choices" in result and len(result["choices"]) > 0:
+                    content = result["choices"][0]["message"]["content"]
+                    if content and len(content.strip()) > 0:
+                        return {
+                            "success": True,
+                            "message": f"{display_name} API连接测试成功"
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "message": f"{display_name} API响应为空"
+                        }
+                else:
+                    return {
+                        "success": False,
+                        "message": f"{display_name} API响应格式异常"
+                    }
+            elif response.status_code == 401:
+                return {
+                    "success": False,
+                    "message": f"{display_name} API密钥无效或已过期"
+                }
+            elif response.status_code == 403:
+                return {
+                    "success": False,
+                    "message": f"{display_name} API权限不足或配额已用完"
+                }
+            else:
+                try:
+                    error_detail = response.json()
+                    error_msg = error_detail.get("error", {}).get("message", f"HTTP {response.status_code}")
+                    return {
+                        "success": False,
+                        "message": f"{display_name} API测试失败: {error_msg}"
+                    }
+                except:
+                    return {
+                        "success": False,
+                        "message": f"{display_name} API测试失败: HTTP {response.status_code}"
+                    }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"{display_name} API测试异常: {str(e)}"
+            }
+
+    async def fetch_provider_models(self, provider_id: str) -> dict:
+        """从厂家 API 获取模型列表"""
+        try:
+            print(f"🔍 获取厂家模型列表 - provider_id: {provider_id}")
+
+            db = await self._get_db()
+            providers_collection = db.llm_providers
+
+            # 兼容处理：尝试 ObjectId 和字符串两种类型
+            from bson import ObjectId
+            provider_data = None
+            try:
+                provider_data = await providers_collection.find_one({"_id": ObjectId(provider_id)})
+            except Exception:
+                pass
+
+            if not provider_data:
+                provider_data = await providers_collection.find_one({"_id": provider_id})
+
+            if not provider_data:
+                return {
+                    "success": False,
+                    "message": f"厂家不存在 (ID: {provider_id})"
+                }
+
+            provider_name = provider_data.get("name")
+            api_key = provider_data.get("api_key")
+            base_url = provider_data.get("default_base_url")
+            display_name = provider_data.get("display_name", provider_name)
+
+            # 如果数据库中没有 API Key，尝试从环境变量读取
+            if not api_key:
+                env_api_key = self._get_env_api_key(provider_name)
+                if env_api_key:
+                    api_key = env_api_key
+                    print(f"✅ 从环境变量读取到 {display_name} 的 API Key")
+                else:
+                    # 某些聚合平台（如 OpenRouter）的 /models 端点不需要 API Key
+                    print(f"⚠️ {display_name} 未配置API密钥，尝试无认证访问")
+
+            if not base_url:
+                return {
+                    "success": False,
+                    "message": f"{display_name} 未配置 API 基础地址 (default_base_url)"
+                }
+
+            # 调用 OpenAI 兼容的 /v1/models 端点
+            import asyncio
+            result = await asyncio.get_event_loop().run_in_executor(
+                None, self._fetch_models_from_api, api_key, base_url, display_name
+            )
+
+            return result
+
+        except Exception as e:
+            print(f"获取模型列表失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                "success": False,
+                "message": f"获取模型列表失败: {str(e)}"
+            }
+
+    def _fetch_models_from_api(self, api_key: str, base_url: str, display_name: str) -> dict:
+        """从 API 获取模型列表"""
+        try:
+            import requests
+
+            # 确保 base_url 以 /v1 结尾
+            if not base_url.endswith("/v1"):
+                base_url = base_url.rstrip("/") + "/v1"
+
+            url = f"{base_url}/models"
+
+            # 构建请求头
+            headers = {}
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+                print(f"🔍 请求 URL: {url} (with API Key)")
+            else:
+                print(f"🔍 请求 URL: {url} (without API Key)")
+
+            response = requests.get(url, headers=headers, timeout=15)
+
+            print(f"📊 响应状态码: {response.status_code}")
+            print(f"📊 响应内容: {response.text[:500]}...")
+
+            if response.status_code == 200:
+                result = response.json()
+                print(f"📊 响应 JSON 结构: {list(result.keys())}")
+
+                if "data" in result and isinstance(result["data"], list):
+                    all_models = result["data"]
+                    print(f"📊 API 返回 {len(all_models)} 个模型")
+
+                    # 打印所有 Anthropic 模型（用于调试）
+                    anthropic_models = [m for m in all_models if "anthropic" in m.get("id", "").lower()]
+                    if anthropic_models:
+                        print(f"🔍 Anthropic 模型列表 ({len(anthropic_models)} 个):")
+                        for m in anthropic_models[:20]:  # 只打印前 20 个
+                            print(f"   - {m.get('id')}")
+
+                    # 过滤：只保留主流大厂的常用模型
+                    filtered_models = self._filter_popular_models(all_models)
+                    print(f"✅ 过滤后保留 {len(filtered_models)} 个常用模型")
+
+                    # 转换模型格式，包含价格信息
+                    formatted_models = self._format_models_with_pricing(filtered_models)
+
+                    return {
+                        "success": True,
+                        "models": formatted_models,
+                        "message": f"成功获取 {len(formatted_models)} 个常用模型（已过滤）"
+                    }
+                else:
+                    print(f"❌ 响应格式异常，期望 'data' 字段为列表")
+                    return {
+                        "success": False,
+                        "message": f"{display_name} API 响应格式异常（缺少 data 字段或格式不正确）"
+                    }
+            elif response.status_code == 401:
+                return {
+                    "success": False,
+                    "message": f"{display_name} API密钥无效或已过期"
+                }
+            elif response.status_code == 403:
+                return {
+                    "success": False,
+                    "message": f"{display_name} API权限不足"
+                }
+            else:
+                try:
+                    error_detail = response.json()
+                    error_msg = error_detail.get("error", {}).get("message", f"HTTP {response.status_code}")
+                    print(f"❌ API 错误: {error_msg}")
+                    return {
+                        "success": False,
+                        "message": f"{display_name} API请求失败: {error_msg}"
+                    }
+                except:
+                    print(f"❌ HTTP 错误: {response.status_code}")
+                    return {
+                        "success": False,
+                        "message": f"{display_name} API请求失败: HTTP {response.status_code}, 响应: {response.text[:200]}"
+                    }
+
+        except Exception as e:
+            print(f"❌ 异常: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                "success": False,
+                "message": f"{display_name} API请求异常: {str(e)}"
+            }
+
+    def _format_models_with_pricing(self, models: list) -> list:
+        """
+        格式化模型列表，包含价格信息
+
+        OpenRouter API 返回的价格单位是 USD per token
+        我们需要转换为 USD per 1K tokens
+        """
+        formatted = []
+        for model in models:
+            model_id = model.get("id", "")
+            model_name = model.get("name", model_id)
+
+            # 获取价格信息
+            pricing = model.get("pricing", {})
+            prompt_price = pricing.get("prompt", "0")  # USD per token
+            completion_price = pricing.get("completion", "0")  # USD per token
+
+            # 转换为 float 并乘以 1000（转换为 per 1K tokens）
+            try:
+                input_price_per_1k = float(prompt_price) * 1000 if prompt_price else None
+                output_price_per_1k = float(completion_price) * 1000 if completion_price else None
+            except (ValueError, TypeError):
+                input_price_per_1k = None
+                output_price_per_1k = None
+
+            # 获取上下文长度
+            context_length = model.get("context_length")
+            if not context_length:
+                # 尝试从 top_provider 获取
+                top_provider = model.get("top_provider", {})
+                context_length = top_provider.get("context_length")
+
+            formatted_model = {
+                "id": model_id,
+                "name": model_name,
+                "context_length": context_length,
+                "input_price_per_1k": input_price_per_1k,
+                "output_price_per_1k": output_price_per_1k,
+            }
+
+            formatted.append(formatted_model)
+
+            # 打印价格信息（用于调试）
+            if input_price_per_1k or output_price_per_1k:
+                print(f"💰 {model_id}: 输入=${input_price_per_1k:.6f}/1K, 输出=${output_price_per_1k:.6f}/1K")
+
+        return formatted
+
+    def _filter_popular_models(self, models: list) -> list:
+        """过滤模型列表，只保留主流大厂的常用模型"""
+        import re
+
+        # 只保留三大厂：OpenAI、Anthropic、Google
+        popular_providers = [
+            "openai",      # OpenAI
+            "anthropic",   # Anthropic
+            "google",      # Google
+        ]
+
+        # 排除的关键词
+        exclude_keywords = [
+            "preview",
+            "experimental",
+            "alpha",
+            "beta",
+            "free",
+            "extended",
+            "nitro",
+            ":free",
+            ":extended",
+            "online",  # 排除带在线搜索的版本
+            "instruct",  # 排除 instruct 版本
+        ]
+
+        # 日期格式正则表达式（匹配 2024-05-13 这种格式）
+        date_pattern = re.compile(r'\d{4}-\d{2}-\d{2}')
+
+        filtered = []
+        for model in models:
+            model_id = model.get("id", "").lower()
+            model_name = model.get("name", "").lower()
+
+            # 检查是否属于三大厂
+            is_popular_provider = any(provider in model_id for provider in popular_providers)
+
+            if not is_popular_provider:
+                continue
+
+            # 检查是否包含日期（排除带日期的旧版本）
+            if date_pattern.search(model_id):
+                print(f"⏭️ 跳过带日期的旧版本: {model_id}")
+                continue
+
+            # 检查是否包含排除关键词
+            has_exclude_keyword = any(keyword in model_id or keyword in model_name for keyword in exclude_keywords)
+
+            if has_exclude_keyword:
+                print(f"⏭️ 跳过排除关键词: {model_id}")
+                continue
+
+            # 保留该模型
+            print(f"✅ 保留模型: {model_id}")
+            filtered.append(model)
+
+        return filtered
+
+    def _test_openai_compatible_api(self, api_key: str, display_name: str, base_url: str = None) -> dict:
+        """测试 OpenAI 兼容 API（用于聚合渠道）"""
+        try:
+            import requests
+
+            # 如果没有提供 base_url，使用默认值
+            if not base_url:
+                return {
+                    "success": False,
+                    "message": f"{display_name} 未配置 API 基础地址 (default_base_url)"
+                }
+
+            # 确保 base_url 以 /v1 结尾
+            if not base_url.endswith("/v1"):
+                base_url = base_url.rstrip("/") + "/v1"
+
+            url = f"{base_url}/chat/completions"
+
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}"
+            }
+
+            # 使用一个通用的模型名称进行测试
+            # 聚合渠道通常支持多种模型，这里使用 gpt-3.5-turbo 作为测试
+            data = {
+                "model": "gpt-3.5-turbo",
+                "messages": [
+                    {"role": "user", "content": "Hello, please respond with 'OK' if you can read this."}
+                ],
+                "max_tokens": 10,
                 "temperature": 0.1
             }
 
