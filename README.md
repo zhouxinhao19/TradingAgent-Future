@@ -1436,6 +1436,9 @@ cost_optimized_config = {
 - **邮箱**: hsliup@163.com
 - 项目ＱＱ群：187537480
 - 项目微信公众号：TradingAgents-CN
+
+  <img src="assets/weixin.png" alt="微信公众号" width="200"/>
+
 - **原项目**: [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents)
 - **文档**: [完整文档目录](docs/)
 
