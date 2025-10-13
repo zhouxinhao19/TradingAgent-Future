@@ -178,6 +178,7 @@ export const ActionTypes = {
   SYSTEM_SETTINGS: 'system_settings',
   USER_LOGIN: 'user_login',
   USER_LOGOUT: 'user_logout',
+  USER_MANAGEMENT: 'user_management',  // 🔧 添加用户管理操作类型
   DATABASE_OPERATION: 'database_operation',
   SCREENING: 'screening',
   REPORT_GENERATION: 'report_generation'
@@ -193,6 +194,7 @@ export const ActionTypeNames = {
   [ActionTypes.SYSTEM_SETTINGS]: '系统设置',
   [ActionTypes.USER_LOGIN]: '用户登录',
   [ActionTypes.USER_LOGOUT]: '用户登出',
+  [ActionTypes.USER_MANAGEMENT]: '用户管理',  // 🔧 添加用户管理操作类型名称
   [ActionTypes.DATABASE_OPERATION]: '数据库操作',
   [ActionTypes.SCREENING]: '股票筛选',
   [ActionTypes.REPORT_GENERATION]: '报告生成'
@@ -208,6 +210,7 @@ export const ActionTypeTagColors = {
   [ActionTypes.SYSTEM_SETTINGS]: 'danger',
   [ActionTypes.USER_LOGIN]: 'success',
   [ActionTypes.USER_LOGOUT]: 'warning',
+  [ActionTypes.USER_MANAGEMENT]: 'warning',  // 🔧 添加用户管理操作类型颜色
   [ActionTypes.DATABASE_OPERATION]: 'primary',
   [ActionTypes.SCREENING]: 'info',
   [ActionTypes.REPORT_GENERATION]: 'primary'

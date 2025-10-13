@@ -50,6 +50,7 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
             "/api/system/database/": ActionType.DATABASE_OPERATION,
             "/api/auth/login": ActionType.USER_LOGIN,
             "/api/auth/logout": ActionType.USER_LOGOUT,
+            "/api/auth/change-password": ActionType.USER_MANAGEMENT,  # 🔧 添加修改密码操作类型
             "/api/reports/": ActionType.REPORT_GENERATION,
         }
 
@@ -218,6 +219,8 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
                 return "用户登录"
             elif "logout" in path:
                 return "用户登出"
+            elif "change-password" in path:
+                return "修改密码"
             else:
                 return f"{action_verb}认证操作"
 

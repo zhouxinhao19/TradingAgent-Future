@@ -99,6 +99,7 @@ class ActionType:
     SYSTEM_SETTINGS = "system_settings"
     USER_LOGIN = "user_login"
     USER_LOGOUT = "user_logout"
+    USER_MANAGEMENT = "user_management"  # 🔧 添加用户管理操作类型
     DATABASE_OPERATION = "database_operation"
     SCREENING = "screening"
     REPORT_GENERATION = "report_generation"
@@ -114,6 +115,7 @@ ACTION_TYPE_NAMES = {
     ActionType.SYSTEM_SETTINGS: "系统设置",
     ActionType.USER_LOGIN: "用户登录",
     ActionType.USER_LOGOUT: "用户登出",
+    ActionType.USER_MANAGEMENT: "用户管理",  # 🔧 添加用户管理操作类型名称
     ActionType.DATABASE_OPERATION: "数据库操作",
     ActionType.SCREENING: "股票筛选",
     ActionType.REPORT_GENERATION: "报告生成",

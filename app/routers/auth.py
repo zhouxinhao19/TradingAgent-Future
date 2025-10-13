@@ -280,13 +280,8 @@ async def change_password(
     user: dict = Depends(get_current_user)
 ):
     """修改密码"""
-    import time
     import json
     from pathlib import Path
-
-    start_time = time.time()
-    ip_address = request.client.host if request.client else "unknown"
-    user_agent = request.headers.get("user-agent", "")
 
     try:
         # 验证旧密码
@@ -304,18 +299,7 @@ async def change_password(
 
         # 验证旧密码
         if payload.old_password != current_password:
-            await log_operation(
-                user_id=user["id"],
-                username=user["username"],
-                action_type=ActionType.USER_MANAGEMENT,
-                action="修改密码",
-                details={"reason": "旧密码错误"},
-                success=False,
-                error_message="旧密码错误",
-                duration_ms=int((time.time() - start_time) * 1000),
-                ip_address=ip_address,
-                user_agent=user_agent
-            )
+            # 🔧 移除手动日志记录，由 OperationLogMiddleware 自动处理
             raise HTTPException(status_code=400, detail="旧密码错误")
 
         # 保存新密码
@@ -323,19 +307,7 @@ async def change_password(
         with open(config_file, "w", encoding="utf-8") as f:
             json.dump({"password": payload.new_password}, f, ensure_ascii=False, indent=2)
 
-        # 记录操作日志
-        await log_operation(
-            user_id=user["id"],
-            username=user["username"],
-            action_type=ActionType.USER_MANAGEMENT,
-            action="修改密码",
-            details={"success": True},
-            success=True,
-            duration_ms=int((time.time() - start_time) * 1000),
-            ip_address=ip_address,
-            user_agent=user_agent
-        )
-
+        # 🔧 移除手动日志记录，由 OperationLogMiddleware 自动处理
         return {
             "success": True,
             "data": {},
@@ -348,19 +320,7 @@ async def change_password(
         logger = logging.getLogger(__name__)
         logger.error(f"修改密码失败: {e}")
 
-        await log_operation(
-            user_id=user["id"],
-            username=user["username"],
-            action_type=ActionType.USER_MANAGEMENT,
-            action="修改密码",
-            details={"error": str(e)},
-            success=False,
-            error_message=str(e),
-            duration_ms=int((time.time() - start_time) * 1000),
-            ip_address=ip_address,
-            user_agent=user_agent
-        )
-
+        # 🔧 移除手动日志记录，由 OperationLogMiddleware 自动处理
         raise HTTPException(status_code=500, detail=f"修改密码失败: {str(e)}")
 
 @router.post("/debug-token")

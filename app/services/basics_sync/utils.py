@@ -17,8 +17,10 @@ def fetch_stock_basic_df():
     注意：这是一个同步函数，会等待 Tushare 连接完成。
     """
     import time
+    import logging
     from tradingagents.dataflows.providers.china.tushare import get_tushare_provider
 
+    logger = logging.getLogger(__name__)
     provider = get_tushare_provider()
 
     # 等待连接完成（最多等待 5 秒）
@@ -26,16 +28,24 @@ def fetch_stock_basic_df():
     wait_interval = 0.1
     elapsed = 0.0
 
+    logger.info(f"⏳ 等待 Tushare 连接...")
     while not getattr(provider, "connected", False) and elapsed < max_wait_seconds:
         time.sleep(wait_interval)
         elapsed += wait_interval
 
     # 检查连接状态和API可用性
     if not getattr(provider, "connected", False) or provider.api is None:
+        logger.error(f"❌ Tushare 连接失败（等待 {max_wait_seconds}s 后超时）")
+        logger.error(f"💡 请检查：")
+        logger.error(f"   1. 环境变量 TUSHARE_ENABLED=true")
+        logger.error(f"   2. .env 文件中配置了有效的 TUSHARE_TOKEN")
+        logger.error(f"   3. Tushare Token 未过期且有足够的积分")
         raise RuntimeError(
             f"Tushare not connected after waiting {max_wait_seconds}s. "
             "Set TUSHARE_ENABLED=true and TUSHARE_TOKEN in .env"
         )
+
+    logger.info(f"✅ Tushare 已连接，开始获取股票列表...")
 
     # 直接调用 Tushare API 获取 DataFrame
     try:
@@ -43,8 +53,29 @@ def fetch_stock_basic_df():
             list_status='L',
             fields='ts_code,symbol,name,area,industry,market,exchange,list_date,is_hs'
         )
+
+        # 🔧 增强错误诊断
+        if df is None:
+            logger.error(f"❌ Tushare API 返回 None")
+            logger.error(f"💡 可能原因：")
+            logger.error(f"   1. Tushare Token 无效或过期")
+            logger.error(f"   2. API 积分不足")
+            logger.error(f"   3. 网络连接问题")
+            raise RuntimeError("Tushare API returned None. Check token validity and API credits.")
+
+        if hasattr(df, 'empty') and df.empty:
+            logger.error(f"❌ Tushare API 返回空 DataFrame")
+            logger.error(f"💡 可能原因：")
+            logger.error(f"   1. list_status='L' 参数可能不正确")
+            logger.error(f"   2. Tushare 数据源暂时不可用")
+            logger.error(f"   3. API 调用限制（请检查积分和调用频率）")
+            raise RuntimeError("Tushare API returned empty DataFrame. Check API parameters and data availability.")
+
+        logger.info(f"✅ 成功获取 {len(df)} 条股票数据")
         return df
+
     except Exception as e:
+        logger.error(f"❌ 调用 Tushare API 失败: {e}")
         raise RuntimeError(f"Failed to fetch stock basic DataFrame: {e}")
 
 
