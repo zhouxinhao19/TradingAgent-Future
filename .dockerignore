@@ -1,5 +1,8 @@
 # TradingAgents-CN Docker构建忽略文件
 # 用于减小Docker镜像大小和加快构建速度
+#
+# 注意：此文件同时用于后端和前端镜像构建
+# 前端构建需要保留 frontend/ 目录下的源代码和配置文件
 
 # Git相关
 .git
@@ -62,8 +65,11 @@ yarn-error.log*
 .yarn-integrity
 
 # 前端构建产物（在Dockerfile中会重新构建）
+# 注意：只排除构建产物和node_modules，不排除源代码
 frontend/dist/
 frontend/node_modules/
+frontend/.vite/
+frontend/coverage/
 
 # IDE和编辑器
 .vscode/
@@ -91,12 +97,11 @@ tmp/
 temp/
 *.tmp
 
-# 测试相关
+# 测试相关（排除根目录的测试，但保留frontend/src下的测试文件）
 tests/
 test/
-*.test.js
-*.spec.js
 coverage/
+# 前端测试文件在构建时会被排除，这里不需要特别处理
 
 # 文档（不需要在镜像中）
 docs/
@@ -119,10 +124,8 @@ scripts/
 .env.example
 *.example
 
-# 其他
+# 其他配置文件
 .editorconfig
 .prettierrc
-.eslintrc*
-tsconfig.json
-vite.config.js
+# 注意：不排除 tsconfig.json、vite.config.js 等，因为前端构建需要这些文件
 
