@@ -1,0 +1,125 @@
+# TradingAgents-CN Docker构建忽略文件
+# 用于减小Docker镜像大小和加快构建速度
+
+# Git相关
+.git
+.gitignore
+.gitattributes
+
+# Python相关
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.hypothesis/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# 虚拟环境
+venv/
+.venv/
+ENV/
+env/
+.env.local
+.env.*.local
+
+# Node.js相关
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.npm
+.eslintcache
+.node_repl_history
+*.tgz
+.yarn-integrity
+
+# 前端构建产物（在Dockerfile中会重新构建）
+frontend/dist/
+frontend/node_modules/
+
+# IDE和编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# 日志文件
+logs/
+*.log
+log/
+
+# 数据文件
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+# 测试相关
+tests/
+test/
+*.test.js
+*.spec.js
+coverage/
+
+# 文档（不需要在镜像中）
+docs/
+*.md
+!README.md
+
+# Docker相关
+Dockerfile.legacy
+docker-compose.yml
+docker-compose.split.yml
+docker-compose.*.yml
+!docker-compose.v1.0.0.yml
+
+# 脚本（不需要在镜像中）
+scripts/
+*.sh
+*.ps1
+
+# 配置示例文件
+.env.example
+*.example
+
+# 其他
+.editorconfig
+.prettierrc
+.eslintrc*
+tsconfig.json
+vite.config.js
+

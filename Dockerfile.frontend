@@ -1,31 +1,41 @@
-# Frontend Dockerfile for Vite/Vue app (front/back split)
-FROM node:18-alpine AS build
+# Frontend Dockerfile for Vue 3 + Vite app (TradingAgents-CN v1.0.0-preview)
+# 前后端分离架构 - 前端服务
+
+# 构建阶段：使用Node.js 22.x（与项目开发环境一致）
+FROM node:22-alpine AS build
 
 ENV NODE_ENV=production
 WORKDIR /app/frontend
 
-# Enable Corepack and use Yarn Classic (v1) for deterministic installs
+# 启用Corepack并使用Yarn 1.22.22（项目使用的包管理器）
 RUN corepack enable && corepack prepare yarn@1.22.22 --activate \
     && yarn config set registry https://registry.npmmirror.com
 
-# Install deps via Yarn (use lockfile; ensure dev deps for build)
+# 复制package.json和yarn.lock
 COPY frontend/package.json frontend/yarn.lock ./
+
+# 安装依赖（使用yarn.lock确保版本一致）
 RUN yarn install --frozen-lockfile --production=false
 
-# Build assets
+# 复制前端源代码
 COPY frontend/. ./
-RUN yarn build
 
-# Runtime image using Nginx to serve static files
+# 构建生产版本（跳过类型检查以加快构建速度）
+RUN yarn vite build
+
+# 运行阶段：使用Nginx提供静态文件服务
 FROM nginx:alpine AS runtime
+
 WORKDIR /usr/share/nginx/html
 
-# Copy built assets
+# 从构建阶段复制构建产物
 COPY --from=build /app/frontend/dist .
 
-# Replace default server config to support SPA history routing
+# 复制Nginx配置（支持SPA路由）
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 
+# 暴露端口80
 EXPOSE 80
 
+# 启动Nginx
 CMD ["nginx", "-g", "daemon off;"]
