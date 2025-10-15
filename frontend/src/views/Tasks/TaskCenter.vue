@@ -76,14 +76,6 @@
           </el-button>
         </div>
         <div class="right">
-          <el-button @click="batchFavorite" :disabled="selectedRows.length===0">
-            <el-icon><Star /></el-icon>
-            批量收藏
-          </el-button>
-          <el-button @click="batchTag" :disabled="selectedRows.length===0">
-            <el-icon><PriceTag /></el-icon>
-            批量标签
-          </el-button>
           <el-button @click="exportSelected" :disabled="selectedRows.length===0">
             <el-icon><Download /></el-icon>
             导出所选
@@ -154,7 +146,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { List, Refresh, Download, Star, PriceTag } from '@element-plus/icons-vue'
+import { List, Refresh, Download } from '@element-plus/icons-vue'
 import { analysisApi } from '@/api/analysis'
 import { marked } from 'marked'
 import TaskResultDialog from '@/components/Global/TaskResultDialog.vue'
@@ -369,9 +361,7 @@ const deleteTask = async (row: any) => {
   }
 }
 
-// 批量操作占位
-const batchFavorite = () => { ElMessage.info('批量收藏：后端接口待接入') }
-const batchTag = () => { ElMessage.info('批量标签：后端接口待接入') }
+// 导出所选任务
 const exportSelected = () => {
   try {
     const data = JSON.stringify(selectedRows.value, null, 2)

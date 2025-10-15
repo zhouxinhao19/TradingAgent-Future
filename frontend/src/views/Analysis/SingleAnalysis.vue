@@ -919,13 +919,12 @@ const submitAnalysis = async () => {
 
     console.log('🔍 分析响应数据:', response)
     console.log('🔍 响应数据结构:', response.data)
-    console.log('🔍 任务数据:', response.data.data)
-    console.log('🔍 任务ID:', response.data.data?.task_id)
+    console.log('🔍 任务ID:', response.data?.task_id)
 
     ElMessage.success('分析任务已提交，正在处理中...')
 
-    // 修复数据访问路径：response.data.data.task_id
-    currentTaskId.value = response.data.data.task_id
+    // 响应拦截器已返回 response.data，所以直接访问 response.data.task_id
+    currentTaskId.value = response.data.task_id
 
     if (!currentTaskId.value) {
       console.error('❌ 任务ID为空:', response)
@@ -963,7 +962,7 @@ const submitAnalysis = async () => {
     setTimeout(async () => {
       try {
         const response = await analysisApi.getTaskStatus(currentTaskId.value)
-        const status = response.data.data // 修复数据访问路径
+        const status = response.data // 响应拦截器已返回 response.data
         console.log('🔄 立即查询状态:', status)
         console.log('🔄 当前 analysisStatus:', analysisStatus.value)
         if (status.status === 'running') {
@@ -1009,7 +1008,7 @@ const startPollingTaskStatus = () => {
 
       console.log('🔄 开始查询任务状态:', currentTaskId.value)
       const response = await analysisApi.getTaskStatus(currentTaskId.value)
-      const status = response.data.data // 修复：获取实际的任务状态数据
+      const status = response.data // 响应拦截器已返回 response.data
 
       console.log('🔍 任务状态响应:', response)
       console.log('🔍 任务状态数据:', status)
@@ -1644,7 +1643,7 @@ const handleVisibilityChange = () => {
       setTimeout(async () => {
         try {
           const response = await analysisApi.getTaskStatus(currentTaskId.value)
-          const status = response.data.data // 修复数据访问路径
+          const status = response.data // 响应拦截器已返回 response.data
           console.log('🔄 页面恢复查询状态:', status)
           if (status.status === 'running') {
             analysisStatus.value = 'running'
@@ -1832,7 +1831,7 @@ const restoreTaskFromCache = async () => {
 
     // 查询任务当前状态
     const response = await analysisApi.getTaskStatus(cached.taskId)
-    const status = response.data.data
+    const status = response.data // 响应拦截器已返回 response.data
 
     console.log('📊 恢复的任务状态:', status)
 

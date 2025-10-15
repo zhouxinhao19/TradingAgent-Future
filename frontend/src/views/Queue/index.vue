@@ -358,8 +358,8 @@ const viewTaskDetail = async (task: any) => {
     currentTaskRow.value = task
     // 仅调用 /status，避免无效的 /details 404 噪音
     const res = await analysisApi.getTaskStatus(task.task_id)
-    const payload = res?.data?.data ?? res?.data ?? res
-    const data = payload?.data ?? payload
+    // 响应拦截器已返回 response.data，所以 res 就是 ApiResponse<T>
+    const data = res?.data
     if (!data) {
       ElMessage.warning('暂无详情数据')
       return

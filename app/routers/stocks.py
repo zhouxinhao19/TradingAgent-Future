@@ -107,7 +107,18 @@ async def get_fundamentals(code: str, current_user: dict = Depends(get_current_u
     except Exception as e:
         print(f"获取财务数据失败: {e}")
 
-    # 3. 构建返回数据
+    # 3. 获取实时PE/PB（优先使用实时计算）
+    from tradingagents.dataflows.realtime_metrics import get_pe_pb_with_fallback
+    import asyncio
+
+    # 在线程池中执行同步的实时计算
+    realtime_metrics = await asyncio.to_thread(
+        get_pe_pb_with_fallback,
+        code6,
+        db.client
+    )
+
+    # 4. 构建返回数据
     data = {
         "code": code6,
         "name": b.get("name"),
@@ -117,11 +128,16 @@ async def get_fundamentals(code: str, current_user: dict = Depends(get_current_u
         # 板块信息：使用 market 字段（主板/创业板/科创板/北交所等）
         "sector": b.get("market"),
 
-        # 估值指标（来自 stock_basic_info）
-        "pe": b.get("pe"),
-        "pb": b.get("pb"),
-        "pe_ttm": b.get("pe_ttm"),
-        "pb_mrq": b.get("pb_mrq"),
+        # 估值指标（优先使用实时计算，降级到 stock_basic_info）
+        "pe": realtime_metrics.get("pe") or b.get("pe"),
+        "pb": realtime_metrics.get("pb") or b.get("pb"),
+        "pe_ttm": realtime_metrics.get("pe_ttm") or b.get("pe_ttm"),
+        "pb_mrq": realtime_metrics.get("pb_mrq") or b.get("pb_mrq"),
+
+        # PE/PB 数据来源标识
+        "pe_source": realtime_metrics.get("source", "unknown"),
+        "pe_is_realtime": realtime_metrics.get("is_realtime", False),
+        "pe_updated_at": realtime_metrics.get("updated_at"),
 
         # ROE（优先从 stock_financial_data 获取，其次从 stock_basic_info）
         "roe": None,
@@ -140,7 +156,7 @@ async def get_fundamentals(code: str, current_user: dict = Depends(get_current_u
         "updated_at": b.get("updated_at"),
     }
 
-    # 4. 从财务数据中提取 ROE 和负债率
+    # 5. 从财务数据中提取 ROE 和负债率
     if financial_data:
         # ROE（净资产收益率）
         if financial_data.get("financial_indicators"):
@@ -154,7 +170,7 @@ async def get_fundamentals(code: str, current_user: dict = Depends(get_current_u
         if data["debt_ratio"] is None:
             data["debt_ratio"] = financial_data.get("debt_to_assets")
 
-    # 5. 如果财务数据中没有 ROE，使用 stock_basic_info 中的
+    # 6. 如果财务数据中没有 ROE，使用 stock_basic_info 中的
     if data["roe"] is None:
         data["roe"] = b.get("roe")
 

@@ -590,11 +590,6 @@
             <!-- 性能设置 -->
             <el-divider content-position="left">性能设置</el-divider>
 
-            <el-form-item label="最大并发任务">
-              <el-input-number v-model="systemSettings.max_concurrent_tasks" :min="1" :max="10" :disabled="!isEditable('max_concurrent_tasks')" />
-              <div class="setting-description">同时执行的分析任务数量上限（建议3-5）</div>
-            </el-form-item>
-
             <el-form-item label="分析超时时间">
               <el-input-number v-model="systemSettings.default_analysis_timeout" :min="60" :max="1800" :disabled="!isEditable('default_analysis_timeout')" />
               <span class="setting-description">秒</span>
@@ -1323,7 +1318,6 @@ const loadSystemSettings = async () => {
     systemSettings.value = {
       quick_analysis_model: 'qwen-turbo',
       deep_analysis_model: 'qwen-max',
-      max_concurrent_tasks: 3,
       default_analysis_timeout: 300,
       enable_cache: true,
       cache_ttl: 3600,

@@ -946,32 +946,45 @@ class OptimizedChinaDataProvider:
             else:
                 metrics["net_margin"] = "N/A"
 
-            # 计算 PE - 优先从stock_basic_info获取，否则尝试计算
+            # 计算 PE/PB - 优先使用实时计算，降级到静态数据
             pe_value = None
+            pb_value = None
             try:
-                # 尝试从stock_basic_info获取PE
+                # 优先使用实时计算
+                from tradingagents.dataflows.realtime_metrics import get_pe_pb_with_fallback
                 from tradingagents.config.database_manager import get_database_manager
+
                 db_manager = get_database_manager()
                 if db_manager.is_mongodb_available():
                     client = db_manager.get_mongodb_client()
-                    db = client['tradingagents']
-                    basic_info_collection = db['stock_basic_info']
                     # 从symbol中提取股票代码
                     stock_code = latest_indicators.get('code') or latest_indicators.get('symbol', '').replace('.SZ', '').replace('.SH', '')
+
                     if stock_code:
-                        basic_info = basic_info_collection.find_one({'code': stock_code})
-                        if basic_info:
-                            pe_value = basic_info.get('pe')
+                        # 获取实时PE/PB
+                        realtime_metrics = get_pe_pb_with_fallback(stock_code, client)
+
+                        if realtime_metrics:
+                            # 使用实时PE
+                            pe_value = realtime_metrics.get('pe')
                             if pe_value is not None and pe_value > 0:
-                                metrics["pe"] = f"{pe_value:.1f}倍"
-                                logger.debug(f"✅ 从stock_basic_info获取PE: {metrics['pe']}")
-                            else:
-                                pe_value = None
+                                is_realtime = realtime_metrics.get('is_realtime', False)
+                                realtime_tag = " (实时)" if is_realtime else ""
+                                metrics["pe"] = f"{pe_value:.1f}倍{realtime_tag}"
+                                logger.debug(f"✅ 获取PE: {metrics['pe']} [来源: {realtime_metrics.get('source')}]")
+
+                            # 使用实时PB
+                            pb_value = realtime_metrics.get('pb')
+                            if pb_value is not None and pb_value > 0:
+                                is_realtime = realtime_metrics.get('is_realtime', False)
+                                realtime_tag = " (实时)" if is_realtime else ""
+                                metrics["pb"] = f"{pb_value:.2f}倍{realtime_tag}"
+                                logger.debug(f"✅ 获取PB: {metrics['pb']} [来源: {realtime_metrics.get('source')}]")
+
             except Exception as e:
-                logger.debug(f"从stock_basic_info获取PE失败: {e}")
-                pe_value = None
-            
-            # 如果无法从stock_basic_info获取，尝试计算
+                logger.debug(f"获取实时PE/PB失败: {e}")
+
+            # 如果实时计算失败，尝试传统计算方式
             if pe_value is None:
                 net_profit = latest_indicators.get('net_profit')
                 if net_profit and net_profit > 0:
@@ -989,26 +1002,6 @@ class OptimizedChinaDataProvider:
                 else:
                     metrics["pe"] = "N/A"
 
-            # 计算 PB - 优先从stock_basic_info获取，否则尝试计算
-            pb_value = None
-            try:
-                # 尝试从stock_basic_info获取PB
-                if db_manager.is_mongodb_available():
-                    stock_code = latest_indicators.get('code') or latest_indicators.get('symbol', '').replace('.SZ', '').replace('.SH', '')
-                    if stock_code:
-                        basic_info = basic_info_collection.find_one({'code': stock_code})
-                        if basic_info:
-                            pb_value = basic_info.get('pb')
-                            if pb_value is not None and pb_value > 0:
-                                metrics["pb"] = f"{pb_value:.2f}倍"
-                                logger.debug(f"✅ 从stock_basic_info获取PB: {metrics['pb']}")
-                            else:
-                                pb_value = None
-            except Exception as e:
-                logger.debug(f"从stock_basic_info获取PB失败: {e}")
-                pb_value = None
-            
-            # 如果无法从stock_basic_info获取，尝试计算
             if pb_value is None:
                 total_equity = latest_indicators.get('total_hldr_eqy_exc_min_int')
                 if total_equity and total_equity > 0:

@@ -268,16 +268,22 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="pe" label="市盈率" width="100" align="right">
+        <el-table-column prop="pe" label="市盈率" width="130" align="right">
           <template #default="{ row }">
-            <span v-if="row.pe">{{ row.pe?.toFixed(2) }}</span>
+            <span v-if="row.pe">
+              {{ row.pe?.toFixed(2) }}
+              <el-tag v-if="row.pe_is_realtime" type="success" size="small" style="margin-left: 4px">实时</el-tag>
+            </span>
             <span v-else class="text-gray-400">-</span>
           </template>
         </el-table-column>
 
-        <el-table-column prop="pb" label="市净率" width="100" align="right">
+        <el-table-column prop="pb" label="市净率" width="130" align="right">
           <template #default="{ row }">
-            <span v-if="row.pb">{{ row.pb?.toFixed(2) }}</span>
+            <span v-if="row.pb">
+              {{ row.pb?.toFixed(2) }}
+              <el-tag v-if="row.pe_is_realtime" type="success" size="small" style="margin-left: 4px">实时</el-tag>
+            </span>
             <span v-else class="text-gray-400">-</span>
           </template>
         </el-table-column>

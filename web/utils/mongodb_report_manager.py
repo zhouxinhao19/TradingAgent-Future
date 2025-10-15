@@ -118,10 +118,23 @@ class MongoDBReportManager:
             timestamp = datetime.now()
             analysis_id = f"{stock_symbol}_{timestamp.strftime('%Y%m%d_%H%M%S')}"
 
+            # 🔥 根据股票代码推断市场类型
+            from tradingagents.utils.stock_utils import StockUtils
+            market_info = StockUtils.get_market_info(stock_symbol)
+            market_type_map = {
+                "china_a": "A股",
+                "hong_kong": "港股",
+                "us": "美股",
+                "unknown": "A股"  # 默认为A股
+            }
+            market_type = market_type_map.get(market_info.get("market", "unknown"), "A股")
+            logger.info(f"📊 推断市场类型: {stock_symbol} -> {market_type}")
+
             # 构建文档
             document = {
                 "analysis_id": analysis_id,
                 "stock_symbol": stock_symbol,
+                "market_type": market_type,  # 🔥 添加市场类型字段
                 "analysis_date": timestamp.strftime('%Y-%m-%d'),
                 "timestamp": timestamp,
                 "status": "completed",
@@ -139,17 +152,17 @@ class MongoDBReportManager:
                 "created_at": timestamp,
                 "updated_at": timestamp
             }
-            
+
             # 插入文档
             result = self.collection.insert_one(document)
-            
+
             if result.inserted_id:
                 logger.info(f"✅ 分析报告已保存到MongoDB: {analysis_id}")
                 return True
             else:
                 logger.error("❌ MongoDB插入失败")
                 return False
-                
+
         except Exception as e:
             logger.error(f"❌ 保存分析报告到MongoDB失败: {e}")
             return False

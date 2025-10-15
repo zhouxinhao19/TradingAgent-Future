@@ -71,7 +71,7 @@ router = APIRouter(prefix="/api/reports", tags=["reports"])
 class ReportFilter(BaseModel):
     """报告筛选参数"""
     search_keyword: Optional[str] = None
-    status_filter: Optional[str] = None
+    market_filter: Optional[str] = None
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     stock_code: Optional[str] = None
@@ -89,7 +89,7 @@ async def get_reports_list(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
     search_keyword: Optional[str] = Query(None, description="搜索关键词"),
-    status_filter: Optional[str] = Query(None, description="状态筛选"),
+    market_filter: Optional[str] = Query(None, description="市场筛选（A股/港股/美股）"),
     start_date: Optional[str] = Query(None, description="开始日期"),
     end_date: Optional[str] = Query(None, description="结束日期"),
     stock_code: Optional[str] = Query(None, description="股票代码"),
@@ -97,7 +97,7 @@ async def get_reports_list(
 ):
     """获取分析报告列表"""
     try:
-        logger.info(f"🔍 获取报告列表: 用户={user['id']}, 页码={page}, 每页={page_size}")
+        logger.info(f"🔍 获取报告列表: 用户={user['id']}, 页码={page}, 每页={page_size}, 市场={market_filter}")
 
         db = get_mongo_db()
 
@@ -112,9 +112,9 @@ async def get_reports_list(
                 {"summary": {"$regex": search_keyword, "$options": "i"}}
             ]
 
-        # 状态筛选
-        if status_filter:
-            query["status"] = status_filter
+        # 市场筛选
+        if market_filter:
+            query["market_type"] = market_filter
 
         # 股票代码筛选
         if stock_code:
@@ -144,12 +144,26 @@ async def get_reports_list(
             stock_code = doc.get("stock_symbol", "")
             stock_name = get_stock_name(stock_code)
 
+            # 🔥 获取市场类型，如果没有则根据股票代码推断
+            market_type = doc.get("market_type")
+            if not market_type:
+                from tradingagents.utils.stock_utils import StockUtils
+                market_info = StockUtils.get_market_info(stock_code)
+                market_type_map = {
+                    "china_a": "A股",
+                    "hong_kong": "港股",
+                    "us": "美股",
+                    "unknown": "A股"
+                }
+                market_type = market_type_map.get(market_info.get("market", "unknown"), "A股")
+
             report = {
                 "id": str(doc["_id"]),
                 "analysis_id": doc.get("analysis_id", ""),
                 "title": f"{stock_name}({stock_code}) 分析报告",
                 "stock_code": stock_code,
                 "stock_name": stock_name,
+                "market_type": market_type,  # 🔥 添加市场类型字段
                 "type": "single",  # 目前主要是单股分析
                 "format": "markdown",  # 主要格式
                 "status": doc.get("status", "completed"),

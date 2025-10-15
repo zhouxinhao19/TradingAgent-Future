@@ -6,7 +6,7 @@
         我的自选股
       </h1>
       <p class="page-description">
-        管理您关注的股票，设置价格提醒
+        管理您关注的股票
       </p>
     </div>
 
@@ -239,25 +239,6 @@
             placeholder="可选：添加备注信息"
           />
         </el-form-item>
-
-        <el-form-item label="价格提醒">
-          <el-row :gutter="8">
-            <el-col :span="12">
-              <el-input
-                v-model.number="addForm.alert_price_high"
-                placeholder="上限价格"
-                type="number"
-              />
-            </el-col>
-            <el-col :span="12">
-              <el-input
-                v-model.number="addForm.alert_price_low"
-                placeholder="下限价格"
-                type="number"
-              />
-            </el-col>
-          </el-row>
-        </el-form-item>
       </el-form>
 
       <template #footer>
@@ -291,17 +272,6 @@
 
         <el-form-item label="备注">
           <el-input v-model="editForm.notes" type="textarea" :rows="2" placeholder="可选：添加备注信息" />
-        </el-form-item>
-
-        <el-form-item label="价格提醒">
-          <el-row :gutter="8">
-            <el-col :span="12">
-              <el-input v-model.number="editForm.alert_price_high" placeholder="上限价格" type="number" />
-            </el-col>
-            <el-col :span="12">
-              <el-input v-model.number="editForm.alert_price_low" placeholder="下限价格" type="number" />
-            </el-col>
-          </el-row>
         </el-form-item>
       </el-form>
 
@@ -443,9 +413,7 @@ const addForm = ref({
   stock_name: '',
   market: 'A股',
   tags: [],
-  notes: '',
-  alert_price_high: null,
-  alert_price_low: null
+  notes: ''
 })
 
 const addRules = {
@@ -466,9 +434,7 @@ const editForm = ref({
   stock_name: '',
   market: 'A股',
   tags: [] as string[],
-  notes: '',
-  alert_price_high: null as number | null,
-  alert_price_low: null as number | null,
+  notes: ''
 })
 
 
@@ -657,9 +623,7 @@ const showAddDialog = () => {
     stock_name: '',
     market: 'A股',
     tags: [],
-    notes: '',
-    alert_price_high: null,
-    alert_price_low: null
+    notes: ''
   }
   addDialogVisible.value = true
 }
@@ -696,9 +660,7 @@ const handleUpdateFavorite = async () => {
     editLoading.value = true
     const payload = {
       tags: editForm.value.tags,
-      notes: editForm.value.notes,
-      alert_price_high: editForm.value.alert_price_high,
-      alert_price_low: editForm.value.alert_price_low
+      notes: editForm.value.notes
     }
     const res = await favoritesApi.update(editForm.value.stock_code, payload as any)
     if ((res as any)?.success === false) throw new Error((res as any)?.message || '更新失败')
@@ -720,9 +682,7 @@ const editFavorite = (row: any) => {
     stock_name: row.stock_name,
     market: row.market || 'A股',
     tags: Array.isArray(row.tags) ? [...row.tags] : [],
-    notes: row.notes || '',
-    alert_price_high: row.alert_price_high ?? null,
-    alert_price_low: row.alert_price_low ?? null,
+    notes: row.notes || ''
   }
   editDialogVisible.value = true
 }

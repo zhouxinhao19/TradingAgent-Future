@@ -68,6 +68,97 @@
         </el-alert>
       </div>
 
+      <!-- 关键指标 -->
+      <el-card class="metrics-card" shadow="never">
+        <template #header>
+          <div class="card-header">
+            <el-icon><TrendCharts /></el-icon>
+            <span>关键指标</span>
+          </div>
+        </template>
+        <div class="metrics-content">
+          <el-row :gutter="24">
+            <!-- 投资建议 -->
+            <el-col :span="8">
+              <div class="metric-item">
+                <div class="metric-label">
+                  <el-icon><TrendCharts /></el-icon>
+                  投资建议
+                </div>
+                <div class="metric-value recommendation-value markdown-content" v-html="renderMarkdown(report.recommendation || '暂无')"></div>
+              </div>
+            </el-col>
+
+            <!-- 置信度评分 -->
+            <el-col :span="8">
+              <div class="metric-item confidence-item">
+                <div class="metric-label">
+                  <el-icon><DataAnalysis /></el-icon>
+                  置信度评分
+                </div>
+                <div class="confidence-display">
+                  <el-progress
+                    type="circle"
+                    :percentage="normalizeConfidenceScore(report.confidence_score || 0)"
+                    :width="120"
+                    :stroke-width="10"
+                    :color="getConfidenceColor(normalizeConfidenceScore(report.confidence_score || 0))"
+                  >
+                    <template #default="{ percentage }">
+                      <span class="confidence-text">
+                        <span class="confidence-number">{{ percentage }}</span>
+                        <span class="confidence-unit">分</span>
+                      </span>
+                    </template>
+                  </el-progress>
+                  <div class="confidence-label">{{ getConfidenceLabel(normalizeConfidenceScore(report.confidence_score || 0)) }}</div>
+                </div>
+              </div>
+            </el-col>
+
+            <!-- 风险等级 -->
+            <el-col :span="8">
+              <div class="metric-item risk-item">
+                <div class="metric-label">
+                  <el-icon><Warning /></el-icon>
+                  风险等级
+                </div>
+                <div class="risk-display">
+                  <div class="risk-stars">
+                    <el-icon
+                      v-for="star in 5"
+                      :key="star"
+                      class="star-icon"
+                      :class="{ active: star <= getRiskStars(report.risk_level || '中等') }"
+                    >
+                      <StarFilled />
+                    </el-icon>
+                  </div>
+                  <div class="risk-label" :style="{ color: getRiskColor(report.risk_level || '中等') }">
+                    {{ report.risk_level || '中等' }}风险
+                  </div>
+                  <div class="risk-description">{{ getRiskDescription(report.risk_level || '中等') }}</div>
+                </div>
+              </div>
+            </el-col>
+          </el-row>
+
+          <!-- 关键要点 -->
+          <div v-if="report.key_points && report.key_points.length > 0" class="key-points">
+            <h4>
+              <el-icon><List /></el-icon>
+              关键要点
+            </h4>
+            <ul>
+              <li v-for="(point, index) in report.key_points" :key="index">
+                <el-icon class="point-icon"><Check /></el-icon>
+                {{ point }}
+              </li>
+            </ul>
+          </div>
+        </div>
+      </el-card>
+
       <!-- 报告摘要 -->
       <el-card v-if="report.summary" class="summary-card" shadow="never">
         <template #header>
@@ -77,47 +168,6 @@
           </div>
         </template>
         <div class="summary-content markdown-content" v-html="renderMarkdown(report.summary)"></div>
-      </el-card>
-
-      <!-- 关键指标 -->
-      <el-card v-if="report.key_points && report.key_points.length > 0" class="metrics-card" shadow="never">
-        <template #header>
-          <div class="card-header">
-            <el-icon><TrendCharts /></el-icon>
-            <span>关键要点</span>
-          </div>
-        </template>
-        <div class="metrics-content">
-          <el-row :gutter="16">
-            <el-col :span="8">
-              <div class="metric-item">
-                <div class="metric-label">投资建议</div>
-                <div class="metric-value markdown-content" v-html="renderMarkdown(report.recommendation || '暂无')"></div>
-              </div>
-            </el-col>
-            <el-col :span="8">
-              <div class="metric-item">
-                <div class="metric-label">信心评分</div>
-                <div class="metric-value">{{ report.confidence_score || 0 }}%</div>
-              </div>
-            </el-col>
-            <el-col :span="8">
-              <div class="metric-item">
-                <div class="metric-label">风险等级</div>
-                <div class="metric-value">{{ report.risk_level || '中等' }}</div>
-              </div>
-            </el-col>
-          </el-row>
-          
-          <div class="key-points">
-            <h4>关键要点：</h4>
-            <ul>
-              <li v-for="(point, index) in report.key_points" :key="index">
-                {{ point }}
-              </li>
-            </ul>
-          </div>
-        </div>
       </el-card>
 
       <!-- 报告模块 -->
@@ -180,7 +230,12 @@ import {
   TrendCharts,
   Files,
   ShoppingCart,
-  WarningFilled
+  WarningFilled,
+  DataAnalysis,
+  Warning,
+  StarFilled,
+  List,
+  Check
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { marked } from 'marked'
@@ -577,6 +632,65 @@ const renderMarkdown = (content: string) => {
   }
 }
 
+// 置信度评分相关函数
+// 将后端返回的 0-1 小数转换为 0-100 的百分制
+const normalizeConfidenceScore = (score: number) => {
+  // 如果已经是 0-100 的范围，直接返回
+  if (score > 1) {
+    return Math.round(score)
+  }
+  // 如果是 0-1 的小数，转换为百分制
+  return Math.round(score * 100)
+}
+
+const getConfidenceColor = (score: number) => {
+  if (score >= 80) return '#67C23A' // 高信心 - 绿色
+  if (score >= 60) return '#409EFF' // 中高信心 - 蓝色
+  if (score >= 40) return '#E6A23C' // 中等信心 - 橙色
+  return '#F56C6C' // 低信心 - 红色
+}
+
+const getConfidenceLabel = (score: number) => {
+  if (score >= 80) return '高信心'
+  if (score >= 60) return '中高信心'
+  if (score >= 40) return '中等信心'
+  return '低信心'
+}
+
+// 风险等级相关函数
+const getRiskStars = (riskLevel: string) => {
+  const riskMap: Record<string, number> = {
+    '低': 1,
+    '中低': 2,
+    '中等': 3,
+    '中高': 4,
+    '高': 5
+  }
+  return riskMap[riskLevel] || 3
+}
+
+const getRiskColor = (riskLevel: string) => {
+  const colorMap: Record<string, string> = {
+    '低': '#67C23A',      // 绿色
+    '中低': '#95D475',    // 浅绿色
+    '中等': '#E6A23C',    // 橙色
+    '中高': '#F56C6C',    // 红色
+    '高': '#F56C6C'       // 深红色
+  }
+  return colorMap[riskLevel] || '#E6A23C'
+}
+
+const getRiskDescription = (riskLevel: string) => {
+  const descMap: Record<string, string> = {
+    '低': '风险较小，适合稳健投资者',
+    '中低': '风险可控，适合大多数投资者',
+    '中等': '风险适中，需要谨慎评估',
+    '中高': '风险较高，需要密切关注',
+    '高': '风险很高，建议谨慎投资'
+  }
+  return descMap[riskLevel] || '请根据自身风险承受能力决策'
+}
+
 // 生命周期
 onMounted(() => {
   fetchReportDetail()
@@ -720,14 +834,30 @@ onMounted(() => {
     .metrics-content {
       .metric-item {
         text-align: center;
-        padding: 16px;
+        padding: 24px;
         border: 1px solid var(--el-border-color-light);
-        border-radius: 8px;
+        border-radius: 12px;
+        background: var(--el-fill-color-blank);
+        transition: all 0.3s ease;
+
+        &:hover {
+          box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+          transform: translateY(-2px);
+        }
 
         .metric-label {
-          font-size: 14px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          font-size: 15px;
+          font-weight: 500;
           color: var(--el-text-color-regular);
-          margin-bottom: 8px;
+          margin-bottom: 16px;
+
+          .el-icon {
+            font-size: 18px;
+          }
         }
 
         .metric-value {
@@ -735,25 +865,150 @@ onMounted(() => {
           font-weight: 600;
           color: var(--el-color-primary);
         }
+
+        .recommendation-value {
+          font-size: 16px;
+          line-height: 1.6;
+          color: var(--el-text-color-primary);
+        }
+      }
+
+      // 置信度评分样式
+      .confidence-item {
+        .confidence-display {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 12px;
+
+          .el-progress {
+            margin-bottom: 8px;
+          }
+
+          .confidence-text {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            line-height: 1;
+
+            .confidence-number {
+              font-size: 32px;
+              font-weight: 700;
+            }
+
+            .confidence-unit {
+              font-size: 14px;
+              margin-top: 4px;
+              opacity: 0.8;
+            }
+          }
+
+          .confidence-label {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--el-text-color-primary);
+          }
+        }
+      }
+
+      // 风险等级样式
+      .risk-item {
+        .risk-display {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 12px;
+
+          .risk-stars {
+            display: flex;
+            gap: 8px;
+            font-size: 28px;
+
+            .star-icon {
+              color: #DCDFE6;
+              transition: all 0.3s ease;
+
+              &.active {
+                color: #F7BA2A;
+                animation: starPulse 0.6s ease-in-out;
+              }
+            }
+          }
+
+          .risk-label {
+            font-size: 18px;
+            font-weight: 700;
+            margin-top: 4px;
+          }
+
+          .risk-description {
+            font-size: 13px;
+            color: var(--el-text-color-secondary);
+            text-align: center;
+            line-height: 1.4;
+            max-width: 200px;
+          }
+        }
       }
 
       .key-points {
-        margin-top: 24px;
+        margin-top: 32px;
+        padding-top: 24px;
+        border-top: 1px solid var(--el-border-color-lighter);
 
         h4 {
-          margin: 0 0 12px 0;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin: 0 0 16px 0;
+          font-size: 16px;
+          font-weight: 600;
           color: var(--el-text-color-primary);
+
+          .el-icon {
+            font-size: 18px;
+            color: var(--el-color-primary);
+          }
         }
 
         ul {
           margin: 0;
-          padding-left: 20px;
+          padding: 0;
+          list-style: none;
 
           li {
-            margin-bottom: 8px;
-            line-height: 1.5;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin-bottom: 12px;
+            padding: 12px;
+            background: var(--el-fill-color-light);
+            border-radius: 8px;
+            line-height: 1.6;
+            transition: all 0.2s ease;
+
+            &:hover {
+              background: var(--el-fill-color);
+            }
+
+            .point-icon {
+              flex-shrink: 0;
+              margin-top: 2px;
+              font-size: 16px;
+              color: var(--el-color-success);
+            }
           }
         }
+      }
+    }
+
+    // 星星脉冲动画
+    @keyframes starPulse {
+      0%, 100% {
+        transform: scale(1);
+      }
+      50% {
+        transform: scale(1.2);
       }
     }
 

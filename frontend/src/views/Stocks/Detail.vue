@@ -181,7 +181,13 @@
             <div class="fact"><span>行业</span><b>{{ basics.industry }}</b></div>
             <div class="fact"><span>板块</span><b>{{ basics.sector }}</b></div>
             <div class="fact"><span>总市值</span><b>{{ fmtAmount(basics.marketCap) }}</b></div>
-            <div class="fact"><span>PE(TTM)</span><b>{{ Number.isFinite(basics.pe) ? basics.pe.toFixed(2) : '-' }}</b></div>
+            <div class="fact">
+              <span>PE(TTM)</span>
+              <b>
+                {{ Number.isFinite(basics.pe) ? basics.pe.toFixed(2) : '-' }}
+                <el-tag v-if="basics.peIsRealtime" type="success" size="small" style="margin-left: 4px">实时</el-tag>
+              </b>
+            </div>
             <div class="fact"><span>ROE</span><b>{{ fmtPercent(basics.roe) }}</b></div>
             <div class="fact"><span>负债率</span><b>{{ fmtPercent(basics.debtRatio) }}</b></div>
           </div>
@@ -385,8 +391,13 @@ async function fetchFundamentals() {
     // 优先使用 pe_ttm，其次 pe
     basics.pe = Number.isFinite(f.pe_ttm) ? Number(f.pe_ttm) : (Number.isFinite(f.pe) ? Number(f.pe) : basics.pe)
     basics.roe = Number.isFinite(f.roe) ? Number(f.roe) : basics.roe
-const ff: any = f
-basics.debtRatio = Number.isFinite(ff.debt_ratio) ? Number(ff.debt_ratio) : basics.debtRatio
+    const ff: any = f
+    basics.debtRatio = Number.isFinite(ff.debt_ratio) ? Number(ff.debt_ratio) : basics.debtRatio
+
+    // 获取PE/PB的实时标识
+    basics.peIsRealtime = ff.pe_is_realtime || false
+    basics.peSource = ff.pe_source || ''
+    basics.peUpdatedAt = ff.pe_updated_at || null
   } catch (e) {
     console.error('获取基本面失败', e)
   }
@@ -530,7 +541,10 @@ const basics = reactive({
   marketCap: NaN,
   pe: NaN,
   roe: NaN,
-  debtRatio: NaN
+  debtRatio: NaN,
+  peIsRealtime: false,  // PE是否为实时数据
+  peSource: '',         // PE数据来源
+  peUpdatedAt: null     // PE更新时间
 })
 
 // 操作

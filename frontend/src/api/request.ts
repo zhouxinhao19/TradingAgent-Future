@@ -134,7 +134,8 @@ const createAxiosInstance = (): AxiosInstance => {
         }
       }
 
-      return response
+      // 返回 response.data 而不是 response，这样调用方可以直接访问 ApiResponse
+      return response.data
     },
     async (error) => {
       const appStore = useAppStore()
@@ -338,8 +339,8 @@ export class ApiClient {
     params?: any,
     config?: RequestConfig
   ): Promise<ApiResponse<T>> {
-    const response = await request.get(url, { params, ...config })
-    return response.data
+    // 响应拦截器已经返回 response.data，所以这里直接返回
+    return await request.get(url, { params, ...config })
   }
 
   // POST请求
@@ -348,8 +349,8 @@ export class ApiClient {
     data?: any,
     config?: RequestConfig
   ): Promise<ApiResponse<T>> {
-    const response = await request.post(url, data, config)
-    return response.data
+    // 响应拦截器已经返回 response.data，所以这里直接返回
+    return await request.post(url, data, config)
   }
 
   // PUT请求
@@ -358,8 +359,8 @@ export class ApiClient {
     data?: any,
     config?: RequestConfig
   ): Promise<ApiResponse<T>> {
-    const response = await request.put(url, data, config)
-    return response.data
+    // 响应拦截器已经返回 response.data，所以这里直接返回
+    return await request.put(url, data, config)
   }
 
   // DELETE请求
@@ -367,8 +368,8 @@ export class ApiClient {
     url: string,
     config?: RequestConfig
   ): Promise<ApiResponse<T>> {
-    const response = await request.delete(url, config)
-    return response.data
+    // 响应拦截器已经返回 response.data，所以这里直接返回
+    return await request.delete(url, config)
   }
 
   // PATCH请求
@@ -377,8 +378,8 @@ export class ApiClient {
     data?: any,
     config?: RequestConfig
   ): Promise<ApiResponse<T>> {
-    const response = await request.patch(url, data, config)
-    return response.data
+    // 响应拦截器已经返回 response.data，所以这里直接返回
+    return await request.patch(url, data, config)
   }
 
   // 上传文件
@@ -391,7 +392,8 @@ export class ApiClient {
     const formData = new FormData()
     formData.append('file', file)
 
-    const response = await request.post(url, formData, {
+    // 响应拦截器已经返回 response.data，所以这里直接返回
+    return await request.post(url, formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       },
@@ -403,8 +405,6 @@ export class ApiClient {
       },
       ...config
     })
-
-    return response.data
   }
 
   // 下载文件
@@ -413,12 +413,13 @@ export class ApiClient {
     filename?: string,
     config?: RequestConfig
   ): Promise<void> {
-    const response = await request.get(url, {
+    // 对于 blob 响应，响应拦截器返回的就是 blob 数据
+    const blobData = await request.get(url, {
       responseType: 'blob',
       ...config
     })
 
-    const blob = new Blob([response.data])
+    const blob = new Blob([blobData])
     const downloadUrl = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = downloadUrl

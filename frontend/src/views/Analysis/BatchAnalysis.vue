@@ -193,39 +193,13 @@
             </template>
 
             <div class="config-content">
-              <!-- AI模型配置 -->
-              <div class="config-section">
-                <h4 class="config-title">🤖 AI模型配置</h4>
-                <div class="model-config">
-                  <div class="model-item">
-                    <div class="model-label">
-                      <span>快速分析模型</span>
-                      <el-tooltip content="用于市场分析、新闻分析等" placement="top">
-                        <el-icon class="help-icon"><InfoFilled /></el-icon>
-                      </el-tooltip>
-                    </div>
-                    <el-select v-model="modelSettings.quickAnalysisModel" size="small" style="width: 100%">
-                      <el-option label="qwen-turbo" value="qwen-turbo" />
-                      <el-option label="qwen-plus" value="qwen-plus" />
-                      <el-option label="qwen-max" value="qwen-max" />
-                    </el-select>
-                  </div>
-
-                  <div class="model-item">
-                    <div class="model-label">
-                      <span>深度分析模型</span>
-                      <el-tooltip content="用于基本面分析、综合分析等" placement="top">
-                        <el-icon class="help-icon"><InfoFilled /></el-icon>
-                      </el-tooltip>
-                    </div>
-                    <el-select v-model="modelSettings.deepAnalysisModel" size="small" style="width: 100%">
-                      <el-option label="qwen-plus" value="qwen-plus" />
-                      <el-option label="qwen-max" value="qwen-max" />
-                      <el-option label="qwen-turbo" value="qwen-turbo" />
-                    </el-select>
-                  </div>
-                </div>
-              </div>
+              <!-- AI模型配置组件 -->
+              <ModelConfig
+                v-model:quick-analysis-model="modelSettings.quickAnalysisModel"
+                v-model:deep-analysis-model="modelSettings.deepAnalysisModel"
+                :available-models="availableModels"
+                :analysis-depth="batchForm.depth"
+              />
 
               <!-- 分析选项 -->
               <div class="config-section">
@@ -309,12 +283,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Files, TrendCharts, Check, Close, InfoFilled } from '@element-plus/icons-vue'
+import { Files, TrendCharts, Check, Close } from '@element-plus/icons-vue'
 import { ANALYSTS, DEFAULT_ANALYSTS, convertAnalystNamesToIds } from '@/constants/analysts'
 import { configApi } from '@/api/config'
 import { useRouter, useRoute } from 'vue-router'
+import ModelConfig from '@/components/ModelConfig.vue'
+
+// 路由实例（必须在顶层调用）
+const router = useRouter()
+const route = useRoute()
 
 const submitting = ref(false)
 const stockInput = ref('')
@@ -327,6 +306,9 @@ const modelSettings = ref({
   quickAnalysisModel: 'qwen-turbo',
   deepAnalysisModel: 'qwen-max'
 })
+
+// 可用的模型列表（从配置中获取）
+const availableModels = ref<any[]>([])
 
 const batchForm = reactive({
   title: '',
@@ -366,9 +348,20 @@ const clearStocks = () => {
 // 初始化模型设置
 const initializeModelSettings = async () => {
   try {
+    // 获取默认模型
     const defaultModels = await configApi.getDefaultModels()
     modelSettings.value.quickAnalysisModel = defaultModels.quick_analysis_model
     modelSettings.value.deepAnalysisModel = defaultModels.deep_analysis_model
+
+    // 获取所有可用的模型列表
+    const llmConfigs = await configApi.getLLMConfigs()
+    availableModels.value = llmConfigs.filter((config: any) => config.enabled)
+
+    console.log('✅ 加载模型配置成功:', {
+      quick: modelSettings.value.quickAnalysisModel,
+      deep: modelSettings.value.deepAnalysisModel,
+      available: availableModels.value.length
+    })
   } catch (error) {
     console.error('加载默认模型配置失败:', error)
     // 使用硬编码的默认值
@@ -378,9 +371,8 @@ const initializeModelSettings = async () => {
 }
 
 // 页面初始化
-const route = useRoute()
-onMounted(() => {
-  initializeModelSettings()
+onMounted(async () => {
+  await initializeModelSettings()
 
   // 读取路由查询参数以便从筛选页预填充
   const q = route.query as any
@@ -440,8 +432,8 @@ const submitBatchAnalysis = async () => {
     return
   }
 
-  if (stockCodes.value.length > 100) {
-    ElMessage.warning('单次批量分析最多支持100只股票')
+  if (stockCodes.value.length > 10) {
+    ElMessage.warning('单次批量分析最多支持10只股票，请减少股票数量')
     return
   }
 
@@ -486,14 +478,32 @@ const submitBatchAnalysis = async () => {
 
     const { batch_id, total_tasks } = response.data
 
-    ElMessage.success(`批量分析任务已提交，共${total_tasks}只股票`)
+    // 显示成功提示并引导用户去任务中心
+    ElMessageBox.confirm(
+      `✅ 批量分析任务已成功提交！\n\n📊 股票数量：${total_tasks}只\n📋 批次ID：${batch_id}\n\n任务正在后台执行中，最多同时执行3个任务，其他任务会自动排队等待。\n\n是否前往任务中心查看进度？`,
+      '提交成功',
+      {
+        confirmButtonText: '前往任务中心',
+        cancelButtonText: '留在当前页面',
+        type: 'success',
+        distinguishCancelAndClose: true,
+        closeOnClickModal: false
+      }
+    ).then(() => {
+      // 用户点击"前往任务中心"
+      router.push({ path: '/tasks', query: { batch_id } })
+    }).catch((action) => {
+      // 用户点击"留在当前页面"或关闭对话框
+      if (action === 'cancel') {
+        ElMessage.info('任务正在后台执行，您可以随时前往任务中心查看进度')
+      }
+    })
 
-    // 跳转到队列管理页面并携带batch_id
-    const router = useRouter()
-    router.push({ path: '/queue', query: { batch_id } })
-    
-  } catch {
-    // 用户取消
+  } catch (error: any) {
+    // 处理错误
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '批量分析提交失败')
+    }
   } finally {
     submitting.value = false
   }
@@ -577,6 +587,77 @@ const resetForm = () => {
 
       :deep(.el-card__body) {
         padding: 24px;
+      }
+    }
+
+    // 右侧高级配置卡片样式
+    .advanced-config-card {
+      border-radius: 16px;
+      border: none;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+
+      :deep(.el-card__header) {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        color: white;
+        border-radius: 16px 16px 0 0;
+        padding: 20px 24px;
+
+        .card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+
+          h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+          }
+        }
+      }
+
+      :deep(.el-card__body) {
+        padding: 24px;
+      }
+
+      .config-content {
+        .config-section {
+          margin-bottom: 24px;
+
+          &:last-child {
+            margin-bottom: 0;
+          }
+
+          .analysis-options {
+            .option-item {
+              display: flex;
+              align-items: flex-start;
+              gap: 12px;
+              padding: 12px 0;
+              border-bottom: 1px solid #f3f4f6;
+
+              &:last-child {
+                border-bottom: none;
+                padding-bottom: 0;
+              }
+
+              .option-content {
+                flex: 1;
+
+                .option-name {
+                  font-size: 14px;
+                  font-weight: 500;
+                  color: #374151;
+                  margin-bottom: 2px;
+                }
+
+                .option-desc {
+                  font-size: 12px;
+                  color: #6b7280;
+                }
+              }
+            }
+          }
+        }
       }
     }
 
@@ -690,26 +771,6 @@ const resetForm = () => {
                   color: #6b7280;
                 }
               }
-            }
-          }
-        }
-      }
-
-      .model-config {
-        .model-item {
-          margin-bottom: 16px;
-
-          .model-label {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 8px;
-            font-size: 13px;
-            color: #374151;
-
-            .help-icon {
-              color: #9ca3af;
-              cursor: help;
             }
           }
         }

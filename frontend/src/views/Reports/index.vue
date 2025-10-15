@@ -28,10 +28,10 @@
         </el-col>
         
         <el-col :span="4">
-          <el-select v-model="statusFilter" placeholder="状态筛选" clearable>
-            <el-option label="已完成" value="completed" />
-            <el-option label="处理中" value="processing" />
-            <el-option label="失败" value="failed" />
+          <el-select v-model="marketFilter" placeholder="市场筛选" clearable @change="handleMarketChange">
+            <el-option label="A股" value="A股" />
+            <el-option label="港股" value="港股" />
+            <el-option label="美股" value="美股" />
           </el-select>
         </el-col>
         
@@ -182,7 +182,7 @@ const authStore = useAuthStore()
 // 响应式数据
 const loading = ref(false)
 const searchKeyword = ref('')
-const statusFilter = ref('')
+const marketFilter = ref('')
 const dateRange = ref<[string, string] | null>(null)
 const selectedReports = ref([])
 const currentPage = ref(1)
@@ -209,8 +209,8 @@ const fetchReports = async () => {
     if (searchKeyword.value) {
       params.append('search_keyword', searchKeyword.value)
     }
-    if (statusFilter.value) {
-      params.append('status_filter', statusFilter.value)
+    if (marketFilter.value) {
+      params.append('market_filter', marketFilter.value)
     }
     if (dateRange.value) {
       params.append('start_date', dateRange.value[0])
@@ -251,6 +251,11 @@ const handleSearch = () => {
 }
 
 const handleDateChange = () => {
+  currentPage.value = 1
+  fetchReports()
+}
+
+const handleMarketChange = () => {
   currentPage.value = 1
   fetchReports()
 }

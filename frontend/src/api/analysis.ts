@@ -3,7 +3,7 @@
  * 股票分析API
  */
 
-import { request } from './request'
+import { request, type ApiResponse } from './request'
 
 // 分析相关类型定义
 export interface AnalysisRequest {
@@ -123,12 +123,12 @@ export const analysisApi = {
   },
 
   // 开始单股分析（使用后端期望的格式）
-  startSingleAnalysis(analysisRequest: SingleAnalysisRequest): Promise<{ success: boolean; data: any; message: string }> {
+  startSingleAnalysis(analysisRequest: SingleAnalysisRequest): Promise<ApiResponse<any>> {
     return request.post('/api/analysis/single', analysisRequest)
   },
 
   // 获取任务状态
-  getTaskStatus(taskId: string): Promise<{ success: boolean; data: any; message: string }> {
+  getTaskStatus(taskId: string): Promise<ApiResponse<any>> {
     return request.get(`/api/analysis/tasks/${taskId}/status`)
   },
 
@@ -181,7 +181,7 @@ export const analysisApi = {
     symbols?: string[]  // 主字段：股票代码列表
     stock_codes?: string[]  // 兼容字段（已废弃）
     parameters?: SingleAnalysisRequest['parameters']
-  }): Promise<{ success: boolean; data: { batch_id: string; total_tasks: number; task_ids: string[]; status: string }; message: string }>{
+  }): Promise<ApiResponse<{ batch_id: string; total_tasks: number; task_ids: string[]; mapping?: any[]; status: string }>>{
     return request.post('/api/analysis/batch', batchRequest)
   },
 

@@ -115,6 +115,13 @@ class EnhancedScreeningService:
                 except Exception as enrich_err:
                     logger.warning(f"实时行情富集失败（已忽略）: {enrich_err}")
 
+            # 为筛选结果添加实时PE/PB
+            if items:
+                try:
+                    items = await self._enrich_results_with_realtime_metrics(items)
+                except Exception as enrich_err:
+                    logger.warning(f"实时PE/PB富集失败（已忽略）: {enrich_err}")
+
             # 计算耗时
             took_ms = int((time.time() - start_time) * 1000)
 
@@ -201,6 +208,54 @@ class EnhancedScreeningService:
     ) -> Dict[str, Any]:
         """Delegate condition conversion to utils."""
         return _convert_to_traditional_util(conditions)
+
+    async def _enrich_results_with_realtime_metrics(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        为筛选结果添加实时PE/PB
+
+        Args:
+            items: 筛选结果列表
+
+        Returns:
+            List[Dict]: 富集后的结果列表
+        """
+        from tradingagents.dataflows.realtime_metrics import calculate_realtime_pe_pb
+        import asyncio
+
+        db = get_mongo_db()
+
+        # 批量计算实时PE/PB
+        for item in items:
+            code = item.get("code") or item.get("symbol")
+            if code:
+                try:
+                    # 在线程池中执行同步计算
+                    realtime_metrics = await asyncio.to_thread(
+                        calculate_realtime_pe_pb,
+                        code,
+                        db.client
+                    )
+
+                    if realtime_metrics:
+                        # 更新PE/PB（如果实时计算成功）
+                        if realtime_metrics.get("pe") is not None:
+                            item["pe"] = realtime_metrics.get("pe")
+                        if realtime_metrics.get("pb") is not None:
+                            item["pb"] = realtime_metrics.get("pb")
+                        if realtime_metrics.get("pe_ttm") is not None:
+                            item["pe_ttm"] = realtime_metrics.get("pe_ttm")
+                        if realtime_metrics.get("pb_mrq") is not None:
+                            item["pb_mrq"] = realtime_metrics.get("pb_mrq")
+
+                        # 添加实时标识
+                        item["pe_is_realtime"] = realtime_metrics.get("is_realtime", False)
+                        item["pe_source"] = realtime_metrics.get("source", "unknown")
+
+                except Exception as e:
+                    logger.debug(f"计算股票 {code} 的实时PE/PB失败: {e}")
+                    # 保持原有数据，不影响其他字段
+
+        return items
 
     async def get_field_info(self, field: str) -> Optional[Dict[str, Any]]:
         """

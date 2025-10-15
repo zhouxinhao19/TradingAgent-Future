@@ -452,8 +452,14 @@ class SimpleAnalysisService:
         # 进度跟踪器缓存
         self._progress_trackers: Dict[str, RedisProgressTracker] = {}
 
+        # 🔧 创建共享的线程池，支持并发执行多个分析任务
+        # 默认最多同时执行3个分析任务（可根据服务器资源调整）
+        import concurrent.futures
+        self._thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=3)
+
         logger.info(f"🔧 [服务初始化] SimpleAnalysisService 实例ID: {id(self)}")
         logger.info(f"🔧 [服务初始化] 内存管理器实例ID: {id(self.memory_manager)}")
+        logger.info(f"🔧 [服务初始化] 线程池最大并发数: 3")
 
         # 设置 WebSocket 管理器
         # 简单的股票名称缓存，减少重复查询
@@ -523,23 +529,27 @@ class SimpleAnalysisService:
             return PyObjectId(new_object_id)
 
     def _get_trading_graph(self, config: Dict[str, Any]) -> TradingAgentsGraph:
-        """获取或创建TradingAgents实例 - 完全复制web目录的创建方式"""
-        config_key = str(sorted(config.items()))
+        """获取或创建TradingAgents实例
 
-        if config_key not in self._trading_graph_cache:
-            logger.info(f"创建新的TradingAgents实例...")
+        ⚠️ 注意：为了避免并发执行时的数据混淆，每次都创建新实例
+        虽然这会增加一些初始化开销，但可以确保线程安全
 
-            # 直接使用完整配置，不再合并DEFAULT_CONFIG（因为create_analysis_config已经处理了）
-            # 这与web目录的方式一致
-            self._trading_graph_cache[config_key] = TradingAgentsGraph(
-                selected_analysts=config.get("selected_analysts", ["market", "fundamentals"]),
-                debug=config.get("debug", False),
-                config=config
-            )
+        TradingAgentsGraph 实例包含可变状态（self.ticker, self.curr_state等），
+        如果多个线程共享同一个实例，会导致数据混淆。
+        """
+        # 🔧 [并发安全] 每次都创建新实例，避免多线程共享状态
+        # 不再使用缓存，因为 TradingAgentsGraph 有可变的实例变量
+        logger.info(f"🔧 创建新的TradingAgents实例（并发安全模式）...")
 
-            logger.info(f"✅ TradingAgents实例创建成功")
+        trading_graph = TradingAgentsGraph(
+            selected_analysts=config.get("selected_analysts", ["market", "fundamentals"]),
+            debug=config.get("debug", False),
+            config=config
+        )
 
-        return self._trading_graph_cache[config_key]
+        logger.info(f"✅ TradingAgents实例创建成功（实例ID: {id(trading_graph)}）")
+
+        return trading_graph
 
     async def create_analysis_task(
         self,
@@ -551,16 +561,21 @@ class SimpleAnalysisService:
             # 生成任务ID
             task_id = str(uuid.uuid4())
 
-            logger.info(f"📝 创建分析任务: {task_id} - {request.stock_code}")
+            # 🔧 使用 get_symbol() 方法获取股票代码（兼容 symbol 和 stock_code 字段）
+            stock_code = request.get_symbol()
+            if not stock_code:
+                raise ValueError("股票代码不能为空")
+
+            logger.info(f"📝 创建分析任务: {task_id} - {stock_code}")
             logger.info(f"🔍 内存管理器实例ID: {id(self.memory_manager)}")
 
             # 在内存中创建任务状态
             task_state = await self.memory_manager.create_task(
                 task_id=task_id,
                 user_id=user_id,
-                stock_code=request.stock_code,
+                stock_code=stock_code,
                 parameters=request.parameters.model_dump() if request.parameters else {},
-                stock_name=(self._resolve_stock_name(request.stock_code) if hasattr(self, '_resolve_stock_name') else None),
+                stock_name=(self._resolve_stock_name(stock_code) if hasattr(self, '_resolve_stock_name') else None),
             )
 
             logger.info(f"✅ 任务状态已创建: {task_state.task_id}")
@@ -573,7 +588,7 @@ class SimpleAnalysisService:
                 logger.error(f"❌ 任务创建验证失败: 无法查询到刚创建的任务 {task_id}")
 
             # 补齐股票名称并写入数据库任务文档的初始记录
-            code = request.stock_code
+            code = stock_code
             name = self._resolve_stock_name(code) if hasattr(self, '_resolve_stock_name') else f"股票{code}"
 
             try:
@@ -622,10 +637,13 @@ class SimpleAnalysisService:
         request: SingleAnalysisRequest
     ):
         """在后台执行分析任务"""
+        # 🔧 使用 get_symbol() 方法获取股票代码（兼容 symbol 和 stock_code 字段）
+        stock_code = request.get_symbol()
+
         # 添加最外层的异常捕获，确保所有异常都被记录
         try:
             logger.info(f"🎯🎯🎯 [ENTRY] execute_analysis_background 方法被调用: {task_id}")
-            logger.info(f"🎯🎯🎯 [ENTRY] user_id={user_id}, stock_code={request.stock_code}")
+            logger.info(f"🎯🎯🎯 [ENTRY] user_id={user_id}, stock_code={stock_code}")
         except Exception as entry_error:
             print(f"❌❌❌ [CRITICAL] 日志记录失败: {entry_error}")
             import traceback
@@ -636,7 +654,7 @@ class SimpleAnalysisService:
             logger.info(f"🚀 开始后台执行分析任务: {task_id}")
 
             # 🔍 验证股票代码是否存在
-            logger.info(f"🔍 开始验证股票代码: {request.stock_code}")
+            logger.info(f"🔍 开始验证股票代码: {stock_code}")
             from tradingagents.utils.stock_validator import prepare_stock_data
             from datetime import datetime
 
@@ -663,7 +681,7 @@ class SimpleAnalysisService:
             # 验证股票代码并预获取数据
             validation_result = await asyncio.to_thread(
                 prepare_stock_data,
-                stock_code=request.stock_code,
+                stock_code=stock_code,
                 market_type=market_type,
                 period_days=30,
                 analysis_date=analysis_date
@@ -692,7 +710,7 @@ class SimpleAnalysisService:
 
                 return
 
-            logger.info(f"✅ 股票代码验证通过: {request.stock_code} - {validation_result.stock_name}")
+            logger.info(f"✅ 股票代码验证通过: {stock_code} - {validation_result.stock_name}")
             logger.info(f"📊 市场类型: {validation_result.market_type}")
             logger.info(f"📈 历史数据: {'有' if validation_result.has_historical_data else '无'}")
             logger.info(f"📋 基本信息: {'有' if validation_result.has_basic_info else '无'}")
@@ -846,20 +864,20 @@ class SimpleAnalysisService:
         request: SingleAnalysisRequest,
         progress_tracker: Optional[RedisProgressTracker] = None
     ) -> Dict[str, Any]:
-        """同步执行分析（在线程池中运行）"""
-        import concurrent.futures
-
-        # 在线程池中执行同步分析
+        """同步执行分析（在共享线程池中运行）"""
+        # 🔧 使用共享线程池，支持多个任务并发执行
+        # 不再每次创建新的线程池，避免串行执行
         loop = asyncio.get_event_loop()
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            result = await loop.run_in_executor(
-                executor,
-                self._run_analysis_sync,
-                task_id,
-                user_id,
-                request,
-                progress_tracker
-            )
+        logger.info(f"🚀 [线程池] 提交分析任务到共享线程池: {task_id} - {request.stock_code}")
+        result = await loop.run_in_executor(
+            self._thread_pool,  # 使用共享线程池
+            self._run_analysis_sync,
+            task_id,
+            user_id,
+            request,
+            progress_tracker
+        )
+        logger.info(f"✅ [线程池] 分析任务执行完成: {task_id}")
         return result
 
     def _run_analysis_sync(
@@ -2087,10 +2105,23 @@ class SimpleAnalysisService:
                         except Exception as fallback_error:
                             logger.warning(f"⚠️ 降级提取也失败: {fallback_error}")
 
+            # 🔥 根据股票代码推断市场类型
+            from tradingagents.utils.stock_utils import StockUtils
+            market_info = StockUtils.get_market_info(stock_symbol)
+            market_type_map = {
+                "china_a": "A股",
+                "hong_kong": "港股",
+                "us": "美股",
+                "unknown": "A股"  # 默认为A股
+            }
+            market_type = market_type_map.get(market_info.get("market", "unknown"), "A股")
+            logger.info(f"📊 推断市场类型: {stock_symbol} -> {market_type}")
+
             # 构建文档（与web目录的MongoDBReportManager保持一致）
             document = {
                 "analysis_id": analysis_id,
                 "stock_symbol": stock_symbol,
+                "market_type": market_type,  # 🔥 添加市场类型字段
                 "analysis_date": timestamp.strftime('%Y-%m-%d'),
                 "timestamp": timestamp,
                 "status": "completed",

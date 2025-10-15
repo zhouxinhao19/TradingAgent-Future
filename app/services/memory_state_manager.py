@@ -4,6 +4,7 @@
 """
 
 import asyncio
+import threading
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 import logging
@@ -95,7 +96,10 @@ class MemoryStateManager:
 
     def __init__(self):
         self._tasks: Dict[str, TaskState] = {}
-        self._lock = asyncio.Lock()
+        # 🔧 使用 threading.Lock 代替 asyncio.Lock，避免事件循环冲突
+        # 当在线程池中执行分析时，会创建新的事件循环，asyncio.Lock 会导致
+        # "is bound to a different event loop" 错误
+        self._lock = threading.Lock()
         self._websocket_manager = None
 
     def set_websocket_manager(self, websocket_manager):
@@ -111,7 +115,7 @@ class MemoryStateManager:
         stock_name: Optional[str] = None,
     ) -> TaskState:
         """创建新任务"""
-        async with self._lock:
+        with self._lock:
             # 计算预估总时长
             estimated_duration = self._calculate_estimated_duration(parameters or {})
 
@@ -174,8 +178,8 @@ class MemoryStateManager:
         return total_time
 
     async def update_task_status(
-        self, 
-        task_id: str, 
+        self,
+        task_id: str,
         status: TaskStatus,
         progress: Optional[int] = None,
         message: Optional[str] = None,
@@ -184,7 +188,7 @@ class MemoryStateManager:
         error_message: Optional[str] = None
     ) -> bool:
         """更新任务状态"""
-        async with self._lock:
+        with self._lock:
             if task_id not in self._tasks:
                 logger.warning(f"⚠️ 任务不存在: {task_id}")
                 return False
@@ -241,7 +245,7 @@ class MemoryStateManager:
     
     async def get_task(self, task_id: str) -> Optional[TaskState]:
         """获取任务状态"""
-        async with self._lock:
+        with self._lock:
             logger.debug(f"🔍 查询任务: {task_id}")
             logger.debug(f"📊 当前内存中任务数量: {len(self._tasks)}")
             logger.debug(f"🔑 内存中的任务ID列表: {list(self._tasks.keys())}")
@@ -264,7 +268,7 @@ class MemoryStateManager:
         offset: int = 0
     ) -> List[Dict[str, Any]]:
         """获取所有任务列表（不限用户）"""
-        async with self._lock:
+        with self._lock:
             tasks = []
             for task in self._tasks.values():
                 if status is None or task.status == status:
@@ -288,7 +292,7 @@ class MemoryStateManager:
         offset: int = 0
     ) -> List[Dict[str, Any]]:
         """获取用户的任务列表"""
-        async with self._lock:
+        with self._lock:
             tasks = []
             for task in self._tasks.values():
                 if task.user_id == user_id:
@@ -307,7 +311,7 @@ class MemoryStateManager:
     
     async def delete_task(self, task_id: str) -> bool:
         """删除任务"""
-        async with self._lock:
+        with self._lock:
             if task_id in self._tasks:
                 del self._tasks[task_id]
                 logger.info(f"🗑️ 删除任务: {task_id}")
@@ -316,7 +320,7 @@ class MemoryStateManager:
     
     async def get_statistics(self) -> Dict[str, Any]:
         """获取统计信息"""
-        async with self._lock:
+        with self._lock:
             total_tasks = len(self._tasks)
             status_counts = {}
             
@@ -334,7 +338,7 @@ class MemoryStateManager:
     
     async def cleanup_old_tasks(self, max_age_hours: int = 24) -> int:
         """清理旧任务"""
-        async with self._lock:
+        with self._lock:
             cutoff_time = datetime.now().timestamp() - (max_age_hours * 3600)
             tasks_to_remove = []
 
@@ -358,7 +362,7 @@ class MemoryStateManager:
         Returns:
             清理的任务数量
         """
-        async with self._lock:
+        with self._lock:
             cutoff_time = datetime.now().timestamp() - (max_running_hours * 3600)
             zombie_tasks = []
 
@@ -396,7 +400,7 @@ class MemoryStateManager:
         Returns:
             是否成功删除
         """
-        async with self._lock:
+        with self._lock:
             if task_id in self._tasks:
                 del self._tasks[task_id]
                 logger.info(f"🗑️ 任务已从内存中删除: {task_id}")
