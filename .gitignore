@@ -40,9 +40,26 @@ Thumbs.db
 
 # 数据文件
 *.csv
-*.json
 *.xlsx
 *.xls
+
+# JSON文件规则
+# 排除运行时数据和敏感配置，但保留代码必需的配置文件
+config/*.json
+!config/*.json.example
+data/**/*.json
+eval_results/**/*.json
+web/data/**/*.json
+web/eval_results/**/*.json
+web/config/*.json
+*.cache.json
+*_cache.json
+hk_stock_cache.json
+
+# 保留前端必需的JSON文件（已在前面的规则中处理）
+# !frontend/package*.json
+# !frontend/tsconfig*.json
+# !frontend/public/*.json
 
 # 项目特定目录
 # 注意：排除规则必须在忽略规则之前
