@@ -43,6 +43,9 @@ venv/
 .venv/
 ENV/
 env/
+
+# 环境变量文件（敏感信息，不应打包到镜像）
+.env
 .env.local
 .env.*.local
 

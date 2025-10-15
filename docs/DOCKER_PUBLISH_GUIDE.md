@@ -184,12 +184,20 @@ docker pull YOUR_DOCKERHUB_USERNAME/tradingagents-frontend:latest
 
 ### 2. 准备环境文件
 
+**重要**：Docker镜像中**不包含**`.env`文件（出于安全考虑），用户需要自己创建。
+
 创建`.env`文件（参考`.env.example`）：
 
 ```bash
 cp .env.example .env
 # 编辑.env文件，配置必要的环境变量
 ```
+
+必需的环境变量包括：
+- `JWT_SECRET` - JWT密钥
+- `OPENAI_API_KEY` - OpenAI API密钥（如果使用OpenAI）
+- `DEEPSEEK_API_KEY` - DeepSeek API密钥（如果使用DeepSeek）
+- 其他API密钥和配置
 
 ### 3. 启动服务
 
@@ -281,6 +289,30 @@ jobs:
 **注意**：需要在GitHub仓库设置中添加以下Secrets：
 - `DOCKERHUB_USERNAME` - 你的Docker Hub用户名
 - `DOCKERHUB_TOKEN` - 你的Docker Hub Access Token（在Docker Hub Settings → Security → New Access Token创建）
+
+## 安全说明
+
+### 环境变量和敏感信息
+
+**重要**：Docker镜像中**不包含**任何敏感信息：
+
+1. ✅ `.env`文件被`.dockerignore`排除，不会打包到镜像中
+2. ✅ API密钥、数据库密码等敏感信息需要在运行时通过环境变量注入
+3. ✅ 用户需要自己创建`.env`文件或通过docker-compose的`environment`配置
+
+### 不要做的事情
+
+❌ **不要**在Dockerfile中使用`COPY .env`
+❌ **不要**在镜像中硬编码API密钥
+❌ **不要**将包含敏感信息的配置文件打包到镜像
+❌ **不要**在GitHub仓库中提交`.env`文件
+
+### 推荐做法
+
+✅ 使用`env_file`在docker-compose中注入环境变量
+✅ 使用Docker Secrets（生产环境）
+✅ 使用环境变量管理工具（如Vault、AWS Secrets Manager）
+✅ 在`.env.example`中提供配置模板（不包含真实值）
 
 ## 镜像大小优化建议
 
