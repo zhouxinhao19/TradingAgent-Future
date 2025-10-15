@@ -52,7 +52,7 @@ services:
   # FastAPI后端服务
   backend:
     # 替换为你的Docker Hub用户名
-    image: YOUR_DOCKERHUB_USERNAME/tradingagents-backend:latest
+    image: hsliup/tradingagents-backend:latest
     container_name: tradingagents-backend
     restart: unless-stopped
     ports:
@@ -83,7 +83,7 @@ services:
   # Vue 3前端服务
   frontend:
     # 替换为你的Docker Hub用户名
-    image: YOUR_DOCKERHUB_USERNAME/tradingagents-frontend:latest
+    image: hsliup/tradingagents-frontend:latest
     container_name: tradingagents-frontend
     restart: unless-stopped
     ports:
