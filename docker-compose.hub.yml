@@ -44,10 +44,11 @@ services:
       - tradingagents_redis_data_v1:/data
     environment:
       TZ: "Asia/Shanghai"
+    command: redis-server --appendonly yes --requirepass tradingagents123
     networks:
       - tradingagents-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "tradingagents123", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -76,7 +77,8 @@ services:
       # Redis配置
       REDIS_HOST: "redis"
       REDIS_PORT: "6379"
-      REDIS_URL: "redis://redis:6379/0"
+      REDIS_PASSWORD: "tradingagents123"
+      REDIS_URL: "redis://:tradingagents123@redis:6379/0"
       DOCKER_CONTAINER: "true"
       # CORS配置
       CORS_ORIGINS: "http://localhost:3000,http://localhost:8080,http://localhost:5173"
