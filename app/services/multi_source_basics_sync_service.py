@@ -42,6 +42,7 @@ class DataSourcePriority(Enum):
 class SyncStats:
     """同步统计信息"""
     job: str = JOB_KEY
+    data_type: str = "stock_basics"  # 添加data_type字段以符合数据库索引要求
     status: str = "idle"
     started_at: Optional[str] = None
     finished_at: Optional[str] = None
@@ -80,24 +81,18 @@ class MultiSourceBasicsSyncService:
         """持久化同步状态"""
         stats["job"] = JOB_KEY
 
-        # 如果是开始状态，创建新记录
-        if stats.get("status") == "running":
-            # 插入新的历史记录
-            await db[STATUS_COLLECTION].insert_one(stats.copy())
-        else:
-            # 更新最新的记录（按started_at排序的最新一条）
-            latest_record = await db[STATUS_COLLECTION].find_one(
-                {"job": JOB_KEY},
-                sort=[("started_at", -1)]
-            )
-            if latest_record:
-                await db[STATUS_COLLECTION].update_one(
-                    {"_id": latest_record["_id"]},
-                    {"$set": stats}
-                )
-            else:
-                # 如果没有找到记录，插入新记录
-                await db[STATUS_COLLECTION].insert_one(stats.copy())
+        # 使用 upsert 来避免重复键错误
+        # 基于 data_type 和 job 进行更新或插入
+        filter_query = {
+            "data_type": stats.get("data_type", "stock_basics"),
+            "job": JOB_KEY
+        }
+
+        await db[STATUS_COLLECTION].update_one(
+            filter_query,
+            {"$set": stats},
+            upsert=True
+        )
 
         self._last_status = {k: v for k, v in stats.items() if k != "_id"}
 

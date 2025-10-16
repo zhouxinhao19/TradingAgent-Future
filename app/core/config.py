@@ -150,6 +150,12 @@ class Settings(BaseSettings):
     QUOTES_BACKFILL_ON_STARTUP: bool = Field(default=True)
     QUOTES_BACKFILL_ON_OFFHOURS: bool = Field(default=True)
 
+    # Tushare基础配置
+    TUSHARE_TOKEN: str = Field(default="", description="Tushare API Token")
+    TUSHARE_ENABLED: bool = Field(default=True, description="启用Tushare数据源")
+    TUSHARE_TIER: str = Field(default="standard", description="Tushare积分等级 (free/basic/standard/premium/vip)")
+    TUSHARE_RATE_LIMIT_SAFETY_MARGIN: float = Field(default=0.8, ge=0.1, le=1.0, description="速率限制安全边际")
+
     # Tushare统一数据同步配置
     TUSHARE_UNIFIED_ENABLED: bool = Field(default=True)
     TUSHARE_BASIC_INFO_SYNC_ENABLED: bool = Field(default=True)
@@ -167,10 +173,6 @@ class Settings(BaseSettings):
     TUSHARE_INIT_HISTORICAL_DAYS: int = Field(default=365, ge=1, le=3650, description="初始化历史数据天数")
     TUSHARE_INIT_BATCH_SIZE: int = Field(default=100, ge=10, le=1000, description="初始化批处理大小")
     TUSHARE_INIT_AUTO_START: bool = Field(default=False, description="应用启动时自动检查并初始化数据")
-
-    # Tushare速率限制配置
-    TUSHARE_TIER: str = Field(default="standard", description="Tushare积分等级 (free/basic/standard/premium/vip)")
-    TUSHARE_RATE_LIMIT_SAFETY_MARGIN: float = Field(default=0.8, ge=0.1, le=1.0, description="速率限制安全边际")
 
     # AKShare统一数据同步配置
     AKSHARE_UNIFIED_ENABLED: bool = Field(default=True, description="启用AKShare统一数据同步")
