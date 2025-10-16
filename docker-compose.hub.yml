@@ -85,6 +85,8 @@ services:
       MONGODB_DATABASE: "tradingagents"
       MONGODB_AUTH_SOURCE: "admin"
       MONGODB_URL: "mongodb://admin:tradingagents123@mongodb:27017/tradingagents?authSource=admin"
+      # MongoDB连接字符串（用于tradingagents.config.mongodb_storage）
+      MONGODB_CONNECTION_STRING: "mongodb://admin:tradingagents123@mongodb:27017/tradingagents?authSource=admin"
       # Redis配置
       REDIS_HOST: "redis"
       REDIS_PORT: "6379"
