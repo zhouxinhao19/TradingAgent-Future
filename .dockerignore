@@ -103,10 +103,12 @@ test/
 coverage/
 # 前端测试文件在构建时会被排除，这里不需要特别处理
 
-# 文档（不需要在镜像中）
-docs/
+# 文档（保留部署相关文档）
+# docs/ - 注释掉，因为需要部署指南
 *.md
 !README.md
+!docs/docker_deployment_guide.md
+!docs/auth_system_improvement.md
 
 # Docker相关
 Dockerfile.legacy
@@ -115,10 +117,12 @@ docker-compose.split.yml
 docker-compose.*.yml
 !docker-compose.v1.0.0.yml
 
-# 脚本（不需要在镜像中）
-scripts/
-*.sh
-*.ps1
+# 脚本（保留Python脚本，排除Shell脚本）
+# scripts/ - 注释掉，因为需要Python初始化脚本
+scripts/*.sh
+scripts/*.ps1
+scripts/build-and-publish-*.sh
+scripts/full_redeploy_*.sh
 
 # 配置示例文件
 .env.example

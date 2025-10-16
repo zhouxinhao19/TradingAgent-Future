@@ -26,6 +26,8 @@ RUN pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple && \
 COPY app ./app
 COPY tradingagents ./tradingagents
 COPY config ./config
+COPY scripts ./scripts
+COPY docs ./docs
 
 # 暴露后端端口（与docker-compose.v1.0.0.yml一致）
 EXPOSE 8000
