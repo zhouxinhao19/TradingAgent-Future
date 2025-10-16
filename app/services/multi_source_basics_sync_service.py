@@ -127,8 +127,14 @@ class MultiSourceBasicsSyncService:
 
             logger.info(f"Available data sources: {[adapter.name for adapter in available_adapters]}")
 
+            # 如果指定了优先数据源，记录日志
+            if preferred_sources:
+                logger.info(f"Using preferred data sources: {preferred_sources}")
+
             # Step 2: 尝试从数据源获取股票列表
-            stock_df, source_used = await asyncio.to_thread(manager.get_stock_list_with_fallback)
+            stock_df, source_used = await asyncio.to_thread(
+                manager.get_stock_list_with_fallback, preferred_sources
+            )
             if stock_df is None or getattr(stock_df, "empty", True):
                 raise RuntimeError("All data sources failed to provide stock list")
 
@@ -136,14 +142,16 @@ class MultiSourceBasicsSyncService:
             logger.info(f"Successfully fetched {len(stock_df)} stocks from {source_used}")
 
             # Step 3: 获取最新交易日期和财务数据
-            latest_trade_date = await asyncio.to_thread(manager.find_latest_trade_date_with_fallback)
+            latest_trade_date = await asyncio.to_thread(
+                manager.find_latest_trade_date_with_fallback, preferred_sources
+            )
             stats.last_trade_date = latest_trade_date
 
             daily_data_map = {}
             daily_source = ""
             if latest_trade_date:
                 daily_df, daily_source = await asyncio.to_thread(
-                    manager.get_daily_basic_with_fallback, latest_trade_date
+                    manager.get_daily_basic_with_fallback, latest_trade_date, preferred_sources
                 )
                 if daily_df is not None and not daily_df.empty:
                     for _, row in daily_df.iterrows():

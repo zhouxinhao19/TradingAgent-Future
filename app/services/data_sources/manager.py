@@ -48,8 +48,32 @@ class DataSourceManager:
                 logger.warning(f"Data source {adapter.name} is not available")
         return available
 
-    def get_stock_list_with_fallback(self) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
+    def get_stock_list_with_fallback(self, preferred_sources: Optional[List[str]] = None) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
+        """
+        获取股票列表，支持指定优先数据源
+
+        Args:
+            preferred_sources: 优先使用的数据源列表，例如 ['akshare', 'baostock']
+                             如果为 None，则按照默认优先级顺序
+
+        Returns:
+            (DataFrame, source_name) 或 (None, None)
+        """
         available_adapters = self.get_available_adapters()
+
+        # 如果指定了优先数据源，重新排序
+        if preferred_sources:
+            logger.info(f"Using preferred data sources: {preferred_sources}")
+            # 创建优先级映射
+            priority_map = {name: idx for idx, name in enumerate(preferred_sources)}
+            # 将指定的数据源排在前面，其他的保持原顺序
+            preferred = [a for a in available_adapters if a.name in priority_map]
+            others = [a for a in available_adapters if a.name not in priority_map]
+            # 按照 preferred_sources 的顺序排序
+            preferred.sort(key=lambda a: priority_map.get(a.name, 999))
+            available_adapters = preferred + others
+            logger.info(f"Reordered adapters: {[a.name for a in available_adapters]}")
+
         for adapter in available_adapters:
             try:
                 logger.info(f"Trying to fetch stock list from {adapter.name}")
@@ -61,8 +85,27 @@ class DataSourceManager:
                 continue
         return None, None
 
-    def get_daily_basic_with_fallback(self, trade_date: str) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
+    def get_daily_basic_with_fallback(self, trade_date: str, preferred_sources: Optional[List[str]] = None) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
+        """
+        获取每日基础数据，支持指定优先数据源
+
+        Args:
+            trade_date: 交易日期
+            preferred_sources: 优先使用的数据源列表
+
+        Returns:
+            (DataFrame, source_name) 或 (None, None)
+        """
         available_adapters = self.get_available_adapters()
+
+        # 如果指定了优先数据源，重新排序
+        if preferred_sources:
+            priority_map = {name: idx for idx, name in enumerate(preferred_sources)}
+            preferred = [a for a in available_adapters if a.name in priority_map]
+            others = [a for a in available_adapters if a.name not in priority_map]
+            preferred.sort(key=lambda a: priority_map.get(a.name, 999))
+            available_adapters = preferred + others
+
         for adapter in available_adapters:
             try:
                 logger.info(f"Trying to fetch daily basic data from {adapter.name}")
@@ -74,8 +117,26 @@ class DataSourceManager:
                 continue
         return None, None
 
-    def find_latest_trade_date_with_fallback(self) -> Optional[str]:
+    def find_latest_trade_date_with_fallback(self, preferred_sources: Optional[List[str]] = None) -> Optional[str]:
+        """
+        查找最新交易日期，支持指定优先数据源
+
+        Args:
+            preferred_sources: 优先使用的数据源列表
+
+        Returns:
+            交易日期字符串（YYYYMMDD格式）或 None
+        """
         available_adapters = self.get_available_adapters()
+
+        # 如果指定了优先数据源，重新排序
+        if preferred_sources:
+            priority_map = {name: idx for idx, name in enumerate(preferred_sources)}
+            preferred = [a for a in available_adapters if a.name in priority_map]
+            others = [a for a in available_adapters if a.name not in priority_map]
+            preferred.sort(key=lambda a: priority_map.get(a.name, 999))
+            available_adapters = preferred + others
+
         for adapter in available_adapters:
             try:
                 trade_date = adapter.find_latest_trade_date()
