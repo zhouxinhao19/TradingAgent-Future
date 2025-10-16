@@ -303,7 +303,7 @@ const exampleStore = useExampleStore()
 
 如有问题，请通过以下方式联系：
 
-- 📧 邮箱: support@tradingagents.cn
+- 📧 邮箱: hsliup@163.com
 - 💬 微信群: 扫描README中的二维码
 - 🐛 问题反馈: GitHub Issues
 

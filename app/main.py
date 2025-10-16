@@ -214,55 +214,69 @@ async def lifespan(app: FastAPI):
             logger.info(f"⏱ 实时行情入库任务已启动: 每 {settings.QUOTES_INGEST_INTERVAL_SECONDS}s")
 
         # Tushare统一数据同步任务配置
-        if settings.TUSHARE_UNIFIED_ENABLED:
-            logger.info("🔄 配置Tushare统一数据同步任务...")
+        logger.info("🔄 配置Tushare统一数据同步任务...")
 
-            # 基础信息同步任务
-            if settings.TUSHARE_BASIC_INFO_SYNC_ENABLED:
-                scheduler.add_job(
-                    run_tushare_basic_info_sync,
-                    CronTrigger.from_crontab(settings.TUSHARE_BASIC_INFO_SYNC_CRON, timezone=settings.TIMEZONE),
-                    id="tushare_basic_info_sync",
-                    kwargs={"force_update": False}
-                )
-                logger.info(f"📅 Tushare基础信息同步已配置: {settings.TUSHARE_BASIC_INFO_SYNC_CRON}")
+        # 基础信息同步任务
+        scheduler.add_job(
+            run_tushare_basic_info_sync,
+            CronTrigger.from_crontab(settings.TUSHARE_BASIC_INFO_SYNC_CRON, timezone=settings.TIMEZONE),
+            id="tushare_basic_info_sync",
+            kwargs={"force_update": False}
+        )
+        if not (settings.TUSHARE_UNIFIED_ENABLED and settings.TUSHARE_BASIC_INFO_SYNC_ENABLED):
+            scheduler.pause_job("tushare_basic_info_sync")
+            logger.info(f"⏸️ Tushare基础信息同步已添加但暂停: {settings.TUSHARE_BASIC_INFO_SYNC_CRON}")
+        else:
+            logger.info(f"📅 Tushare基础信息同步已配置: {settings.TUSHARE_BASIC_INFO_SYNC_CRON}")
 
-            # 实时行情同步任务
-            if settings.TUSHARE_QUOTES_SYNC_ENABLED:
-                scheduler.add_job(
-                    run_tushare_quotes_sync,
-                    CronTrigger.from_crontab(settings.TUSHARE_QUOTES_SYNC_CRON, timezone=settings.TIMEZONE),
-                    id="tushare_quotes_sync"
-                )
-                logger.info(f"📈 Tushare行情同步已配置: {settings.TUSHARE_QUOTES_SYNC_CRON}")
+        # 实时行情同步任务
+        scheduler.add_job(
+            run_tushare_quotes_sync,
+            CronTrigger.from_crontab(settings.TUSHARE_QUOTES_SYNC_CRON, timezone=settings.TIMEZONE),
+            id="tushare_quotes_sync"
+        )
+        if not (settings.TUSHARE_UNIFIED_ENABLED and settings.TUSHARE_QUOTES_SYNC_ENABLED):
+            scheduler.pause_job("tushare_quotes_sync")
+            logger.info(f"⏸️ Tushare行情同步已添加但暂停: {settings.TUSHARE_QUOTES_SYNC_CRON}")
+        else:
+            logger.info(f"📈 Tushare行情同步已配置: {settings.TUSHARE_QUOTES_SYNC_CRON}")
 
-            # 历史数据同步任务
-            if settings.TUSHARE_HISTORICAL_SYNC_ENABLED:
-                scheduler.add_job(
-                    run_tushare_historical_sync,
-                    CronTrigger.from_crontab(settings.TUSHARE_HISTORICAL_SYNC_CRON, timezone=settings.TIMEZONE),
-                    id="tushare_historical_sync",
-                    kwargs={"incremental": True}
-                )
-                logger.info(f"📊 Tushare历史数据同步已配置: {settings.TUSHARE_HISTORICAL_SYNC_CRON}")
+        # 历史数据同步任务
+        scheduler.add_job(
+            run_tushare_historical_sync,
+            CronTrigger.from_crontab(settings.TUSHARE_HISTORICAL_SYNC_CRON, timezone=settings.TIMEZONE),
+            id="tushare_historical_sync",
+            kwargs={"incremental": True}
+        )
+        if not (settings.TUSHARE_UNIFIED_ENABLED and settings.TUSHARE_HISTORICAL_SYNC_ENABLED):
+            scheduler.pause_job("tushare_historical_sync")
+            logger.info(f"⏸️ Tushare历史数据同步已添加但暂停: {settings.TUSHARE_HISTORICAL_SYNC_CRON}")
+        else:
+            logger.info(f"📊 Tushare历史数据同步已配置: {settings.TUSHARE_HISTORICAL_SYNC_CRON}")
 
-            # 财务数据同步任务
-            if settings.TUSHARE_FINANCIAL_SYNC_ENABLED:
-                scheduler.add_job(
-                    run_tushare_financial_sync,
-                    CronTrigger.from_crontab(settings.TUSHARE_FINANCIAL_SYNC_CRON, timezone=settings.TIMEZONE),
-                    id="tushare_financial_sync"
-                )
-                logger.info(f"💰 Tushare财务数据同步已配置: {settings.TUSHARE_FINANCIAL_SYNC_CRON}")
+        # 财务数据同步任务
+        scheduler.add_job(
+            run_tushare_financial_sync,
+            CronTrigger.from_crontab(settings.TUSHARE_FINANCIAL_SYNC_CRON, timezone=settings.TIMEZONE),
+            id="tushare_financial_sync"
+        )
+        if not (settings.TUSHARE_UNIFIED_ENABLED and settings.TUSHARE_FINANCIAL_SYNC_ENABLED):
+            scheduler.pause_job("tushare_financial_sync")
+            logger.info(f"⏸️ Tushare财务数据同步已添加但暂停: {settings.TUSHARE_FINANCIAL_SYNC_CRON}")
+        else:
+            logger.info(f"💰 Tushare财务数据同步已配置: {settings.TUSHARE_FINANCIAL_SYNC_CRON}")
 
-            # 状态检查任务
-            if settings.TUSHARE_STATUS_CHECK_ENABLED:
-                scheduler.add_job(
-                    run_tushare_status_check,
-                    CronTrigger.from_crontab(settings.TUSHARE_STATUS_CHECK_CRON, timezone=settings.TIMEZONE),
-                    id="tushare_status_check"
-                )
-                logger.info(f"🔍 Tushare状态检查已配置: {settings.TUSHARE_STATUS_CHECK_CRON}")
+        # 状态检查任务
+        scheduler.add_job(
+            run_tushare_status_check,
+            CronTrigger.from_crontab(settings.TUSHARE_STATUS_CHECK_CRON, timezone=settings.TIMEZONE),
+            id="tushare_status_check"
+        )
+        if not (settings.TUSHARE_UNIFIED_ENABLED and settings.TUSHARE_STATUS_CHECK_ENABLED):
+            scheduler.pause_job("tushare_status_check")
+            logger.info(f"⏸️ Tushare状态检查已添加但暂停: {settings.TUSHARE_STATUS_CHECK_CRON}")
+        else:
+            logger.info(f"🔍 Tushare状态检查已配置: {settings.TUSHARE_STATUS_CHECK_CRON}")
 
         # AKShare统一数据同步任务配置
         logger.info("🔄 配置AKShare统一数据同步任务...")
