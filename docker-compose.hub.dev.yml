@@ -14,7 +14,11 @@ services:
       - "27017:27017"
     volumes:
       - tradingagents_mongodb_data_v1:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: tradingagents123
+      MONGO_INITDB_DATABASE: tradingagents
       TZ: "Asia/Shanghai"
     networks:
       - tradingagents-network
@@ -36,10 +40,11 @@ services:
       - tradingagents_redis_data_v1:/data
     environment:
       TZ: "Asia/Shanghai"
+    command: redis-server --appendonly yes --requirepass tradingagents123
     networks:
       - tradingagents-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "tradingagents123", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -56,8 +61,20 @@ services:
       - .env
     environment:
       TZ: "Asia/Shanghai"
-      MONGODB_URL: "mongodb://mongodb:27017/tradingagents"
-      REDIS_URL: "redis://redis:6379/0"
+      # MongoDB配置（Docker环境，带认证）
+      MONGODB_HOST: "mongodb"
+      MONGODB_PORT: "27017"
+      MONGODB_USERNAME: "admin"
+      MONGODB_PASSWORD: "tradingagents123"
+      MONGODB_DATABASE: "tradingagents"
+      MONGODB_AUTH_SOURCE: "admin"
+      MONGODB_URL: "mongodb://admin:tradingagents123@mongodb:27017/tradingagents?authSource=admin"
+      MONGODB_CONNECTION_STRING: "mongodb://admin:tradingagents123@mongodb:27017/tradingagents?authSource=admin"
+      # Redis配置
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: "tradingagents123"
+      REDIS_URL: "redis://:tradingagents123@redis:6379/0"
       DOCKER_CONTAINER: "true"
       # CORS配置
       CORS_ORIGINS: "http://localhost:3000,http://localhost:8080,http://localhost:5173"
