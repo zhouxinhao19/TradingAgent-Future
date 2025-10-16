@@ -62,10 +62,21 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
+    volumes:
+      # 日志目录映射 - 重要：将容器内日志映射到宿主机logs目录
+      - ./logs:/app/logs
+      # 配置目录映射 - 重要：持久化配置数据
+      - ./config:/app/config
+      # 数据目录映射 - 重要：持久化数据文件
+      - ./data:/app/data
     env_file:
       - .env
     environment:
       TZ: "Asia/Shanghai"
+      # 日志配置
+      TRADINGAGENTS_LOG_LEVEL: "INFO"
+      TRADINGAGENTS_LOG_DIR: "/app/logs"
+      TRADINGAGENTS_LOG_FILE: "/app/logs/tradingagents.log"
       # MongoDB配置（Docker环境，带认证）
       MONGODB_HOST: "mongodb"
       MONGODB_PORT: "27017"

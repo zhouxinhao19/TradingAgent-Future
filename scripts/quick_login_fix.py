@@ -117,10 +117,20 @@ def check_mongodb_connection():
         is_docker = os.path.exists('/.dockerenv') or os.getenv('DOCKER_CONTAINER') == 'true'
 
         if is_docker:
-            # Docker环境：使用服务名
+            # Docker环境：使用服务名和认证
             mongo_host = os.getenv('MONGODB_HOST', 'mongodb')
             mongo_port = int(os.getenv('MONGODB_PORT', '27017'))
-            mongo_url = f"mongodb://{mongo_host}:{mongo_port}/"
+            mongo_username = os.getenv('MONGODB_USERNAME', '')
+            mongo_password = os.getenv('MONGODB_PASSWORD', '')
+            mongo_database = os.getenv('MONGODB_DATABASE', 'tradingagents')
+            mongo_auth_source = os.getenv('MONGODB_AUTH_SOURCE', 'admin')
+
+            if mongo_username and mongo_password:
+                # 带认证的连接
+                mongo_url = f"mongodb://{mongo_username}:{mongo_password}@{mongo_host}:{mongo_port}/{mongo_database}?authSource={mongo_auth_source}"
+            else:
+                # 无认证的连接
+                mongo_url = f"mongodb://{mongo_host}:{mongo_port}/"
         else:
             # 本地环境：使用localhost
             mongo_url = "mongodb://localhost:27017/"
