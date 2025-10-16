@@ -215,7 +215,14 @@ class AKShareAdapter(DataSourceAdapter):
                 code_raw = row.get(code_col)
                 if not code_raw:
                     continue
-                code = str(code_raw).zfill(6)
+                # 标准化股票代码：移除前导0，然后补齐到6位
+                code_str = str(code_raw).strip()
+                # 如果是纯数字，移除前导0后补齐到6位
+                if code_str.isdigit():
+                    code_clean = code_str.lstrip('0') or '0'  # 移除前导0，如果全是0则保留一个0
+                    code = code_clean.zfill(6)  # 补齐到6位
+                else:
+                    code = code_str.zfill(6)
                 close = self._safe_float(row.get(price_col))
                 pct = self._safe_float(row.get(pct_col)) if pct_col else None
                 amt = self._safe_float(row.get(amount_col)) if amount_col else None
