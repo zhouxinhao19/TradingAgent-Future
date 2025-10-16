@@ -4,7 +4,7 @@
 
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
 from bson import ObjectId
 from .user import PyObjectId
@@ -95,10 +95,10 @@ class AnalysisTask(BaseModel):
     max_retries: int = 3
     last_error: Optional[str] = None
     
-    class Config:
-        allow_population_by_field_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True
+    )
 
 
 class AnalysisBatch(BaseModel):
@@ -128,10 +128,10 @@ class AnalysisBatch(BaseModel):
     # 结果摘要
     results_summary: Optional[Dict[str, Any]] = None
     
-    class Config:
-        allow_population_by_field_name = True
-        arbitrary_types_allowed = True
-        json_encoders = {ObjectId: str}
+    model_config = ConfigDict(
+        populate_by_name=True,
+        arbitrary_types_allowed=True
+    )
 
 
 class StockInfo(BaseModel):
