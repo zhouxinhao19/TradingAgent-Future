@@ -293,6 +293,7 @@ class FinancialDataService:
         """标准化Tushare财务数据"""
         # Tushare数据已经在provider中进行了标准化，直接使用
         base_data = {
+            "code": symbol,  # 添加 code 字段以兼容唯一索引
             "symbol": symbol,
             "full_symbol": self._get_full_symbol(symbol, market),
             "market": market,
@@ -329,6 +330,7 @@ class FinancialDataService:
         """标准化AKShare财务数据"""
         # AKShare数据需要从多个数据集中提取关键指标
         base_data = {
+            "code": symbol,  # 添加 code 字段以兼容唯一索引
             "symbol": symbol,
             "full_symbol": self._get_full_symbol(symbol, market),
             "market": market,
@@ -339,7 +341,7 @@ class FinancialDataService:
             "updated_at": now,
             "version": 1
         }
-        
+
         # 提取关键财务指标
         base_data.update(self._extract_akshare_indicators(financial_data))
         return base_data
@@ -355,6 +357,7 @@ class FinancialDataService:
     ) -> Dict[str, Any]:
         """标准化BaoStock财务数据"""
         base_data = {
+            "code": symbol,  # 添加 code 字段以兼容唯一索引
             "symbol": symbol,
             "full_symbol": self._get_full_symbol(symbol, market),
             "market": market,
@@ -365,7 +368,7 @@ class FinancialDataService:
             "updated_at": now,
             "version": 1
         }
-        
+
         # 合并BaoStock财务数据
         base_data.update(financial_data)
         return base_data
