@@ -2,6 +2,7 @@
 Multi-source synchronization API routes
 Provides endpoints for multi-source stock data synchronization
 """
+import asyncio
 import logging
 from typing import Dict, List, Optional, Any, Union
 from fastapi import APIRouter, HTTPException, Query
@@ -128,106 +129,143 @@ async def run_stock_basics_sync(
         raise HTTPException(status_code=500, detail=f"Failed to run synchronization: {str(e)}")
 
 
-@router.post("/test-sources")
-async def test_data_sources():
-    """测试所有数据源的连接和数据获取能力"""
+async def _test_single_adapter(adapter) -> dict:
+    """
+    在后台线程中测试单个数据源适配器
+    避免阻塞事件循环
+    """
+    result = {
+        "name": adapter.name,
+        "priority": adapter.priority,
+        "available": True,
+        "tests": {}
+    }
+
+    # 测试股票列表获取
     try:
-        manager = DataSourceManager()
-        available_adapters = manager.get_available_adapters()
-        
-        test_results = []
-        
-        for adapter in available_adapters:
-            result = {
-                "name": adapter.name,
-                "priority": adapter.priority,
-                "available": True,
-                "tests": {}
+        # 在线程池中运行同步方法，避免阻塞事件循环
+        df = await asyncio.to_thread(adapter.get_stock_list)
+        if df is not None and not df.empty:
+            result["tests"]["stock_list"] = {
+                "success": True,
+                "count": len(df),
+                "message": f"Successfully fetched {len(df)} stocks"
             }
-            
-            # 测试股票列表获取
-            try:
-                df = adapter.get_stock_list()
-                if df is not None and not df.empty:
-                    result["tests"]["stock_list"] = {
-                        "success": True,
-                        "count": len(df),
-                        "message": f"Successfully fetched {len(df)} stocks"
-                    }
-                else:
-                    result["tests"]["stock_list"] = {
-                        "success": False,
-                        "count": 0,
-                        "message": "No stock data returned"
-                    }
-            except Exception as e:
-                result["tests"]["stock_list"] = {
-                    "success": False,
-                    "count": 0,
-                    "message": f"Error: {str(e)}"
+        else:
+            result["tests"]["stock_list"] = {
+                "success": False,
+                "count": 0,
+                "message": "No stock data returned"
+            }
+    except Exception as e:
+        result["tests"]["stock_list"] = {
+            "success": False,
+            "count": 0,
+            "message": f"Error: {str(e)}"
+        }
+
+    # 测试最新交易日期查找
+    try:
+        trade_date = await asyncio.to_thread(adapter.find_latest_trade_date)
+        if trade_date:
+            result["tests"]["trade_date"] = {
+                "success": True,
+                "date": trade_date,
+                "message": f"Found latest trade date: {trade_date}"
+            }
+        else:
+            result["tests"]["trade_date"] = {
+                "success": False,
+                "date": None,
+                "message": "No trade date found"
+            }
+    except Exception as e:
+        result["tests"]["trade_date"] = {
+            "success": False,
+            "date": None,
+            "message": f"Error: {str(e)}"
+        }
+
+    # 测试每日基础数据获取（如果支持）
+    try:
+        trade_date = result["tests"]["trade_date"].get("date")
+        if trade_date:
+            df = await asyncio.to_thread(adapter.get_daily_basic, trade_date)
+            if df is not None and not df.empty:
+                result["tests"]["daily_basic"] = {
+                    "success": True,
+                    "count": len(df),
+                    "message": f"Successfully fetched daily data for {len(df)} stocks"
                 }
-            
-            # 测试最新交易日期查找
-            try:
-                trade_date = adapter.find_latest_trade_date()
-                if trade_date:
-                    result["tests"]["trade_date"] = {
-                        "success": True,
-                        "date": trade_date,
-                        "message": f"Found latest trade date: {trade_date}"
-                    }
-                else:
-                    result["tests"]["trade_date"] = {
-                        "success": False,
-                        "date": None,
-                        "message": "No trade date found"
-                    }
-            except Exception as e:
-                result["tests"]["trade_date"] = {
-                    "success": False,
-                    "date": None,
-                    "message": f"Error: {str(e)}"
-                }
-            
-            # 测试每日基础数据获取（如果支持）
-            try:
-                trade_date = result["tests"]["trade_date"].get("date")
-                if trade_date:
-                    df = adapter.get_daily_basic(trade_date)
-                    if df is not None and not df.empty:
-                        result["tests"]["daily_basic"] = {
-                            "success": True,
-                            "count": len(df),
-                            "message": f"Successfully fetched daily data for {len(df)} stocks"
-                        }
-                    else:
-                        result["tests"]["daily_basic"] = {
-                            "success": False,
-                            "count": 0,
-                            "message": "No daily basic data available or not supported"
-                        }
-                else:
-                    result["tests"]["daily_basic"] = {
-                        "success": False,
-                        "count": 0,
-                        "message": "Cannot test without valid trade date"
-                    }
-            except Exception as e:
+            else:
                 result["tests"]["daily_basic"] = {
                     "success": False,
                     "count": 0,
-                    "message": f"Error: {str(e)}"
+                    "message": "No daily basic data available or not supported"
                 }
-            
-            test_results.append(result)
-        
+        else:
+            result["tests"]["daily_basic"] = {
+                "success": False,
+                "count": 0,
+                "message": "Cannot test without valid trade date"
+            }
+    except Exception as e:
+        result["tests"]["daily_basic"] = {
+            "success": False,
+            "count": 0,
+            "message": f"Error: {str(e)}"
+        }
+
+    return result
+
+
+@router.post("/test-sources")
+async def test_data_sources():
+    """
+    测试所有数据源的连接和数据获取能力
+
+    注意：此接口会执行耗时操作（获取股票列表等），
+    所有同步操作都在后台线程中执行，避免阻塞事件循环
+    """
+    try:
+        manager = DataSourceManager()
+        available_adapters = manager.get_available_adapters()
+
+        logger.info(f"🧪 开始测试 {len(available_adapters)} 个数据源...")
+
+        # 并发测试所有适配器（在后台线程中执行）
+        test_tasks = [_test_single_adapter(adapter) for adapter in available_adapters]
+        test_results = await asyncio.gather(*test_tasks, return_exceptions=True)
+
+        # 处理异常结果
+        final_results = []
+        for i, result in enumerate(test_results):
+            if isinstance(result, Exception):
+                logger.error(f"❌ 测试适配器 {available_adapters[i].name} 时出错: {result}")
+                final_results.append({
+                    "name": available_adapters[i].name,
+                    "priority": available_adapters[i].priority,
+                    "available": False,
+                    "tests": {
+                        "error": {
+                            "success": False,
+                            "message": f"Test failed: {str(result)}"
+                        }
+                    }
+                })
+            else:
+                final_results.append(result)
+
+        logger.info(f"✅ 数据源测试完成，共测试 {len(final_results)} 个数据源")
+
         return SyncResponse(
             success=True,
-            message=f"Tested {len(test_results)} data sources",
-            data={"test_results": test_results}
+            message=f"Tested {len(final_results)} data sources",
+            data={"test_results": final_results}
         )
-        
+
     except Exception as e:
+        logger.error(f"❌ 测试数据源时出错: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to test data sources: {str(e)}")
 
 
