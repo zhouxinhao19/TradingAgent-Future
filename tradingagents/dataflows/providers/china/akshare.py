@@ -76,6 +76,26 @@ class AKShareProvider(BaseStockDataProvider):
             logger.error(f"❌ AKShare连接测试失败: {e}")
             return False
     
+    def get_stock_list_sync(self) -> Optional[pd.DataFrame]:
+        """获取股票列表（同步版本）"""
+        if not self.connected:
+            return None
+
+        try:
+            logger.info("📋 获取AKShare股票列表（同步）...")
+            stock_df = self.ak.stock_info_a_code_name()
+
+            if stock_df is None or stock_df.empty:
+                logger.warning("⚠️ AKShare股票列表为空")
+                return None
+
+            logger.info(f"✅ AKShare股票列表获取成功: {len(stock_df)}只股票")
+            return stock_df
+
+        except Exception as e:
+            logger.error(f"❌ AKShare获取股票列表失败: {e}")
+            return None
+
     async def get_stock_list(self) -> List[Dict[str, Any]]:
         """
         获取股票列表

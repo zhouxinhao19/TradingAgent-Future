@@ -83,7 +83,8 @@ class TushareAdapter(DataSourceAdapter):
             return None
 
         try:
-            df = self._provider.get_stock_list()
+            # 使用同步版本的方法
+            df = self._provider.get_stock_list_sync()
             if df is not None and not df.empty:
                 logger.info(f"Tushare: Successfully fetched {len(df)} stocks")
                 return df

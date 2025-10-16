@@ -63,6 +63,50 @@ class BaoStockProvider(BaseStockDataProvider):
             logger.error(f"❌ BaoStock连接测试失败: {e}")
             return False
     
+    def get_stock_list_sync(self) -> Optional[pd.DataFrame]:
+        """获取股票列表（同步版本）"""
+        if not self.connected:
+            return None
+
+        try:
+            logger.info("📋 获取BaoStock股票列表（同步）...")
+
+            lg = self.bs.login()
+            if lg.error_code != '0':
+                logger.error(f"BaoStock登录失败: {lg.error_msg}")
+                return None
+
+            try:
+                rs = self.bs.query_stock_basic()
+                if rs.error_code != '0':
+                    logger.error(f"BaoStock查询失败: {rs.error_msg}")
+                    return None
+
+                data_list = []
+                while (rs.error_code == '0') & rs.next():
+                    data_list.append(rs.get_row_data())
+
+                if not data_list:
+                    logger.warning("⚠️ BaoStock股票列表为空")
+                    return None
+
+                # 转换为DataFrame
+                import pandas as pd
+                df = pd.DataFrame(data_list, columns=rs.fields)
+
+                # 只保留股票类型（type=1）
+                df = df[df['type'] == '1']
+
+                logger.info(f"✅ BaoStock股票列表获取成功: {len(df)}只股票")
+                return df
+
+            finally:
+                self.bs.logout()
+
+        except Exception as e:
+            logger.error(f"❌ BaoStock获取股票列表失败: {e}")
+            return None
+
     async def get_stock_list(self) -> List[Dict[str, Any]]:
         """
         获取股票列表
