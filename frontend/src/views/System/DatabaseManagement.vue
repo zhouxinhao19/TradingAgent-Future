@@ -126,6 +126,7 @@
             <el-form-item label="数据集合">
               <el-select v-model="exportCollection" style="width: 100%">
                 <el-option label="全部集合" value="all" />
+                <el-option label="配置数据（用于演示系统）" value="config_only" />
                 <el-option label="分析结果" value="analysis_results" />
                 <el-option label="用户配置" value="user_configs" />
                 <el-option label="操作日志" value="operation_logs" />
@@ -416,7 +417,28 @@ const testConnections = async () => {
 const exportData = async () => {
   exporting.value = true
   try {
-    const collections = exportCollection.value === 'all' ? [] : [exportCollection.value]
+    // 配置数据集合列表（用于演示系统）
+    const configCollections = [
+      'system_configs',      // 系统配置（包括 LLM 配置）
+      'users',               // 用户数据
+      'llm_providers',       // LLM 提供商
+      'market_categories',   // 市场分类
+      'user_tags',           // 用户标签
+      'datasource_groupings',// 数据源分组
+      'platform_configs',    // 平台配置
+      'user_configs',        // 用户配置
+      'model_catalog'        // 模型目录
+    ]
+
+    let collections: string[] = []
+
+    if (exportCollection.value === 'all') {
+      collections = [] // 空数组表示导出所有集合
+    } else if (exportCollection.value === 'config_only') {
+      collections = configCollections // 仅导出配置数据
+    } else {
+      collections = [exportCollection.value] // 导出单个集合
+    }
 
     const blob = await databaseApi.exportData({
       collections,
@@ -427,11 +449,16 @@ const exportData = async () => {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `database_export_${new Date().toISOString().split('T')[0]}.${exportFormat.value}`
+    const suffix = exportCollection.value === 'config_only' ? '_config' : ''
+    link.download = `database_export${suffix}_${new Date().toISOString().split('T')[0]}.${exportFormat.value}`
     link.click()
     URL.revokeObjectURL(url)
 
-    ElMessage.success('数据导出成功')
+    if (exportCollection.value === 'config_only') {
+      ElMessage.success('配置数据导出成功（包含 LLM 配置、用户数据等）')
+    } else {
+      ElMessage.success('数据导出成功')
+    }
 
   } catch (error) {
     console.error('❌ 数据导出失败:', error)
