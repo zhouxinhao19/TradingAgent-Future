@@ -13,7 +13,7 @@ services:
     ports:
       - "27017:27017"
     volumes:
-      - tradingagents_mongodb_data_v1:/data/db
+      - tradingagents_mongodb_data:/data/db
       - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
@@ -37,7 +37,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - tradingagents_redis_data_v1:/data
+      - tradingagents_redis_data:/data
     environment:
       TZ: "Asia/Shanghai"
     command: redis-server --appendonly yes --requirepass tradingagents123
@@ -119,8 +119,10 @@ services:
       start_period: 10s
 
 volumes:
-  tradingagents_mongodb_data_v1:
-  tradingagents_redis_data_v1:
+  tradingagents_mongodb_data:
+    external: true
+  tradingagents_redis_data:
+    external: true
 
 networks:
   tradingagents-network:

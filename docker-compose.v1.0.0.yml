@@ -195,10 +195,10 @@ services:
 volumes:
   mongodb_data:
     driver: local
-    name: tradingagents_mongodb_data_v1
+    name: tradingagents_mongodb_data
   redis_data:
     driver: local
-    name: tradingagents_redis_data_v1
+    name: tradingagents_redis_data
 
 # 网络定义
 networks:
