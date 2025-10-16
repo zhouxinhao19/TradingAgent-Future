@@ -63,9 +63,13 @@ if [ ! -f "pyproject.toml" ] || [ ! -f "Dockerfile.backend" ]; then
 fi
 echo -e "${GREEN}  ✅ 当前目录正确${NC}"
 
-# 检查Git分支
-CURRENT_BRANCH=$(git branch --show-current)
-echo -e "${BLUE}  当前分支: ${CURRENT_BRANCH}${NC}"
+# 检查Git分支（可选）
+if git rev-parse --git-dir > /dev/null 2>&1; then
+    CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
+    echo -e "${BLUE}  当前分支: ${CURRENT_BRANCH}${NC}"
+else
+    echo -e "${YELLOW}  ⚠️  不是Git仓库，跳过分支检查${NC}"
+fi
 
 echo ""
 

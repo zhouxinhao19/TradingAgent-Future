@@ -363,6 +363,35 @@ chmod +x scripts/easy_install.sh
 
 ### 🐳 方式二：Docker部署（推荐有Docker用户）
 
+#### 选项A：使用Docker Hub镜像（最简单）⭐
+
+**v1.0.0-preview新增：无需构建，直接拉取运行！**
+
+```bash
+# 1. 下载配置文件
+wget https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/docker-compose.hub.yml
+wget https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/.env.example -O .env
+
+# 2. 配置环境变量
+nano .env  # 编辑 .env 文件，填入API密钥
+
+# 3. 启动服务
+docker-compose -f docker-compose.hub.yml up -d
+
+# 4. 访问应用
+# 前端: http://localhost:3000
+# 后端API: http://localhost:8000
+# API文档: http://localhost:8000/docs
+```
+
+**Docker Hub镜像**：
+- 🐳 后端: `hsliup/tradingagents-backend:latest`
+- 🎨 前端: `hsliup/tradingagents-frontend:latest`
+
+📖 **详细指南**: [Docker快速开始](DOCKER_QUICKSTART.md)
+
+#### 选项B：从源码构建（Streamlit版本）
+
 ```bash
 # 1. 克隆项目
 git clone https://github.com/hsliuping/TradingAgents-CN.git
