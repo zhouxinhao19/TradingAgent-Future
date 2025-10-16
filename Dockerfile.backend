@@ -29,6 +29,9 @@ COPY config ./config
 COPY scripts ./scripts
 COPY docs ./docs
 
+# 复制Docker环境配置文件
+COPY .env.docker ./.env
+
 # 暴露后端端口（与docker-compose.v1.0.0.yml一致）
 EXPOSE 8000
 

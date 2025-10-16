@@ -108,14 +108,29 @@ def create_web_users_config():
 def check_mongodb_connection():
     """检查 MongoDB 连接"""
     print("🗄️ 检查 MongoDB 连接...")
-    
+
     try:
         from pymongo import MongoClient
-        
+        import os
+
+        # 检查是否在Docker容器内
+        is_docker = os.path.exists('/.dockerenv') or os.getenv('DOCKER_CONTAINER') == 'true'
+
+        if is_docker:
+            # Docker环境：使用服务名
+            mongo_host = os.getenv('MONGODB_HOST', 'mongodb')
+            mongo_port = int(os.getenv('MONGODB_PORT', '27017'))
+            mongo_url = f"mongodb://{mongo_host}:{mongo_port}/"
+        else:
+            # 本地环境：使用localhost
+            mongo_url = "mongodb://localhost:27017/"
+
+        print(f"   连接地址: {mongo_url}")
+
         # 尝试连接 MongoDB
-        client = MongoClient("mongodb://localhost:27017/", serverSelectionTimeoutMS=5000)
+        client = MongoClient(mongo_url, serverSelectionTimeoutMS=5000)
         client.server_info()
-        
+
         print("✅ MongoDB 连接成功")
         return client
         
