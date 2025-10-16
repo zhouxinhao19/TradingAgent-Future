@@ -273,12 +273,16 @@ redis                           7-alpine  xxx    xxx MB
 ### 步骤 5：启动服务
 
 ```bash
-# 启动所有服务
+# 启动所有服务（首次启动会自动创建数据卷）
 docker compose -f docker-compose.hub.yml up -d
 
 # 查看服务状态
 docker compose -f docker-compose.hub.yml ps
 ```
+
+**注意**：首次启动时，Docker Compose 会自动创建以下数据卷：
+- `tradingagents_mongodb_data` - MongoDB 数据存储
+- `tradingagents_redis_data` - Redis 数据存储
 
 **预期输出**：
 
