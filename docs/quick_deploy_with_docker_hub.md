@@ -37,10 +37,6 @@ wget https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview
 # 下载 Nginx 配置文件
 mkdir -p nginx
 wget https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/nginx/nginx.conf -O nginx/nginx.conf
-
-# 下载初始配置数据（包含预配置的 LLM 和示例数据）
-mkdir -p install
-wget https://github.com/hsliuping/TradingAgents-CN/releases/download/v1.0.0-preview/database_export_config.json -O install/database_export_config.json
 ```
 
 **Windows PowerShell**：
@@ -58,10 +54,6 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hsliuping/TradingAgent
 # 下载 Nginx 配置
 New-Item -ItemType Directory -Path "nginx" -Force
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/nginx/nginx.conf" -OutFile "nginx\nginx.conf"
-
-# 下载初始配置数据
-New-Item -ItemType Directory -Path "install" -Force
-Invoke-WebRequest -Uri "https://github.com/hsliuping/TradingAgents-CN/releases/download/v1.0.0-preview/database_export_config.json" -OutFile "install\database_export_config.json"
 ```
 
 ### 步骤 2：拉取 Docker 镜像
@@ -172,11 +164,65 @@ docker-compose -f docker-compose.hub.nginx.yml logs -f backend
 **首次部署必须执行此步骤**，导入系统配置和创建管理员账号：
 
 ```bash
-# 导入配置数据（包含 15 个预配置的 LLM 模型和示例数据）
+# 导入镜像内置的配置数据（推荐）
 docker exec -it tradingagents-backend python scripts/import_config_and_create_user.py
 ```
 
 **预期输出**：
+```
+💡 未指定文件，使用默认配置: /app/install/database_export_config_2025-10-17.json
+================================================================================
+📦 导入配置数据并创建默认用户
+================================================================================
+
+🔌 连接到 MongoDB...
+✅ MongoDB 连接成功
+
+📂 加载导出文件: /app/install/database_export_config_2025-10-17.json
+✅ 文件加载成功
+   导出时间: 2025-10-17T05:50:07
+   集合数量: 11
+
+📋 准备导入 11 个集合:
+   - system_configs: 79 个文档
+   - users: 1 个文档
+   - llm_providers: 8 个提供商
+   - model_catalog: 15+ 个模型
+   - market_categories: 3 个分类
+   - user_tags: 2 个标签
+   - datasource_groupings: 3 个分组
+   - platform_configs: 4 个配置
+   - user_configs: 0 个配置
+   - market_quotes: 5760 条行情数据
+   - stock_basic_info: 5684 条股票信息
+
+🚀 开始导入...
+   ✅ 导入成功
+
+👤 创建默认管理员用户...
+   ✅ 用户创建成功
+
+================================================================================
+✅ 操作完成！
+================================================================================
+
+🔐 登录信息:
+   用户名: admin
+   密码: admin123
+```
+
+**说明**：
+- ✅ 配置数据已打包到 Docker 镜像中（`/app/install/database_export_config_2025-10-17.json`）
+- ✅ 脚本会自动检测并导入镜像内置的配置文件
+- ✅ 导入的配置包含：
+  - 系统配置（79 个配置项）
+  - LLM 提供商配置（8 个提供商）
+  - LLM 模型目录（15+ 个模型）
+  - 市场分类、用户标签、数据源分组等
+  - 示例股票数据（5000+ 条）
+- ⚠️ 如果看到重复键错误（E11000），说明数据已存在，可以忽略
+
+**预期输出（完整导入）**：
 ```
 ================================================================================
 📦 导入配置数据并创建默认用户
@@ -190,7 +236,6 @@ docker exec -it tradingagents-backend python scripts/import_config_and_create_us
 📂 加载导出文件: /app/install/database_export_config.json
 ✅ 文件加载成功
    导出时间: 2025-10-17T05:50:07
-   导出格式: json
    集合数量: 11
 
 📋 准备导入 11 个集合:
@@ -201,21 +246,12 @@ docker exec -it tradingagents-backend python scripts/import_config_and_create_us
    - user_tags: 2 个文档
    - datasource_groupings: 3 个文档
    - platform_configs: 4 个文档
-   - user_configs: 0 个文档
    - model_catalog: 8 个文档
    - market_quotes: 5760 个实时行情数据
    - stock_basic_info: 5684 个股票基础信息
 
 🚀 开始导入...
-   模式: 增量
-
-   导入 system_configs...
-      ✅ 插入 79 个，跳过 0 个
-
-   导入 users...
-      ✅ 插入 1 个，跳过 0 个
-
-   ... (其他集合导入信息)
+   ✅ 导入成功
 
 👤 创建默认管理员用户...
    ✅ 用户创建成功
@@ -227,14 +263,28 @@ docker exec -it tradingagents-backend python scripts/import_config_and_create_us
 🔐 登录信息:
    用户名: admin
    密码: admin123
-
-📝 后续步骤:
-   1. 重启后端服务: docker restart tradingagents-backend
-   2. 访问前端并使用默认账号登录
-   3. 检查系统配置是否正确加载
 ```
 
-**注意**：如果看到 `market_quotes` 或 `stock_basic_info` 导入失败（重复键错误），这是正常的，说明数据库中已经有数据了。
+**预期输出（仅创建用户）**：
+```
+================================================================================
+📦 创建默认管理员用户
+================================================================================
+
+🔌 连接到 MongoDB...
+✅ MongoDB 连接成功
+
+👤 创建默认管理员用户...
+   ✅ 用户创建成功
+
+================================================================================
+✅ 操作完成！
+================================================================================
+
+🔐 登录信息:
+   用户名: admin
+   密码: admin123
+```
 
 ### 步骤 6：重启后端服务
 
@@ -316,12 +366,12 @@ Frontend            Backend
 ├── .env                          # 环境变量配置
 ├── nginx/
 │   └── nginx.conf                # Nginx 配置文件
-├── install/
-│   └── database_export_config.json  # 初始配置数据
 ├── logs/                         # 日志目录（自动创建）
 ├── data/                         # 数据目录（自动创建）
 └── config/                       # 配置目录（自动创建）
 ```
+
+**注意**：配置数据（`database_export_config_2025-10-17.json`）已打包到 Docker 镜像中，无需单独下载。
 
 ---
 
