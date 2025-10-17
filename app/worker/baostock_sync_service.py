@@ -152,89 +152,93 @@ class BaoStockSyncService:
             logger.error(f"❌ 更新基础信息到数据库失败: {e}")
             raise
     
-    async def sync_realtime_quotes(self, batch_size: int = 50) -> BaoStockSyncStats:
+    async def sync_daily_quotes(self, batch_size: int = 50) -> BaoStockSyncStats:
         """
-        同步实时行情数据
-        
+        同步日K线数据（最新交易日）
+
+        注意：BaoStock不支持实时行情，此方法获取最新交易日的日K线数据
+
         Args:
             batch_size: 批处理大小
-            
+
         Returns:
             同步统计信息
         """
         stats = BaoStockSyncStats()
-        
+
         try:
-            logger.info("🔄 开始BaoStock实时行情同步...")
-            
+            logger.info("🔄 开始BaoStock日K线同步（最新交易日）...")
+            logger.info("ℹ️ 注意：BaoStock不支持实时行情，此任务同步最新交易日的日K线数据")
+
             # 从数据库获取股票列表
             collection = self.db.stock_basic_info
             cursor = collection.find({"data_source": "baostock"}, {"code": 1})
             stock_codes = [doc["code"] async for doc in cursor]
-            
+
             if not stock_codes:
                 logger.warning("⚠️ 数据库中没有BaoStock股票数据")
                 return stats
-            
-            logger.info(f"📈 开始同步{len(stock_codes)}只股票的行情数据...")
-            
+
+            logger.info(f"📈 开始同步{len(stock_codes)}只股票的日K线数据...")
+
             # 批量处理
             for i in range(0, len(stock_codes), batch_size):
                 batch = stock_codes[i:i + batch_size]
                 batch_stats = await self._sync_quotes_batch(batch)
-                
+
                 stats.quotes_count += batch_stats.quotes_count
                 stats.errors.extend(batch_stats.errors)
-                
+
                 logger.info(f"📊 批次进度: {i + len(batch)}/{len(stock_codes)}, "
                           f"成功: {batch_stats.quotes_count}, "
                           f"错误: {len(batch_stats.errors)}")
-                
+
                 # 避免API限制
                 await asyncio.sleep(0.2)
-            
-            logger.info(f"✅ BaoStock行情同步完成: {stats.quotes_count}条记录")
+
+            logger.info(f"✅ BaoStock日K线同步完成: {stats.quotes_count}条记录")
             return stats
-            
+
         except Exception as e:
-            logger.error(f"❌ BaoStock行情同步失败: {e}")
+            logger.error(f"❌ BaoStock日K线同步失败: {e}")
             stats.errors.append(str(e))
             return stats
     
     async def _sync_quotes_batch(self, code_batch: List[str]) -> BaoStockSyncStats:
-        """同步行情批次"""
+        """同步日K线批次"""
         stats = BaoStockSyncStats()
-        
+
         for code in code_batch:
             try:
+                # 注意：get_stock_quotes 实际返回的是最新日K线数据，不是实时行情
                 quotes = await self.provider.get_stock_quotes(code)
-                
+
                 if quotes:
                     # 更新数据库
                     await self._update_stock_quotes(quotes)
                     stats.quotes_count += 1
                 else:
-                    stats.errors.append(f"获取{code}行情失败")
-                    
+                    stats.errors.append(f"获取{code}日K线失败")
+
             except Exception as e:
-                stats.errors.append(f"处理{code}行情失败: {e}")
-        
+                stats.errors.append(f"处理{code}日K线失败: {e}")
+
         return stats
-    
+
     async def _update_stock_quotes(self, quotes: Dict[str, Any]):
-        """更新股票行情到数据库"""
+        """更新股票日K线到数据库"""
         try:
             collection = self.db.market_quotes
-            
+
             # 使用upsert更新或插入
             await collection.update_one(
                 {"code": quotes["code"]},
                 {"$set": quotes},
                 upsert=True
             )
-            
+
         except Exception as e:
-            logger.error(f"❌ 更新行情到数据库失败: {e}")
+            logger.error(f"❌ 更新日K线到数据库失败: {e}")
             raise
     
     async def sync_historical_data(self, days: int = 30, batch_size: int = 20, period: str = "daily") -> BaoStockSyncStats:
@@ -409,14 +413,14 @@ async def run_baostock_basic_info_sync():
         logger.error(f"❌ BaoStock基础信息同步任务失败: {e}")
 
 
-async def run_baostock_quotes_sync():
-    """运行BaoStock行情同步任务"""
+async def run_baostock_daily_quotes_sync():
+    """运行BaoStock日K线同步任务（最新交易日）"""
     try:
         service = BaoStockSyncService()
-        stats = await service.sync_realtime_quotes()
-        logger.info(f"🎯 BaoStock行情同步完成: {stats.quotes_count}条记录, {len(stats.errors)}个错误")
+        stats = await service.sync_daily_quotes()
+        logger.info(f"🎯 BaoStock日K线同步完成: {stats.quotes_count}条记录, {len(stats.errors)}个错误")
     except Exception as e:
-        logger.error(f"❌ BaoStock行情同步任务失败: {e}")
+        logger.error(f"❌ BaoStock日K线同步任务失败: {e}")
 
 
 async def run_baostock_historical_sync():

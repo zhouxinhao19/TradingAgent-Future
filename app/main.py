@@ -50,7 +50,7 @@ from app.worker.akshare_sync_service import (
 )
 from app.worker.baostock_sync_service import (
     run_baostock_basic_info_sync,
-    run_baostock_quotes_sync,
+    run_baostock_daily_quotes_sync,
     run_baostock_historical_sync,
     run_baostock_status_check
 )
@@ -358,17 +358,17 @@ async def lifespan(app: FastAPI):
         else:
             logger.info(f"📋 BaoStock基础信息同步已配置: {settings.BAOSTOCK_BASIC_INFO_SYNC_CRON}")
 
-        # 行情同步任务
+        # 日K线同步任务（注意：BaoStock不支持实时行情）
         scheduler.add_job(
-            run_baostock_quotes_sync,
-            CronTrigger.from_crontab(settings.BAOSTOCK_QUOTES_SYNC_CRON, timezone=settings.TIMEZONE),
-            id="baostock_quotes_sync"
+            run_baostock_daily_quotes_sync,
+            CronTrigger.from_crontab(settings.BAOSTOCK_DAILY_QUOTES_SYNC_CRON, timezone=settings.TIMEZONE),
+            id="baostock_daily_quotes_sync"
         )
-        if not (settings.BAOSTOCK_UNIFIED_ENABLED and settings.BAOSTOCK_QUOTES_SYNC_ENABLED):
-            scheduler.pause_job("baostock_quotes_sync")
-            logger.info(f"⏸️ BaoStock行情同步已添加但暂停: {settings.BAOSTOCK_QUOTES_SYNC_CRON}")
+        if not (settings.BAOSTOCK_UNIFIED_ENABLED and settings.BAOSTOCK_DAILY_QUOTES_SYNC_ENABLED):
+            scheduler.pause_job("baostock_daily_quotes_sync")
+            logger.info(f"⏸️ BaoStock日K线同步已添加但暂停: {settings.BAOSTOCK_DAILY_QUOTES_SYNC_CRON}")
         else:
-            logger.info(f"📈 BaoStock行情同步已配置: {settings.BAOSTOCK_QUOTES_SYNC_CRON}")
+            logger.info(f"📈 BaoStock日K线同步已配置: {settings.BAOSTOCK_DAILY_QUOTES_SYNC_CRON} (注意：BaoStock不支持实时行情)")
 
         # 历史数据同步任务
         scheduler.add_job(
