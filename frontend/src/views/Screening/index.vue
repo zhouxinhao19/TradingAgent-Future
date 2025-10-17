@@ -585,8 +585,11 @@ const analyzeSingle = (stock: StockInfo) => {
 }
 
 const viewStockDetail = (stock: StockInfo) => {
-  // 打开股票详情页面
-  window.open(`/stock/${stock.code}`, '_blank')
+  // 跳转到股票详情页面
+  router.push({
+    name: 'StockDetail',
+    params: { code: stock.code }
+  })
 }
 
 const isFavorited = (code: string) => favoriteSet.value.has(code)
