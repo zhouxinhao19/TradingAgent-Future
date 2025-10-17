@@ -19,8 +19,19 @@ def fetch_stock_basic_df():
     import time
     import logging
     from tradingagents.dataflows.providers.china.tushare import get_tushare_provider
+    from app.core.config import settings
 
     logger = logging.getLogger(__name__)
+
+    # 检查 Tushare 是否启用
+    if not settings.TUSHARE_ENABLED:
+        logger.error("❌ Tushare 数据源已禁用 (TUSHARE_ENABLED=false)")
+        logger.error("💡 请在 .env 文件中设置 TUSHARE_ENABLED=true 或使用多数据源同步服务")
+        raise RuntimeError(
+            "Tushare is disabled (TUSHARE_ENABLED=false). "
+            "Set TUSHARE_ENABLED=true in .env or use MultiSourceBasicsSyncService."
+        )
+
     provider = get_tushare_provider()
 
     # 等待连接完成（最多等待 5 秒）
@@ -37,12 +48,12 @@ def fetch_stock_basic_df():
     if not getattr(provider, "connected", False) or provider.api is None:
         logger.error(f"❌ Tushare 连接失败（等待 {max_wait_seconds}s 后超时）")
         logger.error(f"💡 请检查：")
-        logger.error(f"   1. 环境变量 TUSHARE_ENABLED=true")
-        logger.error(f"   2. .env 文件中配置了有效的 TUSHARE_TOKEN")
-        logger.error(f"   3. Tushare Token 未过期且有足够的积分")
+        logger.error(f"   1. .env 文件中配置了有效的 TUSHARE_TOKEN")
+        logger.error(f"   2. Tushare Token 未过期且有足够的积分")
+        logger.error(f"   3. 网络连接正常")
         raise RuntimeError(
             f"Tushare not connected after waiting {max_wait_seconds}s. "
-            "Set TUSHARE_ENABLED=true and TUSHARE_TOKEN in .env"
+            "Check TUSHARE_TOKEN in .env and ensure it's valid."
         )
 
     logger.info(f"✅ Tushare 已连接，开始获取股票列表...")

@@ -33,6 +33,7 @@ from app.routers import stock_data as stock_data_router
 from app.routers import notifications as notifications_router
 from app.routers import scheduler as scheduler_router
 from app.services.basics_sync_service import get_basics_sync_service
+from app.services.multi_source_basics_sync_service import MultiSourceBasicsSyncService
 from app.services.scheduler_service import set_scheduler_instance
 from app.worker.tushare_sync_service import (
     run_tushare_basic_info_sync,
@@ -76,6 +77,25 @@ async def _print_config_summary(logger):
         # 数据库连接
         logger.info(f"MongoDB: {settings.MONGODB_HOST}:{settings.MONGODB_PORT}/{settings.MONGODB_DATABASE}")
         logger.info(f"Redis: {settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_DB}")
+
+        # 代理配置
+        import os
+        if settings.HTTP_PROXY or settings.HTTPS_PROXY:
+            logger.info("Proxy Configuration:")
+            if settings.HTTP_PROXY:
+                logger.info(f"  HTTP_PROXY: {settings.HTTP_PROXY}")
+            if settings.HTTPS_PROXY:
+                logger.info(f"  HTTPS_PROXY: {settings.HTTPS_PROXY}")
+            if settings.NO_PROXY:
+                # 只显示前3个域名
+                no_proxy_list = settings.NO_PROXY.split(',')
+                if len(no_proxy_list) <= 3:
+                    logger.info(f"  NO_PROXY: {settings.NO_PROXY}")
+                else:
+                    logger.info(f"  NO_PROXY: {','.join(no_proxy_list[:3])}... ({len(no_proxy_list)} domains)")
+            logger.info(f"  ✅ Proxy environment variables set successfully")
+        else:
+            logger.info("Proxy: Not configured (direct connection)")
 
         # 检查大模型配置
         try:
@@ -179,16 +199,35 @@ async def lifespan(app: FastAPI):
         croniter = None  # 可选依赖
     try:
         scheduler = AsyncIOScheduler(timezone=settings.TIMEZONE)
-        service = get_basics_sync_service()
+
+        # 使用多数据源同步服务（支持自动切换）
+        multi_source_service = MultiSourceBasicsSyncService()
+
+        # 根据 TUSHARE_ENABLED 配置决定优先数据源
+        # 如果 Tushare 被禁用，系统会自动使用其他可用数据源（AKShare/BaoStock）
+        preferred_sources = None  # None 表示使用默认优先级顺序
+
+        if settings.TUSHARE_ENABLED:
+            # Tushare 启用时，优先使用 Tushare
+            preferred_sources = ["tushare", "akshare", "baostock"]
+            logger.info(f"📊 股票基础信息同步优先数据源: Tushare > AKShare > BaoStock")
+        else:
+            # Tushare 禁用时，使用 AKShare 和 BaoStock
+            preferred_sources = ["akshare", "baostock"]
+            logger.info(f"📊 股票基础信息同步优先数据源: AKShare > BaoStock (Tushare已禁用)")
+
         # 立即在启动后尝试一次（不阻塞）
-        asyncio.create_task(service.run_full_sync(force=False))
+        async def run_sync_with_sources():
+            await multi_source_service.run_full_sync(force=False, preferred_sources=preferred_sources)
+
+        asyncio.create_task(run_sync_with_sources())
 
         # 配置调度：优先使用 CRON，其次使用 HH:MM
         if settings.SYNC_STOCK_BASICS_ENABLED:
             if settings.SYNC_STOCK_BASICS_CRON:
                 # 如果提供了cron表达式
                 scheduler.add_job(
-                    service.run_full_sync,  # coroutine function; AsyncIOScheduler will await it
+                    lambda: multi_source_service.run_full_sync(force=False, preferred_sources=preferred_sources),
                     CronTrigger.from_crontab(settings.SYNC_STOCK_BASICS_CRON, timezone=settings.TIMEZONE),
                     id="basics_sync_service"
                 )
@@ -196,7 +235,7 @@ async def lifespan(app: FastAPI):
             else:
                 hh, mm = (settings.SYNC_STOCK_BASICS_TIME or "06:30").split(":")
                 scheduler.add_job(
-                    service.run_full_sync,  # coroutine function; AsyncIOScheduler will await it
+                    lambda: multi_source_service.run_full_sync(force=False, preferred_sources=preferred_sources),
                     CronTrigger(hour=int(hh), minute=int(mm), timezone=settings.TIMEZONE),
                     id="basics_sync_service"
                 )

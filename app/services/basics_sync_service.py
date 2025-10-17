@@ -20,6 +20,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from pymongo import UpdateOne
 
 from app.core.database import get_mongo_db
+from app.core.config import settings
 
 from app.services.basics_sync import (
     fetch_stock_basic_df as _fetch_stock_basic_df_util,
@@ -86,6 +87,18 @@ class BasicsSyncService:
         await self._persist_status(db, stats.__dict__.copy())
 
         try:
+            # Step 0: Check if Tushare is enabled
+            if not settings.TUSHARE_ENABLED:
+                error_msg = (
+                    "❌ Tushare 数据源已禁用 (TUSHARE_ENABLED=false)\n"
+                    "💡 此服务仅支持 Tushare 数据源\n"
+                    "📋 解决方案：\n"
+                    "   1. 在 .env 文件中设置 TUSHARE_ENABLED=true 并配置 TUSHARE_TOKEN\n"
+                    "   2. 系统已自动切换到多数据源同步服务（支持 AKShare/BaoStock）"
+                )
+                logger.warning(error_msg)
+                raise RuntimeError(error_msg)
+
             # Step 1: Fetch stock basic list from Tushare (blocking -> thread)
             stock_df = await asyncio.to_thread(self._fetch_stock_basic_df)
             if stock_df is None or getattr(stock_df, "empty", True):

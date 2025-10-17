@@ -97,6 +97,17 @@ class Settings(BaseSettings):
     LOG_FORMAT: str = Field(default="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     LOG_FILE: str = Field(default="logs/tradingagents.log")
 
+    # 代理配置
+    # 用于配置需要绕过代理的域名（国内数据源）
+    # 多个域名用逗号分隔
+    # ⚠️ Windows 不支持通配符 *，必须使用完整域名
+    # 详细说明: docs/proxy_configuration.md
+    HTTP_PROXY: str = Field(default="")
+    HTTPS_PROXY: str = Field(default="")
+    NO_PROXY: str = Field(
+        default="localhost,127.0.0.1,eastmoney.com,push2.eastmoney.com,82.push2.eastmoney.com,82.push2delay.eastmoney.com,gtimg.cn,sinaimg.cn,api.tushare.pro,baostock.com"
+    )
+
     # 文件上传配置
     MAX_UPLOAD_SIZE: int = Field(default=10 * 1024 * 1024)  # 10MB
     UPLOAD_DIR: str = Field(default="uploads")
@@ -235,6 +246,15 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()
+
+# 自动将代理配置设置到环境变量
+# 这样 requests 库可以直接读取 os.environ['NO_PROXY']
+if settings.HTTP_PROXY:
+    os.environ['HTTP_PROXY'] = settings.HTTP_PROXY
+if settings.HTTPS_PROXY:
+    os.environ['HTTPS_PROXY'] = settings.HTTPS_PROXY
+if settings.NO_PROXY:
+    os.environ['NO_PROXY'] = settings.NO_PROXY
 
 
 def get_settings() -> Settings:
