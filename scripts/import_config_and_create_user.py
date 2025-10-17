@@ -31,7 +31,7 @@ from bson import ObjectId
 
 
 # 配置
-MONGO_URI = "mongodb://admin:tradingagents123@localhost:27017/tradingagents?authSource=admin"
+MONGO_URI = "mongodb://admin:tradingagents123@mongodb:27017/tradingagents?authSource=admin"
 DB_NAME = "tradingagents"
 
 # 默认管理员用户
