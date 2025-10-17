@@ -996,11 +996,29 @@ class OptimizedChinaDataProvider:
                             metrics["pe"] = f"{pe_calculated:.1f}倍"
                             logger.debug(f"✅ 计算PE: 市值{money_cap} / 净利润{net_profit} = {metrics['pe']}")
                         else:
-                            metrics["pe"] = "N/A"
+                            # 第三层降级：直接使用 latest_indicators 中的 pe 字段
+                            pe_static = latest_indicators.get('pe') or latest_indicators.get('pe_ttm')
+                            if pe_static is not None and str(pe_static) != 'nan' and pe_static != '--':
+                                try:
+                                    metrics["pe"] = f"{float(pe_static):.1f}倍"
+                                    logger.debug(f"✅ 使用静态PE: {metrics['pe']}")
+                                except (ValueError, TypeError):
+                                    metrics["pe"] = "N/A"
+                            else:
+                                metrics["pe"] = "N/A"
                     except (ValueError, TypeError, ZeroDivisionError):
                         metrics["pe"] = "N/A"
                 else:
-                    metrics["pe"] = "N/A"
+                    # 第三层降级：直接使用 latest_indicators 中的 pe 字段
+                    pe_static = latest_indicators.get('pe') or latest_indicators.get('pe_ttm')
+                    if pe_static is not None and str(pe_static) != 'nan' and pe_static != '--':
+                        try:
+                            metrics["pe"] = f"{float(pe_static):.1f}倍"
+                            logger.debug(f"✅ 使用静态PE: {metrics['pe']}")
+                        except (ValueError, TypeError):
+                            metrics["pe"] = "N/A"
+                    else:
+                        metrics["pe"] = "N/A"
 
             if pb_value is None:
                 total_equity = latest_indicators.get('total_hldr_eqy_exc_min_int')
@@ -1013,11 +1031,29 @@ class OptimizedChinaDataProvider:
                             metrics["pb"] = f"{pb_calculated:.2f}倍"
                             logger.debug(f"✅ 计算PB: 市值{money_cap} / 净资产{total_equity} = {metrics['pb']}")
                         else:
-                            metrics["pb"] = "N/A"
+                            # 第三层降级：直接使用 latest_indicators 中的 pb 字段
+                            pb_static = latest_indicators.get('pb') or latest_indicators.get('pb_mrq')
+                            if pb_static is not None and str(pb_static) != 'nan' and pb_static != '--':
+                                try:
+                                    metrics["pb"] = f"{float(pb_static):.2f}倍"
+                                    logger.debug(f"✅ 使用静态PB: {metrics['pb']}")
+                                except (ValueError, TypeError):
+                                    metrics["pb"] = "N/A"
+                            else:
+                                metrics["pb"] = "N/A"
                     except (ValueError, TypeError, ZeroDivisionError):
                         metrics["pb"] = "N/A"
                 else:
-                    metrics["pb"] = "N/A"
+                    # 第三层降级：直接使用 latest_indicators 中的 pb 字段
+                    pb_static = latest_indicators.get('pb') or latest_indicators.get('pb_mrq')
+                    if pb_static is not None and str(pb_static) != 'nan' and pb_static != '--':
+                        try:
+                            metrics["pb"] = f"{float(pb_static):.2f}倍"
+                            logger.debug(f"✅ 使用静态PB: {metrics['pb']}")
+                        except (ValueError, TypeError):
+                            metrics["pb"] = "N/A"
+                    else:
+                        metrics["pb"] = "N/A"
 
             # 资产负债率
             debt_ratio = latest_indicators.get('debt_to_assets')
@@ -1074,8 +1110,22 @@ class OptimizedChinaDataProvider:
             cash_flow = financial_data.get('cash_flow', [])
             main_indicators = financial_data.get('main_indicators')
 
-            if main_indicators is None or main_indicators.empty:
+            # main_indicators 可能是 DataFrame 或 list（to_dict('records') 的结果）
+            if main_indicators is None:
                 logger.warning("AKShare主要财务指标为空")
+                return None
+
+            # 检查是否为空
+            if isinstance(main_indicators, list):
+                if not main_indicators:
+                    logger.warning("AKShare主要财务指标列表为空")
+                    return None
+                # 列表格式：[{指标: 值, ...}, ...]
+                # 转换为 DataFrame 以便统一处理
+                import pandas as pd
+                main_indicators = pd.DataFrame(main_indicators)
+            elif hasattr(main_indicators, 'empty') and main_indicators.empty:
+                logger.warning("AKShare主要财务指标DataFrame为空")
                 return None
 
             # main_indicators是DataFrame，需要转换为字典格式便于查找

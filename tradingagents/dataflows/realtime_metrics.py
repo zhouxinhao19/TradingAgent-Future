@@ -34,7 +34,7 @@ def calculate_realtime_pe_pb(
         如果计算失败返回 None
     """
     try:
-        # 获取数据库连接
+        # 获取数据库连接（确保是同步客户端）
         if db_client is None:
             from tradingagents.config.database_manager import get_database_manager
             db_manager = get_database_manager()
@@ -42,21 +42,31 @@ def calculate_realtime_pe_pb(
                 logger.debug("MongoDB不可用，无法计算实时PE/PB")
                 return None
             db_client = db_manager.get_mongodb_client()
-        
+
+        # 检查是否是异步客户端（AsyncIOMotorClient）
+        # 如果是异步客户端，需要转换为同步客户端
+        client_type = type(db_client).__name__
+        if 'AsyncIOMotorClient' in client_type or 'Motor' in client_type:
+            # 这是异步客户端，创建同步客户端
+            from pymongo import MongoClient
+            from app.core.config import settings
+            logger.debug(f"检测到异步客户端 {client_type}，转换为同步客户端")
+            db_client = MongoClient(settings.MONGO_URI)
+
         db = db_client['tradingagents']
         code6 = str(symbol).zfill(6)
-        
+
         # 1. 获取实时行情（market_quotes）
         quote = db.market_quotes.find_one({"code": code6})
         if not quote:
             logger.debug(f"未找到股票 {code6} 的实时行情")
             return None
-        
+
         realtime_price = quote.get("close")
         if not realtime_price or realtime_price <= 0:
             logger.debug(f"股票 {code6} 的实时价格无效: {realtime_price}")
             return None
-        
+
         # 2. 获取基础信息和财务数据（stock_basic_info）
         basic_info = db.stock_basic_info.find_one({"code": code6})
         if not basic_info:
@@ -174,14 +184,23 @@ def get_pe_pb_with_fallback(
             if not db_manager.is_mongodb_available():
                 return {}
             db_client = db_manager.get_mongodb_client()
-        
+
+        # 检查是否是异步客户端
+        client_type = type(db_client).__name__
+        if 'AsyncIOMotorClient' in client_type or 'Motor' in client_type:
+            # 这是异步客户端，创建同步客户端
+            from pymongo import MongoClient
+            from app.core.config import settings
+            logger.debug(f"降级查询：检测到异步客户端 {client_type}，转换为同步客户端")
+            db_client = MongoClient(settings.MONGO_URI)
+
         db = db_client['tradingagents']
         code6 = str(symbol).zfill(6)
-        
+
         basic_info = db.stock_basic_info.find_one({"code": code6})
         if not basic_info:
             return {}
-        
+
         return {
             "pe": basic_info.get("pe"),
             "pb": basic_info.get("pb"),
@@ -192,7 +211,7 @@ def get_pe_pb_with_fallback(
             "updated_at": basic_info.get("updated_at"),
             "note": "使用最近一个交易日的数据"
         }
-        
+
     except Exception as e:
         logger.error(f"获取股票 {symbol} 的静态PE/PB失败: {e}")
         return {}
