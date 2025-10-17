@@ -146,9 +146,9 @@ services:
 
 volumes:
   tradingagents_mongodb_data:
-    driver: local
+    external: true
   tradingagents_redis_data:
-    driver: local
+    external: true
 
 networks:
   tradingagents-network:
