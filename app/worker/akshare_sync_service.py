@@ -344,6 +344,10 @@ class AKShareSyncService:
                 else:
                     quotes_data = quotes
 
+                # 确保 symbol 字段存在
+                if "symbol" not in quotes_data:
+                    quotes_data["symbol"] = symbol
+
                 # 更新到数据库
                 await self.db.market_quotes.update_one(
                     {"code": symbol},

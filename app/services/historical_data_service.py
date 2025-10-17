@@ -132,6 +132,7 @@ class HistoricalDataService:
         # 基础字段映射
         doc = {
             "symbol": symbol,
+            "code": symbol,  # 添加 code 字段，与 symbol 保持一致（向后兼容）
             "full_symbol": self._get_full_symbol(symbol, market),
             "market": market,
             "trade_date": trade_date,

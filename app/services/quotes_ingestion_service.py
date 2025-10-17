@@ -78,11 +78,13 @@ class QuotesIngestionService:
         for code, q in quotes_map.items():
             if not code:
                 continue
+            code6 = str(code).zfill(6)
             ops.append(
                 UpdateOne(
-                    {"code": str(code).zfill(6)},
+                    {"code": code6},
                     {"$set": {
-                        "code": str(code).zfill(6),
+                        "code": code6,
+                        "symbol": code6,  # 添加 symbol 字段，与 code 保持一致
                         "close": q.get("close"),
                         "pct_chg": q.get("pct_chg"),
                         "amount": q.get("amount"),

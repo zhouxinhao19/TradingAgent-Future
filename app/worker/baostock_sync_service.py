@@ -230,9 +230,14 @@ class BaoStockSyncService:
         try:
             collection = self.db.market_quotes
 
+            # 确保 symbol 字段存在
+            code = quotes.get("code", "")
+            if code and "symbol" not in quotes:
+                quotes["symbol"] = code
+
             # 使用upsert更新或插入
             await collection.update_one(
-                {"code": quotes["code"]},
+                {"code": code},
                 {"$set": quotes},
                 upsert=True
             )
