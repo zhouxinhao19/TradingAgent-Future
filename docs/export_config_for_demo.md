@@ -53,7 +53,9 @@ curl -X POST "http://localhost:8000/api/system/database/export" \
       "datasource_groupings",
       "platform_configs",
       "user_configs",
-      "model_catalog"
+      "model_catalog",
+      "market_quotes",
+      "stock_basic_info"
     ],
     "format": "json"
   }' \
@@ -127,6 +129,8 @@ curl -X POST "http://new-server:8000/api/system/database/import" \
 | `platform_configs` | 平台配置 | ⭐⭐⭐ |
 | `user_configs` | 用户个性化配置 | ⭐⭐ |
 | `model_catalog` | 模型目录 | ⭐⭐ |
+| `market_quotes` | 实时行情数据 | ⭐⭐⭐⭐ |
+| `stock_basic_info` | 股票基础信息 | ⭐⭐⭐⭐ |
 
 ### 包含的 LLM 配置（15 个）
 

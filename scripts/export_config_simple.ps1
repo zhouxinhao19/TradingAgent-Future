@@ -25,7 +25,9 @@ $collections = @(
     "datasource_groupings",
     "platform_configs",
     "user_configs",
-    "model_catalog"
+    "model_catalog",
+    "market_quotes",        # 实时行情数据
+    "stock_basic_info"      # 股票基础信息
 )
 
 Write-Host "`n[1] 检查 MongoDB 容器..." -ForegroundColor Yellow
@@ -167,6 +169,8 @@ $readme = @"
 - platform_configs (平台配置)
 - user_configs (用户配置)
 - model_catalog (模型目录)
+- market_quotes (实时行情数据)
+- stock_basic_info (股票基础信息)
 
 ## 使用方法
 

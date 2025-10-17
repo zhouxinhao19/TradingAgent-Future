@@ -8,11 +8,13 @@
 # - user_tags (用户标签)
 # - datasource_groupings (数据源分组)
 # - platform_configs (平台配置)
+# - market_quotes (实时行情数据)
+# - stock_basic_info (股票基础信息)
 #
 # 不导出的数据：
 # - 分析报告 (analysis_reports)
 # - 分析任务 (analysis_tasks)
-# - 股票数据 (stock_basic_info, market_quotes, stock_daily_quotes)
+# - 历史K线数据 (stock_daily_quotes)
 # - 财务数据 (financial_data_cache, financial_metrics_cache)
 # - 日志和历史记录
 
@@ -41,7 +43,9 @@ $collectionsToExport = @(
     "datasource_groupings",     # 数据源分组
     "platform_configs",         # 平台配置
     "user_configs",             # 用户配置
-    "model_catalog"             # 模型目录
+    "model_catalog",            # 模型目录
+    "market_quotes",            # 实时行情数据
+    "stock_basic_info"          # 股票基础信息
 )
 
 Write-Host "`n[1] 检查 MongoDB 容器..." -ForegroundColor Yellow
