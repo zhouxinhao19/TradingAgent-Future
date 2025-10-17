@@ -29,6 +29,8 @@ class AKShareProvider(BaseStockDataProvider):
         super().__init__("AKShare")
         self.ak = None
         self.connected = False
+        self._stock_list_cache = None  # 缓存股票列表，避免重复获取
+        self._cache_time = None  # 缓存时间
         self._initialize_akshare()
     
     def _initialize_akshare(self):
@@ -181,10 +183,35 @@ class AKShareProvider(BaseStockDataProvider):
             logger.error(f"❌ 获取{code}基础信息失败: {e}")
             return None
     
+    async def _get_stock_list_cached(self):
+        """获取缓存的股票列表（避免重复获取）"""
+        from datetime import datetime, timedelta
+
+        # 如果缓存存在且未过期（1小时），直接返回
+        if self._stock_list_cache is not None and self._cache_time is not None:
+            if datetime.now() - self._cache_time < timedelta(hours=1):
+                return self._stock_list_cache
+
+        # 否则重新获取
+        def fetch_stock_list():
+            return self.ak.stock_info_a_code_name()
+
+        try:
+            stock_list = await asyncio.to_thread(fetch_stock_list)
+            if stock_list is not None and not stock_list.empty:
+                self._stock_list_cache = stock_list
+                self._cache_time = datetime.now()
+                logger.info(f"✅ 股票列表缓存更新: {len(stock_list)} 只股票")
+                return stock_list
+        except Exception as e:
+            logger.error(f"❌ 获取股票列表失败: {e}")
+
+        return None
+
     async def _get_stock_info_detail(self, code: str) -> Dict[str, Any]:
         """获取股票详细信息"""
         try:
-            # 方法1: 尝试获取个股详细信息
+            # 方法1: 尝试获取个股详细信息（包含行业、地区等详细信息）
             def fetch_individual_info():
                 return self.ak.stock_individual_info_em(symbol=code)
 
@@ -219,12 +246,9 @@ class AKShareProvider(BaseStockDataProvider):
             except Exception as e:
                 logger.debug(f"获取{code}个股详细信息失败: {e}")
 
-            # 方法2: 从股票列表中获取基本信息
-            def fetch_stock_list():
-                return self.ak.stock_info_a_code_name()
-
+            # 方法2: 从缓存的股票列表中获取基本信息（只有代码和名称）
             try:
-                stock_list = await asyncio.to_thread(fetch_stock_list)
+                stock_list = await self._get_stock_list_cached()
                 if stock_list is not None and not stock_list.empty:
                     stock_row = stock_list[stock_list['code'] == code]
                     if not stock_row.empty:
