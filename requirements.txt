@@ -29,7 +29,7 @@ chainlit
 rich
 questionary
 langchain_anthropic
-langchain-google-genai
+langchain-google-genai>=2.1.12  # 修复 client_options 未定义错误
 google-genai>=0.1.0
 dashscope
 streamlit
