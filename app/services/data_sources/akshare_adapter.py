@@ -31,82 +31,83 @@ class AKShareAdapter(DataSourceAdapter):
             return False
 
     def get_stock_list(self) -> Optional[pd.DataFrame]:
-        """获取股票列表（基于已知规则生成，避免外部接口不稳定）"""
+        """获取股票列表（使用 AKShare 的 stock_info_a_code_name 接口获取真实股票名称）"""
         if not self.is_available():
             return None
         try:
-            import akshare as ak  # noqa: F401
-            logger.info("AKShare: Generating stock list from known patterns...")
+            import akshare as ak
+            logger.info("AKShare: Fetching stock list with real names from stock_info_a_code_name()...")
 
-            stock_data = []
-            # 深圳主板 000001-000999
-            for i in range(1, 1000):
-                code = f"{i:06d}"
+            # 使用 AKShare 的 stock_info_a_code_name 接口获取股票代码和名称
+            df = ak.stock_info_a_code_name()
+
+            if df is None or df.empty:
+                logger.warning("AKShare: stock_info_a_code_name() returned empty data")
+                return None
+
+            # 标准化列名（AKShare 返回的列名可能是中文）
+            # 通常返回的列：code（代码）、name（名称）
+            df = df.rename(columns={
+                'code': 'symbol',
+                '代码': 'symbol',
+                'name': 'name',
+                '名称': 'name'
+            })
+
+            # 确保有必需的列
+            if 'symbol' not in df.columns or 'name' not in df.columns:
+                logger.error(f"AKShare: Unexpected column names: {df.columns.tolist()}")
+                return None
+
+            # 生成 ts_code 和其他字段
+            def generate_ts_code(code: str) -> str:
+                """根据股票代码生成 ts_code"""
+                if not code:
+                    return ""
+                code = str(code).zfill(6)
+                if code.startswith(('60', '68', '90')):
+                    return f"{code}.SH"
+                elif code.startswith(('00', '30', '20')):
+                    return f"{code}.SZ"
+                elif code.startswith(('8', '4')):
+                    return f"{code}.BJ"
+                else:
+                    return f"{code}.SZ"  # 默认深圳
+
+            def get_market(code: str) -> str:
+                """根据股票代码判断市场"""
+                if not code:
+                    return ""
+                code = str(code).zfill(6)
                 if code.startswith('000'):
-                    stock_data.append({
-                        'symbol': code,
-                        'name': f'股票{code}',
-                        'ts_code': f'{code}.SZ',
-                        'area': '',
-                        'industry': '',
-                        'market': '主板',
-                        'list_date': ''
-                    })
-            # 深圳中小板 002001-002999
-            for i in range(2001, 3000):
-                code = f"{i:06d}"
-                if code.startswith('002'):
-                    stock_data.append({
-                        'symbol': code,
-                        'name': f'股票{code}',
-                        'ts_code': f'{code}.SZ',
-                        'area': '',
-                        'industry': '',
-                        'market': '中小板',
-                        'list_date': ''
-                    })
-            # 创业板 300001-300999
-            for i in range(300001, 301000):
-                code = f"{i:06d}"
-                stock_data.append({
-                    'symbol': code,
-                    'name': f'股票{code}',
-                    'ts_code': f'{code}.SZ',
-                    'area': '',
-                    'industry': '',
-                    'market': '创业板',
-                    'list_date': ''
-                })
-            # 上海主板 600001-600999
-            for i in range(600001, 601000):
-                code = f"{i:06d}"
-                stock_data.append({
-                    'symbol': code,
-                    'name': f'股票{code}',
-                    'ts_code': f'{code}.SH',
-                    'area': '',
-                    'industry': '',
-                    'market': '主板',
-                    'list_date': ''
-                })
-            # 科创板 688001-688099（前100个）
-            for i in range(688001, 688100):
-                code = f"{i:06d}"
-                stock_data.append({
-                    'symbol': code,
-                    'name': f'股票{code}',
-                    'ts_code': f'{code}.SH',
-                    'area': '',
-                    'industry': '',
-                    'market': '科创板',
-                    'list_date': ''
-                })
+                    return '主板'
+                elif code.startswith('002'):
+                    return '中小板'
+                elif code.startswith('300'):
+                    return '创业板'
+                elif code.startswith('60'):
+                    return '主板'
+                elif code.startswith('688'):
+                    return '科创板'
+                elif code.startswith('8'):
+                    return '北交所'
+                elif code.startswith('4'):
+                    return '新三板'
+                else:
+                    return '未知'
 
-            df = pd.DataFrame(stock_data)
-            logger.info(f"AKShare: Successfully generated {len(df)} stock codes")
+            # 添加 ts_code 和 market 字段
+            df['ts_code'] = df['symbol'].apply(generate_ts_code)
+            df['market'] = df['symbol'].apply(get_market)
+            df['area'] = ''
+            df['industry'] = ''
+            df['list_date'] = ''
+
+            logger.info(f"AKShare: Successfully fetched {len(df)} stocks with real names")
             return df
+
         except Exception as e:
-            logger.error(f"AKShare: Failed to generate stock list: {e}")
+            logger.error(f"AKShare: Failed to fetch stock list: {e}")
             return None
 
     def get_daily_basic(self, trade_date: str) -> Optional[pd.DataFrame]:
