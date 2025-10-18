@@ -38,7 +38,6 @@ class ChatDashScopeOpenAI(ChatOpenAI):
         else:
             logger.error(f"❌ [DashScope初始化] DASHSCOPE_API_KEY 环境变量为空！")
             # 打印所有环境变量中包含 DASH 的
-            import os
             dash_vars = {k: v for k, v in os.environ.items() if 'DASH' in k.upper()}
             logger.info(f"🔍 [DashScope初始化] 所有包含DASH的环境变量: {list(dash_vars.keys())}")
 
