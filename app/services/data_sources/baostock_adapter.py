@@ -58,7 +58,28 @@ class BaoStockAdapter(DataSourceAdapter):
                 )
                 df['name'] = df['code_name']
                 df['area'] = ''
-                df['industry'] = ''
+
+                # 获取行业信息
+                logger.info("BaoStock: Querying stock industry info...")
+                industry_rs = bs.query_stock_industry()
+                if industry_rs.error_code == '0':
+                    industry_list = []
+                    while (industry_rs.error_code == '0') & industry_rs.next():
+                        industry_list.append(industry_rs.get_row_data())
+                    if industry_list:
+                        industry_df = pd.DataFrame(industry_list, columns=industry_rs.fields)
+                        # 创建行业映射字典 {code: industry}
+                        industry_map = dict(zip(industry_df['code'], industry_df['industry']))
+                        # 将行业信息合并到主DataFrame
+                        df['industry'] = df['code'].map(industry_map).fillna('')
+                        logger.info(f"BaoStock: Successfully mapped industry info for {len(industry_map)} stocks")
+                    else:
+                        df['industry'] = ''
+                        logger.warning("BaoStock: No industry data returned")
+                else:
+                    df['industry'] = ''
+                    logger.warning(f"BaoStock: Failed to query industry info: {industry_rs.error_msg}")
+
                 df['market'] = '\u4e3b\u677f'
                 df['list_date'] = ''
                 logger.info(f"BaoStock: Successfully fetched {len(df)} stocks")
