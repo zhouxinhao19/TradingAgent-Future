@@ -28,13 +28,27 @@ class ChatGoogleOpenAI(ChatGoogleGenerativeAI):
     def __init__(self, **kwargs):
         """初始化 Google AI OpenAI 兼容客户端"""
 
+        # 🔍 [DEBUG] 读取环境变量前的日志
+        logger.info("🔍 [Google初始化] 开始初始化 ChatGoogleOpenAI")
+        logger.info(f"🔍 [Google初始化] kwargs 中是否包含 google_api_key: {'google_api_key' in kwargs}")
+
         # 设置 Google AI 的默认配置
         kwargs.setdefault("temperature", 0.1)
         kwargs.setdefault("max_tokens", 2000)
 
         # 检查 API 密钥
-        google_api_key = kwargs.get("google_api_key") or os.getenv("GOOGLE_API_KEY")
+        env_api_key = os.getenv("GOOGLE_API_KEY")
+        logger.info(f"🔍 [Google初始化] 从环境变量读取 GOOGLE_API_KEY: {'有值' if env_api_key else '空'}")
+        if env_api_key:
+            logger.info(f"🔍 [Google初始化] API Key 长度: {len(env_api_key)}, 前10位: {env_api_key[:10]}...")
+        else:
+            logger.error("❌ [Google初始化] GOOGLE_API_KEY 环境变量为空！")
+
+        google_api_key = kwargs.get("google_api_key") or env_api_key
+        logger.info(f"🔍 [Google初始化] 最终使用的 API Key: {'有值' if google_api_key else '空'}")
+
         if not google_api_key:
+            logger.error("❌ [Google初始化] API Key 检查失败，即将抛出异常")
             raise ValueError(
                 "Google API key not found. Please set GOOGLE_API_KEY environment variable "
                 "or pass google_api_key parameter."
@@ -90,9 +104,19 @@ class ChatGoogleOpenAI(ChatGoogleGenerativeAI):
         except Exception as e:
             logger.error(f"❌ Google AI 生成失败: {e}")
             logger.exception(e)  # 打印完整的堆栈跟踪
+
+            # 检查是否为 API Key 无效错误
+            error_str = str(e)
+            if 'API_KEY_INVALID' in error_str or 'API key not valid' in error_str:
+                error_content = "Google AI API Key 无效或未配置。\n\n请检查：\n1. GOOGLE_API_KEY 环境变量是否正确配置\n2. API Key 是否有效（访问 https://ai.google.dev/ 获取）\n3. 是否启用了 Gemini API\n\n建议：使用其他 AI 模型（如阿里百炼、DeepSeek）"
+            elif 'Connection' in error_str or 'Network' in error_str:
+                error_content = f"Google AI 网络连接失败: {error_str}\n\n请检查：\n1. 网络连接是否正常\n2. 是否需要科学上网\n3. 防火墙设置"
+            else:
+                error_content = f"Google AI 调用失败: {error_str}\n\n请检查配置或使用其他 AI 模型"
+
             # 返回一个包含错误信息的结果，而不是抛出异常
             from langchain_core.outputs import ChatGeneration
-            error_message = AIMessage(content=f"Google AI 调用失败: {str(e)}\n\n请检查：\n1. 网络连接是否正常\n2. 是否需要科学上网\n3. GOOGLE_API_KEY 是否有效")
+            error_message = AIMessage(content=error_content)
             error_generation = ChatGeneration(message=error_message)
             return LLMResult(generations=[[error_generation]])
     

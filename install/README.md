@@ -1,14 +1,50 @@
-# 演示系统部署文件
+# 🚀 TradingAgents-CN 安装文件
 
-## 📋 目录说明
+本目录包含 TradingAgents-CN 的一键安装脚本和配置文件。
 
-本目录包含用于快速部署 TradingAgents 演示系统的配置文件。
-
-### 文件列表
+## 📋 文件列表
 
 | 文件 | 说明 |
 |------|------|
+| `install_linux.sh` | Linux 一键安装脚本 (Ubuntu 20.04+, CentOS 7+, Debian 10+) |
+| `install_macos.sh` | macOS 一键安装脚本 (macOS 10.15+) |
+| `install_windows.ps1` | Windows 一键安装脚本 (Windows 10+, Windows Server 2019+) |
 | `database_export_config_2025-10-16.json` | 系统配置数据导出文件 |
+
+---
+
+## 🚀 一键安装（推荐）
+
+### Linux
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/install/install_linux.sh | bash
+```
+
+### macOS
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/install/install_macos.sh | bash
+```
+
+### Windows
+
+```powershell
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/install/install_windows.ps1" -OutFile "install_windows.ps1"
+.\install_windows.ps1
+```
+
+**安装脚本功能**：
+- ✅ 自动检测并安装 Docker
+- ✅ 下载配置文件
+- ✅ 交互式配置 API 密钥
+- ✅ 启动所有服务
+- ✅ 导入初始配置
+- ✅ 创建管理员账号
+
+---
+
+## 📖 手动部署
 
 ---
 

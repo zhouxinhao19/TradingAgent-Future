@@ -186,9 +186,7 @@ wget https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview
 mkdir -p nginx
 wget https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/nginx/nginx.conf -O nginx/nginx.conf
 
-# 下载初始配置数据（包含 LLM 配置和示例数据）
-mkdir -p install
-wget https://github.com/hsliuping/TradingAgents-CN/releases/download/v1.0.0-preview/database_export_config.json -O install/database_export_config.json
+
 ```
 
 **Windows PowerShell**：
@@ -206,8 +204,6 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hsliuping/TradingAgent
 New-Item -ItemType Directory -Path "nginx" -Force
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/nginx/nginx.conf" -OutFile "nginx\nginx.conf"
 
-New-Item -ItemType Directory -Path "install" -Force
-Invoke-WebRequest -Uri "https://github.com/hsliuping/TradingAgents-CN/releases/download/v1.0.0-preview/database_export_config.json" -OutFile "install\database_export_config.json"
 ```
 
 ### 步骤 3：配置 API 密钥（重要）

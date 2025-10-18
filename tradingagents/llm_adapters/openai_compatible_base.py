@@ -60,18 +60,34 @@ class OpenAICompatibleBase(ChatOpenAI):
             **kwargs: 其他参数
         """
         
+        # 🔍 [DEBUG] 读取环境变量前的日志
+        logger.info(f"🔍 [{provider_name}初始化] 开始初始化 OpenAI 兼容适配器")
+        logger.info(f"🔍 [{provider_name}初始化] 模型: {model}")
+        logger.info(f"🔍 [{provider_name}初始化] API Key 环境变量名: {api_key_env_var}")
+        logger.info(f"🔍 [{provider_name}初始化] 是否传入 api_key 参数: {api_key is not None}")
+
         # 在父类初始化前先缓存元信息到私有属性（避免Pydantic字段限制）
         object.__setattr__(self, "_provider_name", provider_name)
         object.__setattr__(self, "_model_name_alias", model)
-        
+
         # 获取API密钥
         if api_key is None:
-            api_key = os.getenv(api_key_env_var)
+            env_api_key = os.getenv(api_key_env_var)
+            logger.info(f"🔍 [{provider_name}初始化] 从环境变量读取 {api_key_env_var}: {'有值' if env_api_key else '空'}")
+            if env_api_key:
+                logger.info(f"🔍 [{provider_name}初始化] API Key 长度: {len(env_api_key)}, 前10位: {env_api_key[:10]}...")
+            else:
+                logger.error(f"❌ [{provider_name}初始化] {api_key_env_var} 环境变量为空！")
+
+            api_key = env_api_key
             if not api_key:
+                logger.error(f"❌ [{provider_name}初始化] API Key 检查失败，即将抛出异常")
                 raise ValueError(
                     f"{provider_name} API密钥未找到。"
                     f"请设置{api_key_env_var}环境变量或传入api_key参数。"
                 )
+        else:
+            logger.info(f"🔍 [{provider_name}初始化] 使用传入的 API Key (长度: {len(api_key)})")
         
         # 设置OpenAI兼容参数
         # 注意：model参数会被Pydantic映射到model_name字段

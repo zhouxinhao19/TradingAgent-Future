@@ -101,6 +101,27 @@ services:
       BCRYPT_ROUNDS: "12"
       # CORS配置（允许 Nginx 代理）
       CORS_ORIGINS: "*"
+      # AI模型API密钥（从.env文件读取，environment部分需要显式声明才能覆盖镜像内的占位符）
+      DASHSCOPE_API_KEY: "${DASHSCOPE_API_KEY}"
+      DASHSCOPE_ENABLED: "${DASHSCOPE_ENABLED:-false}"
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY}"
+      DEEPSEEK_ENABLED: "${DEEPSEEK_ENABLED:-false}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      OPENAI_ENABLED: "${OPENAI_ENABLED:-false}"
+      GOOGLE_API_KEY: "${GOOGLE_API_KEY}"
+      GOOGLE_ENABLED: "${GOOGLE_ENABLED:-false}"
+      BAIDU_API_KEY: "${BAIDU_API_KEY}"
+      BAIDU_SECRET_KEY: "${BAIDU_SECRET_KEY}"
+      BAIDU_ENABLED: "${BAIDU_ENABLED:-false}"
+      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY}"
+      OPENROUTER_ENABLED: "${OPENROUTER_ENABLED:-false}"
+      # 数据源API密钥
+      TUSHARE_TOKEN: "${TUSHARE_TOKEN}"
+      TUSHARE_ENABLED: "${TUSHARE_ENABLED:-false}"
+      AKSHARE_ENABLED: "${AKSHARE_ENABLED:-true}"
+      BAOSTOCK_ENABLED: "${BAOSTOCK_ENABLED:-true}"
+      FINNHUB_API_KEY: "${FINNHUB_API_KEY}"
+      FINNHUB_ENABLED: "${FINNHUB_ENABLED:-false}"
     depends_on:
       mongodb:
         condition: service_healthy

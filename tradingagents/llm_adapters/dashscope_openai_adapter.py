@@ -25,16 +25,36 @@ class ChatDashScopeOpenAI(ChatOpenAI):
     
     def __init__(self, **kwargs):
         """初始化 DashScope OpenAI 兼容客户端"""
-        
+
+        # 🔍 [DEBUG] 读取环境变量前的日志
+        logger.info(f"🔍 [DashScope初始化] 开始初始化 ChatDashScopeOpenAI")
+        logger.info(f"🔍 [DashScope初始化] kwargs 中是否包含 api_key: {'api_key' in kwargs}")
+
+        # 尝试从环境变量读取 API Key
+        env_api_key = os.getenv("DASHSCOPE_API_KEY")
+        logger.info(f"🔍 [DashScope初始化] 从环境变量读取 DASHSCOPE_API_KEY: {'有值' if env_api_key else '空'}")
+        if env_api_key:
+            logger.info(f"🔍 [DashScope初始化] API Key 长度: {len(env_api_key)}, 前10位: {env_api_key[:10]}...")
+        else:
+            logger.error(f"❌ [DashScope初始化] DASHSCOPE_API_KEY 环境变量为空！")
+            # 打印所有环境变量中包含 DASH 的
+            import os
+            dash_vars = {k: v for k, v in os.environ.items() if 'DASH' in k.upper()}
+            logger.info(f"🔍 [DashScope初始化] 所有包含DASH的环境变量: {list(dash_vars.keys())}")
+
         # 设置 DashScope OpenAI 兼容接口的默认配置
         kwargs.setdefault("base_url", "https://dashscope.aliyuncs.com/compatible-mode/v1")
-        kwargs.setdefault("api_key", os.getenv("DASHSCOPE_API_KEY"))
+        kwargs.setdefault("api_key", env_api_key)
         kwargs.setdefault("model", "qwen-turbo")
         kwargs.setdefault("temperature", 0.1)
         kwargs.setdefault("max_tokens", 2000)
-        
+
         # 检查 API 密钥
-        if not kwargs.get("api_key"):
+        final_api_key = kwargs.get("api_key")
+        logger.info(f"🔍 [DashScope初始化] 最终使用的 API Key: {'有值' if final_api_key else '空'}")
+
+        if not final_api_key:
+            logger.error(f"❌ [DashScope初始化] API Key 检查失败，即将抛出异常")
             raise ValueError(
                 "DashScope API key not found. Please set DASHSCOPE_API_KEY environment variable "
                 "or pass api_key parameter."
