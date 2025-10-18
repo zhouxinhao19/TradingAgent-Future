@@ -280,15 +280,32 @@ class AKShareProvider(BaseStockDataProvider):
             return "未知市场"
     
     def _get_full_symbol(self, code: str) -> str:
-        """获取完整股票代码"""
-        if code.startswith(('60', '68')):
+        """
+        获取完整股票代码
+
+        Args:
+            code: 6位股票代码
+
+        Returns:
+            完整标准化代码，如果无法识别则返回原始代码（确保不为空）
+        """
+        # 确保 code 不为空
+        if not code:
+            return ""
+
+        # 标准化为字符串
+        code = str(code).strip()
+
+        # 根据代码前缀判断交易所
+        if code.startswith(('60', '68', '90')):  # 上海证券交易所（增加90开头的B股）
             return f"{code}.SS"
-        elif code.startswith(('00', '30')):
+        elif code.startswith(('00', '30', '20')):  # 深圳证券交易所（增加20开头的B股）
             return f"{code}.SZ"
-        elif code.startswith('8'):
+        elif code.startswith(('8', '4')):  # 北京证券交易所（增加4开头的新三板）
             return f"{code}.BJ"
         else:
-            return code
+            # 无法识别的代码，返回原始代码（确保不为空）
+            return code if code else ""
     
     def _get_market_info(self, code: str) -> Dict[str, Any]:
         """获取市场信息"""

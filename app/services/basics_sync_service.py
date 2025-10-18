@@ -271,20 +271,29 @@ class BasicsSyncService:
             code: 6位股票代码
 
         Returns:
-            完整标准化代码（如 000001.SZ）
+            完整标准化代码（如 000001.SZ），如果代码无效则返回原始代码（确保不为空）
         """
-        if not code or len(code) != 6:
-            return None
+        # 确保 code 不为空
+        if not code:
+            return ""
+
+        # 标准化为字符串并去除空格
+        code = str(code).strip()
+
+        # 如果长度不是 6，返回原始代码（避免返回 None）
+        if len(code) != 6:
+            return code
 
         # 根据代码判断交易所
         if code.startswith(('60', '68', '90')):
             return f"{code}.SS"  # 上海证券交易所
         elif code.startswith(('00', '30', '20')):
             return f"{code}.SZ"  # 深圳证券交易所
-        elif code.startswith('8') or code.startswith('4'):
+        elif code.startswith(('8', '4')):
             return f"{code}.BJ"  # 北京证券交易所
         else:
-            return f"{code}.SZ"  # 默认深圳
+            # 无法识别的代码，返回原始代码（确保不为空）
+            return code if code else ""
 
 
 # Singleton accessor

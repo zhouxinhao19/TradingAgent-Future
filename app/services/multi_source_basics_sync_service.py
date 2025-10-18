@@ -201,6 +201,9 @@ class MultiSourceBasicsSyncService:
                     if isinstance(ts_code, str) and ts_code in daily_data_map:
                         daily_metrics = daily_data_map[ts_code]
 
+                    # 生成 full_symbol（确保不为空）
+                    full_symbol = ts_code if ts_code else self._generate_full_symbol(code)
+
                     # 构建文档
                     doc = {
                         "code": code,
@@ -210,6 +213,7 @@ class MultiSourceBasicsSyncService:
                         "market": market,
                         "list_date": list_date,
                         "sse": sse,
+                        "full_symbol": full_symbol,  # 添加 full_symbol 字段
                         "category": category,
                         "source": "multi_source",
                         "updated_at": datetime.now(),
@@ -262,6 +266,38 @@ class MultiSourceBasicsSyncService:
     def _add_financial_metrics(self, doc: Dict, daily_metrics: Dict) -> None:
         """委托到 basics_sync.processing.add_financial_metrics"""
         return _add_financial_metrics_util(doc, daily_metrics)
+
+    def _generate_full_symbol(self, code: str) -> str:
+        """
+        根据股票代码生成完整标准化代码
+
+        Args:
+            code: 6位股票代码
+
+        Returns:
+            完整标准化代码，如果无法识别则返回原始代码（确保不为空）
+        """
+        # 确保 code 不为空
+        if not code:
+            return ""
+
+        # 标准化为字符串并去除空格
+        code = str(code).strip()
+
+        # 如果长度不是 6，返回原始代码
+        if len(code) != 6:
+            return code
+
+        # 根据代码前缀判断交易所
+        if code.startswith(('60', '68', '90')):  # 上海证券交易所
+            return f"{code}.SS"
+        elif code.startswith(('00', '30', '20')):  # 深圳证券交易所
+            return f"{code}.SZ"
+        elif code.startswith(('8', '4')):  # 北京证券交易所
+            return f"{code}.BJ"
+        else:
+            # 无法识别的代码，返回原始代码（确保不为空）
+            return code if code else ""
 
 
 # 全局服务实例
