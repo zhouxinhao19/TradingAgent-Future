@@ -53,14 +53,27 @@ def bridge_config_to_env():
         bridged_count += 1
 
         # 1. 桥接大模型配置（基础 API 密钥）
+        # 🔧 [优先级] .env 文件 > 数据库配置
+        # 只有当环境变量不存在或为占位符时，才使用数据库中的配置
         llm_configs = unified_config.get_llm_configs()
         for llm_config in llm_configs:
-            if llm_config.enabled and llm_config.api_key:
-                # 将 API 密钥写入环境变量
-                env_key = f"{llm_config.provider.value.upper()}_API_KEY"
-                os.environ[env_key] = llm_config.api_key
-                logger.info(f"  ✓ 桥接 {env_key} (长度: {len(llm_config.api_key)})")
+            env_key = f"{llm_config.provider.value.upper()}_API_KEY"
+            existing_env_value = os.getenv(env_key)
+
+            # 检查环境变量是否已存在且有效（不是占位符）
+            if existing_env_value and not existing_env_value.startswith("your_"):
+                logger.info(f"  ✓ 使用 .env 文件中的 {env_key} (长度: {len(existing_env_value)})")
                 bridged_count += 1
+            elif llm_config.enabled and llm_config.api_key:
+                # 只有当环境变量不存在或为占位符时，才使用数据库配置
+                if not llm_config.api_key.startswith("your_"):
+                    os.environ[env_key] = llm_config.api_key
+                    logger.info(f"  ✓ 使用数据库中的 {env_key} (长度: {len(llm_config.api_key)})")
+                    bridged_count += 1
+                else:
+                    logger.warning(f"  ⚠️  {env_key} 在 .env 和数据库中都是占位符，跳过")
+            else:
+                logger.debug(f"  ⏭️  {env_key} 未配置")
 
         # 2. 桥接默认模型配置
         default_model = unified_config.get_default_model()
@@ -82,18 +95,33 @@ def bridge_config_to_env():
             bridged_count += 1
 
         # 3. 桥接数据源配置（基础 API 密钥）
+        # 🔧 [优先级] .env 文件 > 数据库配置
         data_source_configs = unified_config.get_data_source_configs()
         for ds_config in data_source_configs:
             if ds_config.enabled and ds_config.api_key:
                 # Tushare Token
                 if ds_config.type.value == 'tushare':
-                    os.environ['TUSHARE_TOKEN'] = ds_config.api_key
-                    logger.info(f"  ✓ 桥接 TUSHARE_TOKEN (长度: {len(ds_config.api_key)})")
+                    existing_token = os.getenv('TUSHARE_TOKEN')
+                    if existing_token and not existing_token.startswith("your_"):
+                        logger.info(f"  ✓ 使用 .env 文件中的 TUSHARE_TOKEN (长度: {len(existing_token)})")
+                    elif not ds_config.api_key.startswith("your_"):
+                        os.environ['TUSHARE_TOKEN'] = ds_config.api_key
+                        logger.info(f"  ✓ 使用数据库中的 TUSHARE_TOKEN (长度: {len(ds_config.api_key)})")
+                    else:
+                        logger.warning(f"  ⚠️  TUSHARE_TOKEN 在 .env 和数据库中都是占位符，跳过")
+                        continue
                     bridged_count += 1
                 # FinnHub API Key
                 elif ds_config.type.value == 'finnhub':
-                    os.environ['FINNHUB_API_KEY'] = ds_config.api_key
-                    logger.info(f"  ✓ 桥接 FINNHUB_API_KEY (长度: {len(ds_config.api_key)})")
+                    existing_key = os.getenv('FINNHUB_API_KEY')
+                    if existing_key and not existing_key.startswith("your_"):
+                        logger.info(f"  ✓ 使用 .env 文件中的 FINNHUB_API_KEY (长度: {len(existing_key)})")
+                    elif not ds_config.api_key.startswith("your_"):
+                        os.environ['FINNHUB_API_KEY'] = ds_config.api_key
+                        logger.info(f"  ✓ 使用数据库中的 FINNHUB_API_KEY (长度: {len(ds_config.api_key)})")
+                    else:
+                        logger.warning(f"  ⚠️  FINNHUB_API_KEY 在 .env 和数据库中都是占位符，跳过")
+                        continue
                     bridged_count += 1
 
         # 4. 桥接数据源细节配置（超时、重试、缓存等）
