@@ -68,8 +68,20 @@ class BaoStockAdapter(DataSourceAdapter):
                         industry_list.append(industry_rs.get_row_data())
                     if industry_list:
                         industry_df = pd.DataFrame(industry_list, columns=industry_rs.fields)
-                        # 创建行业映射字典 {code: industry}
-                        industry_map = dict(zip(industry_df['code'], industry_df['industry']))
+
+                        # 去掉行业编码前缀（如 "I65软件和信息技术服务业" -> "软件和信息技术服务业"）
+                        def clean_industry_name(industry_str):
+                            if not industry_str or pd.isna(industry_str):
+                                return ''
+                            # 使用正则表达式去掉前面的字母和数字编码（如 I65、C31 等）
+                            import re
+                            cleaned = re.sub(r'^[A-Z]\d+', '', str(industry_str))
+                            return cleaned.strip()
+
+                        industry_df['industry_clean'] = industry_df['industry'].apply(clean_industry_name)
+
+                        # 创建行业映射字典 {code: industry_clean}
+                        industry_map = dict(zip(industry_df['code'], industry_df['industry_clean']))
                         # 将行业信息合并到主DataFrame
                         df['industry'] = df['code'].map(industry_map).fillna('')
                         logger.info(f"BaoStock: Successfully mapped industry info for {len(industry_map)} stocks")
