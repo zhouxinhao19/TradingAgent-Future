@@ -204,7 +204,7 @@ const quickSync = async () => {
 
 // 跳转到同步管理页面
 const goToSyncPage = () => {
-  router.push('/system/sync')
+  router.push('/settings/sync')
 }
 
 // 开始状态轮询
