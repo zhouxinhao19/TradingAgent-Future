@@ -262,7 +262,7 @@ import { ElMessage } from 'element-plus'
 import type { AnalysisTask } from '@/types/analysis'
 import MultiSourceSyncCard from '@/components/Dashboard/MultiSourceSyncCard.vue'
 import { favoritesApi } from '@/api/favorites'
-import { getAnalysisHistory } from '@/api/analysis'
+import { analysisApi } from '@/api/analysis'
 import { newsApi } from '@/api/news'
 import { paperApi, type PaperAccountSummary } from '@/api/paper'
 
@@ -327,16 +327,43 @@ const goToQueue = () => {
 }
 
 const goToHistory = () => {
-  router.push('/analysis/history')
+  router.push('/tasks?tab=completed')
 }
 
 const viewAnalysis = (analysis: AnalysisTask) => {
-  router.push(`/analysis/result/${analysis.task_id}`)
+  router.push({ name: 'ReportDetail', params: { id: analysis.task_id } })
 }
 
-const downloadReport = (analysis: AnalysisTask) => {
-  // 下载分析报告
-  console.log('下载报告:', analysis.task_id)
+const downloadReport = async (analysis: AnalysisTask) => {
+  try {
+    const reportId = analysis.task_id
+    const res = await fetch(`/api/reports/${reportId}/download?format=markdown`, {
+      headers: {
+        'Authorization': `Bearer ${authStore.token}`
+      }
+    })
+    if (!res.ok) {
+      const msg = `下载失败：HTTP ${res.status}`
+      console.error(msg)
+      ElMessage.error('下载失败，报告可能尚未生成')
+      return
+    }
+    const blob = await res.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const code = (analysis as any).stock_code || (analysis as any).stock_symbol || 'stock'
+    const dateStr = (analysis as any).analysis_date || (analysis as any).start_time || ''
+    a.download = `${code}_${String(dateStr).slice(0,10)}_report.md`
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+    ElMessage.success('报告已开始下载')
+  } catch (err) {
+    console.error('下载报告出错:', err)
+    ElMessage.error('下载失败，请稍后重试')
+  }
 }
 
 const openNewsUrl = (url?: string) => {
@@ -415,24 +442,24 @@ const loadFavoriteStocks = async () => {
 
 const loadRecentAnalyses = async () => {
   try {
-    const response = await getAnalysisHistory({
-      page: 1,
-      page_size: 10,  // 获取最近10条
+    // 使用任务中心的用户任务接口，获取最近10条
+    const res = await analysisApi.getTaskList({
+      limit: 10,
+      offset: 0,
+      // 不限定状态，展示最近任务；如需仅展示已完成可设为 'completed'
       status: undefined
     })
 
-    if (response.success && response.data) {
-      // 后端已经按开始时间倒序排列，直接使用
-      recentAnalyses.value = response.data.tasks || []
+    // 兼容不同返回结构（ApiResponse 或直接 data）
+    const body: any = (res as any)?.data?.data || (res as any)?.data || res || {}
+    const tasks = body.tasks || []
 
-      // 更新统计数据
-      userStats.value.totalAnalyses = response.data.total || 0
-      userStats.value.successfulAnalyses = response.data.tasks?.filter(
-        (item: any) => item.status === 'completed'
-      ).length || 0
-    }
+    recentAnalyses.value = tasks
+    userStats.value.totalAnalyses = body.total ?? tasks.length
+    userStats.value.successfulAnalyses = tasks.filter((item: any) => item.status === 'completed').length
   } catch (error) {
     console.error('加载最近分析失败:', error)
+    recentAnalyses.value = []
   }
 }
 
