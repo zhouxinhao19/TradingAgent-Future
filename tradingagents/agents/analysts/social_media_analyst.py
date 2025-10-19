@@ -80,11 +80,11 @@ def create_social_media_analyst(llm, toolkit):
     def social_media_analyst_node(state):
         current_date = state["trade_date"]
         ticker = state["company_of_interest"]
-        
+
         # 获取股票市场信息
         from tradingagents.utils.stock_utils import StockUtils
         market_info = StockUtils.get_market_info(ticker)
-        
+
         # 获取公司名称
         company_name = _get_company_name_for_social_media(ticker, market_info)
         logger.info(f"[社交媒体分析师] 公司名称: {company_name}")

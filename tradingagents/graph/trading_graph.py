@@ -815,8 +815,22 @@ class TradingAgentsGraph:
         # Log state
         self._log_state(trade_date, final_state)
 
+        # 获取模型信息
+        model_info = ""
+        try:
+            if hasattr(self.deep_thinking_llm, 'model_name'):
+                model_info = f"{self.deep_thinking_llm.__class__.__name__}:{self.deep_thinking_llm.model_name}"
+            else:
+                model_info = self.deep_thinking_llm.__class__.__name__
+        except Exception:
+            model_info = "Unknown"
+
+        # 处理决策并添加模型信息
+        decision = self.process_signal(final_state["final_trade_decision"], company_name)
+        decision['model_info'] = model_info
+
         # Return decision and processed signal
-        return final_state, self.process_signal(final_state["final_trade_decision"], company_name)
+        return final_state, decision
 
     def _send_progress_update(self, chunk, progress_callback):
         """发送进度更新到回调函数

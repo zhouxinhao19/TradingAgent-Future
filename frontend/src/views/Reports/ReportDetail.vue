@@ -13,10 +13,11 @@
           <div class="title-section">
             <h1 class="report-title">
               <el-icon><Document /></el-icon>
-              {{ report.stock_symbol }} 分析报告
+              {{ report.stock_name || report.stock_symbol }} 分析报告
             </h1>
             <div class="report-meta">
               <el-tag type="primary">{{ report.stock_symbol }}</el-tag>
+              <el-tag v-if="report.stock_name && report.stock_name !== report.stock_symbol" type="info">{{ report.stock_name }}</el-tag>
               <el-tag type="success">{{ getStatusText(report.status) }}</el-tag>
               <span class="meta-item">
                 <el-icon><Calendar /></el-icon>
@@ -25,6 +26,10 @@
               <span class="meta-item">
                 <el-icon><User /></el-icon>
                 {{ report.analysts.join(', ') }}
+              </span>
+              <span v-if="report.model_info && report.model_info !== 'Unknown'" class="meta-item">
+                <el-icon><Cpu /></el-icon>
+                <el-tag type="info">{{ report.model_info }}</el-tag>
               </span>
             </div>
           </div>
@@ -235,7 +240,8 @@ import {
   Warning,
   StarFilled,
   List,
-  Check
+  Check,
+  Cpu
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { marked } from 'marked'

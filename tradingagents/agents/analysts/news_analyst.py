@@ -229,7 +229,7 @@ def create_news_analyst(llm, toolkit):
                     if hasattr(result, 'content') and result.content:
                         report = result.content
                         logger.info(f"[新闻分析师] ✅ 预处理模式成功，报告长度: {len(report)} 字符")
-                        
+
                         # 跳转到最终处理
                         state["messages"].append(result)
                         end_time = datetime.now()
@@ -336,7 +336,7 @@ def create_news_analyst(llm, toolkit):
         # 这确保工作流图能正确判断分析已完成，避免重复调用
         from langchain_core.messages import AIMessage
         clean_message = AIMessage(content=report)
-        
+
         logger.info(f"[新闻分析师] ✅ 返回清洁消息，报告长度: {len(report)} 字符")
 
         return {

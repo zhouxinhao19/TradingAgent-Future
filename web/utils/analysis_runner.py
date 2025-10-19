@@ -501,6 +501,9 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             if usage_record:
                 update_progress(f"💰 记录使用成本: ¥{usage_record.cost:.4f}")
 
+        # 从决策中提取模型信息
+        model_info = decision.get('model_info', 'Unknown') if isinstance(decision, dict) else 'Unknown'
+
         results = {
             'stock_symbol': stock_symbol,
             'analysis_date': analysis_date,
@@ -508,6 +511,7 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
             'research_depth': research_depth,
             'llm_provider': llm_provider,
             'llm_model': llm_model,
+            'model_info': model_info,  # 🔥 添加模型信息字段
             'state': state,
             'decision': decision,
             'success': True,

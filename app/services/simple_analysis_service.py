@@ -1494,6 +1494,9 @@ class SimpleAnalysisService:
                 recommendation = f"请参考详细分析报告做出投资决策。"
                 logger.warning(f"⚠️ [RECOMMENDATION] 使用备用建议")
 
+            # 从决策中提取模型信息
+            model_info = decision.get('model_info', 'Unknown') if isinstance(decision, dict) else 'Unknown'
+
             # 构建结果
             result = {
                 "analysis_id": str(uuid.uuid4()),
@@ -1516,6 +1519,8 @@ class SimpleAnalysisService:
                 "reports": reports,
                 # 🔥 关键修复：添加格式化后的decision字段！
                 "decision": formatted_decision,
+                # 🔥 添加模型信息字段
+                "model_info": model_info,
                 # 🆕 性能指标数据
                 "performance_metrics": state.get("performance_metrics", {}) if isinstance(state, dict) else {}
             }
@@ -2117,11 +2122,45 @@ class SimpleAnalysisService:
             market_type = market_type_map.get(market_info.get("market", "unknown"), "A股")
             logger.info(f"📊 推断市场类型: {stock_symbol} -> {market_type}")
 
+            # 🔥 获取股票名称
+            stock_name = stock_symbol  # 默认使用股票代码
+            try:
+                if market_info.get("market") == "china_a":
+                    # A股：使用统一接口获取股票信息
+                    from tradingagents.dataflows.interface import get_china_stock_info_unified
+                    stock_info = get_china_stock_info_unified(stock_symbol)
+                    if "股票名称:" in stock_info:
+                        stock_name = stock_info.split("股票名称:")[1].split("\n")[0].strip()
+                        logger.info(f"📊 获取A股名称: {stock_symbol} -> {stock_name}")
+                elif market_info.get("market") == "hong_kong":
+                    # 港股：使用改进的港股工具
+                    try:
+                        from tradingagents.dataflows.improved_hk_utils import get_hk_company_name_improved
+                        stock_name = get_hk_company_name_improved(stock_symbol)
+                        logger.info(f"📊 获取港股名称: {stock_symbol} -> {stock_name}")
+                    except Exception:
+                        clean_ticker = stock_symbol.replace('.HK', '').replace('.hk', '')
+                        stock_name = f"港股{clean_ticker}"
+                elif market_info.get("market") == "us":
+                    # 美股：使用简单映射
+                    us_stock_names = {
+                        'AAPL': '苹果公司', 'TSLA': '特斯拉', 'NVDA': '英伟达',
+                        'MSFT': '微软', 'GOOGL': '谷歌', 'AMZN': '亚马逊',
+                        'META': 'Meta', 'NFLX': '奈飞'
+                    }
+                    stock_name = us_stock_names.get(stock_symbol.upper(), f"美股{stock_symbol}")
+                    logger.info(f"📊 获取美股名称: {stock_symbol} -> {stock_name}")
+            except Exception as e:
+                logger.warning(f"⚠️ 获取股票名称失败: {stock_symbol} - {e}")
+                stock_name = stock_symbol
+
             # 构建文档（与web目录的MongoDBReportManager保持一致）
             document = {
                 "analysis_id": analysis_id,
                 "stock_symbol": stock_symbol,
+                "stock_name": stock_name,  # 🔥 添加股票名称字段
                 "market_type": market_type,  # 🔥 添加市场类型字段
+                "model_info": result.get("model_info", "Unknown"),  # 🔥 添加模型信息字段
                 "analysis_date": timestamp.strftime('%Y-%m-%d'),
                 "timestamp": timestamp,
                 "status": "completed",

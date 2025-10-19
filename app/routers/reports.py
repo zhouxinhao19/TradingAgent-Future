@@ -142,7 +142,10 @@ async def get_reports_list(
         async for doc in cursor:
             # 转换为前端需要的格式
             stock_code = doc.get("stock_symbol", "")
-            stock_name = get_stock_name(stock_code)
+            # 🔥 优先使用MongoDB中保存的股票名称，如果没有则查询
+            stock_name = doc.get("stock_name")
+            if not stock_name:
+                stock_name = get_stock_name(stock_code)
 
             # 🔥 获取市场类型，如果没有则根据股票代码推断
             market_type = doc.get("market_type")
@@ -164,6 +167,7 @@ async def get_reports_list(
                 "stock_code": stock_code,
                 "stock_name": stock_name,
                 "market_type": market_type,  # 🔥 添加市场类型字段
+                "model_info": doc.get("model_info", "Unknown"),  # 🔥 添加模型信息字段
                 "type": "single",  # 目前主要是单股分析
                 "format": "markdown",  # 主要格式
                 "status": doc.get("status", "completed"),
@@ -226,10 +230,17 @@ async def get_report_detail(
             def to_iso(x):
                 return x.isoformat() if hasattr(x, "isoformat") else (x or "")
 
+            stock_symbol = r.get("stock_symbol", r.get("stock_code", tasks_doc.get("stock_code", "")))
+            stock_name = r.get("stock_name")
+            if not stock_name:
+                stock_name = get_stock_name(stock_symbol)
+
             report = {
                 "id": tasks_doc.get("task_id", report_id),
                 "analysis_id": r.get("analysis_id", ""),
-                "stock_symbol": r.get("stock_symbol", r.get("stock_code", tasks_doc.get("stock_code", ""))),
+                "stock_symbol": stock_symbol,
+                "stock_name": stock_name,  # 🔥 添加股票名称字段
+                "model_info": r.get("model_info", "Unknown"),  # 🔥 添加模型信息字段
                 "analysis_date": r.get("analysis_date", ""),
                 "status": r.get("status", "completed"),
                 "created_at": to_iso(created_at),
@@ -249,10 +260,17 @@ async def get_report_detail(
             }
         else:
             # 转换为详细格式（analysis_reports 命中）
+            stock_symbol = doc.get("stock_symbol", "")
+            stock_name = doc.get("stock_name")
+            if not stock_name:
+                stock_name = get_stock_name(stock_symbol)
+
             report = {
                 "id": str(doc["_id"]),
                 "analysis_id": doc.get("analysis_id", ""),
-                "stock_symbol": doc.get("stock_symbol", ""),
+                "stock_symbol": stock_symbol,
+                "stock_name": stock_name,  # 🔥 添加股票名称字段
+                "model_info": doc.get("model_info", "Unknown"),  # 🔥 添加模型信息字段
                 "analysis_date": doc.get("analysis_date", ""),
                 "status": doc.get("status", "completed"),
                 "created_at": doc.get("created_at", datetime.now()).isoformat(),

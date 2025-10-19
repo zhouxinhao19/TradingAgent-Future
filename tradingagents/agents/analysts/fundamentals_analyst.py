@@ -295,7 +295,7 @@ def create_fundamentals_analyst(llm, toolkit):
                 analysis_prompt_template=analysis_prompt_template,
                 analyst_name="基本面分析师"
             )
-            
+
             return {"fundamentals_report": report}
         else:
             # 非Google模型的处理逻辑
@@ -394,7 +394,7 @@ def create_fundamentals_analyst(llm, toolkit):
                 except Exception as e:
                     logger.error(f"❌ [DEBUG] 强制工具调用分析失败: {e}")
                     report = f"基本面分析失败：{str(e)}"
-                
+
                 return {"fundamentals_report": report}
 
         # 这里不应该到达，但作为备用

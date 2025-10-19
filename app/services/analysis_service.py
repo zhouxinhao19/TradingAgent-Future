@@ -187,6 +187,9 @@ class AnalysisService:
             # 生成报告
             progress_tracker.update_progress("📊 生成分析报告")
 
+            # 从决策中提取模型信息
+            model_info = decision.get('model_info', 'Unknown') if isinstance(decision, dict) else 'Unknown'
+
             # 构建结果
             result = AnalysisResult(
                 analysis_id=str(uuid.uuid4()),
@@ -197,7 +200,8 @@ class AnalysisService:
                 key_points=decision.get("key_points", []),
                 detailed_analysis=decision,
                 execution_time=execution_time,
-                tokens_used=decision.get("tokens_used", 0)
+                tokens_used=decision.get("tokens_used", 0),
+                model_info=model_info  # 🔥 添加模型信息字段
             )
 
             logger.info(f"✅ [线程池] 分析任务完成: {task.task_id} - 耗时{execution_time:.2f}秒")
@@ -271,6 +275,9 @@ class AnalysisService:
 
             execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
 
+            # 从决策中提取模型信息
+            model_info = decision.get('model_info', 'Unknown') if isinstance(decision, dict) else 'Unknown'
+
             # 构建结果
             result = AnalysisResult(
                 analysis_id=str(uuid.uuid4()),
@@ -281,7 +288,8 @@ class AnalysisService:
                 key_points=decision.get("key_points", []),
                 detailed_analysis=decision,
                 execution_time=execution_time,
-                tokens_used=decision.get("tokens_used", 0)
+                tokens_used=decision.get("tokens_used", 0),
+                model_info=model_info  # 🔥 添加模型信息字段
             )
 
             logger.info(f"✅ [线程池] 分析任务完成: {task.task_id} - 耗时{execution_time:.2f}秒")
@@ -639,7 +647,10 @@ class AnalysisService:
             
             if progress_callback:
                 progress_callback(80, "处理分析结果...")
-            
+
+            # 从决策中提取模型信息
+            model_info = decision.get('model_info', 'Unknown') if isinstance(decision, dict) else 'Unknown'
+
             # 构建结果
             result = AnalysisResult(
                 analysis_id=str(uuid.uuid4()),
@@ -650,9 +661,10 @@ class AnalysisService:
                 key_points=decision.get("key_points", []),
                 detailed_analysis=decision,
                 execution_time=execution_time,
-                tokens_used=decision.get("tokens_used", 0)
+                tokens_used=decision.get("tokens_used", 0),
+                model_info=model_info  # 🔥 添加模型信息字段
             )
-            
+
             if progress_callback:
                 progress_callback(100, "分析完成")
 

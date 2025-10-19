@@ -109,7 +109,16 @@
             </el-tag>
           </template>
         </el-table-column>
-        
+
+        <el-table-column prop="model_info" label="分析模型" width="180">
+          <template #default="{ row }">
+            <el-tag v-if="row.model_info && row.model_info !== 'Unknown'" type="info" size="small">
+              {{ row.model_info }}
+            </el-tag>
+            <span v-else class="text-gray">-</span>
+          </template>
+        </el-table-column>
+
         <el-table-column prop="created_at" label="创建时间" width="180">
           <template #default="{ row }">
             {{ formatTime(row.created_at) }}

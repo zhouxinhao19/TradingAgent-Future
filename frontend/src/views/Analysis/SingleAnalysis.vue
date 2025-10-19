@@ -515,6 +515,10 @@
                   <div class="result-meta">
                     <el-tag type="success">{{ analysisResults.symbol || analysisResults.stock_symbol || analysisForm.symbol || analysisForm.stockCode }}</el-tag>
                     <el-tag>{{ analysisResults.analysis_date }}</el-tag>
+                    <el-tag v-if="analysisResults.model_info && analysisResults.model_info !== 'Unknown'" type="info">
+                      <el-icon><Cpu /></el-icon>
+                      {{ analysisResults.model_info }}
+                    </el-tag>
                   </div>
                 </div>
               </template>
@@ -684,6 +688,7 @@ import {
   Download,
   CreditCard,
   WarningFilled,
+  Cpu,
 } from '@element-plus/icons-vue'
 import { analysisApi, type SingleAnalysisRequest } from '@/api/analysis'
 import { paperApi } from '@/api/paper'
