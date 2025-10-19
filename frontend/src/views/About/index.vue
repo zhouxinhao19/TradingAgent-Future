@@ -351,7 +351,7 @@
     <div class="footer-section">
       <div class="footer-content">
         <p>&copy; 2024 TradingAgents-CN. All rights reserved.</p>
-        <p>基于MIT许可证开源，欢迎贡献代码</p>
+        <p>许可证说明：开源组件遵循 Apache 2.0；前端与后端采用专有许可证（个人学习/研究免费，商业使用需授权）。</p>
       </div>
     </div>
   </div>
