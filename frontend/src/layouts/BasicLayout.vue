@@ -24,14 +24,21 @@
       </div>
     </aside>
 
+    <!-- 点击蒙层：移动端展开时，点击空白处收起侧边栏 -->
+    <div
+      v-if="isMobile && !appStore.sidebarCollapsed"
+      class="sidebar-overlay"
+      @click="appStore.setSidebarCollapsed(true)"
+    ></div>
+
     <!-- 主内容区 -->
-    <div class="main-container" :style="{ marginLeft: appStore.actualSidebarWidth + 'px' }">
+    <div class="main-container" :style="{ marginLeft: appStore.actualSidebarWidth + 'px' }" @click="handleMainClick">
       <!-- 顶部导航栏 -->
       <header class="header">
         <div class="header-left">
           <el-button
             type="text"
-            @click="appStore.toggleSidebar()"
+            @click.stop="appStore.toggleSidebar()"
             class="sidebar-toggle"
           >
             <el-icon><Expand v-if="appStore.sidebarCollapsed" /><Fold v-else /></el-icon>
@@ -84,6 +91,8 @@ import AppFooter from '@/components/Layout/AppFooter.vue'
 import { Expand, Fold } from '@element-plus/icons-vue'
 
 const appStore = useAppStore()
+const route = useRoute()
+const { width } = useWindowSize()
 
 // 需要缓存的组件
 const keepAliveComponents = computed(() => [
@@ -93,11 +102,26 @@ const keepAliveComponents = computed(() => [
   'QueueManagement'
 ])
 
-// 监听窗口大小变化
-const { width } = useWindowSize()
+// 移动端判断
+const isMobile = computed(() => width.value < 768)
+
+// 点击主内容时，若移动端且侧边栏已展开，则收起
+const handleMainClick = () => {
+  if (isMobile.value && !appStore.sidebarCollapsed) {
+    appStore.setSidebarCollapsed(true)
+  }
+}
+
+// 监听窗口大小变化：在小屏幕上自动折叠侧边栏
 watch(width, (newWidth) => {
-  // 在小屏幕上自动折叠侧边栏
   if (newWidth < 768 && !appStore.sidebarCollapsed) {
+    appStore.setSidebarCollapsed(true)
+  }
+})
+
+// 路由变化时，移动端收起侧边栏
+watch(() => route.fullPath, () => {
+  if (isMobile.value) {
     appStore.setSidebarCollapsed(true)
   }
 })
@@ -107,6 +131,13 @@ watch(width, (newWidth) => {
 .basic-layout {
   min-height: 100vh;
   background-color: var(--el-bg-color-page);
+}
+
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 950; // 低于侧边栏(1000)，高于内容区
 }
 
 .sidebar {
