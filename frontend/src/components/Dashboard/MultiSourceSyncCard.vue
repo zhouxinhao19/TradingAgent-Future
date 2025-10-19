@@ -232,8 +232,8 @@ const stopStatusPolling = () => {
 }
 
 // 获取状态类型
-const getStatusType = (status?: string) => {
-  const typeMap: Record<string, string> = {
+const getStatusType = (status?: SyncStatus['status'] | string): 'success' | 'info' | 'warning' | 'danger' => {
+  const typeMap: Record<string, 'success' | 'info' | 'warning' | 'danger'> = {
     idle: 'info',
     running: 'warning',
     success: 'success',
@@ -241,11 +241,11 @@ const getStatusType = (status?: string) => {
     failed: 'danger',
     never_run: 'info'
   }
-  return typeMap[status || 'never_run'] || 'info'
+  return typeMap[status ?? 'never_run'] ?? 'info'
 }
 
 // 获取状态文本
-const getStatusText = (status?: string) => {
+const getStatusText = (status?: SyncStatus['status'] | string) => {
   const textMap: Record<string, string> = {
     idle: '空闲',
     running: '运行中',
@@ -254,7 +254,7 @@ const getStatusText = (status?: string) => {
     failed: '失败',
     never_run: '未运行'
   }
-  return textMap[status || 'never_run'] || '未知'
+  return textMap[status ?? 'never_run'] ?? '未知'
 }
 
 // 获取进度百分比

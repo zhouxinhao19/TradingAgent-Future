@@ -143,8 +143,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { List, Refresh, Download } from '@element-plus/icons-vue'
 import { analysisApi } from '@/api/analysis'
@@ -159,6 +159,7 @@ const renderMarkdown = (s: string) => {
 }
 
 const router = useRouter()
+const route = useRoute()
 
 const activeTab = ref<'running'|'completed'|'failed'|'all'>('running')
 const loading = ref(false)
@@ -380,7 +381,27 @@ const exportSelected = () => {
   }
 }
 
-onMounted(() => { loadList(); setupPolling() })
+onMounted(() => {
+  // 根据路由 query 初始化标签页
+  const tab = String((route.query as any)?.tab || '').toLowerCase()
+  const validTabs = ['running', 'completed', 'failed', 'all']
+  if (validTabs.includes(tab)) {
+    activeTab.value = tab as any
+  }
+  loadList(); setupPolling()
+})
+
+// 监听路由 query 的 tab 变化，动态切换标签页
+watch(() => (route.query as any)?.tab, (newVal) => {
+  const tab = String(newVal || '').toLowerCase()
+  const validTabs = ['running', 'completed', 'failed', 'all']
+  if (validTabs.includes(tab)) {
+    activeTab.value = tab as any
+    currentPage.value = 1
+    loadList()
+    setupPolling()
+  }
+})
 onUnmounted(() => { clearInterval(timer) })
 
 const getStatusType = (status:string): 'success' | 'info' | 'warning' | 'danger' => {

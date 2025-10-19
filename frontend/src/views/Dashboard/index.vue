@@ -259,7 +259,7 @@ import {
   Refresh
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import type { AnalysisTask } from '@/types/analysis'
+import type { AnalysisTask, AnalysisStatus } from '@/types/analysis'
 import MultiSourceSyncCard from '@/components/Dashboard/MultiSourceSyncCard.vue'
 import { favoritesApi } from '@/api/favorites'
 import { analysisApi } from '@/api/analysis'
@@ -331,7 +331,13 @@ const goToHistory = () => {
 }
 
 const viewAnalysis = (analysis: AnalysisTask) => {
-  router.push({ name: 'ReportDetail', params: { id: analysis.task_id } })
+  const status = (analysis as any)?.status
+  if (status === 'completed') {
+    router.push({ name: 'ReportDetail', params: { id: analysis.task_id } })
+  } else {
+    // 未完成任务跳转到任务中心的“进行中”标签页
+    router.push('/tasks?tab=running')
+  }
 }
 
 const downloadReport = async (analysis: AnalysisTask) => {
@@ -380,10 +386,11 @@ const goToNewsCenter = () => {
   // router.push('/news')
 }
 
-const getStatusType = (status: string) => {
-  const statusMap: Record<string, string> = {
+const getStatusType = (status: string | AnalysisStatus): 'success' | 'info' | 'warning' | 'danger' => {
+  const statusMap: Record<string, 'success' | 'info' | 'warning' | 'danger'> = {
     pending: 'info',
     processing: 'warning',
+    running: 'warning',
     completed: 'success',
     failed: 'danger',
     cancelled: 'info'
@@ -391,15 +398,16 @@ const getStatusType = (status: string) => {
   return statusMap[status] || 'info'
 }
 
-const getStatusText = (status: string) => {
+const getStatusText = (status: string | AnalysisStatus) => {
   const statusMap: Record<string, string> = {
     pending: '等待中',
     processing: '处理中',
+    running: '处理中',
     completed: '已完成',
     failed: '失败',
     cancelled: '已取消'
   }
-  return statusMap[status] || status
+  return statusMap[status] || String(status)
 }
 
 import { formatDateTime } from '@/utils/datetime'
