@@ -199,8 +199,8 @@ const getCurrencySymbol = (currency: string) => {
 const loadStatistics = async () => {
   try {
     const res = await getUsageStatistics({ days: selectedDays.value })
-    if (res.data.success) {
-      statistics.value = res.data.data
+    if (res.success) {
+      statistics.value = res.data
       await nextTick()
       renderCharts()
     }
@@ -217,9 +217,9 @@ const loadRecords = async () => {
     const res = await getUsageRecords({
       limit: pageSize.value
     })
-    if (res.data.success) {
-      records.value = res.data.data.records
-      totalRecords.value = res.data.data.total
+    if (res.success) {
+      records.value = res.data.records
+      totalRecords.value = res.data.total
     }
   } catch (error) {
     console.error('加载使用记录失败:', error)
@@ -387,8 +387,8 @@ const handleDeleteOldRecords = async () => {
     )
 
     const res = await deleteOldRecords(90)
-    if (res.data.success) {
-      ElMessage.success(`已删除 ${res.data.data.deleted_count} 条旧记录`)
+    if (res.success) {
+      ElMessage.success(`已删除 ${res.data.deleted_count} 条旧记录`)
       loadData()
     }
   } catch (error: any) {
