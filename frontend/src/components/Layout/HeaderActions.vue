@@ -130,7 +130,7 @@ onUnmounted(() => {
 })
 
 function showHelp() {
-  window.open('https://github.com/TauricResearch/TradingAgents-CN', '_blank')
+  window.open('https://mp.weixin.qq.com/s/ppsYiBncynxlsfKFG8uEbw', '_blank')
 }
 </script>
 
