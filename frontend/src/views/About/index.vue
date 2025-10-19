@@ -30,11 +30,11 @@
           <div class="hero-card">
             <div class="hero-stats">
               <div class="stat-item">
-                <div class="stat-number">4</div>
+                <div class="stat-number">12</div>
                 <div class="stat-label">智能体</div>
               </div>
               <div class="stat-item">
-                <div class="stat-number">10+</div>
+                <div class="stat-number">12+</div>
                 <div class="stat-label">数据源</div>
               </div>
               <div class="stat-item">
