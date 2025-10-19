@@ -695,12 +695,29 @@ import { ANALYSTS, convertAnalystNamesToIds } from '@/constants/analysts'
 import { marked } from 'marked'
 import { recommendModels, validateModels, type ModelRecommendationResponse } from '@/api/modelCapabilities'
 import { validateStockCode, getStockCodeFormatHelp, getStockCodeExamples } from '@/utils/stockValidator'
+import { normalizeMarketForAnalysis } from '@/utils/market'
 
 // 配置marked选项
 marked.setOptions({
   breaks: true,        // 支持换行符转换为<br>
   gfm: true           // 启用GitHub风格的Markdown
 })
+
+// 市场类型定义
+type MarketType = 'A股' | '美股' | '港股'
+
+// 表单类型定义
+interface AnalysisForm {
+  stockCode: string
+  symbol: string
+  market: MarketType
+  analysisDate: Date
+  researchDepth: number
+  selectedAnalysts: string[]
+  includeSentiment: boolean
+  includeRisk: boolean
+  language: 'zh-CN' | 'en-US'
+}
 
 // 使用store
 const appStore = useAppStore()
@@ -763,7 +780,7 @@ const modelRecommendation = ref<{
 } | null>(null)
 
 // 分析表单
-const analysisForm = reactive({
+const analysisForm = reactive<AnalysisForm>({
   stockCode: '',  // 保留用于表单绑定
   symbol: '',     // 标准化后的代码
   market: 'A股',
@@ -1351,8 +1368,42 @@ const formatReportContent = (content: any) => {
 }
 
 // 下载报告
-const downloadReport = () => {
-  ElMessage.info('下载功能开发中...')
+const downloadReport = async () => {
+  try {
+    if (!analysisResults.value && !currentTaskId.value) {
+      ElMessage.error('报告尚未生成，无法下载')
+      return
+    }
+    const reportId = (analysisResults.value?.id as any) || currentTaskId.value
+    const res = await fetch(`/api/reports/${reportId}/download?format=markdown`, {
+      headers: {
+        'Authorization': `Bearer ${authStore.token}`
+      }
+    })
+    if (!res.ok) {
+      ElMessage.error('下载失败，报告可能尚未生成')
+      return
+    }
+    const blob = await res.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const code =
+      analysisResults.value?.stock_code ||
+      analysisResults.value?.stock_symbol ||
+      analysisResults.value?.symbol ||
+      'stock'
+    const dateStr = analysisResults.value?.analysis_date || new Date().toISOString().slice(0, 10)
+    a.download = `${String(code)}_${String(dateStr).slice(0, 10)}_report.md`
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+    ElMessage.success('报告已开始下载')
+  } catch (err) {
+    console.error('下载报告出错:', err)
+    ElMessage.error('下载失败，请稍后重试')
+  }
 }
 
 // 解析投资建议
@@ -2056,7 +2107,7 @@ onMounted(async () => {
   // 接收一次路由参数（从筛选页带入）
   const q = route.query as any
   if (q?.stock) analysisForm.stockCode = String(q.stock)
-  if (q?.market) analysisForm.market = String(q.market)
+  if (q?.market) analysisForm.market = normalizeMarketForAnalysis(q.market) as MarketType
 
   // 尝试恢复任务状态
   await restoreTaskFromCache()
