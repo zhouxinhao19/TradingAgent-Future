@@ -153,9 +153,28 @@ def get_provider_and_url_by_model_sync(model_name: str) -> dict:
 
         client.close()
 
-        # 如果数据库中没有找到，使用默认映射
+        # 如果数据库中没有找到模型配置，使用默认映射
         logger.warning(f"⚠️ [同步查询] 数据库中未找到模型 {model_name}，使用默认映射")
         provider = _get_default_provider_by_model(model_name)
+
+        # 尝试从厂家配置中获取 default_base_url
+        try:
+            client = MongoClient(settings.MONGO_URI)
+            db = client[settings.MONGO_DB]
+            providers_collection = db.llm_providers
+            provider_doc = providers_collection.find_one({"name": provider})
+
+            if provider_doc and provider_doc.get("default_base_url"):
+                backend_url = provider_doc["default_base_url"]
+                logger.info(f"✅ [同步查询] 使用厂家 {provider} 的 default_base_url: {backend_url}")
+                client.close()
+                return {"provider": provider, "backend_url": backend_url}
+
+            client.close()
+        except Exception as e:
+            logger.warning(f"⚠️ [同步查询] 无法查询厂家配置: {e}")
+
+        # 最后回退到硬编码的默认 URL
         return {
             "provider": provider,
             "backend_url": _get_default_backend_url(provider)
@@ -164,6 +183,28 @@ def get_provider_and_url_by_model_sync(model_name: str) -> dict:
     except Exception as e:
         logger.error(f"❌ [同步查询] 查找模型供应商失败: {e}")
         provider = _get_default_provider_by_model(model_name)
+
+        # 尝试从厂家配置中获取 default_base_url
+        try:
+            from pymongo import MongoClient
+            from app.core.config import settings
+
+            client = MongoClient(settings.MONGO_URI)
+            db = client[settings.MONGO_DB]
+            providers_collection = db.llm_providers
+            provider_doc = providers_collection.find_one({"name": provider})
+
+            if provider_doc and provider_doc.get("default_base_url"):
+                backend_url = provider_doc["default_base_url"]
+                logger.info(f"✅ [同步查询] 使用厂家 {provider} 的 default_base_url: {backend_url}")
+                client.close()
+                return {"provider": provider, "backend_url": backend_url}
+
+            client.close()
+        except Exception as e2:
+            logger.warning(f"⚠️ [同步查询] 无法查询厂家配置: {e2}")
+
+        # 最后回退到硬编码的默认 URL
         return {
             "provider": provider,
             "backend_url": _get_default_backend_url(provider)
@@ -366,36 +407,16 @@ def create_analysis_config(
         config["memory_enabled"] = True
         config["online_tools"] = True
 
-    # 🔧 从统一配置获取 backend_url（如果有配置的话）
+    # 🔧 获取 backend_url（优先级：模型配置 > 厂家配置 > 硬编码默认值）
     try:
-        from app.core.unified_config import unified_config
-
-        # 尝试从统一配置获取模型的 API base URL
-        # 遍历所有 LLM 配置，找到匹配的模型
-        quick_llm_config = None
-        for llm_config in unified_config.get_llm_configs():
-            if llm_config.model_name == quick_model:
-                quick_llm_config = llm_config
-                break
-
-        if quick_llm_config and quick_llm_config.api_base:
-            config["backend_url"] = quick_llm_config.api_base
-            logger.info(f"🔧 使用统一配置的 backend_url: {quick_llm_config.api_base}")
-        else:
-            # 回退到默认 URL
-            if llm_provider == "dashscope":
-                config["backend_url"] = "https://dashscope.aliyuncs.com/api/v1"
-            elif llm_provider == "deepseek":
-                config["backend_url"] = "https://api.deepseek.com"
-            elif llm_provider == "openai":
-                config["backend_url"] = "https://api.openai.com/v1"
-            elif llm_provider == "google":
-                config["backend_url"] = "https://generativelanguage.googleapis.com/v1"
-            elif llm_provider == "qianfan":
-                config["backend_url"] = "https://aip.baidubce.com"
+        # 1️⃣ 优先从数据库获取（包含模型配置的 api_base 和厂家的 default_base_url）
+        provider_info = get_provider_and_url_by_model_sync(quick_model)
+        config["backend_url"] = provider_info["backend_url"]
+        logger.info(f"✅ 使用数据库配置的 backend_url: {provider_info['backend_url']}")
+        logger.info(f"   来源: 模型 {quick_model} 的配置或厂家 {provider_info['provider']} 的默认地址")
     except Exception as e:
-        logger.warning(f"⚠️  无法从统一配置获取 backend_url: {e}")
-        # 回退到默认 URL
+        logger.warning(f"⚠️  无法从数据库获取 backend_url: {e}")
+        # 2️⃣ 回退到硬编码的默认 URL
         if llm_provider == "dashscope":
             config["backend_url"] = "https://dashscope.aliyuncs.com/api/v1"
         elif llm_provider == "deepseek":
@@ -406,6 +427,10 @@ def create_analysis_config(
             config["backend_url"] = "https://generativelanguage.googleapis.com/v1"
         elif llm_provider == "qianfan":
             config["backend_url"] = "https://aip.baidubce.com"
+        else:
+            # 未知厂家，使用 OpenAI 兼容格式
+            config["backend_url"] = "https://api.openai.com/v1"
+        logger.info(f"⚠️  使用硬编码的默认 backend_url: {config['backend_url']}")
 
     # 添加分析师配置
     config["selected_analysts"] = selected_analysts

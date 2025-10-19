@@ -88,8 +88,36 @@
           {{ props.provider?.extra_config?.has_api_key ? '已配置' : '未配置' }}
         </el-tag>
         <el-tag v-if="props.provider?.extra_config?.has_api_key" :type="props.provider?.extra_config?.source === 'environment' ? 'warning' : 'success'" size="small" class="ml-2">
-          {{ props.provider?.extra_config?.source === 'environment' ? 'ENV' : 'DB' }}
+          {{ props.provider?.extra_config?.source === 'environment' ? 'ENV' : '已配置' }}
         </el-tag>
+      </el-form-item>
+
+      <!-- 🔥 新增：API Key 输入框 -->
+      <el-form-item label="API Key" prop="api_key">
+        <el-input
+          v-model="formData.api_key"
+          type="password"
+          placeholder="输入 API Key（可选，留空则使用环境变量）"
+          show-password
+          clearable
+        />
+        <div class="form-tip">
+          优先级：数据库配置 > 环境变量。留空则使用 .env 文件中的配置
+        </div>
+      </el-form-item>
+
+      <!-- 🔥 新增：API Secret 输入框（某些厂家需要） -->
+      <el-form-item v-if="needsApiSecret" label="API Secret" prop="api_secret">
+        <el-input
+          v-model="formData.api_secret"
+          type="password"
+          placeholder="输入 API Secret（可选）"
+          show-password
+          clearable
+        />
+        <div class="form-tip">
+          某些厂家（如百度千帆）需要额外的 Secret Key
+        </div>
       </el-form-item>
 
       <el-form-item label="支持功能" prop="supported_features">
@@ -318,10 +346,18 @@ const handleSubmit = async () => {
     await formRef.value?.validate()
     submitting.value = true
 
-    // 按方案A：前端不提交敏感字段
+    // 🔥 修改：允许提交 API Key 和 API Secret
     const payload: any = { ...formData.value }
-    delete payload.api_key
-    delete payload.api_secret
+
+    // 如果 API Key 为空或是占位符，则删除该字段（使用环境变量）
+    if (!payload.api_key || payload.api_key.startsWith('your_') || payload.api_key.startsWith('your-')) {
+      delete payload.api_key
+    }
+
+    // 如果 API Secret 为空或是占位符，则删除该字段
+    if (!payload.api_secret || payload.api_secret.startsWith('your_') || payload.api_secret.startsWith('your-')) {
+      delete payload.api_secret
+    }
 
     if (isEdit.value) {
       await configApi.updateLLMProvider(formData.value.id!, payload)

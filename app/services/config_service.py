@@ -1318,14 +1318,29 @@ class ConfigService:
 
             for provider_data in providers_data:
                 provider = LLMProvider(**provider_data)
-                # 如果厂家配置中没有API密钥，尝试从环境变量获取
-                if not provider.api_key:
+
+                # 🔥 判断数据库中的 API Key 是否有效
+                db_key_valid = self._is_valid_api_key(provider.api_key)
+
+                # 初始化 extra_config
+                provider.extra_config = provider.extra_config or {}
+
+                if not db_key_valid:
+                    # 数据库中的 Key 无效，尝试从环境变量获取
                     env_key = self._get_env_api_key(provider.name)
                     if env_key:
                         provider.api_key = env_key
-                        provider.extra_config = provider.extra_config or {}
                         provider.extra_config["source"] = "environment"
-                        print(f"✅ 从环境变量为厂家 {provider.display_name} 获取API密钥")
+                        provider.extra_config["has_api_key"] = True
+                        print(f"✅ 数据库配置无效，从环境变量为厂家 {provider.display_name} 获取API密钥")
+                    else:
+                        provider.extra_config["has_api_key"] = False
+                        print(f"⚠️ 厂家 {provider.display_name} 的数据库配置和环境变量都未配置有效的API密钥")
+                else:
+                    # 数据库中的 Key 有效，使用数据库配置
+                    provider.extra_config["source"] = "database"
+                    provider.extra_config["has_api_key"] = True
+                    print(f"✅ 使用数据库配置的 {provider.display_name} API密钥")
 
                 providers.append(provider)
 
@@ -1333,6 +1348,41 @@ class ConfigService:
         except Exception as e:
             print(f"获取厂家列表失败: {e}")
             return []
+
+    def _is_valid_api_key(self, api_key: Optional[str]) -> bool:
+        """
+        判断 API Key 是否有效
+
+        有效条件：
+        1. Key 不为空
+        2. Key 不是占位符（不以 'your_' 或 'your-' 开头）
+        3. Key 长度 > 10（基本的格式验证）
+
+        Args:
+            api_key: 待验证的 API Key
+
+        Returns:
+            bool: True 表示有效，False 表示无效
+        """
+        if not api_key:
+            return False
+
+        # 去除首尾空格
+        api_key = api_key.strip()
+
+        # 检查是否为空
+        if not api_key:
+            return False
+
+        # 检查是否为占位符
+        if api_key.startswith('your_') or api_key.startswith('your-'):
+            return False
+
+        # 检查长度（大多数 API Key 都 > 10 个字符）
+        if len(api_key) <= 10:
+            return False
+
+        return True
 
     def _get_env_api_key(self, provider_name: str) -> Optional[str]:
         """从环境变量获取API密钥"""
@@ -1360,8 +1410,8 @@ class ConfigService:
         env_var = env_key_mapping.get(provider_name)
         if env_var:
             api_key = os.getenv(env_var)
-            # 过滤掉占位符
-            if api_key and not api_key.startswith('your_'):
+            # 使用统一的验证方法
+            if self._is_valid_api_key(api_key):
                 return api_key
 
         return None
@@ -1774,17 +1824,20 @@ class ConfigService:
             api_key = provider_data.get("api_key")
             display_name = provider_data.get("display_name", provider_name)
 
-            # 如果数据库中没有 API Key，尝试从环境变量读取
-            if not api_key:
+            # 🔥 判断数据库中的 API Key 是否有效
+            if not self._is_valid_api_key(api_key):
+                # 数据库中的 Key 无效，尝试从环境变量读取
                 env_api_key = self._get_env_api_key(provider_name)
                 if env_api_key:
                     api_key = env_api_key
-                    print(f"✅ 从环境变量读取到 {display_name} 的 API Key")
+                    print(f"✅ 数据库配置无效，从环境变量读取到 {display_name} 的 API Key")
                 else:
                     return {
                         "success": False,
-                        "message": f"{display_name} 未配置API密钥（数据库和环境变量中都未找到）"
+                        "message": f"{display_name} 未配置有效的API密钥（数据库和环境变量中都未找到）"
                     }
+            else:
+                print(f"✅ 使用数据库配置的 {display_name} API密钥")
 
             # 根据厂家类型调用相应的测试函数
             test_result = await self._test_provider_connection(provider_name, api_key, display_name)
@@ -2296,15 +2349,18 @@ class ConfigService:
             base_url = provider_data.get("default_base_url")
             display_name = provider_data.get("display_name", provider_name)
 
-            # 如果数据库中没有 API Key，尝试从环境变量读取
-            if not api_key:
+            # 🔥 判断数据库中的 API Key 是否有效
+            if not self._is_valid_api_key(api_key):
+                # 数据库中的 Key 无效，尝试从环境变量读取
                 env_api_key = self._get_env_api_key(provider_name)
                 if env_api_key:
                     api_key = env_api_key
-                    print(f"✅ 从环境变量读取到 {display_name} 的 API Key")
+                    print(f"✅ 数据库配置无效，从环境变量读取到 {display_name} 的 API Key")
                 else:
                     # 某些聚合平台（如 OpenRouter）的 /models 端点不需要 API Key
-                    print(f"⚠️ {display_name} 未配置API密钥，尝试无认证访问")
+                    print(f"⚠️ {display_name} 未配置有效的API密钥，尝试无认证访问")
+            else:
+                print(f"✅ 使用数据库配置的 {display_name} API密钥")
 
             if not base_url:
                 return {

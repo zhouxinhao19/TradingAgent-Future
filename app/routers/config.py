@@ -243,12 +243,19 @@ async def update_llm_provider(
     """更新大模型厂家"""
     try:
         update_data = request.model_dump(exclude_unset=True)
-        # 安全措施：不允许通过REST API更新敏感字段
-        # 如果前端发送了这些字段，则从更新数据中移除（保持数据库中的原值）
+
+        # 🔥 修改：允许更新 API Key，但验证有效性
+        # 如果 API Key 无效（空、占位符、长度不够），则删除该字段（保持数据库原值或使用环境变量）
         if 'api_key' in update_data:
-            del update_data['api_key']
+            api_key = update_data.get('api_key', '')
+            if not api_key or api_key.startswith('your_') or api_key.startswith('your-') or len(api_key) <= 10:
+                del update_data['api_key']
+
         if 'api_secret' in update_data:
-            del update_data['api_secret']
+            api_secret = update_data.get('api_secret', '')
+            if not api_secret or api_secret.startswith('your_') or api_secret.startswith('your-') or len(api_secret) <= 10:
+                del update_data['api_secret']
+
         success = await config_service.update_llm_provider(provider_id, update_data)
 
         if success:
@@ -529,9 +536,13 @@ async def add_llm_config(
             logger.info(f"🔑 使用提供的API密钥 (长度: {len(llm_config_data.get('api_key', ''))})")
 
         logger.info(f"📋 最终配置数据: {llm_config_data}")
-        # 方案A：禁止通过 REST 写入/落盘密钥，统一从环境变量/厂家配置注入
+        # 🔥 修改：允许通过 REST 写入密钥，但如果是无效的密钥则清空
+        # 无效的密钥：空字符串、占位符（your_xxx）、长度不够
         if 'api_key' in llm_config_data:
-            llm_config_data['api_key'] = ""
+            api_key = llm_config_data.get('api_key', '')
+            # 如果是无效的 Key，则清空（让系统使用环境变量）
+            if not api_key or api_key.startswith('your_') or api_key.startswith('your-') or len(api_key) <= 10:
+                llm_config_data['api_key'] = ""
 
 
         # 尝试创建LLMConfig对象
