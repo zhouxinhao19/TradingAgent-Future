@@ -2,7 +2,8 @@
  * 使用统计 API
  */
 
-import request, { ApiClient, ApiResponse } from './request'
+import request, { ApiClient } from './request'
+import type { ApiResponse } from './request'
 
 export interface UsageRecord {
   id?: string
