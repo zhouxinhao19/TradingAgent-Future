@@ -22,9 +22,9 @@
     >
       <div
         v-for="(item, index) in dataSources"
-        :key="item.data_source_name"
+        :key="item.name"
         class="datasource-item"
-        :data-id="item.data_source_name"
+        :data-id="item.name"
       >
         <div class="drag-handle">
           <el-icon><Rank /></el-icon>
@@ -32,7 +32,7 @@
         
         <div class="datasource-info">
           <div class="datasource-header">
-            <span class="datasource-name">{{ item.display_name || item.data_source_name }}</span>
+            <span class="datasource-name">{{ item.display_name || item.name }}</span>
             <div class="datasource-tags">
               <el-tag
                 :type="item.enabled ? 'success' : 'danger'"
@@ -71,7 +71,7 @@
           </el-button>
           <el-button
             size="small"
-            @click="$emit('manage-grouping', item.data_source_name)"
+            @click="$emit('manage-grouping', item.name)"
           >
             分组
           </el-button>
@@ -151,7 +151,7 @@ const initSortable = () => {
       if (evt.oldIndex !== evt.newIndex && evt.oldIndex !== undefined && evt.newIndex !== undefined) {
         // 重新计算优先级
         const orderedItems = props.dataSources.map((item, index) => ({
-          name: item.data_source_name,
+          name: item.name,
           priority: props.dataSources.length - index // 倒序，第一个优先级最高
         }))
         
@@ -174,7 +174,7 @@ const destroySortable = () => {
 const updatePriority = async (item: DataSourceConfig & { priority: number; enabled: boolean }) => {
   try {
     await configApi.updateDataSourceGrouping(
-      item.data_source_name,
+      item.name,
       props.categoryId,
       { priority: item.priority }
     )
@@ -191,7 +191,7 @@ const toggleDataSource = async (item: DataSourceConfig & { priority: number; ena
   try {
     const newEnabled = !item.enabled
     await configApi.updateDataSourceGrouping(
-      item.data_source_name,
+      item.name,
       props.categoryId,
       { enabled: newEnabled }
     )

@@ -15,12 +15,31 @@ from tradingagents.config.runtime_settings import get_int
 from tradingagents.utils.logging_init import get_logger
 logger = get_logger("default")
 
+# 新增：使用统一的数据目录配置
+try:
+    from utils.data_config import get_cache_dir
+except Exception:
+    # 回退：在项目根目录下的 data/cache/hk
+    def get_cache_dir(subdir: Optional[str] = None, create: bool = True):
+        base = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'data', 'cache')
+        if subdir:
+            base = os.path.join(base, subdir)
+        if create:
+            os.makedirs(base, exist_ok=True)
+        return base
+
 
 class ImprovedHKStockProvider:
     """改进的港股数据提供器"""
     
     def __init__(self):
-        self.cache_file = "hk_stock_cache.json"
+        # 将缓存文件写入到统一的数据缓存目录下，避免污染项目根目录
+        hk_cache_dir = get_cache_dir('hk')
+        if hasattr(hk_cache_dir, 'joinpath'):  # Path
+            self.cache_file = str(hk_cache_dir.joinpath('hk_stock_cache.json'))
+        else:  # str
+            self.cache_file = os.path.join(hk_cache_dir, 'hk_stock_cache.json')
+
         self.cache_ttl = get_int("TA_HK_CACHE_TTL_SECONDS", "ta_hk_cache_ttl_seconds", 3600 * 24)
         self.rate_limit_wait = get_int("TA_HK_RATE_LIMIT_WAIT_SECONDS", "ta_hk_rate_limit_wait_seconds", 5)
         self.last_request_time = 0
@@ -101,6 +120,8 @@ class ImprovedHKStockProvider:
     def _save_cache(self):
         """保存缓存"""
         try:
+            # 确保目录存在
+            os.makedirs(os.path.dirname(self.cache_file), exist_ok=True)
             with open(self.cache_file, 'w', encoding='utf-8') as f:
                 json.dump(self.cache, f, ensure_ascii=False, indent=2)
         except Exception as e:

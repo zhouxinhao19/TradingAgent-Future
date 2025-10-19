@@ -7,6 +7,7 @@ import asyncio
 import argparse
 import logging
 import sys
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -17,12 +18,13 @@ from app.worker.baostock_init_service import BaoStockInitService
 from app.worker.baostock_sync_service import BaoStockSyncService
 
 # 配置日志
+os.makedirs(os.path.join('data', 'logs'), exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s | %(name)s | %(levelname)s | %(message)s',
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler('baostock_init.log', encoding='utf-8')
+        logging.FileHandler(os.path.join('data', 'logs', 'baostock_init.log'), encoding='utf-8')
     ]
 )
 logger = logging.getLogger(__name__)
