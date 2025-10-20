@@ -51,9 +51,7 @@ CONFIG_COLLECTIONS = [
     "datasource_groupings",
     "platform_configs",
     "user_configs",
-    "model_catalog",
-    "market_quotes",        # 实时行情数据
-    "stock_basic_info"      # 股票基础信息
+    "model_catalog"
 ]
 
 
