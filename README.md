@@ -18,6 +18,87 @@
 
 **🎯 我们的使命**: 为中国用户提供完整的中文化体验，支持A股/港股市场，集成国产大模型，推动AI金融技术在中文社区的普及应用。
 
+## 🎉 v1.0.0-preview 内测版本 - 全新架构升级
+
+> 🚀 **重磅发布**: v1.0.0-preview 版本现已开启内测！全新的 FastAPI + Vue 3 架构，带来企业级的性能和体验！
+
+### ✨ 核心特性
+
+#### 🏗️ **全新技术架构**
+- **后端升级**: 从 Streamlit 迁移到 FastAPI，提供更强大的 RESTful API
+- **前端重构**: 采用 Vue 3 + Element Plus，打造现代化的单页应用
+- **数据库优化**: MongoDB + Redis 双数据库架构，性能提升 10 倍
+- **容器化部署**: 完整的 Docker 多架构支持（amd64 + arm64）
+
+#### 🎯 **企业级功能**
+- **用户权限管理**: 完整的用户认证、角色管理、操作日志系统
+- **配置管理中心**: 可视化的大模型配置、数据源管理、系统设置
+- **缓存管理系统**: 智能缓存策略，支持 MongoDB/Redis/文件多级缓存
+- **实时通知系统**: SSE 推送，实时跟踪分析进度和系统状态
+
+#### 🤖 **智能分析增强**
+- **动态供应商管理**: 支持动态添加和配置 LLM 供应商
+- **模型能力管理**: 智能模型选择，根据任务自动匹配最佳模型
+- **多数据源同步**: 统一的数据源管理，支持 Tushare、AkShare、BaoStock
+- **报告导出功能**: 支持 Markdown/Word/PDF 多格式专业报告导出
+
+#### 🐳 **Docker 多架构支持**
+- **跨平台部署**: 支持 x86_64 和 ARM64 架构（Apple Silicon、树莓派、AWS Graviton）
+- **GitHub Actions**: 自动化构建和发布 Docker 镜像
+- **一键部署**: 完整的 Docker Compose 配置，5 分钟快速启动
+
+### 📊 技术栈升级
+
+| 组件 | v0.1.x | v1.0.0-preview |
+|------|--------|----------------|
+| **后端框架** | Streamlit | FastAPI + Uvicorn |
+| **前端框架** | Streamlit | Vue 3 + Vite + Element Plus |
+| **数据库** | 可选 MongoDB | MongoDB + Redis |
+| **API 架构** | 单体应用 | RESTful API + WebSocket |
+| **部署方式** | 本地/Docker | Docker 多架构 + GitHub Actions |
+
+### 🎯 内测申请
+
+v1.0.0-preview 版本目前处于**内测阶段**，我们诚邀您参与体验和测试！
+
+#### 📝 如何申请试用
+
+1. **关注公众号**: 微信搜索 **"TradingAgents-CN"** 并关注
+2. **提交申请**: 通过公众号私信发送以下信息：
+   - 您的姓名/昵称
+   - 使用场景（个人学习/企业应用/学术研究）
+   - 技术背景（可选）
+   - 期望的功能或建议（可选）
+3. **获取权限**: 我们会在 1-2 个工作日内回复，并提供：
+   - 内测版本访问地址
+   - 详细的使用文档
+   - 技术支持和交流群
+
+#### 🎁 内测用户福利
+
+- ✅ **优先体验**: 第一时间体验最新功能
+- ✅ **技术支持**: 专属技术支持和问题解答
+- ✅ **功能定制**: 您的需求将优先纳入开发计划
+- ✅ **社区荣誉**: 内测贡献者将在项目中特别致谢
+
+#### 📱 联系方式
+
+- **微信公众号**: TradingAgents-CN（推荐）
+
+  <img src="assets/weixin.png" alt="微信公众号" width="200"/>
+
+- **QQ 群**: 187537480
+- **GitHub Issues**: [提交问题和建议](https://github.com/hsliuping/TradingAgents-CN/issues)
+
+### 📚 相关文档
+
+- [v1.0.0-preview 发布说明](docs/releases/v1.0.0-preview-release-notes.md)
+- [系统稳定性和 Docker 多架构支持](docs/blog/2025-10-20-system-stability-and-docker-multiarch.md)
+- [配置系统升级指南](docs/configuration/API_KEY_PRIORITY.md)
+- [GitHub Actions 自动构建指南](docs/deployment/docker/GITHUB_ACTIONS_QUICKSTART.md)
+
+---
+
 ## 🆕 v0.1.15 重大更新
 
 ### 🤖 LLM生态系统大升级
