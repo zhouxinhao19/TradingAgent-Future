@@ -106,7 +106,7 @@ async def _print_config_summary(logger):
                 logger.info(f"Enabled LLMs: {len(enabled_llms)}")
                 if enabled_llms:
                     for llm in enabled_llms[:3]:  # 只显示前3个
-                        logger.info(f"  • {llm.provider.value}: {llm.model_name}")
+                        logger.info(f"  • {llm.provider}: {llm.model_name}")
                     if len(enabled_llms) > 3:
                         logger.info(f"  • ... and {len(enabled_llms) - 3} more")
                 else:
