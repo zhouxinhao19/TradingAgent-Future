@@ -98,20 +98,12 @@ class UnifiedConfigManager:
         """获取标准化的LLM配置"""
         legacy_models = self.get_legacy_models()
         llm_configs = []
-        
+
         for model in legacy_models:
             try:
-                # 映射提供商名称
-                provider_map = {
-                    "dashscope": ModelProvider.QWEN,
-                    "openai": ModelProvider.OPENAI,
-                    "google": ModelProvider.OPENAI,  # 临时映射
-                    "deepseek": ModelProvider.LOCAL,
-                    "zhipu": ModelProvider.ZHIPU
-                }
-                
-                provider = provider_map.get(model.get("provider", ""), ModelProvider.OPENAI)
-                
+                # 直接使用 provider 字符串，不再映射到枚举
+                provider = model.get("provider", "openai")
+
                 # 方案A：敏感密钥不从文件加载，统一走环境变量/厂家目录
                 llm_config = LLMConfig(
                     provider=provider,
@@ -127,27 +119,18 @@ class UnifiedConfigManager:
             except Exception as e:
                 print(f"转换模型配置失败: {model}, 错误: {e}")
                 continue
-        
+
         return llm_configs
     
     def save_llm_config(self, llm_config: LLMConfig) -> bool:
         """保存LLM配置到传统格式"""
         try:
             legacy_models = self.get_legacy_models()
-            
-            # 映射回传统格式
-            provider_reverse_map = {
-                ModelProvider.OPENAI: "openai",
-                ModelProvider.QWEN: "dashscope",
-                ModelProvider.ZHIPU: "zhipu",
-                ModelProvider.BAIDU: "baidu",
-                ModelProvider.ANTHROPIC: "anthropic",
-                ModelProvider.LOCAL: "deepseek"
-            }
-            
+
+            # 直接使用 provider 字符串，不再需要映射
             # 方案A：保存到文件时不写入密钥
             legacy_model = {
-                "provider": provider_reverse_map.get(llm_config.provider, "openai"),
+                "provider": llm_config.provider,
                 "model_name": llm_config.model_name,
                 "api_key": "",
                 "base_url": llm_config.api_base,
