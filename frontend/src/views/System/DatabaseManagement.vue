@@ -427,9 +427,8 @@ const exportData = async () => {
       'datasource_groupings',// 数据源分组
       'platform_configs',    // 平台配置
       'user_configs',        // 用户配置
-      'model_catalog',       // 模型目录
-      'market_quotes',       // 实时行情数据
-      'stock_basic_info'     // 股票基础信息
+      'model_catalog'        // 模型目录
+      // 注意: 不包含 market_quotes 和 stock_basic_info（数据量大，不适合演示系统）
     ]
 
     let collections: string[] = []
@@ -457,7 +456,7 @@ const exportData = async () => {
     URL.revokeObjectURL(url)
 
     if (exportCollection.value === 'config_only') {
-      ElMessage.success('配置数据导出成功（包含 LLM 配置、用户数据、股票基础信息、实时行情等）')
+      ElMessage.success('配置数据导出成功（包含 LLM 配置、用户数据、模型目录等，不含行情数据）')
     } else {
       ElMessage.success('数据导出成功')
     }
