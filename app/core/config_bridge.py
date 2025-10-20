@@ -57,7 +57,8 @@ def bridge_config_to_env():
         # 只有当环境变量不存在或为占位符时，才使用数据库中的配置
         llm_configs = unified_config.get_llm_configs()
         for llm_config in llm_configs:
-            env_key = f"{llm_config.provider.value.upper()}_API_KEY"
+            # provider 现在是字符串类型，不再是枚举
+            env_key = f"{llm_config.provider.upper()}_API_KEY"
             existing_env_value = os.getenv(env_key)
 
             # 检查环境变量是否已存在且有效（不是占位符）
@@ -509,7 +510,8 @@ def _sync_pricing_config(llm_configs):
         for llm_config in llm_configs:
             if llm_config.enabled:
                 pricing_config = {
-                    "provider": llm_config.provider.value,
+                    # provider 现在是字符串类型，不再是枚举
+                    "provider": llm_config.provider,
                     "model_name": llm_config.model_name,
                     "input_price_per_1k": llm_config.input_price_per_1k or 0.0,
                     "output_price_per_1k": llm_config.output_price_per_1k or 0.0,
