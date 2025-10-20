@@ -584,15 +584,18 @@ class StockDataCache:
             'stock_data_count': 0,
             'news_count': 0,
             'fundamentals_count': 0,
-            'total_size_mb': 0,
+            'total_size': 0,  # 字节
+            'total_size_mb': 0,  # MB（保留用于兼容性）
             'skipped_count': 0  # 新增：跳过的缓存数量
         }
-        
+
+        total_size_bytes = 0
+
         for metadata_file in self.metadata_dir.glob("*_meta.json"):
             try:
                 with open(metadata_file, 'r', encoding='utf-8') as f:
                     metadata = json.load(f)
-                
+
                 data_type = metadata.get('data_type', 'unknown')
                 if data_type == 'stock_data':
                     stats['stock_data_count'] += 1
@@ -600,21 +603,23 @@ class StockDataCache:
                     stats['news_count'] += 1
                 elif data_type == 'fundamentals':
                     stats['fundamentals_count'] += 1
-                
+
                 # 检查是否为跳过的缓存（没有实际文件）
                 data_file = Path(metadata.get('file_path', ''))
                 if not data_file.exists():
                     stats['skipped_count'] += 1
                 else:
-                    # 计算文件大小
-                    stats['total_size_mb'] += data_file.stat().st_size / (1024 * 1024)
-                
+                    # 计算文件大小（字节）
+                    file_size = data_file.stat().st_size
+                    total_size_bytes += file_size
+
                 stats['total_files'] += 1
-                
+
             except Exception:
                 continue
-        
-        stats['total_size_mb'] = round(stats['total_size_mb'], 2)
+
+        stats['total_size'] = total_size_bytes  # 字节
+        stats['total_size_mb'] = round(total_size_bytes / (1024 * 1024), 2)  # MB
         return stats
 
     def get_content_length_config_status(self) -> Dict[str, Any]:

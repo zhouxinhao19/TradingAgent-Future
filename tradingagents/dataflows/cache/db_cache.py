@@ -464,22 +464,48 @@ class DatabaseCacheManager:
 
     def get_cache_stats(self) -> Dict[str, Any]:
         """获取缓存统计信息"""
+        # 标准统计格式（与 file_cache 保持一致）
         stats = {
+            'total_files': 0,
+            'stock_data_count': 0,
+            'news_count': 0,
+            'fundamentals_count': 0,
+            'total_size': 0,  # 字节
+            'total_size_mb': 0,  # MB
+            'skipped_count': 0
+        }
+
+        # 详细的后端信息
+        backend_info = {
             "mongodb": {"available": self.mongodb_db is not None, "collections": {}},
             "redis": {"available": self.redis_client is not None, "keys": 0, "memory_usage": "N/A"}
         }
 
         # MongoDB统计
+        total_size_bytes = 0
         if self.mongodb_db is not None:
             try:
                 for collection_name in ["stock_data", "news_data", "fundamentals_data"]:
                     collection = self.mongodb_db[collection_name]
                     count = collection.count_documents({})
                     size = self.mongodb_db.command("collStats", collection_name).get("size", 0)
-                    stats["mongodb"]["collections"][collection_name] = {
+                    backend_info["mongodb"]["collections"][collection_name] = {
                         "count": count,
                         "size_mb": round(size / (1024 * 1024), 2)
                     }
+
+                    # 累加到标准统计
+                    total_size_bytes += size
+                    stats['total_files'] += count
+
+                    # 按类型分类
+                    if collection_name == "stock_data":
+                        stats['stock_data_count'] += count
+                    elif collection_name == "news_data":
+                        stats['news_count'] += count
+                    elif collection_name == "fundamentals_data":
+                        stats['fundamentals_count'] += count
+
             except Exception as e:
                 logger.error(f"⚠️ MongoDB统计获取失败: {e}")
 
@@ -487,10 +513,17 @@ class DatabaseCacheManager:
         if self.redis_client:
             try:
                 info = self.redis_client.info()
-                stats["redis"]["keys"] = info.get("db0", {}).get("keys", 0)
-                stats["redis"]["memory_usage"] = f"{info.get('used_memory_human', 'N/A')}"
+                backend_info["redis"]["keys"] = info.get("db0", {}).get("keys", 0)
+                backend_info["redis"]["memory_usage"] = f"{info.get('used_memory_human', 'N/A')}"
             except Exception as e:
                 logger.error(f"⚠️ Redis统计获取失败: {e}")
+
+        # 设置总大小
+        stats['total_size'] = total_size_bytes
+        stats['total_size_mb'] = round(total_size_bytes / (1024 * 1024), 2)
+
+        # 添加后端详细信息
+        stats['backend_info'] = backend_info
 
         return stats
 

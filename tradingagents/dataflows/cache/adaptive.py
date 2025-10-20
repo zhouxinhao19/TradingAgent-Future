@@ -313,7 +313,19 @@ class AdaptiveCacheSystem:
     
     def get_cache_stats(self) -> Dict[str, Any]:
         """获取缓存统计信息"""
+        # 标准统计格式
         stats = {
+            'total_files': 0,
+            'stock_data_count': 0,
+            'news_count': 0,
+            'fundamentals_count': 0,
+            'total_size': 0,  # 字节
+            'total_size_mb': 0,  # MB
+            'skipped_count': 0
+        }
+
+        # 后端信息
+        backend_info = {
             'primary_backend': self.primary_backend,
             'fallback_enabled': self.fallback_enabled,
             'database_available': self.db_manager.is_database_available(),
@@ -322,26 +334,68 @@ class AdaptiveCacheSystem:
             'file_cache_directory': str(self.cache_dir),
             'file_cache_count': len(list(self.cache_dir.glob("*.pkl"))),
         }
-        
-        # Redis统计
-        redis_client = self.db_manager.get_redis_client()
-        if redis_client:
-            try:
-                redis_info = redis_client.info()
-                stats['redis_memory_used'] = redis_info.get('used_memory_human', 'N/A')
-                stats['redis_keys'] = redis_client.dbsize()
-            except:
-                stats['redis_status'] = 'Error'
-        
+
+        total_size_bytes = 0
+
         # MongoDB统计
         mongodb_client = self.db_manager.get_mongodb_client()
         if mongodb_client:
             try:
                 db = mongodb_client.tradingagents
-                stats['mongodb_cache_count'] = db.cache.count_documents({})
+
+                # 统计各个集合
+                for collection_name in ["stock_data", "news_data", "fundamentals_data"]:
+                    if collection_name in db.list_collection_names():
+                        collection = db[collection_name]
+                        count = collection.count_documents({})
+
+                        # 获取集合大小
+                        try:
+                            coll_stats = db.command("collStats", collection_name)
+                            size = coll_stats.get("size", 0)
+                            total_size_bytes += size
+                        except:
+                            pass
+
+                        stats['total_files'] += count
+
+                        # 按类型分类
+                        if collection_name == "stock_data":
+                            stats['stock_data_count'] += count
+                        elif collection_name == "news_data":
+                            stats['news_count'] += count
+                        elif collection_name == "fundamentals_data":
+                            stats['fundamentals_count'] += count
+
+                backend_info['mongodb_cache_count'] = stats['total_files']
             except:
-                stats['mongodb_status'] = 'Error'
-        
+                backend_info['mongodb_status'] = 'Error'
+
+        # Redis统计
+        redis_client = self.db_manager.get_redis_client()
+        if redis_client:
+            try:
+                redis_info = redis_client.info()
+                backend_info['redis_memory_used'] = redis_info.get('used_memory_human', 'N/A')
+                backend_info['redis_keys'] = redis_client.dbsize()
+            except:
+                backend_info['redis_status'] = 'Error'
+
+        # 文件缓存统计
+        if self.primary_backend == 'file' or self.fallback_enabled:
+            for pkl_file in self.cache_dir.glob("*.pkl"):
+                try:
+                    total_size_bytes += pkl_file.stat().st_size
+                except:
+                    pass
+
+        # 设置总大小
+        stats['total_size'] = total_size_bytes
+        stats['total_size_mb'] = round(total_size_bytes / (1024 * 1024), 2)
+
+        # 添加后端详细信息
+        stats['backend_info'] = backend_info
+
         return stats
     
     def clear_expired_cache(self):

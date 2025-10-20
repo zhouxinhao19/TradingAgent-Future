@@ -195,30 +195,37 @@ class IntegratedCacheManager:
     def get_cache_stats(self) -> Dict[str, Any]:
         """获取缓存统计信息"""
         if self.use_adaptive:
-            # 获取自适应缓存统计
-            adaptive_stats = self.adaptive_cache.get_cache_stats()
-            
-            # 添加传统缓存统计
-            legacy_stats = self.legacy_cache.get_cache_stats()
-            
-            return {
-                "cache_system": "adaptive",
-                "adaptive_cache": adaptive_stats,
-                "legacy_cache": legacy_stats,
-                "database_available": self.db_manager.is_database_available(),
-                "mongodb_available": self.db_manager.is_mongodb_available(),
-                "redis_available": self.db_manager.is_redis_available()
-            }
+            # 获取自适应缓存统计（已经是标准格式）
+            stats = self.adaptive_cache.get_cache_stats()
+
+            # 添加缓存系统信息
+            stats['cache_system'] = 'adaptive'
+
+            # 确保后端信息存在
+            if 'backend_info' not in stats:
+                stats['backend_info'] = {}
+
+            stats['backend_info']['database_available'] = self.db_manager.is_database_available()
+            stats['backend_info']['mongodb_available'] = self.db_manager.is_mongodb_available()
+            stats['backend_info']['redis_available'] = self.db_manager.is_redis_available()
+
+            return stats
         else:
-            # 只返回传统缓存统计
-            legacy_stats = self.legacy_cache.get_cache_stats()
-            return {
-                "cache_system": "legacy",
-                "legacy_cache": legacy_stats,
-                "database_available": False,
-                "mongodb_available": False,
-                "redis_available": False
-            }
+            # 返回传统缓存统计（已经是标准格式）
+            stats = self.legacy_cache.get_cache_stats()
+
+            # 添加缓存系统信息
+            stats['cache_system'] = 'legacy'
+
+            # 确保后端信息存在
+            if 'backend_info' not in stats:
+                stats['backend_info'] = {}
+
+            stats['backend_info']['database_available'] = False
+            stats['backend_info']['mongodb_available'] = False
+            stats['backend_info']['redis_available'] = False
+
+            return stats
     
     def clear_expired_cache(self):
         """清理过期缓存"""
