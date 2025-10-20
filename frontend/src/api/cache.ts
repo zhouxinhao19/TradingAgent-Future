@@ -1,7 +1,7 @@
 /**
  * 缓存管理 API
  */
-import request from '@/utils/request'
+import request from '@/api/request'
 
 /**
  * 缓存统计数据
