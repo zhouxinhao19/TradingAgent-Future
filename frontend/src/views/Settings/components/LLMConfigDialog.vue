@@ -489,8 +489,24 @@ const getModelInfo = (provider: string, modelName: string): ModelInfo | null => 
 }
 
 // 处理供应商变更
-const handleProviderChange = (provider: string) => {
+const handleProviderChange = async (provider: string) => {
+  // 先尝试从已加载的目录中获取
   modelOptions.value = getModelOptions(provider)
+
+  // 如果没有找到模型，重新加载模型目录
+  if (modelOptions.value.length === 0) {
+    console.log(`⚠️ 供应商 ${provider} 没有模型数据，重新加载模型目录...`)
+    await loadModelCatalog()
+    // 重新获取模型选项
+    modelOptions.value = getModelOptions(provider)
+
+    if (modelOptions.value.length > 0) {
+      ElMessage.success(`已加载 ${modelOptions.value.length} 个可用模型`)
+    } else {
+      ElMessage.warning('该供应商暂无可用模型，请在"模型目录管理"中添加')
+    }
+  }
+
   formData.value.model_name = ''
   // 清空价格信息
   formData.value.input_price_per_1k = 0
@@ -585,8 +601,11 @@ watch(
   () => props.visible,
   async (visible) => {
     if (visible) {
-      // 对话框打开时刷新供应商列表，确保显示最新添加的供应商
-      await loadProviders()
+      // 对话框打开时刷新供应商列表和模型目录，确保显示最新数据
+      await Promise.all([
+        loadProviders(),
+        loadModelCatalog()
+      ])
 
       if (props.config) {
         // 编辑模式：先使用默认值，再用配置覆盖
@@ -617,7 +636,12 @@ watch(
       } else {
         // 新增模式：使用默认值
         formData.value = { ...defaultFormData }
-        modelOptions.value = getModelOptions('dashscope')
+        // 如果有供应商，加载其模型列表
+        if (formData.value.provider) {
+          modelOptions.value = getModelOptions(formData.value.provider)
+        } else {
+          modelOptions.value = []
+        }
         selectedModelKey.value = ''
       }
     }
@@ -690,7 +714,7 @@ const loadProviders = async (showSuccessMessage = false) => {
     // 如果是新增模式且没有选择供应商，默认选择第一个
     if (!isEdit.value && !formData.value.provider && availableProviders.value.length > 0) {
       formData.value.provider = availableProviders.value[0].name
-      handleProviderChange(formData.value.provider)
+      await handleProviderChange(formData.value.provider)
     }
   } catch (error) {
     console.error('❌ 加载厂家列表失败:', error)
