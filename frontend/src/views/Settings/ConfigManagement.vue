@@ -330,7 +330,7 @@
                   </el-table-column>
 
                   <!-- 操作 -->
-                  <el-table-column label="操作" width="200" fixed="right">
+                  <el-table-column label="操作" width="260" fixed="right">
                     <template #default="{ row }">
                       <el-button size="small" @click="editLLMConfig(row)">
                         编辑
@@ -341,6 +341,13 @@
                         @click="testLLMConfig(row)"
                       >
                         测试
+                      </el-button>
+                      <el-button
+                        size="small"
+                        :type="row.enabled ? 'warning' : 'success'"
+                        @click="toggleLLMConfig(row)"
+                      >
+                        {{ row.enabled ? '禁用' : '启用' }}
                       </el-button>
                       <el-button
                         size="small"
@@ -1671,6 +1678,26 @@ const testLLMConfig = async (config: LLMConfig) => {
     }
   } catch (error) {
     ElMessage.error('测试配置失败')
+  }
+}
+
+// 切换LLM配置启用状态
+const toggleLLMConfig = async (config: LLMConfig) => {
+  try {
+    const newStatus = !config.enabled
+    const action = newStatus ? '启用' : '禁用'
+
+    // 更新配置
+    const updateData = {
+      ...config,
+      enabled: newStatus
+    }
+
+    await configApi.updateLLMConfig(updateData)
+    await loadLLMConfigs()
+    ElMessage.success(`模型已${action}`)
+  } catch (error) {
+    ElMessage.error('切换模型状态失败')
   }
 }
 
