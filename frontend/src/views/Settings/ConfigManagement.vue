@@ -1526,13 +1526,26 @@ const addModelToProvider = (providerRow: any) => {
 // 切换厂家状态
 const toggleProviderStatus = async (providerRow: any) => {
   try {
-    // 这里可以调用切换厂家状态的API
-    // await configApi.toggleProvider(providerRow.provider)
+    const newStatus = !providerRow.is_active
+    const action = newStatus ? '启用' : '禁用'
 
-    // 暂时只更新本地状态
-    providerRow.is_active = !providerRow.is_active
-    ElMessage.success(`厂家${providerRow.is_active ? '启用' : '禁用'}成功`)
+    // 获取厂家ID
+    const provider = providers.value.find(p => p.name === providerRow.provider)
+    if (!provider) {
+      ElMessage.error('找不到厂家信息')
+      return
+    }
+
+    // 调用后端API切换厂家状态
+    await configApi.toggleLLMProvider(provider.id, newStatus)
+
+    // 重新加载数据
+    await loadProviders()
+    await loadLLMConfigs()
+
+    ElMessage.success(`厂家已${action}`)
   } catch (error) {
+    console.error('切换厂家状态失败:', error)
     ElMessage.error('切换厂家状态失败')
   }
 }
