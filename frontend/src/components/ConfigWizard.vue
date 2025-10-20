@@ -228,7 +228,7 @@
                 <div>3. 在个人中心获取 Token</div>
                 <div style="margin-top: 8px;">
                   <el-link
-                    href="https://tushare.pro/register?reg=128886"
+                    href="https://tushare.pro/register?reg=tacn"
                     type="primary"
                     target="_blank"
                   >
