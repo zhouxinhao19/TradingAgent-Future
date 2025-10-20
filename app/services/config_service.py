@@ -1363,7 +1363,7 @@ class ConfigService:
 
         有效条件：
         1. Key 不为空
-        2. Key 不是占位符（不以 'your_' 或 'your-' 开头）
+        2. Key 不是占位符（不以 'your_' 或 'your-' 开头，不以 '_here' 结尾）
         3. Key 长度 > 10（基本的格式验证）
 
         Args:
@@ -1382,8 +1382,12 @@ class ConfigService:
         if not api_key:
             return False
 
-        # 检查是否为占位符
+        # 检查是否为占位符（前缀）
         if api_key.startswith('your_') or api_key.startswith('your-'):
+            return False
+
+        # 检查是否为占位符（后缀）
+        if api_key.endswith('_here') or api_key.endswith('-here'):
             return False
 
         # 检查长度（大多数 API Key 都 > 10 个字符）

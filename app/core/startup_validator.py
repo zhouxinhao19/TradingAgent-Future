@@ -120,7 +120,41 @@ class StartupValidator:
             invalid_configs=[],
             warnings=[]
         )
-    
+
+    def _is_valid_api_key(self, api_key: str) -> bool:
+        """
+        判断 API Key 是否有效（不是占位符）
+
+        Args:
+            api_key: 待验证的 API Key
+
+        Returns:
+            bool: True 表示有效，False 表示无效或占位符
+        """
+        if not api_key:
+            return False
+
+        # 去除首尾空格和引号
+        api_key = api_key.strip().strip('"').strip("'")
+
+        # 检查是否为空
+        if not api_key:
+            return False
+
+        # 检查是否为占位符（前缀）
+        if api_key.startswith('your_') or api_key.startswith('your-'):
+            return False
+
+        # 检查是否为占位符（后缀）
+        if api_key.endswith('_here') or api_key.endswith('-here'):
+            return False
+
+        # 检查长度（大多数 API Key 都 > 10 个字符）
+        if len(api_key) <= 10:
+            return False
+
+        return True
+
     def validate(self) -> ValidationResult:
         """
         验证配置
@@ -165,10 +199,14 @@ class StartupValidator:
         """验证推荐配置"""
         for config in self.RECOMMENDED_CONFIGS:
             value = os.getenv(config.key)
-            
+
             if not value:
                 self.result.missing_recommended.append(config)
                 logger.warning(f"⚠️  缺少推荐配置: {config.key}")
+            elif not self._is_valid_api_key(value):
+                # API Key 存在但是占位符，视为未配置
+                self.result.missing_recommended.append(config)
+                logger.warning(f"⚠️  {config.key} 配置为占位符，视为未配置")
             else:
                 logger.debug(f"✅ {config.key}: 已配置")
     
