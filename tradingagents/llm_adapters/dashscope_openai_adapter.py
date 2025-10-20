@@ -48,9 +48,11 @@ class ChatDashScopeOpenAI(ChatOpenAI):
         kwargs.setdefault("temperature", 0.1)
         kwargs.setdefault("max_tokens", 2000)
 
-        # 检查 API 密钥
+        # 检查 API 密钥和 base_url
         final_api_key = kwargs.get("api_key")
+        final_base_url = kwargs.get("base_url")
         logger.info(f"🔍 [DashScope初始化] 最终使用的 API Key: {'有值' if final_api_key else '空'}")
+        logger.info(f"🔍 [DashScope初始化] 最终使用的 base_url: {final_base_url}")
 
         if not final_api_key:
             logger.error(f"❌ [DashScope初始化] API Key 检查失败，即将抛出异常")

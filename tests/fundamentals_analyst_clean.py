@@ -103,11 +103,19 @@ def create_fundamentals_analyst(llm, toolkit):
         if hasattr(llm, '__class__') and 'DashScope' in llm.__class__.__name__:
             print(f"📊 [DEBUG] 检测到阿里百炼模型，创建新实例以避免工具缓存")
             from tradingagents.llm_adapters import ChatDashScopeOpenAI
+
+            # 获取原始 LLM 的 base_url
+            original_base_url = getattr(llm, 'openai_api_base', None)
+
             llm = ChatDashScopeOpenAI(
                 model=llm.model_name,
+                base_url=original_base_url if original_base_url else None,  # 传递 base_url
                 temperature=llm.temperature,
                 max_tokens=getattr(llm, 'max_tokens', 2000)
             )
+
+            if original_base_url:
+                print(f"📊 [DEBUG] 新实例使用原始 base_url: {original_base_url}")
 
         print(f"📊 [DEBUG] 创建LLM链，工具数量: {len(tools)}")
         print(f"📊 [DEBUG] 绑定的工具列表: {[tool.name for tool in tools]}")

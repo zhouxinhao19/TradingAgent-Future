@@ -72,8 +72,10 @@ def create_llm_by_provider(provider: str, model: str, backend_url: str, temperat
         )
 
     elif provider.lower() == "dashscope":
+        # 传递 base_url 参数，使厂家配置的 default_base_url 生效
         return ChatDashScopeOpenAI(
             model=model,
+            base_url=backend_url if backend_url else None,  # 如果有自定义 URL 则使用
             temperature=temperature,
             max_tokens=max_tokens,
             request_timeout=timeout
@@ -385,14 +387,21 @@ class TradingAgentsGraph:
             logger.info(f"🔧 [阿里百炼-快速模型] max_tokens={quick_max_tokens}, temperature={quick_temperature}, timeout={quick_timeout}s")
             logger.info(f"🔧 [阿里百炼-深度模型] max_tokens={deep_max_tokens}, temperature={deep_temperature}, timeout={deep_timeout}s")
 
+            # 获取 backend_url（如果配置中有的话）
+            backend_url = self.config.get("backend_url")
+            if backend_url:
+                logger.info(f"🔧 [阿里百炼] 使用自定义 API 地址: {backend_url}")
+
             self.deep_thinking_llm = ChatDashScopeOpenAI(
                 model=self.config["deep_think_llm"],
+                base_url=backend_url if backend_url else None,  # 传递 base_url
                 temperature=deep_temperature,
                 max_tokens=deep_max_tokens,
                 request_timeout=deep_timeout
             )
             self.quick_thinking_llm = ChatDashScopeOpenAI(
                 model=self.config["quick_think_llm"],
+                base_url=backend_url if backend_url else None,  # 传递 base_url
                 temperature=quick_temperature,
                 max_tokens=quick_max_tokens,
                 request_timeout=quick_timeout
