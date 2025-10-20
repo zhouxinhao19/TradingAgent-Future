@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional
 from datetime import datetime, timedelta
 
-from app.core.auth import get_current_user
+from app.routers.auth import get_current_user
 from app.core.response import ok, error
 from tradingagents.utils.logging_manager import get_logger
 
