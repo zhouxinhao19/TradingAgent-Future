@@ -14,21 +14,30 @@
     >
       <!-- 基础配置 -->
       <el-form-item label="供应商" prop="provider">
-        <el-select
-          v-model="formData.provider"
-          placeholder="选择供应商"
-          @change="handleProviderChange"
-          :loading="providersLoading"
-        >
-          <el-option
-            v-for="provider in availableProviders"
-            :key="provider.name"
-            :label="provider.display_name"
-            :value="provider.name"
+        <div style="display: flex; gap: 8px; align-items: flex-start; width: 100%;">
+          <el-select
+            v-model="formData.provider"
+            placeholder="选择供应商"
+            @change="handleProviderChange"
+            :loading="providersLoading"
+            style="flex: 1; min-width: 0;"
+          >
+            <el-option
+              v-for="provider in availableProviders"
+              :key="provider.name"
+              :label="provider.display_name"
+              :value="provider.name"
+            />
+          </el-select>
+          <el-button
+            :icon="Refresh"
+            :loading="providersLoading"
+            @click="() => loadProviders(true)"
+            title="刷新供应商列表"
           />
-        </el-select>
+        </div>
         <div class="form-tip">
-          如果没有找到需要的供应商，请先在"厂家管理"中添加
+          如果没有找到需要的供应商，请先在"厂家管理"中添加，然后点击刷新按钮
         </div>
       </el-form-item>
 
@@ -134,8 +143,8 @@
         <el-input-number
           v-model="formData.input_price_per_1k"
           :min="0"
-          :step="0.000001"
-          :precision="6"
+          :step="0.0001"
+          :controls="false"
           placeholder="每1000个token的价格"
         />
         <span class="ml-2 text-gray-500">{{ formData.currency || 'CNY' }}/1K tokens</span>
@@ -145,8 +154,8 @@
         <el-input-number
           v-model="formData.output_price_per_1k"
           :min="0"
-          :step="0.000001"
-          :precision="6"
+          :step="0.0001"
+          :controls="false"
           placeholder="每1000个token的价格"
         />
         <span class="ml-2 text-gray-500">{{ formData.currency || 'CNY' }}/1K tokens</span>
@@ -342,6 +351,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
+import { Refresh } from '@element-plus/icons-vue'
 import { configApi, type LLMProvider, type LLMConfig, validateLLMConfig } from '@/api/config'
 
 // Props
@@ -573,8 +583,11 @@ watch(
 // 监听visible变化
 watch(
   () => props.visible,
-  (visible) => {
+  async (visible) => {
     if (visible) {
+      // 对话框打开时刷新供应商列表，确保显示最新添加的供应商
+      await loadProviders()
+
       if (props.config) {
         // 编辑模式：先使用默认值，再用配置覆盖
         formData.value = {
@@ -662,13 +675,17 @@ const handleSubmit = async () => {
 }
 
 // 加载可用的厂家列表
-const loadProviders = async () => {
+const loadProviders = async (showSuccessMessage = false) => {
   providersLoading.value = true
   try {
     const providers = await configApi.getLLMProviders()
     // 只显示启用的厂家
     availableProviders.value = providers.filter(p => p.is_active)
     console.log('✅ 加载厂家列表成功:', availableProviders.value.length)
+
+    if (showSuccessMessage) {
+      ElMessage.success(`已刷新供应商列表，共 ${availableProviders.value.length} 个启用的供应商`)
+    }
 
     // 如果是新增模式且没有选择供应商，默认选择第一个
     if (!isEdit.value && !formData.value.provider && availableProviders.value.length > 0) {

@@ -1483,12 +1483,13 @@ const getRoleText = (role: string) => {
   return roleMap[role] || role
 }
 
-// 🆕 格式化价格显示（保持6位小数）
+// 🆕 格式化价格显示（去除尾部多余的零）
 const formatPrice = (price: number | undefined | null) => {
   if (price === undefined || price === null) {
-    return '0.000000'
+    return '0'
   }
-  return price.toFixed(6)
+  // 转换为字符串并去除尾部多余的零
+  return parseFloat(price.toFixed(6)).toString()
 }
 
 // 为厂家添加模型

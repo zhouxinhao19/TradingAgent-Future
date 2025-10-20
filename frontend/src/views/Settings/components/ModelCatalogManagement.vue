@@ -87,23 +87,31 @@
         label-width="120px"
       >
         <el-form-item label="厂家标识" prop="provider">
-          <el-select
-            v-model="formData.provider"
-            placeholder="请选择厂家"
-            :disabled="isEdit"
-            filterable
-            @change="handleProviderChange"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="provider in availableProviders"
-              :key="provider.name"
-              :label="`${provider.display_name} (${provider.name})`"
-              :value="provider.name"
+          <div style="display: flex; gap: 8px; align-items: flex-start;">
+            <el-select
+              v-model="formData.provider"
+              placeholder="请选择厂家"
+              :disabled="isEdit"
+              filterable
+              @change="handleProviderChange"
+              style="flex: 1"
+            >
+              <el-option
+                v-for="provider in availableProviders"
+                :key="provider.name"
+                :label="`${provider.display_name} (${provider.name})`"
+                :value="provider.name"
+              />
+            </el-select>
+            <el-button
+              :icon="Refresh"
+              :loading="providersLoading"
+              @click="() => loadProviders(true)"
+              title="刷新厂家列表"
             />
-          </el-select>
+          </div>
           <div class="form-tip">
-            选择已配置的厂家，如果没有找到需要的厂家，请先在"厂家管理"中添加
+            选择已配置的厂家，如果没有找到需要的厂家，请先在"厂家管理"中添加，然后点击刷新按钮
           </div>
         </el-form-item>
         <el-form-item label="厂家名称" prop="provider_name">
@@ -185,31 +193,31 @@
             </el-table-column>
             <el-table-column label="输入价格/1K" width="180">
               <template #default="{ row, $index }">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <el-input
-                    v-model.number="row.input_price_per_1k"
-                    placeholder="0.001"
+                <div style="display: flex; align-items: center; gap: 4px;">
+                  <el-input-number
+                    v-model="row.input_price_per_1k"
+                    :min="0"
+                    :step="0.0001"
                     size="small"
-                    type="number"
-                    step="0.0001"
-                    style="width: 100px;"
+                    :controls="false"
+                    style="width: 110px;"
                   />
-                  <span style="color: #909399; font-size: 12px;">{{ row.currency || 'CNY' }}</span>
+                  <span style="color: #909399; font-size: 12px; white-space: nowrap;">{{ row.currency || 'CNY' }}</span>
                 </div>
               </template>
             </el-table-column>
             <el-table-column label="输出价格/1K" width="180">
               <template #default="{ row, $index }">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <el-input
-                    v-model.number="row.output_price_per_1k"
-                    placeholder="0.002"
+                <div style="display: flex; align-items: center; gap: 4px;">
+                  <el-input-number
+                    v-model="row.output_price_per_1k"
+                    :min="0"
+                    :step="0.0001"
                     size="small"
-                    type="number"
-                    step="0.0001"
-                    style="width: 100px;"
+                    :controls="false"
+                    style="width: 110px;"
                   />
-                  <span style="color: #909399; font-size: 12px;">{{ row.currency || 'CNY' }}</span>
+                  <span style="color: #909399; font-size: 12px; white-space: nowrap;">{{ row.currency || 'CNY' }}</span>
                 </div>
               </template>
             </el-table-column>
@@ -326,12 +334,15 @@ const loadCatalogs = async () => {
 }
 
 // 加载可用的厂家列表
-const loadProviders = async () => {
+const loadProviders = async (showSuccessMessage = false) => {
   providersLoading.value = true
   try {
     const providers = await configApi.getLLMProviders()
     availableProviders.value = providers
     console.log('✅ 加载厂家列表成功:', availableProviders.value.length)
+    if (showSuccessMessage) {
+      ElMessage.success(`已刷新厂家列表，共 ${providers.length} 个厂家`)
+    }
   } catch (error) {
     console.error('❌ 加载厂家列表失败:', error)
     ElMessage.error('加载厂家列表失败')
@@ -348,23 +359,27 @@ const handleProviderChange = (providerName: string) => {
   }
 }
 
-const handleAdd = () => {
+const handleAdd = async () => {
   isEdit.value = false
   formData.value = {
     provider: '',
     provider_name: '',
     models: []
   }
+  // 打开对话框前刷新厂家列表，确保显示最新添加的厂家
+  await loadProviders()
   dialogVisible.value = true
 }
 
-const handleEdit = (row: any) => {
+const handleEdit = async (row: any) => {
   isEdit.value = true
   formData.value = {
     provider: row.provider,
     provider_name: row.provider_name,
     models: JSON.parse(JSON.stringify(row.models))
   }
+  // 打开对话框前刷新厂家列表
+  await loadProviders()
   dialogVisible.value = true
 }
 
