@@ -4,6 +4,7 @@
 
 import time
 import asyncio
+import logging
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from app.utils.timezone import now_tz
@@ -16,6 +17,8 @@ from app.models.config import (
     ModelProvider, DataSourceType, DatabaseType, LLMProvider,
     MarketCategory, DataSourceGrouping, ModelCatalog, ModelInfo
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigService:
@@ -1316,37 +1319,42 @@ class ConfigService:
             providers_data = await providers_collection.find().to_list(length=None)
             providers = []
 
+            logger.info(f"🔍 [get_llm_providers] 从数据库获取到 {len(providers_data)} 个供应商")
+
             for provider_data in providers_data:
                 provider = LLMProvider(**provider_data)
 
                 # 🔥 判断数据库中的 API Key 是否有效
                 db_key_valid = self._is_valid_api_key(provider.api_key)
+                logger.info(f"🔍 [get_llm_providers] 供应商 {provider.display_name} ({provider.name}): 数据库密钥有效={db_key_valid}")
 
                 # 初始化 extra_config
                 provider.extra_config = provider.extra_config or {}
 
                 if not db_key_valid:
                     # 数据库中的 Key 无效，尝试从环境变量获取
+                    logger.info(f"🔍 [get_llm_providers] 尝试从环境变量获取 {provider.name} 的 API 密钥...")
                     env_key = self._get_env_api_key(provider.name)
                     if env_key:
                         provider.api_key = env_key
                         provider.extra_config["source"] = "environment"
                         provider.extra_config["has_api_key"] = True
-                        print(f"✅ 数据库配置无效，从环境变量为厂家 {provider.display_name} 获取API密钥")
+                        logger.info(f"✅ [get_llm_providers] 从环境变量为厂家 {provider.display_name} 获取API密钥")
                     else:
                         provider.extra_config["has_api_key"] = False
-                        print(f"⚠️ 厂家 {provider.display_name} 的数据库配置和环境变量都未配置有效的API密钥")
+                        logger.warning(f"⚠️ [get_llm_providers] 厂家 {provider.display_name} 的数据库配置和环境变量都未配置有效的API密钥")
                 else:
                     # 数据库中的 Key 有效，使用数据库配置
                     provider.extra_config["source"] = "database"
                     provider.extra_config["has_api_key"] = True
-                    print(f"✅ 使用数据库配置的 {provider.display_name} API密钥")
+                    logger.info(f"✅ [get_llm_providers] 使用数据库配置的 {provider.display_name} API密钥")
 
                 providers.append(provider)
 
+            logger.info(f"🔍 [get_llm_providers] 返回 {len(providers)} 个供应商")
             return providers
         except Exception as e:
-            print(f"获取厂家列表失败: {e}")
+            logger.error(f"❌ [get_llm_providers] 获取厂家列表失败: {e}", exc_info=True)
             return []
 
     def _is_valid_api_key(self, api_key: Optional[str]) -> bool:
