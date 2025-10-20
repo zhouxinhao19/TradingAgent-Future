@@ -1543,6 +1543,10 @@ const toggleProviderStatus = async (providerRow: any) => {
     await loadProviders()
     await loadLLMConfigs()
 
+    // 重新构建厂家信息映射和分组数据
+    await loadProviderInfoMap()
+    buildLLMConfigGroups()
+
     ElMessage.success(`厂家已${action}`)
   } catch (error) {
     console.error('切换厂家状态失败:', error)
