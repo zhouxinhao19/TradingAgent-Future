@@ -280,8 +280,9 @@ const getCacheTypeTag = (type: string): string => {
 const refreshStats = async () => {
   statsLoading.value = true
   try {
-    const stats = await cacheApi.getCacheStats()
-    cacheStats.value = stats
+    const response = await cacheApi.getCacheStats()
+    // 从 ApiResponse 中提取 data 字段
+    cacheStats.value = response.data || response
     ElMessage.success('缓存统计已刷新')
   } catch (error: any) {
     console.error('刷新缓存统计失败:', error)
@@ -351,8 +352,10 @@ const loadCacheDetails = async () => {
   detailsLoading.value = true
   try {
     const response = await cacheApi.getCacheDetails(currentPage.value, pageSize.value)
-    cacheDetails.value = response.items
-    totalItems.value = response.total
+    // 从 ApiResponse 中提取 data 字段
+    const data = response.data || response
+    cacheDetails.value = data.items || []
+    totalItems.value = data.total || 0
   } catch (error: any) {
     console.error('加载缓存详情失败:', error)
     ElMessage.error(error.message || '加载缓存详情失败')
