@@ -209,6 +209,7 @@ import {
   Delete,
   Refresh
 } from '@element-plus/icons-vue'
+import * as cacheApi from '@/api/cache'
 
 // 响应式数据
 const statsLoading = ref(false)
@@ -279,21 +280,12 @@ const getCacheTypeTag = (type: string): string => {
 const refreshStats = async () => {
   statsLoading.value = true
   try {
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    cacheStats.value = {
-      totalFiles: 1234,
-      totalSize: 256 * 1024 * 1024, // 256MB
-      maxSize: 1024 * 1024 * 1024, // 1GB
-      stockDataCount: 856,
-      newsDataCount: 234,
-      analysisDataCount: 144
-    }
-    
+    const stats = await cacheApi.getCacheStats()
+    cacheStats.value = stats
     ElMessage.success('缓存统计已刷新')
-  } catch (error) {
-    ElMessage.error('刷新缓存统计失败')
+  } catch (error: any) {
+    console.error('刷新缓存统计失败:', error)
+    ElMessage.error(error.message || '刷新缓存统计失败')
   } finally {
     statsLoading.value = false
   }
@@ -306,19 +298,19 @@ const cleanupOldCache = async () => {
       '确认清理',
       { type: 'warning' }
     )
-    
+
     cleanupLoading.value = true
-    
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    
+
+    await cacheApi.cleanupOldCache(cleanupDays.value)
+
     ElMessage.success(`已清理 ${cleanupDays.value} 天前的缓存文件`)
     await refreshStats()
     await loadCacheDetails()
-    
-  } catch (error) {
+
+  } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error('清理缓存失败')
+      console.error('清理缓存失败:', error)
+      ElMessage.error(error.message || '清理缓存失败')
     }
   } finally {
     cleanupLoading.value = false
@@ -330,25 +322,25 @@ const clearAllCache = async () => {
     await ElMessageBox.confirm(
       '确定要清空所有缓存文件吗？此操作无法恢复！',
       '确认清空',
-      { 
+      {
         type: 'error',
         confirmButtonText: '确定清空',
         cancelButtonText: '取消'
       }
     )
-    
+
     clearAllLoading.value = true
-    
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 3000))
-    
+
+    await cacheApi.clearAllCache()
+
     ElMessage.success('所有缓存已清空')
     await refreshStats()
     await loadCacheDetails()
-    
-  } catch (error) {
+
+  } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error('清空缓存失败')
+      console.error('清空缓存失败:', error)
+      ElMessage.error(error.message || '清空缓存失败')
     }
   } finally {
     clearAllLoading.value = false
@@ -358,33 +350,12 @@ const clearAllCache = async () => {
 const loadCacheDetails = async () => {
   detailsLoading.value = true
   try {
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // 模拟缓存详情数据
-    cacheDetails.value = [
-      {
-        type: 'stock',
-        symbol: '000001',
-        size: 1024 * 1024,
-        created_at: '2024-01-15T10:30:00Z',
-        last_accessed: '2024-01-18T14:20:00Z',
-        hit_count: 15
-      },
-      {
-        type: 'news',
-        symbol: 'AAPL',
-        size: 512 * 1024,
-        created_at: '2024-01-16T09:15:00Z',
-        last_accessed: '2024-01-18T11:45:00Z',
-        hit_count: 8
-      }
-    ]
-    
-    totalItems.value = 50
-    
-  } catch (error) {
-    ElMessage.error('加载缓存详情失败')
+    const response = await cacheApi.getCacheDetails(currentPage.value, pageSize.value)
+    cacheDetails.value = response.items
+    totalItems.value = response.total
+  } catch (error: any) {
+    console.error('加载缓存详情失败:', error)
+    ElMessage.error(error.message || '加载缓存详情失败')
   } finally {
     detailsLoading.value = false
   }
