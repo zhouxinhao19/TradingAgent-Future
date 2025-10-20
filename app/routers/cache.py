@@ -7,7 +7,7 @@ from typing import Optional
 from datetime import datetime, timedelta
 
 from app.routers.auth import get_current_user
-from app.core.response import ok, error
+from app.core.response import ok
 from tradingagents.utils.logging_manager import get_logger
 
 logger = get_logger(__name__)
