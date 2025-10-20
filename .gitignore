@@ -92,6 +92,8 @@ tradingagents.egg-info/
 # 日志文件
 *.log
 
+*.tar
+
 # 过时的版本文档
 *_PREVIEW_README.md
 RELEASE_NOTES_PREVIEW.md
