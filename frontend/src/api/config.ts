@@ -422,6 +422,11 @@ export const configApi = {
   // 迁移传统配置
   migrateLegacyConfig(): Promise<{ message: string }> {
     return ApiClient.post('/api/config/migrate-legacy')
+  },
+
+  // 配置重载
+  reloadConfig(): Promise<{ success: boolean; message: string; data?: any }> {
+    return ApiClient.post('/api/config/reload')
   }
 }
 
@@ -553,9 +558,4 @@ export const validateDatabaseConfig = (config: Partial<DatabaseConfig>): string[
   if (config.pool_size && config.pool_size <= 0) errors.push('连接池大小必须大于0')
 
   return errors
-}
-
-// 配置重载
-export const reloadConfig = (): Promise<ApiResponse> => {
-  return client.post('/config/reload')
 }
