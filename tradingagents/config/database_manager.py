@@ -274,7 +274,21 @@ class DatabaseManager:
             "redis": self.redis_config,
             "primary_backend": self.primary_backend,
             "mongodb_available": self.mongodb_available,
-            "redis_available": self.redis_available
+            "redis_available": self.redis_available,
+            "cache": {
+                "primary_backend": self.primary_backend,
+                "fallback_enabled": True,  # 总是启用降级
+                "ttl_settings": {
+                    # 美股数据TTL（秒）
+                    "us_stock_data": 7200,  # 2小时
+                    "us_news": 21600,  # 6小时
+                    "us_fundamentals": 86400,  # 24小时
+                    # A股数据TTL（秒）
+                    "china_stock_data": 3600,  # 1小时
+                    "china_news": 14400,  # 4小时
+                    "china_fundamentals": 43200,  # 12小时
+                }
+            }
         }
 
     def get_status_report(self) -> Dict[str, Any]:

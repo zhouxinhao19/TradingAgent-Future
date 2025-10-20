@@ -19,13 +19,16 @@ from tradingagents.config.database_manager import get_database_manager
 class AdaptiveCacheSystem:
     """自适应缓存系统"""
     
-    def __init__(self, cache_dir: str = "data/cache"):
+    def __init__(self, cache_dir: str = None):
         self.logger = logging.getLogger(__name__)
-        
+
         # 获取数据库管理器
         self.db_manager = get_database_manager()
-        
+
         # 设置缓存目录
+        if cache_dir is None:
+            # 默认使用 data/cache 目录
+            cache_dir = "data/cache"
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         
