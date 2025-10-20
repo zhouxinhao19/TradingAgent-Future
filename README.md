@@ -6,7 +6,6 @@
 [![Documentation](https://img.shields.io/badge/docs-中文文档-green.svg)](./docs/)
 [![Original](https://img.shields.io/badge/基于-TauricResearch/TradingAgents-orange.svg)](https://github.com/TauricResearch/TradingAgents)
 
-> 🚀 **最新版本 cn-0.1.15**: 开发者体验与LLM生态系统大升级！新增千帆大模型支持、完整开发工具链、学术研究资料、企业级工作流规范！
 >
 > 🎯 **核心功能**: 原生OpenAI支持 | Google AI全面集成 | 自定义端点配置 | 智能模型选择 | 多LLM提供商支持 | 模型选择持久化 | Docker容器化部署 | 专业报告导出 | 完整A股支持 | 中文本地化
 
@@ -61,7 +60,19 @@
 
 v1.0.0-preview 版本目前处于**内测阶段**，我们诚邀您参与体验和测试！
 
-#### 📝 如何申请试用
+####  使用指南
+
+在申请试用前，建议先阅读详细的使用指南：
+
+**[📘 TradingAgents-CN v1.0.0-preview 使用指南](https://mp.weixin.qq.com/s/ppsYiBncynxlsfKFG8uEbw)**
+
+使用指南包含：
+- ✅ 完整的功能介绍和操作演示
+- ✅ 详细的配置说明和最佳实践
+- ✅ 常见问题解答和故障排除
+- ✅ 实际使用案例和效果展示
+
+#### 如何申请试用
 
 1. **关注公众号**: 微信搜索 **"TradingAgents-CN"** 并关注
 2. **提交申请**: 通过公众号私信发送以下信息：
@@ -86,16 +97,6 @@ v1.0.0-preview 版本目前处于**内测阶段**，我们诚邀您参与体验�
 - **微信公众号**: TradingAgents-CN（推荐）
 
   <img src="assets/weixin.png" alt="微信公众号" width="200"/>
-
-- **QQ 群**: 187537480
-- **GitHub Issues**: [提交问题和建议](https://github.com/hsliuping/TradingAgents-CN/issues)
-
-### 📚 相关文档
-
-- [v1.0.0-preview 发布说明](docs/releases/v1.0.0-preview-release-notes.md)
-- [系统稳定性和 Docker 多架构支持](docs/blog/2025-10-20-system-stability-and-docker-multiarch.md)
-- [配置系统升级指南](docs/configuration/API_KEY_PRIORITY.md)
-- [GitHub Actions 自动构建指南](docs/deployment/docker/GITHUB_ACTIONS_QUICKSTART.md)
 
 ---
 
