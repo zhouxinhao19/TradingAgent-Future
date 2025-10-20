@@ -110,28 +110,37 @@ async def notifications_stream_generator(user_id: str):
         yield f"event: connected\ndata: {{\"channel\": \"{channel}\"}}\n\n"
 
         idle = 0
+        message_count = 0  # 统计发送的消息数量
         while True:
             try:
                 msg = await asyncio.wait_for(pubsub.get_message(ignore_subscribe_messages=True), timeout=10)
                 if msg and msg.get('type') == 'message':
                     idle = 0
                     data = msg.get('data')
+                    message_count += 1
                     # data 已经是JSON字符串
+                    logger.debug(f"📨 [SSE] 发送通知消息 #{message_count}: user={user_id}")
                     yield f"event: notification\ndata: {data}\n\n"
                 else:
+                    # 没有消息时等待一段时间，避免空转
+                    await asyncio.sleep(10)
                     idle += 1
-                    if idle % 3 == 0:  # 心跳
+                    if idle % 3 == 0:  # 每 30 秒发送一次心跳
+                        message_count += 1
+                        logger.debug(f"💓 [SSE] 发送心跳 #{message_count}: user={user_id}, idle={idle}")
                         yield f"event: heartbeat\ndata: {{\"ts\": {asyncio.get_event_loop().time()} }}\n\n"
             except asyncio.TimeoutError:
                 idle += 1
-                if idle % 3 == 0:
+                if idle % 3 == 0:  # 每 30 秒发送一次心跳
+                    message_count += 1
+                    logger.debug(f"💓 [SSE] 发送心跳(超时) #{message_count}: user={user_id}, idle={idle}")
                     yield f"event: heartbeat\ndata: {{\"ts\": {asyncio.get_event_loop().time()} }}\n\n"
             except asyncio.CancelledError:
                 # 客户端断开连接
-                logger.info(f"🔌 [SSE] 客户端断开连接: user={user_id}")
+                logger.info(f"🔌 [SSE] 客户端断开连接: user={user_id}, 已发送 {message_count} 条消息")
                 break
             except Exception as e:
-                logger.error(f"❌ [SSE] 消息处理错误: {e}", exc_info=True)
+                logger.error(f"❌ [SSE] 消息处理错误: {e}, 已发送 {message_count} 条消息", exc_info=True)
                 break
 
     except Exception as e:
