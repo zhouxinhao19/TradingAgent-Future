@@ -760,7 +760,19 @@ async def get_llm_configs(
             # 这里可以根据已有的厂家创建示例配置
             # 暂时返回空列表，让前端显示"暂无配置"
 
-        return _sanitize_llm_configs(config.llm_configs)
+        # 获取所有供应商信息，用于过滤被禁用供应商的模型
+        providers = await config_service.get_llm_providers()
+        active_provider_names = {p.name for p in providers if p.is_active}
+
+        # 过滤：只返回启用的模型 且 供应商也启用的模型
+        filtered_configs = [
+            llm_config for llm_config in config.llm_configs
+            if llm_config.enabled and llm_config.provider in active_provider_names
+        ]
+
+        logger.info(f"✅ 过滤后的大模型配置数量: {len(filtered_configs)} (原始: {len(config.llm_configs)})")
+
+        return _sanitize_llm_configs(filtered_configs)
     except Exception as e:
         logger.error(f"❌ 获取大模型配置失败: {e}")
         raise HTTPException(
