@@ -1,11 +1,13 @@
 # ⚠️ 注意：此文件保留用于兼容性，但推荐使用 pyproject.toml
 #
 # 推荐安装方式：
-#   pip install -e .          # 开发模式安装（推荐）
-#   uv pip install -e .       # 使用 uv 更快安装
+#   pip install -e .
 #
-# 传统安装方式（如果需要）：
-#   pip install -r requirements.txt
+# 国内用户推荐使用镜像加速（详见 docs/installation-mirror.md）：
+#   pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple
+#
+# 或永久配置镜像：
+#   pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 #
 # 此文件与 pyproject.toml 保持同步
 # 最后更新：2025-10-21

@@ -70,6 +70,9 @@ python -m pip install --upgrade pip
 # 4. 安装依赖
 pip install -e .
 
+# 💡 国内用户推荐使用镜像加速（详见 docs/installation-mirror.md）
+# pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple
+
 # 5. 配置环境变量
 cp .env.example .env
 # 编辑 .env 文件

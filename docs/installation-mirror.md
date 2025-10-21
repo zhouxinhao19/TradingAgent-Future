@@ -1,0 +1,112 @@
+# 国内镜像加速安装指南
+
+## 问题
+
+安装依赖时速度很慢或经常卡死，特别是安装 torch、transformers 等大型包。
+
+## 解决方案
+
+使用国内 PyPI 镜像源加速安装。
+
+---
+
+## 🚀 快速使用（推荐）
+
+### 临时使用镜像（单次安装）
+
+```bash
+# 使用清华镜像（推荐）
+pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 或使用阿里云镜像
+pip install -e . -i https://mirrors.aliyun.com/pypi/simple/
+
+# 或使用中科大镜像
+pip install -e . -i https://mirrors.ustc.edu.cn/pypi/web/simple
+```
+
+---
+
+## 🔧 永久配置镜像（推荐）
+
+### Windows
+
+```powershell
+pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+### Linux / macOS
+
+```bash
+pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+配置后，以后所有 `pip install` 命令都会自动使用镜像源。
+
+---
+
+## 📋 推荐镜像源
+
+| 镜像源 | URL | 说明 |
+|--------|-----|------|
+| 清华大学 | `https://pypi.tuna.tsinghua.edu.cn/simple` | ⭐ 推荐，速度快，稳定 |
+| 阿里云 | `https://mirrors.aliyun.com/pypi/simple/` | 稳定，速度快 |
+| 中科大 | `https://mirrors.ustc.edu.cn/pypi/web/simple` | 教育网友好 |
+| 豆瓣 | `https://pypi.douban.com/simple/` | 备选 |
+
+---
+
+## ✅ 完整安装示例
+
+```bash
+# 1. 配置镜像（一次性）
+pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 2. 升级 pip
+pip install --upgrade pip
+
+# 3. 安装项目
+pip install -e .
+
+# 完成！
+```
+
+---
+
+## 🔄 取消镜像配置
+
+如果需要恢复默认 PyPI 源：
+
+```bash
+pip config unset global.index-url
+```
+
+---
+
+## 💡 其他加速方法
+
+### 使用 uv（更快的包管理器）
+
+```bash
+# 安装 uv
+pip install uv
+
+# 使用 uv 安装（自动使用最快的源）
+uv pip install -e .
+```
+
+---
+
+## 📞 遇到问题？
+
+如果使用镜像后仍然很慢：
+
+1. 尝试更换其他镜像源
+2. 检查网络连接
+3. 使用 `uv` 包管理器
+4. 在 GitHub Issues 中反馈
+
+---
+
+**推荐配置**: 清华镜像 + pip 永久配置，一劳永逸！🎉
+
