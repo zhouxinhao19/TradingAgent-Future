@@ -346,17 +346,32 @@ const handleSubmit = async () => {
     await formRef.value?.validate()
     submitting.value = true
 
-    // 🔥 修改：允许提交 API Key 和 API Secret
+    // 🔥 修改：处理 API Key 的提交逻辑
     const payload: any = { ...formData.value }
 
-    // 如果 API Key 为空或是占位符，则删除该字段（使用环境变量）
-    if (!payload.api_key || payload.api_key.startsWith('your_') || payload.api_key.startsWith('your-')) {
-      delete payload.api_key
+    // 处理 API Key
+    if ('api_key' in payload) {
+      const apiKey = payload.api_key || ''
+
+      // 如果是截断的密钥（包含 "..."），表示用户没有修改，删除该字段（不更新）
+      if (apiKey.includes('...')) {
+        delete payload.api_key
+      }
+      // 如果是占位符，删除该字段（不更新）
+      else if (apiKey.startsWith('your_') || apiKey.startsWith('your-')) {
+        delete payload.api_key
+      }
+      // 如果是空字符串，保留（表示用户想清空密钥）
+      // 如果是有效的完整密钥，保留（表示用户想更新密钥）
     }
 
-    // 如果 API Secret 为空或是占位符，则删除该字段
-    if (!payload.api_secret || payload.api_secret.startsWith('your_') || payload.api_secret.startsWith('your-')) {
-      delete payload.api_secret
+    // 处理 API Secret（同样的逻辑）
+    if ('api_secret' in payload) {
+      const apiSecret = payload.api_secret || ''
+
+      if (apiSecret.includes('...') || apiSecret.startsWith('your_') || apiSecret.startsWith('your-')) {
+        delete payload.api_secret
+      }
     }
 
     if (isEdit.value) {

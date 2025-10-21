@@ -765,15 +765,18 @@ class ConfigService:
             # 这里应该实际调用LLM API进行测试
             # 目前返回模拟结果
             await asyncio.sleep(1)  # 模拟API调用
-            
+
             response_time = time.time() - start_time
-            
+
+            # 获取 provider 字符串值（兼容枚举和字符串）
+            provider_str = llm_config.provider.value if hasattr(llm_config.provider, 'value') else str(llm_config.provider)
+
             return {
                 "success": True,
-                "message": f"成功连接到 {llm_config.provider.value} {llm_config.model_name}",
+                "message": f"成功连接到 {provider_str} {llm_config.model_name}",
                 "response_time": response_time,
                 "details": {
-                    "provider": llm_config.provider.value,
+                    "provider": provider_str,
                     "model": llm_config.model_name,
                     "api_base": llm_config.api_base
                 }

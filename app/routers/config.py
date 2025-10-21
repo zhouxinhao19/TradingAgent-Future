@@ -244,16 +244,22 @@ async def update_llm_provider(
     try:
         update_data = request.model_dump(exclude_unset=True)
 
-        # 🔥 修改：允许更新 API Key，但验证有效性
-        # 如果 API Key 无效（空、占位符、长度不够），则删除该字段（保持数据库原值或使用环境变量）
+        # 🔥 修改：处理 API Key 的更新逻辑
+        # 1. 如果 API Key 是空字符串，表示用户想清空密钥 → 保存空字符串
+        # 2. 如果 API Key 是占位符或截断的密钥（如 "sk-99054..."），则删除该字段（不更新）
+        # 3. 如果 API Key 是有效的完整密钥，则更新
         if 'api_key' in update_data:
             api_key = update_data.get('api_key', '')
-            if not api_key or api_key.startswith('your_') or api_key.startswith('your-') or len(api_key) <= 10:
+            # 如果是占位符或截断的密钥（包含 "..."），则不更新
+            if api_key and (api_key.startswith('your_') or api_key.startswith('your-') or '...' in api_key):
                 del update_data['api_key']
+            # 如果是空字符串，保留（表示清空）
+            # 如果是有效的完整密钥，保留（表示更新）
 
         if 'api_secret' in update_data:
             api_secret = update_data.get('api_secret', '')
-            if not api_secret or api_secret.startswith('your_') or api_secret.startswith('your-') or len(api_secret) <= 10:
+            # 同样的逻辑处理 API Secret
+            if api_secret and (api_secret.startswith('your_') or api_secret.startswith('your-') or '...' in api_secret):
                 del update_data['api_secret']
 
         success = await config_service.update_llm_provider(provider_id, update_data)
