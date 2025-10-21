@@ -25,12 +25,24 @@ class ChatGoogleOpenAI(ChatGoogleGenerativeAI):
     解决Google模型工具调用返回格式与系统期望不匹配的问题
     """
 
-    def __init__(self, **kwargs):
-        """初始化 Google AI OpenAI 兼容客户端"""
+    def __init__(self, base_url: Optional[str] = None, **kwargs):
+        """
+        初始化 Google AI OpenAI 兼容客户端
+
+        Args:
+            base_url: 自定义 API 端点（可选）
+                     如果提供，将通过 client_options 传递给 Google AI SDK
+                     支持格式：
+                     - https://generativelanguage.googleapis.com/v1beta
+                     - https://generativelanguage.googleapis.com/v1 (自动转换为 v1beta)
+                     - 自定义代理地址
+            **kwargs: 其他参数
+        """
 
         # 🔍 [DEBUG] 读取环境变量前的日志
         logger.info("🔍 [Google初始化] 开始初始化 ChatGoogleOpenAI")
         logger.info(f"🔍 [Google初始化] kwargs 中是否包含 google_api_key: {'google_api_key' in kwargs}")
+        logger.info(f"🔍 [Google初始化] 传入的 base_url: {base_url}")
 
         # 设置 Google AI 的默认配置
         kwargs.setdefault("temperature", 0.1)
@@ -56,6 +68,24 @@ class ChatGoogleOpenAI(ChatGoogleGenerativeAI):
 
         kwargs["google_api_key"] = google_api_key
 
+        # 🔧 处理自定义 base_url
+        if base_url:
+            # 移除末尾的斜杠
+            base_url = base_url.rstrip('/')
+            logger.info(f"🔍 [Google初始化] 处理 base_url: {base_url}")
+
+            # 如果 base_url 以 /v1 结尾，自动转换为 /v1beta（Google AI 的正确端点）
+            if base_url.endswith('/v1'):
+                base_url = base_url[:-3] + '/v1beta'
+                logger.info(f"🔍 [Google初始化] 自动将 /v1 转换为 /v1beta: {base_url}")
+
+            # 通过 client_options 传递自定义端点
+            # 参考: https://github.com/langchain-ai/langchain-google/issues/783
+            kwargs["client_options"] = {"api_endpoint": base_url}
+            logger.info(f"✅ [Google初始化] 设置 client_options.api_endpoint: {base_url}")
+        else:
+            logger.info(f"🔍 [Google初始化] 未提供 base_url，使用默认端点")
+
         # 调用父类初始化
         super().__init__(**kwargs)
 
@@ -63,6 +93,8 @@ class ChatGoogleOpenAI(ChatGoogleGenerativeAI):
         logger.info(f"   模型: {kwargs.get('model', 'gemini-pro')}")
         logger.info(f"   温度: {kwargs.get('temperature', 0.1)}")
         logger.info(f"   最大Token: {kwargs.get('max_tokens', 2000)}")
+        if base_url:
+            logger.info(f"   自定义端点: {base_url}")
 
     @property
     def model_name(self) -> str:
@@ -275,15 +307,30 @@ def get_available_google_models() -> Dict[str, Dict[str, Any]]:
 def create_google_openai_llm(
     model: str = "gemini-2.5-flash-lite-preview-06-17",
     google_api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
     temperature: float = 0.1,
     max_tokens: int = 2000,
     **kwargs
 ) -> ChatGoogleOpenAI:
-    """创建 Google AI OpenAI 兼容 LLM 实例的便捷函数"""
-    
+    """
+    创建 Google AI OpenAI 兼容 LLM 实例的便捷函数
+
+    Args:
+        model: 模型名称
+        google_api_key: Google API Key
+        base_url: 自定义 API 端点（可选）
+        temperature: 温度参数
+        max_tokens: 最大 token 数
+        **kwargs: 其他参数
+
+    Returns:
+        ChatGoogleOpenAI 实例
+    """
+
     return ChatGoogleOpenAI(
         model=model,
         google_api_key=google_api_key,
+        base_url=base_url,
         temperature=temperature,
         max_tokens=max_tokens,
         **kwargs

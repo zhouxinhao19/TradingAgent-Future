@@ -63,9 +63,11 @@ def create_llm_by_provider(provider: str, model: str, backend_url: str, temperat
         if not google_api_key:
             raise ValueError("使用Google需要设置GOOGLE_API_KEY环境变量")
 
+        # 传递 base_url 参数，使厂家配置的 default_base_url 生效
         return ChatGoogleOpenAI(
             model=model,
             google_api_key=google_api_key,
+            base_url=backend_url if backend_url else None,
             temperature=temperature,
             max_tokens=max_tokens,
             timeout=timeout
@@ -346,9 +348,17 @@ class TradingAgentsGraph:
             logger.info(f"🔧 [Google-快速模型] max_tokens={quick_max_tokens}, temperature={quick_temperature}, timeout={quick_timeout}s")
             logger.info(f"🔧 [Google-深度模型] max_tokens={deep_max_tokens}, temperature={deep_temperature}, timeout={deep_timeout}s")
 
+            # 获取 backend_url（如果配置中有的话）
+            backend_url = self.config.get("backend_url")
+            if backend_url:
+                logger.info(f"🔧 [Google AI] 使用配置的 backend_url: {backend_url}")
+            else:
+                logger.info(f"🔧 [Google AI] 未配置 backend_url，使用默认端点")
+
             self.deep_thinking_llm = ChatGoogleOpenAI(
                 model=self.config["deep_think_llm"],
                 google_api_key=google_api_key,
+                base_url=backend_url if backend_url else None,
                 temperature=deep_temperature,
                 max_tokens=deep_max_tokens,
                 timeout=deep_timeout
@@ -356,6 +366,7 @@ class TradingAgentsGraph:
             self.quick_thinking_llm = ChatGoogleOpenAI(
                 model=self.config["quick_think_llm"],
                 google_api_key=google_api_key,
+                base_url=backend_url if backend_url else None,
                 temperature=quick_temperature,
                 max_tokens=quick_max_tokens,
                 timeout=quick_timeout,
