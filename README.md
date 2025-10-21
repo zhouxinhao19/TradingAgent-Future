@@ -448,14 +448,14 @@ chmod +x scripts/smart_start.sh && ./scripts/smart_start.sh
 # 1. 升级pip (重要！避免安装错误)
 python -m pip install --upgrade pip
 
-# 2. 安装依赖
-pip install -e .
+# 2. 安装依赖（推荐使用锁定版本，安装速度最快）
+pip install -r requirements-lock.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-# 💡 国内用户推荐使用镜像加速（详见 docs/installation-mirror.md）
+# 或使用可编辑模式（开发时推荐）
 # pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-# ⚠️ Windows 用户如遇到 PyYAML 编译错误，先执行：
-# pip install --only-binary :all: pyyaml -i https://pypi.tuna.tsinghua.edu.cn/simple
+# 💡 国内用户推荐使用镜像加速（详见 docs/installation-mirror.md）
+# ⚠️ Windows 用户如遇到 PyYAML 编译错误，使用锁定版本可避免此问题
 
 # 3. 启动应用
 python start_web.py

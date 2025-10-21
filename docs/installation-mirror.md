@@ -12,10 +12,23 @@
 
 ## 🚀 快速使用（推荐）
 
-### 临时使用镜像（单次安装）
+### 方式 1: 使用锁定版本（最快，强烈推荐）
 
 ```bash
-# 使用清华镜像（推荐）
+# 使用锁定版本 + 清华镜像（安装速度最快）
+pip install -r requirements-lock.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+**优势**：
+- ✅ **安装速度极快**（无需依赖解析，直接下载指定版本）
+- ✅ **环境完全可重现**（所有包版本锁定）
+- ✅ **避免版本冲突**和 PyYAML 编译错误
+- ✅ **节省时间**（从几分钟缩短到几十秒）
+
+### 方式 2: 使用可编辑模式（开发时推荐）
+
+```bash
+# 使用清华镜像
 pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 或使用阿里云镜像
@@ -24,6 +37,8 @@ pip install -e . -i https://mirrors.aliyun.com/pypi/simple/
 # 或使用中科大镜像
 pip install -e . -i https://mirrors.ustc.edu.cn/pypi/web/simple
 ```
+
+**注意**: 此方式需要 pip 解析依赖，速度较慢（可能需要几分钟），但适合开发时修改代码。
 
 ---
 

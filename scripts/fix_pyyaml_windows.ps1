@@ -39,28 +39,11 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# 安装 PyYAML 预编译版本
-Write-Host "`n📦 安装 PyYAML 预编译版本..." -ForegroundColor Yellow
-$pyyamlCmd = "$pythonCmd -m pip install --only-binary :all: pyyaml -i https://pypi.tuna.tsinghua.edu.cn/simple"
-Write-Host "执行: $pyyamlCmd" -ForegroundColor Gray
-Invoke-Expression $pyyamlCmd
-
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ PyYAML 安装失败" -ForegroundColor Red
-    Write-Host "`n💡 建议:" -ForegroundColor Yellow
-    Write-Host "  1. 检查网络连接" -ForegroundColor White
-    Write-Host "  2. 尝试其他镜像源（阿里云、中科大）" -ForegroundColor White
-    Write-Host "  3. 安装 Microsoft C++ Build Tools" -ForegroundColor White
-    Write-Host "     下载: https://visualstudio.microsoft.com/visual-cpp-build-tools/" -ForegroundColor White
-    exit 1
-}
-
-Write-Host "`n✅ PyYAML 安装成功！" -ForegroundColor Green
-
-# 安装项目依赖
-Write-Host "`n📦 安装项目依赖..." -ForegroundColor Yellow
-$installCmd = "$pythonCmd -m pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple"
+# 安装项目依赖（使用 --only-binary 避免编译 PyYAML）
+Write-Host "`n📦 安装项目依赖（使用预编译包）..." -ForegroundColor Yellow
+$installCmd = "$pythonCmd -m pip install -e . --only-binary pyyaml -i https://pypi.tuna.tsinghua.edu.cn/simple"
 Write-Host "执行: $installCmd" -ForegroundColor Gray
+Write-Host "💡 使用 --only-binary pyyaml 避免编译错误" -ForegroundColor Cyan
 
 $startTime = Get-Date
 Invoke-Expression $installCmd
