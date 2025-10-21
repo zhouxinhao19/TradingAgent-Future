@@ -935,26 +935,38 @@ class ConfigService:
         start_time = time.time()
         try:
             import requests
+            import os
 
             ds_type = ds_config.type.value if hasattr(ds_config.type, 'value') else str(ds_config.type)
 
             logger.info(f"🧪 测试数据源配置: {ds_config.name} ({ds_type})")
 
+            # 🔥 优先使用配置中的 API Key，如果没有则从环境变量获取
+            api_key = ds_config.api_key
+            used_env_credentials = False
+
             # 根据不同的数据源类型进行测试
             if ds_type == "tushare":
-                # Tushare 需要 API Token
-                if not ds_config.api_key:
-                    return {
-                        "success": False,
-                        "message": "Tushare 需要配置 API Token",
-                        "response_time": time.time() - start_time,
-                        "details": None
-                    }
+                # 如果配置中没有 API Key 或被截断，尝试从环境变量获取
+                if not api_key or "..." in api_key:
+                    env_token = os.getenv('TUSHARE_TOKEN')
+                    if env_token:
+                        # 移除可能的引号
+                        api_key = env_token.strip().strip('"').strip("'")
+                        used_env_credentials = True
+                        logger.info("🔑 使用环境变量中的 Tushare Token")
+                    else:
+                        return {
+                            "success": False,
+                            "message": "API Key 无效或被截断，且环境变量中未配置 TUSHARE_TOKEN",
+                            "response_time": time.time() - start_time,
+                            "details": None
+                        }
 
                 # 测试 Tushare API
                 try:
                     import tushare as ts
-                    ts.set_token(ds_config.api_key)
+                    ts.set_token(api_key)
                     pro = ts.pro_api()
                     # 获取交易日历（轻量级测试）
                     df = pro.trade_cal(exchange='SSE', start_date='20240101', end_date='20240101')
@@ -967,7 +979,8 @@ class ConfigService:
                             "response_time": response_time,
                             "details": {
                                 "type": ds_type,
-                                "test_result": "获取交易日历成功"
+                                "test_result": "获取交易日历成功",
+                                "used_env_credentials": used_env_credentials
                             }
                         }
                     else:
@@ -1072,14 +1085,20 @@ class ConfigService:
                     }
 
             elif ds_type == "alpha_vantage":
-                # Alpha Vantage 需要 API Key
-                if not ds_config.api_key:
-                    return {
-                        "success": False,
-                        "message": "Alpha Vantage 需要配置 API Key",
-                        "response_time": time.time() - start_time,
-                        "details": None
-                    }
+                # 如果配置中没有 API Key 或被截断，尝试从环境变量获取
+                if not api_key or "..." in api_key:
+                    env_key = os.getenv('ALPHA_VANTAGE_API_KEY')
+                    if env_key:
+                        api_key = env_key.strip()
+                        used_env_credentials = True
+                        logger.info("🔑 使用环境变量中的 Alpha Vantage API Key")
+                    else:
+                        return {
+                            "success": False,
+                            "message": "API Key 无效或被截断，且环境变量中未配置 ALPHA_VANTAGE_API_KEY",
+                            "response_time": time.time() - start_time,
+                            "details": None
+                        }
 
                 endpoint = ds_config.endpoint or "https://www.alphavantage.co"
                 url = f"{endpoint}/query"
@@ -1087,7 +1106,7 @@ class ConfigService:
                     "function": "TIME_SERIES_INTRADAY",
                     "symbol": "IBM",
                     "interval": "5min",
-                    "apikey": ds_config.api_key
+                    "apikey": api_key
                 }
 
                 try:
@@ -1104,7 +1123,8 @@ class ConfigService:
                                 "details": {
                                     "type": ds_type,
                                     "endpoint": endpoint,
-                                    "test_result": "API 密钥有效"
+                                    "test_result": "API 密钥有效",
+                                    "used_env_credentials": used_env_credentials
                                 }
                             }
                         elif "Error Message" in data:
@@ -1137,10 +1157,44 @@ class ConfigService:
                     }
 
             else:
-                # 其他数据源类型 - 基本的端点测试
+                # 其他数据源类型 - 尝试从环境变量获取 API Key（如果需要）
+                # 支持的环境变量映射
+                env_key_map = {
+                    "finnhub": "FINNHUB_API_KEY",
+                    "polygon": "POLYGON_API_KEY",
+                    "iex": "IEX_API_KEY",
+                    "quandl": "QUANDL_API_KEY",
+                }
+
+                # 如果配置中没有 API Key，尝试从环境变量获取
+                if ds_type in env_key_map and (not api_key or "..." in api_key):
+                    env_var_name = env_key_map[ds_type]
+                    env_key = os.getenv(env_var_name)
+                    if env_key:
+                        api_key = env_key.strip()
+                        used_env_credentials = True
+                        logger.info(f"🔑 使用环境变量中的 {ds_type.upper()} API Key ({env_var_name})")
+
+                # 基本的端点测试
                 if ds_config.endpoint:
                     try:
-                        response = requests.get(ds_config.endpoint, timeout=10)
+                        # 如果有 API Key，添加到请求中
+                        headers = {}
+                        params = {}
+
+                        if api_key:
+                            # 根据不同数据源的认证方式添加 API Key
+                            if ds_type == "finnhub":
+                                params["token"] = api_key
+                            elif ds_type in ["polygon", "alpha_vantage"]:
+                                params["apiKey"] = api_key
+                            elif ds_type == "iex":
+                                params["token"] = api_key
+                            else:
+                                # 默认使用 header 认证
+                                headers["Authorization"] = f"Bearer {api_key}"
+
+                        response = requests.get(ds_config.endpoint, params=params, headers=headers, timeout=10)
                         response_time = time.time() - start_time
 
                         if response.status_code < 500:
@@ -1151,7 +1205,8 @@ class ConfigService:
                                 "details": {
                                     "type": ds_type,
                                     "endpoint": ds_config.endpoint,
-                                    "status_code": response.status_code
+                                    "status_code": response.status_code,
+                                    "used_env_credentials": used_env_credentials
                                 }
                             }
                         else:
