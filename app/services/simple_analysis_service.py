@@ -232,7 +232,7 @@ def _get_default_backend_url(provider: str) -> str:
         "302ai": "https://api.302.ai/v1",
     }
 
-    url = default_urls.get(provider, "https://dashscope.aliyuncs.com/api/v1")
+    url = default_urls.get(provider, "https://dashscope.aliyuncs.com/compatible-mode/v1")
     logger.info(f"🔧 [默认URL] {provider} -> {url}")
     return url
 
