@@ -1840,7 +1840,7 @@ async def init_model_catalog(
 
 @router.get("/database", response_model=List[DatabaseConfig])
 async def get_database_configs(
-    current_user: User = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     """获取所有数据库配置"""
     try:
@@ -1859,7 +1859,7 @@ async def get_database_configs(
 @router.get("/database/{db_name}", response_model=DatabaseConfig)
 async def get_database_config(
     db_name: str,
-    current_user: User = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     """获取指定的数据库配置"""
     try:
@@ -1886,7 +1886,7 @@ async def get_database_config(
 @router.post("/database", response_model=dict)
 async def add_database_config(
     request: DatabaseConfigRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     """添加数据库配置"""
     try:
@@ -1906,7 +1906,7 @@ async def add_database_config(
 
         # 记录操作日志
         await log_operation(
-            user_id=current_user.id,
+            user_id=current_user["id"],
             action=ActionType.CREATE,
             resource_type="database_config",
             resource_id=request.name,
@@ -1929,7 +1929,7 @@ async def add_database_config(
 async def update_database_config(
     db_name: str,
     request: DatabaseConfigRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     """更新数据库配置"""
     try:
@@ -1956,7 +1956,7 @@ async def update_database_config(
 
         # 记录操作日志
         await log_operation(
-            user_id=current_user.id,
+            user_id=current_user["id"],
             action=ActionType.UPDATE,
             resource_type="database_config",
             resource_id=db_name,
@@ -1978,7 +1978,7 @@ async def update_database_config(
 @router.delete("/database/{db_name}", response_model=dict)
 async def delete_database_config(
     db_name: str,
-    current_user: User = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     """删除数据库配置"""
     try:
@@ -1995,7 +1995,7 @@ async def delete_database_config(
 
         # 记录操作日志
         await log_operation(
-            user_id=current_user.id,
+            user_id=current_user["id"],
             action=ActionType.DELETE,
             resource_type="database_config",
             resource_id=db_name,
