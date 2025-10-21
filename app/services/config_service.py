@@ -2838,7 +2838,12 @@ class ConfigService:
                     None, self._test_openai_compatible_api, api_key, display_name, base_url
                 )
             elif provider_name == "google":
-                return await asyncio.get_event_loop().run_in_executor(None, self._test_google_api, api_key, display_name)
+                # 获取厂家的 base_url
+                db = await self._get_db()
+                providers_collection = db.llm_providers
+                provider_data = await providers_collection.find_one({"name": provider_name})
+                base_url = provider_data.get("default_base_url") if provider_data else None
+                return await asyncio.get_event_loop().run_in_executor(None, self._test_google_api, api_key, display_name, base_url)
             elif provider_name == "deepseek":
                 return await asyncio.get_event_loop().run_in_executor(None, self._test_deepseek_api, api_key, display_name)
             elif provider_name == "dashscope":
@@ -2862,13 +2867,34 @@ class ConfigService:
                 "message": f"{display_name} 连接测试失败: {str(e)}"
             }
 
-    def _test_google_api(self, api_key: str, display_name: str) -> dict:
+    def _test_google_api(self, api_key: str, display_name: str, base_url: str = None) -> dict:
         """测试Google AI API"""
         try:
             import requests
 
-            # 使用正确的Google AI Gemini API端点
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+            print(f"🔍 [Google AI 测试] 开始测试")
+            print(f"   display_name: {display_name}")
+            print(f"   base_url (原始): {base_url}")
+            print(f"   api_key 长度: {len(api_key) if api_key else 0}")
+
+            # 使用配置的 base_url 或默认值
+            if not base_url:
+                base_url = "https://generativelanguage.googleapis.com/v1beta"
+                print(f"   ⚠️ base_url 为空，使用默认值: {base_url}")
+
+            # 移除末尾的斜杠
+            base_url = base_url.rstrip('/')
+            print(f"   base_url (去除斜杠): {base_url}")
+
+            # 如果 base_url 以 /v1 结尾，替换为 /v1beta（Google AI 的正确端点）
+            if base_url.endswith('/v1'):
+                base_url = base_url[:-3] + '/v1beta'
+                print(f"   ✅ 将 /v1 替换为 /v1beta: {base_url}")
+
+            # 构建完整的 API 端点
+            url = f"{base_url}/models/gemini-1.5-flash:generateContent?key={api_key}"
+
+            print(f"🔗 [Google AI 测试] 最终请求 URL: {url.replace(api_key, '***')}")
 
             headers = {
                 "Content-Type": "application/json"
@@ -2887,6 +2913,10 @@ class ConfigService:
             }
 
             response = requests.post(url, json=data, headers=headers, timeout=15)
+
+            print(f"📥 [Google AI 测试] 响应状态码: {response.status_code}")
+            if response.status_code != 200:
+                print(f"   响应内容: {response.text[:500]}")
 
             if response.status_code == 200:
                 result = response.json()
