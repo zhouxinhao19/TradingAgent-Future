@@ -748,7 +748,7 @@ async def test_config(
 @router.post("/database/{db_name}/test", response_model=ConfigTestResponse)
 async def test_saved_database_config(
     db_name: str,
-    current_user: User = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user)
 ):
     """测试已保存的数据库配置（从数据库中获取完整配置包括密码）"""
     try:
@@ -1907,10 +1907,10 @@ async def add_database_config(
         # 记录操作日志
         await log_operation(
             user_id=current_user["id"],
-            action=ActionType.CREATE,
-            resource_type="database_config",
-            resource_id=request.name,
-            details={"name": request.name, "type": request.type}
+            username=current_user.get("username", "unknown"),
+            action_type=ActionType.CONFIG_MANAGEMENT,
+            action=f"添加数据库配置: {request.name}",
+            details={"name": request.name, "type": request.type, "host": request.host, "port": request.port}
         )
 
         return {"success": True, "message": "数据库配置添加成功"}
@@ -1957,10 +1957,10 @@ async def update_database_config(
         # 记录操作日志
         await log_operation(
             user_id=current_user["id"],
-            action=ActionType.UPDATE,
-            resource_type="database_config",
-            resource_id=db_name,
-            details={"name": request.name, "type": request.type}
+            username=current_user.get("username", "unknown"),
+            action_type=ActionType.CONFIG_MANAGEMENT,
+            action=f"更新数据库配置: {db_name}",
+            details={"name": request.name, "type": request.type, "host": request.host, "port": request.port}
         )
 
         return {"success": True, "message": "数据库配置更新成功"}
@@ -1996,9 +1996,9 @@ async def delete_database_config(
         # 记录操作日志
         await log_operation(
             user_id=current_user["id"],
-            action=ActionType.DELETE,
-            resource_type="database_config",
-            resource_id=db_name,
+            username=current_user.get("username", "unknown"),
+            action_type=ActionType.CONFIG_MANAGEMENT,
+            action=f"删除数据库配置: {db_name}",
             details={"name": db_name}
         )
 

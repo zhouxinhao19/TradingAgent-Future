@@ -1199,22 +1199,64 @@ class ConfigService:
             if db_type == "mongodb":
                 try:
                     from motor.motor_asyncio import AsyncIOMotorClient
+                    import os
+
+                    # 🔥 优先使用配置中的用户名密码，如果没有则从环境变量获取
+                    username = db_config.username
+                    password = db_config.password
+                    database = db_config.database
+                    auth_source = None
+                    used_env_credentials = False
+
+                    # 如果配置中没有用户名密码，尝试从环境变量获取
+                    if not username or not password:
+                        env_username = os.getenv('MONGODB_USERNAME')
+                        env_password = os.getenv('MONGODB_PASSWORD')
+                        env_auth_source = os.getenv('MONGODB_AUTH_SOURCE', 'admin')
+                        if env_username and env_password:
+                            username = env_username
+                            password = env_password
+                            auth_source = env_auth_source
+                            used_env_credentials = True
+                            logger.info(f"🔑 使用环境变量中的 MongoDB 认证信息 (authSource={auth_source})")
+
+                    # 如果配置中没有数据库名，尝试从环境变量获取
+                    if not database:
+                        env_database = os.getenv('MONGODB_DATABASE')
+                        if env_database:
+                            database = env_database
+                            logger.info(f"📦 使用环境变量中的数据库名: {database}")
+
+                    # 从连接参数中获取 authSource（如果有）
+                    if not auth_source and db_config.connection_params:
+                        auth_source = db_config.connection_params.get('authSource')
 
                     # 构建连接字符串
-                    if db_config.username and db_config.password:
-                        connection_string = f"mongodb://{db_config.username}:{db_config.password}@{db_config.host}:{db_config.port}"
+                    if username and password:
+                        connection_string = f"mongodb://{username}:{password}@{db_config.host}:{db_config.port}"
                     else:
                         connection_string = f"mongodb://{db_config.host}:{db_config.port}"
 
-                    if db_config.database:
-                        connection_string += f"/{db_config.database}"
+                    if database:
+                        connection_string += f"/{database}"
 
                     # 添加连接参数
-                    if db_config.connection_params:
-                        params = "&".join([f"{k}={v}" for k, v in db_config.connection_params.items()])
-                        connection_string += f"?{params}"
+                    params_list = []
 
-                    logger.info(f"🔗 连接字符串: {connection_string.replace(db_config.password or '', '***')}")
+                    # 如果有 authSource，添加到参数中
+                    if auth_source:
+                        params_list.append(f"authSource={auth_source}")
+
+                    # 添加其他连接参数
+                    if db_config.connection_params:
+                        for k, v in db_config.connection_params.items():
+                            if k != 'authSource':  # authSource 已经添加过了
+                                params_list.append(f"{k}={v}")
+
+                    if params_list:
+                        connection_string += f"?{'&'.join(params_list)}"
+
+                    logger.info(f"🔗 连接字符串: {connection_string.replace(password or '', '***') if password else connection_string}")
 
                     # 创建客户端并测试连接
                     client = AsyncIOMotorClient(
@@ -1223,12 +1265,12 @@ class ConfigService:
                     )
 
                     # 如果指定了数据库，测试该数据库的访问权限
-                    if db_config.database:
+                    if database:
                         # 测试指定数据库的访问（不需要管理员权限）
-                        db = client[db_config.database]
+                        db = client[database]
                         # 尝试列出集合（如果没有权限会报错）
                         collections = await db.list_collection_names()
-                        test_result = f"数据库 '{db_config.database}' 可访问，包含 {len(collections)} 个集合"
+                        test_result = f"数据库 '{database}' 可访问，包含 {len(collections)} 个集合"
                     else:
                         # 如果没有指定数据库，只执行 ping 命令
                         await client.admin.command('ping')
@@ -1247,8 +1289,10 @@ class ConfigService:
                             "type": db_type,
                             "host": db_config.host,
                             "port": db_config.port,
-                            "database": db_config.database,
-                            "test_result": test_result
+                            "database": database,
+                            "auth_source": auth_source,
+                            "test_result": test_result,
+                            "used_env_credentials": used_env_credentials
                         }
                     }
                 except ImportError:
@@ -1287,6 +1331,25 @@ class ConfigService:
             elif db_type == "redis":
                 try:
                     import redis.asyncio as aioredis
+                    import os
+
+                    # 🔥 优先使用配置中的密码，如果没有则从环境变量获取
+                    password = db_config.password
+                    database = db_config.database
+
+                    # 如果配置中没有密码，尝试从环境变量获取
+                    if not password:
+                        env_password = os.getenv('REDIS_PASSWORD')
+                        if env_password:
+                            password = env_password
+                            logger.info("🔑 使用环境变量中的 Redis 密码")
+
+                    # 如果配置中没有数据库编号，尝试从环境变量获取
+                    if not database:
+                        env_db = os.getenv('REDIS_DB')
+                        if env_db:
+                            database = env_db
+                            logger.info(f"📦 使用环境变量中的 Redis 数据库编号: {database}")
 
                     # 构建连接参数
                     redis_params = {
@@ -1296,11 +1359,11 @@ class ConfigService:
                         "socket_connect_timeout": 5
                     }
 
-                    if db_config.password:
-                        redis_params["password"] = db_config.password
+                    if password:
+                        redis_params["password"] = password
 
-                    if db_config.database:
-                        redis_params["db"] = int(db_config.database)
+                    if database:
+                        redis_params["db"] = int(database)
 
                     # 创建连接并测试
                     redis_client = await aioredis.from_url(
@@ -1327,7 +1390,9 @@ class ConfigService:
                             "type": db_type,
                             "host": db_config.host,
                             "port": db_config.port,
-                            "redis_version": info.get("redis_version", "unknown")
+                            "database": database,
+                            "redis_version": info.get("redis_version", "unknown"),
+                            "used_env_credentials": not db_config.password
                         }
                     }
                 except ImportError:

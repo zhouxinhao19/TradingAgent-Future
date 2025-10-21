@@ -454,10 +454,7 @@
           <template #header>
             <div class="card-header">
               <h3>数据库配置</h3>
-              <el-button type="primary" @click="showAddDatabaseDialog">
-                <el-icon><Plus /></el-icon>
-                添加数据库
-              </el-button>
+              <el-text type="info" size="small">系统核心数据库配置，仅支持编辑和测试</el-text>
             </div>
           </template>
 
@@ -474,14 +471,11 @@
                   </el-tag>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="280">
+              <el-table-column label="操作" width="200">
                 <template #default="{ row }">
                   <el-button size="small" @click="editDatabaseConfig(row)">编辑</el-button>
                   <el-button size="small" type="primary" @click="testDatabase(row)">
                     测试连接
-                  </el-button>
-                  <el-button size="small" type="danger" @click="deleteDatabaseConfig(row)">
-                    删除
                   </el-button>
                 </template>
               </el-table-column>
@@ -982,21 +976,30 @@
     <!-- 数据库配置对话框 -->
     <el-dialog
       v-model="databaseDialogVisible"
-      :title="databaseDialogMode === 'add' ? '添加数据库配置' : '编辑数据库配置'"
+      title="编辑数据库配置"
       width="600px"
       :close-on-click-modal="false"
     >
+      <el-alert
+        title="提示"
+        type="info"
+        :closable="false"
+        style="margin-bottom: 20px"
+      >
+        数据库配置是系统核心配置，配置名称和类型不可修改。如果配置中未填写用户名密码，系统将使用环境变量（.env文件）中的配置。
+      </el-alert>
+
       <el-form :model="currentDatabaseConfig" label-width="120px">
         <el-form-item label="配置名称" required>
           <el-input
             v-model="currentDatabaseConfig.name"
             placeholder="请输入配置名称"
-            :disabled="databaseDialogMode === 'edit'"
+            disabled
           />
         </el-form-item>
 
         <el-form-item label="数据库类型" required>
-          <el-select v-model="currentDatabaseConfig.type" placeholder="请选择数据库类型">
+          <el-select v-model="currentDatabaseConfig.type" placeholder="请选择数据库类型" disabled>
             <el-option label="MongoDB" value="mongodb" />
             <el-option label="Redis" value="redis" />
             <el-option label="MySQL" value="mysql" />
@@ -1926,25 +1929,6 @@ const testDataSource = async (config: DataSourceConfig) => {
 }
 
 // 数据库相关操作
-const showAddDatabaseDialog = () => {
-  databaseDialogMode.value = 'add'
-  currentDatabaseConfig.value = {
-    name: '',
-    type: 'mongodb',
-    host: 'localhost',
-    port: 27017,
-    username: '',
-    password: '',
-    database: '',
-    connection_params: {},
-    pool_size: 10,
-    max_overflow: 20,
-    enabled: true,
-    description: ''
-  }
-  databaseDialogVisible.value = true
-}
-
 const editDatabaseConfig = (config: DatabaseConfig) => {
   databaseDialogMode.value = 'edit'
   currentDatabaseConfig.value = { ...config }
@@ -1953,43 +1937,15 @@ const editDatabaseConfig = (config: DatabaseConfig) => {
 
 const saveDatabaseConfig = async () => {
   try {
-    if (databaseDialogMode.value === 'add') {
-      await configApi.addDatabaseConfig(currentDatabaseConfig.value)
-      ElMessage.success('数据库配置添加成功')
-    } else {
-      await configApi.updateDatabaseConfig(
-        currentDatabaseConfig.value.name!,
-        currentDatabaseConfig.value
-      )
-      ElMessage.success('数据库配置更新成功')
-    }
-
+    await configApi.updateDatabaseConfig(
+      currentDatabaseConfig.value.name!,
+      currentDatabaseConfig.value
+    )
+    ElMessage.success('数据库配置更新成功')
     databaseDialogVisible.value = false
     await loadDatabaseConfigs()
   } catch (error: any) {
     ElMessage.error(error.message || '保存数据库配置失败')
-  }
-}
-
-const deleteDatabaseConfig = async (config: DatabaseConfig) => {
-  try {
-    await ElMessageBox.confirm(
-      `确定要删除数据库配置 "${config.name}" 吗？`,
-      '确认删除',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-
-    await configApi.deleteDatabaseConfig(config.name)
-    ElMessage.success('数据库配置删除成功')
-    await loadDatabaseConfigs()
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.message || '删除数据库配置失败')
-    }
   }
 }
 
