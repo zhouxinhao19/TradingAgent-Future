@@ -15,8 +15,11 @@
 ### 方式 1: 使用锁定版本（最快，强烈推荐）
 
 ```bash
-# 使用锁定版本 + 清华镜像（安装速度最快）
+# 步骤 1: 安装所有依赖包（使用锁定版本，速度最快）
 pip install -r requirements-lock.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 步骤 2: 安装本项目（可编辑模式，--no-deps 避免重新解析依赖）
+pip install -e . --no-deps
 ```
 
 **优势**：
@@ -24,6 +27,8 @@ pip install -r requirements-lock.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 - ✅ **环境完全可重现**（所有包版本锁定）
 - ✅ **避免版本冲突**和 PyYAML 编译错误
 - ✅ **节省时间**（从几分钟缩短到几十秒）
+
+**说明**: `--no-deps` 参数告诉 pip 不要检查和安装依赖，因为我们已经通过 requirements-lock.txt 安装了所有依赖。
 
 ### 方式 2: 使用可编辑模式（开发时推荐）
 

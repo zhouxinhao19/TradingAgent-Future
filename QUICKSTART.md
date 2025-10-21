@@ -69,8 +69,9 @@ python -m pip install --upgrade pip
 
 # 4. 安装依赖（推荐使用锁定版本，安装速度最快）
 pip install -r requirements-lock.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install -e . --no-deps
 
-# 或使用可编辑模式（开发时推荐）
+# 或一步安装（会重新解析依赖，速度较慢）
 # pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 💡 国内用户推荐使用镜像加速（详见 docs/installation-mirror.md）

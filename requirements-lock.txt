@@ -278,7 +278,7 @@ tomli==2.2.1
 tornado==6.5.2
 tqdm==4.67.1
 traceloop-sdk==0.47.3
--e git+https://github.com/hsliuping/TradingAgents-CN.git@253a7e5b7230667dbe4ce5196d985e229121bfdb#egg=tradingagents
+# tradingagents - 本项目，需要单独安装：pip install -e .
 tushare==1.4.24
 typer==0.19.1
 typing-inspect==0.9.0
