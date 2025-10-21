@@ -325,7 +325,7 @@ class ConfigService:
                     provider=ModelProvider.QWEN,
                     model_name="qwen-turbo",
                     api_key="your-qwen-api-key",
-                    api_base="https://dashscope.aliyuncs.com/api/v1",
+                    api_base="https://dashscope.aliyuncs.com/compatible-mode/v1",
                     max_tokens=4000,
                     temperature=0.7,
                     enabled=False,
@@ -2675,7 +2675,7 @@ class ConfigService:
                     "description": "阿里云百炼大模型服务平台，提供通义千问等模型",
                     "website": "https://bailian.console.aliyun.com",
                     "api_doc_url": "https://help.aliyun.com/zh/dashscope/",
-                    "default_base_url": "https://dashscope.aliyuncs.com/api/v1",
+                    "default_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
                     "supported_features": ["chat", "completion", "embedding", "function_calling", "streaming"]
                 },
                 {
