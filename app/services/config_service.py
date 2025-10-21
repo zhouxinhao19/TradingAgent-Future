@@ -931,25 +931,254 @@ class ConfigService:
             }
     
     async def test_data_source_config(self, ds_config: DataSourceConfig) -> Dict[str, Any]:
-        """测试数据源配置"""
+        """测试数据源配置 - 真实调用API进行验证"""
         start_time = time.time()
         try:
-            # 这里应该实际调用数据源API进行测试
-            await asyncio.sleep(0.5)  # 模拟API调用
-            
-            response_time = time.time() - start_time
-            
-            return {
-                "success": True,
-                "message": f"成功连接到数据源 {ds_config.name}",
-                "response_time": response_time,
-                "details": {
-                    "type": ds_config.type.value,
-                    "endpoint": ds_config.endpoint
+            import requests
+
+            ds_type = ds_config.type.value if hasattr(ds_config.type, 'value') else str(ds_config.type)
+
+            logger.info(f"🧪 测试数据源配置: {ds_config.name} ({ds_type})")
+
+            # 根据不同的数据源类型进行测试
+            if ds_type == "tushare":
+                # Tushare 需要 API Token
+                if not ds_config.api_key:
+                    return {
+                        "success": False,
+                        "message": "Tushare 需要配置 API Token",
+                        "response_time": time.time() - start_time,
+                        "details": None
+                    }
+
+                # 测试 Tushare API
+                try:
+                    import tushare as ts
+                    ts.set_token(ds_config.api_key)
+                    pro = ts.pro_api()
+                    # 获取交易日历（轻量级测试）
+                    df = pro.trade_cal(exchange='SSE', start_date='20240101', end_date='20240101')
+
+                    if df is not None and len(df) > 0:
+                        response_time = time.time() - start_time
+                        return {
+                            "success": True,
+                            "message": f"成功连接到 Tushare 数据源",
+                            "response_time": response_time,
+                            "details": {
+                                "type": ds_type,
+                                "test_result": "获取交易日历成功"
+                            }
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "message": "Tushare API 返回数据为空",
+                            "response_time": time.time() - start_time,
+                            "details": None
+                        }
+                except ImportError:
+                    return {
+                        "success": False,
+                        "message": "Tushare 库未安装，请运行: pip install tushare",
+                        "response_time": time.time() - start_time,
+                        "details": None
+                    }
+                except Exception as e:
+                    return {
+                        "success": False,
+                        "message": f"Tushare API 调用失败: {str(e)}",
+                        "response_time": time.time() - start_time,
+                        "details": None
+                    }
+
+            elif ds_type == "akshare":
+                # AKShare 不需要 API Key，直接测试
+                try:
+                    import akshare as ak
+                    # 获取实时行情（轻量级测试）
+                    df = ak.stock_zh_a_spot_em()
+
+                    if df is not None and len(df) > 0:
+                        response_time = time.time() - start_time
+                        return {
+                            "success": True,
+                            "message": f"成功连接到 AKShare 数据源",
+                            "response_time": response_time,
+                            "details": {
+                                "type": ds_type,
+                                "test_result": f"获取到 {len(df)} 条股票数据"
+                            }
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "message": "AKShare API 返回数据为空",
+                            "response_time": time.time() - start_time,
+                            "details": None
+                        }
+                except ImportError:
+                    return {
+                        "success": False,
+                        "message": "AKShare 库未安装，请运行: pip install akshare",
+                        "response_time": time.time() - start_time,
+                        "details": None
+                    }
+                except Exception as e:
+                    return {
+                        "success": False,
+                        "message": f"AKShare API 调用失败: {str(e)}",
+                        "response_time": time.time() - start_time,
+                        "details": None
+                    }
+
+            elif ds_type == "yahoo_finance":
+                # Yahoo Finance 测试
+                if not ds_config.endpoint:
+                    ds_config.endpoint = "https://query1.finance.yahoo.com"
+
+                try:
+                    url = f"{ds_config.endpoint}/v8/finance/chart/AAPL"
+                    params = {"interval": "1d", "range": "1d"}
+                    response = requests.get(url, params=params, timeout=10)
+
+                    if response.status_code == 200:
+                        data = response.json()
+                        if "chart" in data and "result" in data["chart"]:
+                            response_time = time.time() - start_time
+                            return {
+                                "success": True,
+                                "message": f"成功连接到 Yahoo Finance 数据源",
+                                "response_time": response_time,
+                                "details": {
+                                    "type": ds_type,
+                                    "endpoint": ds_config.endpoint,
+                                    "test_result": "获取 AAPL 数据成功"
+                                }
+                            }
+
+                    return {
+                        "success": False,
+                        "message": f"Yahoo Finance API 返回错误: HTTP {response.status_code}",
+                        "response_time": time.time() - start_time,
+                        "details": None
+                    }
+                except Exception as e:
+                    return {
+                        "success": False,
+                        "message": f"Yahoo Finance API 调用失败: {str(e)}",
+                        "response_time": time.time() - start_time,
+                        "details": None
+                    }
+
+            elif ds_type == "alpha_vantage":
+                # Alpha Vantage 需要 API Key
+                if not ds_config.api_key:
+                    return {
+                        "success": False,
+                        "message": "Alpha Vantage 需要配置 API Key",
+                        "response_time": time.time() - start_time,
+                        "details": None
+                    }
+
+                endpoint = ds_config.endpoint or "https://www.alphavantage.co"
+                url = f"{endpoint}/query"
+                params = {
+                    "function": "TIME_SERIES_INTRADAY",
+                    "symbol": "IBM",
+                    "interval": "5min",
+                    "apikey": ds_config.api_key
                 }
-            }
+
+                try:
+                    response = requests.get(url, params=params, timeout=10)
+
+                    if response.status_code == 200:
+                        data = response.json()
+                        if "Time Series (5min)" in data or "Meta Data" in data:
+                            response_time = time.time() - start_time
+                            return {
+                                "success": True,
+                                "message": f"成功连接到 Alpha Vantage 数据源",
+                                "response_time": response_time,
+                                "details": {
+                                    "type": ds_type,
+                                    "endpoint": endpoint,
+                                    "test_result": "API 密钥有效"
+                                }
+                            }
+                        elif "Error Message" in data:
+                            return {
+                                "success": False,
+                                "message": f"Alpha Vantage API 错误: {data['Error Message']}",
+                                "response_time": time.time() - start_time,
+                                "details": None
+                            }
+                        elif "Note" in data:
+                            return {
+                                "success": False,
+                                "message": "API 调用频率超限，请稍后再试",
+                                "response_time": time.time() - start_time,
+                                "details": None
+                            }
+
+                    return {
+                        "success": False,
+                        "message": f"Alpha Vantage API 返回错误: HTTP {response.status_code}",
+                        "response_time": time.time() - start_time,
+                        "details": None
+                    }
+                except Exception as e:
+                    return {
+                        "success": False,
+                        "message": f"Alpha Vantage API 调用失败: {str(e)}",
+                        "response_time": time.time() - start_time,
+                        "details": None
+                    }
+
+            else:
+                # 其他数据源类型 - 基本的端点测试
+                if ds_config.endpoint:
+                    try:
+                        response = requests.get(ds_config.endpoint, timeout=10)
+                        response_time = time.time() - start_time
+
+                        if response.status_code < 500:
+                            return {
+                                "success": True,
+                                "message": f"成功连接到数据源 {ds_config.name}",
+                                "response_time": response_time,
+                                "details": {
+                                    "type": ds_type,
+                                    "endpoint": ds_config.endpoint,
+                                    "status_code": response.status_code
+                                }
+                            }
+                        else:
+                            return {
+                                "success": False,
+                                "message": f"数据源返回服务器错误: HTTP {response.status_code}",
+                                "response_time": response_time,
+                                "details": None
+                            }
+                    except Exception as e:
+                        return {
+                            "success": False,
+                            "message": f"连接失败: {str(e)}",
+                            "response_time": time.time() - start_time,
+                            "details": None
+                        }
+                else:
+                    return {
+                        "success": False,
+                        "message": f"不支持的数据源类型: {ds_type}，且未配置端点",
+                        "response_time": time.time() - start_time,
+                        "details": None
+                    }
+
         except Exception as e:
             response_time = time.time() - start_time
+            logger.error(f"❌ 测试数据源配置失败: {e}")
             return {
                 "success": False,
                 "message": f"连接失败: {str(e)}",
@@ -958,26 +1187,331 @@ class ConfigService:
             }
     
     async def test_database_config(self, db_config: DatabaseConfig) -> Dict[str, Any]:
-        """测试数据库配置"""
+        """测试数据库配置 - 真实连接测试"""
         start_time = time.time()
         try:
-            # 这里应该实际测试数据库连接
-            await asyncio.sleep(0.3)  # 模拟连接测试
-            
-            response_time = time.time() - start_time
-            
-            return {
-                "success": True,
-                "message": f"成功连接到数据库 {db_config.name}",
-                "response_time": response_time,
-                "details": {
-                    "type": db_config.type.value,
-                    "host": db_config.host,
-                    "port": db_config.port
+            db_type = db_config.type.value if hasattr(db_config.type, 'value') else str(db_config.type)
+
+            logger.info(f"🧪 测试数据库配置: {db_config.name} ({db_type})")
+            logger.info(f"📍 连接地址: {db_config.host}:{db_config.port}")
+
+            # 根据不同的数据库类型进行测试
+            if db_type == "mongodb":
+                try:
+                    from motor.motor_asyncio import AsyncIOMotorClient
+
+                    # 构建连接字符串
+                    if db_config.username and db_config.password:
+                        connection_string = f"mongodb://{db_config.username}:{db_config.password}@{db_config.host}:{db_config.port}"
+                    else:
+                        connection_string = f"mongodb://{db_config.host}:{db_config.port}"
+
+                    if db_config.database:
+                        connection_string += f"/{db_config.database}"
+
+                    # 添加连接参数
+                    if db_config.connection_params:
+                        params = "&".join([f"{k}={v}" for k, v in db_config.connection_params.items()])
+                        connection_string += f"?{params}"
+
+                    logger.info(f"🔗 连接字符串: {connection_string.replace(db_config.password or '', '***')}")
+
+                    # 创建客户端并测试连接
+                    client = AsyncIOMotorClient(
+                        connection_string,
+                        serverSelectionTimeoutMS=5000  # 5秒超时
+                    )
+
+                    # 执行 ping 命令测试连接
+                    await client.admin.command('ping')
+
+                    # 获取数据库列表
+                    db_list = await client.list_database_names()
+
+                    response_time = time.time() - start_time
+
+                    # 关闭连接
+                    client.close()
+
+                    return {
+                        "success": True,
+                        "message": f"成功连接到 MongoDB 数据库",
+                        "response_time": response_time,
+                        "details": {
+                            "type": db_type,
+                            "host": db_config.host,
+                            "port": db_config.port,
+                            "database": db_config.database,
+                            "databases_count": len(db_list)
+                        }
+                    }
+                except ImportError:
+                    return {
+                        "success": False,
+                        "message": "Motor 库未安装，请运行: pip install motor",
+                        "response_time": time.time() - start_time,
+                        "details": None
+                    }
+                except Exception as e:
+                    error_msg = str(e)
+                    if "Authentication failed" in error_msg:
+                        message = "认证失败，请检查用户名和密码"
+                    elif "Connection refused" in error_msg:
+                        message = "连接被拒绝，请检查主机地址和端口"
+                    elif "timed out" in error_msg.lower():
+                        message = "连接超时，请检查网络和防火墙设置"
+                    else:
+                        message = f"连接失败: {error_msg}"
+
+                    return {
+                        "success": False,
+                        "message": message,
+                        "response_time": time.time() - start_time,
+                        "details": None
+                    }
+
+            elif db_type == "redis":
+                try:
+                    import redis.asyncio as aioredis
+
+                    # 构建连接参数
+                    redis_params = {
+                        "host": db_config.host,
+                        "port": db_config.port,
+                        "decode_responses": True,
+                        "socket_connect_timeout": 5
+                    }
+
+                    if db_config.password:
+                        redis_params["password"] = db_config.password
+
+                    if db_config.database:
+                        redis_params["db"] = int(db_config.database)
+
+                    # 创建连接并测试
+                    redis_client = await aioredis.from_url(
+                        f"redis://{db_config.host}:{db_config.port}",
+                        **redis_params
+                    )
+
+                    # 执行 PING 命令
+                    pong = await redis_client.ping()
+
+                    # 获取服务器信息
+                    info = await redis_client.info("server")
+
+                    response_time = time.time() - start_time
+
+                    # 关闭连接
+                    await redis_client.close()
+
+                    return {
+                        "success": True,
+                        "message": f"成功连接到 Redis 数据库",
+                        "response_time": response_time,
+                        "details": {
+                            "type": db_type,
+                            "host": db_config.host,
+                            "port": db_config.port,
+                            "redis_version": info.get("redis_version", "unknown")
+                        }
+                    }
+                except ImportError:
+                    return {
+                        "success": False,
+                        "message": "Redis 库未安装，请运行: pip install redis",
+                        "response_time": time.time() - start_time,
+                        "details": None
+                    }
+                except Exception as e:
+                    error_msg = str(e)
+                    if "WRONGPASS" in error_msg or "Authentication" in error_msg:
+                        message = "认证失败，请检查密码"
+                    elif "Connection refused" in error_msg:
+                        message = "连接被拒绝，请检查主机地址和端口"
+                    elif "timed out" in error_msg.lower():
+                        message = "连接超时，请检查网络和防火墙设置"
+                    else:
+                        message = f"连接失败: {error_msg}"
+
+                    return {
+                        "success": False,
+                        "message": message,
+                        "response_time": time.time() - start_time,
+                        "details": None
+                    }
+
+            elif db_type == "mysql":
+                try:
+                    import aiomysql
+
+                    # 创建连接
+                    conn = await aiomysql.connect(
+                        host=db_config.host,
+                        port=db_config.port,
+                        user=db_config.username,
+                        password=db_config.password,
+                        db=db_config.database,
+                        connect_timeout=5
+                    )
+
+                    # 执行测试查询
+                    async with conn.cursor() as cursor:
+                        await cursor.execute("SELECT VERSION()")
+                        version = await cursor.fetchone()
+
+                    response_time = time.time() - start_time
+
+                    # 关闭连接
+                    conn.close()
+
+                    return {
+                        "success": True,
+                        "message": f"成功连接到 MySQL 数据库",
+                        "response_time": response_time,
+                        "details": {
+                            "type": db_type,
+                            "host": db_config.host,
+                            "port": db_config.port,
+                            "database": db_config.database,
+                            "version": version[0] if version else "unknown"
+                        }
+                    }
+                except ImportError:
+                    return {
+                        "success": False,
+                        "message": "aiomysql 库未安装，请运行: pip install aiomysql",
+                        "response_time": time.time() - start_time,
+                        "details": None
+                    }
+                except Exception as e:
+                    error_msg = str(e)
+                    if "Access denied" in error_msg:
+                        message = "访问被拒绝，请检查用户名和密码"
+                    elif "Unknown database" in error_msg:
+                        message = f"数据库 '{db_config.database}' 不存在"
+                    elif "Can't connect" in error_msg:
+                        message = "无法连接，请检查主机地址和端口"
+                    else:
+                        message = f"连接失败: {error_msg}"
+
+                    return {
+                        "success": False,
+                        "message": message,
+                        "response_time": time.time() - start_time,
+                        "details": None
+                    }
+
+            elif db_type == "postgresql":
+                try:
+                    import asyncpg
+
+                    # 创建连接
+                    conn = await asyncpg.connect(
+                        host=db_config.host,
+                        port=db_config.port,
+                        user=db_config.username,
+                        password=db_config.password,
+                        database=db_config.database,
+                        timeout=5
+                    )
+
+                    # 执行测试查询
+                    version = await conn.fetchval("SELECT version()")
+
+                    response_time = time.time() - start_time
+
+                    # 关闭连接
+                    await conn.close()
+
+                    return {
+                        "success": True,
+                        "message": f"成功连接到 PostgreSQL 数据库",
+                        "response_time": response_time,
+                        "details": {
+                            "type": db_type,
+                            "host": db_config.host,
+                            "port": db_config.port,
+                            "database": db_config.database,
+                            "version": version.split()[1] if version else "unknown"
+                        }
+                    }
+                except ImportError:
+                    return {
+                        "success": False,
+                        "message": "asyncpg 库未安装，请运行: pip install asyncpg",
+                        "response_time": time.time() - start_time,
+                        "details": None
+                    }
+                except Exception as e:
+                    error_msg = str(e)
+                    if "password authentication failed" in error_msg:
+                        message = "密码认证失败，请检查用户名和密码"
+                    elif "does not exist" in error_msg:
+                        message = f"数据库 '{db_config.database}' 不存在"
+                    elif "Connection refused" in error_msg:
+                        message = "连接被拒绝，请检查主机地址和端口"
+                    else:
+                        message = f"连接失败: {error_msg}"
+
+                    return {
+                        "success": False,
+                        "message": message,
+                        "response_time": time.time() - start_time,
+                        "details": None
+                    }
+
+            elif db_type == "sqlite":
+                try:
+                    import aiosqlite
+
+                    # SQLite 使用文件路径，不需要 host/port
+                    db_path = db_config.database or db_config.host
+
+                    # 创建连接
+                    async with aiosqlite.connect(db_path, timeout=5) as conn:
+                        # 执行测试查询
+                        async with conn.execute("SELECT sqlite_version()") as cursor:
+                            version = await cursor.fetchone()
+
+                    response_time = time.time() - start_time
+
+                    return {
+                        "success": True,
+                        "message": f"成功连接到 SQLite 数据库",
+                        "response_time": response_time,
+                        "details": {
+                            "type": db_type,
+                            "database": db_path,
+                            "version": version[0] if version else "unknown"
+                        }
+                    }
+                except ImportError:
+                    return {
+                        "success": False,
+                        "message": "aiosqlite 库未安装，请运行: pip install aiosqlite",
+                        "response_time": time.time() - start_time,
+                        "details": None
+                    }
+                except Exception as e:
+                    return {
+                        "success": False,
+                        "message": f"连接失败: {str(e)}",
+                        "response_time": time.time() - start_time,
+                        "details": None
+                    }
+
+            else:
+                return {
+                    "success": False,
+                    "message": f"不支持的数据库类型: {db_type}",
+                    "response_time": time.time() - start_time,
+                    "details": None
                 }
-            }
+
         except Exception as e:
             response_time = time.time() - start_time
+            logger.error(f"❌ 测试数据库配置失败: {e}")
             return {
                 "success": False,
                 "message": f"连接失败: {str(e)}",
