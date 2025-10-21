@@ -768,26 +768,34 @@ class ConfigService:
             provider_str = llm_config.provider.value if hasattr(llm_config.provider, 'value') else str(llm_config.provider)
 
             logger.info(f"🧪 测试大模型配置: {provider_str} - {llm_config.model_name}")
-            logger.info(f"📍 API基础URL: {llm_config.api_base}")
+            logger.info(f"📍 API基础URL (模型配置): {llm_config.api_base}")
 
-            # 验证必需字段
-            if not llm_config.api_base:
-                return {
-                    "success": False,
-                    "message": "API基础URL不能为空",
-                    "response_time": time.time() - start_time,
-                    "details": None
-                }
+            # 获取厂家配置（用于获取 API Key 和 default_base_url）
+            db = await self._get_db()
+            providers_collection = db.llm_providers
+            provider_data = await providers_collection.find_one({"name": provider_str})
 
-            # 验证 API Key（从厂家配置获取）
+            # 1. 确定 API 基础 URL
+            api_base = llm_config.api_base
+            if not api_base:
+                # 如果模型配置没有 api_base，从厂家配置获取 default_base_url
+                if provider_data and provider_data.get("default_base_url"):
+                    api_base = provider_data["default_base_url"]
+                    logger.info(f"✅ 从厂家配置获取 API 基础 URL: {api_base}")
+                else:
+                    return {
+                        "success": False,
+                        "message": f"模型配置和厂家配置都未设置 API 基础 URL",
+                        "response_time": time.time() - start_time,
+                        "details": None
+                    }
+
+            # 2. 验证 API Key
             api_key = None
             if llm_config.api_key:
                 api_key = llm_config.api_key
             else:
                 # 从厂家配置获取 API Key
-                db = await self._get_db()
-                providers_collection = db.llm_providers
-                provider_data = await providers_collection.find_one({"name": provider_str})
                 if provider_data and provider_data.get("api_key"):
                     api_key = provider_data["api_key"]
                     logger.info(f"✅ 从厂家配置获取到API密钥")
@@ -805,99 +813,123 @@ class ConfigService:
                     "details": None
                 }
 
-            # 构建测试请求
-            api_base = llm_config.api_base.rstrip("/")
-            if not api_base.endswith("/v1"):
-                api_base = api_base + "/v1"
+            # 3. 根据厂家类型选择测试方法
+            if provider_str == "google":
+                # Google AI 使用专门的测试方法
+                logger.info(f"🔍 使用 Google AI 专用测试方法")
+                result = self._test_google_api(api_key, f"{provider_str} {llm_config.model_name}", api_base)
+                result["response_time"] = time.time() - start_time
+                return result
+            elif provider_str == "deepseek":
+                # DeepSeek 使用专门的测试方法
+                logger.info(f"🔍 使用 DeepSeek 专用测试方法")
+                result = self._test_deepseek_api(api_key, f"{provider_str} {llm_config.model_name}")
+                result["response_time"] = time.time() - start_time
+                return result
+            elif provider_str == "dashscope":
+                # DashScope 使用专门的测试方法
+                logger.info(f"🔍 使用 DashScope 专用测试方法")
+                result = self._test_dashscope_api(api_key, f"{provider_str} {llm_config.model_name}")
+                result["response_time"] = time.time() - start_time
+                return result
+            else:
+                # 其他厂家使用 OpenAI 兼容的测试方法
+                logger.info(f"🔍 使用 OpenAI 兼容测试方法")
 
-            url = f"{api_base}/chat/completions"
+                # 构建测试请求
+                api_base_normalized = api_base.rstrip("/")
+                if not api_base_normalized.endswith("/v1"):
+                    api_base_normalized = api_base_normalized + "/v1"
 
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {api_key}"
-            }
+                url = f"{api_base_normalized}/chat/completions"
 
-            data = {
-                "model": llm_config.model_name,
-                "messages": [
-                    {"role": "user", "content": "Hello, please respond with 'OK' if you can read this."}
-                ],
-                "max_tokens": 10,
-                "temperature": 0.1
-            }
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {api_key}"
+                }
 
-            logger.info(f"🌐 发送测试请求到: {url}")
+                data = {
+                    "model": llm_config.model_name,
+                    "messages": [
+                        {"role": "user", "content": "Hello, please respond with 'OK' if you can read this."}
+                    ],
+                    "max_tokens": 10,
+                    "temperature": 0.1
+                }
 
-            # 发送测试请求
-            response = requests.post(url, json=data, headers=headers, timeout=15)
-            response_time = time.time() - start_time
+                logger.info(f"🌐 发送测试请求到: {url}")
 
-            logger.info(f"📡 收到响应: HTTP {response.status_code}")
+                # 发送测试请求
+                response = requests.post(url, json=data, headers=headers, timeout=15)
+                response_time = time.time() - start_time
 
-            if response.status_code == 200:
-                result = response.json()
-                if "choices" in result and len(result["choices"]) > 0:
-                    content = result["choices"][0]["message"]["content"]
-                    if content and len(content.strip()) > 0:
-                        logger.info(f"✅ 测试成功: {content[:50]}")
-                        return {
-                            "success": True,
-                            "message": f"成功连接到 {provider_str} {llm_config.model_name}",
-                            "response_time": response_time,
-                            "details": {
-                                "provider": provider_str,
-                                "model": llm_config.model_name,
-                                "api_base": llm_config.api_base,
-                                "response_preview": content[:100]
+                logger.info(f"📡 收到响应: HTTP {response.status_code}")
+
+                # 处理响应（仅用于 OpenAI 兼容的厂家）
+                if response.status_code == 200:
+                    result = response.json()
+                    if "choices" in result and len(result["choices"]) > 0:
+                        content = result["choices"][0]["message"]["content"]
+                        if content and len(content.strip()) > 0:
+                            logger.info(f"✅ 测试成功: {content[:50]}")
+                            return {
+                                "success": True,
+                                "message": f"成功连接到 {provider_str} {llm_config.model_name}",
+                                "response_time": response_time,
+                                "details": {
+                                    "provider": provider_str,
+                                    "model": llm_config.model_name,
+                                    "api_base": api_base,
+                                    "response_preview": content[:100]
+                                }
                             }
-                        }
+                        else:
+                            return {
+                                "success": False,
+                                "message": "API响应内容为空",
+                                "response_time": response_time,
+                                "details": None
+                            }
                     else:
                         return {
                             "success": False,
-                            "message": "API响应内容为空",
+                            "message": "API响应格式异常",
                             "response_time": response_time,
                             "details": None
                         }
+                elif response.status_code == 401:
+                    return {
+                        "success": False,
+                        "message": "API密钥无效或已过期",
+                        "response_time": response_time,
+                        "details": None
+                    }
+                elif response.status_code == 403:
+                    return {
+                        "success": False,
+                        "message": "API权限不足或配额已用完",
+                        "response_time": response_time,
+                        "details": None
+                    }
+                elif response.status_code == 404:
+                    return {
+                        "success": False,
+                        "message": f"API端点不存在，请检查API基础URL是否正确: {url}",
+                        "response_time": response_time,
+                        "details": None
+                    }
                 else:
-                    return {
-                        "success": False,
-                        "message": "API响应格式异常",
-                        "response_time": response_time,
-                        "details": None
-                    }
-            elif response.status_code == 401:
-                return {
-                    "success": False,
-                    "message": "API密钥无效或已过期",
-                    "response_time": response_time,
-                    "details": None
-                }
-            elif response.status_code == 403:
-                return {
-                    "success": False,
-                    "message": "API权限不足或配额已用完",
-                    "response_time": response_time,
-                    "details": None
-                }
-            elif response.status_code == 404:
-                return {
-                    "success": False,
-                    "message": f"API端点不存在，请检查API基础URL是否正确: {url}",
-                    "response_time": response_time,
-                    "details": None
-                }
-            else:
-                try:
-                    error_detail = response.json()
-                    error_msg = error_detail.get("error", {}).get("message", f"HTTP {response.status_code}")
-                    return {
-                        "success": False,
-                        "message": f"API测试失败: {error_msg}",
-                        "response_time": response_time,
-                        "details": None
-                    }
-                except:
-                    return {
+                    try:
+                        error_detail = response.json()
+                        error_msg = error_detail.get("error", {}).get("message", f"HTTP {response.status_code}")
+                        return {
+                            "success": False,
+                            "message": f"API测试失败: {error_msg}",
+                            "response_time": response_time,
+                            "details": None
+                        }
+                    except:
+                        return {
                         "success": False,
                         "message": f"API测试失败: HTTP {response.status_code}",
                         "response_time": response_time,
