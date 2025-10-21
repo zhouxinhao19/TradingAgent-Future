@@ -2891,8 +2891,8 @@ class ConfigService:
                 base_url = base_url[:-3] + '/v1beta'
                 print(f"   ✅ 将 /v1 替换为 /v1beta: {base_url}")
 
-            # 构建完整的 API 端点
-            url = f"{base_url}/models/gemini-1.5-flash:generateContent?key={api_key}"
+            # 构建完整的 API 端点（使用 gemini-2.0-flash-exp，这是 v1beta 中可用的模型）
+            url = f"{base_url}/models/gemini-2.0-flash-exp:generateContent?key={api_key}"
 
             print(f"🔗 [Google AI 测试] 最终请求 URL: {url.replace(api_key, '***')}")
 

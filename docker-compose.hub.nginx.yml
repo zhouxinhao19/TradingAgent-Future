@@ -23,7 +23,8 @@ services:
       - "27017:27017"
     volumes:
       - tradingagents_mongodb_data:/data/db
-      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      # 注意：不挂载初始化脚本，使用 MongoDB 自动创建的 root 用户
+      # 应用会在首次运行时自动创建所需的集合和索引
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: tradingagents123
@@ -77,13 +78,14 @@ services:
       TRADINGAGENTS_LOG_LEVEL: "INFO"
       TRADINGAGENTS_LOG_DIR: "/app/logs"
       TRADINGAGENTS_LOG_FILE: "/app/logs/tradingagents.log"
-      # MongoDB配置
+      # MongoDB配置（使用 root 用户）
       MONGODB_HOST: "mongodb"
       MONGODB_PORT: "27017"
       MONGODB_USERNAME: "admin"
       MONGODB_PASSWORD: "tradingagents123"
       MONGODB_DATABASE: "tradingagents"
       MONGODB_AUTH_SOURCE: "admin"
+      # 注意：authSource=admin 表示在 admin 数据库中验证用户
       MONGODB_URL: "mongodb://admin:tradingagents123@mongodb:27017/tradingagents?authSource=admin"
       MONGODB_CONNECTION_STRING: "mongodb://admin:tradingagents123@mongodb:27017/tradingagents?authSource=admin"
       # Redis配置
