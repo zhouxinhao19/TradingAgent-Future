@@ -381,9 +381,36 @@ export const configApi = {
   },
 
 
+  // ========== 数据库配置管理 ==========
+
+  // 获取所有数据库配置
+  getDatabaseConfigs(): Promise<DatabaseConfig[]> {
+    return ApiClient.get('/api/config/database')
+  },
+
+  // 获取指定的数据库配置
+  getDatabaseConfig(dbName: string): Promise<DatabaseConfig> {
+    return ApiClient.get(`/api/config/database/${dbName}`)
+  },
+
   // 添加数据库配置
-  addDatabaseConfig(config: Partial<DatabaseConfig>): Promise<{ message: string; name: string }> {
+  addDatabaseConfig(config: Partial<DatabaseConfig>): Promise<{ success: boolean; message: string }> {
     return ApiClient.post('/api/config/database', config)
+  },
+
+  // 更新数据库配置
+  updateDatabaseConfig(dbName: string, config: Partial<DatabaseConfig>): Promise<{ success: boolean; message: string }> {
+    return ApiClient.put(`/api/config/database/${dbName}`, config)
+  },
+
+  // 删除数据库配置
+  deleteDatabaseConfig(dbName: string): Promise<{ success: boolean; message: string }> {
+    return ApiClient.delete(`/api/config/database/${dbName}`)
+  },
+
+  // 测试数据库配置连接
+  testDatabaseConfig(dbName: string): Promise<ConfigTestResponse> {
+    return ApiClient.post(`/api/config/database/${dbName}/test`)
   },
 
   // 获取系统设置
