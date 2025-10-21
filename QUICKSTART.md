@@ -73,6 +73,9 @@ pip install -e .
 # 💡 国内用户推荐使用镜像加速（详见 docs/installation-mirror.md）
 # pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple
 
+# ⚠️ Windows 用户如遇到 PyYAML 编译错误，先执行：
+# pip install --only-binary :all: pyyaml -i https://pypi.tuna.tsinghua.edu.cn/simple
+
 # 5. 配置环境变量
 cp .env.example .env
 # 编辑 .env 文件

@@ -97,7 +97,43 @@ uv pip install -e .
 
 ---
 
-## 📞 遇到问题？
+## 🐛 常见问题
+
+### 问题 1: PyYAML 编译错误（Windows）
+
+**错误信息**:
+```
+AttributeError: cython_sources
+Getting requirements to build wheel did not run successfully
+```
+
+**原因**: PyYAML 在 Windows 上需要编译，但缺少 C 编译器或 Cython 依赖。
+
+**解决方案**:
+
+**方法 1: 使用预编译的二进制包（推荐）**
+```bash
+# 先单独安装 PyYAML 的预编译版本
+pip install --only-binary :all: pyyaml -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 然后安装项目
+pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+**方法 2: 升级 pip 和 setuptools**
+```bash
+python -m pip install --upgrade pip setuptools wheel -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+**方法 3: 安装 Microsoft C++ Build Tools**
+- 下载: https://visualstudio.microsoft.com/visual-cpp-build-tools/
+- 安装 "Desktop development with C++" 工作负载
+- 重启后再安装
+
+---
+
+### 问题 2: 安装仍然很慢
 
 如果使用镜像后仍然很慢：
 
