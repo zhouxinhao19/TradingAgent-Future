@@ -759,30 +759,170 @@ class ConfigService:
             return False
     
     async def test_llm_config(self, llm_config: LLMConfig) -> Dict[str, Any]:
-        """测试大模型配置"""
+        """测试大模型配置 - 真实调用API进行验证"""
         start_time = time.time()
         try:
-            # 这里应该实际调用LLM API进行测试
-            # 目前返回模拟结果
-            await asyncio.sleep(1)  # 模拟API调用
-
-            response_time = time.time() - start_time
+            import requests
 
             # 获取 provider 字符串值（兼容枚举和字符串）
             provider_str = llm_config.provider.value if hasattr(llm_config.provider, 'value') else str(llm_config.provider)
 
-            return {
-                "success": True,
-                "message": f"成功连接到 {provider_str} {llm_config.model_name}",
-                "response_time": response_time,
-                "details": {
-                    "provider": provider_str,
-                    "model": llm_config.model_name,
-                    "api_base": llm_config.api_base
+            logger.info(f"🧪 测试大模型配置: {provider_str} - {llm_config.model_name}")
+            logger.info(f"📍 API基础URL: {llm_config.api_base}")
+
+            # 验证必需字段
+            if not llm_config.api_base:
+                return {
+                    "success": False,
+                    "message": "API基础URL不能为空",
+                    "response_time": time.time() - start_time,
+                    "details": None
                 }
+
+            # 验证 API Key（从厂家配置获取）
+            api_key = None
+            if llm_config.api_key:
+                api_key = llm_config.api_key
+            else:
+                # 从厂家配置获取 API Key
+                db = await self._get_db()
+                providers_collection = db.llm_providers
+                provider_data = await providers_collection.find_one({"name": provider_str})
+                if provider_data and provider_data.get("api_key"):
+                    api_key = provider_data["api_key"]
+                    logger.info(f"✅ 从厂家配置获取到API密钥")
+                else:
+                    # 尝试从环境变量获取
+                    api_key = self._get_env_api_key(provider_str)
+                    if api_key:
+                        logger.info(f"✅ 从环境变量获取到API密钥")
+
+            if not api_key or not self._is_valid_api_key(api_key):
+                return {
+                    "success": False,
+                    "message": f"{provider_str} 未配置有效的API密钥",
+                    "response_time": time.time() - start_time,
+                    "details": None
+                }
+
+            # 构建测试请求
+            api_base = llm_config.api_base.rstrip("/")
+            if not api_base.endswith("/v1"):
+                api_base = api_base + "/v1"
+
+            url = f"{api_base}/chat/completions"
+
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}"
+            }
+
+            data = {
+                "model": llm_config.model_name,
+                "messages": [
+                    {"role": "user", "content": "Hello, please respond with 'OK' if you can read this."}
+                ],
+                "max_tokens": 10,
+                "temperature": 0.1
+            }
+
+            logger.info(f"🌐 发送测试请求到: {url}")
+
+            # 发送测试请求
+            response = requests.post(url, json=data, headers=headers, timeout=15)
+            response_time = time.time() - start_time
+
+            logger.info(f"📡 收到响应: HTTP {response.status_code}")
+
+            if response.status_code == 200:
+                result = response.json()
+                if "choices" in result and len(result["choices"]) > 0:
+                    content = result["choices"][0]["message"]["content"]
+                    if content and len(content.strip()) > 0:
+                        logger.info(f"✅ 测试成功: {content[:50]}")
+                        return {
+                            "success": True,
+                            "message": f"成功连接到 {provider_str} {llm_config.model_name}",
+                            "response_time": response_time,
+                            "details": {
+                                "provider": provider_str,
+                                "model": llm_config.model_name,
+                                "api_base": llm_config.api_base,
+                                "response_preview": content[:100]
+                            }
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "message": "API响应内容为空",
+                            "response_time": response_time,
+                            "details": None
+                        }
+                else:
+                    return {
+                        "success": False,
+                        "message": "API响应格式异常",
+                        "response_time": response_time,
+                        "details": None
+                    }
+            elif response.status_code == 401:
+                return {
+                    "success": False,
+                    "message": "API密钥无效或已过期",
+                    "response_time": response_time,
+                    "details": None
+                }
+            elif response.status_code == 403:
+                return {
+                    "success": False,
+                    "message": "API权限不足或配额已用完",
+                    "response_time": response_time,
+                    "details": None
+                }
+            elif response.status_code == 404:
+                return {
+                    "success": False,
+                    "message": f"API端点不存在，请检查API基础URL是否正确: {url}",
+                    "response_time": response_time,
+                    "details": None
+                }
+            else:
+                try:
+                    error_detail = response.json()
+                    error_msg = error_detail.get("error", {}).get("message", f"HTTP {response.status_code}")
+                    return {
+                        "success": False,
+                        "message": f"API测试失败: {error_msg}",
+                        "response_time": response_time,
+                        "details": None
+                    }
+                except:
+                    return {
+                        "success": False,
+                        "message": f"API测试失败: HTTP {response.status_code}",
+                        "response_time": response_time,
+                        "details": None
+                    }
+
+        except requests.exceptions.Timeout:
+            response_time = time.time() - start_time
+            return {
+                "success": False,
+                "message": "连接超时，请检查API基础URL是否正确或网络是否可达",
+                "response_time": response_time,
+                "details": None
+            }
+        except requests.exceptions.ConnectionError as e:
+            response_time = time.time() - start_time
+            return {
+                "success": False,
+                "message": f"连接失败，请检查API基础URL是否正确: {str(e)}",
+                "response_time": response_time,
+                "details": None
             }
         except Exception as e:
             response_time = time.time() - start_time
+            logger.error(f"❌ 测试大模型配置失败: {e}")
             return {
                 "success": False,
                 "message": f"连接失败: {str(e)}",
@@ -1367,7 +1507,8 @@ class ConfigService:
         有效条件：
         1. Key 不为空
         2. Key 不是占位符（不以 'your_' 或 'your-' 开头，不以 '_here' 结尾）
-        3. Key 长度 > 10（基本的格式验证）
+        3. Key 不是截断的密钥（不包含 '...'）
+        4. Key 长度 > 10（基本的格式验证）
 
         Args:
             api_key: 待验证的 API Key
@@ -1391,6 +1532,10 @@ class ConfigService:
 
         # 检查是否为占位符（后缀）
         if api_key.endswith('_here') or api_key.endswith('-here'):
+            return False
+
+        # 🔥 检查是否为截断的密钥（包含 '...'）
+        if '...' in api_key:
             return False
 
         # 检查长度（大多数 API Key 都 > 10 个字符）
