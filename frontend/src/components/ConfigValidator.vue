@@ -29,15 +29,18 @@
             show-icon
           >
             <template v-if="!validationResult.success">
-              <p v-if="validationResult.missing_required?.length">
-                缺少 {{ validationResult.missing_required.length }} 个必需配置
+              <p v-if="envValidation?.missing_required?.length">
+                缺少 {{ envValidation.missing_required.length }} 个必需配置
               </p>
-              <p v-if="validationResult.invalid_configs?.length">
-                {{ validationResult.invalid_configs.length }} 个配置无效
+              <p v-if="envValidation?.invalid_configs?.length">
+                {{ envValidation.invalid_configs.length }} 个配置无效
+              </p>
+              <p v-if="mongodbValidation?.warnings?.length">
+                {{ mongodbValidation.warnings.length }} 个 MongoDB 配置警告
               </p>
             </template>
             <template v-else>
-              <p>所有必需配置已正确设置</p>
+              <p>所有配置已正确设置</p>
             </template>
           </el-alert>
         </div>
@@ -111,32 +114,30 @@
         <!-- MongoDB 配置验证 -->
         <div v-if="mongodbValidation" class="config-section">
           <h4>
-            <el-icon><Database /></el-icon>
+            <el-icon><Coin /></el-icon>
             MongoDB 配置验证
           </h4>
 
-          <!-- 大模型配置 -->
-          <div v-if="mongodbValidation.llm_configs?.length" class="mongodb-subsection">
-            <h5>大模型配置</h5>
+          <!-- 大模型厂家配置 -->
+          <div v-if="mongodbValidation.llm_providers?.length" class="mongodb-subsection">
+            <h5>大模型厂家</h5>
             <div class="config-items">
               <div
-                v-for="(item, index) in mongodbValidation.llm_configs"
+                v-for="(item, index) in mongodbValidation.llm_providers"
                 :key="index"
                 class="config-item"
                 :class="{
                   'is-valid': item.status === '已配置',
-                  'is-warning': item.status === '未配置或占位符' && item.enabled,
-                  'is-disabled': !item.enabled
+                  'is-warning': item.status === '未配置或占位符'
                 }"
               >
                 <div class="item-icon">
                   <el-icon v-if="item.status === '已配置'" color="#67C23A"><CircleCheck /></el-icon>
-                  <el-icon v-else-if="item.enabled" color="#E6A23C"><Warning /></el-icon>
-                  <el-icon v-else color="#909399"><CircleClose /></el-icon>
+                  <el-icon v-else color="#E6A23C"><Warning /></el-icon>
                 </div>
                 <div class="item-content">
-                  <div class="item-name">{{ item.model_name }}</div>
-                  <div class="item-description">{{ item.provider }}</div>
+                  <div class="item-name">{{ item.display_name }}</div>
+                  <div class="item-description">{{ item.name }}</div>
                 </div>
                 <div class="item-status">
                   <el-tag
@@ -261,7 +262,7 @@ import {
   Star,
   Warning,
   InfoFilled,
-  Database
+  Coin
 } from '@element-plus/icons-vue'
 import axios from 'axios'
 
@@ -284,10 +285,10 @@ interface EnvValidationResult {
 }
 
 interface MongoDBValidationResult {
-  llm_configs?: Array<{
-    provider: string
-    model_name: string
-    enabled: boolean
+  llm_providers?: Array<{
+    name: string
+    display_name: string
+    is_active: boolean
     has_api_key: boolean
     status: string
   }>
@@ -321,12 +322,17 @@ const handleValidate = async () => {
   try {
     const response = await axios.get('/api/system/config/validate')
 
+    console.log('🔍 配置验证响应:', response.data)
+
     if (response.data.success) {
       validationResult.value = response.data.data
 
       // 提取环境变量验证结果和 MongoDB 验证结果
       envValidation.value = response.data.data.env_validation || null
       mongodbValidation.value = response.data.data.mongodb_validation || null
+
+      console.log('🔍 环境变量验证:', envValidation.value)
+      console.log('🔍 MongoDB 验证:', mongodbValidation.value)
 
       updateConfigItems()
 

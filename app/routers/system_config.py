@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Any, Dict
 import re
+import logging
 
 from app.core.config import settings
 from app.routers.auth import get_current_user
 
 router = APIRouter()
+logger = logging.getLogger("webapi")
 
 SENSITIVE_KEYS = {
     "MONGODB_PASSWORD",
@@ -86,44 +88,54 @@ async def validate_config():
         validator = StartupValidator()
         env_result = validator.validate()
 
-        # 🔍 步骤3: 验证 MongoDB 中的配置
+        # 🔍 步骤3: 验证 MongoDB 中的配置（厂家级别）
         mongodb_validation = {
-            "llm_configs": [],
+            "llm_providers": [],
             "data_source_configs": [],
             "warnings": []
         }
 
         try:
+            # 验证大模型厂家配置
+            llm_providers = await config_service.get_llm_providers()
+
+            logger.info(f"🔍 获取到 {len(llm_providers)} 个大模型厂家")
+
+            for provider in llm_providers:
+                # 只验证已启用的厂家
+                if not provider.is_active:
+                    continue
+
+                validation_item = {
+                    "name": provider.name,
+                    "display_name": provider.display_name,
+                    "is_active": provider.is_active,
+                    "has_api_key": False,
+                    "status": "未配置"
+                }
+
+                # 检查 API Key 是否有效
+                if provider.api_key and validator._is_valid_api_key(provider.api_key):
+                    validation_item["has_api_key"] = True
+                    validation_item["status"] = "已配置"
+                else:
+                    validation_item["status"] = "未配置或占位符"
+                    mongodb_validation["warnings"].append(
+                        f"大模型厂家 {provider.display_name} 已启用但未配置有效的 API Key"
+                    )
+
+                mongodb_validation["llm_providers"].append(validation_item)
+
+            # 验证数据源配置
             system_config = await config_service.get_system_config()
+            if system_config and system_config.data_source_configs:
+                logger.info(f"🔍 获取到 {len(system_config.data_source_configs)} 个数据源配置")
 
-            if system_config:
-                # 验证大模型配置
-                for llm_config in system_config.llm_configs:
-                    validation_item = {
-                        "provider": llm_config.provider,
-                        "model_name": llm_config.model_name,
-                        "enabled": llm_config.enabled,
-                        "has_api_key": False,
-                        "status": "未配置"
-                    }
-
-                    if llm_config.enabled:
-                        # 检查 API Key 是否有效
-                        if llm_config.api_key and validator._is_valid_api_key(llm_config.api_key):
-                            validation_item["has_api_key"] = True
-                            validation_item["status"] = "已配置"
-                        else:
-                            validation_item["status"] = "未配置或占位符"
-                            mongodb_validation["warnings"].append(
-                                f"大模型 {llm_config.model_name} 已启用但未配置有效的 API Key"
-                            )
-                    else:
-                        validation_item["status"] = "已禁用"
-
-                    mongodb_validation["llm_configs"].append(validation_item)
-
-                # 验证数据源配置
                 for ds_config in system_config.data_source_configs:
+                    # 只验证已启用的数据源
+                    if not ds_config.enabled:
+                        continue
+
                     validation_item = {
                         "name": ds_config.name,
                         "type": ds_config.type,
@@ -132,31 +144,28 @@ async def validate_config():
                         "status": "未配置"
                     }
 
-                    if ds_config.enabled:
-                        # 某些数据源不需要 API Key（如 AKShare）
-                        if ds_config.type in ["akshare", "yahoo"]:
-                            validation_item["has_api_key"] = True
-                            validation_item["status"] = "已配置（无需密钥）"
-                        elif ds_config.api_key and validator._is_valid_api_key(ds_config.api_key):
-                            validation_item["has_api_key"] = True
-                            validation_item["status"] = "已配置"
-                        else:
-                            validation_item["status"] = "未配置或占位符"
-                            mongodb_validation["warnings"].append(
-                                f"数据源 {ds_config.name} 已启用但未配置有效的 API Key"
-                            )
+                    # 某些数据源不需要 API Key（如 AKShare）
+                    if ds_config.type in ["akshare", "yahoo"]:
+                        validation_item["has_api_key"] = True
+                        validation_item["status"] = "已配置（无需密钥）"
+                    elif ds_config.api_key and validator._is_valid_api_key(ds_config.api_key):
+                        validation_item["has_api_key"] = True
+                        validation_item["status"] = "已配置"
                     else:
-                        validation_item["status"] = "已禁用"
+                        validation_item["status"] = "未配置或占位符"
+                        mongodb_validation["warnings"].append(
+                            f"数据源 {ds_config.name} 已启用但未配置有效的 API Key"
+                        )
 
                     mongodb_validation["data_source_configs"].append(validation_item)
-            else:
-                mongodb_validation["warnings"].append("MongoDB 中没有找到系统配置")
 
         except Exception as e:
-            logger.error(f"验证 MongoDB 配置失败: {e}")
+            logger.error(f"验证 MongoDB 配置失败: {e}", exc_info=True)
             mongodb_validation["warnings"].append(f"MongoDB 配置验证失败: {str(e)}")
 
         # 合并验证结果
+        logger.info(f"🔍 MongoDB 验证结果: {len(mongodb_validation['llm_providers'])} 个大模型厂家, {len(mongodb_validation['data_source_configs'])} 个数据源, {len(mongodb_validation['warnings'])} 个警告")
+
         return {
             "success": True,
             "data": {
