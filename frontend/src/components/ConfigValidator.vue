@@ -108,14 +108,105 @@
           </div>
         </div>
 
-        <!-- 警告信息 -->
-        <div v-if="validationResult?.warnings?.length" class="warnings-section">
+        <!-- MongoDB 配置验证 -->
+        <div v-if="mongodbValidation" class="config-section">
+          <h4>
+            <el-icon><Database /></el-icon>
+            MongoDB 配置验证
+          </h4>
+
+          <!-- 大模型配置 -->
+          <div v-if="mongodbValidation.llm_configs?.length" class="mongodb-subsection">
+            <h5>大模型配置</h5>
+            <div class="config-items">
+              <div
+                v-for="(item, index) in mongodbValidation.llm_configs"
+                :key="index"
+                class="config-item"
+                :class="{
+                  'is-valid': item.status === '已配置',
+                  'is-warning': item.status === '未配置或占位符' && item.enabled,
+                  'is-disabled': !item.enabled
+                }"
+              >
+                <div class="item-icon">
+                  <el-icon v-if="item.status === '已配置'" color="#67C23A"><CircleCheck /></el-icon>
+                  <el-icon v-else-if="item.enabled" color="#E6A23C"><Warning /></el-icon>
+                  <el-icon v-else color="#909399"><CircleClose /></el-icon>
+                </div>
+                <div class="item-content">
+                  <div class="item-name">{{ item.model_name }}</div>
+                  <div class="item-description">{{ item.provider }}</div>
+                </div>
+                <div class="item-status">
+                  <el-tag
+                    :type="item.status === '已配置' ? 'success' : item.enabled ? 'warning' : 'info'"
+                    size="small"
+                  >
+                    {{ item.status }}
+                  </el-tag>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 数据源配置 -->
+          <div v-if="mongodbValidation.data_source_configs?.length" class="mongodb-subsection">
+            <h5>数据源配置</h5>
+            <div class="config-items">
+              <div
+                v-for="(item, index) in mongodbValidation.data_source_configs"
+                :key="index"
+                class="config-item"
+                :class="{
+                  'is-valid': item.status === '已配置' || item.status === '已配置（无需密钥）',
+                  'is-warning': item.status === '未配置或占位符' && item.enabled,
+                  'is-disabled': !item.enabled
+                }"
+              >
+                <div class="item-icon">
+                  <el-icon v-if="item.status.includes('已配置')" color="#67C23A"><CircleCheck /></el-icon>
+                  <el-icon v-else-if="item.enabled" color="#E6A23C"><Warning /></el-icon>
+                  <el-icon v-else color="#909399"><CircleClose /></el-icon>
+                </div>
+                <div class="item-content">
+                  <div class="item-name">{{ item.name }}</div>
+                  <div class="item-description">{{ item.type }}</div>
+                </div>
+                <div class="item-status">
+                  <el-tag
+                    :type="item.status.includes('已配置') ? 'success' : item.enabled ? 'warning' : 'info'"
+                    size="small"
+                  >
+                    {{ item.status }}
+                  </el-tag>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- MongoDB 配置警告 -->
+          <div v-if="mongodbValidation.warnings?.length" class="mongodb-warnings">
+            <el-alert
+              v-for="(warning, index) in mongodbValidation.warnings"
+              :key="index"
+              :title="warning"
+              type="warning"
+              :closable="false"
+              show-icon
+              class="warning-item"
+            />
+          </div>
+        </div>
+
+        <!-- 环境变量警告信息 -->
+        <div v-if="envValidation?.warnings?.length" class="warnings-section">
           <h4>
             <el-icon><InfoFilled /></el-icon>
-            警告信息
+            环境变量警告
           </h4>
           <el-alert
-            v-for="(warning, index) in validationResult.warnings"
+            v-for="(warning, index) in envValidation.warnings"
             :key="index"
             :title="warning"
             type="warning"
@@ -169,7 +260,8 @@ import {
   Refresh,
   Star,
   Warning,
-  InfoFilled
+  InfoFilled,
+  Database
 } from '@element-plus/icons-vue'
 import axios from 'axios'
 
@@ -183,7 +275,7 @@ interface ConfigItem {
   help?: string
 }
 
-interface ValidationResult {
+interface EnvValidationResult {
   success: boolean
   missing_required?: Array<{ key: string; description: string }>
   missing_recommended?: Array<{ key: string; description: string }>
@@ -191,9 +283,35 @@ interface ValidationResult {
   warnings?: string[]
 }
 
+interface MongoDBValidationResult {
+  llm_configs?: Array<{
+    provider: string
+    model_name: string
+    enabled: boolean
+    has_api_key: boolean
+    status: string
+  }>
+  data_source_configs?: Array<{
+    name: string
+    type: string
+    enabled: boolean
+    has_api_key: boolean
+    status: string
+  }>
+  warnings?: string[]
+}
+
+interface ValidationResult {
+  success: boolean
+  env_validation?: EnvValidationResult
+  mongodb_validation?: MongoDBValidationResult
+}
+
 // 响应式数据
 const validating = ref(false)
 const validationResult = ref<ValidationResult | null>(null)
+const envValidation = ref<EnvValidationResult | null>(null)
+const mongodbValidation = ref<MongoDBValidationResult | null>(null)
 const requiredConfigs = ref<ConfigItem[]>([])
 const recommendedConfigs = ref<ConfigItem[]>([])
 
@@ -202,12 +320,17 @@ const handleValidate = async () => {
   validating.value = true
   try {
     const response = await axios.get('/api/system/config/validate')
-    
+
     if (response.data.success) {
       validationResult.value = response.data.data
+
+      // 提取环境变量验证结果和 MongoDB 验证结果
+      envValidation.value = response.data.data.env_validation || null
+      mongodbValidation.value = response.data.data.mongodb_validation || null
+
       updateConfigItems()
-      
-      if (validationResult.value.success) {
+
+      if (validationResult.value?.success) {
         ElMessage.success('配置验证通过')
       } else {
         ElMessage.warning('配置验证失败，请检查缺少的配置项')
@@ -224,7 +347,7 @@ const handleValidate = async () => {
 }
 
 const updateConfigItems = () => {
-  if (!validationResult.value) return
+  if (!envValidation.value) return
 
   // 更新必需配置
   const requiredKeys = [
@@ -237,9 +360,9 @@ const updateConfigItems = () => {
   ]
 
   requiredConfigs.value = requiredKeys.map(item => {
-    const missing = validationResult.value?.missing_required?.find(m => m.key === item.key)
-    const invalid = validationResult.value?.invalid_configs?.find(i => i.key === item.key)
-    
+    const missing = envValidation.value?.missing_required?.find(m => m.key === item.key)
+    const invalid = envValidation.value?.invalid_configs?.find(i => i.key === item.key)
+
     return {
       ...item,
       valid: !missing && !invalid,
@@ -255,8 +378,8 @@ const updateConfigItems = () => {
   ]
 
   recommendedConfigs.value = recommendedKeys.map(item => {
-    const missing = validationResult.value?.missing_recommended?.find(m => m.key === item.key)
-    
+    const missing = envValidation.value?.missing_recommended?.find(m => m.key === item.key)
+
     return {
       ...item,
       valid: !missing
@@ -336,6 +459,12 @@ onMounted(() => {
           background: var(--el-color-warning-light-9);
         }
 
+        &.is-disabled {
+          border-color: var(--el-border-color-lighter);
+          background: var(--el-fill-color-lighter);
+          opacity: 0.7;
+        }
+
         .item-icon {
           flex-shrink: 0;
           font-size: 20px;
@@ -372,6 +501,35 @@ onMounted(() => {
 
         .item-status {
           flex-shrink: 0;
+        }
+      }
+    }
+
+    .mongodb-subsection {
+      margin-bottom: 20px;
+
+      h5 {
+        margin: 0 0 12px 0;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--el-text-color-secondary);
+        padding-left: 8px;
+        border-left: 3px solid var(--el-color-primary);
+      }
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+
+    .mongodb-warnings {
+      margin-top: 16px;
+
+      .warning-item {
+        margin-bottom: 8px;
+
+        &:last-child {
+          margin-bottom: 0;
         }
       }
     }
