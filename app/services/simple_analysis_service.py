@@ -222,7 +222,7 @@ def _get_default_backend_url(provider: str) -> str:
         str: 默认的 backend_url
     """
     default_urls = {
-        "google": "https://generativelanguage.googleapis.com/v1",
+        "google": "https://generativelanguage.googleapis.com/v1beta",
         "dashscope": "https://dashscope.aliyuncs.com/api/v1",
         "openai": "https://api.openai.com/v1",
         "deepseek": "https://api.deepseek.com",
@@ -424,7 +424,7 @@ def create_analysis_config(
         elif llm_provider == "openai":
             config["backend_url"] = "https://api.openai.com/v1"
         elif llm_provider == "google":
-            config["backend_url"] = "https://generativelanguage.googleapis.com/v1"
+            config["backend_url"] = "https://generativelanguage.googleapis.com/v1beta"
         elif llm_provider == "qianfan":
             config["backend_url"] = "https://aip.baidubce.com"
         else:

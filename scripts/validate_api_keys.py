@@ -99,7 +99,7 @@ def validate_google(api_key: str) -> Tuple[bool, str]:
     """验证Google AI API密钥"""
     try:
         response = requests.get(
-            f"https://generativelanguage.googleapis.com/v1/models?key={api_key}",
+            f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}",
             timeout=10
         )
         if response.status_code == 200:

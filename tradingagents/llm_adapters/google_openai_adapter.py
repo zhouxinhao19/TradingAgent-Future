@@ -74,15 +74,25 @@ class ChatGoogleOpenAI(ChatGoogleGenerativeAI):
             base_url = base_url.rstrip('/')
             logger.info(f"🔍 [Google初始化] 处理 base_url: {base_url}")
 
-            # 如果 base_url 以 /v1 结尾，自动转换为 /v1beta（Google AI 的正确端点）
-            if base_url.endswith('/v1'):
-                base_url = base_url[:-3] + '/v1beta'
-                logger.info(f"🔍 [Google初始化] 自动将 /v1 转换为 /v1beta: {base_url}")
+            # 提取域名部分（client_options.api_endpoint 只需要域名，SDK 会自动添加 /v1beta）
+            # 例如：https://generativelanguage.googleapis.com/v1beta -> https://generativelanguage.googleapis.com
+            #      https://generativelanguage.googleapis.com/v1 -> https://generativelanguage.googleapis.com
+            if base_url.endswith('/v1beta'):
+                api_endpoint = base_url[:-8]  # 移除 /v1beta
+                logger.info(f"🔍 [Google初始化] 从 base_url 提取域名: {api_endpoint}")
+            elif base_url.endswith('/v1'):
+                api_endpoint = base_url[:-3]  # 移除 /v1
+                logger.info(f"🔍 [Google初始化] 从 base_url 提取域名: {api_endpoint}")
+            else:
+                # 如果没有版本后缀，直接使用
+                api_endpoint = base_url
+                logger.info(f"🔍 [Google初始化] 使用完整 base_url 作为域名: {api_endpoint}")
 
-            # 通过 client_options 传递自定义端点
+            # 通过 client_options 传递自定义端点（只传递域名，SDK 会自动添加 /v1beta）
             # 参考: https://github.com/langchain-ai/langchain-google/issues/783
-            kwargs["client_options"] = {"api_endpoint": base_url}
-            logger.info(f"✅ [Google初始化] 设置 client_options.api_endpoint: {base_url}")
+            kwargs["client_options"] = {"api_endpoint": api_endpoint}
+            logger.info(f"✅ [Google初始化] 设置 client_options.api_endpoint: {api_endpoint}")
+            logger.info(f"   SDK 会自动添加 /v1beta 路径")
         else:
             logger.info(f"🔍 [Google初始化] 未提供 base_url，使用默认端点")
 

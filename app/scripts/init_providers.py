@@ -51,7 +51,7 @@ async def init_providers():
             "description": "Google的人工智能平台，提供Gemini系列模型",
             "website": "https://ai.google.dev",
             "api_doc_url": "https://ai.google.dev/docs",
-            "default_base_url": "https://generativelanguage.googleapis.com/v1",
+            "default_base_url": "https://generativelanguage.googleapis.com/v1beta",
             "is_active": True,
             "supported_features": ["chat", "completion", "embedding", "vision", "function_calling", "streaming"]
         },
