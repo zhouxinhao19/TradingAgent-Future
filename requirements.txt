@@ -11,6 +11,15 @@
 #
 # 此文件与 pyproject.toml 保持同步
 # 最后更新：2025-10-21
+#
+# 移除了以下间接依赖（会被其他包自动安装）：
+# - pydantic (langchain 依赖)
+# - numpy (pandas/streamlit 依赖)
+# - python-dateutil (pandas 依赖)
+# - typing-extensions (langchain-core/streamlit 依赖)
+# - tenacity (langchain-core/streamlit 依赖)
+# - toml (streamlit 依赖)
+# - urllib3 (requests 依赖)
 
 # ==================== 核心框架 ====================
 langchain>=0.3.0
@@ -20,8 +29,7 @@ langchain-anthropic>=0.3.15
 langchain-experimental>=0.3.4
 langchain-google-genai>=2.1.5
 langgraph>=0.4.8
-pydantic>=2.0.0
-typing-extensions>=4.14.0
+typer>=0.9.0
 
 # ==================== LLM API 客户端 ====================
 openai>=1.0.0,<2.0.0
@@ -31,9 +39,8 @@ google-generativeai>=0.8.0
 
 # ==================== 数据处理 ====================
 pandas>=2.3.0
-numpy>=1.24.0
-python-dateutil>=2.8.0
 pytz>=2025.2
+beautifulsoup4>=4.12.0
 
 # ==================== 数据源 ====================
 akshare>=1.16.98
@@ -42,7 +49,9 @@ yfinance>=0.2.63
 baostock>=0.8.8
 finnhub-python>=2.4.23
 eodhd>=1.0.32
-stockstats>=0.6.5
+feedparser>=6.0.11
+parsel>=1.10.0
+praw>=7.8.1
 
 # ==================== 数据库 ====================
 pymongo>=4.0.0
@@ -52,33 +61,26 @@ redis>=6.2.0
 streamlit>=1.28.0
 streamlit-cookies-manager>=0.2.0
 chainlit>=2.5.5
+chromadb>=1.0.12
 
 # ==================== AI/ML ====================
 sentence-transformers>=2.2.0
 torch>=2.0.0
 transformers>=4.30.0
-chromadb>=1.0.12
 
 # ==================== 回测框架 ====================
 backtrader>=1.9.78.123
+stockstats>=0.6.5
 
 # ==================== 网络请求 ====================
 requests>=2.32.4
-urllib3>=2.0.0
-feedparser>=6.0.11
-praw>=7.8.1
-parsel>=1.10.0
-beautifulsoup4>=4.12.0
 
 # ==================== CLI 工具 ====================
-typer>=0.9.0
 rich>=14.0.0
 questionary>=2.1.0
 
 # ==================== 工具库 ====================
 python-dotenv>=1.0.0
-tenacity>=8.0.0
-toml>=0.10.0
 tqdm>=4.67.1
 psutil>=6.1.0
 plotly>=5.0.0
