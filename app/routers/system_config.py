@@ -63,10 +63,23 @@ async def validate_config():
     """
     验证系统配置的完整性和有效性。
     返回验证结果，包括缺少的配置项和无效的配置。
+
+    注意：此接口会先从 MongoDB 重载配置到环境变量，然后再验证。
+    这样可以确保验证的是最新的配置（包括 MongoDB 中的配置）。
     """
     from app.core.startup_validator import StartupValidator
+    from app.core.config_bridge import bridge_config_to_env
 
     try:
+        # 🔧 先重载配置：从 MongoDB 读取配置并桥接到环境变量
+        # 这样验证器就能检查到 MongoDB 中的配置
+        try:
+            bridge_config_to_env()
+            logger.info("✅ 配置已从 MongoDB 重载到环境变量")
+        except Exception as e:
+            logger.warning(f"⚠️  配置重载失败: {e}，将验证 .env 文件中的配置")
+
+        # 验证配置
         validator = StartupValidator()
         result = validator.validate()
 
