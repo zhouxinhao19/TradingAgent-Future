@@ -99,18 +99,47 @@ def test_google_base_url():
         print(f"❌ LLM 创建失败: {e}")
         return False
     
-    # 测试 5: 实际 API 调用（跳过，因为需要特殊的代理配置）
-    print("\n📊 测试 5: 实际 API 调用（跳过）")
+    # 测试 5: 实际 API 调用（使用 REST 模式）
+    print("\n📊 测试 5: 实际 API 调用（使用 REST 模式）")
     print("-" * 80)
-    print("ℹ️  跳过实际 API 调用测试")
-    print("   原因：需要特殊的代理配置来支持 HTTPS over HTTP proxy")
-    print()
-    print("   如需测试实际 API 调用，请使用以下方法之一：")
-    print("   1. 直接连接（不使用代理）")
-    print("   2. 使用支持 HTTPS CONNECT 的代理")
-    print("   3. 在生产环境中测试（后端服务会自动处理代理）")
-    print()
-    print("   ✅ 重要：base_url 参数传递功能已验证成功！")
+
+    try:
+        print("📤 发送测试消息...")
+        print("   提示: 你好，请用一句话介绍你自己")
+
+        # 使用 REST 模式的 LLM（llm2）
+        response = llm2.invoke("你好，请用一句话介绍你自己")
+
+        print("✅ API 调用成功！")
+        print(f"📥 响应内容: {response.content[:200]}...")
+        print(f"   响应长度: {len(response.content)} 字符")
+
+        # 检查响应元数据
+        if hasattr(response, 'response_metadata'):
+            metadata = response.response_metadata
+            print(f"   模型: {metadata.get('model_name', 'N/A')}")
+            if 'token_usage' in metadata:
+                usage = metadata['token_usage']
+                print(f"   Token使用: 输入={usage.get('prompt_tokens', 0)}, 输出={usage.get('completion_tokens', 0)}, 总计={usage.get('total_tokens', 0)}")
+
+        return True
+
+    except Exception as e:
+        print(f"❌ API 调用失败: {e}")
+        print()
+        print("   可能的原因：")
+        print("   1. 网络连接问题（需要能访问 Google API）")
+        print("   2. Google API Key 无效或已过期")
+        print("   3. API 配额已用完")
+        print("   4. 代理配置问题（如果使用代理）")
+        print()
+        print("   💡 提示：")
+        print("   - 在美国服务器上应该可以直接连接")
+        print("   - 检查 GOOGLE_API_KEY 是否正确")
+        print("   - 访问 https://ai.google.dev/ 查看 API 状态")
+        print()
+        print("   ⚠️  注意：API 调用失败不影响 base_url 参数传递功能")
+        return False
 
     print("\n" + "=" * 80)
     print("🎉 所有基础测试通过！Google AI 的 base_url 参数功能正常")

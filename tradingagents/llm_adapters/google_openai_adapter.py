@@ -78,10 +78,10 @@ class ChatGoogleOpenAI(ChatGoogleGenerativeAI):
             # 例如：https://generativelanguage.googleapis.com/v1beta -> https://generativelanguage.googleapis.com
             #      https://generativelanguage.googleapis.com/v1 -> https://generativelanguage.googleapis.com
             if base_url.endswith('/v1beta'):
-                api_endpoint = base_url[:-8]  # 移除 /v1beta
+                api_endpoint = base_url[:-7]  # 移除 /v1beta (7个字符)
                 logger.info(f"🔍 [Google初始化] 从 base_url 提取域名: {api_endpoint}")
             elif base_url.endswith('/v1'):
-                api_endpoint = base_url[:-3]  # 移除 /v1
+                api_endpoint = base_url[:-3]  # 移除 /v1 (3个字符)
                 logger.info(f"🔍 [Google初始化] 从 base_url 提取域名: {api_endpoint}")
             else:
                 # 如果没有版本后缀，直接使用
