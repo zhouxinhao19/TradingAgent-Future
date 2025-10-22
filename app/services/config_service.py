@@ -1043,8 +1043,9 @@ class ConfigService:
                 # AKShare 不需要 API Key，直接测试
                 try:
                     import akshare as ak
-                    # 获取实时行情（轻量级测试）
-                    df = ak.stock_zh_a_spot_em()
+                    # 使用更轻量级的接口测试 - 获取交易日历
+                    # 这个接口数据量小，响应快，更适合测试连接
+                    df = ak.tool_trade_date_hist_sina()
 
                     if df is not None and len(df) > 0:
                         response_time = time.time() - start_time
@@ -1054,7 +1055,7 @@ class ConfigService:
                             "response_time": response_time,
                             "details": {
                                 "type": ds_type,
-                                "test_result": f"获取到 {len(df)} 条股票数据"
+                                "test_result": f"获取交易日历成功（{len(df)} 条记录）"
                             }
                         }
                     else:

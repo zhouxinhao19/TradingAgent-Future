@@ -291,7 +291,7 @@ class UnifiedConfigManager:
         if settings.get("finnhub_api_key"):
             finnhub_config = DataSourceConfig(
                 name="Finnhub",
-                type=DataSourceType.ALPHA_VANTAGE,  # 临时映射
+                type=DataSourceType.FINNHUB,
                 api_key=settings.get("finnhub_api_key"),
                 endpoint="https://finnhub.io/api/v1",
                 enabled=True,
