@@ -1790,18 +1790,28 @@ const setDefaultLLM = async (modelName: string) => {
 // 测试LLM配置
 const testLLMConfig = async (config: LLMConfig) => {
   try {
+    console.log('🧪 测试LLM配置:', config)
+    console.log('📋 厂家:', config.provider)
+    console.log('📋 模型名称:', config.model_name)
+    console.log('📋 显示名称:', config.model_display_name)
+    console.log('📋 API基础URL:', config.api_base)
+
     const result = await configApi.testConfig({
       config_type: 'llm',
       config_data: config
     })
+
+    console.log('✅ 测试结果:', result)
 
     if (result.success) {
       ElMessage.success(`测试成功: ${result.message}`)
     } else {
       ElMessage.error(`测试失败: ${result.message}`)
     }
-  } catch (error) {
-    ElMessage.error('测试配置失败')
+  } catch (error: any) {
+    console.error('❌ 测试配置失败:', error)
+    console.error('❌ 错误详情:', error.response?.data)
+    ElMessage.error(error.response?.data?.detail || error.message || '测试配置失败')
   }
 }
 

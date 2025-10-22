@@ -817,19 +817,19 @@ class ConfigService:
             if provider_str == "google":
                 # Google AI 使用专门的测试方法
                 logger.info(f"🔍 使用 Google AI 专用测试方法")
-                result = self._test_google_api(api_key, f"{provider_str} {llm_config.model_name}", api_base)
+                result = self._test_google_api(api_key, f"{provider_str} {llm_config.model_name}", api_base, llm_config.model_name)
                 result["response_time"] = time.time() - start_time
                 return result
             elif provider_str == "deepseek":
                 # DeepSeek 使用专门的测试方法
                 logger.info(f"🔍 使用 DeepSeek 专用测试方法")
-                result = self._test_deepseek_api(api_key, f"{provider_str} {llm_config.model_name}")
+                result = self._test_deepseek_api(api_key, f"{provider_str} {llm_config.model_name}", llm_config.model_name)
                 result["response_time"] = time.time() - start_time
                 return result
             elif provider_str == "dashscope":
                 # DashScope 使用专门的测试方法
                 logger.info(f"🔍 使用 DashScope 专用测试方法")
-                result = self._test_dashscope_api(api_key, f"{provider_str} {llm_config.model_name}")
+                result = self._test_dashscope_api(api_key, f"{provider_str} {llm_config.model_name}", llm_config.model_name)
                 result["response_time"] = time.time() - start_time
                 return result
             else:
@@ -858,6 +858,8 @@ class ConfigService:
                 }
 
                 logger.info(f"🌐 发送测试请求到: {url}")
+                logger.info(f"📦 使用模型: {llm_config.model_name}")
+                logger.info(f"📦 请求数据: {data}")
 
                 # 发送测试请求
                 response = requests.post(url, json=data, headers=headers, timeout=15)
@@ -2912,34 +2914,40 @@ class ConfigService:
                 "message": f"{display_name} 连接测试失败: {str(e)}"
             }
 
-    def _test_google_api(self, api_key: str, display_name: str, base_url: str = None) -> dict:
+    def _test_google_api(self, api_key: str, display_name: str, base_url: str = None, model_name: str = None) -> dict:
         """测试Google AI API"""
         try:
             import requests
 
-            print(f"🔍 [Google AI 测试] 开始测试")
-            print(f"   display_name: {display_name}")
-            print(f"   base_url (原始): {base_url}")
-            print(f"   api_key 长度: {len(api_key) if api_key else 0}")
+            # 如果没有指定模型，使用默认模型
+            if not model_name:
+                model_name = "gemini-2.0-flash-exp"
+                logger.info(f"⚠️ 未指定模型，使用默认模型: {model_name}")
+
+            logger.info(f"🔍 [Google AI 测试] 开始测试")
+            logger.info(f"   display_name: {display_name}")
+            logger.info(f"   model_name: {model_name}")
+            logger.info(f"   base_url (原始): {base_url}")
+            logger.info(f"   api_key 长度: {len(api_key) if api_key else 0}")
 
             # 使用配置的 base_url 或默认值
             if not base_url:
                 base_url = "https://generativelanguage.googleapis.com/v1beta"
-                print(f"   ⚠️ base_url 为空，使用默认值: {base_url}")
+                logger.info(f"   ⚠️ base_url 为空，使用默认值: {base_url}")
 
             # 移除末尾的斜杠
             base_url = base_url.rstrip('/')
-            print(f"   base_url (去除斜杠): {base_url}")
+            logger.info(f"   base_url (去除斜杠): {base_url}")
 
             # 如果 base_url 以 /v1 结尾，替换为 /v1beta（Google AI 的正确端点）
             if base_url.endswith('/v1'):
                 base_url = base_url[:-3] + '/v1beta'
-                print(f"   ✅ 将 /v1 替换为 /v1beta: {base_url}")
+                logger.info(f"   ✅ 将 /v1 替换为 /v1beta: {base_url}")
 
-            # 构建完整的 API 端点（使用 gemini-2.0-flash-exp，这是 v1beta 中可用的模型）
-            url = f"{base_url}/models/gemini-2.0-flash-exp:generateContent?key={api_key}"
+            # 构建完整的 API 端点（使用用户配置的模型）
+            url = f"{base_url}/models/{model_name}:generateContent?key={api_key}"
 
-            print(f"🔗 [Google AI 测试] 最终请求 URL: {url.replace(api_key, '***')}")
+            logger.info(f"🔗 [Google AI 测试] 最终请求 URL: {url.replace(api_key, '***')}")
 
             headers = {
                 "Content-Type": "application/json"
@@ -3019,10 +3027,17 @@ class ConfigService:
                 "message": f"{display_name} API测试异常: {str(e)}"
             }
 
-    def _test_deepseek_api(self, api_key: str, display_name: str) -> dict:
+    def _test_deepseek_api(self, api_key: str, display_name: str, model_name: str = None) -> dict:
         """测试DeepSeek API"""
         try:
             import requests
+
+            # 如果没有指定模型，使用默认模型
+            if not model_name:
+                model_name = "deepseek-chat"
+                logger.info(f"⚠️ 未指定模型，使用默认模型: {model_name}")
+
+            logger.info(f"🔍 [DeepSeek 测试] 使用模型: {model_name}")
 
             url = "https://api.deepseek.com/chat/completions"
 
@@ -3032,7 +3047,7 @@ class ConfigService:
             }
 
             data = {
-                "model": "deepseek-chat",
+                "model": model_name,
                 "messages": [
                     {"role": "user", "content": "你好，请简单介绍一下你自己。"}
                 ],
@@ -3073,10 +3088,17 @@ class ConfigService:
                 "message": f"{display_name} API测试异常: {str(e)}"
             }
 
-    def _test_dashscope_api(self, api_key: str, display_name: str) -> dict:
+    def _test_dashscope_api(self, api_key: str, display_name: str, model_name: str = None) -> dict:
         """测试阿里云百炼API"""
         try:
             import requests
+
+            # 如果没有指定模型，使用默认模型
+            if not model_name:
+                model_name = "qwen-turbo"
+                logger.info(f"⚠️ 未指定模型，使用默认模型: {model_name}")
+
+            logger.info(f"🔍 [DashScope 测试] 使用模型: {model_name}")
 
             # 使用阿里云百炼的OpenAI兼容接口
             url = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
@@ -3087,7 +3109,7 @@ class ConfigService:
             }
 
             data = {
-                "model": "qwen-turbo",
+                "model": model_name,
                 "messages": [
                     {"role": "user", "content": "你好，请简单介绍一下你自己。"}
                 ],
