@@ -149,6 +149,7 @@ class DataSourceType(str, Enum):
     AKSHARE = "akshare"
     YAHOO_FINANCE = "yahoo_finance"
     ALPHA_VANTAGE = "alpha_vantage"
+    FINNHUB = "finnhub"
     WIND = "wind"
     CHOICE = "choice"
     LOCAL_FILE = "local_file"
