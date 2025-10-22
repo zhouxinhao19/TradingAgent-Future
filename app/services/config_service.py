@@ -2995,14 +2995,15 @@ class ConfigService:
                 "Content-Type": "application/json"
             }
 
+            # 🔧 增加 token 限制到 2000，避免思考模式消耗导致无输出
             data = {
                 "contents": [{
                     "parts": [{
-                        "text": "Hello, please introduce yourself briefly."
+                        "text": "Hello, please respond with 'OK' if you can read this."
                     }]
                 }],
                 "generationConfig": {
-                    "maxOutputTokens": 50,
+                    "maxOutputTokens": 2000,
                     "temperature": 0.1
                 }
             }
@@ -3010,36 +3011,77 @@ class ConfigService:
             response = requests.post(url, json=data, headers=headers, timeout=15)
 
             print(f"📥 [Google AI 测试] 响应状态码: {response.status_code}")
-            if response.status_code != 200:
-                print(f"   响应内容: {response.text[:500]}")
 
             if response.status_code == 200:
+                # 打印完整的响应内容用于调试
+                print(f"📥 [Google AI 测试] 响应内容（前1000字符）: {response.text[:1000]}")
+
                 result = response.json()
+                print(f"📥 [Google AI 测试] 解析后的 JSON 结构:")
+                print(f"   - 顶层键: {list(result.keys())}")
+                print(f"   - 是否包含 'candidates': {'candidates' in result}")
+                if "candidates" in result:
+                    print(f"   - candidates 长度: {len(result['candidates'])}")
+                    if len(result['candidates']) > 0:
+                        print(f"   - candidates[0] 的键: {list(result['candidates'][0].keys())}")
+
                 if "candidates" in result and len(result["candidates"]) > 0:
                     candidate = result["candidates"][0]
-                    if "content" in candidate and "parts" in candidate["content"]:
-                        text = candidate["content"]["parts"][0].get("text", "")
-                        if text and len(text.strip()) > 0:
-                            return {
-                                "success": True,
-                                "message": f"{display_name} API连接测试成功"
-                            }
+                    print(f"📥 [Google AI 测试] candidate 结构: {candidate}")
+
+                    # 检查 finishReason
+                    finish_reason = candidate.get("finishReason", "")
+                    print(f"📥 [Google AI 测试] finishReason: {finish_reason}")
+
+                    if "content" in candidate:
+                        content = candidate["content"]
+
+                        # 检查是否有 parts
+                        if "parts" in content and len(content["parts"]) > 0:
+                            text = content["parts"][0].get("text", "")
+                            print(f"📥 [Google AI 测试] 提取的文本: {text}")
+
+                            if text and len(text.strip()) > 0:
+                                return {
+                                    "success": True,
+                                    "message": f"{display_name} API连接测试成功"
+                                }
+                            else:
+                                print(f"❌ [Google AI 测试] 文本为空")
+                                return {
+                                    "success": False,
+                                    "message": f"{display_name} API响应内容为空"
+                                }
                         else:
-                            return {
-                                "success": False,
-                                "message": f"{display_name} API响应内容为空"
-                            }
+                            # content 中没有 parts，可能是因为 MAX_TOKENS 或其他原因
+                            print(f"❌ [Google AI 测试] content 中没有 parts")
+                            print(f"   content 的键: {list(content.keys())}")
+
+                            if finish_reason == "MAX_TOKENS":
+                                return {
+                                    "success": False,
+                                    "message": f"{display_name} API响应被截断（MAX_TOKENS），请增加 maxOutputTokens 配置"
+                                }
+                            else:
+                                return {
+                                    "success": False,
+                                    "message": f"{display_name} API响应格式异常（缺少 parts，finishReason: {finish_reason}）"
+                                }
                     else:
+                        print(f"❌ [Google AI 测试] candidate 中缺少 'content'")
+                        print(f"   candidate 的键: {list(candidate.keys())}")
                         return {
                             "success": False,
-                            "message": f"{display_name} API响应格式异常"
+                            "message": f"{display_name} API响应格式异常（缺少 content）"
                         }
                 else:
+                    print(f"❌ [Google AI 测试] 缺少 candidates 或 candidates 为空")
                     return {
                         "success": False,
                         "message": f"{display_name} API无有效候选响应"
                     }
             elif response.status_code == 400:
+                print(f"❌ [Google AI 测试] 400 错误，响应内容: {response.text[:500]}")
                 try:
                     error_detail = response.json()
                     error_msg = error_detail.get("error", {}).get("message", "未知错误")
@@ -3053,11 +3095,35 @@ class ConfigService:
                         "message": f"{display_name} API请求格式错误"
                     }
             elif response.status_code == 403:
+                print(f"❌ [Google AI 测试] 403 错误，响应内容: {response.text[:500]}")
                 return {
                     "success": False,
                     "message": f"{display_name} API密钥无效或权限不足"
                 }
+            elif response.status_code == 503:
+                print(f"❌ [Google AI 测试] 503 错误，响应内容: {response.text[:500]}")
+                try:
+                    error_detail = response.json()
+                    error_code = error_detail.get("code", "")
+                    error_msg = error_detail.get("message", "服务暂时不可用")
+
+                    if error_code == "NO_KEYS_AVAILABLE":
+                        return {
+                            "success": False,
+                            "message": f"{display_name} 中转服务暂时无可用密钥，请稍后重试或联系中转服务提供商"
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "message": f"{display_name} 服务暂时不可用: {error_msg}"
+                        }
+                except:
+                    return {
+                        "success": False,
+                        "message": f"{display_name} 服务暂时不可用 (HTTP 503)"
+                    }
             else:
+                print(f"❌ [Google AI 测试] {response.status_code} 错误，响应内容: {response.text[:500]}")
                 return {
                     "success": False,
                     "message": f"{display_name} API测试失败: HTTP {response.status_code}"
