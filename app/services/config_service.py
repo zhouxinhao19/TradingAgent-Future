@@ -1290,24 +1290,44 @@ class ConfigService:
                     from motor.motor_asyncio import AsyncIOMotorClient
                     import os
 
-                    # 🔥 优先使用配置中的用户名密码，如果没有则从环境变量获取
+                    # 🔥 优先使用环境变量中的完整连接信息（包括host、用户名、密码）
+                    host = db_config.host
+                    port = db_config.port
                     username = db_config.username
                     password = db_config.password
                     database = db_config.database
                     auth_source = None
-                    used_env_credentials = False
+                    used_env_config = False
 
-                    # 如果配置中没有用户名密码，尝试从环境变量获取
+                    # 检测是否在 Docker 环境中
+                    is_docker = os.path.exists('/.dockerenv') or os.getenv('DOCKER_CONTAINER') == 'true'
+
+                    # 如果配置中没有用户名密码，尝试从环境变量获取完整配置
                     if not username or not password:
+                        env_host = os.getenv('MONGODB_HOST')
+                        env_port = os.getenv('MONGODB_PORT')
                         env_username = os.getenv('MONGODB_USERNAME')
                         env_password = os.getenv('MONGODB_PASSWORD')
                         env_auth_source = os.getenv('MONGODB_AUTH_SOURCE', 'admin')
+
                         if env_username and env_password:
                             username = env_username
                             password = env_password
                             auth_source = env_auth_source
-                            used_env_credentials = True
-                            logger.info(f"🔑 使用环境变量中的 MongoDB 认证信息 (authSource={auth_source})")
+                            used_env_config = True
+
+                            # 如果环境变量中有 host 配置，也使用它
+                            if env_host:
+                                host = env_host
+                                # 🔥 Docker 环境下，将 localhost 替换为 mongodb
+                                if is_docker and host == 'localhost':
+                                    host = 'mongodb'
+                                    logger.info(f"🐳 检测到 Docker 环境，将 host 从 localhost 改为 mongodb")
+
+                            if env_port:
+                                port = int(env_port)
+
+                            logger.info(f"🔑 使用环境变量中的 MongoDB 配置 (host={host}, port={port}, authSource={auth_source})")
 
                     # 如果配置中没有数据库名，尝试从环境变量获取
                     if not database:
@@ -1322,9 +1342,9 @@ class ConfigService:
 
                     # 构建连接字符串
                     if username and password:
-                        connection_string = f"mongodb://{username}:{password}@{db_config.host}:{db_config.port}"
+                        connection_string = f"mongodb://{username}:{password}@{host}:{port}"
                     else:
-                        connection_string = f"mongodb://{db_config.host}:{db_config.port}"
+                        connection_string = f"mongodb://{host}:{port}"
 
                     if database:
                         connection_string += f"/{database}"
