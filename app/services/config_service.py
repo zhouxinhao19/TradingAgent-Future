@@ -1442,28 +1442,50 @@ class ConfigService:
                     import redis.asyncio as aioredis
                     import os
 
-                    # 🔥 优先使用配置中的密码，如果没有则从环境变量获取
+                    # 🔥 优先使用环境变量中的完整 Redis 配置（包括host、密码）
+                    host = db_config.host
+                    port = db_config.port
                     password = db_config.password
                     database = db_config.database
+                    used_env_config = False
 
-                    # 如果配置中没有密码，尝试从环境变量获取
+                    # 检测是否在 Docker 环境中
+                    is_docker = os.path.exists('/.dockerenv') or os.getenv('DOCKER_CONTAINER') == 'true'
+
+                    # 如果配置中没有密码，尝试从环境变量获取完整配置
                     if not password:
+                        env_host = os.getenv('REDIS_HOST')
+                        env_port = os.getenv('REDIS_PORT')
                         env_password = os.getenv('REDIS_PASSWORD')
+
                         if env_password:
                             password = env_password
-                            logger.info("🔑 使用环境变量中的 Redis 密码")
+                            used_env_config = True
+
+                            # 如果环境变量中有 host 配置，也使用它
+                            if env_host:
+                                host = env_host
+                                # 🔥 Docker 环境下，将 localhost 替换为 redis
+                                if is_docker and host == 'localhost':
+                                    host = 'redis'
+                                    logger.info(f"🐳 检测到 Docker 环境，将 Redis host 从 localhost 改为 redis")
+
+                            if env_port:
+                                port = int(env_port)
+
+                            logger.info(f"🔑 使用环境变量中的 Redis 配置 (host={host}, port={port})")
 
                     # 如果配置中没有数据库编号，尝试从环境变量获取
-                    if not database:
+                    if database is None:
                         env_db = os.getenv('REDIS_DB')
                         if env_db:
-                            database = env_db
+                            database = int(env_db)
                             logger.info(f"📦 使用环境变量中的 Redis 数据库编号: {database}")
 
                     # 构建连接参数
                     redis_params = {
-                        "host": db_config.host,
-                        "port": db_config.port,
+                        "host": host,
+                        "port": port,
                         "decode_responses": True,
                         "socket_connect_timeout": 5
                     }
@@ -1471,17 +1493,17 @@ class ConfigService:
                     if password:
                         redis_params["password"] = password
 
-                    if database:
+                    if database is not None:
                         redis_params["db"] = int(database)
 
                     # 创建连接并测试
                     redis_client = await aioredis.from_url(
-                        f"redis://{db_config.host}:{db_config.port}",
+                        f"redis://{host}:{port}",
                         **redis_params
                     )
 
                     # 执行 PING 命令
-                    pong = await redis_client.ping()
+                    await redis_client.ping()
 
                     # 获取服务器信息
                     info = await redis_client.info("server")
@@ -1497,11 +1519,11 @@ class ConfigService:
                         "response_time": response_time,
                         "details": {
                             "type": db_type,
-                            "host": db_config.host,
-                            "port": db_config.port,
+                            "host": host,
+                            "port": port,
                             "database": database,
                             "redis_version": info.get("redis_version", "unknown"),
-                            "used_env_credentials": not db_config.password
+                            "used_env_config": used_env_config
                         }
                     }
                 except ImportError:
