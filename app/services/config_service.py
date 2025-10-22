@@ -1396,12 +1396,12 @@ class ConfigService:
                         "response_time": response_time,
                         "details": {
                             "type": db_type,
-                            "host": db_config.host,
-                            "port": db_config.port,
+                            "host": host,
+                            "port": port,
                             "database": database,
                             "auth_source": auth_source,
                             "test_result": test_result,
-                            "used_env_credentials": used_env_credentials
+                            "used_env_config": used_env_config
                         }
                     }
                 except ImportError:
