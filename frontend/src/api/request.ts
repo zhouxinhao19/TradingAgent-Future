@@ -21,15 +21,19 @@ export interface RequestConfig extends AxiosRequestConfig {
   skipErrorHandler?: boolean
   showLoading?: boolean
   loadingText?: string
+  retryCount?: number  // 重试次数
+  retryDelay?: number  // 重试延迟（毫秒）
 }
 
 // 创建axios实例
 const createAxiosInstance = (): AxiosInstance => {
   const instance = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL || '',
-    timeout: 30000, // 增加超时时间到30秒（数据库统计可能需要较长时间）
+    timeout: 60000, // 增加超时时间到60秒（数据同步等长时间操作）
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache',  // 禁用客户端缓存
+      'Pragma': 'no-cache'
     }
   })
 
@@ -231,6 +235,12 @@ const createAxiosInstance = (): AxiosInstance => {
           timeout: config?.timeout,
           url: config?.url
         })
+
+        // 尝试重试
+        if (await shouldRetry(config, error)) {
+          return retryRequest(instance, config)
+        }
+
         ElMessage.error('请求超时，请检查网络连接')
       } else if (error.message === 'Network Error') {
         console.error('🔍 [REQUEST] 网络连接错误:', {
@@ -239,6 +249,12 @@ const createAxiosInstance = (): AxiosInstance => {
           url: config?.url,
           baseURL: config?.baseURL
         })
+
+        // 尝试重试
+        if (await shouldRetry(config, error)) {
+          return retryRequest(instance, config)
+        }
+
         ElMessage.error('网络连接失败，请检查网络设置')
       } else if (error.message.includes('Failed to fetch')) {
         console.error('🔍 [REQUEST] Fetch失败错误:', {
@@ -247,6 +263,12 @@ const createAxiosInstance = (): AxiosInstance => {
           url: config?.url,
           baseURL: config?.baseURL
         })
+
+        // 尝试重试
+        if (await shouldRetry(config, error)) {
+          return retryRequest(instance, config)
+        }
+
         ElMessage.error('网络请求失败，请检查服务器连接')
       } else if (!config?.skipErrorHandler) {
         console.error('🔍 [REQUEST] 其他错误:', {
@@ -295,6 +317,46 @@ const handleBusinessError = (data: ApiResponse) => {
 // 生成请求ID
 const generateRequestId = (): string => {
   return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+}
+
+// 判断是否应该重试
+const shouldRetry = async (config: RequestConfig | undefined, error: any): Promise<boolean> => {
+  if (!config) return false
+
+  // 获取重试配置（默认重试 2 次）
+  const retryCount = config.retryCount ?? 2
+  const currentRetry = (config as any).__retryCount || 0
+
+  // 如果已经重试过指定次数，不再重试
+  if (currentRetry >= retryCount) {
+    console.log(`🔄 已达到最大重试次数 (${retryCount})，停止重试`)
+    return false
+  }
+
+  // 只对网络错误和超时错误重试
+  const shouldRetryError =
+    error.code === 'ECONNABORTED' ||
+    error.message === 'Network Error' ||
+    error.message.includes('Failed to fetch') ||
+    (error.response && [502, 503, 504].includes(error.response.status))
+
+  return shouldRetryError
+}
+
+// 重试请求
+const retryRequest = async (instance: AxiosInstance, config: RequestConfig): Promise<any> => {
+  const currentRetry = (config as any).__retryCount || 0
+  const retryDelay = config.retryDelay ?? 1000  // 默认延迟 1 秒
+
+  // 增加重试计数
+  (config as any).__retryCount = currentRetry + 1
+
+  console.log(`🔄 第 ${currentRetry + 1} 次重试请求: ${config.url}`)
+
+  // 延迟后重试
+  await new Promise(resolve => setTimeout(resolve, retryDelay * (currentRetry + 1)))
+
+  return instance.request(config)
 }
 
 // 创建请求实例
