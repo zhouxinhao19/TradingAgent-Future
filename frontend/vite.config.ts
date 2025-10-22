@@ -54,7 +54,7 @@ export default defineConfig({
     }
   },
   build: {
-    target: 'es2015',
+    target: 'es2020',  // 支持 nullish coalescing operator (??) 和 optional chaining (?.)
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: false,

@@ -324,7 +324,10 @@ const shouldRetry = async (config: RequestConfig | undefined, error: any): Promi
   if (!config) return false
 
   // 获取重试配置（默认重试 2 次）
-  const retryCount = config.retryCount ?? 2
+  let retryCount = 2
+  if (config.retryCount !== undefined) {
+    retryCount = config.retryCount
+  }
   const currentRetry = (config as any).__retryCount || 0
 
   // 如果已经重试过指定次数，不再重试
@@ -346,7 +349,11 @@ const shouldRetry = async (config: RequestConfig | undefined, error: any): Promi
 // 重试请求
 const retryRequest = async (instance: AxiosInstance, config: RequestConfig): Promise<any> => {
   const currentRetry = (config as any).__retryCount || 0
-  const retryDelay = config.retryDelay ?? 1000  // 默认延迟 1 秒
+  // 使用显式的默认值处理
+  let retryDelay = 1000
+  if (config.retryDelay !== undefined) {
+    retryDelay = config.retryDelay
+  }
 
   // 增加重试计数
   (config as any).__retryCount = currentRetry + 1

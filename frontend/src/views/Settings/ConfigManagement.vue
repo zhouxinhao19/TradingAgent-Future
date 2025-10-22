@@ -1951,6 +1951,12 @@ const saveDatabaseConfig = async () => {
 
 const testDatabase = async (config: DatabaseConfig) => {
   try {
+    console.log('🧪 测试数据库配置:', config)
+    console.log('📋 配置名称:', config.name)
+    console.log('📋 配置类型:', config.type)
+    console.log('📋 主机地址:', config.host)
+    console.log('📋 端口:', config.port)
+
     const result = await configApi.testDatabaseConfig(config.name)
 
     if (result.success) {
@@ -1959,8 +1965,9 @@ const testDatabase = async (config: DatabaseConfig) => {
       ElMessage.error(`数据库连接测试失败: ${result.message}`)
     }
   } catch (error: any) {
-    console.error('数据库测试失败:', error)
-    ElMessage.error(error.message || '数据库连接测试失败')
+    console.error('❌ 数据库测试失败:', error)
+    console.error('❌ 错误详情:', error.response?.data)
+    ElMessage.error(error.response?.data?.detail || error.message || '数据库连接测试失败')
   }
 }
 
