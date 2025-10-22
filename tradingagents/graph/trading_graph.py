@@ -133,11 +133,30 @@ def create_llm_by_provider(provider: str, model: str, backend_url: str, temperat
         )
 
     else:
-        # 默认使用 OpenAI 兼容模式
-        logger.warning(f"⚠️ 未知的 provider: {provider}，使用 OpenAI 兼容模式")
+        # 🔧 自定义厂家：使用 OpenAI 兼容模式
+        logger.info(f"🔧 使用 OpenAI 兼容模式处理自定义厂家: {provider}")
+
+        # 尝试从环境变量获取 API Key（支持多种命名格式）
+        api_key_candidates = [
+            f"{provider.upper()}_API_KEY",  # 例如: KYX_API_KEY
+            f"{provider}_API_KEY",          # 例如: kyx_API_KEY
+            "CUSTOM_OPENAI_API_KEY"         # 通用环境变量
+        ]
+
+        custom_api_key = None
+        for env_var in api_key_candidates:
+            custom_api_key = os.getenv(env_var)
+            if custom_api_key:
+                logger.info(f"✅ 从环境变量 {env_var} 获取到 API Key")
+                break
+
+        if not custom_api_key:
+            logger.warning(f"⚠️ 未找到自定义厂家 {provider} 的 API Key，尝试使用默认配置")
+
         return ChatOpenAI(
             model=model,
             base_url=backend_url,
+            api_key=custom_api_key,
             temperature=temperature,
             max_tokens=max_tokens,
             timeout=timeout
@@ -546,7 +565,79 @@ class TradingAgentsGraph:
             )
             logger.info("✅ [千帆] 文心一言适配器已配置成功并应用用户配置的模型参数")
         else:
-            raise ValueError(f"Unsupported LLM provider: {self.config['llm_provider']}")
+            # 🔧 通用的 OpenAI 兼容厂家支持（用于自定义厂家）
+            logger.info(f"🔧 使用通用 OpenAI 兼容适配器处理自定义厂家: {self.config['llm_provider']}")
+            from tradingagents.llm_adapters.openai_compatible_base import create_openai_compatible_llm
+
+            # 获取厂家配置中的 API Key 和 base_url
+            provider_name = self.config['llm_provider']
+
+            # 尝试从环境变量获取 API Key（支持多种命名格式）
+            api_key_candidates = [
+                f"{provider_name.upper()}_API_KEY",  # 例如: KYX_API_KEY
+                f"{provider_name}_API_KEY",          # 例如: kyx_API_KEY
+                "CUSTOM_OPENAI_API_KEY"              # 通用环境变量
+            ]
+
+            custom_api_key = None
+            for env_var in api_key_candidates:
+                custom_api_key = os.getenv(env_var)
+                if custom_api_key:
+                    logger.info(f"✅ 从环境变量 {env_var} 获取到 API Key")
+                    break
+
+            if not custom_api_key:
+                raise ValueError(
+                    f"使用自定义厂家 {provider_name} 需要设置以下环境变量之一:\n"
+                    f"  - {provider_name.upper()}_API_KEY\n"
+                    f"  - CUSTOM_OPENAI_API_KEY"
+                )
+
+            # 获取 backend_url（从配置中获取）
+            backend_url = self.config.get("backend_url")
+            if not backend_url:
+                raise ValueError(
+                    f"使用自定义厂家 {provider_name} 需要在数据库配置中设置 default_base_url"
+                )
+
+            logger.info(f"🔧 [自定义厂家 {provider_name}] 使用端点: {backend_url}")
+
+            # 🔧 从配置中读取模型参数
+            quick_config = self.config.get("quick_model_config", {})
+            deep_config = self.config.get("deep_model_config", {})
+
+            quick_max_tokens = quick_config.get("max_tokens", 4000)
+            quick_temperature = quick_config.get("temperature", 0.7)
+            quick_timeout = quick_config.get("timeout", 180)
+
+            deep_max_tokens = deep_config.get("max_tokens", 4000)
+            deep_temperature = deep_config.get("temperature", 0.7)
+            deep_timeout = deep_config.get("timeout", 180)
+
+            logger.info(f"🔧 [{provider_name}-快速模型] max_tokens={quick_max_tokens}, temperature={quick_temperature}, timeout={quick_timeout}s")
+            logger.info(f"🔧 [{provider_name}-深度模型] max_tokens={deep_max_tokens}, temperature={deep_temperature}, timeout={deep_timeout}s")
+
+            # 使用 custom_openai 适配器创建 LLM 实例
+            self.deep_thinking_llm = create_openai_compatible_llm(
+                provider="custom_openai",
+                model=self.config["deep_think_llm"],
+                api_key=custom_api_key,
+                base_url=backend_url,
+                temperature=deep_temperature,
+                max_tokens=deep_max_tokens,
+                timeout=deep_timeout
+            )
+            self.quick_thinking_llm = create_openai_compatible_llm(
+                provider="custom_openai",
+                model=self.config["quick_think_llm"],
+                api_key=custom_api_key,
+                base_url=backend_url,
+                temperature=quick_temperature,
+                max_tokens=quick_max_tokens,
+                timeout=quick_timeout
+            )
+
+            logger.info(f"✅ [自定义厂家 {provider_name}] 已配置自定义端点并应用用户配置的模型参数")
         
         self.toolkit = Toolkit(config=self.config)
 

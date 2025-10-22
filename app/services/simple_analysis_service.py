@@ -428,9 +428,31 @@ def create_analysis_config(
         elif llm_provider == "qianfan":
             config["backend_url"] = "https://aip.baidubce.com"
         else:
-            # 未知厂家，使用 OpenAI 兼容格式
-            config["backend_url"] = "https://api.openai.com/v1"
-        logger.info(f"⚠️  使用硬编码的默认 backend_url: {config['backend_url']}")
+            # 🔧 未知厂家，尝试从数据库获取厂家的 default_base_url
+            logger.warning(f"⚠️  未知厂家 {llm_provider}，尝试从数据库获取配置")
+            try:
+                from pymongo import MongoClient
+                from app.core.config import settings
+
+                client = MongoClient(settings.MONGO_URI)
+                db = client[settings.MONGO_DB]
+                providers_collection = db.llm_providers
+                provider_doc = providers_collection.find_one({"name": llm_provider})
+
+                if provider_doc and provider_doc.get("default_base_url"):
+                    config["backend_url"] = provider_doc["default_base_url"]
+                    logger.info(f"✅ 从数据库获取自定义厂家 {llm_provider} 的 backend_url: {config['backend_url']}")
+                else:
+                    # 如果数据库中也没有，使用 OpenAI 兼容格式作为最后的回退
+                    config["backend_url"] = "https://api.openai.com/v1"
+                    logger.warning(f"⚠️  数据库中未找到厂家 {llm_provider} 的配置，使用默认 OpenAI 端点")
+
+                client.close()
+            except Exception as e2:
+                logger.error(f"❌ 查询数据库失败: {e2}，使用默认 OpenAI 端点")
+                config["backend_url"] = "https://api.openai.com/v1"
+
+        logger.info(f"⚠️  使用回退的 backend_url: {config['backend_url']}")
 
     # 添加分析师配置
     config["selected_analysts"] = selected_analysts

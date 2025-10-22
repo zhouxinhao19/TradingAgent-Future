@@ -2889,10 +2889,23 @@ class ConfigService:
             elif provider_name == "qianfan":
                 return await asyncio.get_event_loop().run_in_executor(None, self._test_qianfan_api, api_key, display_name)
             else:
-                return {
-                    "success": False,
-                    "message": f"暂不支持测试 {display_name} 厂家"
-                }
+                # 🔧 对于未知的自定义厂家，使用 OpenAI 兼容 API 测试
+                logger.info(f"🔍 使用 OpenAI 兼容 API 测试自定义厂家: {provider_name}")
+                # 获取厂家的 base_url
+                db = await self._get_db()
+                providers_collection = db.llm_providers
+                provider_data = await providers_collection.find_one({"name": provider_name})
+                base_url = provider_data.get("default_base_url") if provider_data else None
+
+                if not base_url:
+                    return {
+                        "success": False,
+                        "message": f"自定义厂家 {display_name} 未配置 API 基础 URL"
+                    }
+
+                return await asyncio.get_event_loop().run_in_executor(
+                    None, self._test_openai_compatible_api, api_key, display_name, base_url
+                )
         except Exception as e:
             return {
                 "success": False,
