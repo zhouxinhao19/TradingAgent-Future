@@ -80,9 +80,21 @@ async def debug_redis_pool(user: dict = Depends(get_current_user)):
             "blocked_clients": info.get("blocked_clients", "N/A"),
         }
 
+        # 🔥 新增：获取 PubSub 频道信息
+        try:
+            pubsub_info = await r.execute_command("PUBSUB", "CHANNELS", "notifications:*")
+            pubsub_channels = {
+                "active_channels": len(pubsub_info) if pubsub_info else 0,
+                "channels": pubsub_info if pubsub_info else []
+            }
+        except Exception as e:
+            logger.warning(f"获取 PubSub 频道信息失败: {e}")
+            pubsub_channels = {"error": str(e)}
+
         return ok(data={
             "pool": pool_info,
-            "redis_server": redis_info
+            "redis_server": redis_info,
+            "pubsub": pubsub_channels
         })
     except Exception as e:
         logger.error(f"获取 Redis 连接池信息失败: {e}", exc_info=True)
@@ -101,13 +113,34 @@ async def notifications_stream_generator(user_id: str):
     channel = f"notifications:{user_id}"
 
     try:
+        # 🔥 修复：在创建 PubSub 之前检查连接池状态
+        try:
+            pool = r.connection_pool
+            logger.debug(f"📊 [SSE] Redis 连接池状态: max={pool.max_connections}, "
+                        f"available={len(pool._available_connections) if hasattr(pool, '_available_connections') else 'N/A'}, "
+                        f"in_use={len(pool._in_use_connections) if hasattr(pool, '_in_use_connections') else 'N/A'}")
+        except Exception as e:
+            logger.warning(f"⚠️ [SSE] 无法获取连接池状态: {e}")
+
         # 创建 PubSub 连接
         pubsub = r.pubsub()
         logger.info(f"📡 [SSE] 创建 PubSub 连接: user={user_id}, channel={channel}")
 
-        # 订阅频道
-        await pubsub.subscribe(channel)
-        yield f"event: connected\ndata: {{\"channel\": \"{channel}\"}}\n\n"
+        # 订阅频道（这里可能失败，需要确保 pubsub 被清理）
+        try:
+            await pubsub.subscribe(channel)
+            logger.info(f"✅ [SSE] 订阅频道成功: {channel}")
+            yield f"event: connected\ndata: {{\"channel\": \"{channel}\"}}\n\n"
+        except Exception as subscribe_error:
+            # 🔥 订阅失败时立即清理 pubsub 连接
+            logger.error(f"❌ [SSE] 订阅频道失败: {subscribe_error}")
+            try:
+                await pubsub.close()
+                logger.info(f"🧹 [SSE] 订阅失败后已关闭 PubSub 连接")
+            except Exception as close_error:
+                logger.error(f"❌ [SSE] 关闭 PubSub 连接失败: {close_error}")
+            # 重新抛出异常，让外层 except 处理
+            raise
 
         idle = 0
         message_count = 0  # 统计发送的消息数量

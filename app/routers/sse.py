@@ -18,7 +18,8 @@ logger = logging.getLogger("webapi.sse")
 async def task_progress_generator(task_id: str, user_id: str):
     """Generate SSE events for task progress updates"""
     r = get_redis_client()
-    pubsub = r.pubsub()
+    pubsub = None
+    channel = f"task_progress:{task_id}"
 
     try:
         # Load dynamic SSE settings
@@ -33,11 +34,26 @@ async def task_progress_generator(task_id: str, user_id: str):
             heartbeat_every = int(getattr(settings, "SSE_HEARTBEAT_INTERVAL_SECONDS", 10))
             max_idle_seconds = int(getattr(settings, "SSE_TASK_MAX_IDLE_SECONDS", 300))
 
-        # Subscribe to task progress updates
-        await pubsub.subscribe(f"task_progress:{task_id}")
+        # 🔥 修复：创建 PubSub 连接
+        pubsub = r.pubsub()
+        logger.info(f"📡 [SSE-Task] 创建 PubSub 连接: task={task_id}, user={user_id}")
 
-        # Send initial connection confirmation
-        yield f"event: connected\ndata: {{\"task_id\": \"{task_id}\", \"message\": \"已连接进度流\"}}\n\n"
+        # 🔥 修复：订阅频道（可能失败，需要确保 pubsub 被清理）
+        try:
+            await pubsub.subscribe(channel)
+            logger.info(f"✅ [SSE-Task] 订阅频道成功: {channel}")
+            # Send initial connection confirmation
+            yield f"event: connected\ndata: {{\"task_id\": \"{task_id}\", \"message\": \"已连接进度流\"}}\n\n"
+        except Exception as subscribe_error:
+            # 🔥 订阅失败时立即清理 pubsub 连接
+            logger.error(f"❌ [SSE-Task] 订阅频道失败: {subscribe_error}")
+            try:
+                await pubsub.close()
+                logger.info(f"🧹 [SSE-Task] 订阅失败后已关闭 PubSub 连接")
+            except Exception as close_error:
+                logger.error(f"❌ [SSE-Task] 关闭 PubSub 连接失败: {close_error}")
+            # 重新抛出异常，让外层 except 处理
+            raise
 
         # Listen for progress updates
         idle_elapsed = 0.0
@@ -70,13 +86,32 @@ async def task_progress_generator(task_id: str, user_id: str):
         logger.exception(f"SSE error for task {task_id}: {e}")
         yield f"event: error\ndata: {{\"error\": \"连接异常: {str(e)}\"}}\n\n"
     finally:
-        await pubsub.unsubscribe(f"task_progress:{task_id}")
-        await pubsub.close()
+        # 🔥 修复：确保在所有情况下都释放连接
+        if pubsub:
+            logger.info(f"🧹 [SSE-Task] 清理 PubSub 连接: task={task_id}")
+
+            # 分步骤关闭，确保即使 unsubscribe 失败也能关闭连接
+            try:
+                await pubsub.unsubscribe(channel)
+                logger.debug(f"✅ [SSE-Task] 已取消订阅频道: {channel}")
+            except Exception as e:
+                logger.warning(f"⚠️ [SSE-Task] 取消订阅失败（将继续关闭连接）: {e}")
+
+            try:
+                await pubsub.close()
+                logger.info(f"✅ [SSE-Task] PubSub 连接已关闭: task={task_id}")
+            except Exception as e:
+                logger.error(f"❌ [SSE-Task] 关闭 PubSub 连接失败: {e}", exc_info=True)
+                # 即使关闭失败，也尝试重置连接
+                try:
+                    await pubsub.reset()
+                    logger.info(f"🔄 [SSE-Task] PubSub 连接已重置: task={task_id}")
+                except Exception as reset_error:
+                    logger.error(f"❌ [SSE-Task] 重置 PubSub 连接也失败: {reset_error}")
 
 
 async def batch_progress_generator(batch_id: str, user_id: str):
     """Generate SSE events for batch progress updates"""
-    r = get_redis_client()
     svc = get_queue_service()
 
     try:
