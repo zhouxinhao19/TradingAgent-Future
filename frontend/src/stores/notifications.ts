@@ -9,20 +9,15 @@ export const useNotificationStore = defineStore('notifications', () => {
   const loading = ref(false)
   const drawerVisible = ref(false)
 
-  // 🔥 WebSocket 连接状态（优先使用）
+  // 🔥 WebSocket 连接状态
   const ws = ref<WebSocket | null>(null)
   const wsConnected = ref(false)
   let wsReconnectTimer: any = null
   let wsReconnectAttempts = 0
-  const maxReconnectAttempts = 5
+  const maxReconnectAttempts = 10  // 增加重连次数
 
-  // SSE 连接状态（降级方案）
-  const sse = ref<EventSource | null>(null)
-  const sseConnected = ref(false)
-  let sseReconnectTimer: any = null
-
-  // 连接状态（WebSocket 或 SSE）
-  const connected = computed(() => wsConnected.value || sseConnected.value)
+  // 连接状态
+  const connected = computed(() => wsConnected.value)
 
   const hasUnread = computed(() => unreadCount.value > 0)
 
@@ -124,8 +119,7 @@ export const useNotificationStore = defineStore('notifications', () => {
             connectWebSocket()
           }, delay)
         } else {
-          console.warn('[WS] 达到最大重连次数，降级到 SSE')
-          connectSSE()
+          console.error('[WS] 达到最大重连次数，停止重连')
         }
       }
 
@@ -145,8 +139,6 @@ export const useNotificationStore = defineStore('notifications', () => {
     } catch (error) {
       console.error('[WS] 连接失败:', error)
       wsConnected.value = false
-      // 降级到 SSE
-      connectSSE()
     }
   }
 
@@ -200,82 +192,16 @@ export const useNotificationStore = defineStore('notifications', () => {
     wsReconnectAttempts = 0
   }
 
-  // 连接 SSE（降级方案）
-  function connectSSE() {
-    try {
-      // 若已存在连接，先关闭
-      if (sse.value) {
-        try { sse.value.close() } catch {}
-        sse.value = null
-      }
-      if (sseReconnectTimer) { clearTimeout(sseReconnectTimer); sseReconnectTimer = null }
-
-      const authStore = useAuthStore()
-      const token = authStore.token || localStorage.getItem('auth-token') || ''
-      const base = (import.meta.env.VITE_API_BASE_URL || '')
-      const url = `${base}/api/notifications/stream${token ? `?token=${encodeURIComponent(token)}` : ''}`.replace(/\/+$/, '')
-
-      console.log('[SSE] 连接到:', url)
-
-      const es = new EventSource(url)
-      sse.value = es
-
-      es.onopen = () => {
-        console.log('[SSE] 连接成功')
-        sseConnected.value = true
-      }
-      es.onerror = () => {
-        console.log('[SSE] 连接错误')
-        sseConnected.value = false
-        // 简单重连策略
-        if (!sseReconnectTimer) {
-          sseReconnectTimer = setTimeout(() => connectSSE(), 3000)
-        }
-      }
-
-      es.addEventListener('notification', (ev: MessageEvent) => {
-        try {
-          const data = JSON.parse(ev.data)
-          if (data && data.title && data.type) {
-            addNotification({
-              id: data.id,
-              title: data.title,
-              content: data.content,
-              type: data.type,
-              link: data.link,
-              source: data.source,
-              created_at: data.created_at,
-              status: data.status || 'unread'
-            })
-          }
-        } catch {}
-      })
-
-      es.addEventListener('heartbeat', () => { /* 保持连接，无操作 */ })
-    } catch {
-      sseConnected.value = false
-    }
-  }
-
-  // 断开 SSE
-  function disconnectSSE() {
-    try { if (sse.value) sse.value.close() } catch {}
-    sse.value = null
-    sseConnected.value = false
-    if (sseReconnectTimer) { clearTimeout(sseReconnectTimer); sseReconnectTimer = null }
-  }
-
-  // 🔥 统一连接入口（优先 WebSocket，失败降级到 SSE）
+  // 🔥 连接 WebSocket
   function connect() {
     console.log('[Notifications] 开始连接...')
     connectWebSocket()
   }
 
-  // 🔥 统一断开入口
+  // 🔥 断开 WebSocket
   function disconnect() {
     console.log('[Notifications] 断开连接...')
     disconnectWebSocket()
-    disconnectSSE()
   }
 
   function setDrawerVisible(v: boolean) {

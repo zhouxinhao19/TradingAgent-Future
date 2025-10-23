@@ -11,6 +11,7 @@ from app.core.database import get_mongo_db, get_redis_client
 from app.models.notification import (
     NotificationCreate, NotificationOut, NotificationList
 )
+from app.utils.timezone import now_tz
 
 logger = logging.getLogger("webapi.notifications")
 
@@ -42,7 +43,7 @@ class NotificationsService:
             "source": payload.source,
             "severity": payload.severity or "info",
             "status": "unread",
-            "created_at": datetime.utcnow(),
+            "created_at": now_tz(),
             "metadata": payload.metadata or {},
         }
         res = await db[self.collection].insert_one(doc)
@@ -59,27 +60,19 @@ class NotificationsService:
             "created_at": doc["created_at"].isoformat(),
         }
 
-        # 🔥 优先使用 WebSocket 发送通知
+        # 🔥 使用 WebSocket 发送通知
         try:
             from app.routers.websocket_notifications import send_notification_via_websocket
             await send_notification_via_websocket(payload.user_id, payload_to_publish)
             logger.debug(f"✅ [WS] 通知已通过 WebSocket 发送: user={payload.user_id}")
         except Exception as e:
-            logger.debug(f"⚠️ [WS] WebSocket 发送失败，尝试 Redis: {e}")
-
-            # 降级到 Redis PubSub（兼容旧的 SSE 客户端）
-            try:
-                r = get_redis_client()
-                await r.publish(f"{self.channel_prefix}{payload.user_id}", json.dumps(payload_to_publish, ensure_ascii=False))
-                logger.debug(f"✅ [Redis] 通知已通过 Redis 发送: user={payload.user_id}")
-            except Exception as redis_error:
-                logger.warning(f"❌ Redis 发布通知失败(忽略): {redis_error}")
+            logger.warning(f"⚠️ [WS] WebSocket 发送失败: {e}")
 
         # 清理策略：保留最近N天/最多M条
         try:
             await db[self.collection].delete_many({
                 "user_id": payload.user_id,
-                "created_at": {"$lt": datetime.utcnow() - timedelta(days=self.retain_days)}
+                "created_at": {"$lt": now_tz() - timedelta(days=self.retain_days)}
             })
             # 超过配额按时间删旧
             count = await db[self.collection].count_documents({"user_id": payload.user_id})
@@ -118,7 +111,7 @@ class NotificationsService:
                 link=d.get("link"),
                 source=d.get("source"),
                 status=d.get("status", "unread"),
-                created_at=d.get("created_at") or datetime.utcnow(),
+                created_at=d.get("created_at") or now_tz(),
             ))
         return NotificationList(items=items, total=total, page=page, page_size=page_size)
 
