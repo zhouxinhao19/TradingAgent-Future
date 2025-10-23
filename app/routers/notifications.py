@@ -138,7 +138,7 @@ async def notifications_stream_generator(user_id: str):
             except asyncio.CancelledError:
                 # 客户端断开连接
                 logger.info(f"🔌 [SSE] 客户端断开连接: user={user_id}, 已发送 {message_count} 条消息")
-                break
+                raise  # 重新抛出 CancelledError 以确保正确的异步取消行为
             except Exception as e:
                 logger.error(f"❌ [SSE] 消息处理错误: {e}, 已发送 {message_count} 条消息", exc_info=True)
                 break
@@ -149,13 +149,26 @@ async def notifications_stream_generator(user_id: str):
     finally:
         # 确保在所有情况下都释放连接
         if pubsub:
+            logger.info(f"🧹 [SSE] 清理 PubSub 连接: user={user_id}")
+
+            # 分步骤关闭，确保即使 unsubscribe 失败也能关闭连接
             try:
-                logger.info(f"🧹 [SSE] 清理 PubSub 连接: user={user_id}")
                 await pubsub.unsubscribe(channel)
+                logger.debug(f"✅ [SSE] 已取消订阅频道: {channel}")
+            except Exception as e:
+                logger.warning(f"⚠️ [SSE] 取消订阅失败（将继续关闭连接）: {e}")
+
+            try:
                 await pubsub.close()
                 logger.info(f"✅ [SSE] PubSub 连接已关闭: user={user_id}")
             except Exception as e:
-                logger.error(f"⚠️ [SSE] 关闭 PubSub 连接失败: {e}", exc_info=True)
+                logger.error(f"❌ [SSE] 关闭 PubSub 连接失败: {e}", exc_info=True)
+                # 即使关闭失败，也尝试重置连接
+                try:
+                    await pubsub.reset()
+                    logger.info(f"🔄 [SSE] PubSub 连接已重置: user={user_id}")
+                except Exception as reset_error:
+                    logger.error(f"❌ [SSE] 重置 PubSub 连接也失败: {reset_error}")
 
 
 @router.get("/notifications/stream")
