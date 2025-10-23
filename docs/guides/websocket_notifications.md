@@ -283,6 +283,41 @@ WS_HEARTBEAT_INTERVAL=30  # 心跳间隔（秒）
 WS_MAX_CONNECTIONS_PER_USER=3  # 每个用户最大连接数
 ```
 
+### Nginx 配置
+
+如果使用 Nginx 作为反向代理，需要确保以下配置：
+
+```nginx
+location /api/ {
+    proxy_pass http://backend/api/;
+
+    # WebSocket 支持（必需）
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+
+    # 超时设置（重要！）
+    # WebSocket 长连接需要更长的超时时间
+    proxy_connect_timeout 120s;
+    proxy_send_timeout 3600s;  # 1小时
+    proxy_read_timeout 3600s;  # 1小时
+
+    # 禁用缓存
+    proxy_buffering off;
+    proxy_cache off;
+}
+```
+
+**关键配置说明**：
+
+1. **`proxy_http_version 1.1`**：WebSocket 需要 HTTP/1.1
+2. **`Upgrade` 和 `Connection` 头**：用于协议升级
+3. **`proxy_send_timeout` 和 `proxy_read_timeout`**：
+   - 设置为 3600s（1小时）或更长
+   - 如果设置太短（如 120s），WebSocket 连接会被意外关闭
+   - 后端有心跳机制（每 30 秒），可以保持连接活跃
+4. **`proxy_buffering off`**：禁用缓冲，确保实时性
+
 ---
 
 ## 📊 监控
