@@ -297,13 +297,13 @@ LLMProviderResponse 构造
 
 ---
 
-## 4. 当前问题分析
+## 4. 问题分析与修复状态
 
-### 问题 1：厂家列表返回的缩略 Key 格式不一致 ❌
+### ✅ 问题 1：厂家列表返回的缩略 Key 格式不一致（已修复）
 
-**位置**：`app/routers/config.py` 第 258 行
+**位置**：`app/routers/config.py` 第 238-306 行
 
-**当前代码**：
+**修复前**：
 ```python
 api_key=provider.api_key[:8] + "..." if provider.api_key else None,
 ```
@@ -313,15 +313,36 @@ api_key=provider.api_key[:8] + "..." if provider.api_key else None,
 - 与数据源的缩略格式不一致（前6位 + "..." + 后6位）
 - 用户无法区分不同的 Key
 
-**影响**：
-- 用户编辑厂家时，看不到完整的缩略 Key
-- 如果环境变量中有 Key，也不会显示
+**修复后**：
+```python
+from app.utils.api_key_utils import (
+    is_valid_api_key,
+    truncate_api_key,
+    get_env_api_key_for_provider
+)
 
-### 问题 2：厂家列表未检查环境变量 ❌
+# 优先使用数据库配置，如果数据库没有则检查环境变量
+db_key_valid = is_valid_api_key(provider.api_key)
+if db_key_valid:
+    api_key_display = truncate_api_key(provider.api_key)
+else:
+    env_key = get_env_api_key_for_provider(provider.name)
+    if env_key:
+        api_key_display = truncate_api_key(env_key)
+    else:
+        api_key_display = None
+```
 
-**位置**：`app/routers/config.py` 第 238-274 行
+**效果**：
+- ✅ 统一缩略格式：前6位 + "..." + 后6位（如 `d1el86...j41hai0`）
+- ✅ 支持环境变量回退
+- ✅ 用户可以区分不同的 Key
 
-**当前逻辑**：
+### ✅ 问题 2：厂家列表未检查环境变量（已修复）
+
+**位置**：`app/routers/config.py` 第 238-306 行
+
+**修复前**：
 ```python
 # 只检查数据库中的 API Key
 api_key=provider.api_key[:8] + "..." if provider.api_key else None,
@@ -331,77 +352,214 @@ api_key=provider.api_key[:8] + "..." if provider.api_key else None,
 - 如果数据库中没有 API Key，但环境变量中有，返回 `None`
 - 用户编辑时看到空白，不知道环境变量中已经配置了
 
-**期望**：
+**修复后**：
 - 如果数据库中没有，检查环境变量
 - 如果环境变量中有，返回缩略版本
+- 用户编辑时可以看到缩略的环境变量 Key
+
+**效果**：
+- ✅ 用户编辑厂家时，可以看到环境变量中的 Key
+- ✅ 避免用户误以为没有配置
+
+### ✅ 问题 3：配置验证未明确区分 MongoDB 和 .env（已修复）
+
+**位置**：`app/routers/system_config.py` 第 98-222 行
+
+**修复前**：
+- 只有 `source` 字段标识来源
+- 前端无法区分 MongoDB 是否配置
+
+**修复后**：
+```python
+validation_item = {
+    "mongodb_configured": False,  # 新增：MongoDB 是否配置
+    "env_configured": False,      # 新增：环境变量是否配置
+    "source": None,               # 实际使用的来源
+    "status": "未配置"            # 显示状态
+}
+```
+
+**效果**：
+- ✅ 前端可以明确知道 MongoDB 是否配置
+- ✅ 前端可以明确知道 .env 是否配置
+- ✅ 用户清空 MongoDB Key 后，显示黄色（使用 .env）
+- ✅ 用户填写 MongoDB Key 后，显示绿色（使用 MongoDB）
+
+### ✅ 问题 4：代码重复（已修复）
+
+**修复前**：
+- `is_valid_key()` 函数在多个文件中重复定义
+- `truncate_key()` 函数在多个文件中重复定义
+- 环境变量读取逻辑分散在各处
+
+**修复后**：
+- 创建 `app/utils/api_key_utils.py` 统一管理
+- 所有调用点使用公共函数
+- 易于维护和测试
+
+**效果**：
+- ✅ 代码复用，减少维护成本
+- ✅ 逻辑统一，避免不一致
+- ✅ 易于扩展和测试
 
 ---
 
-## 5. 建议的修复方案
+## 5. 修复方案实施总结
 
-### 修复 1：统一厂家列表的缩略 Key 格式
+### ✅ 修复 1：统一厂家列表的缩略 Key 格式（已完成）
 
 **修改文件**：`app/routers/config.py`
 
-**修改位置**：第 238-274 行的 `get_llm_providers()` 函数
+**修改位置**：第 238-306 行的 `get_llm_providers()` 函数
 
-**修改内容**：
-1. 添加 `truncate_key()` 辅助函数（与 `_sanitize_datasource_configs` 中的一致）
-2. 添加 `is_valid_key()` 辅助函数
-3. 修改返回逻辑：
-   - 数据库有有效 Key → 返回缩略版本（前6位 + "..." + 后6位）
+**实施内容**：
+1. ✅ 使用公共函数 `truncate_api_key()`（前6位 + "..." + 后6位）
+2. ✅ 使用公共函数 `is_valid_api_key()` 验证 Key
+3. ✅ 使用公共函数 `get_env_api_key_for_provider()` 读取环境变量
+4. ✅ 修改返回逻辑：
+   - 数据库有有效 Key → 返回缩略版本
    - 数据库没有 → 检查环境变量
      - 环境变量有 → 返回缩略版本
      - 环境变量没有 → 返回 `None`
 
-### 修复 2：提取公共的 API Key 处理函数
+**提交记录**：commit 77bc278
 
-**建议**：创建 `app/utils/api_key_utils.py`
+### ✅ 修复 2：提取公共的 API Key 处理函数（已完成）
 
-**内容**：
+**创建文件**：`app/utils/api_key_utils.py`
+
+**实施内容**：
 ```python
 def is_valid_api_key(api_key: str) -> bool:
     """判断 API Key 是否有效"""
-    # ... 统一的验证逻辑
+    # ✅ 统一的验证逻辑（5个条件）
 
 def truncate_api_key(api_key: str) -> str:
     """缩略 API Key，显示前6位和后6位"""
-    # ... 统一的缩略逻辑
+    # ✅ 统一的缩略逻辑
 
-def get_env_api_key(provider_name: str, ds_type: str = None) -> str:
-    """从环境变量获取 API Key"""
-    # ... 统一的环境变量读取逻辑
+def get_env_api_key_for_provider(provider_name: str) -> str:
+    """从环境变量获取大模型厂家的 API Key"""
+    # ✅ 统一的环境变量读取逻辑
+
+def get_env_api_key_for_datasource(ds_type: str) -> str:
+    """从环境变量获取数据源的 API Key"""
+    # ✅ 统一的环境变量读取逻辑
+
+def should_skip_api_key_update(api_key: str) -> bool:
+    """判断是否应该跳过 API Key 的更新"""
+    # ✅ 统一的更新判断逻辑
 ```
 
-**好处**：
-- 避免代码重复
-- 确保所有地方使用相同的逻辑
-- 易于维护和测试
+**效果**：
+- ✅ 避免代码重复
+- ✅ 确保所有地方使用相同的逻辑
+- ✅ 易于维护和测试
+
+**提交记录**：commit 77bc278
+
+### ✅ 修复 3：更新所有调用点使用公共函数（已完成）
+
+**修改文件**：
+1. ✅ `app/routers/config.py`
+   - `get_llm_providers()` - 厂家列表读取
+   - `update_llm_provider()` - 厂家更新
+   - `_sanitize_datasource_configs()` - 数据源脱敏
+   - `add_data_source_config()` - 数据源添加
+   - `update_data_source_config()` - 数据源更新
+
+2. ✅ `app/routers/system_config.py`
+   - `validate_config()` - 配置验证（厂家部分）
+   - `validate_config()` - 配置验证（数据源部分）
+
+**提交记录**：commit 77bc278
+
+### ✅ 修复 4：明确区分 MongoDB 和 .env 配置状态（已完成）
+
+**修改文件**：`app/routers/system_config.py`
+
+**修改位置**：第 98-222 行的 `validate_config()` 函数
+
+**实施内容**：
+1. ✅ 新增字段 `mongodb_configured`：标识 MongoDB 是否配置
+2. ✅ 新增字段 `env_configured`：标识环境变量是否配置
+3. ✅ 保留字段 `source`：标识实际使用的来源
+4. ✅ 保留字段 `status`：标识显示状态
+
+**显示规则**：
+| MongoDB | .env | 显示状态 | 颜色 |
+|---------|------|---------|------|
+| ✅ | 任意 | "已配置" | 🟢 绿色 |
+| ❌ | ✅ | "已配置（环境变量）" | 🟡 黄色 |
+| ❌ | ❌ | "未配置" | 🔴 红色 |
+
+**提交记录**：commit 77bc278
 
 ---
 
 ## 6. 总结
 
-### 当前状态
+### ✅ 当前状态（已全部修复）
 
 | 功能 | 状态 | 说明 |
 |------|------|------|
-| 数据源配置读取 | ✅ | 支持环境变量回退，返回缩略 Key |
+| 数据源配置读取 | ✅ | 支持环境变量回退，返回缩略 Key（前6位+...+后6位） |
 | 数据源配置更新 | ✅ | 正确处理截断 Key、占位符、清空等场景 |
-| 厂家配置读取 | ❌ | 不支持环境变量回退，缩略格式不一致 |
+| **厂家配置读取** | ✅ | **支持环境变量回退，缩略格式统一（前6位+...+后6位）** |
 | 厂家配置更新 | ✅ | 正确处理截断 Key、占位符、清空等场景 |
-| 配置验证 | ✅ | 支持环境变量回退，黄色警告提示 |
+| **配置验证** | ✅ | **明确区分 MongoDB 和 .env，正确显示颜色** |
 | 配置桥接 | ✅ | 优先级正确，支持数据库和环境变量 |
+| **代码复用** | ✅ | **提取公共函数，避免代码重复** |
 
-### 需要修复的问题
+### ✅ 已修复的问题
 
-1. ❌ **厂家列表返回的缩略 Key 格式不一致**
-2. ❌ **厂家列表未检查环境变量**
-3. ⚠️ **代码重复**（多处使用相同的 `is_valid_key` 和 `truncate_key` 逻辑）
+1. ✅ **厂家列表返回的缩略 Key 格式不一致** → 已统一为前6位+...+后6位
+2. ✅ **厂家列表未检查环境变量** → 已支持环境变量回退
+3. ✅ **配置验证未明确区分 MongoDB 和 .env** → 已新增 `mongodb_configured` 和 `env_configured` 字段
+4. ✅ **代码重复** → 已提取公共函数到 `app/utils/api_key_utils.py`
 
-### 建议的优先级
+### 📝 提交记录
 
-1. **高优先级**：修复厂家列表的缩略 Key 格式和环境变量检查
-2. **中优先级**：提取公共函数，减少代码重复
-3. **低优先级**：添加单元测试，确保所有场景都正确处理
+**commit 77bc278**: feat: 统一 API Key 配置管理，明确区分 MongoDB 和环境变量配置
+
+**修改文件**：
+- ✅ 新增：`app/utils/api_key_utils.py`（公共工具函数）
+- ✅ 新增：`docs/API_KEY_MANAGEMENT_ANALYSIS.md`（完整分析文档）
+- ✅ 修改：`app/routers/config.py`（厂家和数据源 API）
+- ✅ 修改：`app/routers/system_config.py`（配置验证）
+
+### 🎯 用户体验改进
+
+1. **编辑对话框显示缩略 Key**
+   - 用户可以看到 MongoDB 或 .env 中的 Key（如 `d1el86...j41hai0`）
+   - 用户知道已有配置，不会误以为未配置
+
+2. **配置验证清晰区分来源**
+   - MongoDB 有 Key → 显示绿色"已配置"
+   - MongoDB 无，.env 有 → 显示黄色"已配置（环境变量）"
+   - 都没有 → 显示红色"未配置"
+
+3. **用户清空 MongoDB Key 的行为**
+   - 保存后 MongoDB 中的 Key 被清空
+   - 配置验证显示黄色（因为 .env 中有值）
+   - 系统实际使用 .env 中的 Key
+
+4. **用户填写 MongoDB Key 的行为**
+   - 保存后 MongoDB 中保存新 Key
+   - 配置验证显示绿色
+   - 系统优先使用 MongoDB 中的 Key
+
+### 🧪 建议的后续工作
+
+1. **低优先级**：添加单元测试
+   - 测试 `app/utils/api_key_utils.py` 中的所有函数
+   - 测试各种边界情况（空字符串、占位符、截断 Key 等）
+
+2. **低优先级**：前端适配
+   - 确认前端正确处理 `mongodb_configured` 和 `env_configured` 字段
+   - 确认前端正确显示颜色（绿色/黄色/红色）
+
+3. **低优先级**：文档完善
+   - 更新用户手册，说明配置优先级
+   - 更新开发文档，说明 API Key 处理流程
 
