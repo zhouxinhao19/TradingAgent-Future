@@ -17,7 +17,7 @@ def bridge_config_to_env():
     将统一配置桥接到环境变量
 
     这个函数会：
-    1. 从统一配置读取大模型配置（API 密钥、超时、温度等）
+    1. 从数据库读取大模型厂家配置（API 密钥、超时、温度等）
     2. 将配置写入环境变量
     3. 将默认模型写入环境变量
     4. 将数据源配置写入环境变量（API 密钥、超时、重试等）
@@ -53,28 +53,83 @@ def bridge_config_to_env():
         bridged_count += 1
 
         # 1. 桥接大模型配置（基础 API 密钥）
-        # 🔧 [优先级] .env 文件 > 数据库配置
+        # 🔧 [优先级] .env 文件 > 数据库厂家配置
+        # 🔥 修改：从数据库的 llm_providers 集合读取厂家配置，而不是从 JSON 文件
         # 只有当环境变量不存在或为占位符时，才使用数据库中的配置
-        llm_configs = unified_config.get_llm_configs()
-        for llm_config in llm_configs:
-            # provider 现在是字符串类型，不再是枚举
-            env_key = f"{llm_config.provider.upper()}_API_KEY"
-            existing_env_value = os.getenv(env_key)
+        try:
+            # 使用同步方式获取厂家配置
+            import asyncio
+            try:
+                loop = asyncio.get_running_loop()
+                # 在异步上下文中，使用 run_coroutine_threadsafe
+                from concurrent.futures import ThreadPoolExecutor
+                import threading
 
-            # 检查环境变量是否已存在且有效（不是占位符）
-            if existing_env_value and not existing_env_value.startswith("your_"):
-                logger.info(f"  ✓ 使用 .env 文件中的 {env_key} (长度: {len(existing_env_value)})")
-                bridged_count += 1
-            elif llm_config.enabled and llm_config.api_key:
-                # 只有当环境变量不存在或为占位符时，才使用数据库配置
-                if not llm_config.api_key.startswith("your_"):
-                    os.environ[env_key] = llm_config.api_key
-                    logger.info(f"  ✓ 使用数据库中的 {env_key} (长度: {len(llm_config.api_key)})")
+                # 创建一个新的事件循环在单独的线程中运行
+                providers = []
+                def get_providers():
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        return new_loop.run_until_complete(config_service.get_llm_providers())
+                    finally:
+                        new_loop.close()
+
+                with ThreadPoolExecutor() as executor:
+                    future = executor.submit(get_providers)
+                    providers = future.result(timeout=10)
+
+            except RuntimeError:
+                # 不在异步上下文中，直接使用 asyncio.run
+                providers = asyncio.run(config_service.get_llm_providers())
+
+            logger.info(f"  📊 从数据库读取到 {len(providers)} 个厂家配置")
+
+            for provider in providers:
+                if not provider.is_active:
+                    logger.debug(f"  ⏭️  厂家 {provider.name} 未启用，跳过")
+                    continue
+
+                env_key = f"{provider.name.upper()}_API_KEY"
+                existing_env_value = os.getenv(env_key)
+
+                # 检查环境变量是否已存在且有效（不是占位符）
+                if existing_env_value and not existing_env_value.startswith("your_"):
+                    logger.info(f"  ✓ 使用 .env 文件中的 {env_key} (长度: {len(existing_env_value)})")
+                    bridged_count += 1
+                elif provider.api_key and not provider.api_key.startswith("your_"):
+                    # 只有当环境变量不存在或为占位符时，才使用数据库配置
+                    os.environ[env_key] = provider.api_key
+                    logger.info(f"  ✓ 使用数据库厂家配置的 {env_key} (长度: {len(provider.api_key)})")
                     bridged_count += 1
                 else:
-                    logger.warning(f"  ⚠️  {env_key} 在 .env 和数据库中都是占位符，跳过")
-            else:
-                logger.debug(f"  ⏭️  {env_key} 未配置")
+                    logger.debug(f"  ⏭️  {env_key} 未配置有效的 API Key")
+
+        except Exception as e:
+            logger.error(f"❌ 从数据库读取厂家配置失败: {e}", exc_info=True)
+            logger.warning("⚠️  将尝试从 JSON 文件读取配置作为后备方案")
+
+            # 后备方案：从 JSON 文件读取
+            llm_configs = unified_config.get_llm_configs()
+            for llm_config in llm_configs:
+                # provider 现在是字符串类型，不再是枚举
+                env_key = f"{llm_config.provider.upper()}_API_KEY"
+                existing_env_value = os.getenv(env_key)
+
+                # 检查环境变量是否已存在且有效（不是占位符）
+                if existing_env_value and not existing_env_value.startswith("your_"):
+                    logger.info(f"  ✓ 使用 .env 文件中的 {env_key} (长度: {len(existing_env_value)})")
+                    bridged_count += 1
+                elif llm_config.enabled and llm_config.api_key:
+                    # 只有当环境变量不存在或为占位符时，才使用数据库配置
+                    if not llm_config.api_key.startswith("your_"):
+                        os.environ[env_key] = llm_config.api_key
+                        logger.info(f"  ✓ 使用 JSON 文件中的 {env_key} (长度: {len(llm_config.api_key)})")
+                        bridged_count += 1
+                    else:
+                        logger.warning(f"  ⚠️  {env_key} 在 .env 和 JSON 文件中都是占位符，跳过")
+                else:
+                    logger.debug(f"  ⏭️  {env_key} 未配置")
 
         # 2. 桥接默认模型配置
         default_model = unified_config.get_default_model()
