@@ -625,10 +625,24 @@ async def add_data_source_config(
                 detail="系统配置不存在"
             )
 
-        # 添加新的数据源配置（方案A：清洗敏感字段）
+        # 添加新的数据源配置
+        # 🔥 修改：支持保存 API Key（与大模型厂家管理逻辑一致）
         _req = request.model_dump()
-        _req['api_key'] = ""
-        _req['api_secret'] = ""
+
+        # 处理 API Key
+        if 'api_key' in _req:
+            api_key = _req.get('api_key', '')
+            # 如果是占位符或截断的密钥，清空该字段
+            if api_key and (api_key.startswith('your_') or api_key.startswith('your-') or '...' in api_key):
+                _req['api_key'] = ""
+            # 如果是空字符串或有效的完整密钥，保留
+
+        # 处理 API Secret
+        if 'api_secret' in _req:
+            api_secret = _req.get('api_secret', '')
+            if api_secret and (api_secret.startswith('your_') or api_secret.startswith('your-') or '...' in api_secret):
+                _req['api_secret'] = ""
+
         ds_config = DataSourceConfig(**_req)
         config.data_source_configs.append(ds_config)
 
@@ -959,10 +973,25 @@ async def update_data_source_config(
         # 查找并更新数据源配置
         for i, ds_config in enumerate(config.data_source_configs):
             if ds_config.name == name:
-                # 更新配置（方案A：清洗敏感字段）
+                # 更新配置
+                # 🔥 修改：处理 API Key 的更新逻辑（与大模型厂家管理逻辑一致）
                 _req = request.model_dump()
-                _req['api_key'] = ""
-                _req['api_secret'] = ""
+
+                # 处理 API Key
+                if 'api_key' in _req:
+                    api_key = _req.get('api_key', '')
+                    # 如果是占位符或截断的密钥（包含 "..."），则不更新（保留原值）
+                    if api_key and (api_key.startswith('your_') or api_key.startswith('your-') or '...' in api_key):
+                        _req['api_key'] = ds_config.api_key or ""
+                    # 如果是空字符串，保留（表示清空）
+                    # 如果是有效的完整密钥，保留（表示更新）
+
+                # 处理 API Secret
+                if 'api_secret' in _req:
+                    api_secret = _req.get('api_secret', '')
+                    if api_secret and (api_secret.startswith('your_') or api_secret.startswith('your-') or '...' in api_secret):
+                        _req['api_secret'] = ds_config.api_secret or ""
+
                 updated_config = DataSourceConfig(**_req)
                 config.data_source_configs[i] = updated_config
 

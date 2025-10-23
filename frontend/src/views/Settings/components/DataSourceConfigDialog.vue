@@ -61,13 +61,33 @@
         />
       </el-form-item>
 
-      <el-alert
-        title="🔒 安全提示"
-        type="info"
-        description="敏感密钥通过环境变量/运维配置注入；此处不保存或显示真实密钥。"
-        show-icon
-        :closable="false"
-      />
+      <!-- API Key 输入框 -->
+      <el-form-item label="API Key" prop="api_key">
+        <el-input
+          v-model="formData.api_key"
+          type="password"
+          placeholder="输入 API Key（可选，留空则使用环境变量）"
+          show-password
+          clearable
+        />
+        <div class="form-tip">
+          优先级：数据库配置 > 环境变量。留空则使用 .env 文件中的配置
+        </div>
+      </el-form-item>
+
+      <!-- API Secret 输入框（某些数据源需要） -->
+      <el-form-item v-if="needsApiSecret" label="API Secret" prop="api_secret">
+        <el-input
+          v-model="formData.api_secret"
+          type="password"
+          placeholder="输入 API Secret（可选）"
+          show-password
+          clearable
+        />
+        <div class="form-tip">
+          某些数据源（如 Alpha Vantage）需要额外的 Secret Key
+        </div>
+      </el-form-item>
 
       <!-- 性能配置 -->
       <el-divider content-position="left">性能配置</el-divider>
@@ -236,6 +256,13 @@ const marketCategories = ref<MarketCategory[]>([])
 // Computed
 const isEdit = computed(() => !!props.config)
 
+// 判断是否需要显示 API Secret 字段
+const needsApiSecret = computed(() => {
+  const type = formData.value.type?.toLowerCase() || ''
+  // 某些数据源类型需要 API Secret
+  return ['alpha_vantage', 'wind', 'choice'].includes(type)
+})
+
 // 表单数据
 const defaultFormData = {
   name: '',
@@ -372,10 +399,33 @@ const handleSubmit = async () => {
     await formRef.value.validate()
     loading.value = true
 
-    // 方案A：前端不提交敏感字段
+    // 🔥 修改：处理 API Key 的提交逻辑（与 ProviderDialog 一致）
     const payload: any = { ...formData.value }
-    delete payload.api_key
-    delete payload.api_secret
+
+    // 处理 API Key
+    if ('api_key' in payload) {
+      const apiKey = payload.api_key || ''
+
+      // 如果是截断的密钥（包含 "..."），表示用户没有修改，删除该字段（不更新）
+      if (apiKey.includes('...')) {
+        delete payload.api_key
+      }
+      // 如果是占位符，删除该字段（不更新）
+      else if (apiKey.startsWith('your_') || apiKey.startsWith('your-')) {
+        delete payload.api_key
+      }
+      // 如果是空字符串，保留（表示用户想清空密钥）
+      // 如果是有效的完整密钥，保留（表示用户想更新密钥）
+    }
+
+    // 处理 API Secret（同样的逻辑）
+    if ('api_secret' in payload) {
+      const apiSecret = payload.api_secret || ''
+
+      if (apiSecret.includes('...') || apiSecret.startsWith('your_') || apiSecret.startsWith('your-')) {
+        delete payload.api_secret
+      }
+    }
 
     if (isEdit.value) {
       // 更新数据源
@@ -437,6 +487,13 @@ onMounted(() => {
   color: #909399;
   font-size: 12px;
   margin-left: 8px;
+}
+
+.form-tip {
+  color: #909399;
+  font-size: 12px;
+  margin-top: 4px;
+  line-height: 1.5;
 }
 
 .config-params {
