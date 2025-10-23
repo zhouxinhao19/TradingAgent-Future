@@ -137,11 +137,6 @@
             <el-icon class="empty-icon"><InfoFilled /></el-icon>
             <p>暂无市场快讯</p>
           </div>
-          <div v-if="marketNews.length > 0" class="news-footer">
-            <el-button type="text" size="small" @click="goToNewsCenter">
-              查看更多 <el-icon><ArrowRight /></el-icon>
-            </el-button>
-          </div>
         </el-card>
       </el-col>
 
@@ -378,12 +373,6 @@ const openNewsUrl = (url?: string) => {
   } else {
     ElMessage.info('该新闻暂无详情链接')
   }
-}
-
-const goToNewsCenter = () => {
-  // 跳转到新闻中心页面（如果有的话）
-  ElMessage.info('新闻中心功能开发中...')
-  // router.push('/news')
 }
 
 const getStatusType = (status: string | AnalysisStatus): 'success' | 'info' | 'warning' | 'danger' => {
