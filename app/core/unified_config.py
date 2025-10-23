@@ -257,12 +257,45 @@ class UnifiedConfigManager:
     # ==================== 数据源配置管理 ====================
     
     def get_data_source_configs(self) -> List[DataSourceConfig]:
-        """获取数据源配置"""
+        """获取数据源配置 - 优先从数据库读取，回退到硬编码"""
+        try:
+            # 🔥 优先从数据库读取配置
+            from app.core.database import get_mongo_db
+            db = get_mongo_db()
+            config_collection = db.system_configs
+
+            # 获取最新的激活配置
+            config_data = config_collection.find_one(
+                {"is_active": True},
+                sort=[("version", -1)]
+            )
+
+            if config_data and config_data.get('data_source_configs'):
+                # 从数据库读取到配置
+                data_source_configs = config_data.get('data_source_configs', [])
+                print(f"✅ [unified_config] 从数据库读取到 {len(data_source_configs)} 个数据源配置")
+
+                # 转换为 DataSourceConfig 对象
+                result = []
+                for ds_config in data_source_configs:
+                    try:
+                        result.append(DataSourceConfig(**ds_config))
+                    except Exception as e:
+                        print(f"⚠️ [unified_config] 解析数据源配置失败: {e}, 配置: {ds_config}")
+                        continue
+
+                # 按优先级排序（数字越大优先级越高）
+                result.sort(key=lambda x: x.priority, reverse=True)
+                return result
+            else:
+                print("⚠️ [unified_config] 数据库中没有数据源配置，使用硬编码配置")
+        except Exception as e:
+            print(f"⚠️ [unified_config] 从数据库读取数据源配置失败: {e}，使用硬编码配置")
+
+        # 🔥 回退到硬编码配置（兼容性）
         settings = self.get_system_settings()
-        
-        # 从设置中提取数据源配置
         data_sources = []
-        
+
         # AKShare (默认启用)
         akshare_config = DataSourceConfig(
             name="AKShare",
@@ -273,7 +306,7 @@ class UnifiedConfigManager:
             description="AKShare开源金融数据接口"
         )
         data_sources.append(akshare_config)
-        
+
         # Tushare (如果有配置)
         if settings.get("tushare_token"):
             tushare_config = DataSourceConfig(
@@ -286,7 +319,7 @@ class UnifiedConfigManager:
                 description="Tushare专业金融数据接口"
             )
             data_sources.append(tushare_config)
-        
+
         # Finnhub (如果有配置)
         if settings.get("finnhub_api_key"):
             finnhub_config = DataSourceConfig(
@@ -299,7 +332,7 @@ class UnifiedConfigManager:
                 description="Finnhub股票数据接口"
             )
             data_sources.append(finnhub_config)
-        
+
         return data_sources
     
     # ==================== 数据库配置管理 ====================
