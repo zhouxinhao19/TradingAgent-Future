@@ -18,6 +18,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from app.core.database import get_mongo_db
 from app.models.user import User, UserRole
 from app.utils.security import get_password_hash
+from app.utils.timezone import now_tz
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -45,8 +46,8 @@ async def create_default_users(db):
         "role": UserRole.ADMIN.value,
         "is_active": True,
         "is_superuser": True,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
+        "created_at": now_tz(),
+        "updated_at": now_tz(),
         "settings": {
             "default_research_depth": 2,
             "enable_notifications": True,
@@ -69,8 +70,8 @@ async def create_default_users(db):
         "role": UserRole.USER.value,
         "is_active": True,
         "is_superuser": False,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
+        "created_at": now_tz(),
+        "updated_at": now_tz(),
         "settings": {
             "default_research_depth": 2,
             "enable_notifications": True,
@@ -103,56 +104,56 @@ async def create_system_config(db):
             "value": "v1.0.0-preview",
             "description": "系统版本号",
             "category": "system",
-            "updated_at": datetime.utcnow()
+            "updated_at": now_tz()
         },
         {
             "key": "max_concurrent_tasks",
             "value": 3,
             "description": "最大并发分析任务数",
             "category": "performance",
-            "updated_at": datetime.utcnow()
+            "updated_at": now_tz()
         },
         {
             "key": "default_research_depth",
             "value": 2,
             "description": "默认分析深度（1-5）",
             "category": "analysis",
-            "updated_at": datetime.utcnow()
+            "updated_at": now_tz()
         },
         {
             "key": "enable_realtime_pe_pb",
             "value": True,
             "description": "启用实时PE/PB计算",
             "category": "features",
-            "updated_at": datetime.utcnow()
+            "updated_at": now_tz()
         },
         {
             "key": "quotes_update_interval",
             "value": 30,
             "description": "行情更新间隔（秒）",
             "category": "data",
-            "updated_at": datetime.utcnow()
+            "updated_at": now_tz()
         },
         {
             "key": "cache_ttl",
             "value": 300,
             "description": "缓存过期时间（秒）",
             "category": "performance",
-            "updated_at": datetime.utcnow()
+            "updated_at": now_tz()
         },
         {
             "key": "enable_batch_analysis",
             "value": True,
             "description": "启用批量分析功能",
             "category": "features",
-            "updated_at": datetime.utcnow()
+            "updated_at": now_tz()
         },
         {
             "key": "max_batch_size",
             "value": 50,
             "description": "批量分析最大股票数",
             "category": "limits",
-            "updated_at": datetime.utcnow()
+            "updated_at": now_tz()
         }
     ]
     
@@ -191,8 +192,8 @@ async def create_model_config(db):
                 "max_tokens": 4096,
                 "rate_limit_per_minute": 60
             },
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": now_tz(),
+            "updated_at": now_tz()
         },
         {
             "provider": "dashscope",
@@ -211,8 +212,8 @@ async def create_model_config(db):
                 "max_tokens": 8192,
                 "rate_limit_per_minute": 60
             },
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": now_tz(),
+            "updated_at": now_tz()
         },
         {
             "provider": "openai",
@@ -231,8 +232,8 @@ async def create_model_config(db):
                 "max_tokens": 8192,
                 "rate_limit_per_minute": 60
             },
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": now_tz(),
+            "updated_at": now_tz()
         }
     ]
     
@@ -263,8 +264,8 @@ async def create_sync_status(db):
             "total_count": 0,
             "success_count": 0,
             "error_count": 0,
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": now_tz(),
+            "updated_at": now_tz()
         },
         {
             "data_type": "market_quotes",
@@ -275,8 +276,8 @@ async def create_sync_status(db):
             "total_count": 0,
             "success_count": 0,
             "error_count": 0,
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": now_tz(),
+            "updated_at": now_tz()
         },
         {
             "data_type": "financial_data",
@@ -287,8 +288,8 @@ async def create_sync_status(db):
             "total_count": 0,
             "success_count": 0,
             "error_count": 0,
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
+            "created_at": now_tz(),
+            "updated_at": now_tz()
         }
     ]
     

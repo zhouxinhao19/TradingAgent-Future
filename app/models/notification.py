@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Optional, Literal, List, Dict, Any
 from pydantic import BaseModel, Field
 from bson import ObjectId
+from app.utils.timezone import now_tz
 
 # 简单工具：ObjectId -> str
 
@@ -42,7 +43,7 @@ class NotificationDB(BaseModel):
     source: Optional[str] = None
     severity: Optional[Literal['info','success','warning','error']] = 'info'
     status: NotificationStatus = 'unread'
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=now_tz)
     metadata: Optional[Dict[str, Any]] = None
 
 

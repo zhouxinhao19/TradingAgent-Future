@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
 from bson import ObjectId
 from .user import PyObjectId
+from app.utils.timezone import now_tz
 
 
 class AnalysisStatus(str, Enum):
@@ -80,9 +81,9 @@ class AnalysisTask(BaseModel):
     status: AnalysisStatus = AnalysisStatus.PENDING
 
     progress: int = Field(default=0, ge=0, le=100, description="任务进度 0-100")
-    
+
     # 时间戳
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=now_tz)
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     

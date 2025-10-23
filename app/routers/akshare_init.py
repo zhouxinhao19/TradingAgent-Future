@@ -14,6 +14,7 @@ from app.core.database import get_mongo_db
 from app.worker.akshare_init_service import get_akshare_init_service
 from app.worker.akshare_sync_service import get_akshare_sync_service
 from app.routers.auth import get_current_user
+from app.utils.timezone import now_tz
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +95,7 @@ async def get_database_status():
                     "latest_update": latest_quotes.get("updated_at") if latest_quotes else None
                 },
                 "data_quality": data_quality,
-                "check_time": datetime.utcnow()
+                "check_time": now_tz()
             },
             "message": "数据库状态检查完成"
         }
@@ -118,7 +119,7 @@ async def test_akshare_connection():
         
         result = {
             "connected": connected,
-            "test_time": datetime.utcnow()
+            "test_time": now_tz()
         }
         
         if connected:
@@ -168,7 +169,7 @@ async def start_full_initialization(
         _initialization_status.update({
             "is_running": True,
             "current_task": "full_initialization",
-            "start_time": datetime.utcnow(),
+            "start_time": now_tz(),
             "progress": {"current_step": "准备中", "completed_steps": 0, "total_steps": 6},
             "result": None
         })
@@ -226,7 +227,7 @@ async def start_basic_sync(
         _initialization_status.update({
             "is_running": True,
             "current_task": "basic_sync",
-            "start_time": datetime.utcnow(),
+            "start_time": now_tz(),
             "progress": {"current_step": "同步基础信息", "completed_steps": 0, "total_steps": 1},
             "result": None
         })
@@ -274,7 +275,7 @@ async def get_initialization_status():
             "progress": _initialization_status["progress"],
             "result": _initialization_status["result"],
             "duration": (
-                (datetime.utcnow() - _initialization_status["start_time"]).total_seconds()
+                (now_tz() - _initialization_status["start_time"]).total_seconds()
                 if _initialization_status["start_time"] else 0
             )
         },
