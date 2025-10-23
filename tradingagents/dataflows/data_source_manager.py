@@ -67,6 +67,71 @@ class DataSourceManager:
         from tradingagents.config.runtime_settings import use_app_cache_enabled
         return use_app_cache_enabled()
 
+    def _get_data_source_priority_order(self) -> List[ChinaDataSource]:
+        """
+        从数据库获取数据源优先级顺序（用于降级）
+
+        Returns:
+            按优先级排序的数据源列表（不包含MongoDB，因为MongoDB是最高优先级）
+        """
+        try:
+            # 🔥 从数据库读取数据源配置
+            from app.core.database import get_mongo_db
+            db = get_mongo_db()
+            config_collection = db.system_configs
+
+            # 获取最新的激活配置
+            config_data = config_collection.find_one(
+                {"is_active": True},
+                sort=[("version", -1)]
+            )
+
+            if config_data and config_data.get('data_source_configs'):
+                data_source_configs = config_data.get('data_source_configs', [])
+
+                # 过滤出启用的数据源，并按优先级排序（数字越大优先级越高）
+                enabled_sources = [
+                    ds for ds in data_source_configs
+                    if ds.get('enabled', True)
+                ]
+                enabled_sources.sort(key=lambda x: x.get('priority', 0), reverse=True)
+
+                # 转换为 ChinaDataSource 枚举
+                source_mapping = {
+                    'tushare': ChinaDataSource.TUSHARE,
+                    'akshare': ChinaDataSource.AKSHARE,
+                    'baostock': ChinaDataSource.BAOSTOCK,
+                }
+
+                result = []
+                for ds in enabled_sources:
+                    ds_type = ds.get('type', '').lower()
+                    if ds_type in source_mapping:
+                        source = source_mapping[ds_type]
+                        # 排除 MongoDB（MongoDB 是最高优先级，不参与降级）
+                        if source != ChinaDataSource.MONGODB and source in self.available_sources:
+                            result.append(source)
+
+                if result:
+                    logger.info(f"✅ [数据源优先级] 从数据库读取: {[s.value for s in result]}")
+                    return result
+                else:
+                    logger.warning("⚠️ [数据源优先级] 数据库配置中没有可用的数据源，使用默认顺序")
+            else:
+                logger.warning("⚠️ [数据源优先级] 数据库中没有数据源配置，使用默认顺序")
+        except Exception as e:
+            logger.warning(f"⚠️ [数据源优先级] 从数据库读取失败: {e}，使用默认顺序")
+
+        # 🔥 回退到默认顺序（兼容性）
+        # 默认顺序：AKShare > Tushare > BaoStock
+        default_order = [
+            ChinaDataSource.AKSHARE,
+            ChinaDataSource.TUSHARE,
+            ChinaDataSource.BAOSTOCK,
+        ]
+        # 只返回可用的数据源
+        return [s for s in default_order if s in self.available_sources]
+
     def _get_default_source(self) -> ChinaDataSource:
         """获取默认数据源"""
         # 如果启用MongoDB缓存，MongoDB作为最高优先级数据源
@@ -986,14 +1051,9 @@ class DataSourceManager:
         """尝试备用数据源 - 避免递归调用"""
         logger.error(f"🔄 {self.current_source.value}失败，尝试备用数据源获取{period}数据...")
 
-        # 备用数据源优先级: AKShare > Tushare > BaoStock
+        # 🔥 从数据库获取数据源优先级顺序
         # 注意：不包含MongoDB，因为MongoDB是最高优先级，如果失败了就不再尝试
-        # TDX 已移除
-        fallback_order = [
-            ChinaDataSource.AKSHARE,
-            ChinaDataSource.TUSHARE,
-            ChinaDataSource.BAOSTOCK,
-        ]
+        fallback_order = self._get_data_source_priority_order()
 
         for source in fallback_order:
             if source != self.current_source and source in self.available_sources:
@@ -1593,11 +1653,8 @@ class DataSourceManager:
         """基本面数据降级处理"""
         logger.error(f"🔄 {self.current_source.value}失败，尝试备用数据源获取基本面...")
 
-        # 备用数据源优先级: Tushare > AKShare > 生成分析
-        fallback_order = [
-            ChinaDataSource.TUSHARE,
-            ChinaDataSource.AKSHARE,
-        ]
+        # 🔥 从数据库获取数据源优先级顺序
+        fallback_order = self._get_data_source_priority_order()
 
         for source in fallback_order:
             if source != self.current_source and source in self.available_sources:
@@ -1672,11 +1729,8 @@ class DataSourceManager:
         """新闻数据降级处理"""
         logger.error(f"🔄 {self.current_source.value}失败，尝试备用数据源获取新闻...")
 
-        # 备用数据源优先级: Tushare > AKShare
-        fallback_order = [
-            ChinaDataSource.TUSHARE,
-            ChinaDataSource.AKSHARE,
-        ]
+        # 🔥 从数据库获取数据源优先级顺序
+        fallback_order = self._get_data_source_priority_order()
 
         for source in fallback_order:
             if source != self.current_source and source in self.available_sources:
