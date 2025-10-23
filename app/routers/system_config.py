@@ -111,18 +111,39 @@ async def validate_config():
                     "display_name": provider.display_name,
                     "is_active": provider.is_active,
                     "has_api_key": False,
-                    "status": "未配置"
+                    "status": "未配置",
+                    "source": None  # 新增：标识配置来源（database/environment）
                 }
 
-                # 检查 API Key 是否有效
-                if provider.api_key and validator._is_valid_api_key(provider.api_key):
+                # 检查数据库中的 API Key 是否有效
+                db_key_valid = provider.api_key and validator._is_valid_api_key(provider.api_key)
+
+                if db_key_valid:
+                    # 数据库中有有效的 API Key
                     validation_item["has_api_key"] = True
                     validation_item["status"] = "已配置"
+                    validation_item["source"] = "database"
                 else:
-                    validation_item["status"] = "未配置或占位符"
-                    mongodb_validation["warnings"].append(
-                        f"大模型厂家 {provider.display_name} 已启用但未配置有效的 API Key"
-                    )
+                    # 数据库中没有有效的 API Key，检查环境变量
+                    import os
+                    env_key_name = f"{provider.name.upper()}_API_KEY"
+                    env_key = os.getenv(env_key_name)
+
+                    if env_key and validator._is_valid_api_key(env_key):
+                        # 环境变量中有有效的 API Key
+                        validation_item["has_api_key"] = True
+                        validation_item["status"] = "已配置（环境变量）"
+                        validation_item["source"] = "environment"
+                        # 用黄色警告提示用户可以在数据库中配置
+                        mongodb_validation["warnings"].append(
+                            f"大模型厂家 {provider.display_name} 使用环境变量配置，建议在数据库中配置以便统一管理"
+                        )
+                    else:
+                        # 数据库和环境变量都没有有效的 API Key
+                        validation_item["status"] = "未配置"
+                        mongodb_validation["warnings"].append(
+                            f"大模型厂家 {provider.display_name} 已启用但未配置有效的 API Key（数据库和环境变量中都未找到）"
+                        )
 
                 mongodb_validation["llm_providers"].append(validation_item)
 
@@ -141,21 +162,59 @@ async def validate_config():
                         "type": ds_config.type,
                         "enabled": ds_config.enabled,
                         "has_api_key": False,
-                        "status": "未配置"
+                        "status": "未配置",
+                        "source": None  # 新增：标识配置来源（database/environment）
                     }
 
                     # 某些数据源不需要 API Key（如 AKShare）
                     if ds_config.type in ["akshare", "yahoo"]:
                         validation_item["has_api_key"] = True
                         validation_item["status"] = "已配置（无需密钥）"
+                        validation_item["source"] = "builtin"
                     elif ds_config.api_key and validator._is_valid_api_key(ds_config.api_key):
+                        # 数据库中有有效的 API Key
                         validation_item["has_api_key"] = True
                         validation_item["status"] = "已配置"
+                        validation_item["source"] = "database"
                     else:
-                        validation_item["status"] = "未配置或占位符"
-                        mongodb_validation["warnings"].append(
-                            f"数据源 {ds_config.name} 已启用但未配置有效的 API Key"
-                        )
+                        # 数据库中没有有效的 API Key，检查环境变量
+                        import os
+
+                        # 根据数据源类型确定环境变量名
+                        env_key_map = {
+                            "tushare": "TUSHARE_TOKEN",
+                            "finnhub": "FINNHUB_API_KEY",
+                            "polygon": "POLYGON_API_KEY",
+                            "iex": "IEX_API_KEY",
+                            "quandl": "QUANDL_API_KEY",
+                        }
+
+                        env_key_name = env_key_map.get(ds_config.type.value if hasattr(ds_config.type, 'value') else ds_config.type)
+
+                        if env_key_name:
+                            env_key = os.getenv(env_key_name)
+
+                            if env_key and validator._is_valid_api_key(env_key):
+                                # 环境变量中有有效的 API Key
+                                validation_item["has_api_key"] = True
+                                validation_item["status"] = "已配置（环境变量）"
+                                validation_item["source"] = "environment"
+                                # 用黄色警告提示用户可以在数据库中配置
+                                mongodb_validation["warnings"].append(
+                                    f"数据源 {ds_config.name} 使用环境变量配置，建议在数据库中配置以便统一管理"
+                                )
+                            else:
+                                # 数据库和环境变量都没有有效的 API Key
+                                validation_item["status"] = "未配置"
+                                mongodb_validation["warnings"].append(
+                                    f"数据源 {ds_config.name} 已启用但未配置有效的 API Key（数据库和环境变量中都未找到）"
+                                )
+                        else:
+                            # 未知的数据源类型，无法检查环境变量
+                            validation_item["status"] = "未配置或占位符"
+                            mongodb_validation["warnings"].append(
+                                f"数据源 {ds_config.name} 已启用但未配置有效的 API Key"
+                            )
 
                     mongodb_validation["data_source_configs"].append(validation_item)
 
