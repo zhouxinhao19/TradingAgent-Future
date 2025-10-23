@@ -17,23 +17,30 @@ redis_client: Optional[redis.Redis] = None
 async def init_redis():
     """初始化Redis连接"""
     global redis_pool, redis_client
-    
+
     try:
         # 创建连接池
         redis_pool = redis.ConnectionPool.from_url(
             settings.REDIS_URL,
-            max_connections=20,
-            retry_on_timeout=True,
-            decode_responses=True
+            max_connections=settings.REDIS_MAX_CONNECTIONS,  # 使用配置文件中的值
+            retry_on_timeout=settings.REDIS_RETRY_ON_TIMEOUT,
+            decode_responses=True,
+            socket_keepalive=True,  # 启用 TCP keepalive
+            socket_keepalive_options={
+                1: 60,  # TCP_KEEPIDLE: 60秒后开始发送keepalive探测
+                2: 10,  # TCP_KEEPINTVL: 每10秒发送一次探测
+                3: 3,   # TCP_KEEPCNT: 最多发送3次探测
+            },
+            health_check_interval=30,  # 每30秒检查一次连接健康状态
         )
-        
+
         # 创建Redis客户端
         redis_client = redis.Redis(connection_pool=redis_pool)
-        
+
         # 测试连接
         await redis_client.ping()
-        logger.info("✅ Redis连接成功建立")
-        
+        logger.info(f"✅ Redis连接成功建立 (max_connections={settings.REDIS_MAX_CONNECTIONS})")
+
     except Exception as e:
         logger.error(f"❌ Redis连接失败: {e}")
         raise
