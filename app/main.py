@@ -434,36 +434,39 @@ async def lifespan(app: FastAPI):
             logger.info(f"🔍 BaoStock状态检查已配置: {settings.BAOSTOCK_STATUS_CHECK_CRON}")
 
         # 新闻数据同步任务配置（使用AKShare同步所有股票新闻）
-        if settings.NEWS_SYNC_ENABLED:
-            logger.info("🔄 配置新闻数据同步任务...")
+        logger.info("🔄 配置新闻数据同步任务...")
 
-            from app.worker.akshare_sync_service import get_akshare_sync_service
+        from app.worker.akshare_sync_service import get_akshare_sync_service
 
-            async def run_news_sync():
-                """运行新闻同步任务 - 使用AKShare同步所有股票新闻"""
-                try:
-                    logger.info("📰 开始新闻数据同步（AKShare）...")
-                    service = await get_akshare_sync_service()
-                    result = await service.sync_news_data(
-                        symbols=None,  # None表示同步所有股票
-                        max_news_per_stock=settings.NEWS_SYNC_MAX_PER_SOURCE
-                    )
-                    logger.info(
-                        f"✅ 新闻同步完成: "
-                        f"处理{result['total_processed']}只股票, "
-                        f"成功{result['success_count']}只, "
-                        f"失败{result['error_count']}只, "
-                        f"新闻总数{result['news_count']}条, "
-                        f"耗时{(datetime.utcnow() - result['start_time']).total_seconds():.2f}秒"
-                    )
-                except Exception as e:
-                    logger.error(f"❌ 新闻同步失败: {e}", exc_info=True)
+        async def run_news_sync():
+            """运行新闻同步任务 - 使用AKShare同步所有股票新闻"""
+            try:
+                logger.info("📰 开始新闻数据同步（AKShare）...")
+                service = await get_akshare_sync_service()
+                result = await service.sync_news_data(
+                    symbols=None,  # None表示同步所有股票
+                    max_news_per_stock=settings.NEWS_SYNC_MAX_PER_SOURCE
+                )
+                logger.info(
+                    f"✅ 新闻同步完成: "
+                    f"处理{result['total_processed']}只股票, "
+                    f"成功{result['success_count']}只, "
+                    f"失败{result['error_count']}只, "
+                    f"新闻总数{result['news_count']}条, "
+                    f"耗时{(datetime.utcnow() - result['start_time']).total_seconds():.2f}秒"
+                )
+            except Exception as e:
+                logger.error(f"❌ 新闻同步失败: {e}", exc_info=True)
 
-            scheduler.add_job(
-                run_news_sync,
-                CronTrigger.from_crontab(settings.NEWS_SYNC_CRON, timezone=settings.TIMEZONE),
-                id="news_sync"
-            )
+        scheduler.add_job(
+            run_news_sync,
+            CronTrigger.from_crontab(settings.NEWS_SYNC_CRON, timezone=settings.TIMEZONE),
+            id="news_sync"
+        )
+        if not settings.NEWS_SYNC_ENABLED:
+            scheduler.pause_job("news_sync")
+            logger.info(f"⏸️ 新闻数据同步已添加但暂停: {settings.NEWS_SYNC_CRON}")
+        else:
             logger.info(f"📰 新闻数据同步已配置: {settings.NEWS_SYNC_CRON}")
 
         scheduler.start()
