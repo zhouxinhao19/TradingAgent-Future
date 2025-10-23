@@ -31,6 +31,7 @@ from app.routers import sync as sync_router, multi_source_sync
 from app.routers import stocks as stocks_router
 from app.routers import stock_data as stock_data_router
 from app.routers import notifications as notifications_router
+from app.routers import websocket_notifications as websocket_notifications_router
 from app.routers import scheduler as scheduler_router
 from app.services.basics_sync_service import get_basics_sync_service
 from app.services.multi_source_basics_sync_service import MultiSourceBasicsSyncService
@@ -596,6 +597,9 @@ app.include_router(system_config_router.router, prefix="/api/system", tags=["sys
 
 # 通知模块（REST + SSE）
 app.include_router(notifications_router.router, prefix="/api", tags=["notifications"])
+
+# 🔥 WebSocket 通知模块（替代 SSE + Redis PubSub）
+app.include_router(websocket_notifications_router.router, prefix="/api", tags=["websocket"])
 
 # 定时任务管理
 app.include_router(scheduler_router.router, tags=["scheduler"])

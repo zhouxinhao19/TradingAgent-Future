@@ -48,22 +48,32 @@ class NotificationsService:
         res = await db[self.collection].insert_one(doc)
         doc_id = str(res.inserted_id)
 
-        # 发布到 Redis 频道
+        payload_to_publish = {
+            "id": doc_id,
+            "type": doc["type"],
+            "title": doc["title"],
+            "content": doc.get("content"),
+            "link": doc.get("link"),
+            "source": doc.get("source"),
+            "status": doc.get("status", "unread"),
+            "created_at": doc["created_at"].isoformat(),
+        }
+
+        # 🔥 优先使用 WebSocket 发送通知
         try:
-            r = get_redis_client()
-            payload_to_publish = {
-                "id": doc_id,
-                "type": doc["type"],
-                "title": doc["title"],
-                "content": doc.get("content"),
-                "link": doc.get("link"),
-                "source": doc.get("source"),
-                "status": doc.get("status", "unread"),
-                "created_at": doc["created_at"].isoformat(),
-            }
-            await r.publish(f"{self.channel_prefix}{payload.user_id}", json.dumps(payload_to_publish, ensure_ascii=False))
+            from app.routers.websocket_notifications import send_notification_via_websocket
+            await send_notification_via_websocket(payload.user_id, payload_to_publish)
+            logger.debug(f"✅ [WS] 通知已通过 WebSocket 发送: user={payload.user_id}")
         except Exception as e:
-            logger.warning(f"Redis 发布通知失败(忽略): {e}")
+            logger.debug(f"⚠️ [WS] WebSocket 发送失败，尝试 Redis: {e}")
+
+            # 降级到 Redis PubSub（兼容旧的 SSE 客户端）
+            try:
+                r = get_redis_client()
+                await r.publish(f"{self.channel_prefix}{payload.user_id}", json.dumps(payload_to_publish, ensure_ascii=False))
+                logger.debug(f"✅ [Redis] 通知已通过 Redis 发送: user={payload.user_id}")
+            except Exception as redis_error:
+                logger.warning(f"❌ Redis 发布通知失败(忽略): {redis_error}")
 
         # 清理策略：保留最近N天/最多M条
         try:
