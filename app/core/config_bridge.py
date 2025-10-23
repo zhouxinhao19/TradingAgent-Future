@@ -57,31 +57,19 @@ def bridge_config_to_env():
         # 🔥 修改：从数据库的 llm_providers 集合读取厂家配置，而不是从 JSON 文件
         # 只有当环境变量不存在或为占位符时，才使用数据库中的配置
         try:
-            # 使用同步方式获取厂家配置
-            import asyncio
-            try:
-                loop = asyncio.get_running_loop()
-                # 在异步上下文中，使用 run_coroutine_threadsafe
-                from concurrent.futures import ThreadPoolExecutor
-                import threading
+            # 使用同步 MongoDB 客户端读取厂家配置
+            from pymongo import MongoClient
+            from app.core.config import settings
+            from app.models.config import LLMProvider
 
-                # 创建一个新的事件循环在单独的线程中运行
-                providers = []
-                def get_providers():
-                    new_loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(new_loop)
-                    try:
-                        return new_loop.run_until_complete(config_service.get_llm_providers())
-                    finally:
-                        new_loop.close()
+            # 创建同步 MongoDB 客户端
+            client = MongoClient(settings.MONGO_URI)
+            db = client[settings.MONGO_DB]
+            providers_collection = db.llm_providers
 
-                with ThreadPoolExecutor() as executor:
-                    future = executor.submit(get_providers)
-                    providers = future.result(timeout=10)
-
-            except RuntimeError:
-                # 不在异步上下文中，直接使用 asyncio.run
-                providers = asyncio.run(config_service.get_llm_providers())
+            # 查询所有厂家配置
+            providers_data = list(providers_collection.find())
+            providers = [LLMProvider(**data) for data in providers_data]
 
             logger.info(f"  📊 从数据库读取到 {len(providers)} 个厂家配置")
 
@@ -104,6 +92,9 @@ def bridge_config_to_env():
                     bridged_count += 1
                 else:
                     logger.debug(f"  ⏭️  {env_key} 未配置有效的 API Key")
+
+            # 关闭同步客户端
+            client.close()
 
         except Exception as e:
             logger.error(f"❌ 从数据库读取厂家配置失败: {e}", exc_info=True)
@@ -152,7 +143,40 @@ def bridge_config_to_env():
 
         # 3. 桥接数据源配置（基础 API 密钥）
         # 🔧 [优先级] .env 文件 > 数据库配置
-        data_source_configs = unified_config.get_data_source_configs()
+        # 🔥 修改：从数据库的 system_configs 集合读取数据源配置，而不是从 JSON 文件
+        try:
+            # 使用同步 MongoDB 客户端读取系统配置
+            from pymongo import MongoClient
+            from app.core.config import settings
+            from app.models.config import SystemConfig
+
+            # 创建同步 MongoDB 客户端
+            client = MongoClient(settings.MONGO_URI)
+            db = client[settings.MONGO_DB]
+            config_collection = db.system_configs
+
+            # 查询最新的系统配置
+            config_data = config_collection.find_one(
+                {"is_active": True},
+                sort=[("version", -1)]
+            )
+
+            if config_data and config_data.get('data_source_configs'):
+                system_config = SystemConfig(**config_data)
+                data_source_configs = system_config.data_source_configs
+                logger.info(f"  📊 从数据库读取到 {len(data_source_configs)} 个数据源配置")
+            else:
+                logger.warning("  ⚠️  数据库中没有数据源配置，使用 JSON 文件配置")
+                data_source_configs = unified_config.get_data_source_configs()
+
+            # 关闭同步客户端
+            client.close()
+
+        except Exception as e:
+            logger.error(f"❌ 从数据库读取数据源配置失败: {e}", exc_info=True)
+            logger.warning("⚠️  将尝试从 JSON 文件读取配置作为后备方案")
+            data_source_configs = unified_config.get_data_source_configs()
+
         for ds_config in data_source_configs:
             if ds_config.enabled and ds_config.api_key:
                 # Tushare Token
