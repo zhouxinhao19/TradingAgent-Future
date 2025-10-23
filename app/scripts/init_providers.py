@@ -84,6 +84,16 @@ async def init_providers():
             "default_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
             "is_active": True,
             "supported_features": ["chat", "completion", "embedding", "function_calling", "streaming"]
+        },
+        {
+            "name": "siliconflow",
+            "display_name": "硅基流动",
+            "description": "硅基流动提供高性价比的AI推理服务，支持多种开源模型",
+            "website": "https://siliconflow.cn",
+            "api_doc_url": "https://docs.siliconflow.cn",
+            "default_base_url": "https://api.siliconflow.cn/v1",
+            "is_active": True,
+            "supported_features": ["chat", "completion", "embedding", "function_calling", "streaming"]
         }
     ]
     
