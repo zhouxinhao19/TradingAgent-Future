@@ -87,9 +87,55 @@ def _sanitize_llm_configs(items):
         return items
 
 def _sanitize_datasource_configs(items):
+    """
+    脱敏数据源配置，返回缩略的 API Key
+
+    逻辑：
+    1. 如果数据库中有有效的 API Key，返回缩略版本
+    2. 如果数据库中没有，尝试从环境变量读取并返回缩略版本
+    3. 如果都没有，返回 None
+    """
     try:
-        return [DataSourceConfig(**{**i.model_dump(), "api_key": None, "api_secret": None}) for i in items]
-    except Exception:
+        from app.utils.api_key_utils import (
+            is_valid_api_key,
+            truncate_api_key,
+            get_env_api_key_for_datasource
+        )
+
+        result = []
+        for item in items:
+            data = item.model_dump()
+
+            # 处理 API Key
+            db_key = data.get("api_key")
+            if is_valid_api_key(db_key):
+                # 数据库中有有效的 API Key，返回缩略版本
+                data["api_key"] = truncate_api_key(db_key)
+            else:
+                # 数据库中没有有效的 API Key，尝试从环境变量读取
+                ds_type = data.get("type")
+                if isinstance(ds_type, str):
+                    env_key = get_env_api_key_for_datasource(ds_type)
+                    if env_key:
+                        # 环境变量中有有效的 API Key，返回缩略版本
+                        data["api_key"] = truncate_api_key(env_key)
+                    else:
+                        data["api_key"] = None
+                else:
+                    data["api_key"] = None
+
+            # 处理 API Secret（同样的逻辑）
+            db_secret = data.get("api_secret")
+            if is_valid_api_key(db_secret):
+                data["api_secret"] = truncate_api_key(db_secret)
+            else:
+                data["api_secret"] = None
+
+            result.append(DataSourceConfig(**data))
+
+        return result
+    except Exception as e:
+        print(f"⚠️ 脱敏数据源配置失败: {e}")
         return items
 
 def _sanitize_database_configs(items):
@@ -164,32 +210,64 @@ async def get_llm_providers(
 ):
     """获取所有大模型厂家"""
     try:
+        from app.utils.api_key_utils import (
+            is_valid_api_key,
+            truncate_api_key,
+            get_env_api_key_for_provider
+        )
+
         providers = await config_service.get_llm_providers()
-        return [
-            LLMProviderResponse(
-                id=str(provider.id),
-                name=provider.name,
-                display_name=provider.display_name,
-                description=provider.description,
-                website=provider.website,
-                api_doc_url=provider.api_doc_url,
-                logo_url=provider.logo_url,
-                is_active=provider.is_active,
-                supported_features=provider.supported_features,
-                default_base_url=provider.default_base_url,
-                # 安全考虑：不返回完整API密钥，只返回前缀和状态
-                api_key=provider.api_key[:8] + "..." if provider.api_key else None,
-                api_secret=provider.api_secret[:8] + "..." if provider.api_secret else None,
-                extra_config={
-                    **provider.extra_config,
-                    "has_api_key": bool(provider.api_key),
-                    "has_api_secret": bool(provider.api_secret)
-                },
-                created_at=provider.created_at,
-                updated_at=provider.updated_at
+        result = []
+
+        for provider in providers:
+            # 处理 API Key：优先使用数据库配置，如果数据库没有则检查环境变量
+            db_key_valid = is_valid_api_key(provider.api_key)
+            if db_key_valid:
+                # 数据库中有有效的 API Key，返回缩略版本
+                api_key_display = truncate_api_key(provider.api_key)
+            else:
+                # 数据库中没有有效的 API Key，尝试从环境变量读取
+                env_key = get_env_api_key_for_provider(provider.name)
+                if env_key:
+                    # 环境变量中有有效的 API Key，返回缩略版本
+                    api_key_display = truncate_api_key(env_key)
+                else:
+                    api_key_display = None
+
+            # 处理 API Secret（同样的逻辑）
+            db_secret_valid = is_valid_api_key(provider.api_secret)
+            if db_secret_valid:
+                api_secret_display = truncate_api_key(provider.api_secret)
+            else:
+                # 注意：API Secret 通常不在环境变量中，所以这里只检查数据库
+                api_secret_display = None
+
+            result.append(
+                LLMProviderResponse(
+                    id=str(provider.id),
+                    name=provider.name,
+                    display_name=provider.display_name,
+                    description=provider.description,
+                    website=provider.website,
+                    api_doc_url=provider.api_doc_url,
+                    logo_url=provider.logo_url,
+                    is_active=provider.is_active,
+                    supported_features=provider.supported_features,
+                    default_base_url=provider.default_base_url,
+                    # 返回缩略的 API Key（前6位 + "..." + 后6位）
+                    api_key=api_key_display,
+                    api_secret=api_secret_display,
+                    extra_config={
+                        **provider.extra_config,
+                        "has_api_key": bool(api_key_display),
+                        "has_api_secret": bool(api_secret_display)
+                    },
+                    created_at=provider.created_at,
+                    updated_at=provider.updated_at
+                )
             )
-            for provider in providers
-        ]
+
+        return result
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -242,6 +320,8 @@ async def update_llm_provider(
 ):
     """更新大模型厂家"""
     try:
+        from app.utils.api_key_utils import should_skip_api_key_update
+
         update_data = request.model_dump(exclude_unset=True)
 
         # 🔥 修改：处理 API Key 的更新逻辑
@@ -250,8 +330,8 @@ async def update_llm_provider(
         # 3. 如果 API Key 是有效的完整密钥，则更新
         if 'api_key' in update_data:
             api_key = update_data.get('api_key', '')
-            # 如果是占位符或截断的密钥（包含 "..."），则不更新
-            if api_key and (api_key.startswith('your_') or api_key.startswith('your-') or '...' in api_key):
+            # 如果应该跳过更新（占位符或截断的密钥），则删除该字段
+            if should_skip_api_key_update(api_key):
                 del update_data['api_key']
             # 如果是空字符串，保留（表示清空）
             # 如果是有效的完整密钥，保留（表示更新）
@@ -259,7 +339,7 @@ async def update_llm_provider(
         if 'api_secret' in update_data:
             api_secret = update_data.get('api_secret', '')
             # 同样的逻辑处理 API Secret
-            if api_secret and (api_secret.startswith('your_') or api_secret.startswith('your-') or '...' in api_secret):
+            if should_skip_api_key_update(api_secret):
                 del update_data['api_secret']
 
         success = await config_service.update_llm_provider(provider_id, update_data)
@@ -627,20 +707,22 @@ async def add_data_source_config(
 
         # 添加新的数据源配置
         # 🔥 修改：支持保存 API Key（与大模型厂家管理逻辑一致）
+        from app.utils.api_key_utils import should_skip_api_key_update
+
         _req = request.model_dump()
 
         # 处理 API Key
         if 'api_key' in _req:
             api_key = _req.get('api_key', '')
             # 如果是占位符或截断的密钥，清空该字段
-            if api_key and (api_key.startswith('your_') or api_key.startswith('your-') or '...' in api_key):
+            if should_skip_api_key_update(api_key):
                 _req['api_key'] = ""
             # 如果是空字符串或有效的完整密钥，保留
 
         # 处理 API Secret
         if 'api_secret' in _req:
             api_secret = _req.get('api_secret', '')
-            if api_secret and (api_secret.startswith('your_') or api_secret.startswith('your-') or '...' in api_secret):
+            if should_skip_api_key_update(api_secret):
                 _req['api_secret'] = ""
 
         ds_config = DataSourceConfig(**_req)
@@ -971,6 +1053,8 @@ async def update_data_source_config(
             )
 
         # 查找并更新数据源配置
+        from app.utils.api_key_utils import should_skip_api_key_update
+
         for i, ds_config in enumerate(config.data_source_configs):
             if ds_config.name == name:
                 # 更新配置
@@ -981,7 +1065,7 @@ async def update_data_source_config(
                 if 'api_key' in _req:
                     api_key = _req.get('api_key', '')
                     # 如果是占位符或截断的密钥（包含 "..."），则不更新（保留原值）
-                    if api_key and (api_key.startswith('your_') or api_key.startswith('your-') or '...' in api_key):
+                    if should_skip_api_key_update(api_key):
                         _req['api_key'] = ds_config.api_key or ""
                     # 如果是空字符串，保留（表示清空）
                     # 如果是有效的完整密钥，保留（表示更新）
@@ -989,7 +1073,7 @@ async def update_data_source_config(
                 # 处理 API Secret
                 if 'api_secret' in _req:
                     api_secret = _req.get('api_secret', '')
-                    if api_secret and (api_secret.startswith('your_') or api_secret.startswith('your-') or '...' in api_secret):
+                    if should_skip_api_key_update(api_secret):
                         _req['api_secret'] = ds_config.api_secret or ""
 
                 updated_config = DataSourceConfig(**_req)
