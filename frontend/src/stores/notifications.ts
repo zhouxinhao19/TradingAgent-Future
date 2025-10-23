@@ -9,10 +9,20 @@ export const useNotificationStore = defineStore('notifications', () => {
   const loading = ref(false)
   const drawerVisible = ref(false)
 
-  // SSE 连接状态
+  // 🔥 WebSocket 连接状态（优先使用）
+  const ws = ref<WebSocket | null>(null)
+  const wsConnected = ref(false)
+  let wsReconnectTimer: any = null
+  let wsReconnectAttempts = 0
+  const maxReconnectAttempts = 5
+
+  // SSE 连接状态（降级方案）
   const sse = ref<EventSource | null>(null)
   const sseConnected = ref(false)
-  let reconnectTimer: any = null
+  let sseReconnectTimer: any = null
+
+  // 连接状态（WebSocket 或 SSE）
+  const connected = computed(() => wsConnected.value || sseConnected.value)
 
   const hasUnread = computed(() => unreadCount.value > 0)
 
@@ -67,6 +77,130 @@ export const useNotificationStore = defineStore('notifications', () => {
     if (item.status === 'unread') unreadCount.value += 1
   }
 
+  // 🔥 连接 WebSocket（优先）
+  function connectWebSocket() {
+    try {
+      // 若已存在连接，先关闭
+      if (ws.value) {
+        try { ws.value.close() } catch {}
+        ws.value = null
+      }
+      if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null }
+
+      const authStore = useAuthStore()
+      const token = authStore.token || localStorage.getItem('auth-token') || ''
+      if (!token) {
+        console.warn('[WS] 未找到 token，无法连接 WebSocket')
+        return
+      }
+
+      const base = (import.meta.env.VITE_API_BASE_URL || '').replace(/^https?:\/\//, '')
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      const url = `${wsProtocol}//${base}/api/ws/notifications?token=${encodeURIComponent(token)}`
+
+      console.log('[WS] 连接到:', url)
+
+      const socket = new WebSocket(url)
+      ws.value = socket
+
+      socket.onopen = () => {
+        console.log('[WS] 连接成功')
+        wsConnected.value = true
+        wsReconnectAttempts = 0
+      }
+
+      socket.onclose = (event) => {
+        console.log('[WS] 连接关闭:', event.code, event.reason)
+        wsConnected.value = false
+        ws.value = null
+
+        // 自动重连
+        if (wsReconnectAttempts < maxReconnectAttempts) {
+          const delay = Math.min(1000 * Math.pow(2, wsReconnectAttempts), 30000)
+          console.log(`[WS] ${delay}ms 后重连 (尝试 ${wsReconnectAttempts + 1}/${maxReconnectAttempts})`)
+
+          wsReconnectTimer = setTimeout(() => {
+            wsReconnectAttempts++
+            connectWebSocket()
+          }, delay)
+        } else {
+          console.warn('[WS] 达到最大重连次数，降级到 SSE')
+          connectSSE()
+        }
+      }
+
+      socket.onerror = (error) => {
+        console.error('[WS] 连接错误:', error)
+        wsConnected.value = false
+      }
+
+      socket.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data)
+          handleWebSocketMessage(message)
+        } catch (error) {
+          console.error('[WS] 解析消息失败:', error)
+        }
+      }
+    } catch (error) {
+      console.error('[WS] 连接失败:', error)
+      wsConnected.value = false
+      // 降级到 SSE
+      connectSSE()
+    }
+  }
+
+  // 处理 WebSocket 消息
+  function handleWebSocketMessage(message: any) {
+    console.log('[WS] 收到消息:', message)
+
+    switch (message.type) {
+      case 'connected':
+        console.log('[WS] 连接确认:', message.data)
+        break
+
+      case 'notification':
+        // 处理通知
+        if (message.data && message.data.title && message.data.type) {
+          addNotification({
+            id: message.data.id,
+            title: message.data.title,
+            content: message.data.content,
+            type: message.data.type,
+            link: message.data.link,
+            source: message.data.source,
+            created_at: message.data.created_at,
+            status: message.data.status || 'unread'
+          })
+        }
+        break
+
+      case 'heartbeat':
+        // 心跳消息，无需处理
+        break
+
+      default:
+        console.warn('[WS] 未知消息类型:', message.type)
+    }
+  }
+
+  // 断开 WebSocket
+  function disconnectWebSocket() {
+    if (wsReconnectTimer) {
+      clearTimeout(wsReconnectTimer)
+      wsReconnectTimer = null
+    }
+
+    if (ws.value) {
+      try { ws.value.close() } catch {}
+      ws.value = null
+    }
+
+    wsConnected.value = false
+    wsReconnectAttempts = 0
+  }
+
+  // 连接 SSE（降级方案）
   function connectSSE() {
     try {
       // 若已存在连接，先关闭
@@ -74,22 +208,28 @@ export const useNotificationStore = defineStore('notifications', () => {
         try { sse.value.close() } catch {}
         sse.value = null
       }
-      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+      if (sseReconnectTimer) { clearTimeout(sseReconnectTimer); sseReconnectTimer = null }
 
       const authStore = useAuthStore()
       const token = authStore.token || localStorage.getItem('auth-token') || ''
       const base = (import.meta.env.VITE_API_BASE_URL || '')
       const url = `${base}/api/notifications/stream${token ? `?token=${encodeURIComponent(token)}` : ''}`.replace(/\/+$/, '')
 
+      console.log('[SSE] 连接到:', url)
+
       const es = new EventSource(url)
       sse.value = es
 
-      es.onopen = () => { sseConnected.value = true }
+      es.onopen = () => {
+        console.log('[SSE] 连接成功')
+        sseConnected.value = true
+      }
       es.onerror = () => {
+        console.log('[SSE] 连接错误')
         sseConnected.value = false
         // 简单重连策略
-        if (!reconnectTimer) {
-          reconnectTimer = setTimeout(() => connectSSE(), 3000)
+        if (!sseReconnectTimer) {
+          sseReconnectTimer = setTimeout(() => connectSSE(), 3000)
         }
       }
 
@@ -117,11 +257,25 @@ export const useNotificationStore = defineStore('notifications', () => {
     }
   }
 
+  // 断开 SSE
   function disconnectSSE() {
     try { if (sse.value) sse.value.close() } catch {}
     sse.value = null
     sseConnected.value = false
-    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+    if (sseReconnectTimer) { clearTimeout(sseReconnectTimer); sseReconnectTimer = null }
+  }
+
+  // 🔥 统一连接入口（优先 WebSocket，失败降级到 SSE）
+  function connect() {
+    console.log('[Notifications] 开始连接...')
+    connectWebSocket()
+  }
+
+  // 🔥 统一断开入口
+  function disconnect() {
+    console.log('[Notifications] 断开连接...')
+    disconnectWebSocket()
+    disconnectSSE()
   }
 
   function setDrawerVisible(v: boolean) {
@@ -134,12 +288,18 @@ export const useNotificationStore = defineStore('notifications', () => {
     hasUnread,
     loading,
     drawerVisible,
+    connected,
+    wsConnected,
     sseConnected,
     refreshUnreadCount,
     loadList,
     markRead,
     markAllRead,
     addNotification,
+    connect,
+    disconnect,
+    connectWebSocket,
+    disconnectWebSocket,
     connectSSE,
     disconnectSSE,
     setDrawerVisible

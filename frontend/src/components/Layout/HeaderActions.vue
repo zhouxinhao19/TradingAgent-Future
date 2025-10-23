@@ -102,8 +102,8 @@ function go(n: any) { if (n.link) window.open(n.link, '_blank') }
 
 onMounted(() => {
   notifStore.refreshUnreadCount()
-  // 建立 SSE 连接
-  notifStore.connectSSE()
+  // 🔥 建立 WebSocket 连接（优先），失败自动降级到 SSE
+  notifStore.connect()
 
   timerCount = setInterval(() => notifStore.refreshUnreadCount(), 30000)
   watch(drawerVisible, (v) => {
@@ -117,16 +117,17 @@ onMounted(() => {
   }, { immediate: true })
   watch(filter, () => { if (drawerVisible.value) notifStore.loadList(filter.value) })
 
-  // token 变化时重连 SSE
+  // token 变化时重连
   watch(() => authStore.token, () => {
-    notifStore.connectSSE()
+    notifStore.connect()
   })
 })
 
 onUnmounted(() => {
   if (timerCount) clearInterval(timerCount)
   if (timerList) clearInterval(timerList)
-  notifStore.disconnectSSE()
+  // 🔥 断开所有连接（WebSocket 和 SSE）
+  notifStore.disconnect()
 })
 
 function showHelp() {
