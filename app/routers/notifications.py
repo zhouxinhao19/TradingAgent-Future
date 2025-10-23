@@ -4,7 +4,7 @@
 import asyncio
 import json
 import logging
-from typing import Optional
+from typing import Optional, Dict
 from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from fastapi.responses import StreamingResponse
 
@@ -16,6 +16,10 @@ from app.services.auth_service import AuthService
 
 router = APIRouter()
 logger = logging.getLogger("webapi.notifications")
+
+# 🔥 全局 SSE 连接管理器：限制每个用户只能有一个活跃的 SSE 连接
+_active_sse_connections: Dict[str, asyncio.Event] = {}
+_sse_connections_lock = asyncio.Lock()
 
 
 @router.get("/notifications")
@@ -107,10 +111,31 @@ async def notifications_stream_generator(user_id: str):
     SSE 通知流生成器
 
     注意：确保在所有情况下都正确释放 Redis PubSub 连接
+
+    🔥 连接管理策略：
+    - 每个用户只能有一个活跃的 SSE 连接
+    - 新连接到来时，旧连接会被自动关闭
+    - 这样可以防止 PubSub 连接泄漏
     """
     r = get_redis_client()
     pubsub = None
     channel = f"notifications:{user_id}"
+    disconnect_event = None
+
+    # 🔥 检查是否已有活跃连接
+    async with _sse_connections_lock:
+        if user_id in _active_sse_connections:
+            # 通知旧连接断开
+            old_event = _active_sse_connections[user_id]
+            old_event.set()
+            logger.info(f"🔄 [SSE] 用户 {user_id} 已有活跃连接，将关闭旧连接")
+            # 等待一小段时间让旧连接清理
+            await asyncio.sleep(0.1)
+
+        # 创建新的断开事件
+        disconnect_event = asyncio.Event()
+        _active_sse_connections[user_id] = disconnect_event
+        logger.info(f"✅ [SSE] 注册新连接: user={user_id}, 当前活跃连接数={len(_active_sse_connections)}")
 
     try:
         # 🔥 修复：在创建 PubSub 之前检查连接池状态
@@ -145,6 +170,11 @@ async def notifications_stream_generator(user_id: str):
         idle = 0
         message_count = 0  # 统计发送的消息数量
         while True:
+            # 🔥 检查是否需要断开（新连接到来）
+            if disconnect_event and disconnect_event.is_set():
+                logger.info(f"🔄 [SSE] 检测到新连接，关闭当前连接: user={user_id}")
+                break
+
             try:
                 msg = await asyncio.wait_for(pubsub.get_message(ignore_subscribe_messages=True), timeout=10)
                 if msg and msg.get('type') == 'message':
@@ -180,6 +210,12 @@ async def notifications_stream_generator(user_id: str):
         logger.error(f"❌ [SSE] 连接错误: {e}", exc_info=True)
         yield f"event: error\ndata: {{\"error\": \"{str(e)}\"}}\n\n"
     finally:
+        # 🔥 从连接管理器中移除
+        async with _sse_connections_lock:
+            if user_id in _active_sse_connections and _active_sse_connections[user_id] == disconnect_event:
+                del _active_sse_connections[user_id]
+                logger.info(f"🗑️ [SSE] 从连接管理器中移除: user={user_id}, 剩余活跃连接数={len(_active_sse_connections)}")
+
         # 确保在所有情况下都释放连接
         if pubsub:
             logger.info(f"🧹 [SSE] 清理 PubSub 连接: user={user_id}")
