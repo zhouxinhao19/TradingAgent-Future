@@ -101,8 +101,23 @@ async def validate_config():
                 get_env_api_key_for_provider
             )
 
-            # 验证大模型厂家配置
-            llm_providers = await config_service.get_llm_providers()
+            # 🔥 修改：直接从数据库读取原始数据，避免使用 get_llm_providers() 返回的已修改数据
+            # get_llm_providers() 会将环境变量的 Key 赋值给 provider.api_key，导致无法区分来源
+            from pymongo import MongoClient
+            from app.core.config import settings
+            from app.models.config import LLMProvider
+
+            # 创建同步 MongoDB 客户端
+            client = MongoClient(settings.MONGO_URI)
+            db = client[settings.MONGO_DB]
+            providers_collection = db.llm_providers
+
+            # 查询所有厂家配置（原始数据）
+            providers_data = list(providers_collection.find())
+            llm_providers = [LLMProvider(**data) for data in providers_data]
+
+            # 关闭同步客户端
+            client.close()
 
             logger.info(f"🔍 获取到 {len(llm_providers)} 个大模型厂家")
 
@@ -118,11 +133,11 @@ async def validate_config():
                     "has_api_key": False,
                     "status": "未配置",
                     "source": None,  # 标识配置来源（database/environment）
-                    "mongodb_configured": False,  # 新增：MongoDB 是否配置
-                    "env_configured": False  # 新增：环境变量是否配置
+                    "mongodb_configured": False,  # MongoDB 是否配置
+                    "env_configured": False  # 环境变量是否配置
                 }
 
-                # 检查数据库中的 API Key 是否有效
+                # 🔥 关键：检查数据库中的原始 API Key 是否有效
                 db_key_valid = is_valid_api_key(provider.api_key)
                 validation_item["mongodb_configured"] = db_key_valid
 
@@ -228,6 +243,11 @@ async def validate_config():
         # 合并验证结果
         logger.info(f"🔍 MongoDB 验证结果: {len(mongodb_validation['llm_providers'])} 个大模型厂家, {len(mongodb_validation['data_source_configs'])} 个数据源, {len(mongodb_validation['warnings'])} 个警告")
 
+        # 🔥 修改：只有必需配置有问题时才认为验证失败
+        # MongoDB 配置警告（推荐配置）不影响总体验证结果
+        # 只有环境变量中的必需配置缺失或无效时才显示红色错误
+        overall_success = env_result.success
+
         return {
             "success": True,
             "data": {
@@ -250,8 +270,8 @@ async def validate_config():
                 },
                 # MongoDB 配置验证结果
                 "mongodb_validation": mongodb_validation,
-                # 总体验证结果
-                "success": env_result.success and len(mongodb_validation["warnings"]) == 0
+                # 总体验证结果（只考虑必需配置）
+                "success": overall_success
             },
             "message": "配置验证完成"
         }

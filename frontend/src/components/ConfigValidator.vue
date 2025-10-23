@@ -22,26 +22,47 @@
       <div v-loading="validating" class="validator-content">
         <!-- 验证结果摘要 -->
         <div v-if="validationResult" class="validation-summary">
+          <!-- 必需配置错误（红色） -->
           <el-alert
-            :title="validationResult.success ? '配置验证通过' : '配置验证失败'"
-            :type="validationResult.success ? 'success' : 'error'"
+            v-if="!validationResult.success"
+            title="配置验证失败"
+            type="error"
             :closable="false"
             show-icon
           >
-            <template v-if="!validationResult.success">
-              <p v-if="envValidation?.missing_required?.length">
-                缺少 {{ envValidation.missing_required.length }} 个必需配置
-              </p>
-              <p v-if="envValidation?.invalid_configs?.length">
-                {{ envValidation.invalid_configs.length }} 个配置无效
-              </p>
-              <p v-if="mongodbValidation?.warnings?.length">
-                {{ mongodbValidation.warnings.length }} 个 MongoDB 配置警告
-              </p>
-            </template>
-            <template v-else>
-              <p>所有配置已正确设置</p>
-            </template>
+            <p v-if="envValidation?.missing_required?.length">
+              缺少 {{ envValidation.missing_required.length }} 个必需配置
+            </p>
+            <p v-if="envValidation?.invalid_configs?.length">
+              {{ envValidation.invalid_configs.length }} 个配置无效
+            </p>
+          </el-alert>
+
+          <!-- 推荐配置警告（黄色） -->
+          <el-alert
+            v-else-if="hasRecommendedWarnings"
+            title="配置验证通过（有推荐配置未设置）"
+            type="warning"
+            :closable="false"
+            show-icon
+          >
+            <p v-if="envValidation?.missing_recommended?.length">
+              缺少 {{ envValidation.missing_recommended.length }} 个推荐配置
+            </p>
+            <p v-if="mongodbValidation?.warnings?.length">
+              {{ mongodbValidation.warnings.length }} 个 MongoDB 配置警告
+            </p>
+          </el-alert>
+
+          <!-- 所有配置正常（绿色） -->
+          <el-alert
+            v-else
+            title="配置验证通过"
+            type="success"
+            :closable="false"
+            show-icon
+          >
+            <p>所有配置已正确设置</p>
           </el-alert>
         </div>
 
@@ -253,7 +274,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   CircleCheck,
@@ -315,6 +336,13 @@ const envValidation = ref<EnvValidationResult | null>(null)
 const mongodbValidation = ref<MongoDBValidationResult | null>(null)
 const requiredConfigs = ref<ConfigItem[]>([])
 const recommendedConfigs = ref<ConfigItem[]>([])
+
+// 计算属性：是否有推荐配置警告
+const hasRecommendedWarnings = computed(() => {
+  const hasMissingRecommended = (envValidation.value?.missing_recommended?.length ?? 0) > 0
+  const hasMongodbWarnings = (mongodbValidation.value?.warnings?.length ?? 0) > 0
+  return hasMissingRecommended || hasMongodbWarnings
+})
 
 // 方法
 const handleValidate = async () => {
