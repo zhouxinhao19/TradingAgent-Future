@@ -122,12 +122,21 @@ class HistoricalDataService:
         """标准化单条记录"""
         now = datetime.utcnow()
 
-        # 获取日期 - 优先使用索引，然后尝试从列中获取
+        # 获取日期 - 优先从列中获取，如果索引是日期类型才使用索引
         trade_date = None
-        if date_index is not None:
+
+        # 先尝试从列中获取日期
+        date_from_column = row.get('date') or row.get('trade_date')
+
+        # 如果列中有日期，优先使用列中的日期
+        if date_from_column is not None:
+            trade_date = self._format_date(date_from_column)
+        # 如果列中没有日期，且索引是日期类型，才使用索引
+        elif date_index is not None and isinstance(date_index, (date, datetime, pd.Timestamp)):
             trade_date = self._format_date(date_index)
+        # 否则使用当前日期
         else:
-            trade_date = self._format_date(row.get('date') or row.get('trade_date'))
+            trade_date = self._format_date(None)
 
         # 基础字段映射
         doc = {
