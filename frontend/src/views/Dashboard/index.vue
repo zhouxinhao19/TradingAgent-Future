@@ -473,7 +473,15 @@ const loadRecentAnalyses = async () => {
 
 const loadMarketNews = async () => {
   try {
-    const response = await newsApi.getLatestNews(undefined, 10, 24)
+    // 先尝试获取最近 24 小时的新闻
+    let response = await newsApi.getLatestNews(undefined, 10, 24)
+
+    // 如果最近 24 小时没有新闻，则获取最新的 10 条（不限时间）
+    if (response.success && response.data && response.data.news.length === 0) {
+      console.log('最近 24 小时没有新闻，获取最新的 10 条新闻（不限时间）')
+      response = await newsApi.getLatestNews(undefined, 10, 24 * 365) // 回溯 1 年
+    }
+
     if (response.success && response.data) {
       marketNews.value = response.data.news.map((item: any) => ({
         id: item.id || item.title,
