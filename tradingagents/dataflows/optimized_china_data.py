@@ -458,10 +458,11 @@ class OptimizedChinaDataProvider:
 - **分析日期**: {datetime.now(ZoneInfo(get_timezone_name())).strftime('%Y年%m月%d日')}{data_source_note}
 
 ## 💰 核心财务指标
-- **市盈率(PE)**: {financial_estimates['pe']}
-- **市净率(PB)**: {financial_estimates['pb']}
-- **净资产收益率(ROE)**: {financial_estimates['roe']}
-- **资产负债率**: {financial_estimates['debt_ratio']}
+- **市盈率(PE)**: {financial_estimates.get('pe', 'N/A')}
+- **市盈率TTM(PE_TTM)**: {financial_estimates.get('pe_ttm', 'N/A')}
+- **市净率(PB)**: {financial_estimates.get('pb', 'N/A')}
+- **净资产收益率(ROE)**: {financial_estimates.get('roe', 'N/A')}
+- **资产负债率**: {financial_estimates.get('debt_ratio', 'N/A')}
 
 ## 💡 基础评估
 - **基本面评分**: {financial_estimates['fundamental_score']}/10
@@ -489,10 +490,11 @@ class OptimizedChinaDataProvider:
 ## 💰 财务数据分析
 
 ### 估值指标
-- **市盈率(PE)**: {financial_estimates['pe']}
-- **市净率(PB)**: {financial_estimates['pb']}
-- **市销率(PS)**: {financial_estimates['ps']}
-- **股息收益率**: {financial_estimates['dividend_yield']}
+- **市盈率(PE)**: {financial_estimates.get('pe', 'N/A')}
+- **市盈率TTM(PE_TTM)**: {financial_estimates.get('pe_ttm', 'N/A')}
+- **市净率(PB)**: {financial_estimates.get('pb', 'N/A')}
+- **市销率(PS)**: {financial_estimates.get('ps', 'N/A')}
+- **股息收益率**: {financial_estimates.get('dividend_yield', 'N/A')}
 
 ### 盈利能力指标
 - **净资产收益率(ROE)**: {financial_estimates['roe']}
@@ -546,16 +548,17 @@ class OptimizedChinaDataProvider:
 ## 💰 财务数据分析
 
 ### 估值指标
-- **市盈率(PE)**: {financial_estimates['pe']}
-- **市净率(PB)**: {financial_estimates['pb']}
-- **市销率(PS)**: {financial_estimates['ps']}
-- **股息收益率**: {financial_estimates['dividend_yield']}
+- **市盈率(PE)**: {financial_estimates.get('pe', 'N/A')}
+- **市盈率TTM(PE_TTM)**: {financial_estimates.get('pe_ttm', 'N/A')}
+- **市净率(PB)**: {financial_estimates.get('pb', 'N/A')}
+- **市销率(PS)**: {financial_estimates.get('ps', 'N/A')}
+- **股息收益率**: {financial_estimates.get('dividend_yield', 'N/A')}
 
 ### 盈利能力指标
-- **净资产收益率(ROE)**: {financial_estimates['roe']}
-- **总资产收益率(ROA)**: {financial_estimates['roa']}
-- **毛利率**: {financial_estimates['gross_margin']}
-- **净利率**: {financial_estimates['net_margin']}
+- **净资产收益率(ROE)**: {financial_estimates.get('roe', 'N/A')}
+- **总资产收益率(ROA)**: {financial_estimates.get('roa', 'N/A')}
+- **毛利率**: {financial_estimates.get('gross_margin', 'N/A')}
+- **净利率**: {financial_estimates.get('net_margin', 'N/A')}
 
 ### 财务健康度
 - **资产负债率**: {financial_estimates['debt_ratio']}
@@ -947,7 +950,9 @@ class OptimizedChinaDataProvider:
                 metrics["net_margin"] = "N/A"
 
             # 计算 PE/PB - 优先使用实时计算，降级到静态数据
+            # 同时获取 PE 和 PE_TTM 两个指标
             pe_value = None
+            pe_ttm_value = None
             pb_value = None
 
             try:
@@ -970,7 +975,7 @@ class OptimizedChinaDataProvider:
                         realtime_metrics = get_pe_pb_with_fallback(stock_code, client)
 
                         if realtime_metrics:
-                            # 使用实时PE
+                            # 使用实时PE（动态市盈率）
                             pe_value = realtime_metrics.get('pe')
                             if pe_value is not None and pe_value > 0:
                                 is_realtime = realtime_metrics.get('is_realtime', False)
@@ -985,6 +990,14 @@ class OptimizedChinaDataProvider:
 
                                 logger.info(f"✅ [PE计算-第1层成功] PE={pe_value:.2f}倍 | 来源={source} | 实时={is_realtime}")
                                 logger.info(f"   └─ 计算数据: 股价={price}元, 市值={market_cap}亿元, 更新时间={updated_at}")
+
+                            # 使用实时PE_TTM（TTM市盈率）
+                            pe_ttm_value = realtime_metrics.get('pe_ttm')
+                            if pe_ttm_value is not None and pe_ttm_value > 0:
+                                is_realtime = realtime_metrics.get('is_realtime', False)
+                                realtime_tag = " (实时)" if is_realtime else ""
+                                metrics["pe_ttm"] = f"{pe_ttm_value:.1f}倍{realtime_tag}"
+                                logger.info(f"✅ [PE_TTM计算-第1层成功] PE_TTM={pe_ttm_value:.2f}倍 | 来源={source} | 实时={is_realtime}")
 
                             # 使用实时PB
                             pb_value = realtime_metrics.get('pb')
@@ -1017,12 +1030,12 @@ class OptimizedChinaDataProvider:
                             logger.warning(f"⚠️ [PE计算-第2层失败] 市值无效: {money_cap}，尝试第3层")
 
                             # 第三层降级：直接使用 latest_indicators 中的 pe 字段
-                            pe_static = latest_indicators.get('pe') or latest_indicators.get('pe_ttm')
+                            pe_static = latest_indicators.get('pe')
                             if pe_static is not None and str(pe_static) != 'nan' and pe_static != '--':
                                 try:
                                     metrics["pe"] = f"{float(pe_static):.1f}倍"
                                     logger.info(f"✅ [PE计算-第3层成功] 使用静态PE: {metrics['pe']}")
-                                    logger.info(f"   └─ 数据来源: stock_basic_info.pe 或 pe_ttm")
+                                    logger.info(f"   └─ 数据来源: stock_basic_info.pe")
                                 except (ValueError, TypeError):
                                     metrics["pe"] = "N/A"
                                     logger.error(f"❌ [PE计算-第3层失败] 静态PE格式错误: {pe_static}")
@@ -1036,18 +1049,34 @@ class OptimizedChinaDataProvider:
                     logger.warning(f"⚠️ [PE计算-第2层跳过] 净利润无效: {net_profit}，尝试第3层")
 
                     # 第三层降级：直接使用 latest_indicators 中的 pe 字段
-                    pe_static = latest_indicators.get('pe') or latest_indicators.get('pe_ttm')
+                    pe_static = latest_indicators.get('pe')
                     if pe_static is not None and str(pe_static) != 'nan' and pe_static != '--':
                         try:
                             metrics["pe"] = f"{float(pe_static):.1f}倍"
                             logger.info(f"✅ [PE计算-第3层成功] 使用静态PE: {metrics['pe']}")
-                            logger.info(f"   └─ 数据来源: stock_basic_info.pe 或 pe_ttm")
+                            logger.info(f"   └─ 数据来源: stock_basic_info.pe")
                         except (ValueError, TypeError):
                             metrics["pe"] = "N/A"
                             logger.error(f"❌ [PE计算-第3层失败] 静态PE格式错误: {pe_static}")
                     else:
                         metrics["pe"] = "N/A"
                         logger.error(f"❌ [PE计算-全部失败] 无可用PE数据")
+
+            # 如果 PE_TTM 未获取到，尝试从静态数据获取
+            if pe_ttm_value is None:
+                logger.info(f"📊 [PE_TTM计算-第2层] 尝试从静态数据获取")
+                pe_ttm_static = latest_indicators.get('pe_ttm')
+                if pe_ttm_static is not None and str(pe_ttm_static) != 'nan' and pe_ttm_static != '--':
+                    try:
+                        metrics["pe_ttm"] = f"{float(pe_ttm_static):.1f}倍"
+                        logger.info(f"✅ [PE_TTM计算-第2层成功] 使用静态PE_TTM: {metrics['pe_ttm']}")
+                        logger.info(f"   └─ 数据来源: stock_basic_info.pe_ttm")
+                    except (ValueError, TypeError):
+                        metrics["pe_ttm"] = "N/A"
+                        logger.error(f"❌ [PE_TTM计算-第2层失败] 静态PE_TTM格式错误: {pe_ttm_static}")
+                else:
+                    metrics["pe_ttm"] = "N/A"
+                    logger.warning(f"⚠️ [PE_TTM计算-全部失败] 无可用PE_TTM数据")
 
             if pb_value is None:
                 total_equity = latest_indicators.get('total_hldr_eqy_exc_min_int')
