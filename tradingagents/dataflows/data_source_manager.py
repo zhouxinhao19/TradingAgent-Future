@@ -20,14 +20,21 @@ warnings.filterwarnings('ignore')
 from tradingagents.utils.logging_init import setup_dataflow_logging
 logger = setup_dataflow_logging()
 
+# 导入统一数据源编码
+from tradingagents.constants import DataSourceCode
+
 
 class ChinaDataSource(Enum):
-    """中国股票数据源枚举"""
-    MONGODB = "mongodb"  # MongoDB数据库缓存（最高优先级）
-    TUSHARE = "tushare"
-    AKSHARE = "akshare"
-    BAOSTOCK = "baostock"
-    # TDX = "tdx"  # 已移除：通达信数据源不再支持
+    """
+    中国股票数据源枚举
+
+    注意：这个枚举与 tradingagents.constants.DataSourceCode 保持同步
+    值使用统一的数据源编码
+    """
+    MONGODB = DataSourceCode.MONGODB  # MongoDB数据库缓存（最高优先级）
+    TUSHARE = DataSourceCode.TUSHARE
+    AKSHARE = DataSourceCode.AKSHARE
+    BAOSTOCK = DataSourceCode.BAOSTOCK
 
 
 
@@ -113,11 +120,11 @@ class DataSourceManager:
                 # 按优先级排序（数字越大优先级越高）
                 enabled_sources.sort(key=lambda x: x.get('priority', 0), reverse=True)
 
-                # 转换为 ChinaDataSource 枚举
+                # 转换为 ChinaDataSource 枚举（使用统一编码）
                 source_mapping = {
-                    'tushare': ChinaDataSource.TUSHARE,
-                    'akshare': ChinaDataSource.AKSHARE,
-                    'baostock': ChinaDataSource.BAOSTOCK,
+                    DataSourceCode.TUSHARE: ChinaDataSource.TUSHARE,
+                    DataSourceCode.AKSHARE: ChinaDataSource.AKSHARE,
+                    DataSourceCode.BAOSTOCK: ChinaDataSource.BAOSTOCK,
                 }
 
                 result = []
@@ -189,14 +196,13 @@ class DataSourceManager:
             return ChinaDataSource.MONGODB
 
         # 从环境变量获取，默认使用AKShare作为第一优先级数据源
-        env_source = os.getenv('DEFAULT_CHINA_DATA_SOURCE', 'akshare').lower()
+        env_source = os.getenv('DEFAULT_CHINA_DATA_SOURCE', DataSourceCode.AKSHARE).lower()
 
-        # 映射到枚举
+        # 映射到枚举（使用统一编码）
         source_mapping = {
-            'tushare': ChinaDataSource.TUSHARE,
-            'akshare': ChinaDataSource.AKSHARE,
-            'baostock': ChinaDataSource.BAOSTOCK,
-            # 'tdx': ChinaDataSource.TDX  # 已移除：TDX不再支持
+            DataSourceCode.TUSHARE: ChinaDataSource.TUSHARE,
+            DataSourceCode.AKSHARE: ChinaDataSource.AKSHARE,
+            DataSourceCode.BAOSTOCK: ChinaDataSource.BAOSTOCK,
         }
 
         return source_mapping.get(env_source, ChinaDataSource.AKSHARE)
