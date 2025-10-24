@@ -67,13 +67,19 @@ class DataSourceManager:
         from tradingagents.config.runtime_settings import use_app_cache_enabled
         return use_app_cache_enabled()
 
-    def _get_data_source_priority_order(self) -> List[ChinaDataSource]:
+    def _get_data_source_priority_order(self, symbol: Optional[str] = None) -> List[ChinaDataSource]:
         """
         从数据库获取数据源优先级顺序（用于降级）
+
+        Args:
+            symbol: 股票代码，用于识别市场类型（A股/美股/港股）
 
         Returns:
             按优先级排序的数据源列表（不包含MongoDB，因为MongoDB是最高优先级）
         """
+        # 🔥 识别市场类型
+        market_category = self._identify_market_category(symbol)
+
         try:
             # 🔥 从数据库读取数据源配置
             from app.core.database import get_mongo_db
@@ -89,11 +95,22 @@ class DataSourceManager:
             if config_data and config_data.get('data_source_configs'):
                 data_source_configs = config_data.get('data_source_configs', [])
 
-                # 过滤出启用的数据源，并按优先级排序（数字越大优先级越高）
-                enabled_sources = [
-                    ds for ds in data_source_configs
-                    if ds.get('enabled', True)
-                ]
+                # 🔥 过滤出启用的数据源，并按市场分类过滤
+                enabled_sources = []
+                for ds in data_source_configs:
+                    if not ds.get('enabled', True):
+                        continue
+
+                    # 检查数据源是否属于当前市场分类
+                    market_categories = ds.get('market_categories', [])
+                    if market_categories and market_category:
+                        # 如果数据源配置了市场分类，只选择匹配的数据源
+                        if market_category not in market_categories:
+                            continue
+
+                    enabled_sources.append(ds)
+
+                # 按优先级排序（数字越大优先级越高）
                 enabled_sources.sort(key=lambda x: x.get('priority', 0), reverse=True)
 
                 # 转换为 ChinaDataSource 枚举
@@ -113,10 +130,10 @@ class DataSourceManager:
                             result.append(source)
 
                 if result:
-                    logger.info(f"✅ [数据源优先级] 从数据库读取: {[s.value for s in result]}")
+                    logger.info(f"✅ [数据源优先级] 市场={market_category or '全部'}, 从数据库读取: {[s.value for s in result]}")
                     return result
                 else:
-                    logger.warning("⚠️ [数据源优先级] 数据库配置中没有可用的数据源，使用默认顺序")
+                    logger.warning(f"⚠️ [数据源优先级] 市场={market_category or '全部'}, 数据库配置中没有可用的数据源，使用默认顺序")
             else:
                 logger.warning("⚠️ [数据源优先级] 数据库中没有数据源配置，使用默认顺序")
         except Exception as e:
@@ -131,6 +148,39 @@ class DataSourceManager:
         ]
         # 只返回可用的数据源
         return [s for s in default_order if s in self.available_sources]
+
+    def _identify_market_category(self, symbol: Optional[str]) -> Optional[str]:
+        """
+        识别股票代码所属的市场分类
+
+        Args:
+            symbol: 股票代码
+
+        Returns:
+            市场分类ID（a_shares/us_stocks/hk_stocks），如果无法识别则返回None
+        """
+        if not symbol:
+            return None
+
+        try:
+            from tradingagents.utils.stock_utils import StockUtils, StockMarket
+
+            market = StockUtils.identify_stock_market(symbol)
+
+            # 映射到市场分类ID
+            market_mapping = {
+                StockMarket.CHINA_A: 'a_shares',
+                StockMarket.US: 'us_stocks',
+                StockMarket.HONG_KONG: 'hk_stocks',
+            }
+
+            category = market_mapping.get(market)
+            if category:
+                logger.debug(f"🔍 [市场识别] {symbol} → {category}")
+            return category
+        except Exception as e:
+            logger.warning(f"⚠️ [市场识别] 识别失败: {e}")
+            return None
 
     def _get_default_source(self) -> ChinaDataSource:
         """获取默认数据源"""
@@ -1051,9 +1101,9 @@ class DataSourceManager:
         """尝试备用数据源 - 避免递归调用"""
         logger.error(f"🔄 {self.current_source.value}失败，尝试备用数据源获取{period}数据...")
 
-        # 🔥 从数据库获取数据源优先级顺序
+        # 🔥 从数据库获取数据源优先级顺序（根据股票代码识别市场）
         # 注意：不包含MongoDB，因为MongoDB是最高优先级，如果失败了就不再尝试
-        fallback_order = self._get_data_source_priority_order()
+        fallback_order = self._get_data_source_priority_order(symbol)
 
         for source in fallback_order:
             if source != self.current_source and source in self.available_sources:
@@ -1653,8 +1703,8 @@ class DataSourceManager:
         """基本面数据降级处理"""
         logger.error(f"🔄 {self.current_source.value}失败，尝试备用数据源获取基本面...")
 
-        # 🔥 从数据库获取数据源优先级顺序
-        fallback_order = self._get_data_source_priority_order()
+        # 🔥 从数据库获取数据源优先级顺序（根据股票代码识别市场）
+        fallback_order = self._get_data_source_priority_order(symbol)
 
         for source in fallback_order:
             if source != self.current_source and source in self.available_sources:
@@ -1729,8 +1779,8 @@ class DataSourceManager:
         """新闻数据降级处理"""
         logger.error(f"🔄 {self.current_source.value}失败，尝试备用数据源获取新闻...")
 
-        # 🔥 从数据库获取数据源优先级顺序
-        fallback_order = self._get_data_source_priority_order()
+        # 🔥 从数据库获取数据源优先级顺序（根据股票代码识别市场）
+        fallback_order = self._get_data_source_priority_order(symbol)
 
         for source in fallback_order:
             if source != self.current_source and source in self.available_sources:
