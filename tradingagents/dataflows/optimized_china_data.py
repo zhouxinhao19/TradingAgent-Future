@@ -949,6 +949,7 @@ class OptimizedChinaDataProvider:
             # 计算 PE/PB - 优先使用实时计算，降级到静态数据
             pe_value = None
             pb_value = None
+
             try:
                 # 优先使用实时计算
                 from tradingagents.dataflows.realtime_metrics import get_pe_pb_with_fallback
@@ -960,7 +961,11 @@ class OptimizedChinaDataProvider:
                     # 从symbol中提取股票代码
                     stock_code = latest_indicators.get('code') or latest_indicators.get('symbol', '').replace('.SZ', '').replace('.SH', '')
 
+                    logger.info(f"📊 [PE计算] 开始计算股票 {stock_code} 的PE/PB")
+
                     if stock_code:
+                        logger.info(f"📊 [PE计算-第1层] 尝试实时计算 PE/PB (股票代码: {stock_code})")
+
                         # 获取实时PE/PB
                         realtime_metrics = get_pe_pb_with_fallback(stock_code, client)
 
@@ -971,7 +976,15 @@ class OptimizedChinaDataProvider:
                                 is_realtime = realtime_metrics.get('is_realtime', False)
                                 realtime_tag = " (实时)" if is_realtime else ""
                                 metrics["pe"] = f"{pe_value:.1f}倍{realtime_tag}"
-                                logger.debug(f"✅ 获取PE: {metrics['pe']} [来源: {realtime_metrics.get('source')}]")
+
+                                # 详细日志
+                                price = realtime_metrics.get('price', 'N/A')
+                                market_cap = realtime_metrics.get('market_cap', 'N/A')
+                                source = realtime_metrics.get('source', 'unknown')
+                                updated_at = realtime_metrics.get('updated_at', 'N/A')
+
+                                logger.info(f"✅ [PE计算-第1层成功] PE={pe_value:.2f}倍 | 来源={source} | 实时={is_realtime}")
+                                logger.info(f"   └─ 计算数据: 股价={price}元, 市值={market_cap}亿元, 更新时间={updated_at}")
 
                             # 使用实时PB
                             pb_value = realtime_metrics.get('pb')
@@ -979,13 +992,17 @@ class OptimizedChinaDataProvider:
                                 is_realtime = realtime_metrics.get('is_realtime', False)
                                 realtime_tag = " (实时)" if is_realtime else ""
                                 metrics["pb"] = f"{pb_value:.2f}倍{realtime_tag}"
-                                logger.debug(f"✅ 获取PB: {metrics['pb']} [来源: {realtime_metrics.get('source')}]")
+                                logger.info(f"✅ [PB计算-第1层成功] PB={pb_value:.2f}倍 | 来源={realtime_metrics.get('source')} | 实时={is_realtime}")
+                        else:
+                            logger.warning(f"⚠️ [PE计算-第1层失败] 实时计算返回空结果，将尝试降级计算")
 
             except Exception as e:
-                logger.debug(f"获取实时PE/PB失败: {e}")
+                logger.warning(f"⚠️ [PE计算-第1层异常] 实时计算失败: {e}，将尝试降级计算")
 
             # 如果实时计算失败，尝试传统计算方式
             if pe_value is None:
+                logger.info(f"📊 [PE计算-第2层] 尝试使用市值/净利润计算")
+
                 net_profit = latest_indicators.get('net_profit')
                 if net_profit and net_profit > 0:
                     try:
@@ -994,31 +1011,43 @@ class OptimizedChinaDataProvider:
                         if money_cap and money_cap > 0:
                             pe_calculated = money_cap / net_profit
                             metrics["pe"] = f"{pe_calculated:.1f}倍"
-                            logger.debug(f"✅ 计算PE: 市值{money_cap} / 净利润{net_profit} = {metrics['pe']}")
+                            logger.info(f"✅ [PE计算-第2层成功] PE={pe_calculated:.2f}倍")
+                            logger.info(f"   └─ 计算公式: 市值({money_cap}万元) / 净利润({net_profit}万元)")
                         else:
+                            logger.warning(f"⚠️ [PE计算-第2层失败] 市值无效: {money_cap}，尝试第3层")
+
                             # 第三层降级：直接使用 latest_indicators 中的 pe 字段
                             pe_static = latest_indicators.get('pe') or latest_indicators.get('pe_ttm')
                             if pe_static is not None and str(pe_static) != 'nan' and pe_static != '--':
                                 try:
                                     metrics["pe"] = f"{float(pe_static):.1f}倍"
-                                    logger.debug(f"✅ 使用静态PE: {metrics['pe']}")
+                                    logger.info(f"✅ [PE计算-第3层成功] 使用静态PE: {metrics['pe']}")
+                                    logger.info(f"   └─ 数据来源: stock_basic_info.pe 或 pe_ttm")
                                 except (ValueError, TypeError):
                                     metrics["pe"] = "N/A"
+                                    logger.error(f"❌ [PE计算-第3层失败] 静态PE格式错误: {pe_static}")
                             else:
                                 metrics["pe"] = "N/A"
-                    except (ValueError, TypeError, ZeroDivisionError):
+                                logger.error(f"❌ [PE计算-全部失败] 无可用PE数据")
+                    except (ValueError, TypeError, ZeroDivisionError) as e:
                         metrics["pe"] = "N/A"
+                        logger.error(f"❌ [PE计算-第2层异常] 计算失败: {e}")
                 else:
+                    logger.warning(f"⚠️ [PE计算-第2层跳过] 净利润无效: {net_profit}，尝试第3层")
+
                     # 第三层降级：直接使用 latest_indicators 中的 pe 字段
                     pe_static = latest_indicators.get('pe') or latest_indicators.get('pe_ttm')
                     if pe_static is not None and str(pe_static) != 'nan' and pe_static != '--':
                         try:
                             metrics["pe"] = f"{float(pe_static):.1f}倍"
-                            logger.debug(f"✅ 使用静态PE: {metrics['pe']}")
+                            logger.info(f"✅ [PE计算-第3层成功] 使用静态PE: {metrics['pe']}")
+                            logger.info(f"   └─ 数据来源: stock_basic_info.pe 或 pe_ttm")
                         except (ValueError, TypeError):
                             metrics["pe"] = "N/A"
+                            logger.error(f"❌ [PE计算-第3层失败] 静态PE格式错误: {pe_static}")
                     else:
                         metrics["pe"] = "N/A"
+                        logger.error(f"❌ [PE计算-全部失败] 无可用PE数据")
 
             if pb_value is None:
                 total_equity = latest_indicators.get('total_hldr_eqy_exc_min_int')
