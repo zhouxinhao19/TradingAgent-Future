@@ -138,22 +138,25 @@ class TushareSyncService:
         
         for stock_info in batch:
             try:
-                code = stock_info["code"]
-                
-                # 检查是否需要更新
-                if not force_update:
-                    existing = await self.stock_service.get_stock_basic_info(code)
-                    if existing and self._is_data_fresh(existing.get("updated_at"), hours=24):
-                        batch_stats["skipped_count"] += 1
-                        continue
-                
-                # 转换为字典格式（如果是Pydantic模型）
+                # 🔥 先转换为字典格式（如果是Pydantic模型）
                 if hasattr(stock_info, 'model_dump'):
                     stock_data = stock_info.model_dump()
                 elif hasattr(stock_info, 'dict'):
                     stock_data = stock_info.dict()
                 else:
                     stock_data = stock_info
+
+                code = stock_data["code"]
+
+                # 检查是否需要更新
+                if not force_update:
+                    existing = await self.stock_service.get_stock_basic_info(code)
+                    if existing:
+                        # 🔥 existing 也可能是 Pydantic 模型，需要安全获取属性
+                        existing_dict = existing.model_dump() if hasattr(existing, 'model_dump') else (existing.dict() if hasattr(existing, 'dict') else existing)
+                        if self._is_data_fresh(existing_dict.get("updated_at"), hours=24):
+                            batch_stats["skipped_count"] += 1
+                            continue
 
                 # 更新到数据库
                 success = await self.stock_service.update_stock_basic_info(code, stock_data)
@@ -166,11 +169,24 @@ class TushareSyncService:
                         "error": "数据库更新失败",
                         "context": "update_stock_basic_info"
                     })
-                
+
             except Exception as e:
                 batch_stats["error_count"] += 1
+                # 🔥 安全获取 code（处理 Pydantic 模型和字典）
+                try:
+                    if hasattr(stock_info, 'code'):
+                        code = stock_info.code
+                    elif hasattr(stock_info, 'model_dump'):
+                        code = stock_info.model_dump().get("code", "unknown")
+                    elif hasattr(stock_info, 'dict'):
+                        code = stock_info.dict().get("code", "unknown")
+                    else:
+                        code = stock_info.get("code", "unknown")
+                except:
+                    code = "unknown"
+
                 batch_stats["errors"].append({
-                    "code": stock_info.get("code", "unknown"),
+                    "code": code,
                     "error": str(e),
                     "context": "_process_basic_info_batch"
                 })
@@ -685,11 +701,11 @@ class TushareSyncService:
                 "collections": {
                     "stock_basic_info": {
                         "count": basic_info_count,
-                        "latest_update": latest_basic.get("updated_at") if latest_basic else None
+                        "latest_update": latest_basic.get("updated_at") if (latest_basic and isinstance(latest_basic, dict)) else None
                     },
                     "market_quotes": {
                         "count": quotes_count,
-                        "latest_update": latest_quotes.get("updated_at") if latest_quotes else None
+                        "latest_update": latest_quotes.get("updated_at") if (latest_quotes and isinstance(latest_quotes, dict)) else None
                     }
                 },
                 "status_time": datetime.utcnow()
