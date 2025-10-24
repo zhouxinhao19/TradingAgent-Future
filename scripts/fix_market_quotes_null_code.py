@@ -21,7 +21,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from app.core.database import get_mongo_db, init_mongodb
+from app.core.database import get_mongo_db, init_database
 
 # 配置日志
 logging.basicConfig(
@@ -116,7 +116,7 @@ async def main():
 
     # 0. 初始化数据库连接
     logger.info("📡 初始化数据库连接...")
-    await init_mongodb()
+    await init_database()
     logger.info("✅ 数据库连接成功")
 
     # 1. 检查索引
