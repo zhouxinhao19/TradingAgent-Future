@@ -14,6 +14,7 @@
 
 import asyncio
 import sys
+import logging
 from pathlib import Path
 
 # 添加项目根目录到 Python 路径
@@ -21,9 +22,14 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from app.core.database import get_mongo_db
-from app.core.logging_config import setup_logging
 
-logger = setup_logging()
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)-8s | %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 
 async def fix_null_code_records():
