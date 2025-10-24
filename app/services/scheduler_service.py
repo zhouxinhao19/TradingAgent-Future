@@ -125,6 +125,8 @@ class SchedulerService:
         """
         手动触发任务执行
 
+        注意：如果任务处于暂停状态，会先临时恢复任务，执行一次后不会自动暂停
+
         Args:
             job_id: 任务ID
 
@@ -137,17 +139,28 @@ class SchedulerService:
                 logger.error(f"❌ 任务 {job_id} 不存在")
                 return False
 
+            # 检查任务是否被暂停（next_run_time 为 None 表示暂停）
+            was_paused = job.next_run_time is None
+            if was_paused:
+                logger.warning(f"⚠️ 任务 {job_id} 处于暂停状态，临时恢复以执行一次")
+                self.scheduler.resume_job(job_id)
+                # 重新获取 job 对象（恢复后状态已改变）
+                job = self.scheduler.get_job(job_id)
+                logger.info(f"✅ 任务 {job_id} 已临时恢复")
+
             # 手动触发任务 - 使用带时区的当前时间
             from datetime import timezone
             now = datetime.now(timezone.utc)
             job.modify(next_run_time=now)
-            logger.info(f"🚀 手动触发任务 {job_id} (next_run_time={now})")
+            logger.info(f"🚀 手动触发任务 {job_id} (next_run_time={now}, was_paused={was_paused})")
 
             # 记录操作历史
-            await self._record_job_action(job_id, "trigger", "success")
+            await self._record_job_action(job_id, "trigger", "success", f"手动触发执行 (暂停状态: {was_paused})")
             return True
         except Exception as e:
             logger.error(f"❌ 触发任务 {job_id} 失败: {e}")
+            import traceback
+            logger.error(f"详细错误: {traceback.format_exc()}")
             await self._record_job_action(job_id, "trigger", "failed", str(e))
             return False
     

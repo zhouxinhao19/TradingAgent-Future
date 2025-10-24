@@ -100,7 +100,7 @@ class FinancialDataSyncService:
         if data_sources is None:
             data_sources = ["tushare", "akshare", "baostock"]
         if report_types is None:
-            report_types = ["quarterly"]
+            report_types = ["quarterly", "annual"]  # 同时同步季报和年报
         
         logger.info(f"🔄 开始财务数据同步: 数据源={data_sources}, 报告类型={report_types}")
         
@@ -249,15 +249,21 @@ class FinancialDataSyncService:
         """获取股票代码列表"""
         try:
             cursor = self.db.stock_basic_info.find(
-                {"market_info.market": "CN"},
+                {
+                    "$or": [
+                        {"market_info.market": "CN"},  # 新数据结构
+                        {"category": "stock_cn"},      # 旧数据结构
+                        {"market": {"$in": ["主板", "创业板", "科创板", "北交所"]}}  # 按市场类型
+                    ]
+                },
                 {"code": 1}
             )
-            
+
             symbols = [doc["code"] async for doc in cursor]
-            logger.info(f"📋 获取到 {len(symbols)} 只股票代码")
-            
+            logger.info(f"📋 从 stock_basic_info 获取到 {len(symbols)} 只股票代码")
+
             return symbols
-            
+
         except Exception as e:
             logger.error(f"❌ 获取股票代码列表失败: {e}")
             return []

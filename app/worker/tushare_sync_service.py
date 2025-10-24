@@ -448,39 +448,59 @@ class TushareSyncService:
         try:
             # 1. 获取股票列表
             if symbols is None:
+                # 查询所有A股股票（兼容不同的数据结构）
+                # 优先使用 market_info.market，降级到 category 字段
                 cursor = self.db.stock_basic_info.find(
-                    {"market_info.market": "CN"},
+                    {
+                        "$or": [
+                            {"market_info.market": "CN"},  # 新数据结构
+                            {"category": "stock_cn"},      # 旧数据结构
+                            {"market": {"$in": ["主板", "创业板", "科创板", "北交所"]}}  # 按市场类型
+                        ]
+                    },
                     {"code": 1}
                 )
                 symbols = [doc["code"] async for doc in cursor]
+                logger.info(f"📋 从 stock_basic_info 获取到 {len(symbols)} 只股票")
 
             stats["total_processed"] = len(symbols)
 
-            # 2. 确定日期范围
-            if not start_date:
-                if all_history:
-                    # 全历史同步：从1990年开始
-                    start_date = "1990-01-01"
-                elif incremental:
-                    # 增量同步：从最后更新日期开始
-                    start_date = await self._get_last_sync_date()
-                else:
-                    # 默认同步：从一年前开始
-                    start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
-
+            # 2. 确定全局结束日期
             if not end_date:
                 end_date = datetime.now().strftime('%Y-%m-%d')
 
-            logger.info(f"📊 历史数据同步范围: {start_date} 到 {end_date}, 股票数量: {len(symbols)}")
+            # 3. 确定全局起始日期（仅用于日志显示）
+            global_start_date = start_date
+            if not global_start_date:
+                if all_history:
+                    global_start_date = "1990-01-01"
+                elif incremental:
+                    global_start_date = "各股票最后日期"
+                else:
+                    global_start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
 
-            # 3. 批量处理
+            logger.info(f"📊 历史数据同步: 结束日期={end_date}, 股票数量={len(symbols)}, 模式={'增量' if incremental else '全量'}")
+
+            # 4. 批量处理
             for i, symbol in enumerate(symbols):
                 try:
                     # 速率限制
                     await self.rate_limiter.acquire()
 
+                    # 确定该股票的起始日期
+                    symbol_start_date = start_date
+                    if not symbol_start_date:
+                        if all_history:
+                            symbol_start_date = "1990-01-01"
+                        elif incremental:
+                            # 增量同步：获取该股票的最后日期
+                            symbol_start_date = await self._get_last_sync_date(symbol)
+                            logger.debug(f"📅 {symbol}: 从 {symbol_start_date} 开始同步")
+                        else:
+                            symbol_start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+
                     # 获取历史数据（指定周期）
-                    df = await self.provider.get_historical_data(symbol, start_date, end_date, period=period)
+                    df = await self.provider.get_historical_data(symbol, symbol_start_date, end_date, period=period)
 
                     if df is not None and not df.empty:
                         # 保存到数据库（指定周期）
@@ -550,7 +570,15 @@ class TushareSyncService:
             return 0
 
     async def _get_last_sync_date(self, symbol: str = None) -> str:
-        """获取最后同步日期"""
+        """
+        获取最后同步日期
+
+        Args:
+            symbol: 股票代码，如果提供则返回该股票的最后日期+1天
+
+        Returns:
+            日期字符串 (YYYY-MM-DD)
+        """
         try:
             if self.historical_service is None:
                 self.historical_service = await get_historical_data_service()
@@ -559,20 +587,34 @@ class TushareSyncService:
                 # 获取特定股票的最新日期
                 latest_date = await self.historical_service.get_latest_date(symbol, "tushare")
                 if latest_date:
-                    return latest_date
+                    # 返回最后日期的下一天（避免重复同步）
+                    try:
+                        last_date_obj = datetime.strptime(latest_date, '%Y-%m-%d')
+                        next_date = last_date_obj + timedelta(days=1)
+                        return next_date.strftime('%Y-%m-%d')
+                    except:
+                        # 如果日期格式不对，直接返回
+                        return latest_date
 
-            # 默认返回7天前
-            return (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+            # 默认返回30天前（确保不漏数据）
+            return (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
 
         except Exception as e:
-            logger.error(f"❌ 获取最后同步日期失败: {e}")
-            return (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+            logger.error(f"❌ 获取最后同步日期失败 {symbol}: {e}")
+            # 出错时返回30天前，确保不漏数据
+            return (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
 
     # ==================== 财务数据同步 ====================
 
-    async def sync_financial_data(self, symbols: List[str] = None) -> Dict[str, Any]:
-        """同步财务数据"""
-        logger.info("🔄 开始同步财务数据...")
+    async def sync_financial_data(self, symbols: List[str] = None, limit: int = 20) -> Dict[str, Any]:
+        """
+        同步财务数据
+
+        Args:
+            symbols: 股票代码列表，None表示同步所有股票
+            limit: 获取财报期数，默认20期（约5年数据）
+        """
+        logger.info(f"🔄 开始同步财务数据 (获取最近 {limit} 期)...")
 
         stats = {
             "total_processed": 0,
@@ -586,10 +628,17 @@ class TushareSyncService:
             # 获取股票列表
             if symbols is None:
                 cursor = self.db.stock_basic_info.find(
-                    {"market_info.market": "CN"},
+                    {
+                        "$or": [
+                            {"market_info.market": "CN"},  # 新数据结构
+                            {"category": "stock_cn"},      # 旧数据结构
+                            {"market": {"$in": ["主板", "创业板", "科创板", "北交所"]}}  # 按市场类型
+                        ]
+                    },
                     {"code": 1}
                 )
                 symbols = [doc["code"] async for doc in cursor]
+                logger.info(f"📋 从 stock_basic_info 获取到 {len(symbols)} 只股票")
 
             stats["total_processed"] = len(symbols)
             logger.info(f"📊 需要同步 {len(symbols)} 只股票财务数据")
@@ -600,7 +649,8 @@ class TushareSyncService:
                     # 速率限制
                     await self.rate_limiter.acquire()
 
-                    financial_data = await self.provider.get_financial_data(symbol)
+                    # 获取财务数据（指定获取期数）
+                    financial_data = await self.provider.get_financial_data(symbol, limit=limit)
 
                     if financial_data:
                         # 保存财务数据
@@ -890,21 +940,25 @@ async def run_tushare_quotes_sync():
 
 async def run_tushare_historical_sync(incremental: bool = True):
     """APScheduler任务：同步历史数据"""
+    logger.info(f"🚀 [APScheduler] 开始执行 Tushare 历史数据同步任务 (incremental={incremental})")
     try:
         service = await get_tushare_sync_service()
+        logger.info(f"✅ [APScheduler] Tushare 同步服务已初始化")
         result = await service.sync_historical_data(incremental=incremental)
-        logger.info(f"✅ Tushare历史数据同步完成: {result}")
+        logger.info(f"✅ [APScheduler] Tushare历史数据同步完成: {result}")
         return result
     except Exception as e:
-        logger.error(f"❌ Tushare历史数据同步失败: {e}")
+        logger.error(f"❌ [APScheduler] Tushare历史数据同步失败: {e}")
+        import traceback
+        logger.error(f"详细错误: {traceback.format_exc()}")
         raise
 
 
 async def run_tushare_financial_sync():
-    """APScheduler任务：同步财务数据"""
+    """APScheduler任务：同步财务数据（获取最近20期，约5年）"""
     try:
         service = await get_tushare_sync_service()
-        result = await service.sync_financial_data()
+        result = await service.sync_financial_data(limit=20)  # 获取最近20期（约5年数据）
         logger.info(f"✅ Tushare财务数据同步完成: {result}")
         return result
     except Exception as e:

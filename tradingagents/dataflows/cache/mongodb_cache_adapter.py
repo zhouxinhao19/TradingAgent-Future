@@ -65,10 +65,72 @@ class MongoDBCacheAdapter:
             logger.warning(f"⚠️ 获取基础信息失败: {e}")
             return None
     
+    def _get_data_source_priority(self, symbol: str) -> list:
+        """
+        获取数据源优先级顺序
+
+        Args:
+            symbol: 股票代码
+
+        Returns:
+            按优先级排序的数据源列表，例如: ["tushare", "akshare", "baostock"]
+        """
+        try:
+            # 1. 识别市场分类
+            from tradingagents.utils.stock_utils import StockUtils, StockMarket
+            market = StockUtils.identify_stock_market(symbol)
+
+            market_mapping = {
+                StockMarket.CHINA_A: 'a_shares',
+                StockMarket.US: 'us_stocks',
+                StockMarket.HONG_KONG: 'hk_stocks',
+            }
+            market_category = market_mapping.get(market)
+
+            # 2. 从数据库读取配置
+            if self.db is not None:
+                config_collection = self.db.system_configs
+                config_data = config_collection.find_one(
+                    {"is_active": True},
+                    sort=[("version", -1)]
+                )
+
+                if config_data and config_data.get('data_source_configs'):
+                    configs = config_data['data_source_configs']
+
+                    # 3. 过滤启用的数据源
+                    enabled = []
+                    for ds in configs:
+                        if not ds.get('enabled', True):
+                            continue
+
+                        # 检查市场分类
+                        categories = ds.get('market_categories', [])
+                        if categories and market_category:
+                            if market_category not in categories:
+                                continue
+
+                        enabled.append(ds)
+
+                    # 4. 按优先级排序（数字越大优先级越高）
+                    enabled.sort(key=lambda x: x.get('priority', 0), reverse=True)
+
+                    # 5. 返回数据源类型列表
+                    result = [ds.get('type', '').lower() for ds in enabled if ds.get('type')]
+                    if result:
+                        logger.debug(f"📊 [数据源优先级] {symbol} ({market_category}): {result}")
+                        return result
+
+        except Exception as e:
+            logger.warning(f"⚠️ 获取数据源优先级失败: {e}")
+
+        # 默认顺序：Tushare > AKShare > BaoStock
+        return ['tushare', 'akshare', 'baostock']
+
     def get_historical_data(self, symbol: str, start_date: str = None, end_date: str = None,
                           period: str = "daily") -> Optional[pd.DataFrame]:
         """
-        获取历史数据，支持多周期
+        获取历史数据，支持多周期，按数据源优先级查询
 
         Args:
             symbol: 股票代码
@@ -86,57 +148,76 @@ class MongoDBCacheAdapter:
             code6 = str(symbol).zfill(6)
             collection = self.db.stock_daily_quotes
 
-            # 构建查询条件
-            query = {"symbol": code6, "period": period}
+            # 获取数据源优先级
+            priority_order = self._get_data_source_priority(symbol)
 
-            if start_date:
-                query["trade_date"] = {"$gte": start_date}
-            if end_date:
-                if "trade_date" in query:
-                    query["trade_date"]["$lte"] = end_date
-                else:
-                    query["trade_date"] = {"$lte": end_date}
+            # 按优先级查询
+            for data_source in priority_order:
+                # 构建查询条件
+                query = {
+                    "symbol": code6,
+                    "period": period,
+                    "data_source": data_source  # 指定数据源
+                }
 
-            # 查询数据
-            cursor = collection.find(query, {"_id": 0}).sort("trade_date", 1)
-            data = list(cursor)
+                if start_date:
+                    query["trade_date"] = {"$gte": start_date}
+                if end_date:
+                    if "trade_date" in query:
+                        query["trade_date"]["$lte"] = end_date
+                    else:
+                        query["trade_date"] = {"$lte": end_date}
 
-            if data:
-                df = pd.DataFrame(data)
-                logger.debug(f"✅ [数据来源: MongoDB-{period}数据] 从MongoDB获取历史数据: {symbol}, 记录数: {len(df)}")
-                return df
-            else:
-                logger.debug(f"📊 [数据来源: MongoDB-{period}数据] MongoDB中未找到历史数据: {symbol}")
-                return None
-                
+                # 查询数据
+                cursor = collection.find(query, {"_id": 0}).sort("trade_date", 1)
+                data = list(cursor)
+
+                if data:
+                    df = pd.DataFrame(data)
+                    logger.info(f"✅ [数据来源: MongoDB-{data_source}] {symbol}, {len(df)}条记录 (period={period})")
+                    return df
+
+            # 所有数据源都没有数据
+            logger.debug(f"📊 [数据来源: MongoDB] 所有数据源都没有{period}数据: {symbol}")
+            return None
+
         except Exception as e:
             logger.warning(f"⚠️ 获取历史数据失败: {e}")
             return None
     
     def get_financial_data(self, symbol: str, report_period: str = None) -> Optional[Dict[str, Any]]:
-        """获取财务数据"""
+        """获取财务数据，按数据源优先级查询"""
         if not self.use_app_cache or self.db is None:
             return None
 
         try:
             code6 = str(symbol).zfill(6)
-            collection = self.db.stock_financial_data  # 修正集合名称
+            collection = self.db.stock_financial_data
 
-            # 构建查询条件 - 使用 code 字段而不是 symbol
-            query = {"code": code6}
-            if report_period:
-                query["report_period"] = report_period
+            # 获取数据源优先级
+            priority_order = self._get_data_source_priority(symbol)
 
-            # 获取最新的财务数据
-            doc = collection.find_one(query, {"_id": 0}, sort=[("report_period", -1)])
+            # 按优先级查询
+            for data_source in priority_order:
+                # 构建查询条件
+                query = {
+                    "code": code6,
+                    "data_source": data_source  # 指定数据源
+                }
+                if report_period:
+                    query["report_period"] = report_period
 
-            if doc:
-                logger.info(f"✅ [财务数据] 从 stock_financial_data 集合获取{symbol}财务数据")
-                logger.debug(f"📊 [财务数据] 成功提取{symbol}的财务数据，包含字段: {list(doc.keys())}")
-                return doc
-            else:
-                logger.debug(f"📊 [数据来源: MongoDB-财务数据] MongoDB中未找到财务数据: {symbol}")
-                return None
+                # 获取最新的财务数据
+                doc = collection.find_one(query, {"_id": 0}, sort=[("report_period", -1)])
+
+                if doc:
+                    logger.info(f"✅ [数据来源: MongoDB-{data_source}] {symbol}财务数据")
+                    logger.debug(f"📊 [财务数据] 成功提取{symbol}的财务数据，包含字段: {list(doc.keys())}")
+                    return doc
+
+            # 所有数据源都没有数据
+            logger.debug(f"📊 [数据来源: MongoDB] 所有数据源都没有财务数据: {symbol}")
+            return None
 
         except Exception as e:
             logger.warning(f"⚠️ [数据来源: MongoDB-财务数据] 获取财务数据失败: {e}")
