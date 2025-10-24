@@ -203,6 +203,14 @@ class Settings(BaseSettings):
     AKSHARE_INIT_BATCH_SIZE: int = Field(default=100, ge=10, le=1000, description="初始化批处理大小")
     AKSHARE_INIT_AUTO_START: bool = Field(default=False, description="应用启动时自动检查并初始化数据")
 
+    # ==================== 分析师数据获取配置 ====================
+
+    # 市场分析师数据范围配置
+    MARKET_ANALYST_LOOKBACK_DAYS: int = Field(default=30, ge=5, le=365, description="市场分析回溯天数（用于技术分析）")
+
+    # 基本面分析师数据范围配置
+    FUNDAMENTALS_ANALYST_LOOKBACK_DAYS: int = Field(default=2, ge=1, le=30, description="基本面分析回溯天数（仅需当前价格）")
+
     # ==================== BaoStock统一数据同步配置 ====================
 
     # BaoStock统一数据同步总开关

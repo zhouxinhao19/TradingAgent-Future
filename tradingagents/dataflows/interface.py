@@ -1194,16 +1194,27 @@ def get_china_stock_data_unified(
     Returns:
         str: 格式化的股票数据报告
     """
-    # 🔧 智能日期范围处理：自动扩展到最近10天，处理周末/节假日
+    # 🔧 智能日期范围处理：自动扩展到配置的回溯天数，处理周末/节假日
     from tradingagents.utils.dataflow_utils import get_trading_date_range
+    from app.core.config import get_settings
+
     original_start_date = start_date
     original_end_date = end_date
 
-    # 使用 end_date 作为目标日期，向前回溯10天
-    start_date, end_date = get_trading_date_range(end_date, lookback_days=10)
+    # 从配置获取市场分析回溯天数（默认30天）
+    try:
+        settings = get_settings()
+        lookback_days = settings.MARKET_ANALYST_LOOKBACK_DAYS
+        logger.info(f"📅 [配置] 市场分析回溯天数: {lookback_days}天")
+    except Exception as e:
+        lookback_days = 30  # 默认30天
+        logger.warning(f"⚠️ [配置] 无法获取配置，使用默认值: {lookback_days}天, 错误: {e}")
+
+    # 使用 end_date 作为目标日期，向前回溯指定天数
+    start_date, end_date = get_trading_date_range(end_date, lookback_days=lookback_days)
 
     logger.info(f"📅 [智能日期] 原始日期范围: {original_start_date} 至 {original_end_date}")
-    logger.info(f"📅 [智能日期] 调整后范围: {start_date} 至 {end_date} (回溯10天)")
+    logger.info(f"📅 [智能日期] 调整后范围: {start_date} 至 {end_date} (回溯{lookback_days}天)")
     logger.info(f"💡 [智能日期] 说明: 自动扩展日期范围以处理周末、节假日和数据延迟")
 
     # 记录详细的输入参数
