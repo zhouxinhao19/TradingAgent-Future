@@ -15,7 +15,7 @@ AKShare统一数据源集成方案是TradingAgents-CN系统的第二个主要数
 
 ### 🔄 数据同步功能
 - **股票基础信息同步**: 每日凌晨3点自动同步
-- **实时行情同步**: 交易时间每10分钟同步
+- **实时行情同步**: 交易时间每30分钟同步（避免频率限制）
 - **历史数据同步**: 工作日17点同步
 - **财务数据同步**: 周日凌晨4点同步
 - **状态检查**: 每小时30分进行健康检查
@@ -82,9 +82,9 @@ AKSHARE_UNIFIED_ENABLED=true
 AKSHARE_BASIC_INFO_SYNC_ENABLED=true
 AKSHARE_BASIC_INFO_SYNC_CRON="0 3 * * *"
 
-# 实时行情同步 (交易时间每10分钟)
+# 实时行情同步 (交易时间每30分钟，避免频率限制)
 AKSHARE_QUOTES_SYNC_ENABLED=true
-AKSHARE_QUOTES_SYNC_CRON="*/10 9-15 * * 1-5"
+AKSHARE_QUOTES_SYNC_CRON="*/30 9-15 * * 1-5"
 
 # 历史数据同步 (工作日17点)
 AKSHARE_HISTORICAL_SYNC_ENABLED=true

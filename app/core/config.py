@@ -190,7 +190,7 @@ class Settings(BaseSettings):
     AKSHARE_BASIC_INFO_SYNC_ENABLED: bool = Field(default=True, description="启用基础信息同步")
     AKSHARE_BASIC_INFO_SYNC_CRON: str = Field(default="0 3 * * *", description="基础信息同步CRON表达式")  # 每日凌晨3点
     AKSHARE_QUOTES_SYNC_ENABLED: bool = Field(default=True, description="启用行情同步")
-    AKSHARE_QUOTES_SYNC_CRON: str = Field(default="*/10 9-15 * * 1-5", description="行情同步CRON表达式")  # 交易时间每10分钟
+    AKSHARE_QUOTES_SYNC_CRON: str = Field(default="*/30 9-15 * * 1-5", description="行情同步CRON表达式")  # 交易时间每30分钟（避免频率限制）
     AKSHARE_HISTORICAL_SYNC_ENABLED: bool = Field(default=True, description="启用历史数据同步")
     AKSHARE_HISTORICAL_SYNC_CRON: str = Field(default="0 17 * * 1-5", description="历史数据同步CRON表达式")  # 工作日17点
     AKSHARE_FINANCIAL_SYNC_ENABLED: bool = Field(default=True, description="启用财务数据同步")
