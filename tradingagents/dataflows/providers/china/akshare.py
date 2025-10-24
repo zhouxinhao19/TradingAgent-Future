@@ -342,32 +342,148 @@ class AKShareProvider(BaseStockDataProvider):
                 "timezone": "Asia/Shanghai"
             }
     
+    async def get_batch_stock_quotes(self, codes: List[str]) -> Dict[str, Dict[str, Any]]:
+        """
+        批量获取股票实时行情（优化版：一次获取全市场快照）
+
+        优先使用新浪财经接口（更稳定），失败时回退到东方财富接口
+
+        Args:
+            codes: 股票代码列表
+
+        Returns:
+            股票代码到行情数据的映射字典
+        """
+        if not self.connected:
+            return {}
+
+        # 重试逻辑
+        max_retries = 2
+        retry_delay = 1  # 秒
+
+        for attempt in range(max_retries):
+            try:
+                logger.debug(f"📊 批量获取 {len(codes)} 只股票的实时行情... (尝试 {attempt + 1}/{max_retries})")
+
+                # 优先使用新浪财经接口（更稳定，不容易被封）
+                def fetch_spot_data_sina():
+                    import time
+                    time.sleep(0.3)  # 添加延迟避免频率限制
+                    return self.ak.stock_zh_a_spot()
+
+                try:
+                    spot_df = await asyncio.to_thread(fetch_spot_data_sina)
+                    data_source = "sina"
+                    logger.debug("✅ 使用新浪财经接口获取数据")
+                except Exception as e:
+                    logger.warning(f"⚠️ 新浪财经接口失败: {e}，尝试东方财富接口...")
+                    # 回退到东方财富接口
+                    def fetch_spot_data_em():
+                        import time
+                        time.sleep(0.5)
+                        return self.ak.stock_zh_a_spot_em()
+                    spot_df = await asyncio.to_thread(fetch_spot_data_em)
+                    data_source = "eastmoney"
+                    logger.debug("✅ 使用东方财富接口获取数据")
+
+                if spot_df is None or spot_df.empty:
+                    logger.warning("⚠️ 全市场快照为空")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(retry_delay)
+                        continue
+                    return {}
+
+                # 构建代码到行情的映射
+                quotes_map = {}
+                codes_set = set(codes)
+
+                for _, row in spot_df.iterrows():
+                    code = str(row.get("代码", ""))
+                    if code in codes_set:
+                        quotes_data = {
+                            "name": str(row.get("名称", f"股票{code}")),
+                            "price": self._safe_float(row.get("最新价", 0)),
+                            "change": self._safe_float(row.get("涨跌额", 0)),
+                            "change_percent": self._safe_float(row.get("涨跌幅", 0)),
+                            "volume": self._safe_int(row.get("成交量", 0)),
+                            "amount": self._safe_float(row.get("成交额", 0)),
+                            "open": self._safe_float(row.get("今开", 0)),
+                            "high": self._safe_float(row.get("最高", 0)),
+                            "low": self._safe_float(row.get("最低", 0)),
+                            "pre_close": self._safe_float(row.get("昨收", 0))
+                        }
+
+                        # 转换为标准化字典
+                        quotes_map[code] = {
+                            "code": code,
+                            "symbol": code,
+                            "name": quotes_data.get("name", f"股票{code}"),
+                            "price": float(quotes_data.get("price", 0)),
+                            "change": float(quotes_data.get("change", 0)),
+                            "change_percent": float(quotes_data.get("change_percent", 0)),
+                            "volume": int(quotes_data.get("volume", 0)),
+                            "amount": float(quotes_data.get("amount", 0)),
+                            "open_price": float(quotes_data.get("open", 0)),
+                            "high_price": float(quotes_data.get("high", 0)),
+                            "low_price": float(quotes_data.get("low", 0)),
+                            "pre_close": float(quotes_data.get("pre_close", 0)),
+                            # 扩展字段
+                            "full_symbol": self._get_full_symbol(code),
+                            "market_info": self._get_market_info(code),
+                            "data_source": "akshare",
+                            "last_sync": datetime.now(timezone.utc),
+                            "sync_status": "success"
+                        }
+
+                found_count = len(quotes_map)
+                missing_count = len(codes) - found_count
+                logger.debug(f"✅ 批量获取完成: 找到 {found_count} 只, 未找到 {missing_count} 只")
+
+                # 记录未找到的股票
+                if missing_count > 0:
+                    missing_codes = codes_set - set(quotes_map.keys())
+                    if missing_count <= 10:
+                        logger.debug(f"⚠️ 未找到行情的股票: {list(missing_codes)}")
+                    else:
+                        logger.debug(f"⚠️ 未找到行情的股票: {list(missing_codes)[:10]}... (共{missing_count}只)")
+
+                return quotes_map
+
+            except Exception as e:
+                logger.warning(f"⚠️ 批量获取实时行情失败 (尝试 {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                else:
+                    logger.error(f"❌ 批量获取实时行情失败，已达最大重试次数: {e}")
+                    return {}
+
     async def get_stock_quotes(self, code: str) -> Optional[Dict[str, Any]]:
         """
         获取股票实时行情
-        
+
         Args:
             code: 股票代码
-            
+
         Returns:
             标准化的行情数据
         """
         if not self.connected:
             return None
-        
+
         try:
             logger.debug(f"📈 获取{code}实时行情...")
-            
+
             # 获取实时行情数据
             quotes_data = await self._get_realtime_quotes_data(code)
-            
+
             if not quotes_data:
                 logger.warning(f"⚠️ 未找到{code}的行情数据")
                 return None
-            
+
             # 转换为标准化字典
             quotes = {
                 "code": code,
+                "symbol": code,
                 "name": quotes_data.get("name", f"股票{code}"),
                 "price": float(quotes_data.get("price", 0)),
                 "change": float(quotes_data.get("change", 0)),
@@ -385,10 +501,10 @@ class AKShareProvider(BaseStockDataProvider):
                 "last_sync": datetime.now(timezone.utc),
                 "sync_status": "success"
             }
-            
+
             logger.debug(f"✅ {code}实时行情获取成功")
             return quotes
-            
+
         except Exception as e:
             logger.error(f"❌ 获取{code}实时行情失败: {e}")
             return None

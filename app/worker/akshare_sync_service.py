@@ -296,39 +296,104 @@ class AKShareSyncService:
             return stats
     
     async def _process_quotes_batch(self, batch: List[str]) -> Dict[str, Any]:
-        """处理行情批次"""
+        """处理行情批次 - 优化版：一次获取全市场快照"""
         batch_stats = {
             "success_count": 0,
             "error_count": 0,
             "errors": []
         }
-        
-        # 并发获取行情数据
-        tasks = []
+
+        try:
+            # 一次性获取全市场快照（避免频繁调用接口）
+            logger.debug(f"📊 获取全市场快照以处理 {len(batch)} 只股票...")
+            quotes_map = await self.provider.get_batch_stock_quotes(batch)
+
+            if not quotes_map:
+                logger.warning("⚠️ 获取全市场快照失败，回退到逐个获取")
+                # 回退到原来的逐个获取方式
+                return await self._process_quotes_batch_fallback(batch)
+
+            # 批量保存到数据库
+            for symbol in batch:
+                try:
+                    quotes = quotes_map.get(symbol)
+                    if quotes:
+                        # 转换为字典格式
+                        if hasattr(quotes, 'model_dump'):
+                            quotes_data = quotes.model_dump()
+                        elif hasattr(quotes, 'dict'):
+                            quotes_data = quotes.dict()
+                        else:
+                            quotes_data = quotes
+
+                        # 确保 symbol 和 code 字段存在
+                        if "symbol" not in quotes_data:
+                            quotes_data["symbol"] = symbol
+                        if "code" not in quotes_data:
+                            quotes_data["code"] = symbol
+
+                        # 更新到数据库
+                        await self.db.market_quotes.update_one(
+                            {"code": symbol},
+                            {"$set": quotes_data},
+                            upsert=True
+                        )
+                        batch_stats["success_count"] += 1
+                    else:
+                        batch_stats["error_count"] += 1
+                        batch_stats["errors"].append({
+                            "code": symbol,
+                            "error": "未找到行情数据",
+                            "context": "_process_quotes_batch"
+                        })
+                except Exception as e:
+                    batch_stats["error_count"] += 1
+                    batch_stats["errors"].append({
+                        "code": symbol,
+                        "error": str(e),
+                        "context": "_process_quotes_batch"
+                    })
+
+            return batch_stats
+
+        except Exception as e:
+            logger.error(f"❌ 批量处理行情失败: {e}")
+            # 回退到原来的逐个获取方式
+            return await self._process_quotes_batch_fallback(batch)
+
+    async def _process_quotes_batch_fallback(self, batch: List[str]) -> Dict[str, Any]:
+        """处理行情批次 - 回退方案：逐个获取"""
+        batch_stats = {
+            "success_count": 0,
+            "error_count": 0,
+            "errors": []
+        }
+
+        # 逐个获取行情数据（添加延迟避免频率限制）
         for symbol in batch:
-            tasks.append(self._get_and_save_quotes(symbol))
-        
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # 处理结果
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
+            try:
+                success = await self._get_and_save_quotes(symbol)
+                if success:
+                    batch_stats["success_count"] += 1
+                else:
+                    batch_stats["error_count"] += 1
+                    batch_stats["errors"].append({
+                        "code": symbol,
+                        "error": "获取行情数据失败",
+                        "context": "_process_quotes_batch_fallback"
+                    })
+
+                # 添加延迟避免频率限制
+                await asyncio.sleep(0.1)
+
+            except Exception as e:
                 batch_stats["error_count"] += 1
                 batch_stats["errors"].append({
-                    "code": batch[i],
-                    "error": str(result),
-                    "context": "_process_quotes_batch"
+                    "code": symbol,
+                    "error": str(e),
+                    "context": "_process_quotes_batch_fallback"
                 })
-            elif result:
-                batch_stats["success_count"] += 1
-            else:
-                batch_stats["error_count"] += 1
-                batch_stats["errors"].append({
-                    "code": batch[i],
-                    "error": "获取行情数据失败",
-                    "context": "_process_quotes_batch"
-                })
-        
+
         return batch_stats
     
     async def _get_and_save_quotes(self, symbol: str) -> bool:
