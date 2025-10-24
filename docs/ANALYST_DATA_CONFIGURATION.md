@@ -36,37 +36,31 @@ MARKET_ANALYST_LOOKBACK_DAYS=30
 
 ### 2. 基本面分析师数据范围
 
-**配置项**：`FUNDAMENTALS_ANALYST_LOOKBACK_DAYS`
+**策略**：固定获取10天数据，分析最近2天
 
-**默认值**：2天
+**说明**：
+- **获取10天数据**：保证能拿到数据（处理周末/节假日/数据延迟）
+- **分析最近2天**：只使用最近2天数据参与分析（仅需当前价格）
+- **无需配置**：代码内部已优化，自动处理
 
 **用途**：
 - 获取当前股价
 - 计算市盈率、市净率等估值指标
 - 财务数据分析（不依赖历史价格）
 
-**推荐值**：
-- **所有分析级别**：2-5天（足够获取当前价格信息）
-
-**说明**：
-- 基本面分析主要依赖财务数据，不需要大量历史价格数据
-- 只需要最近几天的价格用于计算当前估值指标
-- 过多的历史数据反而会增加处理时间
-
-**配置示例**：
-```bash
-# .env 文件
-FUNDAMENTALS_ANALYST_LOOKBACK_DAYS=2
-```
+**为什么这样设计**：
+- ✅ 获取10天数据：确保在周末/节假日也能拿到最新交易日数据
+- ✅ 只分析2天：基本面分析只需要当前价格，不需要历史趋势
+- ✅ 自动优化：用户无需关心配置，系统自动处理
 
 ---
 
 ## 📊 配置对比
 
-| 分析师类型 | 默认天数 | 推荐范围 | 数据用途 |
-|-----------|---------|---------|---------|
-| **市场分析师** | 30天 | 10-365天 | 技术指标、趋势分析 |
-| **基本面分析师** | 2天 | 2-5天 | 当前价格、估值指标 |
+| 分析师类型 | 数据获取 | 数据分析 | 是否可配置 | 数据用途 |
+|-----------|---------|---------|-----------|---------|
+| **市场分析师** | 30天（可配置） | 全部数据 | ✅ 是 | 技术指标、趋势分析 |
+| **基本面分析师** | 10天（固定） | 最近2天 | ❌ 否 | 当前价格、估值指标 |
 
 ---
 
@@ -78,8 +72,7 @@ FUNDAMENTALS_ANALYST_LOOKBACK_DAYS=2
 # 市场分析：10天（基础技术指标）
 MARKET_ANALYST_LOOKBACK_DAYS=10
 
-# 基本面分析：2天（当前价格）
-FUNDAMENTALS_ANALYST_LOOKBACK_DAYS=2
+# 基本面分析：自动优化（获取10天，分析2天）
 ```
 
 **特点**：
@@ -95,8 +88,7 @@ FUNDAMENTALS_ANALYST_LOOKBACK_DAYS=2
 # 市场分析：30天（月线分析）
 MARKET_ANALYST_LOOKBACK_DAYS=30
 
-# 基本面分析：2天（当前价格）
-FUNDAMENTALS_ANALYST_LOOKBACK_DAYS=2
+# 基本面分析：自动优化（获取10天，分析2天）
 ```
 
 **特点**：
@@ -113,8 +105,7 @@ FUNDAMENTALS_ANALYST_LOOKBACK_DAYS=2
 # 市场分析：90天（季度分析）
 MARKET_ANALYST_LOOKBACK_DAYS=90
 
-# 基本面分析：2天（当前价格）
-FUNDAMENTALS_ANALYST_LOOKBACK_DAYS=2
+# 基本面分析：自动优化（获取10天，分析2天）
 ```
 
 **特点**：
@@ -130,8 +121,7 @@ FUNDAMENTALS_ANALYST_LOOKBACK_DAYS=2
 # 市场分析：180天（半年分析）
 MARKET_ANALYST_LOOKBACK_DAYS=180
 
-# 基本面分析：2天（当前价格）
-FUNDAMENTALS_ANALYST_LOOKBACK_DAYS=2
+# 基本面分析：自动优化（获取10天，分析2天）
 ```
 
 **特点**：
@@ -148,9 +138,10 @@ FUNDAMENTALS_ANALYST_LOOKBACK_DAYS=2
 编辑 `.env` 文件：
 
 ```bash
-# 分析师数据获取配置
+# 市场分析数据获取配置
 MARKET_ANALYST_LOOKBACK_DAYS=30
-FUNDAMENTALS_ANALYST_LOOKBACK_DAYS=2
+
+# 基本面分析：无需配置（自动优化）
 ```
 
 ### 方法 2：Docker 环境
@@ -158,9 +149,10 @@ FUNDAMENTALS_ANALYST_LOOKBACK_DAYS=2
 编辑 `.env.docker` 文件：
 
 ```bash
-# 分析师数据获取配置
+# 市场分析数据获取配置
 MARKET_ANALYST_LOOKBACK_DAYS=30
-FUNDAMENTALS_ANALYST_LOOKBACK_DAYS=2
+
+# 基本面分析：无需配置（自动优化）
 ```
 
 ### 方法 3：Docker Compose
@@ -172,7 +164,7 @@ services:
   backend:
     environment:
       - MARKET_ANALYST_LOOKBACK_DAYS=30
-      - FUNDAMENTALS_ANALYST_LOOKBACK_DAYS=2
+      # 基本面分析：无需配置（自动优化）
 ```
 
 ---
@@ -234,11 +226,11 @@ MARKET_ANALYST_LOOKBACK_DAYS=30
 MARKET_ANALYST_LOOKBACK_DAYS=90
 ```
 
-### 2. 基本面分析保持简洁
+### 2. 基本面分析自动优化
 
 ```bash
-# 基本面分析不需要大量历史数据
-FUNDAMENTALS_ANALYST_LOOKBACK_DAYS=2
+# 基本面分析已自动优化，无需配置
+# 系统自动：获取10天数据，分析最近2天
 ```
 
 ### 3. 监控性能
@@ -262,12 +254,12 @@ MARKET_ANALYST_LOOKBACK_DAYS=40
 - 计算MACD需要26天数据
 - 30天可以覆盖大部分常用技术指标
 
-### Q2: 为什么基本面分析只需要2天数据？
+### Q2: 为什么基本面分析获取10天数据但只分析2天？
 
 **A**:
-- 基本面分析主要依赖财务数据（PE、PB、ROE等）
-- 只需要当前股价计算估值指标
-- 2天数据足够获取最新价格（处理周末/节假日）
+- **获取10天**：保证能拿到数据（处理周末/节假日/数据延迟）
+- **分析2天**：基本面分析主要依赖财务数据（PE、PB、ROE等），只需要当前股价
+- **自动优化**：系统自动处理，用户无需配置
 
 ### Q3: 如何选择合适的回溯天数？
 

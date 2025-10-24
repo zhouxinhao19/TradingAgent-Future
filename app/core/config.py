@@ -208,9 +208,6 @@ class Settings(BaseSettings):
     # 市场分析师数据范围配置
     MARKET_ANALYST_LOOKBACK_DAYS: int = Field(default=30, ge=5, le=365, description="市场分析回溯天数（用于技术分析）")
 
-    # 基本面分析师数据范围配置
-    FUNDAMENTALS_ANALYST_LOOKBACK_DAYS: int = Field(default=2, ge=1, le=30, description="基本面分析回溯天数（仅需当前价格）")
-
     # ==================== BaoStock统一数据同步配置 ====================
 
     # BaoStock统一数据同步总开关

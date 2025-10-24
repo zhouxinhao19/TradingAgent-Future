@@ -834,19 +834,16 @@ class Toolkit:
                 analysis_modules = "standard"  # 默认标准分析
                 logger.info(f"📊 [基本面策略] 默认模式：获取标准基本面分析")
             
-            # 基本面分析只需要最近几天的价格数据即可
-            # 从配置获取基本面分析回溯天数（默认2天）
-            try:
-                from app.core.config import get_settings
-                settings = get_settings()
-                days_back = settings.FUNDAMENTALS_ANALYST_LOOKBACK_DAYS
-                logger.info(f"📅 [配置] 基本面分析回溯天数: {days_back}天")
-            except Exception as e:
-                days_back = 2  # 默认2天
-                logger.warning(f"⚠️ [配置] 无法获取配置，使用默认值: {days_back}天, 错误: {e}")
+            # 基本面分析策略：
+            # 1. 获取10天数据（保证能拿到数据，处理周末/节假日）
+            # 2. 只使用最近2天数据参与分析（仅需当前价格）
+            days_to_fetch = 10  # 固定获取10天数据
+            days_to_analyze = 2  # 只分析最近2天
+
+            logger.info(f"📅 [基本面策略] 获取{days_to_fetch}天数据，分析最近{days_to_analyze}天")
 
             if not start_date:
-                start_date = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
+                start_date = (datetime.now() - timedelta(days=days_to_fetch)).strftime('%Y-%m-%d')
 
             if not end_date:
                 end_date = curr_date
