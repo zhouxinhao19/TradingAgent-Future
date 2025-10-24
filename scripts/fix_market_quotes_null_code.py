@@ -21,7 +21,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from app.core.database import get_mongo_db
+from app.core.database import get_mongo_db, init_mongodb
 
 # 配置日志
 logging.basicConfig(
@@ -113,13 +113,18 @@ async def check_index():
 async def main():
     """主函数"""
     logger.info("🔧 开始修复 market_quotes 集合中的 code=null 记录...")
-    
+
+    # 0. 初始化数据库连接
+    logger.info("📡 初始化数据库连接...")
+    await init_mongodb()
+    logger.info("✅ 数据库连接成功")
+
     # 1. 检查索引
     await check_index()
-    
+
     # 2. 修复记录
     await fix_null_code_records()
-    
+
     logger.info("✅ 修复完成")
 
 
