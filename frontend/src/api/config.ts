@@ -466,11 +466,35 @@ export const CONFIG_PROVIDERS = {
   CLAUDE: 'claude'
 } as const
 
+/**
+ * 数据源类型常量
+ *
+ * 注意：这些常量与后端 DataSourceType 枚举保持同步
+ * 添加新数据源时，请先在后端 tradingagents/constants/data_sources.py 中注册
+ */
 export const DATA_SOURCE_TYPES = {
-  AKSHARE: 'akshare',
+  // 缓存数据源
+  MONGODB: 'mongodb',
+
+  // 中国市场数据源
   TUSHARE: 'tushare',
-  YAHOO: 'yahoo',
-  ALPHA_VANTAGE: 'alpha_vantage'
+  AKSHARE: 'akshare',
+  BAOSTOCK: 'baostock',
+
+  // 美股数据源
+  FINNHUB: 'finnhub',
+  YAHOO_FINANCE: 'yahoo_finance',
+  ALPHA_VANTAGE: 'alpha_vantage',
+  IEX_CLOUD: 'iex_cloud',
+
+  // 专业数据源
+  WIND: 'wind',
+  CHOICE: 'choice',
+
+  // 其他数据源
+  QUANDL: 'quandl',
+  LOCAL_FILE: 'local_file',
+  CUSTOM: 'custom'
 } as const
 
 export const DATABASE_TYPES = {

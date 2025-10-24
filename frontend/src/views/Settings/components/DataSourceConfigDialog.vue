@@ -284,15 +284,31 @@ const defaultFormData = {
 const formData = ref({ ...defaultFormData })
 const paramKeys = ref<string[]>([])
 
-// 数据源类型选项
+/**
+ * 数据源类型选项
+ *
+ * 注意：这些选项与后端 DataSourceType 枚举保持同步
+ * 添加新数据源时，请先在后端 tradingagents/constants/data_sources.py 中注册
+ */
 const dataSourceTypes = [
+  // 中国市场数据源
   { label: 'AKShare', value: 'akshare' },
   { label: 'Tushare', value: 'tushare' },
-  { label: 'Yahoo Finance', value: 'yahoo' },
-  { label: 'Alpha Vantage', value: 'alphavantage' },
-  { label: 'Quandl', value: 'quandl' },
-  { label: 'IEX Cloud', value: 'iex' },
+  { label: 'BaoStock', value: 'baostock' },
+
+  // 美股数据源
   { label: 'Finnhub', value: 'finnhub' },
+  { label: 'Yahoo Finance', value: 'yahoo_finance' },
+  { label: 'Alpha Vantage', value: 'alpha_vantage' },
+  { label: 'IEX Cloud', value: 'iex_cloud' },
+
+  // 专业数据源
+  { label: 'Wind 万得', value: 'wind' },
+  { label: '东方财富 Choice', value: 'choice' },
+
+  // 其他数据源
+  { label: 'Quandl', value: 'quandl' },
+  { label: '本地文件', value: 'local_file' },
   { label: '自定义', value: 'custom' }
 ]
 
