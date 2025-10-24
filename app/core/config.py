@@ -156,10 +156,27 @@ class Settings(BaseSettings):
 
     # 实时行情入库任务
     QUOTES_INGEST_ENABLED: bool = Field(default=True)
-    QUOTES_INGEST_INTERVAL_SECONDS: int = Field(default=30)
+    QUOTES_INGEST_INTERVAL_SECONDS: int = Field(
+        default=360,
+        description="实时行情采集间隔（秒）。默认360秒（6分钟），免费用户建议>=300秒，付费用户可设置5-60秒"
+    )
     # 休市期/启动兜底补数（填充上一笔快照）
     QUOTES_BACKFILL_ON_STARTUP: bool = Field(default=True)
     QUOTES_BACKFILL_ON_OFFHOURS: bool = Field(default=True)
+
+    # 实时行情接口轮换配置
+    QUOTES_ROTATION_ENABLED: bool = Field(
+        default=True,
+        description="启用接口轮换机制（Tushare → AKShare东方财富 → AKShare新浪财经）"
+    )
+    QUOTES_TUSHARE_HOURLY_LIMIT: int = Field(
+        default=2,
+        description="Tushare rt_k接口每小时调用次数限制（免费用户2次，付费用户可设置更高）"
+    )
+    QUOTES_AUTO_DETECT_TUSHARE_PERMISSION: bool = Field(
+        default=True,
+        description="自动检测Tushare rt_k接口权限，付费用户自动切换到高频模式（5秒）"
+    )
 
     # Tushare基础配置
     TUSHARE_TOKEN: str = Field(default="", description="Tushare API Token")

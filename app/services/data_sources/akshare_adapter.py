@@ -188,29 +188,49 @@ class AKShareAdapter(DataSourceAdapter):
             return None
 
 
-    def get_realtime_quotes(self):
-        """获取全市场实时快照，返回以6位代码为键的字典"""
+    def get_realtime_quotes(self, source: str = "eastmoney"):
+        """
+        获取全市场实时快照，返回以6位代码为键的字典
+
+        Args:
+            source: 数据源选择，"eastmoney"（东方财富）或 "sina"（新浪财经）
+
+        Returns:
+            Dict[str, Dict]: {code: {close, pct_chg, amount, ...}}
+        """
         if not self.is_available():
             return None
+
         try:
             import akshare as ak  # type: ignore
-            df = ak.stock_zh_a_spot_em()
+
+            # 根据 source 参数选择接口
+            if source == "sina":
+                df = ak.stock_zh_a_spot()  # 新浪财经接口
+                logger.info("使用 AKShare 新浪财经接口获取实时行情")
+            else:  # 默认使用东方财富
+                df = ak.stock_zh_a_spot_em()  # 东方财富接口
+                logger.info("使用 AKShare 东方财富接口获取实时行情")
+
             if df is None or getattr(df, "empty", True):
-                logger.warning("AKShare spot 返回空数据")
+                logger.warning(f"AKShare {source} 返回空数据")
                 return None
-            # 列名兼容
-            code_col = next((c for c in ["代码", "代码code", "symbol", "股票代码"] if c in df.columns), None)
-            price_col = next((c for c in ["最新价", "现价", "最新价(元)", "price", "最新"] if c in df.columns), None)
-            pct_col = next((c for c in ["涨跌幅", "涨跌幅(%)", "涨幅", "pct_chg"] if c in df.columns), None)
-            amount_col = next((c for c in ["成交额", "成交额(元)", "amount", "成交额(万元)"] if c in df.columns), None)
+
+            # 列名兼容（两个接口的列名可能不同）
+            code_col = next((c for c in ["代码", "code", "symbol", "股票代码"] if c in df.columns), None)
+            price_col = next((c for c in ["最新价", "现价", "最新价(元)", "price", "最新", "trade"] if c in df.columns), None)
+            pct_col = next((c for c in ["涨跌幅", "涨跌幅(%)", "涨幅", "pct_chg", "changepercent"] if c in df.columns), None)
+            amount_col = next((c for c in ["成交额", "成交额(元)", "amount", "成交额(万元)", "amount(万元)"] if c in df.columns), None)
             open_col = next((c for c in ["今开", "开盘", "open", "今开(元)"] if c in df.columns), None)
             high_col = next((c for c in ["最高", "high"] if c in df.columns), None)
             low_col = next((c for c in ["最低", "low"] if c in df.columns), None)
-            pre_close_col = next((c for c in ["昨收", "昨收(元)", "pre_close", "昨收价"] if c in df.columns), None)
-            volume_col = next((c for c in ["成交量", "成交量(手)", "volume", "成交量(股)"] if c in df.columns), None)
+            pre_close_col = next((c for c in ["昨收", "昨收(元)", "pre_close", "昨收价", "settlement"] if c in df.columns), None)
+            volume_col = next((c for c in ["成交量", "成交量(手)", "volume", "成交量(股)", "vol"] if c in df.columns), None)
+
             if not code_col or not price_col:
-                logger.error(f"AKShare spot 缺少必要列: code={code_col}, price={price_col}")
+                logger.error(f"AKShare {source} 缺少必要列: code={code_col}, price={price_col}, columns={list(df.columns)}")
                 return None
+
             result: Dict[str, Dict[str, Optional[float]]] = {}
             for _, row in df.iterrows():  # type: ignore
                 code_raw = row.get(code_col)
@@ -224,6 +244,7 @@ class AKShareAdapter(DataSourceAdapter):
                     code = code_clean.zfill(6)  # 补齐到6位
                 else:
                     code = code_str.zfill(6)
+
                 close = self._safe_float(row.get(price_col))
                 pct = self._safe_float(row.get(pct_col)) if pct_col else None
                 amt = self._safe_float(row.get(amount_col)) if amount_col else None
@@ -232,10 +253,23 @@ class AKShareAdapter(DataSourceAdapter):
                 lo = self._safe_float(row.get(low_col)) if low_col else None
                 pre = self._safe_float(row.get(pre_close_col)) if pre_close_col else None
                 vol = self._safe_float(row.get(volume_col)) if volume_col else None
-                result[code] = {"close": close, "pct_chg": pct, "amount": amt, "volume": vol, "open": op, "high": hi, "low": lo, "pre_close": pre}
+
+                result[code] = {
+                    "close": close,
+                    "pct_chg": pct,
+                    "amount": amt,
+                    "volume": vol,
+                    "open": op,
+                    "high": hi,
+                    "low": lo,
+                    "pre_close": pre
+                }
+
+            logger.info(f"✅ AKShare {source} 获取到 {len(result)} 只股票的实时行情")
             return result
+
         except Exception as e:
-            logger.error(f"获取AKShare实时快照失败: {e}")
+            logger.error(f"获取AKShare {source} 实时快照失败: {e}")
             return None
 
     def get_kline(self, code: str, period: str = "day", limit: int = 120, adj: Optional[str] = None):
