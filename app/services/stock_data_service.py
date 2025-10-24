@@ -195,11 +195,13 @@ class StockDataService:
             # 添加更新时间
             quote_data["updated_at"] = datetime.utcnow()
 
-            # 确保symbol字段存在
+            # 🔥 确保 symbol 和 code 字段都存在（兼容旧索引）
             if "symbol" not in quote_data:
                 quote_data["symbol"] = symbol6
+            if "code" not in quote_data:
+                quote_data["code"] = symbol6  # code 和 symbol 使用相同的值
 
-            # 执行更新 (使用symbol字段)
+            # 执行更新 (使用symbol字段作为查询条件)
             result = await db[self.market_quotes_collection].update_one(
                 {"symbol": symbol6},
                 {"$set": quote_data},
