@@ -31,11 +31,8 @@ docker pull hsliuping/tradingagents-frontend:v1.0.0-preview-amd64
 # AMD64 (Intel/AMD)
 ./scripts/build-amd64.sh
 
-# ARM64 (ARM 服务器、树莓派)
+# ARM64 (ARM 服务器、树莓派、Apple Silicon)
 ./scripts/build-arm64.sh
-
-# Apple Silicon (M1/M2/M3/M4)
-./scripts/build-apple-silicon.sh
 ```
 
 ### 方案 3：多架构构建（慢，不推荐）
@@ -92,7 +89,7 @@ docker pull hsliuping/tradingagents-frontend:v1.0.0-preview-amd64
 - ✅ iMac (Apple Silicon)
 
 **构建脚本**：
-- macOS: `./scripts/build-apple-silicon.sh`
+- macOS: `./scripts/build-arm64.sh`（与 ARM64 通用）
 
 **构建时间**：约 5-8 分钟（原生架构，快）
 
@@ -100,7 +97,11 @@ docker pull hsliuping/tradingagents-frontend:v1.0.0-preview-amd64
 - 🚀 原生性能，无需模拟
 - ⚡ 构建速度比 x86 模拟快 3-5 倍
 - 💚 运行效率高，功耗低
-- 🔄 镜像与 ARM64 通用
+- 🔄 镜像与 ARM64 服务器完全通用
+
+**说明**：
+- Apple Silicon 使用 ARM64 架构，与 ARM 服务器镜像完全兼容
+- 无需单独构建，直接使用 `build-arm64.sh` 即可
 
 ---
 
@@ -156,20 +157,6 @@ REGISTRY=your-dockerhub-username VERSION=v1.0.0 ./scripts/build-arm64.sh
 
 # 推送到 Docker Hub
 .\scripts\build-arm64.ps1 -Registry your-dockerhub-username -Version v1.0.0
-```
-
----
-
-### 3. Apple Silicon 构建脚本
-
-#### macOS
-
-```bash
-# 基本用法
-./scripts/build-apple-silicon.sh
-
-# 推送到 Docker Hub
-REGISTRY=your-dockerhub-username VERSION=v1.0.0 ./scripts/build-apple-silicon.sh
 ```
 
 ---
@@ -265,7 +252,7 @@ docker-compose up -d
 |---------|---------|
 | Intel/AMD PC | `build-amd64.sh` |
 | ARM 服务器 | `build-arm64.sh` |
-| MacBook M1/M2/M3/M4 | `build-apple-silicon.sh` |
+| MacBook M1/M2/M3/M4 | `build-arm64.sh` |
 | 树莓派 4/5 | `build-arm64.sh` |
 
 ### Q2: 为什么不推荐多架构构建？

@@ -43,11 +43,13 @@ REGISTRY=hsliuping VERSION=v1.0.1 ./scripts/build-arm64.sh
 ### Apple Silicon 构建
 
 ```bash
-# macOS
-REGISTRY=hsliuping VERSION=v1.0.1 ./scripts/build-apple-silicon.sh
+# macOS（使用 ARM64 脚本）
+REGISTRY=hsliuping VERSION=v1.0.1 ./scripts/build-arm64.sh
 ```
 
 **时间**：5-8 分钟 ⚡
+
+**说明**：Apple Silicon 使用 ARM64 架构，与 ARM 服务器镜像完全通用
 
 ---
 

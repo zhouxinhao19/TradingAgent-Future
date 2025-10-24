@@ -172,10 +172,10 @@ services:
 
 ### Apple Silicon 用户（M1/M2/M3/M4）
 
-Apple Silicon 使用 ARM64 架构：
+**重要说明**：Apple Silicon 使用 ARM64 架构，与 ARM 服务器镜像完全通用。
 
 ```bash
-# 使用 ARM64 镜像
+# 使用 ARM64 镜像（与 ARM 服务器相同）
 docker pull hsliuping/tradingagents-backend-arm64:latest
 docker pull hsliuping/tradingagents-frontend-arm64:latest
 ```
@@ -187,10 +187,17 @@ services:
   backend:
     image: hsliuping/tradingagents-backend-arm64:latest
     # ...
-  
+
   frontend:
     image: hsliuping/tradingagents-frontend-arm64:latest
     # ...
+```
+
+**构建镜像**：
+
+```bash
+# Apple Silicon 用户使用 ARM64 构建脚本
+REGISTRY=hsliuping VERSION=v1.0.0 ./scripts/build-arm64.sh
 ```
 
 ---
