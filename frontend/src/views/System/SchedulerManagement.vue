@@ -36,6 +36,58 @@
       </div>
     </el-card>
 
+    <!-- 搜索和筛选 -->
+    <el-card class="filter-card" shadow="never">
+      <el-form :inline="true" class="filter-form">
+        <el-form-item label="任务名称">
+          <el-input
+            v-model="searchKeyword"
+            placeholder="搜索任务名称"
+            clearable
+            :prefix-icon="Search"
+            style="width: 240px"
+            @clear="handleSearch"
+            @input="handleSearch"
+          />
+        </el-form-item>
+
+        <el-form-item label="数据源">
+          <el-select
+            v-model="filterDataSource"
+            placeholder="全部数据源"
+            clearable
+            style="width: 180px"
+            @change="handleSearch"
+          >
+            <el-option label="全部数据源" value="" />
+            <el-option label="Tushare" value="Tushare" />
+            <el-option label="AKShare" value="AKShare" />
+            <el-option label="BaoStock" value="BaoStock" />
+            <el-option label="多数据源" value="多数据源" />
+            <el-option label="其他" value="其他" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="状态">
+          <el-select
+            v-model="filterStatus"
+            placeholder="全部状态"
+            clearable
+            style="width: 150px"
+            @change="handleSearch"
+          >
+            <el-option label="全部状态" value="" />
+            <el-option label="运行中" value="running" />
+            <el-option label="已暂停" value="paused" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item>
+          <el-button :icon="Refresh" @click="handleReset">重置</el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
+
     <!-- 任务列表 -->
     <el-card class="table-card" shadow="never">
       <el-table
@@ -43,7 +95,7 @@
         v-loading="loading"
         stripe
         style="width: 100%"
-        :default-sort="{ prop: 'name', order: 'ascending' }"
+        :default-sort="{ prop: 'paused', order: 'ascending' }"
       >
         <el-table-column prop="name" label="任务名称" min-width="200" sortable>
           <template #default="{ row }">
@@ -279,7 +331,8 @@ import {
   Document,
   Promotion,
   View,
-  Edit
+  Edit,
+  Search
 } from '@element-plus/icons-vue'
 import {
   getJobs,
@@ -302,6 +355,11 @@ const loading = ref(false)
 const jobs = ref<Job[]>([])
 const stats = ref<SchedulerStats | null>(null)
 const actionLoading = reactive<Record<string, boolean>>({})
+
+// 搜索和筛选
+const searchKeyword = ref('')
+const filterDataSource = ref('')
+const filterStatus = ref('')
 
 // 编辑任务元数据
 const editDialogVisible = ref(false)
@@ -327,7 +385,54 @@ const currentHistoryJobId = ref<string | null>(null)
 
 // 计算属性
 const filteredJobs = computed(() => {
-  return jobs.value
+  let result = [...jobs.value]
+
+  // 按任务名称搜索
+  if (searchKeyword.value) {
+    const keyword = searchKeyword.value.toLowerCase()
+    result = result.filter(job =>
+      job.name.toLowerCase().includes(keyword) ||
+      job.id.toLowerCase().includes(keyword) ||
+      (job.display_name && job.display_name.toLowerCase().includes(keyword)) ||
+      (job.description && job.description.toLowerCase().includes(keyword))
+    )
+  }
+
+  // 按数据源筛选
+  if (filterDataSource.value) {
+    if (filterDataSource.value === '其他') {
+      // 其他：不包含 Tushare、AKShare、BaoStock、多数据源
+      result = result.filter(job =>
+        !job.name.includes('Tushare') &&
+        !job.name.includes('AKShare') &&
+        !job.name.includes('BaoStock') &&
+        !job.name.includes('多数据源')
+      )
+    } else {
+      result = result.filter(job => job.name.includes(filterDataSource.value))
+    }
+  }
+
+  // 按状态筛选
+  if (filterStatus.value) {
+    if (filterStatus.value === 'running') {
+      result = result.filter(job => !job.paused)
+    } else if (filterStatus.value === 'paused') {
+      result = result.filter(job => job.paused)
+    }
+  }
+
+  // 默认排序：运行中的任务优先（paused=false 排在前面）
+  result.sort((a, b) => {
+    // 先按状态排序（运行中优先）
+    if (a.paused !== b.paused) {
+      return a.paused ? 1 : -1
+    }
+    // 状态相同时按名称排序
+    return a.name.localeCompare(b.name, 'zh-CN')
+  })
+
+  return result
 })
 
 // 方法
@@ -505,6 +610,16 @@ const formatAction = (action: string) => {
   return actionMap[action] || action
 }
 
+const handleSearch = () => {
+  // 搜索和筛选会自动通过 computed 属性生效
+}
+
+const handleReset = () => {
+  searchKeyword.value = ''
+  filterDataSource.value = ''
+  filterStatus.value = ''
+}
+
 // 生命周期
 onMounted(() => {
   loadJobs()
@@ -516,7 +631,7 @@ onMounted(() => {
   padding: 20px;
 
   .header-card {
-    margin-bottom: 20px;
+    margin-bottom: 16px;
 
     .header-content {
       display: flex;
@@ -550,6 +665,18 @@ onMounted(() => {
     .actions {
       display: flex;
       gap: 10px;
+    }
+  }
+
+  .filter-card {
+    margin-bottom: 16px;
+
+    .filter-form {
+      margin-bottom: 0;
+
+      :deep(.el-form-item) {
+        margin-bottom: 0;
+      }
     }
   }
 
