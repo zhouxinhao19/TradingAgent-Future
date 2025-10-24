@@ -397,11 +397,28 @@ class AKShareProvider(BaseStockDataProvider):
                 quotes_map = {}
                 codes_set = set(codes)
 
+                # 构建代码映射表（支持带前缀的代码匹配）
+                # 例如：sh600000 -> 600000, sz000001 -> 000001
+                code_mapping = {}
+                for code in codes:
+                    code_mapping[code] = code  # 原始代码
+                    # 添加可能的前缀变体
+                    for prefix in ['sh', 'sz', 'bj']:
+                        code_mapping[f"{prefix}{code}"] = code
+
                 for _, row in spot_df.iterrows():
-                    code = str(row.get("代码", ""))
-                    if code in codes_set:
+                    raw_code = str(row.get("代码", ""))
+
+                    # 尝试匹配代码（支持带前缀和不带前缀）
+                    matched_code = None
+                    if raw_code in code_mapping:
+                        matched_code = code_mapping[raw_code]
+                    elif raw_code in codes_set:
+                        matched_code = raw_code
+
+                    if matched_code:
                         quotes_data = {
-                            "name": str(row.get("名称", f"股票{code}")),
+                            "name": str(row.get("名称", f"股票{matched_code}")),
                             "price": self._safe_float(row.get("最新价", 0)),
                             "change": self._safe_float(row.get("涨跌额", 0)),
                             "change_percent": self._safe_float(row.get("涨跌幅", 0)),
@@ -413,11 +430,11 @@ class AKShareProvider(BaseStockDataProvider):
                             "pre_close": self._safe_float(row.get("昨收", 0))
                         }
 
-                        # 转换为标准化字典
-                        quotes_map[code] = {
-                            "code": code,
-                            "symbol": code,
-                            "name": quotes_data.get("name", f"股票{code}"),
+                        # 转换为标准化字典（使用匹配后的代码）
+                        quotes_map[matched_code] = {
+                            "code": matched_code,
+                            "symbol": matched_code,
+                            "name": quotes_data.get("name", f"股票{matched_code}"),
                             "price": float(quotes_data.get("price", 0)),
                             "change": float(quotes_data.get("change", 0)),
                             "change_percent": float(quotes_data.get("change_percent", 0)),
@@ -428,8 +445,8 @@ class AKShareProvider(BaseStockDataProvider):
                             "low_price": float(quotes_data.get("low", 0)),
                             "pre_close": float(quotes_data.get("pre_close", 0)),
                             # 扩展字段
-                            "full_symbol": self._get_full_symbol(code),
-                            "market_info": self._get_market_info(code),
+                            "full_symbol": self._get_full_symbol(matched_code),
+                            "market_info": self._get_market_info(matched_code),
                             "data_source": "akshare",
                             "last_sync": datetime.now(timezone.utc),
                             "sync_status": "success"
