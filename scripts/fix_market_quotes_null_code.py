@@ -57,16 +57,26 @@ async def fix_null_code_records():
         
         for record in records:
             symbol = record.get("symbol")
-            
+
             if symbol:
-                # 如果有 symbol，将 code 设置为 symbol
-                result = await collection.update_one(
-                    {"_id": record["_id"]},
-                    {"$set": {"code": symbol}}
-                )
-                if result.modified_count > 0:
-                    fixed_count += 1
-                    logger.info(f"✅ 修复记录: _id={record['_id']}, symbol={symbol}, code={symbol}")
+                # 检查是否已经存在 code=symbol 的记录
+                existing = await collection.find_one({"code": symbol, "_id": {"$ne": record["_id"]}})
+
+                if existing:
+                    # 如果已经存在，说明是重复记录，删除 code=null 的这条
+                    result = await collection.delete_one({"_id": record["_id"]})
+                    if result.deleted_count > 0:
+                        deleted_count += 1
+                        logger.warning(f"🗑️ 删除重复记录: _id={record['_id']}, symbol={symbol} (已存在 code={symbol} 的记录)")
+                else:
+                    # 如果不存在，将 code 设置为 symbol
+                    result = await collection.update_one(
+                        {"_id": record["_id"]},
+                        {"$set": {"code": symbol}}
+                    )
+                    if result.modified_count > 0:
+                        fixed_count += 1
+                        logger.info(f"✅ 修复记录: _id={record['_id']}, symbol={symbol}, code={symbol}")
             else:
                 # 如果没有 symbol，删除这条记录
                 result = await collection.delete_one({"_id": record["_id"]})
