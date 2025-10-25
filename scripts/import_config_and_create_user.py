@@ -288,11 +288,11 @@ def main():
   # 在宿主机运行（连接到 localhost:27017）
   python scripts/import_config_and_create_user.py --host
 
-  # 从指定文件导入
+  # 从指定文件导入（默认覆盖模式）
   python scripts/import_config_and_create_user.py export.json
 
-  # 覆盖已存在的数据
-  python scripts/import_config_and_create_user.py --overwrite
+  # 增量模式：跳过已存在的数据
+  python scripts/import_config_and_create_user.py --incremental
 
   # 只导入指定的集合
   python scripts/import_config_and_create_user.py --collections system_configs users
@@ -315,7 +315,13 @@ def main():
     parser.add_argument(
         "--overwrite",
         action="store_true",
-        help="覆盖已存在的数据（默认：跳过）"
+        default=True,
+        help="覆盖已存在的数据（默认：覆盖）"
+    )
+    parser.add_argument(
+        "--incremental",
+        action="store_true",
+        help="增量模式：跳过已存在的数据"
     )
     parser.add_argument(
         "--collections",
@@ -334,6 +340,10 @@ def main():
     )
     
     args = parser.parse_args()
+
+    # 处理 incremental 参数（如果指定了 --incremental，则 overwrite 为 False）
+    if args.incremental:
+        args.overwrite = False
 
     # 如果没有指定文件，尝试从 install 目录查找
     if not args.create_user_only and not args.export_file:
