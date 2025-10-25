@@ -124,13 +124,7 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        
-        <el-table-column prop="file_size" label="文件大小" width="120">
-          <template #default="{ row }">
-            {{ formatFileSize(row.file_size) }}
-          </template>
-        </el-table-column>
-        
+
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <el-button type="text" size="small" @click="viewReport(row)">
@@ -396,17 +390,6 @@ import { formatDateTime } from '@/utils/datetime'
 
 const formatTime = (time: string) => {
   return formatDateTime(time)
-}
-
-const formatFileSize = (size: number) => {
-  if (size === 0) return '-'
-  const units = ['B', 'KB', 'MB', 'GB']
-  let index = 0
-  while (size >= 1024 && index < units.length - 1) {
-    size /= 1024
-    index++
-  }
-  return `${size.toFixed(1)} ${units[index]}`
 }
 
 const handleSizeChange = (size: number) => {
