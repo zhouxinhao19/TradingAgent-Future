@@ -140,17 +140,34 @@ def _sanitize_document(doc: Any) -> Any:
 
     敏感字段关键词：api_key, api_secret, secret, token, password,
                     client_secret, webhook_secret, private_key
+
+    排除字段：max_tokens, timeout, retry_times 等配置字段（不是敏感信息）
     """
     SENSITIVE_KEYWORDS = [
         "api_key", "api_secret", "secret", "token", "password",
         "client_secret", "webhook_secret", "private_key"
     ]
 
+    # 排除的字段（虽然包含敏感关键词，但不是敏感信息）
+    EXCLUDED_FIELDS = [
+        "max_tokens",      # LLM 配置：最大 token 数
+        "timeout",         # 超时时间
+        "retry_times",     # 重试次数
+        "context_length",  # 上下文长度
+    ]
+
     if isinstance(doc, dict):
         sanitized = {}
         for k, v in doc.items():
+            # 检查是否在排除列表中
+            if k.lower() in [f.lower() for f in EXCLUDED_FIELDS]:
+                # 保留该字段
+                if isinstance(v, (dict, list)):
+                    sanitized[k] = _sanitize_document(v)
+                else:
+                    sanitized[k] = v
             # 检查字段名是否包含敏感关键词（忽略大小写）
-            if any(keyword in k.lower() for keyword in SENSITIVE_KEYWORDS):
+            elif any(keyword in k.lower() for keyword in SENSITIVE_KEYWORDS):
                 sanitized[k] = ""  # 清空敏感字段
             elif isinstance(v, (dict, list)):
                 sanitized[k] = _sanitize_document(v)  # 递归处理

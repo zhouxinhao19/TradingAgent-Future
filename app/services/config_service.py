@@ -631,6 +631,7 @@ class ConfigService:
                 d = x.model_dump()
                 d["api_key"] = ""
                 # 确保必填字段有默认值（防止导出 None 或空字符串）
+                # 注意：max_tokens 在 system_configs 中已经有正确的值，直接使用
                 if not d.get("max_tokens") or d.get("max_tokens") == "":
                     d["max_tokens"] = 4000
                 if not d.get("temperature") and d.get("temperature") != 0:

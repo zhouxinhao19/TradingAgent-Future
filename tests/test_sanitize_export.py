@@ -15,15 +15,36 @@ def test_sanitize_simple_fields():
         "token": "token123",
         "normal_field": "keep_this"
     }
-    
+
     result = _sanitize_document(doc)
-    
+
     assert result["name"] == "test"
     assert result["api_key"] == ""
     assert result["api_secret"] == ""
     assert result["password"] == ""
     assert result["token"] == ""
     assert result["normal_field"] == "keep_this"
+
+
+def test_sanitize_max_tokens_preserved():
+    """测试 max_tokens 字段不被脱敏"""
+    doc = {
+        "provider": "openai",
+        "model_name": "gpt-4",
+        "api_key": "secret123",
+        "max_tokens": 8000,
+        "timeout": 180,
+        "retry_times": 3,
+        "context_length": 32768
+    }
+
+    result = _sanitize_document(doc)
+
+    assert result["api_key"] == ""  # 敏感字段被清空
+    assert result["max_tokens"] == 8000  # max_tokens 保留
+    assert result["timeout"] == 180  # timeout 保留
+    assert result["retry_times"] == 3  # retry_times 保留
+    assert result["context_length"] == 32768  # context_length 保留
 
 
 def test_sanitize_nested_dict():
