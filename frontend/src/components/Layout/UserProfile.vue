@@ -39,7 +39,8 @@ const router = useRouter()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 
-const userAvatar = computed(() => '/default-avatar.png')
+// 用户头像：优先使用用户设置的头像，否则返回 undefined 使用 el-avatar 的默认图标
+const userAvatar = computed(() => authStore.user?.avatar || undefined)
 const userDisplayName = computed(() => authStore.user?.username || '未登录')
 const userRole = computed(() => {
   if (!authStore.user) return '未登录'

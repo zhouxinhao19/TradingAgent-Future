@@ -67,9 +67,9 @@ export const useAuthStore = defineStore('auth', {
   },
 
   getters: {
-    // 用户头像
-    userAvatar(): string {
-      return this.user?.avatar || '/default-avatar.png'
+    // 用户头像：优先使用用户设置的头像，否则返回 undefined 使用默认图标
+    userAvatar(): string | undefined {
+      return this.user?.avatar || undefined
     },
     
     // 用户显示名称
