@@ -24,10 +24,13 @@ class FavoritesService:
         return self.db
 
     def _is_valid_object_id(self, user_id: str) -> bool:
-        try:
-            return ObjectId.is_valid(user_id)
-        except Exception:
-            return False
+        """
+        检查是否是有效的ObjectId格式
+        注意：这里只检查格式，不代表数据库中实际存储的是ObjectId类型
+        为了兼容性，我们统一使用 user_favorites 集合存储自选股
+        """
+        # 强制返回 False，统一使用 user_favorites 集合
+        return False
 
     def _format_favorite(self, favorite: Dict[str, Any]) -> Dict[str, Any]:
         """格式化收藏条目（仅基础信息，不包含实时行情）。
@@ -57,7 +60,11 @@ class FavoritesService:
 
         favorites: List[Dict[str, Any]] = []
         if self._is_valid_object_id(user_id):
+            # 先尝试使用 ObjectId 查询
             user = await db.users.find_one({"_id": ObjectId(user_id)})
+            # 如果 ObjectId 查询失败，尝试使用字符串查询
+            if user is None:
+                user = await db.users.find_one({"_id": user_id})
             favorites = (user or {}).get("favorite_stocks", [])
         else:
             doc = await db.user_favorites.find_one({"user_id": user_id})
@@ -167,11 +174,28 @@ class FavoritesService:
 
             if is_oid:
                 logger.info(f"🔧 [add_favorite] 使用 ObjectId 方式添加到 users 集合")
+
+                # 先尝试使用 ObjectId 查询
                 result = await db.users.update_one(
                     {"_id": ObjectId(user_id)},
-                    {"$push": {"favorite_stocks": favorite_stock}}
+                    {
+                        "$push": {"favorite_stocks": favorite_stock},
+                        "$setOnInsert": {"favorite_stocks": []}
+                    }
                 )
-                logger.info(f"🔧 [add_favorite] 更新结果: matched_count={result.matched_count}, modified_count={result.modified_count}")
+                logger.info(f"🔧 [add_favorite] ObjectId查询结果: matched_count={result.matched_count}, modified_count={result.modified_count}")
+
+                # 如果 ObjectId 查询失败，尝试使用字符串查询
+                if result.matched_count == 0:
+                    logger.info(f"🔧 [add_favorite] ObjectId查询失败，尝试使用字符串ID查询")
+                    result = await db.users.update_one(
+                        {"_id": user_id},
+                        {
+                            "$push": {"favorite_stocks": favorite_stock}
+                        }
+                    )
+                    logger.info(f"🔧 [add_favorite] 字符串ID查询结果: matched_count={result.matched_count}, modified_count={result.modified_count}")
+
                 success = result.matched_count > 0
                 logger.info(f"🔧 [add_favorite] 返回结果: {success}")
                 return success
@@ -198,10 +222,17 @@ class FavoritesService:
         db = await self._get_db()
 
         if self._is_valid_object_id(user_id):
+            # 先尝试使用 ObjectId 查询
             result = await db.users.update_one(
                 {"_id": ObjectId(user_id)},
                 {"$pull": {"favorite_stocks": {"stock_code": stock_code}}}
             )
+            # 如果 ObjectId 查询失败，尝试使用字符串查询
+            if result.matched_count == 0:
+                result = await db.users.update_one(
+                    {"_id": user_id},
+                    {"$pull": {"favorite_stocks": {"stock_code": stock_code}}}
+                )
             return result.modified_count > 0
         else:
             result = await db.user_favorites.update_one(
@@ -279,14 +310,26 @@ class FavoritesService:
             logger.info(f"🔧 [is_favorite] 用户ID类型: is_valid_object_id={is_oid}")
 
             if is_oid:
+                # 先尝试使用 ObjectId 查询
                 user = await db.users.find_one(
                     {
                         "_id": ObjectId(user_id),
                         "favorite_stocks.stock_code": stock_code
                     }
                 )
+
+                # 如果 ObjectId 查询失败，尝试使用字符串查询
+                if user is None:
+                    logger.info(f"🔧 [is_favorite] ObjectId查询未找到，尝试使用字符串ID查询")
+                    user = await db.users.find_one(
+                        {
+                            "_id": user_id,
+                            "favorite_stocks.stock_code": stock_code
+                        }
+                    )
+
                 result = user is not None
-                logger.info(f"🔧 [is_favorite] ObjectId查询结果: {result}")
+                logger.info(f"🔧 [is_favorite] 查询结果: {result}")
                 return result
             else:
                 doc = await db.user_favorites.find_one(
