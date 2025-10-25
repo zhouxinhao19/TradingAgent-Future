@@ -134,7 +134,36 @@ async def import_data(content: bytes, collection: str, *, format: str = "json", 
     }
 
 
-async def export_data(collections: Optional[List[str]] = None, *, export_dir: str, format: str = "json") -> str:
+def _sanitize_document(doc: Any) -> Any:
+    """
+    递归清空文档中的敏感字段
+
+    敏感字段关键词：api_key, api_secret, secret, token, password,
+                    client_secret, webhook_secret, private_key
+    """
+    SENSITIVE_KEYWORDS = [
+        "api_key", "api_secret", "secret", "token", "password",
+        "client_secret", "webhook_secret", "private_key"
+    ]
+
+    if isinstance(doc, dict):
+        sanitized = {}
+        for k, v in doc.items():
+            # 检查字段名是否包含敏感关键词（忽略大小写）
+            if any(keyword in k.lower() for keyword in SENSITIVE_KEYWORDS):
+                sanitized[k] = ""  # 清空敏感字段
+            elif isinstance(v, (dict, list)):
+                sanitized[k] = _sanitize_document(v)  # 递归处理
+            else:
+                sanitized[k] = v
+        return sanitized
+    elif isinstance(doc, list):
+        return [_sanitize_document(item) for item in doc]
+    else:
+        return doc
+
+
+async def export_data(collections: Optional[List[str]] = None, *, export_dir: str, format: str = "json", sanitize: bool = False) -> str:
     import pandas as pd
 
     db = get_mongo_db()
@@ -150,9 +179,19 @@ async def export_data(collections: Optional[List[str]] = None, *, export_dir: st
     for collection_name in collections:
         collection = db[collection_name]
         docs: List[dict] = []
+
+        # users 集合在脱敏模式下只导出空数组（保留结构，不导出实际用户数据）
+        if sanitize and collection_name == "users":
+            all_data[collection_name] = []
+            continue
+
         async for doc in collection.find():
             docs.append(serialize_document(doc))
         all_data[collection_name] = docs
+
+    # 如果启用脱敏，递归清空所有敏感字段
+    if sanitize:
+        all_data = _sanitize_document(all_data)
 
     if format.lower() == "json":
         filename = f"export_{timestamp}.json"

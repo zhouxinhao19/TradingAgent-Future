@@ -147,9 +147,9 @@ class DatabaseService:
         """导入数据（委托子模块）"""
         return await _db_backups.import_data(content, collection, format=format, overwrite=overwrite, filename=filename)
 
-    async def export_data(self, collections: List[str] = None, format: str = "json") -> str:
+    async def export_data(self, collections: List[str] = None, format: str = "json", sanitize: bool = False) -> str:
         """导出数据（委托子模块）"""
-        return await _db_backups.export_data(collections, export_dir=self.export_dir, format=format)
+        return await _db_backups.export_data(collections, export_dir=self.export_dir, format=format, sanitize=sanitize)
 
     def _serialize_document(self, doc: dict) -> dict:
         """序列化文档，处理特殊类型（委托子模块）"""

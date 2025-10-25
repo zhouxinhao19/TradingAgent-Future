@@ -420,7 +420,7 @@ const exportData = async () => {
     // 配置数据集合列表（用于演示系统）
     const configCollections = [
       'system_configs',      // 系统配置（包括 LLM 配置）
-      'users',               // 用户数据
+      'users',               // 用户数据（脱敏模式下只导出结构，不导出实际数据）
       'llm_providers',       // LLM 提供商
       'market_categories',   // 市场分类
       'user_tags',           // 用户标签
@@ -432,18 +432,21 @@ const exportData = async () => {
     ]
 
     let collections: string[] = []
+    let sanitize = false  // 是否启用脱敏
 
     if (exportCollection.value === 'all') {
       collections = [] // 空数组表示导出所有集合
     } else if (exportCollection.value === 'config_only') {
       collections = configCollections // 仅导出配置数据
+      sanitize = true  // 配置数据导出时自动启用脱敏（清空 API key 等敏感字段）
     } else {
       collections = [exportCollection.value] // 导出单个集合
     }
 
     const blob = await databaseApi.exportData({
       collections,
-      format: exportFormat.value
+      format: exportFormat.value,
+      sanitize  // 传递脱敏参数
     })
 
     // 创建下载链接
@@ -456,7 +459,7 @@ const exportData = async () => {
     URL.revokeObjectURL(url)
 
     if (exportCollection.value === 'config_only') {
-      ElMessage.success('配置数据导出成功（包含 LLM 配置、用户数据、模型目录等，不含行情数据）')
+      ElMessage.success('配置数据导出成功（已脱敏：API key 等敏感字段已清空，用户数据仅保留结构）')
     } else {
       ElMessage.success('数据导出成功')
     }

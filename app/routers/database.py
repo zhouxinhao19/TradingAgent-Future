@@ -34,6 +34,7 @@ class ExportRequest(BaseModel):
     """导出请求"""
     collections: List[str] = []  # 空列表表示导出所有集合
     format: str = "json"  # json, csv
+    sanitize: bool = False  # 是否脱敏（清空敏感字段，用于演示系统）
 
 # 响应模型
 class DatabaseStatusResponse(BaseModel):
@@ -205,13 +206,15 @@ async def export_data(
 ):
     """导出数据"""
     try:
-        logger.info(f"📤 用户 {current_user['username']} 导出数据")
-        
+        sanitize_info = "（脱敏模式）" if request.sanitize else ""
+        logger.info(f"📤 用户 {current_user['username']} 导出数据{sanitize_info}")
+
         file_path = await database_service.export_data(
             collections=request.collections,
-            format=request.format
+            format=request.format,
+            sanitize=request.sanitize
         )
-        
+
         return FileResponse(
             path=file_path,
             filename=os.path.basename(file_path),
