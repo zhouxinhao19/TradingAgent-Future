@@ -554,7 +554,7 @@ const viewDocumentation = () => {
       gap: 24px;
 
       .feature-card {
-        background: white;
+        background: var(--el-bg-color);
         border-radius: 16px;
         padding: 32px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
@@ -619,7 +619,7 @@ const viewDocumentation = () => {
             margin: 0;
             font-size: 20px;
             font-weight: 600;
-            color: var(--el-text-color-primary);
+            color: #1a202c;
           }
         }
 
@@ -654,7 +654,7 @@ const viewDocumentation = () => {
       gap: 32px;
 
       .tech-category {
-        background: white;
+        background: var(--el-bg-color);
         border-radius: 16px;
         padding: 32px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
@@ -699,7 +699,7 @@ const viewDocumentation = () => {
             margin: 0;
             font-size: 20px;
             font-weight: 600;
-            color: var(--el-text-color-primary);
+            color: #1a202c;
           }
         }
 
@@ -717,7 +717,7 @@ const viewDocumentation = () => {
 
             .tech-name {
               font-weight: 500;
-              color: var(--el-text-color-primary);
+              color: #1a202c;
             }
 
             .tech-desc {
@@ -806,7 +806,7 @@ const viewDocumentation = () => {
       }
 
       .framework-info {
-        background: white;
+        background: var(--el-bg-color);
         border-radius: 16px;
         padding: 32px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
@@ -816,7 +816,7 @@ const viewDocumentation = () => {
           margin: 0 0 24px 0;
           font-size: 20px;
           font-weight: 600;
-          color: var(--el-text-color-primary);
+          color: #1a202c;
         }
 
         .framework-list {
@@ -833,7 +833,7 @@ const viewDocumentation = () => {
 
             .name {
               font-weight: 500;
-              color: var(--el-text-color-primary);
+              color: #1a202c;
             }
 
             .version {
@@ -859,7 +859,7 @@ const viewDocumentation = () => {
       gap: 24px;
 
       .contact-card {
-        background: white;
+        background: var(--el-bg-color);
         border-radius: 16px;
         padding: 32px;
         text-align: center;
@@ -904,14 +904,14 @@ const viewDocumentation = () => {
           margin: 0 0 12px 0;
           font-size: 18px;
           font-weight: 600;
-          color: var(--el-text-color-primary);
+          color: #1a202c;
         }
 
         p {
           margin: 0 0 8px 0;
           font-size: 16px;
           font-weight: 500;
-          color: var(--el-text-color-primary);
+          color: #1a202c;
 
           .doc-link {
             color: var(--el-color-primary);
