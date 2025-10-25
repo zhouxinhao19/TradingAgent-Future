@@ -30,8 +30,11 @@ from pymongo import MongoClient
 from bson import ObjectId
 
 
-# 配置
-MONGO_URI = "mongodb://admin:tradingagents123@mongodb:27017/tradingagents?authSource=admin"
+# MongoDB 连接配置
+# Docker 内部运行时使用服务名 "mongodb"
+# 宿主机运行时使用 "localhost"
+MONGO_URI_DOCKER = "mongodb://admin:tradingagents123@mongodb:27017/tradingagents?authSource=admin"
+MONGO_URI_HOST = "mongodb://admin:tradingagents123@localhost:27017/tradingagents?authSource=admin"
 DB_NAME = "tradingagents"
 
 # 默认管理员用户
@@ -124,21 +127,34 @@ def load_export_file(file_path: str) -> Dict[str, Any]:
         sys.exit(1)
 
 
-def connect_mongodb() -> MongoClient:
-    """连接到 MongoDB"""
-    print(f"\n🔌 连接到 MongoDB...")
-    
+def connect_mongodb(use_docker: bool = True) -> MongoClient:
+    """连接到 MongoDB
+
+    Args:
+        use_docker: True=在 Docker 容器内运行（使用 mongodb 服务名）
+                   False=在宿主机运行（使用 localhost）
+    """
+    mongo_uri = MONGO_URI_DOCKER if use_docker else MONGO_URI_HOST
+    env_name = "Docker 容器内" if use_docker else "宿主机"
+
+    print(f"\n🔌 连接到 MongoDB ({env_name})...")
+    print(f"   URI: {mongo_uri.replace('tradingagents123', '***')}")
+
     try:
-        client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+        client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
         # 测试连接
         client.admin.command('ping')
         print(f"✅ MongoDB 连接成功")
         return client
-    
+
     except Exception as e:
         print(f"❌ 错误: MongoDB 连接失败: {e}")
-        print(f"   请确保 MongoDB 容器正在运行")
-        print(f"   运行: docker ps | grep mongodb")
+        if use_docker:
+            print(f"   请确保在 Docker 容器内运行，或使用 --host 参数在宿主机运行")
+            print(f"   检查容器: docker ps | grep mongodb")
+        else:
+            print(f"   请确保 MongoDB 容器正在运行并映射到宿主机端口 27017")
+            print(f"   检查端口映射: docker ps | grep 27017")
         sys.exit(1)
 
 
@@ -266,8 +282,11 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
-  # 从 install 目录导入默认配置数据
+  # 在 Docker 容器内运行（默认）
   python scripts/import_config_and_create_user.py
+
+  # 在宿主机运行（连接到 localhost:27017）
+  python scripts/import_config_and_create_user.py --host
 
   # 从指定文件导入
   python scripts/import_config_and_create_user.py export.json
@@ -287,6 +306,11 @@ def main():
         "export_file",
         nargs="?",
         help="导出的 JSON 文件路径（默认：install/database_export_config_*.json）"
+    )
+    parser.add_argument(
+        "--host",
+        action="store_true",
+        help="在宿主机运行（连接 localhost:27017），默认在 Docker 容器内运行（连接 mongodb:27017）"
     )
     parser.add_argument(
         "--overwrite",
@@ -329,9 +353,10 @@ def main():
     print("=" * 80)
     print("📦 导入配置数据并创建默认用户")
     print("=" * 80)
-    
+
     # 连接数据库
-    client = connect_mongodb()
+    use_docker = not args.host  # 默认在 Docker 内运行，除非指定 --host
+    client = connect_mongodb(use_docker=use_docker)
     db = client[DB_NAME]
     
     # 导入数据
