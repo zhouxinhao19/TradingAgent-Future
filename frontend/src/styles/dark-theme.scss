@@ -1,0 +1,331 @@
+/**
+ * 暗色主题优化样式
+ * 修复暗色模式下按钮和文本对比度不足的问题
+ */
+
+// 暗色主题下的全局样式优化
+html.dark {
+  // 确保背景色正确
+  background-color: var(--el-bg-color-page);
+  
+  // 优化按钮样式
+  .el-button {
+    // 主要按钮
+    &.el-button--primary {
+      --el-button-text-color: #ffffff;
+      --el-button-bg-color: var(--el-color-primary);
+      --el-button-border-color: var(--el-color-primary);
+      --el-button-hover-text-color: #ffffff;
+      --el-button-hover-bg-color: var(--el-color-primary-light-3);
+      --el-button-hover-border-color: var(--el-color-primary-light-3);
+      --el-button-active-text-color: #ffffff;
+      --el-button-active-bg-color: var(--el-color-primary-dark-2);
+      --el-button-active-border-color: var(--el-color-primary-dark-2);
+      
+      color: #ffffff !important;
+      
+      &:hover {
+        color: #ffffff !important;
+      }
+      
+      &:active {
+        color: #ffffff !important;
+      }
+    }
+    
+    // 成功按钮
+    &.el-button--success {
+      --el-button-text-color: #ffffff;
+      color: #ffffff !important;
+      
+      &:hover,
+      &:active {
+        color: #ffffff !important;
+      }
+    }
+    
+    // 警告按钮
+    &.el-button--warning {
+      --el-button-text-color: #ffffff;
+      color: #ffffff !important;
+      
+      &:hover,
+      &:active {
+        color: #ffffff !important;
+      }
+    }
+    
+    // 危险按钮
+    &.el-button--danger {
+      --el-button-text-color: #ffffff;
+      color: #ffffff !important;
+      
+      &:hover,
+      &:active {
+        color: #ffffff !important;
+      }
+    }
+    
+    // 信息按钮
+    &.el-button--info {
+      --el-button-text-color: #ffffff;
+      color: #ffffff !important;
+      
+      &:hover,
+      &:active {
+        color: #ffffff !important;
+      }
+    }
+    
+    // 默认按钮（白色背景）
+    &.el-button--default {
+      --el-button-text-color: var(--el-text-color-primary);
+      --el-button-bg-color: var(--el-fill-color-blank);
+      --el-button-border-color: var(--el-border-color);
+      
+      color: var(--el-text-color-primary) !important;
+      
+      &:hover {
+        color: var(--el-color-primary) !important;
+      }
+    }
+    
+    // 文本按钮
+    &.el-button--text {
+      --el-button-text-color: var(--el-text-color-primary);
+      color: var(--el-text-color-primary) !important;
+      
+      &:hover {
+        color: var(--el-color-primary) !important;
+      }
+    }
+  }
+  
+  // 优化单选按钮组
+  .el-radio-group {
+    .el-radio {
+      --el-radio-text-color: var(--el-text-color-primary);
+      
+      .el-radio__label {
+        color: var(--el-text-color-primary) !important;
+      }
+      
+      &.is-checked {
+        .el-radio__label {
+          color: var(--el-color-primary) !important;
+        }
+      }
+    }
+    
+    // 按钮样式的单选框
+    .el-radio-button {
+      .el-radio-button__inner {
+        color: var(--el-text-color-primary) !important;
+        background-color: var(--el-fill-color-blank);
+        border-color: var(--el-border-color);
+      }
+      
+      &.is-active {
+        .el-radio-button__inner {
+          color: #ffffff !important;
+          background-color: var(--el-color-primary);
+          border-color: var(--el-color-primary);
+        }
+      }
+      
+      &:hover {
+        .el-radio-button__inner {
+          color: var(--el-color-primary) !important;
+        }
+      }
+    }
+  }
+  
+  // 优化复选框
+  .el-checkbox {
+    --el-checkbox-text-color: var(--el-text-color-primary);
+    
+    .el-checkbox__label {
+      color: var(--el-text-color-primary) !important;
+    }
+    
+    &.is-checked {
+      .el-checkbox__label {
+        color: var(--el-color-primary) !important;
+      }
+    }
+  }
+  
+  // 优化表单标签
+  .el-form-item__label {
+    color: var(--el-text-color-primary) !important;
+  }
+  
+  // 优化卡片
+  .el-card {
+    --el-card-bg-color: var(--el-bg-color);
+    background-color: var(--el-bg-color);
+    border-color: var(--el-border-color-light);
+    
+    .el-card__header {
+      background-color: var(--el-bg-color);
+      border-bottom-color: var(--el-border-color-light);
+      color: var(--el-text-color-primary);
+    }
+  }
+  
+  // 优化菜单
+  .el-menu {
+    background-color: var(--el-bg-color);
+    border-color: var(--el-border-color-light);
+    
+    .el-menu-item,
+    .el-sub-menu__title {
+      color: var(--el-text-color-primary) !important;
+      
+      &:hover {
+        background-color: var(--el-fill-color-light);
+        color: var(--el-color-primary) !important;
+      }
+      
+      &.is-active {
+        color: var(--el-color-primary) !important;
+        background-color: var(--el-color-primary-light-9);
+      }
+    }
+  }
+  
+  // 优化输入框
+  .el-input {
+    .el-input__wrapper {
+      background-color: var(--el-fill-color-blank);
+      box-shadow: 0 0 0 1px var(--el-border-color) inset;
+      
+      .el-input__inner {
+        color: var(--el-text-color-primary);
+        
+        &::placeholder {
+          color: var(--el-text-color-placeholder);
+        }
+      }
+    }
+    
+    &.is-disabled {
+      .el-input__wrapper {
+        background-color: var(--el-fill-color-light);
+        
+        .el-input__inner {
+          color: var(--el-text-color-placeholder);
+        }
+      }
+    }
+  }
+  
+  // 优化选择器
+  .el-select {
+    .el-input__wrapper {
+      background-color: var(--el-fill-color-blank);
+    }
+  }
+  
+  // 优化下拉菜单
+  .el-dropdown-menu {
+    background-color: var(--el-bg-color-overlay);
+    border-color: var(--el-border-color-light);
+    
+    .el-dropdown-menu__item {
+      color: var(--el-text-color-primary);
+      
+      &:hover {
+        background-color: var(--el-fill-color-light);
+        color: var(--el-color-primary);
+      }
+    }
+  }
+  
+  // 优化表格
+  .el-table {
+    --el-table-bg-color: var(--el-bg-color);
+    --el-table-tr-bg-color: var(--el-bg-color);
+    --el-table-header-bg-color: var(--el-fill-color-light);
+    --el-table-text-color: var(--el-text-color-primary);
+    --el-table-header-text-color: var(--el-text-color-primary);
+    --el-table-border-color: var(--el-border-color-lighter);
+    
+    background-color: var(--el-bg-color);
+    
+    th.el-table__cell {
+      background-color: var(--el-fill-color-light);
+      color: var(--el-text-color-primary);
+    }
+    
+    td.el-table__cell {
+      color: var(--el-text-color-primary);
+    }
+  }
+  
+  // 优化标签页
+  .el-tabs {
+    .el-tabs__item {
+      color: var(--el-text-color-regular);
+      
+      &:hover {
+        color: var(--el-color-primary);
+      }
+      
+      &.is-active {
+        color: var(--el-color-primary);
+      }
+    }
+  }
+  
+  // 优化滑块
+  .el-slider {
+    .el-slider__runway {
+      background-color: var(--el-border-color-lighter);
+    }
+    
+    .el-slider__bar {
+      background-color: var(--el-color-primary);
+    }
+  }
+  
+  // 优化开关
+  .el-switch {
+    &.is-checked {
+      .el-switch__core {
+        background-color: var(--el-color-primary);
+      }
+    }
+  }
+  
+  // 优化对话框
+  .el-dialog {
+    background-color: var(--el-bg-color);
+    border: 1px solid var(--el-border-color-light);
+    
+    .el-dialog__header {
+      .el-dialog__title {
+        color: var(--el-text-color-primary);
+      }
+    }
+    
+    .el-dialog__body {
+      color: var(--el-text-color-primary);
+    }
+  }
+  
+  // 优化抽屉
+  .el-drawer {
+    background-color: var(--el-bg-color);
+    
+    .el-drawer__header {
+      color: var(--el-text-color-primary);
+    }
+    
+    .el-drawer__body {
+      color: var(--el-text-color-primary);
+    }
+  }
+}
+
