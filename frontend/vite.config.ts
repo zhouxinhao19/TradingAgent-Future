@@ -49,7 +49,8 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
-        secure: false
+        secure: false,
+        ws: true  // 🔥 启用 WebSocket 代理支持
       }
     }
   },
