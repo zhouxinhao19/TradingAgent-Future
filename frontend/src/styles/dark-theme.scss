@@ -701,5 +701,23 @@ html.dark {
       }
     }
   }
+
+  // 优化批量分析页面的页面头部
+  .batch-analysis {
+    .page-header {
+      .header-content {
+        background: var(--el-bg-color) !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+      }
+
+      .page-title {
+        color: #ffffff !important;
+      }
+
+      .page-description {
+        color: var(--el-text-color-regular) !important;
+      }
+    }
+  }
 }
 
