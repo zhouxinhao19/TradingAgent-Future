@@ -12,7 +12,7 @@ import time
 import uuid
 import asyncio
 
-from app.routers.auth import get_current_user
+from app.routers.auth_db import get_current_user
 from app.services.queue_service import get_queue_service, QueueService
 from app.services.analysis_service import get_analysis_service
 from app.services.simple_analysis_service import get_simple_analysis_service

@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from app.routers.auth import get_current_user
+from app.routers.auth_db import get_current_user
 from app.core.database import get_mongo_db, get_redis_client
 from app.services.database_service import DatabaseService
 

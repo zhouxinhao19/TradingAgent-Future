@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from typing import Literal, Optional, Dict, Any, List
 from datetime import datetime
 
-from app.routers.auth import get_current_user
+from app.routers.auth_db import get_current_user
 from app.core.database import get_mongo_db
 from app.core.response import ok
 

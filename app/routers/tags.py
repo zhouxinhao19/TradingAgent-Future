@@ -5,7 +5,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from app.routers.auth import get_current_user
+from app.routers.auth_db import get_current_user
 from app.core.response import ok
 from app.services.tags_service import tags_service
 

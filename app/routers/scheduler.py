@@ -10,7 +10,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 from pydantic import BaseModel
 
-from app.routers.auth import get_current_user
+from app.routers.auth_db import get_current_user
 from app.services.scheduler_service import get_scheduler_service, SchedulerService
 from app.core.response import ok
 

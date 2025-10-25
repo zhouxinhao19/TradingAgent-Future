@@ -5,7 +5,7 @@ import json
 import logging
 import time
 
-from app.routers.auth import get_current_user
+from app.routers.auth_db import get_current_user
 from app.core.database import get_redis_client
 from app.core.config import settings
 

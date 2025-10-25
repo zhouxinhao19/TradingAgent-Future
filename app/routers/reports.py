@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
-from .auth import get_current_user
+from .auth_db import get_current_user
 from ..core.database import get_mongo_db
 import logging
 

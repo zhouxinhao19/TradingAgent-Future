@@ -7,7 +7,7 @@ from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
-from app.routers.auth import get_current_user
+from app.routers.auth_db import get_current_user
 from app.models.user import User
 from app.models.config import (
     SystemConfigResponse, LLMConfigRequest, DataSourceConfigRequest,

@@ -6,7 +6,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi import status
 
-from app.routers.auth import get_current_user
+from app.routers.auth_db import get_current_user
 from app.services.stock_data_service import get_stock_data_service
 from app.models import (
     StockBasicInfoResponse,

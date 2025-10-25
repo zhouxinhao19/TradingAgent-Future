@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 # Routers
 from app.routers import config as config_router
-from app.routers.auth import get_current_user
+from app.routers.auth_db import get_current_user
 
 
 def _admin_user():

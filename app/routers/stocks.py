@@ -7,7 +7,7 @@
 from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.routers.auth import get_current_user
+from app.routers.auth_db import get_current_user
 from app.core.database import get_mongo_db
 from app.core.response import ok
 

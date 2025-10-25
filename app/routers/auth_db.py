@@ -120,9 +120,12 @@ async def login(payload: LoginRequest, request: Request):
     ip_address = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "")
 
+    logger.info(f"🔐 登录请求 - 用户名: {payload.username}, IP: {ip_address}")
+
     try:
         # 验证输入
         if not payload.username or not payload.password:
+            logger.warning(f"❌ 登录失败 - 用户名或密码为空")
             await log_operation(
                 user_id="unknown",
                 username=payload.username or "unknown",
@@ -137,9 +140,15 @@ async def login(payload: LoginRequest, request: Request):
             )
             raise HTTPException(status_code=400, detail="用户名和密码不能为空")
 
+        logger.info(f"🔍 开始认证用户: {payload.username}")
+
         # 使用数据库认证
         user = await user_service.authenticate_user(payload.username, payload.password)
+
+        logger.info(f"🔍 认证结果: user={'存在' if user else '不存在'}")
+
         if not user:
+            logger.warning(f"❌ 登录失败 - 用户名或密码错误: {payload.username}")
             await log_operation(
                 user_id="unknown",
                 username=payload.username,

@@ -5,7 +5,7 @@ import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.routers.auth import get_current_user
+from app.routers.auth_db import get_current_user
 from app.core.response import ok
 from app.core.database import get_redis_client
 from app.services.notifications_service import get_notifications_service

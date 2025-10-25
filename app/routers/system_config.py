@@ -4,7 +4,7 @@ import re
 import logging
 
 from app.core.config import settings
-from app.routers.auth import get_current_user
+from app.routers.auth_db import get_current_user
 
 router = APIRouter()
 logger = logging.getLogger("webapi")
