@@ -183,18 +183,22 @@ export const useAuthStore = defineStore('auth', {
     async login(loginForm: LoginForm) {
       try {
         this.loginLoading = true
-        
+
         const response = await authApi.login(loginForm)
-        
+
         if (response.success) {
           const { access_token, refresh_token, user } = response.data
-          
+
           // 设置认证信息
           this.setAuthInfo(access_token, refresh_token, user)
 
           // 开源版admin用户拥有所有权限
           this.permissions = ['*']
           this.roles = ['admin']
+
+          // 启动 token 自动刷新定时器
+          const { setupTokenRefreshTimer } = await import('@/utils/auth')
+          setupTokenRefreshTimer()
 
           ElMessage.success('登录成功')
           return true

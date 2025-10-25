@@ -14,6 +14,7 @@ import router from './router'
 import { setupGlobalComponents } from './components'
 import { useAuthStore } from './stores/auth'
 import { useAppStore } from './stores/app'
+import { setupTokenRefreshTimer } from './utils/auth'
 import './styles/index.scss'
 
 // 创建应用实例
@@ -42,6 +43,25 @@ setupGlobalComponents(app)
 // 全局错误处理
 app.config.errorHandler = (err, vm, info) => {
   console.error('全局错误:', err, info)
+
+  // 检查是否是认证错误
+  if (err && typeof err === 'object') {
+    const error = err as any
+    // 检查错误消息或状态码
+    if (
+      error.message?.includes('认证失败') ||
+      error.message?.includes('登录已过期') ||
+      error.message?.includes('Token') ||
+      error.response?.status === 401 ||
+      error.code === 401
+    ) {
+      console.log('🔒 全局错误处理：检测到认证错误，跳转登录页')
+      const authStore = useAuthStore()
+      authStore.clearAuthInfo()
+      router.push('/login')
+    }
+  }
+
   // 这里可以集成错误监控服务
 }
 
@@ -85,6 +105,11 @@ const initApp = async () => {
 
       await Promise.race([checkPromise, timeoutPromise])
       console.log('✅ 认证状态初始化完成')
+
+      // 如果用户已登录，启动 token 自动刷新定时器
+      if (authStore.isAuthenticated) {
+        setupTokenRefreshTimer()
+      }
     } else {
       console.log('⚠️ API连接失败，跳过认证检查')
     }

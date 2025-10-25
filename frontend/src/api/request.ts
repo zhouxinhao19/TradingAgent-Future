@@ -120,6 +120,7 @@ const createAxiosInstance = (): AxiosInstance => {
   instance.interceptors.response.use(
     (response: AxiosResponse) => {
       const appStore = useAppStore()
+      const authStore = useAuthStore()
       const config = response.config as RequestConfig
 
       // 隐藏加载状态
@@ -132,9 +133,22 @@ const createAxiosInstance = (): AxiosInstance => {
       // 检查业务状态码
       const data = response.data as ApiResponse
       if (data && typeof data === 'object' && 'success' in data) {
-        if (!data.success && !config.skipErrorHandler) {
-          handleBusinessError(data)
-          return Promise.reject(new Error(data.message || '请求失败'))
+        if (!data.success) {
+          // 检查是否是认证错误（优先处理，不依赖 skipErrorHandler）
+          const code = data.code
+          if (code === 401 || code === 40101 || code === 40102 || code === 40103) {
+            console.log('🔒 业务错误：认证失败 (HTTP 200)，跳转登录页')
+            authStore.clearAuthInfo()
+            router.push('/login')
+            ElMessage.error(data.message || '登录已过期，请重新登录')
+            return Promise.reject(new Error(data.message || '认证失败'))
+          }
+
+          // 其他业务错误
+          if (!config.skipErrorHandler) {
+            handleBusinessError(data)
+            return Promise.reject(new Error(data.message || '请求失败'))
+          }
         }
       }
 
@@ -290,11 +304,22 @@ const createAxiosInstance = (): AxiosInstance => {
 // 处理业务错误
 const handleBusinessError = (data: ApiResponse) => {
   const { code, message } = data
+  const authStore = useAuthStore()
 
   switch (code) {
+    case 401:
+    case 40101:  // 未授权
+    case 40102:  // Token 无效
+    case 40103:  // Token 过期
+      console.log('🔒 业务错误：认证失败，跳转登录页')
+      authStore.clearAuthInfo()
+      router.push('/login')
+      ElMessage.error(message || '登录已过期，请重新登录')
+      break
     case 40001:
       ElMessage.error('参数错误')
       break
+    case 403:
     case 40003:
       ElMessage.error('权限不足')
       break
