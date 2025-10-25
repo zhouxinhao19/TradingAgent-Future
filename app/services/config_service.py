@@ -630,6 +630,15 @@ class ConfigService:
             def _llm_sanitize(x: LLMConfig):
                 d = x.model_dump()
                 d["api_key"] = ""
+                # 确保必填字段有默认值（防止导出 None 或空字符串）
+                if not d.get("max_tokens") or d.get("max_tokens") == "":
+                    d["max_tokens"] = 4000
+                if not d.get("temperature") and d.get("temperature") != 0:
+                    d["temperature"] = 0.7
+                if not d.get("timeout") or d.get("timeout") == "":
+                    d["timeout"] = 180
+                if not d.get("retry_times") or d.get("retry_times") == "":
+                    d["retry_times"] = 3
                 return d
             def _ds_sanitize(x: DataSourceConfig):
                 d = x.model_dump()
@@ -672,6 +681,15 @@ class ConfigService:
                 d = dict(llm or {})
                 d.pop("api_key", None)
                 d["api_key"] = ""
+                # 清理空字符串，让 Pydantic 使用默认值
+                if d.get("max_tokens") == "" or d.get("max_tokens") is None:
+                    d.pop("max_tokens", None)
+                if d.get("temperature") == "" or d.get("temperature") is None:
+                    d.pop("temperature", None)
+                if d.get("timeout") == "" or d.get("timeout") is None:
+                    d.pop("timeout", None)
+                if d.get("retry_times") == "" or d.get("retry_times") is None:
+                    d.pop("retry_times", None)
                 return LLMConfig(**d)
             def _ds_sanitize_in(ds: Dict[str, Any]):
                 d = dict(ds or {})
