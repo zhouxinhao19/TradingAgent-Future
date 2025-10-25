@@ -158,7 +158,7 @@ class FavoritesService:
                 {"_id": ObjectId(user_id)},
                 {"$push": {"favorite_stocks": favorite_stock}}
             )
-            return result.modified_count > 0
+            return result.matched_count > 0
         else:
             # 在独立集合中按user_id维护favorites数组
             await db.user_favorites.update_one(
