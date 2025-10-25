@@ -311,7 +311,7 @@ class ChatQianfanOpenAI(OpenAICompatibleBase):
 
 class ChatCustomOpenAI(OpenAICompatibleBase):
     """自定义OpenAI端点适配器（代理/聚合平台）"""
-    
+
     def __init__(
         self,
         model: str = "gpt-3.5-turbo",
@@ -323,7 +323,7 @@ class ChatCustomOpenAI(OpenAICompatibleBase):
     ):
         if base_url is None:
             base_url = os.getenv("CUSTOM_OPENAI_BASE_URL", "https://api.openai.com/v1")
-        
+
         super().__init__(
             provider_name="custom_openai",
             model=model,

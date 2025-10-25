@@ -857,8 +857,17 @@ class ConfigService:
 
                 # 构建测试请求
                 api_base_normalized = api_base.rstrip("/")
-                if not api_base_normalized.endswith("/v1"):
+
+                # 🔧 智能版本号处理：只有在没有版本号的情况下才添加 /v1
+                # 避免对已有版本号的URL（如智谱AI的 /v4）重复添加 /v1
+                import re
+                if not re.search(r'/v\d+$', api_base_normalized):
+                    # URL末尾没有版本号，添加 /v1（OpenAI标准）
                     api_base_normalized = api_base_normalized + "/v1"
+                    logger.info(f"   添加 /v1 版本号: {api_base_normalized}")
+                else:
+                    # URL已包含版本号（如 /v4），不添加
+                    logger.info(f"   检测到已有版本号，保持原样: {api_base_normalized}")
 
                 url = f"{api_base_normalized}/chat/completions"
 
@@ -3586,9 +3595,17 @@ class ConfigService:
         try:
             import requests
 
-            # 确保 base_url 以 /v1 结尾
-            if not base_url.endswith("/v1"):
-                base_url = base_url.rstrip("/") + "/v1"
+            # 🔧 智能版本号处理：只有在没有版本号的情况下才添加 /v1
+            # 避免对已有版本号的URL（如智谱AI的 /v4）重复添加 /v1
+            import re
+            base_url = base_url.rstrip("/")
+            if not re.search(r'/v\d+$', base_url):
+                # URL末尾没有版本号，添加 /v1（OpenAI标准）
+                base_url = base_url + "/v1"
+                logger.info(f"   [获取模型列表] 添加 /v1 版本号: {base_url}")
+            else:
+                # URL已包含版本号（如 /v4），不添加
+                logger.info(f"   [获取模型列表] 检测到已有版本号，保持原样: {base_url}")
 
             url = f"{base_url}/models"
 
@@ -3791,9 +3808,17 @@ class ConfigService:
                     "message": f"{display_name} 未配置 API 基础地址 (default_base_url)"
                 }
 
-            # 确保 base_url 以 /v1 结尾
-            if not base_url.endswith("/v1"):
-                base_url = base_url.rstrip("/") + "/v1"
+            # 🔧 智能版本号处理：只有在没有版本号的情况下才添加 /v1
+            # 避免对已有版本号的URL（如智谱AI的 /v4）重复添加 /v1
+            import re
+            base_url = base_url.rstrip("/")
+            if not re.search(r'/v\d+$', base_url):
+                # URL末尾没有版本号，添加 /v1（OpenAI标准）
+                base_url = base_url + "/v1"
+                logger.info(f"   [测试API] 添加 /v1 版本号: {base_url}")
+            else:
+                # URL已包含版本号（如 /v4），不添加
+                logger.info(f"   [测试API] 检测到已有版本号，保持原样: {base_url}")
 
             url = f"{base_url}/chat/completions"
 
