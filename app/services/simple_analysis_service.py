@@ -2114,10 +2114,33 @@ class SimpleAnalysisService:
                         if isinstance(value, str) and len(value.strip()) > 10:  # 只保存有实际内容的报告
                             reports[field] = value.strip()
 
-                    # 处理复杂的辩论状态报告
+                    # 处理研究团队辩论状态报告
                     if hasattr(state, 'investment_debate_state') or (isinstance(state, dict) and 'investment_debate_state' in state):
                         debate_state = getattr(state, 'investment_debate_state', None) if hasattr(state, 'investment_debate_state') else state.get('investment_debate_state')
                         if debate_state:
+                            # 提取多头研究员历史
+                            if hasattr(debate_state, 'bull_history'):
+                                bull_content = getattr(debate_state, 'bull_history', "")
+                            elif isinstance(debate_state, dict) and 'bull_history' in debate_state:
+                                bull_content = debate_state['bull_history']
+                            else:
+                                bull_content = ""
+
+                            if bull_content and len(bull_content.strip()) > 10:
+                                reports['bull_researcher'] = bull_content.strip()
+
+                            # 提取空头研究员历史
+                            if hasattr(debate_state, 'bear_history'):
+                                bear_content = getattr(debate_state, 'bear_history', "")
+                            elif isinstance(debate_state, dict) and 'bear_history' in debate_state:
+                                bear_content = debate_state['bear_history']
+                            else:
+                                bear_content = ""
+
+                            if bear_content and len(bear_content.strip()) > 10:
+                                reports['bear_researcher'] = bear_content.strip()
+
+                            # 提取研究经理决策
                             if hasattr(debate_state, 'judge_decision'):
                                 decision_content = getattr(debate_state, 'judge_decision', "")
                             elif isinstance(debate_state, dict) and 'judge_decision' in debate_state:
@@ -2128,9 +2151,44 @@ class SimpleAnalysisService:
                             if decision_content and len(decision_content.strip()) > 10:
                                 reports['research_team_decision'] = decision_content.strip()
 
+                    # 处理风险管理团队辩论状态报告
                     if hasattr(state, 'risk_debate_state') or (isinstance(state, dict) and 'risk_debate_state' in state):
                         risk_state = getattr(state, 'risk_debate_state', None) if hasattr(state, 'risk_debate_state') else state.get('risk_debate_state')
                         if risk_state:
+                            # 提取激进分析师历史
+                            if hasattr(risk_state, 'risky_history'):
+                                risky_content = getattr(risk_state, 'risky_history', "")
+                            elif isinstance(risk_state, dict) and 'risky_history' in risk_state:
+                                risky_content = risk_state['risky_history']
+                            else:
+                                risky_content = ""
+
+                            if risky_content and len(risky_content.strip()) > 10:
+                                reports['risky_analyst'] = risky_content.strip()
+
+                            # 提取保守分析师历史
+                            if hasattr(risk_state, 'safe_history'):
+                                safe_content = getattr(risk_state, 'safe_history', "")
+                            elif isinstance(risk_state, dict) and 'safe_history' in risk_state:
+                                safe_content = risk_state['safe_history']
+                            else:
+                                safe_content = ""
+
+                            if safe_content and len(safe_content.strip()) > 10:
+                                reports['safe_analyst'] = safe_content.strip()
+
+                            # 提取中性分析师历史
+                            if hasattr(risk_state, 'neutral_history'):
+                                neutral_content = getattr(risk_state, 'neutral_history', "")
+                            elif isinstance(risk_state, dict) and 'neutral_history' in risk_state:
+                                neutral_content = risk_state['neutral_history']
+                            else:
+                                neutral_content = ""
+
+                            if neutral_content and len(neutral_content.strip()) > 10:
+                                reports['neutral_analyst'] = neutral_content.strip()
+
+                            # 提取投资组合经理决策
                             if hasattr(risk_state, 'judge_decision'):
                                 risk_decision = getattr(risk_state, 'judge_decision', "")
                             elif isinstance(risk_state, dict) and 'judge_decision' in risk_state:

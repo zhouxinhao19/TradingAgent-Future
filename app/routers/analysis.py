@@ -420,15 +420,43 @@ async def get_task_result(
                         if isinstance(value, str) and len(value.strip()) > 10:
                             reports[field] = value.strip()
 
-                    # 处理复杂的辩论状态报告
+                    # 处理研究团队辩论状态报告
                     investment_debate_state = state.get('investment_debate_state', {})
                     if isinstance(investment_debate_state, dict):
+                        # 提取多头研究员历史
+                        bull_content = investment_debate_state.get('bull_history', "")
+                        if isinstance(bull_content, str) and len(bull_content.strip()) > 10:
+                            reports['bull_researcher'] = bull_content.strip()
+
+                        # 提取空头研究员历史
+                        bear_content = investment_debate_state.get('bear_history', "")
+                        if isinstance(bear_content, str) and len(bear_content.strip()) > 10:
+                            reports['bear_researcher'] = bear_content.strip()
+
+                        # 提取研究经理决策
                         judge_decision = investment_debate_state.get('judge_decision', "")
                         if isinstance(judge_decision, str) and len(judge_decision.strip()) > 10:
                             reports['research_team_decision'] = judge_decision.strip()
 
+                    # 处理风险管理团队辩论状态报告
                     risk_debate_state = state.get('risk_debate_state', {})
                     if isinstance(risk_debate_state, dict):
+                        # 提取激进分析师历史
+                        risky_content = risk_debate_state.get('risky_history', "")
+                        if isinstance(risky_content, str) and len(risky_content.strip()) > 10:
+                            reports['risky_analyst'] = risky_content.strip()
+
+                        # 提取保守分析师历史
+                        safe_content = risk_debate_state.get('safe_history', "")
+                        if isinstance(safe_content, str) and len(safe_content.strip()) > 10:
+                            reports['safe_analyst'] = safe_content.strip()
+
+                        # 提取中性分析师历史
+                        neutral_content = risk_debate_state.get('neutral_history', "")
+                        if isinstance(neutral_content, str) and len(neutral_content.strip()) > 10:
+                            reports['neutral_analyst'] = neutral_content.strip()
+
+                        # 提取投资组合经理决策
                         risk_decision = risk_debate_state.get('judge_decision', "")
                         if isinstance(risk_decision, str) and len(risk_decision.strip()) > 10:
                             reports['risk_management_decision'] = risk_decision.strip()
