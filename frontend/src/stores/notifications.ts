@@ -216,7 +216,6 @@ export const useNotificationStore = defineStore('notifications', () => {
     drawerVisible,
     connected,
     wsConnected,
-    sseConnected,
     refreshUnreadCount,
     loadList,
     markRead,
@@ -226,8 +225,6 @@ export const useNotificationStore = defineStore('notifications', () => {
     disconnect,
     connectWebSocket,
     disconnectWebSocket,
-    connectSSE,
-    disconnectSSE,
     setDrawerVisible
   }
 })

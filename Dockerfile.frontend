@@ -8,14 +8,14 @@ ENV NODE_ENV=production
 WORKDIR /app/frontend
 
 # 启用Corepack并使用Yarn 1.22.22（项目使用的包管理器）
-RUN corepack enable && corepack prepare yarn@1.22.22 --activate \
-    && yarn config set registry https://registry.npmmirror.com
+RUN corepack enable && corepack prepare yarn@1.22.22 --activate
 
-# 复制package.json和yarn.lock
-COPY frontend/package.json frontend/yarn.lock ./
+# 复制package.json、yarn.lock和.yarnrc（配置国内镜像源）
+COPY frontend/package.json frontend/yarn.lock frontend/.yarnrc ./
 
 # 安装依赖（使用yarn.lock确保版本一致）
-RUN yarn install --frozen-lockfile --production=false
+# 增加网络超时时间到5分钟，适应跨平台构建的网络延迟
+RUN yarn install --frozen-lockfile --production=false --network-timeout 300000
 
 # 复制前端源代码
 COPY frontend/. ./
