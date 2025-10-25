@@ -19,8 +19,8 @@ REGISTRY="${REGISTRY:-}"  # 留空表示本地构建，设置为 Docker Hub 用�
 BACKEND_IMAGE="tradingagents-backend"
 FRONTEND_IMAGE="tradingagents-frontend"
 
-# 支持的架构
-PLATFORMS="linux/amd64,linux/arm64"
+# 支持的架构（可通过环境变量覆盖）
+PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}TradingAgents-CN 多架构镜像构建${NC}"
