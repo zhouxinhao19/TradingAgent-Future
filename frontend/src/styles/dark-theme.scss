@@ -593,6 +593,95 @@ html.dark {
         color: var(--el-text-color-regular) !important;
       }
     }
+
+    // 优化 Hero 区域的按钮
+    .hero-section {
+      .hero-actions {
+        .el-button {
+          &.el-button--primary {
+            background: white !important;
+            color: #667eea !important;
+            border: none !important;
+
+            &:hover {
+              background: rgba(255, 255, 255, 0.9) !important;
+            }
+
+            .el-icon {
+              color: #667eea !important;
+            }
+          }
+
+          &:not(.el-button--primary) {
+            background: rgba(255, 255, 255, 0.1) !important;
+            color: white !important;
+            border: 1px solid rgba(255, 255, 255, 0.3) !important;
+
+            &:hover {
+              background: rgba(255, 255, 255, 0.2) !important;
+            }
+
+            .el-icon {
+              color: white !important;
+            }
+          }
+        }
+      }
+    }
+
+    // 优化 Hero 区域的统计卡片文字
+    .hero-visual {
+      .stat-item {
+        .stat-number,
+        .stat-label {
+          color: white !important;
+        }
+      }
+    }
+  }
+
+  // 优化报告详情页面的关键指标卡片
+  .report-detail {
+    .metrics-content {
+      .metric-item {
+        .metric-label {
+          color: #ffffff !important;
+        }
+
+        .recommendation-value {
+          color: #ffffff !important;
+        }
+
+        .confidence-label {
+          color: #ffffff !important;
+        }
+
+        .confidence-text {
+          .confidence-number,
+          .confidence-unit {
+            color: #ffffff !important;
+          }
+        }
+
+        .risk-label {
+          // 保持原有的风险颜色，不覆盖
+        }
+
+        .risk-description {
+          color: var(--el-text-color-secondary) !important;
+        }
+      }
+
+      .key-points {
+        h4 {
+          color: #ffffff !important;
+        }
+
+        li {
+          color: #ffffff !important;
+        }
+      }
+    }
   }
 }
 
