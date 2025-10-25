@@ -94,6 +94,16 @@ async def init_providers():
             "default_base_url": "https://api.siliconflow.cn/v1",
             "is_active": True,
             "supported_features": ["chat", "completion", "embedding", "function_calling", "streaming"]
+        },
+        {
+            "name": "302ai",
+            "display_name": "302.AI",
+            "description": "302.AI是企业级AI聚合平台，提供多种主流大模型的统一接口",
+            "website": "https://302.ai",
+            "api_doc_url": "https://doc.302.ai",
+            "default_base_url": "https://api.302.ai/v1",
+            "is_active": True,
+            "supported_features": ["chat", "completion", "embedding", "image", "vision", "function_calling", "streaming"]
         }
     ]
     

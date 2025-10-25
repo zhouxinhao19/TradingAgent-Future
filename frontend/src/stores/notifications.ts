@@ -89,13 +89,23 @@ export const useNotificationStore = defineStore('notifications', () => {
         return
       }
 
-      const base = (import.meta.env.VITE_API_BASE_URL || '').replace(/^https?:\/\//, '')
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      const url = `${wsProtocol}//${base}/api/ws/notifications?token=${encodeURIComponent(token)}`
+      // WebSocket 连接地址
+      let wsUrl: string
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
 
-      console.log('[WS] 连接到:', url)
+      if (apiBaseUrl) {
+        // 生产环境：使用配置的 API 地址
+        const base = apiBaseUrl.replace(/^https?:\/\//, '')
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+        wsUrl = `${wsProtocol}//${base}/api/ws/notifications?token=${encodeURIComponent(token)}`
+      } else {
+        // 开发环境：直接连接后端服务器（Vite 代理不支持 WebSocket）
+        wsUrl = `ws://localhost:8000/api/ws/notifications?token=${encodeURIComponent(token)}`
+      }
 
-      const socket = new WebSocket(url)
+      console.log('[WS] 连接到:', wsUrl)
+
+      const socket = new WebSocket(wsUrl)
       ws.value = socket
 
       socket.onopen = () => {

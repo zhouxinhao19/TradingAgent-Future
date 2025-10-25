@@ -259,6 +259,15 @@ const presetProviders = [
     api_doc_url: 'https://help.aliyun.com/zh/dashscope/',
     default_base_url: 'https://dashscope.aliyuncs.com/api/v1',
     supported_features: ['chat', 'completion', 'embedding', 'function_calling', 'streaming']
+  },
+  {
+    name: '302ai',
+    display_name: '302.AI',
+    description: '302.AI是企业级AI聚合平台，提供多种主流大模型的统一接口',
+    website: 'https://302.ai',
+    api_doc_url: 'https://doc.302.ai',
+    default_base_url: 'https://api.302.ai/v1',
+    supported_features: ['chat', 'completion', 'embedding', 'image', 'vision', 'function_calling', 'streaming']
   }
 ]
 

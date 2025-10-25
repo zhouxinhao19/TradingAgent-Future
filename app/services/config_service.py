@@ -881,7 +881,7 @@ class ConfigService:
                     "messages": [
                         {"role": "user", "content": "Hello, please respond with 'OK' if you can read this."}
                     ],
-                    "max_tokens": 10,
+                    "max_tokens": 200,  # 增加到200，给推理模型（如o1/gpt-5）足够空间
                     "temperature": 0.1
                 }
 
@@ -897,33 +897,50 @@ class ConfigService:
 
                 # 处理响应（仅用于 OpenAI 兼容的厂家）
                 if response.status_code == 200:
-                    result = response.json()
-                    if "choices" in result and len(result["choices"]) > 0:
-                        content = result["choices"][0]["message"]["content"]
-                        if content and len(content.strip()) > 0:
-                            logger.info(f"✅ 测试成功: {content[:50]}")
-                            return {
-                                "success": True,
-                                "message": f"成功连接到 {provider_str} {llm_config.model_name}",
-                                "response_time": response_time,
-                                "details": {
-                                    "provider": provider_str,
-                                    "model": llm_config.model_name,
-                                    "api_base": api_base,
-                                    "response_preview": content[:100]
+                    try:
+                        result = response.json()
+                        logger.info(f"📦 响应JSON: {result}")
+
+                        if "choices" in result and len(result["choices"]) > 0:
+                            content = result["choices"][0]["message"]["content"]
+                            logger.info(f"📝 响应内容: {content}")
+
+                            if content and len(content.strip()) > 0:
+                                logger.info(f"✅ 测试成功: {content[:50]}")
+                                return {
+                                    "success": True,
+                                    "message": f"成功连接到 {provider_str} {llm_config.model_name}",
+                                    "response_time": response_time,
+                                    "details": {
+                                        "provider": provider_str,
+                                        "model": llm_config.model_name,
+                                        "api_base": api_base,
+                                        "response_preview": content[:100]
+                                    }
                                 }
-                            }
+                            else:
+                                logger.warning(f"⚠️ API响应内容为空")
+                                return {
+                                    "success": False,
+                                    "message": "API响应内容为空",
+                                    "response_time": response_time,
+                                    "details": None
+                                }
                         else:
+                            logger.warning(f"⚠️ API响应格式异常，缺少 choices 字段")
+                            logger.warning(f"   响应内容: {result}")
                             return {
                                 "success": False,
-                                "message": "API响应内容为空",
+                                "message": "API响应格式异常",
                                 "response_time": response_time,
                                 "details": None
                             }
-                    else:
+                    except Exception as e:
+                        logger.error(f"❌ 解析响应失败: {e}")
+                        logger.error(f"   响应文本: {response.text[:500]}")
                         return {
                             "success": False,
-                            "message": "API响应格式异常",
+                            "message": f"解析响应失败: {str(e)}",
                             "response_time": response_time,
                             "details": None
                         }
@@ -3630,6 +3647,12 @@ class ConfigService:
                     all_models = result["data"]
                     print(f"📊 API 返回 {len(all_models)} 个模型")
 
+                    # 打印前几个模型的完整结构（用于调试价格字段）
+                    if all_models:
+                        print(f"🔍 第一个模型的完整结构:")
+                        import json
+                        print(json.dumps(all_models[0], indent=2, ensure_ascii=False))
+
                     # 打印所有 Anthropic 模型（用于调试）
                     anthropic_models = [m for m in all_models if "anthropic" in m.get("id", "").lower()]
                     if anthropic_models:
@@ -3694,26 +3717,50 @@ class ConfigService:
         """
         格式化模型列表，包含价格信息
 
-        OpenRouter API 返回的价格单位是 USD per token
-        我们需要转换为 USD per 1K tokens
+        支持多种价格格式：
+        1. OpenRouter: pricing.prompt/completion (USD per token)
+        2. 302.ai: price.prompt/completion 或 price.input/output
+        3. 其他: 可能没有价格信息
         """
         formatted = []
         for model in models:
             model_id = model.get("id", "")
             model_name = model.get("name", model_id)
 
-            # 获取价格信息
-            pricing = model.get("pricing", {})
-            prompt_price = pricing.get("prompt", "0")  # USD per token
-            completion_price = pricing.get("completion", "0")  # USD per token
+            # 尝试从多个字段获取价格信息
+            input_price_per_1k = None
+            output_price_per_1k = None
 
-            # 转换为 float 并乘以 1000（转换为 per 1K tokens）
-            try:
-                input_price_per_1k = float(prompt_price) * 1000 if prompt_price else None
-                output_price_per_1k = float(completion_price) * 1000 if completion_price else None
-            except (ValueError, TypeError):
-                input_price_per_1k = None
-                output_price_per_1k = None
+            # 方式1：OpenRouter 格式 (pricing.prompt/completion)
+            pricing = model.get("pricing", {})
+            if pricing:
+                prompt_price = pricing.get("prompt", "0")  # USD per token
+                completion_price = pricing.get("completion", "0")  # USD per token
+
+                try:
+                    if prompt_price and float(prompt_price) > 0:
+                        input_price_per_1k = float(prompt_price) * 1000
+                    if completion_price and float(completion_price) > 0:
+                        output_price_per_1k = float(completion_price) * 1000
+                except (ValueError, TypeError):
+                    pass
+
+            # 方式2：302.ai 格式 (price.prompt/completion 或 price.input/output)
+            if not input_price_per_1k and not output_price_per_1k:
+                price = model.get("price", {})
+                if price and isinstance(price, dict):
+                    # 尝试 prompt/completion 字段
+                    prompt_price = price.get("prompt") or price.get("input")
+                    completion_price = price.get("completion") or price.get("output")
+
+                    try:
+                        if prompt_price and float(prompt_price) > 0:
+                            # 假设是 per token，转换为 per 1K tokens
+                            input_price_per_1k = float(prompt_price) * 1000
+                        if completion_price and float(completion_price) > 0:
+                            output_price_per_1k = float(completion_price) * 1000
+                    except (ValueError, TypeError):
+                        pass
 
             # 获取上下文长度
             context_length = model.get("context_length")
@@ -3721,6 +3768,13 @@ class ConfigService:
                 # 尝试从 top_provider 获取
                 top_provider = model.get("top_provider", {})
                 context_length = top_provider.get("context_length")
+
+            # 如果还是没有，尝试从 max_completion_tokens 推断
+            if not context_length:
+                max_tokens = model.get("max_completion_tokens")
+                if max_tokens and max_tokens > 0:
+                    # 通常上下文长度是最大输出的 4-8 倍
+                    context_length = max_tokens * 4
 
             formatted_model = {
                 "id": model_id,
@@ -3749,6 +3803,15 @@ class ConfigService:
             "google",      # Google
         ]
 
+        # 常见模型名称前缀（用于识别不带厂商前缀的模型）
+        model_prefixes = {
+            "gpt-": "openai",           # gpt-3.5-turbo, gpt-4, gpt-4o
+            "o1-": "openai",            # o1-preview, o1-mini
+            "claude-": "anthropic",     # claude-3-opus, claude-3-sonnet
+            "gemini-": "google",        # gemini-pro, gemini-1.5-pro
+            "gemini": "google",         # gemini (不带连字符)
+        }
+
         # 排除的关键词
         exclude_keywords = [
             "preview",
@@ -3773,7 +3836,16 @@ class ConfigService:
             model_name = model.get("name", "").lower()
 
             # 检查是否属于三大厂
+            # 方式1：模型ID中包含厂商名称（如 openai/gpt-4）
             is_popular_provider = any(provider in model_id for provider in popular_providers)
+
+            # 方式2：模型ID以常见前缀开头（如 gpt-4, claude-3-sonnet）
+            if not is_popular_provider:
+                for prefix, provider in model_prefixes.items():
+                    if model_id.startswith(prefix):
+                        is_popular_provider = True
+                        print(f"🔍 识别模型前缀: {model_id} -> {provider}")
+                        break
 
             if not is_popular_provider:
                 continue
@@ -3849,7 +3921,7 @@ class ConfigService:
                 "messages": [
                     {"role": "user", "content": "Hello, please respond with 'OK' if you can read this."}
                 ],
-                "max_tokens": 10,
+                "max_tokens": 200,  # 增加到200，给推理模型（如o1/gpt-5）足够空间
                 "temperature": 0.1
             }
 

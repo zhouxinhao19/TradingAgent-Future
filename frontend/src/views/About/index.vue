@@ -257,7 +257,7 @@
           <div class="version-details">
             <div class="version-item">
               <span class="label">发布日期</span>
-              <span class="value">2024-10-16</span>
+              <span class="value">2025-10-16</span>
             </div>
             <div class="version-item">
               <span class="label">构建时间</span>
