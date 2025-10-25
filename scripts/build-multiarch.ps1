@@ -78,8 +78,10 @@ Write-Host "========================================" -ForegroundColor Blue
 Write-Host ""
 Write-Host "📦 构建后端镜像..." -ForegroundColor Yellow
 $BackendTag = "${BackendImage}:${Version}"
+$BackendLatestTag = "${BackendImage}:latest"
 if ($Registry) {
     $BackendTag = "${Registry}/${BackendTag}"
+    $BackendLatestTag = "${Registry}/${BackendLatestTag}"
 }
 
 $BuildArgs = @(
@@ -90,7 +92,9 @@ if ($Registry) {
     # 推送到远程仓库
     $BuildArgs += "--platform", $Platforms
     $BuildArgs += "--push"
-    Write-Host "将推送到: $BackendTag" -ForegroundColor Yellow
+    Write-Host "将推送到:" -ForegroundColor Yellow
+    Write-Host "  - $BackendTag" -ForegroundColor Yellow
+    Write-Host "  - $BackendLatestTag" -ForegroundColor Yellow
 } else {
     # 本地构建并加载
     Write-Host "本地构建: $BackendTag" -ForegroundColor Yellow
@@ -103,6 +107,9 @@ if ($Registry) {
 
 $BuildArgs += "-f", "Dockerfile.backend"
 $BuildArgs += "-t", $BackendTag
+if ($Registry) {
+    $BuildArgs += "-t", $BackendLatestTag
+}
 $BuildArgs += "."
 
 Write-Host "构建命令: docker $($BuildArgs -join ' ')" -ForegroundColor Blue
@@ -118,8 +125,10 @@ Write-Host "✅ 后端镜像构建成功" -ForegroundColor Green
 Write-Host ""
 Write-Host "📦 构建前端镜像..." -ForegroundColor Yellow
 $FrontendTag = "${FrontendImage}:${Version}"
+$FrontendLatestTag = "${FrontendImage}:latest"
 if ($Registry) {
     $FrontendTag = "${Registry}/${FrontendTag}"
+    $FrontendLatestTag = "${Registry}/${FrontendLatestTag}"
 }
 
 $BuildArgs = @(
@@ -130,7 +139,9 @@ if ($Registry) {
     # 推送到远程仓库
     $BuildArgs += "--platform", $Platforms
     $BuildArgs += "--push"
-    Write-Host "将推送到: $FrontendTag" -ForegroundColor Yellow
+    Write-Host "将推送到:" -ForegroundColor Yellow
+    Write-Host "  - $FrontendTag" -ForegroundColor Yellow
+    Write-Host "  - $FrontendLatestTag" -ForegroundColor Yellow
 } else {
     # 本地构建并加载
     Write-Host "本地构建: $FrontendTag" -ForegroundColor Yellow
@@ -143,6 +154,9 @@ if ($Registry) {
 
 $BuildArgs += "-f", "Dockerfile.frontend"
 $BuildArgs += "-t", $FrontendTag
+if ($Registry) {
+    $BuildArgs += "-t", $FrontendLatestTag
+}
 $BuildArgs += "."
 
 Write-Host "构建命令: docker $($BuildArgs -join ' ')" -ForegroundColor Blue
@@ -163,12 +177,21 @@ Write-Host ""
 
 if ($Registry) {
     Write-Host "镜像已推送到远程仓库:" -ForegroundColor Green
-    Write-Host "  - $BackendTag"
-    Write-Host "  - $FrontendTag"
+    Write-Host "  后端镜像:"
+    Write-Host "    - $BackendTag"
+    Write-Host "    - $BackendLatestTag"
+    Write-Host "  前端镜像:"
+    Write-Host "    - $FrontendTag"
+    Write-Host "    - $FrontendLatestTag"
     Write-Host ""
     Write-Host "使用方法:" -ForegroundColor Yellow
+    Write-Host "  # 拉取指定版本"
     Write-Host "  docker pull $BackendTag"
     Write-Host "  docker pull $FrontendTag"
+    Write-Host ""
+    Write-Host "  # 拉取最新版本"
+    Write-Host "  docker pull $BackendLatestTag"
+    Write-Host "  docker pull $FrontendLatestTag"
 } else {
     Write-Host "镜像已构建到本地:" -ForegroundColor Green
     Write-Host "  - $BackendTag"

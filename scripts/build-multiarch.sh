@@ -78,16 +78,25 @@ echo -e "${BLUE}========================================${NC}"
 echo ""
 echo -e "${YELLOW}📦 构建后端镜像...${NC}"
 BACKEND_TAG="${BACKEND_IMAGE}:${VERSION}"
+BACKEND_LATEST_TAG="${BACKEND_IMAGE}:latest"
 if [ -n "$REGISTRY" ]; then
     BACKEND_TAG="${REGISTRY}/${BACKEND_TAG}"
+    BACKEND_LATEST_TAG="${REGISTRY}/${BACKEND_LATEST_TAG}"
 fi
 
 BUILD_ARGS="--platform ${PLATFORMS} -f Dockerfile.backend -t ${BACKEND_TAG}"
 
+# 添加 latest 标签
+if [ -n "$REGISTRY" ]; then
+    BUILD_ARGS="${BUILD_ARGS} -t ${BACKEND_LATEST_TAG}"
+fi
+
 if [ -n "$REGISTRY" ]; then
     # 推送到远程仓库
     BUILD_ARGS="${BUILD_ARGS} --push"
-    echo -e "${YELLOW}将推送到: ${BACKEND_TAG}${NC}"
+    echo -e "${YELLOW}将推送到:${NC}"
+    echo -e "  - ${BACKEND_TAG}"
+    echo -e "  - ${BACKEND_LATEST_TAG}"
 else
     # 本地构建并加载
     BUILD_ARGS="${BUILD_ARGS} --load"
@@ -112,16 +121,25 @@ fi
 echo ""
 echo -e "${YELLOW}📦 构建前端镜像...${NC}"
 FRONTEND_TAG="${FRONTEND_IMAGE}:${VERSION}"
+FRONTEND_LATEST_TAG="${FRONTEND_IMAGE}:latest"
 if [ -n "$REGISTRY" ]; then
     FRONTEND_TAG="${REGISTRY}/${FRONTEND_TAG}"
+    FRONTEND_LATEST_TAG="${REGISTRY}/${FRONTEND_LATEST_TAG}"
 fi
 
 BUILD_ARGS="--platform ${PLATFORMS} -f Dockerfile.frontend -t ${FRONTEND_TAG}"
 
+# 添加 latest 标签
+if [ -n "$REGISTRY" ]; then
+    BUILD_ARGS="${BUILD_ARGS} -t ${FRONTEND_LATEST_TAG}"
+fi
+
 if [ -n "$REGISTRY" ]; then
     # 推送到远程仓库
     BUILD_ARGS="${BUILD_ARGS} --push"
-    echo -e "${YELLOW}将推送到: ${FRONTEND_TAG}${NC}"
+    echo -e "${YELLOW}将推送到:${NC}"
+    echo -e "  - ${FRONTEND_TAG}"
+    echo -e "  - ${FRONTEND_LATEST_TAG}"
 else
     # 本地构建并加载
     BUILD_ARGS="${BUILD_ARGS} --load"
@@ -151,12 +169,21 @@ echo ""
 
 if [ -n "$REGISTRY" ]; then
     echo -e "${GREEN}镜像已推送到远程仓库:${NC}"
-    echo -e "  - ${BACKEND_TAG}"
-    echo -e "  - ${FRONTEND_TAG}"
+    echo -e "  后端镜像:"
+    echo -e "    - ${BACKEND_TAG}"
+    echo -e "    - ${BACKEND_LATEST_TAG}"
+    echo -e "  前端镜像:"
+    echo -e "    - ${FRONTEND_TAG}"
+    echo -e "    - ${FRONTEND_LATEST_TAG}"
     echo ""
     echo -e "${YELLOW}使用方法:${NC}"
+    echo -e "  # 拉取指定版本"
     echo -e "  docker pull ${BACKEND_TAG}"
     echo -e "  docker pull ${FRONTEND_TAG}"
+    echo ""
+    echo -e "  # 拉取最新版本"
+    echo -e "  docker pull ${BACKEND_LATEST_TAG}"
+    echo -e "  docker pull ${FRONTEND_LATEST_TAG}"
 else
     echo -e "${GREEN}镜像已构建到本地:${NC}"
     echo -e "  - ${BACKEND_TAG}"
