@@ -71,15 +71,25 @@ async def add_favorite(
     current_user: dict = Depends(get_current_user)
 ):
     """添加股票到自选股"""
+    import logging
+    logger = logging.getLogger("webapi")
+
     try:
+        logger.info(f"📝 添加自选股请求: user_id={current_user['id']}, stock_code={request.stock_code}, stock_name={request.stock_name}")
+
         # 检查是否已存在
-        if await favorites_service.is_favorite(current_user["id"], request.stock_code):
+        is_fav = await favorites_service.is_favorite(current_user["id"], request.stock_code)
+        logger.info(f"🔍 检查是否已存在: {is_fav}")
+
+        if is_fav:
+            logger.warning(f"⚠️ 股票已在自选股中: {request.stock_code}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="该股票已在自选股中"
             )
 
         # 添加到自选股
+        logger.info(f"➕ 开始添加自选股...")
         success = await favorites_service.add_favorite(
             user_id=current_user["id"],
             stock_code=request.stock_code,
@@ -91,9 +101,12 @@ async def add_favorite(
             alert_price_low=request.alert_price_low
         )
 
+        logger.info(f"✅ 添加结果: success={success}")
+
         if success:
             return ok({"stock_code": request.stock_code}, "添加成功")
         else:
+            logger.error(f"❌ 添加失败: success=False")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="添加失败"
@@ -102,6 +115,7 @@ async def add_favorite(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"❌ 添加自选股异常: {type(e).__name__}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"添加自选股失败: {str(e)}"

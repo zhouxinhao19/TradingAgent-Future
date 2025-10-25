@@ -140,37 +140,58 @@ class FavoritesService:
         alert_price_low: Optional[float] = None
     ) -> bool:
         """添加股票到自选股（兼容字符串ID与ObjectId）"""
-        db = await self._get_db()
+        import logging
+        logger = logging.getLogger("webapi")
 
-        favorite_stock = {
-            "stock_code": stock_code,
-            "stock_name": stock_name,
-            "market": market,
-            "added_at": datetime.utcnow(),
-            "tags": tags or [],
-            "notes": notes,
-            "alert_price_high": alert_price_high,
-            "alert_price_low": alert_price_low
-        }
+        try:
+            logger.info(f"🔧 [add_favorite] 开始添加自选股: user_id={user_id}, stock_code={stock_code}")
 
-        if self._is_valid_object_id(user_id):
-            result = await db.users.update_one(
-                {"_id": ObjectId(user_id)},
-                {"$push": {"favorite_stocks": favorite_stock}}
-            )
-            return result.matched_count > 0
-        else:
-            # 在独立集合中按user_id维护favorites数组
-            await db.user_favorites.update_one(
-                {"user_id": user_id},
-                {
-                    "$setOnInsert": {"user_id": user_id, "created_at": datetime.utcnow()},
-                    "$push": {"favorites": favorite_stock},
-                    "$set": {"updated_at": datetime.utcnow()}
-                },
-                upsert=True
-            )
-            return True
+            db = await self._get_db()
+            logger.info(f"🔧 [add_favorite] 数据库连接获取成功")
+
+            favorite_stock = {
+                "stock_code": stock_code,
+                "stock_name": stock_name,
+                "market": market,
+                "added_at": datetime.utcnow(),
+                "tags": tags or [],
+                "notes": notes,
+                "alert_price_high": alert_price_high,
+                "alert_price_low": alert_price_low
+            }
+
+            logger.info(f"🔧 [add_favorite] 自选股数据构建完成: {favorite_stock}")
+
+            is_oid = self._is_valid_object_id(user_id)
+            logger.info(f"🔧 [add_favorite] 用户ID类型检查: is_valid_object_id={is_oid}")
+
+            if is_oid:
+                logger.info(f"🔧 [add_favorite] 使用 ObjectId 方式添加到 users 集合")
+                result = await db.users.update_one(
+                    {"_id": ObjectId(user_id)},
+                    {"$push": {"favorite_stocks": favorite_stock}}
+                )
+                logger.info(f"🔧 [add_favorite] 更新结果: matched_count={result.matched_count}, modified_count={result.modified_count}")
+                success = result.matched_count > 0
+                logger.info(f"🔧 [add_favorite] 返回结果: {success}")
+                return success
+            else:
+                logger.info(f"🔧 [add_favorite] 使用字符串ID方式添加到 user_favorites 集合")
+                result = await db.user_favorites.update_one(
+                    {"user_id": user_id},
+                    {
+                        "$setOnInsert": {"user_id": user_id, "created_at": datetime.utcnow()},
+                        "$push": {"favorites": favorite_stock},
+                        "$set": {"updated_at": datetime.utcnow()}
+                    },
+                    upsert=True
+                )
+                logger.info(f"🔧 [add_favorite] 更新结果: matched_count={result.matched_count}, modified_count={result.modified_count}, upserted_id={result.upserted_id}")
+                logger.info(f"🔧 [add_favorite] 返回结果: True")
+                return True
+        except Exception as e:
+            logger.error(f"❌ [add_favorite] 添加自选股异常: {type(e).__name__}: {str(e)}", exc_info=True)
+            raise
 
     async def remove_favorite(self, user_id: str, stock_code: str) -> bool:
         """从自选股中移除股票（兼容字符串ID与ObjectId）"""
@@ -246,24 +267,40 @@ class FavoritesService:
 
     async def is_favorite(self, user_id: str, stock_code: str) -> bool:
         """检查股票是否在自选股中（兼容字符串ID与ObjectId）"""
-        db = await self._get_db()
+        import logging
+        logger = logging.getLogger("webapi")
 
-        if self._is_valid_object_id(user_id):
-            user = await db.users.find_one(
-                {
-                    "_id": ObjectId(user_id),
-                    "favorite_stocks.stock_code": stock_code
-                }
-            )
-            return user is not None
-        else:
-            doc = await db.user_favorites.find_one(
-                {
-                    "user_id": user_id,
-                    "favorites.stock_code": stock_code
-                }
-            )
-            return doc is not None
+        try:
+            logger.info(f"🔧 [is_favorite] 检查自选股: user_id={user_id}, stock_code={stock_code}")
+
+            db = await self._get_db()
+
+            is_oid = self._is_valid_object_id(user_id)
+            logger.info(f"🔧 [is_favorite] 用户ID类型: is_valid_object_id={is_oid}")
+
+            if is_oid:
+                user = await db.users.find_one(
+                    {
+                        "_id": ObjectId(user_id),
+                        "favorite_stocks.stock_code": stock_code
+                    }
+                )
+                result = user is not None
+                logger.info(f"🔧 [is_favorite] ObjectId查询结果: {result}")
+                return result
+            else:
+                doc = await db.user_favorites.find_one(
+                    {
+                        "user_id": user_id,
+                        "favorites.stock_code": stock_code
+                    }
+                )
+                result = doc is not None
+                logger.info(f"🔧 [is_favorite] 字符串ID查询结果: {result}")
+                return result
+        except Exception as e:
+            logger.error(f"❌ [is_favorite] 检查自选股异常: {type(e).__name__}: {str(e)}", exc_info=True)
+            raise
 
     async def get_user_tags(self, user_id: str) -> List[str]:
         """获取用户使用的所有标签（兼容字符串ID与ObjectId）"""
