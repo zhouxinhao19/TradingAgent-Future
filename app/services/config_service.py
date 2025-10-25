@@ -3811,7 +3811,10 @@ class ConfigService:
             # 🔧 智能版本号处理：只有在没有版本号的情况下才添加 /v1
             # 避免对已有版本号的URL（如智谱AI的 /v4）重复添加 /v1
             import re
+            logger.info(f"   [测试API] 原始 base_url: {base_url}")
             base_url = base_url.rstrip("/")
+            logger.info(f"   [测试API] 去除斜杠后: {base_url}")
+
             if not re.search(r'/v\d+$', base_url):
                 # URL末尾没有版本号，添加 /v1（OpenAI标准）
                 base_url = base_url + "/v1"
@@ -3821,6 +3824,7 @@ class ConfigService:
                 logger.info(f"   [测试API] 检测到已有版本号，保持原样: {base_url}")
 
             url = f"{base_url}/chat/completions"
+            logger.info(f"   [测试API] 最终请求URL: {url}")
 
             headers = {
                 "Content-Type": "application/json",
@@ -3833,6 +3837,10 @@ class ConfigService:
                 # 硅基流动使用免费的 Qwen 模型进行测试
                 test_model = "Qwen/Qwen2.5-7B-Instruct"
                 logger.info(f"🔍 硅基流动使用测试模型: {test_model}")
+            elif provider_name == "zhipu":
+                # 智谱AI使用 glm-4 模型进行测试
+                test_model = "glm-4"
+                logger.info(f"🔍 智谱AI使用测试模型: {test_model}")
 
             # 使用一个通用的模型名称进行测试
             # 聚合渠道通常支持多种模型，这里使用 gpt-3.5-turbo 作为测试
@@ -3880,11 +3888,19 @@ class ConfigService:
                 try:
                     error_detail = response.json()
                     error_msg = error_detail.get("error", {}).get("message", f"HTTP {response.status_code}")
+                    logger.error(f"❌ [{display_name}] API测试失败")
+                    logger.error(f"   请求URL: {url}")
+                    logger.error(f"   状态码: {response.status_code}")
+                    logger.error(f"   错误详情: {error_detail}")
                     return {
                         "success": False,
                         "message": f"{display_name} API测试失败: {error_msg}"
                     }
                 except:
+                    logger.error(f"❌ [{display_name}] API测试失败")
+                    logger.error(f"   请求URL: {url}")
+                    logger.error(f"   状态码: {response.status_code}")
+                    logger.error(f"   响应内容: {response.text[:500]}")
                     return {
                         "success": False,
                         "message": f"{display_name} API测试失败: HTTP {response.status_code}"
