@@ -26,12 +26,26 @@ export interface User {
 
 // 用户偏好设置
 export interface UserPreferences {
+  // 分析偏好
   default_market: 'A股' | '美股' | '港股'
   default_depth: '快速' | '标准' | '深度'
+  default_analysts?: string[]
+  auto_refresh?: boolean
+  refresh_interval?: number
+
+  // 外观设置
   ui_theme: 'light' | 'dark' | 'auto'
+  sidebar_width?: number
+
+  // 语言和地区
   language: 'zh-CN' | 'en-US'
+
+  // 通知设置
   notifications_enabled: boolean
   email_notifications: boolean
+  desktop_notifications?: boolean
+  analysis_complete_notification?: boolean
+  system_maintenance_notification?: boolean
 }
 
 // 登录表单

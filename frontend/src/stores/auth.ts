@@ -196,6 +196,9 @@ export const useAuthStore = defineStore('auth', {
           this.permissions = ['*']
           this.roles = ['admin']
 
+          // 同步用户偏好设置到 appStore
+          this.syncUserPreferencesToAppStore()
+
           // 启动 token 自动刷新定时器
           const { setupTokenRefreshTimer } = await import('@/utils/auth')
           setupTokenRefreshTimer()
@@ -312,6 +315,10 @@ export const useAuthStore = defineStore('auth', {
         if (response.success) {
           this.user = response.data
           console.log('✅ 用户信息获取成功:', this.user?.username)
+
+          // 同步用户偏好设置到 appStore
+          this.syncUserPreferencesToAppStore()
+
           return true
         } else {
           console.warn('⚠️ 获取用户信息失败:', response.message)
@@ -335,9 +342,13 @@ export const useAuthStore = defineStore('auth', {
     async updateUserInfo(userInfo: Partial<User>) {
       try {
         const response = await authApi.updateUserInfo(userInfo)
-        
+
         if (response.success) {
           this.user = { ...this.user!, ...response.data }
+
+          // 同步用户偏好设置到 appStore
+          this.syncUserPreferencesToAppStore()
+
           ElMessage.success('用户信息更新成功')
           return true
         } else {
@@ -351,6 +362,44 @@ export const useAuthStore = defineStore('auth', {
       }
     },
     
+    // 同步用户偏好设置到 appStore
+    syncUserPreferencesToAppStore() {
+      if (!this.user?.preferences) return
+
+      // 动态导入 appStore 避免循环依赖
+      import('./app').then(({ useAppStore }) => {
+        const appStore = useAppStore()
+        const prefs = this.user!.preferences
+
+        // 同步主题设置
+        if (prefs.ui_theme) {
+          appStore.setTheme(prefs.ui_theme as 'light' | 'dark' | 'auto')
+        }
+
+        // 同步侧边栏宽度
+        if (prefs.sidebar_width) {
+          appStore.setSidebarWidth(prefs.sidebar_width)
+        }
+
+        // 同步语言设置
+        if (prefs.language) {
+          appStore.setLanguage(prefs.language as 'zh-CN' | 'en-US')
+        }
+
+        // 同步分析偏好
+        if (prefs.default_market || prefs.default_depth || prefs.auto_refresh !== undefined || prefs.refresh_interval) {
+          appStore.updatePreferences({
+            defaultMarket: prefs.default_market as any,
+            defaultDepth: prefs.default_depth as any,
+            autoRefresh: prefs.auto_refresh,
+            refreshInterval: prefs.refresh_interval
+          })
+        }
+
+        console.log('✅ 用户偏好设置已同步到 appStore')
+      })
+    },
+
     // 修改密码
     async changePassword(oldPassword: string, newPassword: string) {
       try {
@@ -358,7 +407,7 @@ export const useAuthStore = defineStore('auth', {
           old_password: oldPassword,
           new_password: newPassword
         })
-        
+
         if (response.success) {
           ElMessage.success('密码修改成功')
           return true
