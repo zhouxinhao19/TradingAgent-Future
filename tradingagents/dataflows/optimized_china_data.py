@@ -1386,34 +1386,47 @@ class OptimizedChinaDataProvider:
             net_income = latest_income.get('n_income', 0) or 0
             operate_profit = latest_income.get('operate_profit', 0) or 0
 
-            # ⚠️ 警告：市值计算使用固定股本（10亿股）是不准确的
-            # 理想情况下应该从 stock_basic_info 或 daily_basic 获取实际总股本
-            # TODO: 需要获取实际总股本数据
-            market_cap = price_value * 1000000000  # 假设10亿股本（不准确！）
+            # 获取实际总股本计算市值
+            # 优先从 stock_info 获取，如果没有则无法计算准确的估值指标
+            total_share = stock_info.get('total_share') if stock_info else None
 
-            # 计算各项指标
-            # PE比率（使用单期净利润，可能不准确）
-            if net_income > 0:
-                pe_ratio = market_cap / (net_income * 10000)  # 转换单位
-                metrics["pe"] = f"{pe_ratio:.1f}倍"
-                logger.warning(f"⚠️ Tushare PE 使用单期净利润，可能不准确")
+            if total_share and total_share > 0:
+                # 市值（元）= 股价（元）× 总股本（万股）× 10000
+                market_cap = price_value * total_share * 10000
+                logger.debug(f"✅ 使用实际总股本计算市值: {price_value}元 × {total_share}万股 = {market_cap/100000000:.2f}亿元")
             else:
-                metrics["pe"] = "N/A（亏损）"
+                logger.error(f"❌ {stock_info.get('code', 'Unknown')} 无法获取总股本，无法计算准确的估值指标")
+                market_cap = None
 
-            # PB比率（净资产使用最新期数据，相对准确）
-            if total_equity > 0:
-                pb_ratio = market_cap / (total_equity * 10000)
-                metrics["pb"] = f"{pb_ratio:.2f}倍"
-            else:
-                metrics["pb"] = "N/A"
+            # 计算各项指标（只有在有准确市值时才计算）
+            if market_cap:
+                # PE比率（使用单期净利润，可能不准确）
+                if net_income > 0:
+                    pe_ratio = market_cap / (net_income * 10000)  # 转换单位
+                    metrics["pe"] = f"{pe_ratio:.1f}倍"
+                    logger.warning(f"⚠️ Tushare PE 使用单期净利润，可能不准确")
+                else:
+                    metrics["pe"] = "N/A（亏损）"
 
-            # PS比率（使用单期营业收入，可能不准确）
-            if total_revenue > 0:
-                ps_ratio = market_cap / (total_revenue * 10000)
-                metrics["ps"] = f"{ps_ratio:.1f}倍"
-                logger.warning(f"⚠️ Tushare PS 使用单期营业收入，可能被高估2-4倍")
+                # PB比率（净资产使用最新期数据，相对准确）
+                if total_equity > 0:
+                    pb_ratio = market_cap / (total_equity * 10000)
+                    metrics["pb"] = f"{pb_ratio:.2f}倍"
+                else:
+                    metrics["pb"] = "N/A"
+
+                # PS比率（使用单期营业收入，可能不准确）
+                if total_revenue > 0:
+                    ps_ratio = market_cap / (total_revenue * 10000)
+                    metrics["ps"] = f"{ps_ratio:.1f}倍"
+                    logger.warning(f"⚠️ Tushare PS 使用单期营业收入，可能被高估2-4倍")
+                else:
+                    metrics["ps"] = "N/A"
             else:
-                metrics["ps"] = "N/A"
+                # 无法获取总股本，无法计算估值指标
+                metrics["pe"] = "N/A（无总股本数据）"
+                metrics["pb"] = "N/A（无总股本数据）"
+                metrics["ps"] = "N/A（无总股本数据）"
 
             # ROE
             if total_equity > 0 and net_income > 0:
@@ -1575,66 +1588,7 @@ class OptimizedChinaDataProvider:
 
         return "中等"
 
-    def _get_estimated_financial_metrics(self, symbol: str, price_value: float) -> dict:
-        """获取估算财务指标（原有的分类方法）"""
-        # 根据股票代码和价格估算指标
-        if symbol.startswith(('000001', '600036')):  # 银行股
-            return {
-                "pe": "5.2倍（银行业平均水平）",
-                "pb": "0.65倍（破净状态，银行业常见）",
-                "ps": "2.1倍",
-                "dividend_yield": "4.2%（银行业分红较高）",
-                "roe": "12.5%（银行业平均）",
-                "roa": "0.95%",
-                "gross_margin": "N/A（银行业无毛利率概念）",
-                "net_margin": "28.5%",
-                "debt_ratio": "92%（银行业负债率高属正常）",
-                "current_ratio": "N/A（银行业特殊）",
-                "quick_ratio": "N/A（银行业特殊）",
-                "cash_ratio": "充足",
-                "fundamental_score": 7.5,
-                "valuation_score": 8.0,
-                "growth_score": 6.5,
-                "risk_level": "中等"
-            }
-        elif symbol.startswith('300'):  # 创业板
-            return {
-                "pe": "35.8倍（创业板平均）",
-                "pb": "3.2倍",
-                "ps": "5.8倍",
-                "dividend_yield": "1.2%",
-                "roe": "15.2%",
-                "roa": "8.5%",
-                "gross_margin": "42.5%",
-                "net_margin": "18.2%",
-                "debt_ratio": "35%",
-                "current_ratio": "2.1倍",
-                "quick_ratio": "1.8倍",
-                "cash_ratio": "良好",
-                "fundamental_score": 7.0,
-                "valuation_score": 5.5,
-                "growth_score": 8.5,
-                "risk_level": "较高"
-            }
-        else:  # 其他股票
-            return {
-                "pe": "18.5倍（市场平均）",
-                "pb": "1.8倍",
-                "ps": "2.5倍",
-                "dividend_yield": "2.5%",
-                "roe": "12.8%",
-                "roa": "6.2%",
-                "gross_margin": "25.5%",
-                "net_margin": "12.8%",
-                "debt_ratio": "45%",
-                "current_ratio": "1.5倍",
-                "quick_ratio": "1.2倍",
-                "cash_ratio": "一般",
-                "fundamental_score": 6.5,
-                "valuation_score": 6.0,
-                "growth_score": 7.0,
-                "risk_level": "中等"
-            }
+
 
     def _analyze_valuation(self, financial_estimates: dict) -> str:
         """分析估值水平"""
