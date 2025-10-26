@@ -1227,20 +1227,56 @@ class OptimizedChinaDataProvider:
             else:
                 metrics["roe"] = "N/A"
 
-            # 获取每股收益 - 用于计算PE
-            eps_value = indicators_dict.get('基本每股收益')
-            if eps_value is not None and str(eps_value) != 'nan' and eps_value != '--':
-                try:
-                    eps_val = float(eps_value)
-                    if eps_val > 0:
-                        # 计算PE = 股价 / 每股收益
-                        pe_val = price_value / eps_val
-                        metrics["pe"] = f"{pe_val:.1f}倍"
-                        logger.debug(f"✅ 计算PE: 股价{price_value} / EPS{eps_val} = {metrics['pe']}")
-                    else:
-                        metrics["pe"] = "N/A（亏损）"
-                except (ValueError, TypeError):
-                    metrics["pe"] = "N/A"
+            # 计算 PE - 优先使用 TTM 数据
+            # 尝试从 main_indicators DataFrame 计算 TTM EPS
+            ttm_eps = None
+            try:
+                # main_indicators 是 DataFrame，包含多期数据
+                # 尝试计算 TTM EPS
+                if '基本每股收益' in main_indicators['指标'].values:
+                    # 提取基本每股收益的所有期数数据
+                    eps_row = main_indicators[main_indicators['指标'] == '基本每股收益']
+                    if not eps_row.empty:
+                        # 获取所有数值列（排除'指标'列）
+                        value_cols = [col for col in eps_row.columns if col != '指标']
+
+                        # 构建 DataFrame 用于 TTM 计算
+                        import pandas as pd
+                        eps_data = []
+                        for col in value_cols:
+                            eps_val = eps_row[col].iloc[0]
+                            if eps_val is not None and str(eps_val) != 'nan' and eps_val != '--':
+                                eps_data.append({'报告期': col, '基本每股收益': eps_val})
+
+                        if len(eps_data) >= 2:
+                            eps_df = pd.DataFrame(eps_data)
+                            # 使用 TTM 计算函数
+                            from scripts.sync_financial_data import _calculate_ttm_metric
+                            ttm_eps = _calculate_ttm_metric(eps_df, '基本每股收益')
+                            if ttm_eps:
+                                logger.info(f"✅ 计算 TTM EPS: {ttm_eps:.4f} 元")
+            except Exception as e:
+                logger.debug(f"计算 TTM EPS 失败: {e}")
+
+            # 使用 TTM EPS 或单期 EPS 计算 PE
+            eps_for_pe = ttm_eps if ttm_eps else None
+            pe_type = "TTM" if ttm_eps else "单期"
+
+            if not eps_for_pe:
+                # 降级到单期 EPS
+                eps_value = indicators_dict.get('基本每股收益')
+                if eps_value is not None and str(eps_value) != 'nan' and eps_value != '--':
+                    try:
+                        eps_for_pe = float(eps_value)
+                    except (ValueError, TypeError):
+                        pass
+
+            if eps_for_pe and eps_for_pe > 0:
+                pe_val = price_value / eps_for_pe
+                metrics["pe"] = f"{pe_val:.1f}倍"
+                logger.info(f"✅ 计算PE({pe_type}): 股价{price_value} / EPS{eps_for_pe:.4f} = {metrics['pe']}")
+            elif eps_for_pe and eps_for_pe <= 0:
+                metrics["pe"] = "N/A（亏损）"
             else:
                 metrics["pe"] = "N/A"
 
@@ -1328,9 +1364,61 @@ class OptimizedChinaDataProvider:
             else:
                 metrics["quick_ratio"] = "N/A"
 
+            # 计算 PS - 市销率（优先使用 TTM 营业收入）
+            # 尝试从 main_indicators DataFrame 计算 TTM 营业收入
+            ttm_revenue = None
+            try:
+                if '营业收入' in main_indicators['指标'].values:
+                    revenue_row = main_indicators[main_indicators['指标'] == '营业收入']
+                    if not revenue_row.empty:
+                        value_cols = [col for col in revenue_row.columns if col != '指标']
+
+                        import pandas as pd
+                        revenue_data = []
+                        for col in value_cols:
+                            rev_val = revenue_row[col].iloc[0]
+                            if rev_val is not None and str(rev_val) != 'nan' and rev_val != '--':
+                                revenue_data.append({'报告期': col, '营业收入': rev_val})
+
+                        if len(revenue_data) >= 2:
+                            revenue_df = pd.DataFrame(revenue_data)
+                            from scripts.sync_financial_data import _calculate_ttm_metric
+                            ttm_revenue = _calculate_ttm_metric(revenue_df, '营业收入')
+                            if ttm_revenue:
+                                logger.info(f"✅ 计算 TTM 营业收入: {ttm_revenue:.2f} 万元")
+            except Exception as e:
+                logger.debug(f"计算 TTM 营业收入失败: {e}")
+
+            # 计算 PS
+            revenue_for_ps = ttm_revenue if ttm_revenue else None
+            ps_type = "TTM" if ttm_revenue else "单期"
+
+            if not revenue_for_ps:
+                # 降级到单期营业收入
+                revenue_value = indicators_dict.get('营业收入')
+                if revenue_value is not None and str(revenue_value) != 'nan' and revenue_value != '--':
+                    try:
+                        revenue_for_ps = float(revenue_value)
+                    except (ValueError, TypeError):
+                        pass
+
+            if revenue_for_ps and revenue_for_ps > 0:
+                # 获取总股本计算市值
+                total_share = stock_info.get('total_share') if stock_info else None
+                if total_share and total_share > 0:
+                    # 市值（万元）= 股价（元）× 总股本（万股）
+                    market_cap = price_value * total_share
+                    ps_val = market_cap / revenue_for_ps
+                    metrics["ps"] = f"{ps_val:.2f}倍"
+                    logger.info(f"✅ 计算PS({ps_type}): 市值{market_cap:.2f}万元 / 营业收入{revenue_for_ps:.2f}万元 = {metrics['ps']}")
+                else:
+                    metrics["ps"] = "N/A（无总股本数据）"
+                    logger.warning(f"⚠️ 无法计算PS: 缺少总股本数据")
+            else:
+                metrics["ps"] = "N/A"
+
             # 补充其他指标的默认值
             metrics.update({
-                "ps": "待计算",
                 "dividend_yield": "待查询",
                 "cash_ratio": "待分析"
             })
@@ -1379,12 +1467,55 @@ class OptimizedChinaDataProvider:
             total_liab = latest_balance.get('total_liab', 0) or 0
             total_equity = latest_balance.get('total_hldr_eqy_exc_min_int', 0) or 0
 
-            # ⚠️ 警告：Tushare income_statement 的 total_revenue 是单期数据（可能是季报/半年报）
-            # 理想情况下应该使用 TTM 数据，但 Tushare 数据结构中没有预先计算的 TTM 字段
-            # TODO: 需要从多期数据中计算 TTM
-            total_revenue = latest_income.get('total_revenue', 0) or 0
-            net_income = latest_income.get('n_income', 0) or 0
+            # 计算 TTM 营业收入和净利润
+            # Tushare income_statement 的数据是累计值（从年初到报告期）
+            # 需要使用 TTM 公式计算
+            ttm_revenue = None
+            ttm_net_income = None
+
+            try:
+                if len(income_statement) >= 2:
+                    # 准备数据用于 TTM 计算
+                    import pandas as pd
+
+                    # 构建营业收入 DataFrame
+                    revenue_data = []
+                    for stmt in income_statement:
+                        end_date = stmt.get('end_date')
+                        revenue = stmt.get('total_revenue')
+                        if end_date and revenue is not None:
+                            revenue_data.append({'报告期': str(end_date), '营业收入': float(revenue)})
+
+                    if len(revenue_data) >= 2:
+                        revenue_df = pd.DataFrame(revenue_data)
+                        from scripts.sync_financial_data import _calculate_ttm_metric
+                        ttm_revenue = _calculate_ttm_metric(revenue_df, '营业收入')
+                        if ttm_revenue:
+                            logger.info(f"✅ Tushare 计算 TTM 营业收入: {ttm_revenue:.2f} 万元")
+
+                    # 构建净利润 DataFrame
+                    profit_data = []
+                    for stmt in income_statement:
+                        end_date = stmt.get('end_date')
+                        profit = stmt.get('n_income')
+                        if end_date and profit is not None:
+                            profit_data.append({'报告期': str(end_date), '净利润': float(profit)})
+
+                    if len(profit_data) >= 2:
+                        profit_df = pd.DataFrame(profit_data)
+                        ttm_net_income = _calculate_ttm_metric(profit_df, '净利润')
+                        if ttm_net_income:
+                            logger.info(f"✅ Tushare 计算 TTM 净利润: {ttm_net_income:.2f} 万元")
+            except Exception as e:
+                logger.warning(f"⚠️ Tushare TTM 计算失败: {e}")
+
+            # 降级到单期数据
+            total_revenue = ttm_revenue if ttm_revenue else (latest_income.get('total_revenue', 0) or 0)
+            net_income = ttm_net_income if ttm_net_income else (latest_income.get('n_income', 0) or 0)
             operate_profit = latest_income.get('operate_profit', 0) or 0
+
+            revenue_type = "TTM" if ttm_revenue else "单期"
+            profit_type = "TTM" if ttm_net_income else "单期"
 
             # 获取实际总股本计算市值
             # 优先从 stock_info 获取，如果没有则无法计算准确的估值指标
@@ -1400,11 +1531,11 @@ class OptimizedChinaDataProvider:
 
             # 计算各项指标（只有在有准确市值时才计算）
             if market_cap:
-                # PE比率（使用单期净利润，可能不准确）
+                # PE比率（优先使用 TTM 净利润）
                 if net_income > 0:
                     pe_ratio = market_cap / (net_income * 10000)  # 转换单位
                     metrics["pe"] = f"{pe_ratio:.1f}倍"
-                    logger.warning(f"⚠️ Tushare PE 使用单期净利润，可能不准确")
+                    logger.info(f"✅ Tushare 计算PE({profit_type}): 市值{market_cap/100000000:.2f}亿元 / 净利润{net_income:.2f}万元 = {pe_ratio:.1f}倍")
                 else:
                     metrics["pe"] = "N/A（亏损）"
 
@@ -1415,11 +1546,11 @@ class OptimizedChinaDataProvider:
                 else:
                     metrics["pb"] = "N/A"
 
-                # PS比率（使用单期营业收入，可能不准确）
+                # PS比率（优先使用 TTM 营业收入）
                 if total_revenue > 0:
                     ps_ratio = market_cap / (total_revenue * 10000)
                     metrics["ps"] = f"{ps_ratio:.1f}倍"
-                    logger.warning(f"⚠️ Tushare PS 使用单期营业收入，可能被高估2-4倍")
+                    logger.info(f"✅ Tushare 计算PS({revenue_type}): 市值{market_cap/100000000:.2f}亿元 / 营业收入{total_revenue:.2f}万元 = {ps_ratio:.1f}倍")
                 else:
                     metrics["ps"] = "N/A"
             else:
