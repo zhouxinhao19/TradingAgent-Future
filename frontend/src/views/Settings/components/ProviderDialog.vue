@@ -475,9 +475,15 @@ const handleSubmit = async () => {
 
 .register-guide {
   p {
-    margin: 0 0 8px 0;
-    font-size: 14px;
+    margin: 0 0 12px 0;
+    font-size: 15px;
+    line-height: 1.6;
     color: var(--el-text-color-regular);
+  }
+
+  :deep(.el-button) {
+    font-size: 15px;
+    padding: 8px 16px;
   }
 }
 </style>
