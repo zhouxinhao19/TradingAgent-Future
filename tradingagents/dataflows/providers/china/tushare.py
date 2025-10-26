@@ -32,10 +32,42 @@ class TushareProvider(BaseStockDataProvider):
         super().__init__("Tushare")
         self.api = None
         self.config = get_provider_config("tushare")
-        
+
         if not TUSHARE_AVAILABLE:
             self.logger.error("❌ Tushare库未安装，请运行: pip install tushare")
-    
+
+    def _get_token_from_database(self) -> Optional[str]:
+        """
+        从数据库读取 Tushare Token
+
+        优先级：数据库配置 > 环境变量
+        这样用户在 Web 后台修改配置后可以立即生效
+        """
+        try:
+            from app.core.database import get_mongo_db
+            db = get_mongo_db()
+            config_collection = db.system_configs
+
+            # 获取最新的激活配置
+            config_data = config_collection.find_one(
+                {"is_active": True},
+                sort=[("version", -1)]
+            )
+
+            if config_data and config_data.get('data_source_configs'):
+                for ds_config in config_data['data_source_configs']:
+                    if ds_config.get('type') == 'tushare':
+                        api_key = ds_config.get('api_key')
+                        if api_key and not api_key.startswith("your_"):
+                            self.logger.debug(f"✅ 从数据库读取 Tushare Token (长度: {len(api_key)})")
+                            return api_key
+
+            self.logger.debug("⚠️ 数据库中未找到有效的 Tushare Token")
+        except Exception as e:
+            self.logger.debug(f"从数据库读取 Token 失败: {e}")
+
+        return None
+
     def connect_sync(self) -> bool:
         """同步连接到Tushare"""
         if not TUSHARE_AVAILABLE:
@@ -43,9 +75,17 @@ class TushareProvider(BaseStockDataProvider):
             return False
 
         try:
-            token = self.config.get('token')
+            # 🔥 优先从数据库读取 Token（用户在 Web 后台修改后立即生效）
+            token = self._get_token_from_database()
+            token_source = "数据库"
+
+            # 降级到环境变量
             if not token:
-                self.logger.error("❌ Tushare token未配置，请设置TUSHARE_TOKEN环境变量")
+                token = self.config.get('token')
+                token_source = "环境变量"
+
+            if not token:
+                self.logger.error("❌ Tushare token未配置，请在 Web 后台或 .env 文件中配置 TUSHARE_TOKEN")
                 return False
 
             # 设置token并初始化API
@@ -57,7 +97,7 @@ class TushareProvider(BaseStockDataProvider):
 
             if test_data is not None and not test_data.empty:
                 self.connected = True
-                self.logger.info("✅ Tushare连接成功")
+                self.logger.info(f"✅ Tushare连接成功 (Token来源: {token_source})")
                 return True
             else:
                 self.logger.error("❌ Tushare连接测试失败")
@@ -74,9 +114,17 @@ class TushareProvider(BaseStockDataProvider):
             return False
 
         try:
-            token = self.config.get('token')
+            # 🔥 优先从数据库读取 Token（用户在 Web 后台修改后立即生效）
+            token = self._get_token_from_database()
+            token_source = "数据库"
+
+            # 降级到环境变量
             if not token:
-                self.logger.error("❌ Tushare token未配置，请设置TUSHARE_TOKEN环境变量")
+                token = self.config.get('token')
+                token_source = "环境变量"
+
+            if not token:
+                self.logger.error("❌ Tushare token未配置，请在 Web 后台或 .env 文件中配置 TUSHARE_TOKEN")
                 return False
 
             # 设置token并初始化API
@@ -89,15 +137,15 @@ class TushareProvider(BaseStockDataProvider):
                 list_status='L',
                 limit=1
             )
-            
+
             if test_data is not None and not test_data.empty:
                 self.connected = True
-                self.logger.info("✅ Tushare连接成功")
+                self.logger.info(f"✅ Tushare连接成功 (Token来源: {token_source})")
                 return True
             else:
                 self.logger.error("❌ Tushare连接测试失败")
                 return False
-                
+
         except Exception as e:
             self.logger.error(f"❌ Tushare连接失败: {e}")
             return False
