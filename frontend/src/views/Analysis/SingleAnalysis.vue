@@ -790,8 +790,8 @@ const analysisForm = reactive<AnalysisForm>({
   symbol: '',     // 标准化后的代码
   market: 'A股',
   analysisDate: new Date(),
-  researchDepth: 3, // 默认选中3级标准分析（推荐）
-  selectedAnalysts: ['市场分析师', '基本面分析师'],
+  researchDepth: 3, // 默认选中3级标准分析（推荐），将在 onMounted 中从用户偏好加载
+  selectedAnalysts: ['市场分析师', '基本面分析师'], // 将在 onMounted 中从用户偏好加载
   includeSentiment: true,
   includeRisk: true,
   language: 'zh-CN'
@@ -2109,7 +2109,45 @@ watch([() => modelSettings.value.quickAnalysisModel, () => modelSettings.value.d
 onMounted(async () => {
   initializeModelSettings()
 
-  // 接收一次路由参数（从筛选页带入）
+  // 🆕 从用户偏好加载默认设置
+  const authStore = useAuthStore()
+  const appStore = useAppStore()
+
+  // 优先从 authStore.user.preferences 读取，其次从 appStore.preferences 读取
+  const userPrefs = authStore.user?.preferences
+  if (userPrefs) {
+    // 加载默认市场
+    if (userPrefs.default_market) {
+      analysisForm.market = userPrefs.default_market as MarketType
+    }
+
+    // 加载默认分析深度（转换为数字）
+    if (userPrefs.default_depth) {
+      analysisForm.researchDepth = parseInt(userPrefs.default_depth)
+    }
+
+    // 加载默认分析师
+    if (userPrefs.default_analysts && userPrefs.default_analysts.length > 0) {
+      analysisForm.selectedAnalysts = [...userPrefs.default_analysts]
+    }
+
+    console.log('✅ 已加载用户偏好设置:', {
+      market: analysisForm.market,
+      depth: analysisForm.researchDepth,
+      analysts: analysisForm.selectedAnalysts
+    })
+  } else {
+    // 降级到 appStore.preferences
+    if (appStore.preferences.defaultMarket) {
+      analysisForm.market = appStore.preferences.defaultMarket as MarketType
+    }
+    if (appStore.preferences.defaultDepth) {
+      analysisForm.researchDepth = parseInt(appStore.preferences.defaultDepth)
+    }
+    console.log('✅ 已加载应用偏好设置（降级）')
+  }
+
+  // 接收一次路由参数（从筛选页带入）- 路由参数优先级最高
   const q = route.query as any
   if (q?.stock) analysisForm.stockCode = String(q.stock)
   if (q?.market) analysisForm.market = normalizeMarketForAnalysis(q.market) as MarketType

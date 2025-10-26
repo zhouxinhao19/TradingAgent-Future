@@ -132,11 +132,11 @@
 
                 <el-form-item label="分析深度">
                   <el-select v-model="batchForm.depth" placeholder="选择深度" size="large" style="width: 100%">
-                    <el-option label="⚡ 1级 - 快速分析 (2-4分钟/只)" value="快速" />
-                    <el-option label="📈 2级 - 基础分析 (4-6分钟/只)" value="基础" />
-                    <el-option label="🎯 3级 - 标准分析 (6-10分钟/只，推荐)" value="标准" />
-                    <el-option label="🔍 4级 - 深度分析 (10-15分钟/只)" value="深度" />
-                    <el-option label="🏆 5级 - 全面分析 (15-25分钟/只)" value="全面" />
+                    <el-option label="⚡ 1级 - 快速分析 (2-4分钟/只)" value="1" />
+                    <el-option label="📈 2级 - 基础分析 (4-6分钟/只)" value="2" />
+                    <el-option label="🎯 3级 - 标准分析 (6-10分钟/只，推荐)" value="3" />
+                    <el-option label="🔍 4级 - 深度分析 (10-15分钟/只)" value="4" />
+                    <el-option label="🏆 5级 - 全面分析 (15-25分钟/只)" value="5" />
                   </el-select>
                 </el-form-item>
               </div>
@@ -289,6 +289,7 @@ import { Files, TrendCharts, Check, Close } from '@element-plus/icons-vue'
 import { ANALYSTS, DEFAULT_ANALYSTS, convertAnalystNamesToIds } from '@/constants/analysts'
 import { configApi } from '@/api/config'
 import { useRouter, useRoute } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import ModelConfig from '@/components/ModelConfig.vue'
 
 // 路由实例（必须在顶层调用）
@@ -314,8 +315,8 @@ const batchForm = reactive({
   title: '',
   description: '',
   market: 'A股',
-  depth: '标准',
-  analysts: [...DEFAULT_ANALYSTS],
+  depth: '3',  // 默认3级标准分析，将在 onMounted 中从用户偏好加载
+  analysts: [...DEFAULT_ANALYSTS],  // 将在 onMounted 中从用户偏好加载
   includeSentiment: true,
   includeRisk: true,
   language: 'zh-CN'
@@ -374,7 +375,34 @@ const initializeModelSettings = async () => {
 onMounted(async () => {
   await initializeModelSettings()
 
-  // 读取路由查询参数以便从筛选页预填充
+  // 🆕 从用户偏好加载默认设置
+  const authStore = useAuthStore()
+  const userPrefs = authStore.user?.preferences
+
+  if (userPrefs) {
+    // 加载默认市场
+    if (userPrefs.default_market) {
+      batchForm.market = userPrefs.default_market
+    }
+
+    // 加载默认分析深度
+    if (userPrefs.default_depth) {
+      batchForm.depth = userPrefs.default_depth
+    }
+
+    // 加载默认分析师
+    if (userPrefs.default_analysts && userPrefs.default_analysts.length > 0) {
+      batchForm.analysts = [...userPrefs.default_analysts]
+    }
+
+    console.log('✅ 批量分析已加载用户偏好设置:', {
+      market: batchForm.market,
+      depth: batchForm.depth,
+      analysts: batchForm.analysts
+    })
+  }
+
+  // 读取路由查询参数以便从筛选页预填充（路由参数优先级最高）
   const q = route.query as any
   if (q?.stocks) {
     const parts = String(q.stocks).split(',').map((s) => s.trim()).filter(Boolean)
@@ -510,12 +538,16 @@ const submitBatchAnalysis = async () => {
 }
 
 const resetForm = () => {
+  // 从用户偏好加载默认值
+  const authStore = useAuthStore()
+  const userPrefs = authStore.user?.preferences
+
   Object.assign(batchForm, {
     title: '',
     description: '',
-    market: 'A股',
-    depth: '标准',
-    analysts: [...DEFAULT_ANALYSTS]
+    market: userPrefs?.default_market || 'A股',
+    depth: userPrefs?.default_depth || '3',
+    analysts: userPrefs?.default_analysts ? [...userPrefs.default_analysts] : [...DEFAULT_ANALYSTS]
   })
   clearStocks()
 }
