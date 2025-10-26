@@ -126,6 +126,8 @@ export const useAppStore = defineStore('app', {
     setTheme(theme: 'light' | 'dark' | 'auto') {
       this.theme = theme
       this.applyTheme()
+      // 同步到 localStorage
+      localStorage.setItem('app-theme', theme)
     },
     
     // 应用主题
@@ -144,6 +146,8 @@ export const useAppStore = defineStore('app', {
     setLanguage(language: 'zh-CN' | 'en-US') {
       this.language = language
       document.documentElement.lang = language
+      // 同步到 localStorage
+      localStorage.setItem('app-language', language)
     },
     
     // 切换侧边栏
@@ -154,11 +158,15 @@ export const useAppStore = defineStore('app', {
     // 设置侧边栏状态
     setSidebarCollapsed(collapsed: boolean) {
       this.sidebarCollapsed = collapsed
+      // 同步到 localStorage
+      localStorage.setItem('sidebar-collapsed', String(collapsed))
     },
-    
+
     // 设置侧边栏宽度
     setSidebarWidth(width: number) {
       this.sidebarWidth = Math.max(200, Math.min(400, width))
+      // 同步到 localStorage
+      localStorage.setItem('sidebar-width', String(this.sidebarWidth))
     },
     
     // 设置当前路由
@@ -169,6 +177,8 @@ export const useAppStore = defineStore('app', {
     // 更新用户偏好
     updatePreferences(preferences: Partial<AppState['preferences']>) {
       this.preferences = { ...this.preferences, ...preferences }
+      // 同步到 localStorage
+      localStorage.setItem('user-preferences', JSON.stringify(this.preferences))
     },
     
     // 重置偏好设置

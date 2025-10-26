@@ -527,7 +527,7 @@ const updateSectionFromRoute = () => {
 // 监听路由变化（包括 query 参数）
 watch(() => [route.path, route.query.tab], updateSectionFromRoute, { immediate: true })
 
-// 从 authStore 获取用户信息
+// 从 authStore 获取用户信息（使用 computed 实现响应式）
 const generalSettings = ref({
   username: authStore.user?.username || 'admin',
   email: authStore.user?.email || 'admin@example.com',
@@ -553,6 +553,32 @@ const notificationSettings = ref({
   analysisComplete: authStore.user?.preferences?.analysis_complete_notification ?? true,
   systemMaintenance: authStore.user?.preferences?.system_maintenance_notification ?? true
 })
+
+// 监听用户信息变化，同步更新设置
+watch(() => authStore.user, (newUser) => {
+  if (newUser) {
+    // 更新通用设置
+    generalSettings.value.username = newUser.username || 'admin'
+    generalSettings.value.email = newUser.email || 'admin@example.com'
+    generalSettings.value.language = newUser.preferences?.language || 'zh-CN'
+
+    // 更新外观设置
+    appearanceSettings.value.theme = newUser.preferences?.ui_theme || 'light'
+    appearanceSettings.value.sidebarWidth = newUser.preferences?.sidebar_width || 240
+
+    // 更新分析偏好
+    analysisSettings.value.defaultMarket = newUser.preferences?.default_market || 'A股'
+    analysisSettings.value.defaultDepth = newUser.preferences?.default_depth || '标准'
+    analysisSettings.value.defaultAnalysts = newUser.preferences?.default_analysts || ['基本面分析师', '技术分析师']
+    analysisSettings.value.autoRefresh = newUser.preferences?.auto_refresh ?? true
+    analysisSettings.value.refreshInterval = newUser.preferences?.refresh_interval || 30
+
+    // 更新通知设置
+    notificationSettings.value.desktop = newUser.preferences?.desktop_notifications ?? true
+    notificationSettings.value.analysisComplete = newUser.preferences?.analysis_complete_notification ?? true
+    notificationSettings.value.systemMaintenance = newUser.preferences?.system_maintenance_notification ?? true
+  }
+}, { deep: true })
 
 // 方法
 const handleMenuSelect = (index: string) => {
