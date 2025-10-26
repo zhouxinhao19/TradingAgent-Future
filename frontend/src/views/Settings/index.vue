@@ -563,8 +563,23 @@ const handleThemeChange = (theme: string) => {
   appStore.setTheme(theme as any)
 }
 
-const saveGeneralSettings = () => {
-  ElMessage.success('通用设置已保存')
+const saveGeneralSettings = async () => {
+  try {
+    // 调用 authStore 更新用户信息
+    const success = await authStore.updateUserInfo({
+      email: generalSettings.value.email,
+      preferences: {
+        language: generalSettings.value.language
+      }
+    })
+
+    if (success) {
+      ElMessage.success('通用设置已保存')
+    }
+  } catch (error) {
+    console.error('保存通用设置失败:', error)
+    ElMessage.error('保存通用设置失败')
+  }
 }
 
 const saveAppearanceSettings = () => {

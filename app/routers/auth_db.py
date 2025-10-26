@@ -307,6 +307,56 @@ async def me(user: dict = Depends(get_current_user)):
         "message": "获取用户信息成功"
     }
 
+@router.put("/me")
+async def update_me(
+    payload: dict,
+    user: dict = Depends(get_current_user)
+):
+    """更新当前用户信息"""
+    try:
+        from app.models.user import UserUpdate, UserPreferences
+
+        # 构建更新数据
+        update_data = {}
+
+        # 更新邮箱
+        if "email" in payload:
+            update_data["email"] = payload["email"]
+
+        # 更新偏好设置
+        if "preferences" in payload:
+            update_data["preferences"] = UserPreferences(**payload["preferences"])
+
+        # 如果有语言设置，更新到偏好中
+        if "language" in payload:
+            if "preferences" not in update_data:
+                # 获取当前偏好
+                current_prefs = user.get("preferences", {})
+                update_data["preferences"] = UserPreferences(**current_prefs)
+            update_data["preferences"].language = payload["language"]
+
+        # 如果有时区设置，更新到偏好中（如果需要）
+        # 注意：时区通常是系统级设置，不是用户级设置
+
+        # 调用服务更新用户
+        user_update = UserUpdate(**update_data)
+        updated_user = await user_service.update_user(user["username"], user_update)
+
+        if not updated_user:
+            raise HTTPException(status_code=400, detail="更新失败，邮箱可能已被使用")
+
+        # 返回更新后的用户信息
+        return {
+            "success": True,
+            "data": updated_user.model_dump(by_alias=True),
+            "message": "用户信息更新成功"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"更新用户信息失败: {e}")
+        raise HTTPException(status_code=500, detail=f"更新用户信息失败: {str(e)}")
+
 @router.post("/change-password")
 async def change_password(
     payload: ChangePasswordRequest,
