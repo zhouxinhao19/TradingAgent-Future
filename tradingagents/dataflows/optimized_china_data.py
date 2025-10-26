@@ -1378,32 +1378,40 @@ class OptimizedChinaDataProvider:
             total_assets = latest_balance.get('total_assets', 0) or 0
             total_liab = latest_balance.get('total_liab', 0) or 0
             total_equity = latest_balance.get('total_hldr_eqy_exc_min_int', 0) or 0
+
+            # ⚠️ 警告：Tushare income_statement 的 total_revenue 是单期数据（可能是季报/半年报）
+            # 理想情况下应该使用 TTM 数据，但 Tushare 数据结构中没有预先计算的 TTM 字段
+            # TODO: 需要从多期数据中计算 TTM
             total_revenue = latest_income.get('total_revenue', 0) or 0
             net_income = latest_income.get('n_income', 0) or 0
             operate_profit = latest_income.get('operate_profit', 0) or 0
 
-            # 估算市值（简化计算）
-            market_cap = price_value * 1000000000  # 假设10亿股本
+            # ⚠️ 警告：市值计算使用固定股本（10亿股）是不准确的
+            # 理想情况下应该从 stock_basic_info 或 daily_basic 获取实际总股本
+            # TODO: 需要获取实际总股本数据
+            market_cap = price_value * 1000000000  # 假设10亿股本（不准确！）
 
             # 计算各项指标
-            # PE比率
+            # PE比率（使用单期净利润，可能不准确）
             if net_income > 0:
                 pe_ratio = market_cap / (net_income * 10000)  # 转换单位
                 metrics["pe"] = f"{pe_ratio:.1f}倍"
+                logger.warning(f"⚠️ Tushare PE 使用单期净利润，可能不准确")
             else:
                 metrics["pe"] = "N/A（亏损）"
 
-            # PB比率
+            # PB比率（净资产使用最新期数据，相对准确）
             if total_equity > 0:
                 pb_ratio = market_cap / (total_equity * 10000)
                 metrics["pb"] = f"{pb_ratio:.2f}倍"
             else:
                 metrics["pb"] = "N/A"
 
-            # PS比率
+            # PS比率（使用单期营业收入，可能不准确）
             if total_revenue > 0:
                 ps_ratio = market_cap / (total_revenue * 10000)
                 metrics["ps"] = f"{ps_ratio:.1f}倍"
+                logger.warning(f"⚠️ Tushare PS 使用单期营业收入，可能被高估2-4倍")
             else:
                 metrics["ps"] = "N/A"
 
