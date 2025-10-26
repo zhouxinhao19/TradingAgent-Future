@@ -70,12 +70,23 @@ class UserService:
                 "updated_at": datetime.utcnow(),
                 "last_login": None,
                 "preferences": {
+                    # 分析偏好
                     "default_market": "A股",
                     "default_depth": "深度",
+                    "default_analysts": ["基本面分析师", "技术分析师"],
+                    "auto_refresh": True,
+                    "refresh_interval": 30,
+                    # 外观设置
                     "ui_theme": "light",
+                    "sidebar_width": 240,
+                    # 语言和地区
                     "language": "zh-CN",
+                    # 通知设置
                     "notifications_enabled": True,
-                    "email_notifications": False
+                    "email_notifications": False,
+                    "desktop_notifications": True,
+                    "analysis_complete_notification": True,
+                    "system_maintenance_notification": True
                 },
                 "daily_quota": 1000,
                 "concurrent_limit": 3,

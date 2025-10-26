@@ -536,22 +536,22 @@ const generalSettings = ref({
 })
 
 const appearanceSettings = ref({
-  theme: 'auto',
-  sidebarWidth: 240
+  theme: authStore.user?.preferences?.ui_theme || 'light',
+  sidebarWidth: authStore.user?.preferences?.sidebar_width || 240
 })
 
 const analysisSettings = ref({
-  defaultMarket: 'A股',
-  defaultDepth: '标准',
-  defaultAnalysts: ['基本面分析师', '技术分析师'],
-  autoRefresh: true,
-  refreshInterval: 30
+  defaultMarket: authStore.user?.preferences?.default_market || 'A股',
+  defaultDepth: authStore.user?.preferences?.default_depth || '标准',
+  defaultAnalysts: authStore.user?.preferences?.default_analysts || ['基本面分析师', '技术分析师'],
+  autoRefresh: authStore.user?.preferences?.auto_refresh ?? true,
+  refreshInterval: authStore.user?.preferences?.refresh_interval || 30
 })
 
 const notificationSettings = ref({
-  desktop: true,
-  analysisComplete: true,
-  systemMaintenance: true
+  desktop: authStore.user?.preferences?.desktop_notifications ?? true,
+  analysisComplete: authStore.user?.preferences?.analysis_complete_notification ?? true,
+  systemMaintenance: authStore.user?.preferences?.system_maintenance_notification ?? true
 })
 
 // 方法
@@ -582,23 +582,78 @@ const saveGeneralSettings = async () => {
   }
 }
 
-const saveAppearanceSettings = () => {
-  appStore.setSidebarWidth(appearanceSettings.value.sidebarWidth)
-  ElMessage.success('外观设置已保存')
+const saveAppearanceSettings = async () => {
+  try {
+    // 更新本地 store（立即生效）
+    appStore.setSidebarWidth(appearanceSettings.value.sidebarWidth)
+    appStore.setTheme(appearanceSettings.value.theme as any)
+
+    // 保存到后端
+    const success = await authStore.updateUserInfo({
+      preferences: {
+        ui_theme: appearanceSettings.value.theme,
+        sidebar_width: appearanceSettings.value.sidebarWidth
+      }
+    })
+
+    if (success) {
+      ElMessage.success('外观设置已保存')
+    }
+  } catch (error) {
+    console.error('保存外观设置失败:', error)
+    ElMessage.error('保存外观设置失败')
+  }
 }
 
-const saveAnalysisSettings = () => {
-  appStore.updatePreferences({
-    defaultMarket: analysisSettings.value.defaultMarket as any,
-    defaultDepth: analysisSettings.value.defaultDepth as any,
-    autoRefresh: analysisSettings.value.autoRefresh,
-    refreshInterval: analysisSettings.value.refreshInterval
-  })
-  ElMessage.success('分析偏好已保存')
+const saveAnalysisSettings = async () => {
+  try {
+    // 更新本地 store（立即生效）
+    appStore.updatePreferences({
+      defaultMarket: analysisSettings.value.defaultMarket as any,
+      defaultDepth: analysisSettings.value.defaultDepth as any,
+      autoRefresh: analysisSettings.value.autoRefresh,
+      refreshInterval: analysisSettings.value.refreshInterval
+    })
+
+    // 保存到后端
+    const success = await authStore.updateUserInfo({
+      preferences: {
+        default_market: analysisSettings.value.defaultMarket,
+        default_depth: analysisSettings.value.defaultDepth,
+        default_analysts: analysisSettings.value.defaultAnalysts,
+        auto_refresh: analysisSettings.value.autoRefresh,
+        refresh_interval: analysisSettings.value.refreshInterval
+      }
+    })
+
+    if (success) {
+      ElMessage.success('分析偏好已保存')
+    }
+  } catch (error) {
+    console.error('保存分析偏好失败:', error)
+    ElMessage.error('保存分析偏好失败')
+  }
 }
 
-const saveNotificationSettings = () => {
-  ElMessage.success('通知设置已保存')
+const saveNotificationSettings = async () => {
+  try {
+    // 保存到后端
+    const success = await authStore.updateUserInfo({
+      preferences: {
+        desktop_notifications: notificationSettings.value.desktop,
+        analysis_complete_notification: notificationSettings.value.analysisComplete,
+        system_maintenance_notification: notificationSettings.value.systemMaintenance,
+        notifications_enabled: notificationSettings.value.desktop || notificationSettings.value.analysisComplete || notificationSettings.value.systemMaintenance
+      }
+    })
+
+    if (success) {
+      ElMessage.success('通知设置已保存')
+    }
+  } catch (error) {
+    console.error('保存通知设置失败:', error)
+    ElMessage.error('保存通知设置失败')
+  }
 }
 
 // 导航函数

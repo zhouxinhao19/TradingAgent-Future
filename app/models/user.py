@@ -36,12 +36,26 @@ PyObjectId = Annotated[
 
 class UserPreferences(BaseModel):
     """用户偏好设置"""
+    # 分析偏好
     default_market: str = "A股"
     default_depth: str = "深度"
+    default_analysts: List[str] = Field(default_factory=lambda: ["基本面分析师", "技术分析师"])
+    auto_refresh: bool = True
+    refresh_interval: int = 30  # 秒
+
+    # 外观设置
     ui_theme: str = "light"
+    sidebar_width: int = 240
+
+    # 语言和地区
     language: str = "zh-CN"
+
+    # 通知设置
     notifications_enabled: bool = True
     email_notifications: bool = False
+    desktop_notifications: bool = True
+    analysis_complete_notification: bool = True
+    system_maintenance_notification: bool = True
 
 
 class FavoriteStock(BaseModel):

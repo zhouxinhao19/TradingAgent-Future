@@ -323,9 +323,16 @@ async def update_me(
         if "email" in payload:
             update_data["email"] = payload["email"]
 
-        # 更新偏好设置
+        # 更新偏好设置（支持部分更新）
         if "preferences" in payload:
-            update_data["preferences"] = UserPreferences(**payload["preferences"])
+            # 获取当前偏好
+            current_prefs = user.get("preferences", {})
+
+            # 合并新的偏好设置
+            merged_prefs = {**current_prefs, **payload["preferences"]}
+
+            # 创建 UserPreferences 对象
+            update_data["preferences"] = UserPreferences(**merged_prefs)
 
         # 如果有语言设置，更新到偏好中
         if "language" in payload:
@@ -354,7 +361,7 @@ async def update_me(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"更新用户信息失败: {e}")
+        logger.error(f"更新用户信息失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"更新用户信息失败: {str(e)}")
 
 @router.post("/change-password")
