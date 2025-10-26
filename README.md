@@ -1,23 +1,15 @@
 # TradingAgents 中文增强版
 
-[![License](https://img.shields.io/badge/License-Mixed-blue.svg)](./LICENSING.md)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/Version-v1.0.0--preview-orange.svg)](./VERSION)
+[![Version](https://img.shields.io/badge/Version-cn--0.1.15-green.svg)](./VERSION)
 [![Documentation](https://img.shields.io/badge/docs-中文文档-green.svg)](./docs/)
 [![Original](https://img.shields.io/badge/基于-TauricResearch/TradingAgents-orange.svg)](https://github.com/TauricResearch/TradingAgents)
 
-[📜 v1.0.0-preview Release Notes](docs/releases/v1.0.0-preview-release-notes.md) · [v1.0.0-preview Release Notes](docs/releases/v1.0.0-preview-release-notes.md)
-
-
-> 🚀 **最新版本 v1.0.0-preview**: 个人用户简化部署！新增一键安装脚本、交互式配置向导、系统诊断工具，5分钟完成部署。明确双许可证模式，开源组件完全免费，专有组件个人免费商业需授权。
 >
 > 🎯 **核心功能**: 原生OpenAI支持 | Google AI全面集成 | 自定义端点配置 | 智能模型选择 | 多LLM提供商支持 | 模型选择持久化 | Docker容器化部署 | 专业报告导出 | 完整A股支持 | 中文本地化
 
 基于多智能体大语言模型的**中文金融交易决策框架**。专为中文用户优化，提供完整的A股/港股/美股分析能力。
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=hsliuping/TradingAgents-CN&type=Date)](https://www.star-history.com/#hsliuping/TradingAgents-CN&Date)
 
 ## 🙏 致敬源项目
 
@@ -25,7 +17,120 @@
 
 **🎯 我们的使命**: 为中国用户提供完整的中文化体验，支持A股/港股市场，集成国产大模型，推动AI金融技术在中文社区的普及应用。
 
-## 🆕 v0.1.14-preview 重大更新
+## 🎉 v1.0.0-preview 内测版本 - 全新架构升级
+
+> 🚀 **重磅发布**: v1.0.0-preview 版本现已开启内测！全新的 FastAPI + Vue 3 架构，带来企业级的性能和体验！
+
+### ✨ 核心特性
+
+#### 🏗️ **全新技术架构**
+- **后端升级**: 从 Streamlit 迁移到 FastAPI，提供更强大的 RESTful API
+- **前端重构**: 采用 Vue 3 + Element Plus，打造现代化的单页应用
+- **数据库优化**: MongoDB + Redis 双数据库架构，性能提升 10 倍
+- **容器化部署**: 完整的 Docker 多架构支持（amd64 + arm64）
+
+#### 🎯 **企业级功能**
+- **用户权限管理**: 完整的用户认证、角色管理、操作日志系统
+- **配置管理中心**: 可视化的大模型配置、数据源管理、系统设置
+- **缓存管理系统**: 智能缓存策略，支持 MongoDB/Redis/文件多级缓存
+- **实时通知系统**: SSE 推送，实时跟踪分析进度和系统状态
+
+#### 🤖 **智能分析增强**
+- **动态供应商管理**: 支持动态添加和配置 LLM 供应商
+- **模型能力管理**: 智能模型选择，根据任务自动匹配最佳模型
+- **多数据源同步**: 统一的数据源管理，支持 Tushare、AkShare、BaoStock
+- **报告导出功能**: 支持 Markdown/Word/PDF 多格式专业报告导出
+
+#### 🐳 **Docker 多架构支持**
+- **跨平台部署**: 支持 x86_64 和 ARM64 架构（Apple Silicon、树莓派、AWS Graviton）
+- **GitHub Actions**: 自动化构建和发布 Docker 镜像
+- **一键部署**: 完整的 Docker Compose 配置，5 分钟快速启动
+
+### 📊 技术栈升级
+
+| 组件 | v0.1.x | v1.0.0-preview |
+|------|--------|----------------|
+| **后端框架** | Streamlit | FastAPI + Uvicorn |
+| **前端框架** | Streamlit | Vue 3 + Vite + Element Plus |
+| **数据库** | 可选 MongoDB | MongoDB + Redis |
+| **API 架构** | 单体应用 | RESTful API + WebSocket |
+| **部署方式** | 本地/Docker | Docker 多架构 + GitHub Actions |
+
+### 🎯 内测申请
+
+v1.0.0-preview 版本目前处于**内测阶段**，我们诚邀您参与体验和测试！
+
+####  使用指南
+
+在申请试用前，建议先阅读详细的使用指南：
+
+**[📘 TradingAgents-CN v1.0.0-preview 使用指南](https://mp.weixin.qq.com/s/ppsYiBncynxlsfKFG8uEbw)**
+
+使用指南包含：
+- ✅ 完整的功能介绍和操作演示
+- ✅ 详细的配置说明和最佳实践
+- ✅ 常见问题解答和故障排除
+- ✅ 实际使用案例和效果展示
+
+#### 如何申请试用
+
+1. **关注公众号**: 微信搜索 **"TradingAgents-CN"** 并关注
+2. **提交申请**: 通过公众号私信发送以下信息：
+   - 您的姓名/昵称
+   - 使用场景（个人学习/企业应用/学术研究）
+   - 技术背景（可选）
+   - 期望的功能或建议（可选）
+3. **获取权限**: 我们会在 1-2 个工作日内回复，并提供：
+   - 内测版本访问地址
+   - 详细的使用文档
+   - 技术支持和交流群
+
+#### 🎁 内测用户福利
+
+- ✅ **优先体验**: 第一时间体验最新功能
+- ✅ **技术支持**: 专属技术支持和问题解答
+- ✅ **功能定制**: 您的需求将优先纳入开发计划
+- ✅ **社区荣誉**: 内测贡献者将在项目中特别致谢
+
+#### 📱 联系方式
+
+- **微信公众号**: TradingAgents-CN（推荐）
+
+  <img src="assets/weixin.png" alt="微信公众号" width="200"/>
+
+---
+
+## 🆕 v0.1.15 重大更新
+
+### 🤖 LLM生态系统大升级
+
+- **千帆大模型支持**: 新增百度千帆(ERNIE)大模型完整集成
+- **LLM适配器重构**: 统一的OpenAI兼容适配器架构
+- **多厂商支持**: 支持更多国产大模型提供商
+- **集成指南**: 完整的LLM集成开发文档和测试工具
+
+### 📚 学术研究支持
+
+- **TradingAgents论文**: 完整的中文翻译版本和深度解读
+- **技术博客**: 详细的技术分析和实现原理解读
+- **学术资料**: PDF论文和相关研究资料
+- **引用支持**: 标准的学术引用格式和参考文献
+
+### 🛠️ 开发者体验升级
+
+- **开发工作流**: 标准化的开发流程和分支管理规范
+- **安装验证**: 完整的安装测试和验证脚本
+- **文档重构**: 结构化的文档系统和快速开始指南
+- **PR模板**: 标准化的Pull Request模板和代码审查流程
+
+### 🔧 企业级工具链
+
+- **分支保护**: GitHub分支保护策略和安全规则
+- **紧急程序**: 完整的紧急处理和故障恢复程序
+- **测试框架**: 增强的测试覆盖和验证工具
+- **部署指南**: 企业级部署和配置管理
+
+## 📋 v0.1.14 功能回顾
 
 ### 👥 用户权限管理系统
 
@@ -308,89 +413,7 @@
 
 ## 🚀 快速开始
 
-### 🎯 方式一：一键安装（推荐个人用户）⭐
-
-**零基础友好，5分钟完成部署！**
-
-#### Windows 用户
-
-```powershell
-# 1. 下载项目
-git clone https://github.com/hsliuping/TradingAgents-CN.git
-cd TradingAgents-CN
-
-# 2. 运行一键安装脚本
-powershell -ExecutionPolicy Bypass -File scripts\easy_install.ps1
-
-# 3. 按照提示完成配置（选择LLM提供商，输入API密钥）
-# 4. 自动启动，浏览器打开 http://localhost:8501
-```
-
-#### Linux/Mac 用户
-
-```bash
-# 1. 下载项目
-git clone https://github.com/hsliuping/TradingAgents-CN.git
-cd TradingAgents-CN
-
-# 2. 运行一键安装脚本
-chmod +x scripts/easy_install.sh
-./scripts/easy_install.sh
-
-# 3. 按照提示完成配置
-# 4. 自动启动，浏览器打开 http://localhost:8501
-```
-
-**特点**：
-- ✅ 自动检测Python环境
-- ✅ 自动安装所有依赖
-- ✅ 交互式配置API密钥
-- ✅ 无需数据库（自动使用文件存储）
-- ✅ 一键启动应用
-
-**日常使用**：
-```bash
-# Windows
-.\start_simple.bat
-
-# Linux/Mac
-./start_simple.sh
-```
-
-📖 **详细指南**: [个人用户简化部署指南](docs/SIMPLE_DEPLOYMENT_GUIDE.md)
-
----
-
-### 🐳 方式二：Docker部署（推荐有Docker用户）
-
-#### 选项A：使用Docker Hub镜像（最简单）⭐
-
-**v1.0.0-preview新增：无需构建，直接拉取运行！**
-
-```bash
-# 1. 下载配置文件
-wget https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/docker-compose.hub.yml
-wget https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/.env.example -O .env
-
-# 2. 配置环境变量
-nano .env  # 编辑 .env 文件，填入API密钥
-
-# 3. 启动服务
-docker-compose -f docker-compose.hub.yml up -d
-
-# 4. 访问应用
-# 前端: http://localhost:3000
-# 后端API: http://localhost:8000
-# API文档: http://localhost:8000/docs
-```
-
-**Docker Hub镜像**：
-- 🐳 后端: `hsliup/tradingagents-backend:latest`
-- 🎨 前端: `hsliup/tradingagents-frontend:latest`
-
-📖 **详细指南**: [Docker快速开始](DOCKER_QUICKSTART.md)
-
-#### 选项B：从源码构建（Streamlit版本）
+### 🐳 Docker部署 (推荐)
 
 ```bash
 # 1. 克隆项目
@@ -419,16 +442,21 @@ chmod +x scripts/smart_start.sh && ./scripts/smart_start.sh
 # Web界面: http://localhost:8501
 ```
 
----
-
-### 💻 方式三：本地部署（开发者）
+### 💻 本地部署
 
 ```bash
 # 1. 升级pip (重要！避免安装错误)
 python -m pip install --upgrade pip
 
-# 2. 安装依赖
-pip install -e .
+# 2. 安装依赖（推荐使用锁定版本，安装速度最快）
+pip install -r requirements-lock.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install -e . --no-deps
+
+# 或一步安装（会重新解析依赖，速度较慢）
+# pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 💡 国内用户推荐使用镜像加速（详见 docs/installation-mirror.md）
+# ⚠️ Windows 用户如遇到 PyYAML 编译错误，使用锁定版本可避免此问题
 
 # 3. 启动应用
 python start_web.py
@@ -584,9 +612,10 @@ source env/bin/activate
 python -m pip install --upgrade pip
 
 # 4. 安装所有依赖
-pip install -r requirements.txt
-#或者使用pip install -e .
 pip install -e .
+
+# 💡 国内用户推荐使用镜像加速（详见 docs/installation-mirror.md）
+# pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 注意：requirements.txt已包含所有必需依赖：
 # - 数据库支持 (MongoDB + Redis)
@@ -982,7 +1011,10 @@ docker-compose logs -f web
 source env/bin/activate
 
 # 2. 安装项目到虚拟环境（重要！）
-pip install -e .
+pip install -e . 
+
+# 💡 国内用户推荐使用镜像加速（详见 docs/installation-mirror.md）
+# pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 3. 启动Web管理界面
 # 方法1：使用项目启动脚本（推荐）
@@ -1377,7 +1409,7 @@ docs/
 # 低成本配置示例
 cost_optimized_config = {
     "deep_think_llm": "gpt-4o-mini",
-    "quick_think_llm": "gpt-4o-mini",
+    "quick_think_llm": "gpt-4o-mini", 
     "max_debate_rounds": 1,
     "online_tools": False  # 使用缓存数据
 }
@@ -1475,10 +1507,7 @@ cost_optimized_config = {
 
 ## 📈 版本历史
 
-- **v1.0.0-preview** (2025-08-XX): 🧭 多应用架构预览（FastAPI + Vite + Streamlit）
-- **v0.1.15** (2025-08-XX): 🔧 开发者体验与 LLM 生态系统升级
-- **v0.1.14-preview** (2025-08-14): 👥 用户权限管理与 Web 认证系统预览
-- **v0.1.13** (2025-08-02): 🤖 原生 OpenAI 支持与 Google AI 生态系统全面集成
+- **v0.1.13** (2025-08-02): 🤖 原生OpenAI支持与Google AI生态系统全面集成 ✨ **最新版本**
 - **v0.1.12** (2025-07-29): 🧠 智能新闻分析模块与项目结构优化
 - **v0.1.11** (2025-07-27): 🤖 多LLM提供商集成与模型选择持久化
 - **v0.1.10** (2025-07-18): 🚀 Web界面实时进度显示与智能会话管理
@@ -1494,78 +1523,19 @@ cost_optimized_config = {
 
 📋 **详细更新日志**: [CHANGELOG.md](./docs/releases/CHANGELOG.md)
 
-## 📄 许可证
-
-TradingAgents-CN 采用**混合许可证策略**：
-
-- 🔓 **开源组件** (Apache 2.0): `tradingagents/`, `cli/`, `scripts/`, `docs/`, `examples/`, `web/` 等
-- 🔒 **专有组件** (Proprietary): `app/` (FastAPI后端), `frontend/` (Vue.js前端)
-
-**商业使用专有组件需要商业许可**。详情请查看 [许可证说明](./LICENSING.md)。
-
 ## 📞 联系方式
 
 - **GitHub Issues**: [提交问题和建议](https://github.com/hsliuping/TradingAgents-CN/issues)
 - **邮箱**: hsliup@163.com
-- 项目ＱＱ群：782124367
-- **商业许可咨询**: hsliup@163.com
+- 项目ＱＱ群：187537480
+- 项目微信公众号：TradingAgents-CN
+
+  <img src="assets/weixin.png" alt="微信公众号" width="200"/>
+
 - **原项目**: [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents)
 - **文档**: [完整文档目录](docs/)
 
-## ⚠️ 重要声明
-
-### 软件许可证
-
-本项目采用**双许可证（混合许可证）模式**：
-
-#### 🔓 开源组件（Apache 2.0）- 完全免费
-
-以下组件完全开源，可自由商业使用：
-- `tradingagents/` - 核心交易智能体库
-- `cli/` - 命令行工具
-- `scripts/` - 运维脚本和安装脚本
-- `web/` - Streamlit Web应用
-- `docs/` - 文档
-- `examples/` - 示例代码
-
-**权限**：
-- ✅ 自由使用、修改、分发（包括商业使用）
-- ✅ 提供源代码和安装脚本
-- ✅ 用户自行下载、安装、配置
-- ❌ 不提供预编译安装包（保持透明性）
-
-#### 🔒 专有组件 - 个人免费，商业需授权
-
-以下组件源代码可见，但商业使用需授权：
-- `app/` - FastAPI后端应用
-- `frontend/` - Vue.js前端应用
-
-**个人用户**：
-- ✅ 免费用于学习、研究、测试
-- ✅ 免费用于个人非商业用途
-
-**商业用户**：
-- ❌ 商业使用需获取商业许可证
-- 📧 联系获取授权：hsliup@163.com
-
-详见：[许可证说明](./LICENSING.md)
-
-### 使用责任
-
-**用户责任**：
-- 用户自行决定是否使用本软件
-- 用户自行承担使用本软件的所有风险
-- 用户需遵守所在地区的法律法规
-- 用户需自行配置API密钥和数据源
-- 商业使用专有组件需获取授权
-
-**开发者责任**：
-- 提供可用的源代码和文档
-- 修复已知的技术问题
-- 开源组件：按Apache 2.0许可证，不对使用结果承担责任
-- 专有组件商业许可：提供专业技术支持
-
-### 投资风险提示
+## ⚠️ 风险提示
 
 **重要声明**: 本框架仅用于研究和教育目的，不构成投资建议。
 
@@ -1573,18 +1543,6 @@ TradingAgents-CN 采用**混合许可证策略**：
 - 🤖 AI模型的预测存在不确定性
 - 💰 投资有风险，决策需谨慎
 - 👨‍💼 建议咨询专业财务顾问
-- ⚖️ 投资决策由用户自行负责
-
-### 免责条款
-
-根据Apache 2.0许可证第7条：
-
-```
-除非适用法律要求或书面同意，否则按"原样"基础分发软件，
-不附带任何明示或暗示的担保或条件。
-```
-
-使用本软件即表示您已阅读、理解并同意上述声明。
 
 ---
 

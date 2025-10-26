@@ -34,6 +34,7 @@
           v-model="formData.type"
           placeholder="请选择数据源类型"
           style="width: 100%"
+          @change="handleTypeChange"
         >
           <el-option
             v-for="option in dataSourceTypes"
@@ -43,6 +44,30 @@
           />
         </el-select>
       </el-form-item>
+
+      <!-- 🆕 注册引导提示 -->
+      <el-alert
+        v-if="formData.type && currentDataSourceInfo?.register_url"
+        :title="`📝 ${currentDataSourceInfo.label} 注册引导`"
+        type="info"
+        :closable="false"
+        class="mb-4"
+      >
+        <template #default>
+          <div class="register-guide">
+            <p>{{ currentDataSourceInfo.register_guide || '如果您还没有账号，请先注册：' }}</p>
+            <el-button
+              type="primary"
+              size="small"
+              link
+              @click="openRegisterUrl"
+            >
+              <el-icon><Link /></el-icon>
+              前往注册 {{ currentDataSourceInfo.label }}
+            </el-button>
+          </div>
+        </template>
+      </el-alert>
 
       <el-form-item label="数据提供商" prop="provider">
         <el-input
@@ -223,12 +248,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Link } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
-import { 
-  configApi, 
-  type DataSourceConfig, 
-  type MarketCategory,
-  DEFAULT_DATA_SOURCE_CONFIG 
+import {
+  configApi,
+  type DataSourceConfig,
+  type MarketCategory
 } from '@/api/config'
 
 // Props
@@ -263,6 +288,25 @@ const needsApiSecret = computed(() => {
   return ['alpha_vantage', 'wind', 'choice'].includes(type)
 })
 
+// 当前选中的数据源信息
+const currentDataSourceInfo = computed(() => {
+  if (!formData.value.type) return null
+  return dataSourceTypes.find(ds => ds.value === formData.value.type)
+})
+
+// 打开注册链接
+const openRegisterUrl = () => {
+  if (currentDataSourceInfo.value?.register_url) {
+    window.open(currentDataSourceInfo.value.register_url, '_blank')
+  }
+}
+
+// 处理数据源类型变化
+const handleTypeChange = () => {
+  // 类型变化时可以做一些额外处理
+  console.log('数据源类型已变更:', formData.value.type)
+}
+
 // 表单数据
 const defaultFormData = {
   name: '',
@@ -292,22 +336,72 @@ const paramKeys = ref<string[]>([])
  */
 const dataSourceTypes = [
   // 中国市场数据源
-  { label: 'AKShare', value: 'akshare' },
-  { label: 'Tushare', value: 'tushare' },
-  { label: 'BaoStock', value: 'baostock' },
+  {
+    label: 'Tushare',
+    value: 'tushare',
+    register_url: 'https://tushare.pro/register?reg=tacn',
+    register_guide: '如果您还没有 Tushare 账号，请先注册并获取 Token：'
+  },
+  {
+    label: 'AKShare',
+    value: 'akshare',
+    register_url: 'https://akshare.akfamily.xyz/',
+    register_guide: 'AKShare 是开源免费的金融数据接口库，无需注册即可使用。访问官网了解更多：'
+  },
+  {
+    label: 'BaoStock',
+    value: 'baostock',
+    register_url: 'http://baostock.com/',
+    register_guide: 'BaoStock 是开源免费的证券数据平台，无需注册即可使用。访问官网了解更多：'
+  },
 
   // 美股数据源
-  { label: 'Finnhub', value: 'finnhub' },
-  { label: 'Yahoo Finance', value: 'yahoo_finance' },
-  { label: 'Alpha Vantage', value: 'alpha_vantage' },
-  { label: 'IEX Cloud', value: 'iex_cloud' },
+  {
+    label: 'Finnhub',
+    value: 'finnhub',
+    register_url: 'https://finnhub.io/register',
+    register_guide: '如果您还没有 Finnhub 账号，请先注册并获取 API Key：'
+  },
+  {
+    label: 'Yahoo Finance',
+    value: 'yahoo_finance',
+    register_url: 'https://finance.yahoo.com/',
+    register_guide: 'Yahoo Finance 提供免费的金融数据，部分功能无需注册。访问官网了解更多：'
+  },
+  {
+    label: 'Alpha Vantage',
+    value: 'alpha_vantage',
+    register_url: 'https://www.alphavantage.co/support/#api-key',
+    register_guide: '如果您还没有 Alpha Vantage 账号，请先注册并获取免费 API Key：'
+  },
+  {
+    label: 'IEX Cloud',
+    value: 'iex_cloud',
+    register_url: 'https://iexcloud.io/cloud-login#/register',
+    register_guide: '如果您还没有 IEX Cloud 账号，请先注册并获取 API Token：'
+  },
 
   // 专业数据源
-  { label: 'Wind 万得', value: 'wind' },
-  { label: '东方财富 Choice', value: 'choice' },
+  {
+    label: 'Wind 万得',
+    value: 'wind',
+    register_url: 'https://www.wind.com.cn/',
+    register_guide: 'Wind 是专业的金融数据服务商，需要购买商业授权。访问官网了解更多：'
+  },
+  {
+    label: '东方财富 Choice',
+    value: 'choice',
+    register_url: 'https://choice.eastmoney.com/',
+    register_guide: 'Choice 是专业的金融数据终端，需要购买商业授权。访问官网了解更多：'
+  },
 
   // 其他数据源
-  { label: 'Quandl', value: 'quandl' },
+  {
+    label: 'Quandl',
+    value: 'quandl',
+    register_url: 'https://www.quandl.com/sign-up',
+    register_guide: '如果您还没有 Quandl 账号，请先注册并获取 API Key：'
+  },
   { label: '本地文件', value: 'local_file' },
   { label: '自定义', value: 'custom' }
 ]
@@ -510,6 +604,24 @@ onMounted(() => {
   font-size: 12px;
   margin-top: 4px;
   line-height: 1.5;
+}
+
+.mb-4 {
+  margin-bottom: 16px;
+}
+
+.register-guide {
+  p {
+    margin: 0 0 12px 0;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--el-text-color-regular);
+  }
+
+  :deep(.el-button) {
+    font-size: 15px;
+    padding: 8px 16px;
+  }
 }
 
 .config-params {

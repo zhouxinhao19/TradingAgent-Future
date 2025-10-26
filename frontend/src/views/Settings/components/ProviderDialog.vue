@@ -251,7 +251,7 @@ const presetProviders = [
     api_doc_url: 'https://doc.302.ai',
     default_base_url: 'https://api.302.ai/v1',
     supported_features: ['chat', 'completion', 'embedding', 'image', 'vision', 'function_calling', 'streaming'],
-    register_url: 'https://302.ai/register',
+    register_url: 'https://share.302.ai/DUjftK',
     register_guide: '如果您还没有 302.AI 账号，请先注册并获取 API Key：'
   },
     {
