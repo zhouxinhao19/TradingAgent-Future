@@ -24,7 +24,7 @@ export interface AppState {
   // 用户偏好
   preferences: {
     defaultMarket: 'A股' | '美股' | '港股'
-    defaultDepth: '快速' | '标准' | '深度'
+    defaultDepth: '1' | '2' | '3' | '4' | '5'  // 1-5级分析深度
     autoRefresh: boolean
     refreshInterval: number
     showWelcome: boolean
@@ -54,13 +54,13 @@ export const useAppStore = defineStore('app', {
 
     preferences: useStorage('user-preferences', {
       defaultMarket: 'A股',
-      defaultDepth: '标准',
+      defaultDepth: '3',  // 3级为标准分析（推荐）
       autoRefresh: true,
       refreshInterval: 30,
       showWelcome: true
     }).value || {
       defaultMarket: 'A股',
-      defaultDepth: '标准',
+      defaultDepth: '3',  // 3级为标准分析（推荐）
       autoRefresh: true,
       refreshInterval: 30,
       showWelcome: true

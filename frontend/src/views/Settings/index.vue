@@ -169,18 +169,20 @@
             
             <el-form-item label="默认分析深度">
               <el-select v-model="analysisSettings.defaultDepth">
-                <el-option label="快速分析" value="快速" />
-                <el-option label="标准分析" value="标准" />
-                <el-option label="深度分析" value="深度" />
+                <el-option label="1级 - 快速分析" value="1" />
+                <el-option label="2级 - 基础分析" value="2" />
+                <el-option label="3级 - 标准分析（推荐）" value="3" />
+                <el-option label="4级 - 深度分析" value="4" />
+                <el-option label="5级 - 全面分析" value="5" />
               </el-select>
             </el-form-item>
-            
+
             <el-form-item label="默认分析师">
               <el-checkbox-group v-model="analysisSettings.defaultAnalysts">
+                <el-checkbox label="市场分析师">市场分析师</el-checkbox>
                 <el-checkbox label="基本面分析师">基本面分析师</el-checkbox>
-                <el-checkbox label="技术分析师">技术分析师</el-checkbox>
-                <el-checkbox label="情绪分析师">情绪分析师</el-checkbox>
-                <el-checkbox label="量化分析师">量化分析师</el-checkbox>
+                <el-checkbox label="新闻分析师">新闻分析师</el-checkbox>
+                <el-checkbox label="社媒分析师">社媒分析师</el-checkbox>
               </el-checkbox-group>
             </el-form-item>
 
@@ -542,8 +544,8 @@ const appearanceSettings = ref({
 
 const analysisSettings = ref({
   defaultMarket: authStore.user?.preferences?.default_market || 'A股',
-  defaultDepth: authStore.user?.preferences?.default_depth || '标准',
-  defaultAnalysts: authStore.user?.preferences?.default_analysts || ['基本面分析师', '技术分析师'],
+  defaultDepth: authStore.user?.preferences?.default_depth || '3',
+  defaultAnalysts: authStore.user?.preferences?.default_analysts || ['市场分析师', '基本面分析师'],
   autoRefresh: authStore.user?.preferences?.auto_refresh ?? true,
   refreshInterval: authStore.user?.preferences?.refresh_interval || 30
 })
@@ -568,8 +570,8 @@ watch(() => authStore.user, (newUser) => {
 
     // 更新分析偏好
     analysisSettings.value.defaultMarket = newUser.preferences?.default_market || 'A股'
-    analysisSettings.value.defaultDepth = newUser.preferences?.default_depth || '标准'
-    analysisSettings.value.defaultAnalysts = newUser.preferences?.default_analysts || ['基本面分析师', '技术分析师']
+    analysisSettings.value.defaultDepth = newUser.preferences?.default_depth || '3'
+    analysisSettings.value.defaultAnalysts = newUser.preferences?.default_analysts || ['市场分析师', '基本面分析师']
     analysisSettings.value.autoRefresh = newUser.preferences?.auto_refresh ?? true
     analysisSettings.value.refreshInterval = newUser.preferences?.refresh_interval || 30
 
