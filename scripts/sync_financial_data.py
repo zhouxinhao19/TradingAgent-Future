@@ -55,22 +55,27 @@ async def sync_single_stock_financial_data(
         
         # 1. 获取财务指标数据
         import akshare as ak
-        
+
         def fetch_financial_indicator():
             return ak.stock_financial_analysis_indicator(symbol=code6)
-        
+
         try:
             df = await asyncio.to_thread(fetch_financial_indicator)
-            
+
             if df is None or df.empty:
                 logger.warning(f"⚠️  {code6} 未获取到财务指标数据")
                 return False
-            
+
             # 获取最新一期数据
             latest = df.iloc[-1].to_dict()
-            
+
             logger.info(f"   获取到 {len(df)} 期财务数据，最新期: {latest.get('报告期', 'N/A')}")
-            
+
+            # 计算 TTM（最近12个月）营业收入
+            ttm_revenue = _calculate_ttm_revenue(df)
+            if ttm_revenue:
+                logger.info(f"   TTM营业收入: {ttm_revenue:.2f} 万元")
+
         except Exception as e:
             logger.error(f"❌ {code6} 获取财务指标失败: {e}")
             return False
@@ -82,27 +87,28 @@ async def sync_single_stock_financial_data(
             "report_period": latest.get('报告期', ''),
             "data_source": "akshare",
             "updated_at": datetime.utcnow(),
-            
+
             # 盈利能力指标
             "roe": _safe_float(latest.get('净资产收益率')),  # ROE
             "roa": _safe_float(latest.get('总资产净利率')),  # ROA
             "gross_margin": _safe_float(latest.get('销售毛利率')),  # 毛利率
             "netprofit_margin": _safe_float(latest.get('销售净利率')),  # 净利率
-            
+
             # 财务数据（万元）
-            "revenue": _safe_float(latest.get('营业收入')),  # 营业收入
+            "revenue": _safe_float(latest.get('营业收入')),  # 营业收入（单期）
+            "revenue_ttm": ttm_revenue,  # TTM营业收入（最近12个月）
             "net_profit": _safe_float(latest.get('净利润')),  # 净利润
             "total_assets": _safe_float(latest.get('总资产')),  # 总资产
             "total_hldr_eqy_exc_min_int": _safe_float(latest.get('股东权益合计')),  # 净资产
-            
+
             # 每股指标
             "basic_eps": _safe_float(latest.get('基本每股收益')),  # 每股收益
             "bps": _safe_float(latest.get('每股净资产')),  # 每股净资产
-            
+
             # 偿债能力指标
             "debt_to_assets": _safe_float(latest.get('资产负债率')),  # 资产负债率
             "current_ratio": _safe_float(latest.get('流动比率')),  # 流动比率
-            
+
             # 运营能力指标
             "total_asset_turnover": _safe_float(latest.get('总资产周转率')),  # 总资产周转率
         }
@@ -199,6 +205,100 @@ def _safe_float(value) -> Optional[float]:
     try:
         return float(value)
     except (ValueError, TypeError):
+        return None
+
+
+def _calculate_ttm_revenue(df) -> Optional[float]:
+    """
+    计算 TTM（最近12个月）营业收入
+
+    策略：
+    1. 如果最新期是年报（12月31日），直接使用年报营业收入
+    2. 如果最新期是中报/季报，计算 TTM = 最新年报 + (本期 - 去年同期)
+    3. 如果数据不足，返回 None
+
+    Args:
+        df: AKShare 返回的财务指标 DataFrame，包含 '报告期' 和 '营业收入' 列
+
+    Returns:
+        TTM 营业收入（万元），如果无法计算则返回 None
+    """
+    try:
+        if df is None or df.empty or len(df) < 1:
+            return None
+
+        # 确保有必要的列
+        if '报告期' not in df.columns or '营业收入' not in df.columns:
+            return None
+
+        # 按报告期排序（升序）
+        df_sorted = df.sort_values('报告期', ascending=True).reset_index(drop=True)
+
+        # 获取最新一期
+        latest = df_sorted.iloc[-1]
+        latest_period = str(latest['报告期'])
+        latest_revenue = _safe_float(latest['营业收入'])
+
+        if latest_revenue is None:
+            return None
+
+        # 判断最新期是否是年报（报告期以1231结尾）
+        if latest_period.endswith('1231'):
+            # 年报，直接使用
+            logger.debug(f"   使用年报数据作为TTM: {latest_revenue:.2f} 万元")
+            return latest_revenue
+
+        # 非年报，需要计算 TTM
+        # 提取年份和月份
+        try:
+            year = int(latest_period[:4])
+            month_day = latest_period[4:]
+        except:
+            return None
+
+        # 查找最近的年报（上一年的1231）
+        last_year = year - 1
+        last_annual_period = f"{last_year}1231"
+
+        # 查找去年同期
+        last_same_period = f"{last_year}{month_day}"
+
+        # 在 DataFrame 中查找
+        last_annual_row = df_sorted[df_sorted['报告期'] == last_annual_period]
+        last_same_row = df_sorted[df_sorted['报告期'] == last_same_period]
+
+        if not last_annual_row.empty and not last_same_row.empty:
+            last_annual_revenue = _safe_float(last_annual_row.iloc[0]['营业收入'])
+            last_same_revenue = _safe_float(last_same_row.iloc[0]['营业收入'])
+
+            if last_annual_revenue is not None and last_same_revenue is not None:
+                # TTM = 最近年报 + (本期 - 去年同期)
+                ttm_revenue = last_annual_revenue + (latest_revenue - last_same_revenue)
+                logger.debug(f"   计算TTM: {last_annual_revenue:.2f} + ({latest_revenue:.2f} - {last_same_revenue:.2f}) = {ttm_revenue:.2f} 万元")
+                return ttm_revenue if ttm_revenue > 0 else None
+
+        # 如果无法计算 TTM，尝试简单年化（不推荐，但总比没有好）
+        if latest_period.endswith('0630'):
+            # 中报，简单 * 2
+            ttm_revenue = latest_revenue * 2
+            logger.debug(f"   使用中报简单年化: {latest_revenue:.2f} * 2 = {ttm_revenue:.2f} 万元")
+            return ttm_revenue
+        elif latest_period.endswith('0331'):
+            # 一季报，简单 * 4
+            ttm_revenue = latest_revenue * 4
+            logger.debug(f"   使用一季报简单年化: {latest_revenue:.2f} * 4 = {ttm_revenue:.2f} 万元")
+            return ttm_revenue
+        elif latest_period.endswith('0930'):
+            # 三季报，简单 * 4/3
+            ttm_revenue = latest_revenue * 4 / 3
+            logger.debug(f"   使用三季报简单年化: {latest_revenue:.2f} * 4/3 = {ttm_revenue:.2f} 万元")
+            return ttm_revenue
+
+        # 无法计算
+        return None
+
+    except Exception as e:
+        logger.warning(f"   计算TTM营业收入失败: {e}")
         return None
 
 

@@ -1123,16 +1123,23 @@ class OptimizedChinaDataProvider:
             else:
                 metrics["debt_ratio"] = "N/A"
 
-            # 计算 PS - 市销率
+            # 计算 PS - 市销率（使用TTM营业收入）
+            # 优先使用 TTM 营业收入，如果没有则使用单期营业收入
+            revenue_ttm = latest_indicators.get('revenue_ttm')
             revenue = latest_indicators.get('revenue')
-            if revenue and revenue > 0:
+
+            # 选择使用哪个营业收入数据
+            revenue_for_ps = revenue_ttm if revenue_ttm and revenue_ttm > 0 else revenue
+            revenue_type = "TTM" if revenue_ttm and revenue_ttm > 0 else "单期"
+
+            if revenue_for_ps and revenue_for_ps > 0:
                 try:
                     # 使用市值/营业收入计算PS
                     money_cap = latest_indicators.get('money_cap')
                     if money_cap and money_cap > 0:
-                        ps_calculated = money_cap / revenue
+                        ps_calculated = money_cap / revenue_for_ps
                         metrics["ps"] = f"{ps_calculated:.2f}倍"
-                        logger.debug(f"✅ 计算PS: 市值{money_cap} / 营业收入{revenue} = {metrics['ps']}")
+                        logger.debug(f"✅ 计算PS({revenue_type}): 市值{money_cap}万元 / 营业收入{revenue_for_ps}万元 = {metrics['ps']}")
                     else:
                         metrics["ps"] = "N/A"
                 except (ValueError, TypeError, ZeroDivisionError):
