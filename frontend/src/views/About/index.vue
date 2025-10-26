@@ -15,6 +15,10 @@
             基于先进的AI技术，为投资者提供专业、准确、及时的股票分析服务。
             采用多智能体协作模式，从不同角度对股票进行全方位分析，助您做出更明智的投资决策。
           </p>
+          <div class="hero-acknowledgment">
+            <el-icon><Star /></el-icon>
+            <span>基于 <a href="https://github.com/TauricResearch/TradingAgents" target="_blank" rel="noopener noreferrer">TradingAgents</a> 项目开发，感谢原项目的贡献</span>
+          </div>
           <div class="hero-actions">
             <el-button type="primary" size="large" @click="goToAnalysis">
               <el-icon><TrendCharts /></el-icon>
@@ -242,6 +246,74 @@
       </div>
     </div>
 
+    <!-- 项目来源 -->
+    <div class="origin-section">
+      <div class="section-header">
+        <h2 class="section-title">项目来源</h2>
+        <p class="section-subtitle">致敬开源，感谢原项目的贡献</p>
+      </div>
+
+      <div class="origin-content">
+        <div class="origin-card">
+          <div class="origin-header">
+            <div class="origin-icon">
+              <el-icon><Link /></el-icon>
+            </div>
+            <div class="origin-info">
+              <h3>TradingAgents</h3>
+              <a href="https://github.com/TauricResearch/TradingAgents"
+                 target="_blank"
+                 rel="noopener noreferrer"
+                 class="origin-link">
+                <el-icon><Link /></el-icon>
+                github.com/TauricResearch/TradingAgents
+              </a>
+            </div>
+          </div>
+
+          <div class="origin-description">
+            <p>
+              <strong>TradingAgents-CN</strong> 是基于 <strong>TradingAgents</strong> 项目开发的中文本地化版本。
+              原项目由 Tauric Research 团队开发，是一个创新的多智能体股票分析框架。
+            </p>
+            <p>
+              我们在原项目的基础上进行了以下改进和扩展：
+            </p>
+            <ul class="origin-improvements">
+              <li>
+                <el-icon class="check-icon"><CircleCheck /></el-icon>
+                <span><strong>完整的中文支持：</strong>针对中国A股市场优化，支持中文数据源和分析</span>
+              </li>
+              <li>
+                <el-icon class="check-icon"><CircleCheck /></el-icon>
+                <span><strong>现代化Web界面：</strong>基于 Vue 3 + Element Plus 开发的全新前端界面</span>
+              </li>
+              <li>
+                <el-icon class="check-icon"><CircleCheck /></el-icon>
+                <span><strong>增强的数据源：</strong>集成 Tushare、AKShare 等中国市场数据源</span>
+              </li>
+              <li>
+                <el-icon class="check-icon"><CircleCheck /></el-icon>
+                <span><strong>多LLM支持：</strong>支持国内外主流大语言模型（OpenAI、Claude、智谱AI、DeepSeek等）</span>
+              </li>
+              <li>
+                <el-icon class="check-icon"><CircleCheck /></el-icon>
+                <span><strong>批量分析功能：</strong>支持批量股票分析和任务管理</span>
+              </li>
+              <li>
+                <el-icon class="check-icon"><CircleCheck /></el-icon>
+                <span><strong>用户系统：</strong>完整的用户认证、权限管理和个性化配置</span>
+              </li>
+            </ul>
+            <p class="origin-thanks">
+              <el-icon><Star /></el-icon>
+              <strong>特别感谢</strong> Tauric Research 团队的开源贡献，为我们提供了优秀的技术基础和设计理念。
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 版本信息 -->
     <div class="version-section">
       <div class="section-header">
@@ -369,8 +441,10 @@ import {
   Setting,
   Message,
   ChatDotRound,
-  Connection,
-  Cpu
+  Cpu,
+  Star,
+  Link,
+  CircleCheck
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -451,9 +525,41 @@ const viewDocumentation = () => {
       .hero-description {
         font-size: 16px;
         line-height: 1.6;
-        margin: 0 0 32px 0;
+        margin: 0 0 20px 0;
         opacity: 0.8;
         max-width: 600px;
+      }
+
+      .hero-acknowledgment {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        opacity: 0.9;
+        margin-bottom: 32px;
+        padding: 12px 16px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        max-width: 600px;
+
+        .el-icon {
+          font-size: 16px;
+          color: #ffd700;
+        }
+
+        a {
+          color: white;
+          text-decoration: none;
+          font-weight: 500;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+          transition: all 0.3s ease;
+
+          &:hover {
+            border-bottom-color: white;
+          }
+        }
       }
 
       .hero-actions {
@@ -638,6 +744,155 @@ const viewDocumentation = () => {
             border-radius: 12px;
             border: none;
             font-size: 12px;
+          }
+        }
+      }
+    }
+  }
+
+  // Origin Section
+  .origin-section {
+    margin-bottom: 80px;
+
+    .origin-content {
+      max-width: 900px;
+      margin: 0 auto;
+
+      .origin-card {
+        background: var(--el-bg-color);
+        border-radius: 16px;
+        padding: 40px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        border: 1px solid var(--el-border-color-lighter);
+        position: relative;
+        overflow: hidden;
+
+        &::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 4px;
+          background: linear-gradient(90deg, #667eea, #764ba2);
+        }
+
+        .origin-header {
+          display: flex;
+          align-items: center;
+          gap: 20px;
+          margin-bottom: 32px;
+          padding-bottom: 24px;
+          border-bottom: 2px solid var(--el-border-color-lighter);
+
+          .origin-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            color: white;
+            flex-shrink: 0;
+          }
+
+          .origin-info {
+            flex: 1;
+
+            h3 {
+              margin: 0 0 8px 0;
+              font-size: 24px;
+              font-weight: 700;
+              color: var(--el-text-color-primary);
+            }
+
+            .origin-link {
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
+              color: var(--el-color-primary);
+              text-decoration: none;
+              font-size: 14px;
+              font-weight: 500;
+              transition: all 0.3s ease;
+
+              .el-icon {
+                font-size: 14px;
+              }
+
+              &:hover {
+                color: #667eea;
+                text-decoration: underline;
+              }
+            }
+          }
+        }
+
+        .origin-description {
+          p {
+            color: var(--el-text-color-regular);
+            line-height: 1.8;
+            margin: 0 0 20px 0;
+            font-size: 15px;
+
+            strong {
+              color: var(--el-text-color-primary);
+              font-weight: 600;
+            }
+          }
+
+          .origin-improvements {
+            list-style: none;
+            padding: 0;
+            margin: 24px 0;
+
+            li {
+              display: flex;
+              align-items: flex-start;
+              gap: 12px;
+              padding: 12px 0;
+              color: var(--el-text-color-regular);
+              line-height: 1.6;
+              font-size: 15px;
+
+              .check-icon {
+                color: var(--el-color-success);
+                font-size: 18px;
+                margin-top: 2px;
+                flex-shrink: 0;
+              }
+
+              strong {
+                color: var(--el-text-color-primary);
+                font-weight: 600;
+              }
+            }
+          }
+
+          .origin-thanks {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 32px;
+            padding: 20px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+            font-size: 15px;
+            color: var(--el-text-color-regular);
+
+            .el-icon {
+              color: #ffd700;
+              font-size: 20px;
+              flex-shrink: 0;
+            }
+
+            strong {
+              color: var(--el-text-color-primary);
+              font-weight: 600;
+            }
           }
         }
       }
