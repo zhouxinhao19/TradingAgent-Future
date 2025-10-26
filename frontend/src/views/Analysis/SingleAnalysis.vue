@@ -2163,14 +2163,14 @@ onMounted(async () => {
 <style lang="scss" scoped>
 .single-analysis {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: var(--el-bg-color-page);
   padding: 24px;
 
   .page-header {
     margin-bottom: 32px;
 
     .header-content {
-      background: white;
+      background: var(--el-bg-color);
       padding: 32px;
       border-radius: 16px;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
@@ -2817,14 +2817,14 @@ onMounted(async () => {
 .stat-item {
   text-align: center;
   padding: 12px;
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  background: var(--el-fill-color-light);
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--el-border-color);
 }
 
 .stat-label {
   font-size: 12px;
-  color: #64748b;
+  color: var(--el-text-color-secondary);
   margin-bottom: 4px;
   font-weight: 500;
 }
@@ -2832,7 +2832,7 @@ onMounted(async () => {
 .stat-value {
   font-size: 14px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--el-text-color-primary);
 }
 
 /* 进度条区域 */
@@ -2842,7 +2842,7 @@ onMounted(async () => {
 
 .main-progress-bar {
   :deep(.el-progress-bar__outer) {
-    background-color: #f1f5f9;
+    background-color: var(--el-fill-color);
     border-radius: 8px;
   }
 
@@ -2854,13 +2854,13 @@ onMounted(async () => {
 
   :deep(.el-progress__text) {
     font-weight: 600;
-    color: #1e293b;
+    color: var(--el-text-color-primary);
   }
 }
 
 /* 当前任务信息 */
 .current-task-info {
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  background: var(--el-fill-color-light);
   border: 1px solid #3b82f6;
   border-radius: 12px;
   padding: 16px;
@@ -2889,8 +2889,8 @@ onMounted(async () => {
 
 /* 分析步骤 */
 .analysis-steps {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
   border-radius: 12px;
   padding: 20px;
 }
@@ -3005,8 +3005,8 @@ onMounted(async () => {
 }
 
 .decision-card {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color);
   border-radius: 12px;
   padding: 20px;
 }
@@ -3106,11 +3106,11 @@ onMounted(async () => {
   /* 标签页头部样式 */
   :deep(.el-tabs__header) {
     margin: 0 0 20px 0;
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    background: var(--el-fill-color-light);
     padding: 12px;
     border-radius: 15px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--el-border-color);
   }
 
   /* 标签页导航 */
@@ -3126,19 +3126,19 @@ onMounted(async () => {
     line-height: 55px !important;
     padding: 0 20px !important;
     margin-right: 8px !important;
-    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%) !important;
-    border: 2px solid #e1e5e9 !important;
+    background: var(--el-bg-color) !important;
+    border: 2px solid var(--el-border-color) !important;
     border-radius: 12px !important;
-    color: #495057 !important;
+    color: var(--el-text-color-regular) !important;
     font-weight: 600 !important;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
     position: relative !important;
     overflow: hidden !important;
-    border-bottom: 2px solid #e1e5e9 !important; /* 确保底部边框存在 */
+    border-bottom: 2px solid var(--el-border-color) !important; /* 确保底部边框存在 */
 
     &:hover {
-      background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
+      background: var(--el-fill-color-light) !important;
       border-color: #2196f3 !important;
       transform: translateY(-2px) scale(1.02) !important;
       box-shadow: 0 4px 15px rgba(33,150,243,0.3) !important;
@@ -3173,9 +3173,9 @@ onMounted(async () => {
 
   :deep(.el-tab-pane) {
     padding: 25px;
-    background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
+    background: var(--el-bg-color);
     border-radius: 15px;
-    border: 1px solid #e1e5e9;
+    border: 1px solid var(--el-border-color);
     box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     margin-top: 10px;
   }
@@ -3185,7 +3185,7 @@ onMounted(async () => {
 .report-header {
   margin-bottom: 25px;
   padding: 20px;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  background: var(--el-fill-color-light);
   border-radius: 15px;
   border-left: 5px solid #667eea;
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
@@ -3217,10 +3217,10 @@ onMounted(async () => {
 
 /* 报告内容包装器 */
 .report-content-wrapper {
-  background: #ffffff;
+  background: var(--el-bg-color);
   padding: 25px;
   border-radius: 12px;
-  border: 1px solid #e1e5e9;
+  border: 1px solid var(--el-border-color);
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
@@ -3273,7 +3273,7 @@ onMounted(async () => {
 
   /* 代码样式 */
   code {
-    background: #f3f4f6 !important;
+    background: var(--el-fill-color-light) !important;
     padding: 2px 6px !important;
     border-radius: 4px !important;
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
@@ -3286,11 +3286,11 @@ onMounted(async () => {
     border-left: 4px solid #3b82f6 !important;
     padding-left: 16px !important;
     margin: 16px 0 !important;
-    background: #f8fafc !important;
+    background: var(--el-fill-color-light) !important;
     padding: 12px 16px !important;
     border-radius: 0 8px 8px 0 !important;
     font-style: italic !important;
-    color: #4b5563 !important;
+    color: var(--el-text-color-regular) !important;
   }
 }
 

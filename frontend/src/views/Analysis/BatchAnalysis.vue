@@ -556,14 +556,14 @@ const resetForm = () => {
 <style lang="scss" scoped>
 .batch-analysis {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: var(--el-bg-color-page);
   padding: 24px;
 
   .page-header {
     margin-bottom: 32px;
 
     .header-content {
-      background: white;
+      background: var(--el-bg-color);
       padding: 32px;
       border-radius: 16px;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
