@@ -1232,6 +1232,20 @@ class TushareProvider(BaseStockDataProvider):
         """
         从 Tushare 利润表数据计算 TTM（最近12个月）
 
+        Tushare 利润表数据是累计值（从年初到报告期的累计）：
+        - 2025Q1 (20250331): 2025年1-3月累计
+        - 2025Q2 (20250630): 2025年1-6月累计
+        - 2025Q3 (20250930): 2025年1-9月累计
+        - 2025Q4 (20251231): 2025年1-12月累计（年报）
+
+        TTM 计算公式：
+        TTM = 去年同期之后的最近年报 + (本期累计 - 去年同期累计)
+
+        例如：2025Q2 TTM = 2024年报 + (2025Q2 - 2024Q2)
+                        = 2024年1-12月 + (2025年1-6月 - 2024年1-6月)
+                        = 2024年7-12月 + 2025年1-6月
+                        = 最近12个月
+
         Args:
             income_statements: 利润表数据列表（按报告期倒序）
             field: 字段名（'revenue' 或 'n_income_attr_p'）
@@ -1255,25 +1269,12 @@ class TushareProvider(BaseStockDataProvider):
 
             # 如果最新期是年报（1231），直接使用
             if month_day == '1231':
-                self.logger.debug(f"TTM计算: 使用年报数据 {latest_period}")
+                self.logger.debug(f"✅ TTM计算: 使用年报数据 {latest_period} = {latest_value:.2f}")
                 return latest_value
 
-            # 如果是季报/半年报，需要计算 TTM
-            # TTM = 最新年报 + (本期 - 去年同期)
+            # 如果是季报/半年报，需要计算 TTM = 基准期 + (本期累计 - 去年同期累计)
 
-            # 查找最新年报
-            latest_annual = None
-            for stmt in income_statements:
-                if stmt.get('end_date', '')[4:8] == '1231':
-                    latest_annual = stmt
-                    break
-
-            if not latest_annual:
-                # 没有年报数据，无法准确计算 TTM
-                self.logger.warning(f"⚠️ TTM计算失败: 缺少年报数据，无法计算准确的TTM（报告期: {latest_period}）")
-                return None
-
-            # 查找去年同期
+            # 1. 查找去年同期
             latest_year = latest_period[:4]
             last_year = str(int(latest_year) - 1)
             last_year_same_period = last_year + latest_period[4:]
@@ -1285,24 +1286,48 @@ class TushareProvider(BaseStockDataProvider):
                     break
 
             if not last_year_same:
-                # 没有去年同期数据，无法准确计算 TTM
-                self.logger.warning(f"⚠️ TTM计算失败: 缺少去年同期数据（需要: {last_year_same_period}）")
+                # 缺少去年同期数据，无法准确计算 TTM
+                self.logger.warning(f"⚠️ TTM计算失败: 缺少去年同期数据（需要: {last_year_same_period}，最新期: {latest_period}）")
                 return None
 
-            # 计算 TTM = 最新年报 + (本期累计 - 去年同期累计)
-            annual_value = self._safe_float(latest_annual.get(field))
             last_year_value = self._safe_float(last_year_same.get(field))
-
-            if annual_value is None or last_year_value is None:
-                self.logger.warning(f"⚠️ TTM计算失败: 数据值为空（年报: {annual_value}, 去年同期: {last_year_value}）")
+            if last_year_value is None:
+                self.logger.warning(f"⚠️ TTM计算失败: 去年同期数据值为空（{last_year_same_period}）")
                 return None
 
-            ttm_value = annual_value + (latest_value - last_year_value)
-            self.logger.debug(f"TTM计算: {latest_annual.get('end_date')} + ({latest_period} - {last_year_same_period}) = {ttm_value:.2f}")
+            # 2. 查找"去年同期之后的最近年报"作为基准期
+            # 例如：如果最新期是 2025Q2，去年同期是 2024Q2，则查找 2024年报（20241231）
+            base_period = None
+            for stmt in income_statements:
+                period = stmt.get('end_date')
+                # 必须满足：在去年同期之后 且 是年报（1231）
+                if period and period > last_year_same_period and period[4:8] == '1231':
+                    base_period = stmt
+                    break
+
+            if not base_period:
+                # 没有找到合适的年报，无法计算
+                # 这种情况通常发生在：最新期是 2025Q1，但 2024年报还没公布
+                self.logger.warning(f"⚠️ TTM计算失败: 缺少基准年报（需要在 {last_year_same_period} 之后的年报，最新期: {latest_period}）")
+                return None
+
+            base_value = self._safe_float(base_period.get(field))
+            if base_value is None:
+                self.logger.warning(f"⚠️ TTM计算失败: 基准年报数据值为空（{base_period.get('end_date')}）")
+                return None
+
+            # 3. 计算 TTM = 基准年报 + (本期累计 - 去年同期累计)
+            ttm_value = base_value + (latest_value - last_year_value)
+
+            self.logger.debug(
+                f"✅ TTM计算: {base_period.get('end_date')}({base_value:.2f}) + "
+                f"({latest_period}({latest_value:.2f}) - {last_year_same_period}({last_year_value:.2f})) = {ttm_value:.2f}"
+            )
+
             return ttm_value
 
         except Exception as e:
-            self.logger.warning(f"TTM计算失败: {e}")
+            self.logger.warning(f"❌ TTM计算异常: {e}")
             return None
 
     def _determine_report_type(self, report_period: str) -> str:
