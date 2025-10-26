@@ -18,6 +18,15 @@ export interface LLMProvider {
   is_active: boolean
   supported_features: string[]
   default_base_url?: string
+  extra_config?: {
+    has_api_key?: boolean
+    source?: 'environment' | 'database'
+    [key: string]: any
+  }
+  // 🆕 聚合渠道支持
+  is_aggregator?: boolean
+  aggregator_type?: string
+  model_name_format?: string
   created_at?: string
   updated_at?: string
 }

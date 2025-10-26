@@ -183,6 +183,12 @@ import { Link } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { configApi, type LLMProvider } from '@/api/config'
 
+// 表单数据类型（扩展 LLMProvider，添加临时字段）
+interface ProviderFormData extends Partial<LLMProvider> {
+  api_key?: string
+  api_secret?: string
+}
+
 interface Props {
   visible: boolean
   provider?: Partial<LLMProvider>
@@ -226,6 +232,39 @@ const openRegisterUrl = () => {
 
 // 预设厂家数据
 const presetProviders = [
+  {
+    name: 'dashscope',
+    display_name: '阿里云百炼',
+    description: '阿里云百炼大模型服务平台，提供通义千问等模型',
+    website: 'https://bailian.console.aliyun.com',
+    api_doc_url: 'https://help.aliyun.com/zh/dashscope/',
+    default_base_url: 'https://dashscope.aliyuncs.com/api/v1',
+    supported_features: ['chat', 'completion', 'embedding', 'function_calling', 'streaming'],
+    register_url: 'https://account.aliyun.com/register/qr_register.htm',
+    register_guide: '如果您还没有阿里云账号，请先注册并开通百炼服务：'
+  },
+  {
+    name: '302ai',
+    display_name: '302.AI',
+    description: '302.AI是企业级AI聚合平台，提供多种主流大模型的统一接口',
+    website: 'https://302.ai',
+    api_doc_url: 'https://doc.302.ai',
+    default_base_url: 'https://api.302.ai/v1',
+    supported_features: ['chat', 'completion', 'embedding', 'image', 'vision', 'function_calling', 'streaming'],
+    register_url: 'https://302.ai/register',
+    register_guide: '如果您还没有 302.AI 账号，请先注册并获取 API Key：'
+  },
+    {
+    name: 'deepseek',
+    display_name: 'DeepSeek',
+    description: 'DeepSeek提供高性能的AI推理服务',
+    website: 'https://www.deepseek.com',
+    api_doc_url: 'https://platform.deepseek.com/api-docs',
+    default_base_url: 'https://api.deepseek.com',
+    supported_features: ['chat', 'completion', 'function_calling', 'streaming'],
+    register_url: 'https://platform.deepseek.com/sign_up',
+    register_guide: '如果您还没有 DeepSeek 账号，请先注册并获取 API Key：'
+  },
   {
     name: 'openai',
     display_name: 'OpenAI',
@@ -291,44 +330,11 @@ const presetProviders = [
     supported_features: ['chat', 'completion', 'embedding', 'streaming'],
     register_url: 'https://login.bce.baidu.com/new-reg',
     register_guide: '如果您还没有百度智能云账号，请先注册并开通文心一言服务：'
-  },
-  {
-    name: 'deepseek',
-    display_name: 'DeepSeek',
-    description: 'DeepSeek提供高性能的AI推理服务',
-    website: 'https://www.deepseek.com',
-    api_doc_url: 'https://platform.deepseek.com/api-docs',
-    default_base_url: 'https://api.deepseek.com',
-    supported_features: ['chat', 'completion', 'function_calling', 'streaming'],
-    register_url: 'https://platform.deepseek.com/sign_up',
-    register_guide: '如果您还没有 DeepSeek 账号，请先注册并获取 API Key：'
-  },
-  {
-    name: 'dashscope',
-    display_name: '阿里云百炼',
-    description: '阿里云百炼大模型服务平台，提供通义千问等模型',
-    website: 'https://bailian.console.aliyun.com',
-    api_doc_url: 'https://help.aliyun.com/zh/dashscope/',
-    default_base_url: 'https://dashscope.aliyuncs.com/api/v1',
-    supported_features: ['chat', 'completion', 'embedding', 'function_calling', 'streaming'],
-    register_url: 'https://account.aliyun.com/register/qr_register.htm',
-    register_guide: '如果您还没有阿里云账号，请先注册并开通百炼服务：'
-  },
-  {
-    name: '302ai',
-    display_name: '302.AI',
-    description: '302.AI是企业级AI聚合平台，提供多种主流大模型的统一接口',
-    website: 'https://302.ai',
-    api_doc_url: 'https://doc.302.ai',
-    default_base_url: 'https://api.302.ai/v1',
-    supported_features: ['chat', 'completion', 'embedding', 'image', 'vision', 'function_calling', 'streaming'],
-    register_url: 'https://302.ai/register',
-    register_guide: '如果您还没有 302.AI 账号，请先注册并获取 API Key：'
   }
 ]
 
 // 表单数据
-const formData = ref<Partial<LLMProvider>>({
+const formData = ref<ProviderFormData>({
   name: '',
   display_name: '',
   description: '',
