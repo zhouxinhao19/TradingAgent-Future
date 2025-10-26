@@ -66,12 +66,12 @@
             </div>
             <h3>多智能体分析</h3>
           </div>
-          <p>基本面、技术面、情绪面、量化分析四大智能体协作，提供全方位的股票分析视角</p>
+          <p>基本面、技术面、新闻分析、社媒分析等12个智能体协作，提供全方位的股票分析视角</p>
           <div class="feature-tags">
             <el-tag size="small">基本面分析</el-tag>
             <el-tag size="small">技术分析</el-tag>
-            <el-tag size="small">情绪分析</el-tag>
-            <el-tag size="small">量化分析</el-tag>
+            <el-tag size="small">新闻分析</el-tag>
+            <el-tag size="small">社媒分析</el-tag>
           </div>
         </div>
 
@@ -302,7 +302,7 @@
               </li>
               <li>
                 <el-icon class="check-icon"><CircleCheck /></el-icon>
-                <span><strong>用户系统：</strong>完整的用户认证、权限管理和个性化配置</span>
+                <span><strong>用户系统：</strong>完整的用户认证和个性化配置</span>
               </li>
             </ul>
             <p class="origin-thanks">
