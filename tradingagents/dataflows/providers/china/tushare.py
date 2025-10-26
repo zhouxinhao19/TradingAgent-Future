@@ -1269,16 +1269,9 @@ class TushareProvider(BaseStockDataProvider):
                     break
 
             if not latest_annual:
-                # 没有年报数据，使用简单年化
-                self.logger.debug(f"TTM计算: 无年报数据，使用简单年化")
-                if month_day == '0331':  # Q1
-                    return latest_value * 4
-                elif month_day == '0630':  # Q2/半年报
-                    return latest_value * 2
-                elif month_day == '0930':  # Q3
-                    return latest_value * 4 / 3
-                else:
-                    return latest_value
+                # 没有年报数据，无法准确计算 TTM
+                self.logger.warning(f"⚠️ TTM计算失败: 缺少年报数据，无法计算准确的TTM（报告期: {latest_period}）")
+                return None
 
             # 查找去年同期
             latest_year = latest_period[:4]
@@ -1292,31 +1285,17 @@ class TushareProvider(BaseStockDataProvider):
                     break
 
             if not last_year_same:
-                # 没有去年同期数据，使用简单年化
-                self.logger.debug(f"TTM计算: 无去年同期数据，使用简单年化")
-                if month_day == '0331':  # Q1
-                    return latest_value * 4
-                elif month_day == '0630':  # Q2/半年报
-                    return latest_value * 2
-                elif month_day == '0930':  # Q3
-                    return latest_value * 4 / 3
-                else:
-                    return latest_value
+                # 没有去年同期数据，无法准确计算 TTM
+                self.logger.warning(f"⚠️ TTM计算失败: 缺少去年同期数据（需要: {last_year_same_period}）")
+                return None
 
-            # 计算 TTM = 最新年报 + (本期 - 去年同期)
+            # 计算 TTM = 最新年报 + (本期累计 - 去年同期累计)
             annual_value = self._safe_float(latest_annual.get(field))
             last_year_value = self._safe_float(last_year_same.get(field))
 
             if annual_value is None or last_year_value is None:
-                self.logger.debug(f"TTM计算: 数据不完整，使用简单年化")
-                if month_day == '0331':  # Q1
-                    return latest_value * 4
-                elif month_day == '0630':  # Q2/半年报
-                    return latest_value * 2
-                elif month_day == '0930':  # Q3
-                    return latest_value * 4 / 3
-                else:
-                    return latest_value
+                self.logger.warning(f"⚠️ TTM计算失败: 数据值为空（年报: {annual_value}, 去年同期: {last_year_value}）")
+                return None
 
             ttm_value = annual_value + (latest_value - last_year_value)
             self.logger.debug(f"TTM计算: {latest_annual.get('end_date')} + ({latest_period} - {last_year_same_period}) = {ttm_value:.2f}")
