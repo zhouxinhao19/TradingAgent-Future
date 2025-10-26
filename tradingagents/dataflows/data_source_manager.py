@@ -88,9 +88,9 @@ class DataSourceManager:
         market_category = self._identify_market_category(symbol)
 
         try:
-            # 🔥 从数据库读取数据源配置
-            from app.core.database import get_mongo_db
-            db = get_mongo_db()
+            # 🔥 从数据库读取数据源配置（使用同步客户端）
+            from app.core.database import get_mongo_db_sync
+            db = get_mongo_db_sync()
             config_collection = db.system_configs
 
             # 获取最新的激活配置
