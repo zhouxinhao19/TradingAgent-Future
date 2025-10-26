@@ -1132,6 +1132,11 @@ class TushareProvider(BaseStockDataProvider):
             report_period = latest_income.get('end_date') or latest_balance.get('end_date') or latest_cashflow.get('end_date')
             ann_date = latest_income.get('ann_date') or latest_balance.get('ann_date') or latest_cashflow.get('ann_date')
 
+            # 计算 TTM 数据
+            income_statements = financial_data.get('income_statement', [])
+            revenue_ttm = self._calculate_ttm_from_tushare(income_statements, 'revenue')
+            net_profit_ttm = self._calculate_ttm_from_tushare(income_statements, 'n_income_attr_p')
+
             standardized_data = {
                 # 基础信息
                 "symbol": symbol,
@@ -1141,10 +1146,12 @@ class TushareProvider(BaseStockDataProvider):
                 "report_type": self._determine_report_type(report_period),
 
                 # 利润表核心指标
-                "revenue": self._safe_float(latest_income.get('revenue')),  # 营业收入
+                "revenue": self._safe_float(latest_income.get('revenue')),  # 营业收入（单期）
+                "revenue_ttm": revenue_ttm,  # 营业收入（TTM）
                 "oper_rev": self._safe_float(latest_income.get('oper_rev')),  # 营业收入
-                "net_income": self._safe_float(latest_income.get('n_income')),  # 净利润
-                "net_profit": self._safe_float(latest_income.get('n_income_attr_p')),  # 归属母公司净利润
+                "net_income": self._safe_float(latest_income.get('n_income')),  # 净利润（单期）
+                "net_profit": self._safe_float(latest_income.get('n_income_attr_p')),  # 归属母公司净利润（单期）
+                "net_profit_ttm": net_profit_ttm,  # 归属母公司净利润（TTM）
                 "oper_profit": self._safe_float(latest_income.get('oper_profit')),  # 营业利润
                 "total_profit": self._safe_float(latest_income.get('total_profit')),  # 利润总额
                 "oper_cost": self._safe_float(latest_income.get('oper_cost')),  # 营业成本
@@ -1220,6 +1227,104 @@ class TushareProvider(BaseStockDataProvider):
                 "updated_at": datetime.utcnow(),
                 "error": str(e)
             }
+
+    def _calculate_ttm_from_tushare(self, income_statements: list, field: str) -> Optional[float]:
+        """
+        从 Tushare 利润表数据计算 TTM（最近12个月）
+
+        Args:
+            income_statements: 利润表数据列表（按报告期倒序）
+            field: 字段名（'revenue' 或 'n_income_attr_p'）
+
+        Returns:
+            TTM 值，如果无法计算则返回 None
+        """
+        if not income_statements or len(income_statements) < 1:
+            return None
+
+        try:
+            latest = income_statements[0]
+            latest_period = latest.get('end_date')
+            latest_value = self._safe_float(latest.get(field))
+
+            if not latest_period or latest_value is None:
+                return None
+
+            # 判断最新期的类型
+            month_day = latest_period[4:8]
+
+            # 如果最新期是年报（1231），直接使用
+            if month_day == '1231':
+                self.logger.debug(f"TTM计算: 使用年报数据 {latest_period}")
+                return latest_value
+
+            # 如果是季报/半年报，需要计算 TTM
+            # TTM = 最新年报 + (本期 - 去年同期)
+
+            # 查找最新年报
+            latest_annual = None
+            for stmt in income_statements:
+                if stmt.get('end_date', '')[4:8] == '1231':
+                    latest_annual = stmt
+                    break
+
+            if not latest_annual:
+                # 没有年报数据，使用简单年化
+                self.logger.debug(f"TTM计算: 无年报数据，使用简单年化")
+                if month_day == '0331':  # Q1
+                    return latest_value * 4
+                elif month_day == '0630':  # Q2/半年报
+                    return latest_value * 2
+                elif month_day == '0930':  # Q3
+                    return latest_value * 4 / 3
+                else:
+                    return latest_value
+
+            # 查找去年同期
+            latest_year = latest_period[:4]
+            last_year = str(int(latest_year) - 1)
+            last_year_same_period = last_year + latest_period[4:]
+
+            last_year_same = None
+            for stmt in income_statements:
+                if stmt.get('end_date') == last_year_same_period:
+                    last_year_same = stmt
+                    break
+
+            if not last_year_same:
+                # 没有去年同期数据，使用简单年化
+                self.logger.debug(f"TTM计算: 无去年同期数据，使用简单年化")
+                if month_day == '0331':  # Q1
+                    return latest_value * 4
+                elif month_day == '0630':  # Q2/半年报
+                    return latest_value * 2
+                elif month_day == '0930':  # Q3
+                    return latest_value * 4 / 3
+                else:
+                    return latest_value
+
+            # 计算 TTM = 最新年报 + (本期 - 去年同期)
+            annual_value = self._safe_float(latest_annual.get(field))
+            last_year_value = self._safe_float(last_year_same.get(field))
+
+            if annual_value is None or last_year_value is None:
+                self.logger.debug(f"TTM计算: 数据不完整，使用简单年化")
+                if month_day == '0331':  # Q1
+                    return latest_value * 4
+                elif month_day == '0630':  # Q2/半年报
+                    return latest_value * 2
+                elif month_day == '0930':  # Q3
+                    return latest_value * 4 / 3
+                else:
+                    return latest_value
+
+            ttm_value = annual_value + (latest_value - last_year_value)
+            self.logger.debug(f"TTM计算: {latest_annual.get('end_date')} + ({latest_period} - {last_year_same_period}) = {ttm_value:.2f}")
+            return ttm_value
+
+        except Exception as e:
+            self.logger.warning(f"TTM计算失败: {e}")
+            return None
 
     def _determine_report_type(self, report_period: str) -> str:
         """根据报告期确定报告类型"""
