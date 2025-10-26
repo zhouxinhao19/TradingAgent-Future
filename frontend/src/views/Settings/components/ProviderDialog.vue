@@ -29,6 +29,30 @@
         </el-select>
       </el-form-item>
 
+      <!-- 🆕 注册引导提示 -->
+      <el-alert
+        v-if="selectedPreset && currentPresetInfo?.register_url"
+        :title="`📝 ${currentPresetInfo.display_name} 注册引导`"
+        type="info"
+        :closable="false"
+        class="mb-4"
+      >
+        <template #default>
+          <div class="register-guide">
+            <p>{{ currentPresetInfo.register_guide || '如果您还没有账号，请先注册：' }}</p>
+            <el-button
+              type="primary"
+              size="small"
+              link
+              @click="openRegisterUrl"
+            >
+              <el-icon><Link /></el-icon>
+              前往注册 {{ currentPresetInfo.display_name }}
+            </el-button>
+          </div>
+        </template>
+      </el-alert>
+
       <el-form-item label="厂家ID" prop="name">
         <el-input 
           v-model="formData.name" 
@@ -155,6 +179,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Link } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { configApi, type LLMProvider } from '@/api/config'
 
@@ -183,8 +208,21 @@ const isEdit = computed(() => !!props.provider?.id)
 // 是否需要API Secret（某些厂家需要）
 const needsApiSecret = computed(() => {
   const providersNeedSecret = ['baidu', 'dashscope', 'qianfan']
-  return providersNeedSecret.includes(formData.value.name)
+  return providersNeedSecret.includes(formData.value.name || '')
 })
+
+// 当前选中的预设厂家信息
+const currentPresetInfo = computed(() => {
+  if (!selectedPreset.value) return null
+  return presetProviders.find(p => p.name === selectedPreset.value)
+})
+
+// 打开注册链接
+const openRegisterUrl = () => {
+  if (currentPresetInfo.value?.register_url) {
+    window.open(currentPresetInfo.value.register_url, '_blank')
+  }
+}
 
 // 预设厂家数据
 const presetProviders = [
@@ -195,7 +233,9 @@ const presetProviders = [
     website: 'https://openai.com',
     api_doc_url: 'https://platform.openai.com/docs',
     default_base_url: 'https://api.openai.com/v1',
-    supported_features: ['chat', 'completion', 'embedding', 'image', 'vision', 'function_calling', 'streaming']
+    supported_features: ['chat', 'completion', 'embedding', 'image', 'vision', 'function_calling', 'streaming'],
+    register_url: 'https://platform.openai.com/signup',
+    register_guide: '如果您还没有 OpenAI 账号，请先注册并获取 API Key：'
   },
   {
     name: 'anthropic',
@@ -204,7 +244,9 @@ const presetProviders = [
     website: 'https://anthropic.com',
     api_doc_url: 'https://docs.anthropic.com',
     default_base_url: 'https://api.anthropic.com',
-    supported_features: ['chat', 'completion', 'function_calling', 'streaming']
+    supported_features: ['chat', 'completion', 'function_calling', 'streaming'],
+    register_url: 'https://console.anthropic.com/signup',
+    register_guide: '如果您还没有 Anthropic 账号，请先注册并获取 API Key：'
   },
   {
     name: 'google',
@@ -213,7 +255,9 @@ const presetProviders = [
     website: 'https://ai.google.dev',
     api_doc_url: 'https://ai.google.dev/docs',
     default_base_url: 'https://generativelanguage.googleapis.com/v1',
-    supported_features: ['chat', 'completion', 'embedding', 'vision', 'function_calling', 'streaming']
+    supported_features: ['chat', 'completion', 'embedding', 'vision', 'function_calling', 'streaming'],
+    register_url: 'https://makersuite.google.com/app/apikey',
+    register_guide: '如果您还没有 Google AI 账号，请先登录 Google 账号并获取 API Key：'
   },
   {
     name: 'azure',
@@ -222,7 +266,9 @@ const presetProviders = [
     website: 'https://azure.microsoft.com/en-us/products/ai-services/openai-service',
     api_doc_url: 'https://learn.microsoft.com/en-us/azure/ai-services/openai/',
     default_base_url: 'https://your-resource.openai.azure.com',
-    supported_features: ['chat', 'completion', 'embedding', 'function_calling', 'streaming']
+    supported_features: ['chat', 'completion', 'embedding', 'function_calling', 'streaming'],
+    register_url: 'https://azure.microsoft.com/en-us/free/',
+    register_guide: '如果您还没有 Azure 账号，请先注册并申请 Azure OpenAI 服务：'
   },
   {
     name: 'zhipu',
@@ -231,7 +277,9 @@ const presetProviders = [
     website: 'https://zhipuai.cn',
     api_doc_url: 'https://open.bigmodel.cn/doc',
     default_base_url: 'https://open.bigmodel.cn/api/paas/v4',
-    supported_features: ['chat', 'completion', 'embedding', 'function_calling', 'streaming']
+    supported_features: ['chat', 'completion', 'embedding', 'function_calling', 'streaming'],
+    register_url: 'https://open.bigmodel.cn/login',
+    register_guide: '如果您还没有智谱AI账号，请先注册并获取 API Key：'
   },
   {
     name: 'baidu',
@@ -240,7 +288,9 @@ const presetProviders = [
     website: 'https://cloud.baidu.com',
     api_doc_url: 'https://cloud.baidu.com/doc/WENXINWORKSHOP/index.html',
     default_base_url: 'https://aip.baidubce.com',
-    supported_features: ['chat', 'completion', 'embedding', 'streaming']
+    supported_features: ['chat', 'completion', 'embedding', 'streaming'],
+    register_url: 'https://login.bce.baidu.com/new-reg',
+    register_guide: '如果您还没有百度智能云账号，请先注册并开通文心一言服务：'
   },
   {
     name: 'deepseek',
@@ -249,7 +299,9 @@ const presetProviders = [
     website: 'https://www.deepseek.com',
     api_doc_url: 'https://platform.deepseek.com/api-docs',
     default_base_url: 'https://api.deepseek.com',
-    supported_features: ['chat', 'completion', 'function_calling', 'streaming']
+    supported_features: ['chat', 'completion', 'function_calling', 'streaming'],
+    register_url: 'https://platform.deepseek.com/sign_up',
+    register_guide: '如果您还没有 DeepSeek 账号，请先注册并获取 API Key：'
   },
   {
     name: 'dashscope',
@@ -258,7 +310,9 @@ const presetProviders = [
     website: 'https://bailian.console.aliyun.com',
     api_doc_url: 'https://help.aliyun.com/zh/dashscope/',
     default_base_url: 'https://dashscope.aliyuncs.com/api/v1',
-    supported_features: ['chat', 'completion', 'embedding', 'function_calling', 'streaming']
+    supported_features: ['chat', 'completion', 'embedding', 'function_calling', 'streaming'],
+    register_url: 'https://account.aliyun.com/register/qr_register.htm',
+    register_guide: '如果您还没有阿里云账号，请先注册并开通百炼服务：'
   },
   {
     name: '302ai',
@@ -267,7 +321,9 @@ const presetProviders = [
     website: 'https://302.ai',
     api_doc_url: 'https://doc.302.ai',
     default_base_url: 'https://api.302.ai/v1',
-    supported_features: ['chat', 'completion', 'embedding', 'image', 'vision', 'function_calling', 'streaming']
+    supported_features: ['chat', 'completion', 'embedding', 'image', 'vision', 'function_calling', 'streaming'],
+    register_url: 'https://302.ai/register',
+    register_guide: '如果您还没有 302.AI 账号，请先注册并获取 API Key：'
   }
 ]
 
@@ -411,5 +467,17 @@ const handleSubmit = async () => {
 
 .dialog-footer {
   text-align: right;
+}
+
+.mb-4 {
+  margin-bottom: 16px;
+}
+
+.register-guide {
+  p {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    color: var(--el-text-color-regular);
+  }
 }
 </style>
