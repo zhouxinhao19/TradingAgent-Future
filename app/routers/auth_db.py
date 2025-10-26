@@ -102,13 +102,15 @@ async def get_current_user(authorization: Optional[str] = Header(default=None)) 
 
     logger.debug(f"✅ 认证成功，用户: {token_data.sub}")
 
+    # 返回完整的用户信息，包括偏好设置
     return {
         "id": str(user.id),
         "username": user.username,
         "email": user.email,
         "name": user.username,
         "is_admin": user.is_admin,
-        "roles": ["admin"] if user.is_admin else ["user"]
+        "roles": ["admin"] if user.is_admin else ["user"],
+        "preferences": user.preferences.model_dump() if user.preferences else {}
     }
 
 @router.post("/login")
