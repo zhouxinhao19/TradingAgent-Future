@@ -140,14 +140,18 @@ class BaoStockSyncService:
         """更新股票基础信息到数据库"""
         try:
             collection = self.db.stock_basic_info
-            
+
+            # 确保 symbol 字段存在（标准化字段）
+            if "symbol" not in basic_info and "code" in basic_info:
+                basic_info["symbol"] = basic_info["code"]
+
             # 使用upsert更新或插入
             await collection.update_one(
                 {"code": basic_info["code"]},
                 {"$set": basic_info},
                 upsert=True
             )
-            
+
         except Exception as e:
             logger.error(f"❌ 更新基础信息到数据库失败: {e}")
             raise

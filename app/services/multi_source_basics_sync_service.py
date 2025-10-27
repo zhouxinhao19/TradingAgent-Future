@@ -207,6 +207,7 @@ class MultiSourceBasicsSyncService:
                     # 构建文档
                     doc = {
                         "code": code,
+                        "symbol": code,  # 添加 symbol 字段（标准化字段）
                         "name": name,
                         "area": area,
                         "industry": industry,

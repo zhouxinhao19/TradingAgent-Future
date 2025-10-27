@@ -50,7 +50,8 @@ def get_basics_from_cache(stock_code: Optional[str] = None) -> Optional[Dict[str
                 _logger.debug(f"[app_cache] 查询基础信息 | db={db_name} coll={BASICS_COLLECTION} code={code6}")
             except Exception:
                 pass
-            doc = coll.find_one({"code": code6})
+            # 同时查询 symbol 和 code 字段，确保兼容新旧数据格式
+            doc = coll.find_one({"$or": [{"symbol": code6}, {"code": code6}]})
             if not doc:
                 try:
                     _logger.debug(f"[app_cache] 基础信息未命中 | db={db_name} coll={BASICS_COLLECTION} code={code6}")
