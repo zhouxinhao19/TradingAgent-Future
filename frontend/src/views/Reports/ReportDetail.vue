@@ -25,11 +25,13 @@
               </span>
               <span class="meta-item">
                 <el-icon><User /></el-icon>
-                {{ report.analysts.join(', ') }}
+                {{ formatAnalysts(report.analysts) }}
               </span>
               <span v-if="report.model_info && report.model_info !== 'Unknown'" class="meta-item">
                 <el-icon><Cpu /></el-icon>
-                <el-tag type="info">{{ report.model_info }}</el-tag>
+                <el-tooltip :content="getModelDescription(report.model_info)" placement="top">
+                  <el-tag type="info" style="cursor: help;">{{ report.model_info }}</el-tag>
+                </el-tooltip>
               </span>
             </div>
           </div>
@@ -244,6 +246,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, ElInput, ElInputNumber, ElForm, ElFormItem } from 'element-plus'
 import { paperApi } from '@/api/paper'
 import { stocksApi } from '@/api/stocks'
+import { configApi, type LLMConfig } from '@/api/config'
 import {
   Document,
   Calendar,
@@ -278,29 +281,42 @@ marked.setOptions({ breaks: true, gfm: true })
 const loading = ref(true)
 const report = ref(null)
 const activeModule = ref('')
+const llmConfigs = ref<LLMConfig[]>([]) // 存储所有模型配置
+
+// 获取模型配置列表
+const fetchLLMConfigs = async () => {
+  try {
+    const response = await configApi.getSystemConfig()
+    if (response.success && response.data?.llm_configs) {
+      llmConfigs.value = response.data.llm_configs
+    }
+  } catch (error) {
+    console.error('获取模型配置失败:', error)
+  }
+}
 
 // 获取报告详情
 const fetchReportDetail = async () => {
   loading.value = true
   try {
     const reportId = route.params.id as string
-    
+
     const response = await fetch(`/api/reports/${reportId}/detail`, {
       headers: {
         'Authorization': `Bearer ${authStore.token}`,
         'Content-Type': 'application/json'
       }
     })
-    
+
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`)
     }
-    
+
     const result = await response.json()
-    
+
     if (result.success) {
       report.value = result.data
-      
+
       // 设置默认激活的模块
       const reports = result.data.reports || {}
       const moduleNames = Object.keys(reports)
@@ -613,6 +629,67 @@ const formatTime = (time: string) => {
   return new Date(time).toLocaleString('zh-CN')
 }
 
+// 将分析师英文名称转换为中文
+const formatAnalysts = (analysts: string[]) => {
+  const analystNameMap: Record<string, string> = {
+    'market': '市场分析师',
+    'fundamentals': '基本面分析师',
+    'news': '新闻分析师',
+    'social': '社媒分析师',
+    'sentiment': '情绪分析师',
+    'technical': '技术分析师'
+  }
+
+  return analysts.map(analyst => analystNameMap[analyst] || analyst).join('、')
+}
+
+// 获取模型的详细描述（从后端配置中获取）
+const getModelDescription = (modelInfo: string) => {
+  if (!modelInfo || modelInfo === 'Unknown') {
+    return '未知模型'
+  }
+
+  // 1. 优先从后端配置中查找精确匹配
+  const config = llmConfigs.value.find(c => c.model_name === modelInfo)
+  if (config?.description) {
+    return config.description
+  }
+
+  // 2. 尝试模糊匹配（处理版本号等变化）
+  const fuzzyConfig = llmConfigs.value.find(c =>
+    modelInfo.toLowerCase().includes(c.model_name.toLowerCase()) ||
+    c.model_name.toLowerCase().includes(modelInfo.toLowerCase())
+  )
+  if (fuzzyConfig?.description) {
+    return fuzzyConfig.description
+  }
+
+  // 3. 根据模型名称前缀提供通用描述
+  const modelLower = modelInfo.toLowerCase()
+  if (modelLower.includes('gpt')) {
+    return `OpenAI ${modelInfo} - 强大的语言模型`
+  } else if (modelLower.includes('claude')) {
+    return `Anthropic ${modelInfo} - 高性能推理模型`
+  } else if (modelLower.includes('qwen')) {
+    return `阿里通义千问 ${modelInfo} - 中文优化模型`
+  } else if (modelLower.includes('glm')) {
+    return `智谱 ${modelInfo} - 综合性能优秀`
+  } else if (modelLower.includes('deepseek')) {
+    return `DeepSeek ${modelInfo} - 高性价比模型`
+  } else if (modelLower.includes('ernie')) {
+    return `百度文心 ${modelInfo} - 中文能力强`
+  } else if (modelLower.includes('spark')) {
+    return `讯飞星火 ${modelInfo} - 专业模型`
+  } else if (modelLower.includes('moonshot')) {
+    return `Moonshot ${modelInfo} - 长上下文模型`
+  } else if (modelLower.includes('yi')) {
+    return `零一万物 ${modelInfo} - 高性能模型`
+  }
+
+  // 4. 默认返回
+  return `${modelInfo} - AI 大语言模型`
+}
+
 const getModuleDisplayName = (moduleName: string) => {
   // 统一与单股分析的中文标签映射（完整的13个报告）
   const nameMap: Record<string, string> = {
@@ -719,7 +796,8 @@ const getRiskDescription = (riskLevel: string) => {
 
 // 生命周期
 onMounted(() => {
-  fetchReportDetail()
+  fetchLLMConfigs() // 先加载模型配置
+  fetchReportDetail() // 再加载报告详情
 })
 </script>
 
