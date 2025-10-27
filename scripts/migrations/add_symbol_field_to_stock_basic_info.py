@@ -13,8 +13,14 @@
 
 import asyncio
 import logging
+import sys
+from pathlib import Path
 from typing import Optional
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+
+# 添加项目根目录到 Python 路径
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 # 配置日志
 logging.basicConfig(
@@ -43,7 +49,7 @@ async def get_mongo_db() -> Optional[AsyncIOMotorDatabase]:
 async def migrate_add_symbol_field():
     """为 stock_basic_info 集合添加 symbol 字段"""
     db = await get_mongo_db()
-    if not db:
+    if db is None:
         logger.error("❌ 无法连接到 MongoDB，迁移中止")
         return False
     
