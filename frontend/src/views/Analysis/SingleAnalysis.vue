@@ -534,9 +534,18 @@
                     <template #title>
                       <div class="disclaimer-content">
                         <el-icon class="disclaimer-icon"><WarningFilled /></el-icon>
-                        <span class="disclaimer-text">
-                          <strong>风险提示：</strong>本报告依据真实交易数据使用AI分析生成，仅供参考，不构成任何投资建议。市场有风险，投资需谨慎。
-                        </span>
+                        <div class="disclaimer-text">
+                          <p style="margin: 0 0 8px 0;"><strong>⚠️ 重要风险提示与免责声明</strong></p>
+                          <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
+                            <li><strong>工具性质：</strong>本系统为股票分析辅助工具，使用AI技术对公开市场数据进行分析，不具备证券投资咨询资质。</li>
+                            <li><strong>非投资建议：</strong>所有分析结果、评分、建议仅为技术分析参考，不构成任何买卖建议或投资决策依据。</li>
+                            <li><strong>数据局限性：</strong>分析基于历史数据和公开信息，可能存在延迟、不完整或不准确的情况，无法预测未来市场走势。</li>
+                            <li><strong>投资风险：</strong>股票投资存在市场风险、流动性风险、政策风险等多种风险，可能导致本金损失。</li>
+                            <li><strong>独立决策：</strong>投资者应基于自身风险承受能力、投资目标和财务状况独立做出投资决策。</li>
+                            <li><strong>专业咨询：</strong>重大投资决策建议咨询具有合法资质的专业投资顾问或金融机构。</li>
+                            <li><strong>责任声明：</strong>使用本工具产生的任何投资决策及其后果由投资者自行承担，本系统不承担任何责任。</li>
+                          </ul>
+                        </div>
                       </div>
                     </template>
                   </el-alert>
@@ -544,38 +553,50 @@
 
                 <!-- 最终决策 -->
                 <div v-if="analysisResults.decision" class="decision-section">
-                  <h4>🎯 投资建议</h4>
+                  <h4>🎯 分析参考</h4>
                   <div class="decision-card">
                     <div class="decision-main">
                       <div class="decision-action">
-                        <span class="label">建议操作:</span>
+                        <span class="label">分析倾向:</span>
                         <el-tag
                           :type="getActionTagType(analysisResults.decision.action)"
                           size="large"
                         >
                           {{ analysisResults.decision.action }}
                         </el-tag>
+                        <el-tag type="info" size="small" style="margin-left: 8px;">仅供参考</el-tag>
                       </div>
 
                       <div class="decision-metrics">
                         <div class="metric-item">
-                          <span class="label">目标价格:</span>
+                          <span class="label">参考价格:</span>
                           <span class="value">{{ analysisResults.decision.target_price }}</span>
                         </div>
                         <div class="metric-item">
-                          <span class="label">置信度:</span>
+                          <span class="label">模型置信度:</span>
                           <span class="value">{{ (analysisResults.decision.confidence * 100).toFixed(1) }}%</span>
+                          <el-tooltip content="基于AI模型计算的置信度，不代表实际投资成功率" placement="top">
+                            <el-icon style="margin-left: 4px; cursor: help;"><QuestionFilled /></el-icon>
+                          </el-tooltip>
                         </div>
                         <div class="metric-item">
                           <span class="label">风险评分:</span>
                           <span class="value">{{ (analysisResults.decision.risk_score * 100).toFixed(1) }}%</span>
+                          <el-tooltip content="基于历史数据的风险评估，实际风险可能更高" placement="top">
+                            <el-icon style="margin-left: 4px; cursor: help;"><QuestionFilled /></el-icon>
+                          </el-tooltip>
                         </div>
                       </div>
                     </div>
 
                     <div class="decision-reasoning">
-                      <h5>分析理由:</h5>
+                      <h5>分析依据:</h5>
                       <p>{{ analysisResults.decision.reasoning }}</p>
+                      <el-alert type="info" :closable="false" style="margin-top: 12px;">
+                        <template #default>
+                          <span style="font-size: 13px;">💡 以上分析基于AI模型对历史数据的处理，不构成投资建议，请结合自身情况独立决策。</span>
+                        </template>
+                      </el-alert>
                     </div>
                   </div>
                 </div>
@@ -689,6 +710,7 @@ import {
   CreditCard,
   WarningFilled,
   Cpu,
+  QuestionFilled,
 } from '@element-plus/icons-vue'
 import { analysisApi, type SingleAnalysisRequest } from '@/api/analysis'
 import { paperApi } from '@/api/paper'
