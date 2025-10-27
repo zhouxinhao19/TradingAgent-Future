@@ -109,6 +109,34 @@
               </div>
             </el-col>
 
+            <!-- 风险评估 -->
+            <el-col :span="8">
+              <div class="metric-item risk-item">
+                <div class="metric-label">
+                  <el-icon><Warning /></el-icon>
+                  风险评估
+                  <el-tooltip content="基于历史数据的风险评估，实际风险可能更高" placement="top">
+                    <el-icon style="margin-left: 4px; cursor: help; font-size: 14px;"><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </div>
+                <div class="risk-display">
+                  <div class="risk-stars">
+                    <el-icon
+                      v-for="star in 5"
+                      :key="star"
+                      class="star-icon"
+                      :class="{ active: star <= getRiskStars(report.risk_level || '中等') }"
+                    >
+                      <StarFilled />
+                    </el-icon>
+                  </div>
+                  <div class="risk-label" :style="{ color: getRiskColor(report.risk_level || '中等') }">
+                    {{ report.risk_level || '中等' }}风险
+                  </div>
+                </div>
+              </div>
+            </el-col>
+
             <!-- 模型置信度 -->
             <el-col :span="8">
               <div class="metric-item confidence-item">
@@ -135,35 +163,6 @@
                     </template>
                   </el-progress>
                   <div class="confidence-label">{{ getConfidenceLabel(normalizeConfidenceScore(report.confidence_score || 0)) }}</div>
-                </div>
-              </div>
-            </el-col>
-
-            <!-- 风险评估 -->
-            <el-col :span="8">
-              <div class="metric-item risk-item">
-                <div class="metric-label">
-                  <el-icon><Warning /></el-icon>
-                  风险评估
-                  <el-tooltip content="基于历史数据的风险评估，实际风险可能更高" placement="top">
-                    <el-icon style="margin-left: 4px; cursor: help; font-size: 14px;"><QuestionFilled /></el-icon>
-                  </el-tooltip>
-                </div>
-                <div class="risk-display">
-                  <div class="risk-stars">
-                    <el-icon
-                      v-for="star in 5"
-                      :key="star"
-                      class="star-icon"
-                      :class="{ active: star <= getRiskStars(report.risk_level || '中等') }"
-                    >
-                      <StarFilled />
-                    </el-icon>
-                  </div>
-                  <div class="risk-label" :style="{ color: getRiskColor(report.risk_level || '中等') }">
-                    {{ report.risk_level || '中等' }}风险
-                  </div>
-                  <div class="risk-description">{{ getRiskDescription(report.risk_level || '中等') }}</div>
                 </div>
               </div>
             </el-col>
@@ -479,6 +478,21 @@ const applyToTrading = async () => {
         })
 
         return () => h('div', { style: 'line-height: 2;' }, [
+          // 风险提示横幅
+          h('div', {
+            style: 'background-color: #FEF0F0; border: 1px solid #F56C6C; border-radius: 4px; padding: 12px; margin-bottom: 16px;'
+          }, [
+            h('div', { style: 'color: #F56C6C; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center;' }, [
+              h('span', { style: 'font-size: 16px; margin-right: 6px;' }, '⚠️'),
+              h('span', '风险提示')
+            ]),
+            h('div', { style: 'color: #606266; font-size: 12px; line-height: 1.6;' }, [
+              h('p', { style: 'margin: 4px 0;' }, '• 本交易基于AI分析结果，仅供参考，不构成投资建议'),
+              h('p', { style: 'margin: 4px 0;' }, '• 模拟交易使用虚拟资金，与实盘存在显著差异'),
+              h('p', { style: 'margin: 4px 0;' }, '• 股票投资存在市场风险，可能导致本金损失'),
+              h('p', { style: 'margin: 4px 0;' }, '• 请勿将模拟结果作为实盘投资决策依据')
+            ])
+          ]),
           h('p', [
             h('strong', '股票代码：'),
             h('span', report.value.stock_symbol)
@@ -490,7 +504,7 @@ const applyToTrading = async () => {
           recommendation.targetPrice ? h('p', [
             h('strong', '目标价格：'),
             h('span', { style: 'color: #E6A23C;' }, `${recommendation.targetPrice.toFixed(2)}元`),
-            h('span', { style: 'color: #909399; font-size: 12px; margin-left: 8px;' }, '(预期最高价)')
+            h('span', { style: 'color: #909399; font-size: 12px; margin-left: 8px;' }, '(仅供参考)')
           ]) : null,
           h('p', [
             h('strong', '当前价格：'),
@@ -532,12 +546,14 @@ const applyToTrading = async () => {
             h('span', { style: 'color: #409EFF; font-weight: bold;' }, `${estimatedAmount.value}元`)
           ]),
           h('p', [
-            h('strong', '置信度：'),
-            h('span', `${(recommendation.confidence * 100).toFixed(1)}%`)
+            h('strong', '模型置信度：'),
+            h('span', `${(recommendation.confidence * 100).toFixed(1)}%`),
+            h('span', { style: 'color: #909399; font-size: 12px; margin-left: 8px;' }, '(不代表实际成功率)')
           ]),
           h('p', [
-            h('strong', '风险等级：'),
-            h('span', recommendation.riskLevel)
+            h('strong', '风险评估：'),
+            h('span', recommendation.riskLevel),
+            h('span', { style: 'color: #909399; font-size: 12px; margin-left: 8px;' }, '(实际风险可能更高)')
           ]),
           recommendation.action === 'buy' ? h('p', { style: 'color: #909399; font-size: 12px; margin-top: 12px;' },
             `可用资金：${account.cash.toFixed(2)}元，最大可买：${maxQuantity}股`
@@ -747,17 +763,17 @@ const normalizeConfidenceScore = (score: number) => {
 }
 
 const getConfidenceColor = (score: number) => {
-  if (score >= 80) return '#67C23A' // 高信心 - 绿色
-  if (score >= 60) return '#409EFF' // 中高信心 - 蓝色
-  if (score >= 40) return '#E6A23C' // 中等信心 - 橙色
-  return '#F56C6C' // 低信心 - 红色
+  if (score >= 80) return '#67C23A' // 较高 - 绿色
+  if (score >= 60) return '#409EFF' // 中上 - 蓝色
+  if (score >= 40) return '#E6A23C' // 中等 - 橙色
+  return '#F56C6C' // 较低 - 红色
 }
 
 const getConfidenceLabel = (score: number) => {
-  if (score >= 80) return '高信心'
-  if (score >= 60) return '中高信心'
-  if (score >= 40) return '中等信心'
-  return '低信心'
+  if (score >= 80) return '较高'
+  if (score >= 60) return '中上'
+  if (score >= 40) return '中等'
+  return '较低'
 }
 
 // 风险等级相关函数
