@@ -181,6 +181,12 @@ export const useAuthStore = defineStore('auth', {
     
     // 登录
     async login(loginForm: LoginForm) {
+      // 防止重复登录请求
+      if (this.loginLoading) {
+        console.log('⏭️ 登录请求进行中，跳过重复调用')
+        return false
+      }
+
       try {
         this.loginLoading = true
 
@@ -203,15 +209,15 @@ export const useAuthStore = defineStore('auth', {
           const { setupTokenRefreshTimer } = await import('@/utils/auth')
           setupTokenRefreshTimer()
 
-          ElMessage.success('登录成功')
+          // 不在这里显示成功消息，由调用方显示
           return true
         } else {
-          ElMessage.error(response.message || '登录失败')
+          // 不在这里显示错误消息，由调用方显示
           return false
         }
       } catch (error: any) {
         console.error('登录失败:', error)
-        ElMessage.error(error.message || '登录失败，请重试')
+        // 不在这里显示错误消息，由调用方显示
         return false
       } finally {
         this.loginLoading = false

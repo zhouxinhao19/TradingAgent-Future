@@ -299,7 +299,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       title: '关于',
       icon: 'InfoFilled',
-      requiresAuth: true,
+      requiresAuth: false, // 关于页面不需要认证
       transition: 'fade'
     }
   },

@@ -12,11 +12,17 @@ import type {
 export const authApi = {
   // 登录
   login: (data: LoginForm) =>
-    ApiClient.post<LoginResponse>('/api/auth/login', data),
+    ApiClient.post<LoginResponse>('/api/auth/login', data, {
+      skipAuth: true,  // 登录请求不需要认证
+      skipAuthError: true  // 跳过 401 错误的自动处理
+    }),
 
   // 注册
   register: (data: RegisterForm) =>
-    ApiClient.post('/api/auth/register', data),
+    ApiClient.post('/api/auth/register', data, {
+      skipAuth: true,  // 注册请求不需要认证
+      skipAuthError: true  // 跳过 401 错误的自动处理
+    }),
 
   // 登出
   logout: () =>

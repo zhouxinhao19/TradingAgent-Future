@@ -18,6 +18,7 @@ export interface ApiResponse<T = any> {
 // 请求配置接口
 export interface RequestConfig extends AxiosRequestConfig {
   skipAuth?: boolean
+  skipAuthError?: boolean  // 跳过 401 错误的自动处理（用于登录等接口）
   skipErrorHandler?: boolean
   showLoading?: boolean
   loadingText?: string
@@ -28,6 +29,9 @@ export interface RequestConfig extends AxiosRequestConfig {
 // 消息去重：记录最近显示的错误消息
 const recentMessages = new Map<string, number>()
 const MESSAGE_THROTTLE_TIME = 3000 // 3秒内相同消息不重复显示
+
+// 401 错误处理标志（避免多个请求同时触发登录跳转）
+let isHandling401 = false
 
 // 显示错误消息（带去重）
 const showErrorMessage = (message: string) => {
@@ -52,6 +56,28 @@ const showErrorMessage = (message: string) => {
   }
 
   ElMessage.error(message)
+}
+
+// 处理 401 错误（带防抖）
+const handle401Error = (authStore: any, message: string = '登录已过期，请重新登录') => {
+  // 如果正在处理 401 错误，跳过
+  if (isHandling401) {
+    console.log('⏭️ 正在处理 401 错误，跳过重复处理')
+    return
+  }
+
+  isHandling401 = true
+
+  // 清除认证信息并跳转到登录页
+  console.log('🔒 处理 401 错误：清除认证信息并跳转登录页')
+  authStore.clearAuthInfo()
+  router.push('/login')
+  showErrorMessage(message)
+
+  // 3秒后重置标志
+  setTimeout(() => {
+    isHandling401 = false
+  }, 3000)
 }
 
 // 创建axios实例
@@ -166,10 +192,11 @@ const createAxiosInstance = (): AxiosInstance => {
           // 检查是否是认证错误（优先处理，不依赖 skipErrorHandler）
           const code = data.code
           if (code === 401 || code === 40101 || code === 40102 || code === 40103) {
-            console.log('🔒 业务错误：认证失败 (HTTP 200)，跳转登录页')
-            authStore.clearAuthInfo()
-            router.push('/login')
-            showErrorMessage(data.message || '登录已过期，请重新登录')
+            // 如果请求标记为跳过认证错误处理（如登录请求），不自动处理
+            if (!config.skipAuthError) {
+              console.log('🔒 业务错误：认证失败 (HTTP 200)')
+              handle401Error(authStore, data.message || '登录已过期，请重新登录')
+            }
             return Promise.reject(new Error(data.message || '认证失败'))
           }
 
@@ -210,12 +237,16 @@ const createAxiosInstance = (): AxiosInstance => {
 
         switch (status) {
           case 401:
+            // 如果请求标记为跳过认证错误处理（如登录请求），直接返回错误
+            if (config?.skipAuthError) {
+              console.log('⏭️ 跳过 401 错误自动处理（skipAuthError=true）')
+              break
+            }
+
             // 如果是refresh请求本身失败，不要再次尝试刷新（避免无限循环）
             if (config?.url?.includes('/auth/refresh')) {
-              console.error('❌ Refresh token请求失败，清除认证信息')
-              authStore.clearAuthInfo()
-              router.push('/login')
-              showErrorMessage('登录已过期，请重新登录')
+              console.error('❌ Refresh token请求失败')
+              handle401Error(authStore, '登录已过期，请重新登录')
               break
             }
 
@@ -237,10 +268,7 @@ const createAxiosInstance = (): AxiosInstance => {
             }
 
             // 清除认证信息并跳转到登录页
-            console.log('🧹 清除认证信息并跳转登录')
-            authStore.clearAuthInfo()
-            router.push('/login')
-            showErrorMessage('登录已过期，请重新登录')
+            handle401Error(authStore, '登录已过期，请重新登录')
             break
 
           case 403:
@@ -340,10 +368,8 @@ const handleBusinessError = (data: ApiResponse) => {
     case 40101:  // 未授权
     case 40102:  // Token 无效
     case 40103:  // Token 过期
-      console.log('🔒 业务错误：认证失败，跳转登录页')
-      authStore.clearAuthInfo()
-      router.push('/login')
-      showErrorMessage(message || '登录已过期，请重新登录')
+      console.log('🔒 业务错误：认证失败')
+      handle401Error(authStore, message || '登录已过期，请重新登录')
       break
     case 40001:
       showErrorMessage('参数错误')

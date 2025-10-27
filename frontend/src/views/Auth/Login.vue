@@ -103,9 +103,16 @@ const loginRules = {
 }
 
 const handleLogin = async () => {
+  // 防止重复提交
+  if (loginLoading.value) {
+    console.log('⏭️ 登录请求进行中，跳过重复点击')
+    return
+  }
+
   try {
     await loginFormRef.value.validate()
 
+    loginLoading.value = true
     console.log('🔐 开始登录流程...')
 
     // 调用真实的登录API
@@ -128,7 +135,12 @@ const handleLogin = async () => {
 
   } catch (error) {
     console.error('登录失败:', error)
-    ElMessage.error('登录失败，请重试')
+    // 只有在不是表单验证错误时才显示错误消息
+    if (error.message && !error.message.includes('validate')) {
+      ElMessage.error('登录失败，请重试')
+    }
+  } finally {
+    loginLoading.value = false
   }
 }
 
