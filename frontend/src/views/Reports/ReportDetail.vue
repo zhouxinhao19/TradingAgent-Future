@@ -65,9 +65,18 @@
           <template #title>
             <div class="disclaimer-content">
               <el-icon class="disclaimer-icon"><WarningFilled /></el-icon>
-              <span class="disclaimer-text">
-                <strong>风险提示：</strong>本报告依据真实交易数据使用AI分析生成，仅供参考，不构成任何投资建议。市场有风险，投资需谨慎。
-              </span>
+              <div class="disclaimer-text">
+                <p style="margin: 0 0 8px 0;"><strong>⚠️ 重要风险提示与免责声明</strong></p>
+                <ul style="margin: 0; padding-left: 20px; line-height: 1.8;">
+                  <li><strong>工具性质：</strong>本系统为股票分析辅助工具，使用AI技术对公开市场数据进行分析，不具备证券投资咨询资质。</li>
+                  <li><strong>非投资建议：</strong>所有分析结果、评分、建议仅为技术分析参考，不构成任何买卖建议或投资决策依据。</li>
+                  <li><strong>数据局限性：</strong>分析基于历史数据和公开信息，可能存在延迟、不完整或不准确的情况，无法预测未来市场走势。</li>
+                  <li><strong>投资风险：</strong>股票投资存在市场风险、流动性风险、政策风险等多种风险，可能导致本金损失。</li>
+                  <li><strong>独立决策：</strong>投资者应基于自身风险承受能力、投资目标和财务状况独立做出投资决策。</li>
+                  <li><strong>专业咨询：</strong>重大投资决策建议咨询具有合法资质的专业投资顾问或金融机构。</li>
+                  <li><strong>责任声明：</strong>使用本工具产生的任何投资决策及其后果由投资者自行承担，本系统不承担任何责任。</li>
+                </ul>
+              </div>
             </div>
           </template>
         </el-alert>
@@ -83,23 +92,30 @@
         </template>
         <div class="metrics-content">
           <el-row :gutter="24">
-            <!-- 投资建议 -->
+            <!-- 分析参考 -->
             <el-col :span="8">
               <div class="metric-item">
                 <div class="metric-label">
                   <el-icon><TrendCharts /></el-icon>
-                  投资建议
+                  分析参考
+                  <el-tooltip content="基于AI模型的分析倾向，仅供参考，不构成投资建议" placement="top">
+                    <el-icon style="margin-left: 4px; cursor: help; font-size: 14px;"><QuestionFilled /></el-icon>
+                  </el-tooltip>
                 </div>
                 <div class="metric-value recommendation-value markdown-content" v-html="renderMarkdown(report.recommendation || '暂无')"></div>
+                <el-tag type="info" size="small" style="margin-top: 8px;">仅供参考</el-tag>
               </div>
             </el-col>
 
-            <!-- 置信度评分 -->
+            <!-- 模型置信度 -->
             <el-col :span="8">
               <div class="metric-item confidence-item">
                 <div class="metric-label">
                   <el-icon><DataAnalysis /></el-icon>
-                  置信度评分
+                  模型置信度
+                  <el-tooltip content="基于AI模型计算的置信度，不代表实际投资成功率" placement="top">
+                    <el-icon style="margin-left: 4px; cursor: help; font-size: 14px;"><QuestionFilled /></el-icon>
+                  </el-tooltip>
                 </div>
                 <div class="confidence-display">
                   <el-progress
@@ -121,12 +137,15 @@
               </div>
             </el-col>
 
-            <!-- 风险等级 -->
+            <!-- 风险评估 -->
             <el-col :span="8">
               <div class="metric-item risk-item">
                 <div class="metric-label">
                   <el-icon><Warning /></el-icon>
-                  风险等级
+                  风险评估
+                  <el-tooltip content="基于历史数据的风险评估，实际风险可能更高" placement="top">
+                    <el-icon style="margin-left: 4px; cursor: help; font-size: 14px;"><QuestionFilled /></el-icon>
+                  </el-tooltip>
                 </div>
                 <div class="risk-display">
                   <div class="risk-stars">
@@ -241,7 +260,8 @@ import {
   StarFilled,
   List,
   Check,
-  Cpu
+  Cpu,
+  QuestionFilled
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { marked } from 'marked'
