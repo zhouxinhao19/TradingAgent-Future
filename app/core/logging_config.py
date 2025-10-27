@@ -85,6 +85,21 @@ def setup_logging(log_level: str = "INFO"):
             Path(file_dir).mkdir(parents=True, exist_ok=True)
             webapi_log = str(Path(file_dir) / "webapi.log")
             worker_log = str(Path(file_dir) / "worker.log")
+            error_log = str(Path(file_dir) / "error.log")
+
+            # 读取错误日志处理器配置
+            error_handler_cfg = handlers_cfg.get("error", {})
+            error_enabled = error_handler_cfg.get("enabled", True)
+            error_level = error_handler_cfg.get("level", "WARNING")
+            error_max_bytes = error_handler_cfg.get("max_size", "10MB")
+            if isinstance(error_max_bytes, str) and error_max_bytes.upper().endswith("MB"):
+                try:
+                    error_max_bytes = int(float(error_max_bytes[:-2]) * 1024 * 1024)
+                except Exception:
+                    error_max_bytes = 10 * 1024 * 1024
+            elif not isinstance(error_max_bytes, int):
+                error_max_bytes = 10 * 1024 * 1024
+            error_backup_count = int(error_handler_cfg.get("backup_count", 5))
 
             # JSON 开关：保持向后兼容（json/mode 仅控制台）；新增 file_json/file_mode 控制文件 handler
             use_json_console = bool(fmt_cfg.get("json", False)) or str(fmt_cfg.get("mode", "")).lower() == "json"
@@ -93,6 +108,50 @@ def setup_logging(log_level: str = "INFO"):
                 or bool(fmt_cfg.get("json_file", False))
                 or str(fmt_cfg.get("file_mode", "")).lower() == "json"
             )
+
+            # 构建处理器配置
+            handlers_config = {
+                "console": {
+                    "class": "logging.StreamHandler",
+                    "formatter": "json_console_fmt" if use_json_console else "console_fmt",
+                    "level": level,
+                    "filters": ["request_context"],
+                    "stream": sys.stdout,
+                },
+                "file": {
+                    "class": "logging.handlers.RotatingFileHandler",
+                    "formatter": "json_file_fmt" if use_json_file else "file_fmt",
+                    "level": file_level,
+                    "filename": webapi_log,
+                    "maxBytes": max_bytes,
+                    "backupCount": backup_count,
+                    "encoding": "utf-8",
+                    "filters": ["request_context"],
+                },
+                "worker_file": {
+                    "class": "logging.handlers.RotatingFileHandler",
+                    "formatter": "json_file_fmt" if use_json_file else "file_fmt",
+                    "level": file_level,
+                    "filename": worker_log,
+                    "maxBytes": max_bytes,
+                    "backupCount": backup_count,
+                    "encoding": "utf-8",
+                    "filters": ["request_context"],
+                },
+            }
+
+            # 添加错误日志处理器（如果启用）
+            if error_enabled:
+                handlers_config["error_file"] = {
+                    "class": "logging.handlers.RotatingFileHandler",
+                    "formatter": "json_file_fmt" if use_json_file else "file_fmt",
+                    "level": error_level,
+                    "filename": error_log,
+                    "maxBytes": error_max_bytes,
+                    "backupCount": error_backup_count,
+                    "encoding": "utf-8",
+                    "filters": ["request_context"],
+                }
 
             logging_config = {
                 "version": 1,
@@ -116,40 +175,28 @@ def setup_logging(log_level: str = "INFO"):
                         "()": "app.core.logging_config.SimpleJsonFormatter"
                     },
                 },
-                "handlers": {
-                    "console": {
-                        "class": "logging.StreamHandler",
-                        "formatter": "json_console_fmt" if use_json_console else "console_fmt",
-                        "level": level,
-                        "filters": ["request_context"],
-                        "stream": sys.stdout,
-                    },
-                    "file": {
-                        "class": "logging.handlers.RotatingFileHandler",
-                        "formatter": "json_file_fmt" if use_json_file else "file_fmt",
-                        "level": file_level,
-                        "filename": webapi_log,
-                        "maxBytes": max_bytes,
-                        "backupCount": backup_count,
-                        "encoding": "utf-8",
-                        "filters": ["request_context"],
-                    },
-                    "worker_file": {
-                        "class": "logging.handlers.RotatingFileHandler",
-                        "formatter": "json_file_fmt" if use_json_file else "file_fmt",
-                        "level": file_level,
-                        "filename": worker_log,
-                        "maxBytes": max_bytes,
-                        "backupCount": backup_count,
-                        "encoding": "utf-8",
-                        "filters": ["request_context"],
-                    },
-                },
+                "handlers": handlers_config,
                 "loggers": {
-                    "webapi": {"level": "INFO", "handlers": ["console", "file"], "propagate": True},
-                    "worker": {"level": "DEBUG", "handlers": ["console", "worker_file"], "propagate": False},
-                    "uvicorn": {"level": "INFO", "handlers": ["console", "file"], "propagate": False},
-                    "fastapi": {"level": "INFO", "handlers": ["console", "file"], "propagate": False},
+                    "webapi": {
+                        "level": "INFO",
+                        "handlers": ["console", "file"] + (["error_file"] if error_enabled else []),
+                        "propagate": True
+                    },
+                    "worker": {
+                        "level": "DEBUG",
+                        "handlers": ["console", "worker_file"] + (["error_file"] if error_enabled else []),
+                        "propagate": False
+                    },
+                    "uvicorn": {
+                        "level": "INFO",
+                        "handlers": ["console", "file"] + (["error_file"] if error_enabled else []),
+                        "propagate": False
+                    },
+                    "fastapi": {
+                        "level": "INFO",
+                        "handlers": ["console", "file"] + (["error_file"] if error_enabled else []),
+                        "propagate": False
+                    },
                 },
                 "root": {"level": level, "handlers": ["console"]},
             }
@@ -206,12 +253,22 @@ def setup_logging(log_level: str = "INFO"):
                 "backupCount": 5,
                 "encoding": "utf-8",
             },
+            "error_file": {
+                "class": "logging.handlers.RotatingFileHandler",
+                "formatter": "detailed",
+                "level": "WARNING",
+                "filters": ["request_context"],
+                "filename": "logs/error.log",
+                "maxBytes": 10485760,
+                "backupCount": 5,
+                "encoding": "utf-8",
+            },
         },
         "loggers": {
-            "webapi": {"level": "INFO", "handlers": ["console", "file"], "propagate": True},
-            "worker": {"level": "DEBUG", "handlers": ["console", "worker_file"], "propagate": False},
-            "uvicorn": {"level": "INFO", "handlers": ["console", "file"], "propagate": False},
-            "fastapi": {"level": "INFO", "handlers": ["console", "file"], "propagate": False},
+            "webapi": {"level": "INFO", "handlers": ["console", "file", "error_file"], "propagate": True},
+            "worker": {"level": "DEBUG", "handlers": ["console", "worker_file", "error_file"], "propagate": False},
+            "uvicorn": {"level": "INFO", "handlers": ["console", "file", "error_file"], "propagate": False},
+            "fastapi": {"level": "INFO", "handlers": ["console", "file", "error_file"], "propagate": False},
         },
         "root": {"level": log_level, "handlers": ["console"]},
     }

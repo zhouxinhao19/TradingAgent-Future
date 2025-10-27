@@ -1085,21 +1085,26 @@ class OptimizedChinaDataProvider:
                         # 使用市值/净资产计算PB
                         money_cap = latest_indicators.get('money_cap')
                         if money_cap and money_cap > 0:
-                            pb_calculated = money_cap / total_equity
+                            # 注意单位转换：money_cap 是万元，total_equity 是元
+                            # PB = 市值(万元) * 10000 / 净资产(元)
+                            pb_calculated = (money_cap * 10000) / total_equity
                             metrics["pb"] = f"{pb_calculated:.2f}倍"
-                            logger.debug(f"✅ 计算PB: 市值{money_cap} / 净资产{total_equity} = {metrics['pb']}")
+                            logger.info(f"✅ [PB计算-第2层成功] PB={pb_calculated:.2f}倍")
+                            logger.info(f"   └─ 计算公式: 市值{money_cap}万元 * 10000 / 净资产{total_equity}元 = {metrics['pb']}")
                         else:
                             # 第三层降级：直接使用 latest_indicators 中的 pb 字段
                             pb_static = latest_indicators.get('pb') or latest_indicators.get('pb_mrq')
                             if pb_static is not None and str(pb_static) != 'nan' and pb_static != '--':
                                 try:
                                     metrics["pb"] = f"{float(pb_static):.2f}倍"
-                                    logger.debug(f"✅ 使用静态PB: {metrics['pb']}")
+                                    logger.info(f"✅ [PB计算-第3层成功] 使用静态PB: {metrics['pb']}")
+                                    logger.info(f"   └─ 数据来源: stock_basic_info.pb")
                                 except (ValueError, TypeError):
                                     metrics["pb"] = "N/A"
                             else:
                                 metrics["pb"] = "N/A"
-                    except (ValueError, TypeError, ZeroDivisionError):
+                    except (ValueError, TypeError, ZeroDivisionError) as e:
+                        logger.error(f"❌ [PB计算-第2层异常] 计算失败: {e}")
                         metrics["pb"] = "N/A"
                 else:
                     # 第三层降级：直接使用 latest_indicators 中的 pb 字段
@@ -1107,7 +1112,8 @@ class OptimizedChinaDataProvider:
                     if pb_static is not None and str(pb_static) != 'nan' and pb_static != '--':
                         try:
                             metrics["pb"] = f"{float(pb_static):.2f}倍"
-                            logger.debug(f"✅ 使用静态PB: {metrics['pb']}")
+                            logger.info(f"✅ [PB计算-第3层成功] 使用静态PB: {metrics['pb']}")
+                            logger.info(f"   └─ 数据来源: stock_basic_info.pb")
                         except (ValueError, TypeError):
                             metrics["pb"] = "N/A"
                     else:
