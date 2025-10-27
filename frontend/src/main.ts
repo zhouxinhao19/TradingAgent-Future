@@ -36,6 +36,12 @@ app.use(ElementPlus, {
   size: 'default',
   zIndex: 3000,
   locale: zhCn,
+  // 配置消息提示
+  message: {
+    max: 3, // 最多同时显示3个消息
+    grouping: true, // 启用消息分组，相同内容的消息不会重复显示
+    duration: 3000, // 默认显示时长3秒
+  },
 })
 
 // 注册全局组件

@@ -25,6 +25,35 @@ export interface RequestConfig extends AxiosRequestConfig {
   retryDelay?: number  // 重试延迟（毫秒）
 }
 
+// 消息去重：记录最近显示的错误消息
+const recentMessages = new Map<string, number>()
+const MESSAGE_THROTTLE_TIME = 3000 // 3秒内相同消息不重复显示
+
+// 显示错误消息（带去重）
+const showErrorMessage = (message: string) => {
+  const now = Date.now()
+  const lastTime = recentMessages.get(message)
+
+  // 如果3秒内已经显示过相同消息，则跳过
+  if (lastTime && now - lastTime < MESSAGE_THROTTLE_TIME) {
+    console.log('⏭️ 跳过重复消息:', message)
+    return
+  }
+
+  // 记录消息显示时间
+  recentMessages.set(message, now)
+
+  // 清理过期的消息记录（保持Map不会无限增长）
+  if (recentMessages.size > 50) {
+    const entries = Array.from(recentMessages.entries())
+    entries.sort((a, b) => a[1] - b[1])
+    // 删除最旧的25条记录
+    entries.slice(0, 25).forEach(([key]) => recentMessages.delete(key))
+  }
+
+  ElMessage.error(message)
+}
+
 // 创建axios实例
 const createAxiosInstance = (): AxiosInstance => {
   const instance = axios.create({
@@ -140,7 +169,7 @@ const createAxiosInstance = (): AxiosInstance => {
             console.log('🔒 业务错误：认证失败 (HTTP 200)，跳转登录页')
             authStore.clearAuthInfo()
             router.push('/login')
-            ElMessage.error(data.message || '登录已过期，请重新登录')
+            showErrorMessage(data.message || '登录已过期，请重新登录')
             return Promise.reject(new Error(data.message || '认证失败'))
           }
 
@@ -186,7 +215,7 @@ const createAxiosInstance = (): AxiosInstance => {
               console.error('❌ Refresh token请求失败，清除认证信息')
               authStore.clearAuthInfo()
               router.push('/login')
-              ElMessage.error('登录已过期，请重新登录')
+              showErrorMessage('登录已过期，请重新登录')
               break
             }
 
@@ -211,35 +240,35 @@ const createAxiosInstance = (): AxiosInstance => {
             console.log('🧹 清除认证信息并跳转登录')
             authStore.clearAuthInfo()
             router.push('/login')
-            ElMessage.error('登录已过期，请重新登录')
+            showErrorMessage('登录已过期，请重新登录')
             break
 
           case 403:
-            ElMessage.error('权限不足，无法访问该资源')
+            showErrorMessage('权限不足，无法访问该资源')
             break
 
           case 404:
-            ElMessage.error('请求的资源不存在')
+            showErrorMessage('请求的资源不存在')
             break
 
           case 429:
-            ElMessage.error('请求过于频繁，请稍后重试')
+            showErrorMessage('请求过于频繁，请稍后重试')
             break
 
           case 500:
-            ElMessage.error('服务器内部错误，请稍后重试')
+            showErrorMessage('服务器内部错误，请稍后重试')
             break
 
           case 502:
           case 503:
           case 504:
-            ElMessage.error('服务暂时不可用，请稍后重试')
+            showErrorMessage('服务暂时不可用，请稍后重试')
             break
 
           default:
             if (!config?.skipErrorHandler) {
               const message = data?.message || error.message || '网络请求失败'
-              ElMessage.error(message)
+              showErrorMessage(message)
             }
         }
       } else if (error.code === 'ECONNABORTED') {
@@ -255,7 +284,7 @@ const createAxiosInstance = (): AxiosInstance => {
           return retryRequest(instance, config)
         }
 
-        ElMessage.error('请求超时，请检查网络连接')
+        showErrorMessage('请求超时，请检查网络连接')
       } else if (error.message === 'Network Error') {
         console.error('🔍 [REQUEST] 网络连接错误:', {
           message: error.message,
@@ -269,7 +298,7 @@ const createAxiosInstance = (): AxiosInstance => {
           return retryRequest(instance, config)
         }
 
-        ElMessage.error('网络连接失败，请检查网络设置')
+        showErrorMessage('网络连接失败，请检查网络设置')
       } else if (error.message.includes('Failed to fetch')) {
         console.error('🔍 [REQUEST] Fetch失败错误:', {
           message: error.message,
@@ -283,7 +312,7 @@ const createAxiosInstance = (): AxiosInstance => {
           return retryRequest(instance, config)
         }
 
-        ElMessage.error('网络请求失败，请检查服务器连接')
+        showErrorMessage('网络请求失败，请检查服务器连接')
       } else if (!config?.skipErrorHandler) {
         console.error('🔍 [REQUEST] 其他错误:', {
           message: error.message,
@@ -291,7 +320,7 @@ const createAxiosInstance = (): AxiosInstance => {
           name: error.name,
           url: config?.url
         })
-        ElMessage.error(error.message || '未知错误')
+        showErrorMessage(error.message || '未知错误')
       }
 
       return Promise.reject(error)
@@ -314,27 +343,27 @@ const handleBusinessError = (data: ApiResponse) => {
       console.log('🔒 业务错误：认证失败，跳转登录页')
       authStore.clearAuthInfo()
       router.push('/login')
-      ElMessage.error(message || '登录已过期，请重新登录')
+      showErrorMessage(message || '登录已过期，请重新登录')
       break
     case 40001:
-      ElMessage.error('参数错误')
+      showErrorMessage('参数错误')
       break
     case 403:
     case 40003:
-      ElMessage.error('权限不足')
+      showErrorMessage('权限不足')
       break
     case 40004:
-      ElMessage.error('资源不存在')
+      showErrorMessage('资源不存在')
       break
     case 40005:
-      ElMessage.error('操作失败')
+      showErrorMessage('操作失败')
       break
     case 50001:
-      ElMessage.error('服务器错误')
+      showErrorMessage('服务器错误')
       break
     default:
       if (message) {
-        ElMessage.error(message)
+        showErrorMessage(message)
       }
   }
 }
