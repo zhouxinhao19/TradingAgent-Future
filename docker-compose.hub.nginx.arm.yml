@@ -17,6 +17,7 @@ services:
   # MongoDB数据库
   mongodb:
     image: mongo:4.4
+    platform: linux/arm64  # 显式指定 ARM64 平台
     container_name: tradingagents-mongodb
     restart: unless-stopped
     ports:
@@ -42,6 +43,7 @@ services:
   # Redis缓存
   redis:
     image: redis:7-alpine
+    platform: linux/arm64  # 显式指定 ARM64 平台
     container_name: tradingagents-redis
     restart: unless-stopped
     ports:
@@ -63,6 +65,7 @@ services:
   # FastAPI后端服务
   backend:
     image: hsliup/tradingagents-backend-arm64:latest
+    platform: linux/arm64  # 显式指定 ARM64 平台
     container_name: tradingagents-backend
     restart: unless-stopped
     expose:
@@ -141,6 +144,7 @@ services:
   # Vue 3前端服务
   frontend:
     image: hsliup/tradingagents-frontend-arm64:latest
+    platform: linux/arm64  # 显式指定 ARM64 平台
     container_name: tradingagents-frontend
     restart: unless-stopped
     expose:
@@ -163,6 +167,7 @@ services:
   # Nginx 反向代理
   nginx:
     image: nginx:alpine
+    platform: linux/arm64  # 显式指定 ARM64 平台
     container_name: tradingagents-nginx
     restart: unless-stopped
     ports:
