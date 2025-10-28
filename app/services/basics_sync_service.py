@@ -189,8 +189,8 @@ class BasicsSyncService:
                 if circ_mv_yi is not None:
                     doc["circ_mv"] = circ_mv_yi
 
-                # Add financial ratios
-                for field in ["pe", "pb", "pe_ttm", "pb_mrq"]:
+                # Add financial ratios (🔥 新增 ps 和 ps_ttm)
+                for field in ["pe", "pb", "ps", "pe_ttm", "pb_mrq", "ps_ttm"]:
                     if field in daily_metrics:
                         doc[field] = daily_metrics[field]
                 # ROE from fina_indicator snapshot

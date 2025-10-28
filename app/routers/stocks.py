@@ -134,6 +134,10 @@ async def get_fundamentals(code: str, current_user: dict = Depends(get_current_u
         "pe_ttm": realtime_metrics.get("pe_ttm") or b.get("pe_ttm"),
         "pb_mrq": realtime_metrics.get("pb_mrq") or b.get("pb_mrq"),
 
+        # 🔥 新增：市销率（PS）
+        "ps": b.get("ps"),  # 市销率（Price-to-Sales Ratio）
+        "ps_ttm": b.get("ps_ttm"),  # 市销率（TTM）
+
         # PE/PB 数据来源标识
         "pe_source": realtime_metrics.get("source", "unknown"),
         "pe_is_realtime": realtime_metrics.get("is_realtime", False),

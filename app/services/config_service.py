@@ -218,11 +218,18 @@ class ConfigService:
             return False
 
     async def update_datasource_grouping(self, data_source_name: str, category_id: str, updates: Dict[str, Any]) -> bool:
-        """更新数据源分组关系"""
+        """更新数据源分组关系
+
+        🔥 重要：同时更新 datasource_groupings 和 system_configs 两个集合
+        - datasource_groupings: 用于前端展示和管理
+        - system_configs.data_source_configs: 用于实际数据获取时的优先级判断
+        """
         try:
             db = await self._get_db()
             groupings_collection = db.datasource_groupings
+            config_collection = db.system_configs
 
+            # 1. 更新 datasource_groupings 集合
             updates["updated_at"] = now_tz()
             result = await groupings_collection.update_one(
                 {
@@ -231,9 +238,51 @@ class ConfigService:
                 },
                 {"$set": updates}
             )
+
+            # 2. 🔥 如果更新了优先级，同步更新 system_configs 集合
+            if "priority" in updates and result.modified_count > 0:
+                # 获取当前激活的配置
+                config_data = await config_collection.find_one(
+                    {"is_active": True},
+                    sort=[("version", -1)]
+                )
+
+                if config_data:
+                    data_source_configs = config_data.get("data_source_configs", [])
+
+                    # 查找并更新对应的数据源配置
+                    # 注意：data_source_name 可能是 "AKShare"，而 config 中的 name 也是 "AKShare"
+                    # 但是 type 字段是小写的 "akshare"
+                    updated = False
+                    for ds_config in data_source_configs:
+                        # 尝试匹配 name 字段（优先）或 type 字段
+                        if (ds_config.get("name") == data_source_name or
+                            ds_config.get("type") == data_source_name.lower()):
+                            ds_config["priority"] = updates["priority"]
+                            updated = True
+                            logger.info(f"✅ [优先级同步] 更新 system_configs 中的数据源: {data_source_name}, 新优先级: {updates['priority']}")
+                            break
+
+                    if updated:
+                        # 更新配置版本
+                        version = config_data.get("version", 0)
+                        await config_collection.update_one(
+                            {"_id": config_data["_id"]},
+                            {
+                                "$set": {
+                                    "data_source_configs": data_source_configs,
+                                    "version": version + 1,
+                                    "updated_at": now_tz()
+                                }
+                            }
+                        )
+                        logger.info(f"✅ [优先级同步] system_configs 版本更新: {version} -> {version + 1}")
+                    else:
+                        logger.warning(f"⚠️ [优先级同步] 未找到匹配的数据源配置: {data_source_name}")
+
             return result.modified_count > 0
         except Exception as e:
-            print(f"❌ 更新数据源分组关系失败: {e}")
+            logger.error(f"❌ 更新数据源分组关系失败: {e}")
             return False
 
     async def update_category_datasource_order(self, category_id: str, ordered_datasources: List[Dict[str, Any]]) -> bool:

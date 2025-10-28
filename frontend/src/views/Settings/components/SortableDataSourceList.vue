@@ -147,14 +147,24 @@ const initSortable = () => {
     
     onEnd: (evt) => {
       isDragging.value = false
-      
+
       if (evt.oldIndex !== evt.newIndex && evt.oldIndex !== undefined && evt.newIndex !== undefined) {
-        // 重新计算优先级
-        const orderedItems = props.dataSources.map((item, index) => ({
-          name: item.name,
-          priority: props.dataSources.length - index // 倒序，第一个优先级最高
+        // 🔥 重要：根据拖动后的DOM顺序重新构建数据数组
+        const container = sortableContainer.value
+        if (!container) return
+
+        // 获取拖动后的DOM元素顺序
+        const items = Array.from(container.querySelectorAll('.datasource-item'))
+        const orderedNames = items.map(item => (item as HTMLElement).dataset.id).filter(Boolean) as string[]
+
+        // 根据新顺序构建优先级映射
+        const orderedItems = orderedNames.map((name, index) => ({
+          name,
+          priority: orderedNames.length - index // 倒序，第一个优先级最高
         }))
-        
+
+        console.log('拖动排序完成:', orderedItems)
+
         // 发送更新事件
         emit('update-order', props.categoryId, orderedItems)
       }

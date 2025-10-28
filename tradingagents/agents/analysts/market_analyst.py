@@ -132,67 +132,58 @@ def create_market_analyst(llm, toolkit):
         logger.info(f"📊 [市场分析师] 绑定的工具: {tool_names_debug}")
         logger.info(f"📊 [市场分析师] 目标市场: {market_info['market_name']}")
 
-        # 统一的系统提示，适用于所有股票类型
-        system_message = (
-            f"""你是一位专业的股票技术分析师。你必须对{company_name}（股票代码：{ticker}）进行详细的技术分析。
-
-**股票信息：**
-- 公司名称：{company_name}
-- 股票代码：{ticker}
-- 所属市场：{market_info['market_name']}
-- 计价货币：{market_info['currency_name']}（{market_info['currency_symbol']}）
-
-**工具调用指令：**
-你有一个工具叫做get_stock_market_data_unified，你必须立即调用这个工具来获取{company_name}（{ticker}）的市场数据。
-不要说你将要调用工具，直接调用工具。
-
-**分析要求：**
-1. 调用工具后，基于获取的真实数据进行技术分析
-2. 分析移动平均线、MACD、RSI、布林带等技术指标
-3. 考虑{market_info['market_name']}市场特点进行分析
-4. 提供具体的数值和专业分析
-5. 给出明确的投资建议
-6. 所有价格数据使用{market_info['currency_name']}（{market_info['currency_symbol']}）表示
-
-**输出格式：**
-## 📊 股票基本信息
-- 公司名称：{company_name}
-- 股票代码：{ticker}
-- 所属市场：{market_info['market_name']}
-
-## 📈 技术指标分析
-## 📉 价格趋势分析
-## 💭 投资建议
-
-请使用中文，基于真实数据进行分析。确保在分析中正确使用公司名称"{company_name}"和股票代码"{ticker}"。"""
-        )
-
-
+        # 🔥 优化：将输出格式要求放在系统提示的开头，确保LLM遵循格式
         prompt = ChatPromptTemplate.from_messages(
             [
                 (
                     "system",
-                    "你是一位专业的股票技术分析师，与其他分析师协作。"
-                    "使用提供的工具来获取和分析股票数据。"
-                    "⚠️ 重要工作流程："
-                    "1. 如果消息历史中没有工具结果，立即调用 get_stock_market_data_unified 工具"
-                    "2. 如果消息历史中已经有工具结果（ToolMessage），立即基于工具数据生成最终分析报告"
-                    "3. 不要重复调用工具！一次工具调用就足够了！"
-                    "4. 接收到工具数据后，必须立即生成完整的技术分析报告，不要再调用任何工具"
-                    "如果你无法完全回答，没关系；其他分析师会从不同角度继续分析。"
-                    "执行你能做的技术分析工作来取得进展。"
-                    "如果你有明确的技术面投资建议：**买入/持有/卖出**，"
-                    "请在你的回复中明确标注，但不要使用'最终交易建议'前缀，因为最终决策需要综合所有分析师的意见。"
-                    "你可以使用以下工具：{tool_names}。\n{system_message}"
-                    "供你参考，当前日期是{current_date}。"
-                    "我们要分析的是{company_name}（股票代码：{ticker}）。"
-                    "请确保所有分析都使用中文，并在分析中正确区分公司名称和股票代码。",
+                    "你是一位专业的股票技术分析师，与其他分析师协作。\n"
+                    "\n"
+                    "📋 **分析对象：**\n"
+                    "- 公司名称：{company_name}\n"
+                    "- 股票代码：{ticker}\n"
+                    "- 所属市场：{market_name}\n"
+                    "- 计价货币：{currency_name}（{currency_symbol}）\n"
+                    "- 分析日期：{current_date}\n"
+                    "\n"
+                    "🔧 **工具使用：**\n"
+                    "你可以使用以下工具：{tool_names}\n"
+                    "⚠️ 重要工作流程：\n"
+                    "1. 如果消息历史中没有工具结果，立即调用 get_stock_market_data_unified 工具\n"
+                    "2. 如果消息历史中已经有工具结果（ToolMessage），立即基于工具数据生成最终分析报告\n"
+                    "3. 不要重复调用工具！一次工具调用就足够了！\n"
+                    "4. 接收到工具数据后，必须立即生成完整的技术分析报告，不要再调用任何工具\n"
+                    "\n"
+                    "📝 **输出格式要求（必须严格遵守）：**\n"
+                    "\n"
+                    "## 📊 股票基本信息\n"
+                    "- 公司名称：{company_name}\n"
+                    "- 股票代码：{ticker}\n"
+                    "- 所属市场：{market_name}\n"
+                    "\n"
+                    "## 📈 技术指标分析\n"
+                    "[在这里分析移动平均线、MACD、RSI、布林带等技术指标，提供具体数值]\n"
+                    "\n"
+                    "## 📉 价格趋势分析\n"
+                    "[在这里分析价格趋势，考虑{market_name}市场特点]\n"
+                    "\n"
+                    "## 💭 投资建议\n"
+                    "[在这里给出明确的投资建议：买入/持有/卖出]\n"
+                    "\n"
+                    "⚠️ **重要提醒：**\n"
+                    "- 必须使用上述格式输出，不要自创标题格式\n"
+                    "- 所有价格数据使用{currency_name}（{currency_symbol}）表示\n"
+                    "- 确保在分析中正确使用公司名称\"{company_name}\"和股票代码\"{ticker}\"\n"
+                    "- 不要在标题中使用\"技术分析报告\"等自创标题\n"
+                    "- 如果你有明确的技术面投资建议（买入/持有/卖出），请在投资建议部分明确标注\n"
+                    "- 不要使用'最终交易建议'前缀，因为最终决策需要综合所有分析师的意见\n"
+                    "\n"
+                    "请使用中文，基于真实数据进行分析。",
                 ),
                 MessagesPlaceholder(variable_name="messages"),
             ]
         )
 
-        prompt = prompt.partial(system_message=system_message)
         # 安全地获取工具名称，处理函数和工具对象
         tool_names = []
         for tool in tools:
@@ -203,10 +194,14 @@ def create_market_analyst(llm, toolkit):
             else:
                 tool_names.append(str(tool))
 
+        # 🔥 设置所有模板变量
         prompt = prompt.partial(tool_names=", ".join(tool_names))
         prompt = prompt.partial(current_date=current_date)
         prompt = prompt.partial(ticker=ticker)
         prompt = prompt.partial(company_name=company_name)
+        prompt = prompt.partial(market_name=market_info['market_name'])
+        prompt = prompt.partial(currency_name=market_info['currency_name'])
+        prompt = prompt.partial(currency_symbol=market_info['currency_symbol'])
 
         # 添加详细日志
         logger.info(f"📊 [市场分析师] LLM类型: {llm.__class__.__name__}")
@@ -215,10 +210,10 @@ def create_market_analyst(llm, toolkit):
         logger.info(f"📊 [市场分析师] 公司名称: {company_name}")
         logger.info(f"📊 [市场分析师] 股票代码: {ticker}")
 
-        # 打印完整的系统提示词
-        logger.info(f"📊 [市场分析师] ========== 系统提示词开始 ==========")
-        logger.info(f"{system_message}")
-        logger.info(f"📊 [市场分析师] ========== 系统提示词结束 ==========")
+        # 打印提示词模板信息
+        logger.info("📊 [市场分析师] ========== 提示词模板信息 ==========")
+        logger.info(f"📊 [市场分析师] 模板变量已设置: company_name={company_name}, ticker={ticker}, market={market_info['market_name']}")
+        logger.info("📊 [市场分析师] ==========================================")
 
         # 打印实际传递给LLM的消息
         logger.info(f"📊 [市场分析师] ========== 传递给LLM的消息 ==========")
@@ -337,21 +332,122 @@ def create_market_analyst(llm, toolkit):
                         tool_messages.append(tool_message)
 
                     # 基于工具结果生成完整分析报告
+                    # 🔥 重要：这里必须包含公司名称和输出格式要求，确保LLM生成正确的报告标题
                     analysis_prompt = f"""现在请基于上述工具获取的数据，生成详细的技术分析报告。
 
-要求：
-1. 报告必须基于工具返回的真实数据进行分析
-2. 包含具体的技术指标数值和专业分析
-3. 提供明确的投资建议和风险提示
-4. 报告长度不少于800字
-5. 使用中文撰写
+**分析对象：**
+- 公司名称：{company_name}
+- 股票代码：{ticker}
+- 所属市场：{market_info['market_name']}
+- 计价货币：{market_info['currency_name']}（{market_info['currency_symbol']}）
 
-请分析股票{ticker}的技术面情况，包括：
-- 价格趋势分析
-- 技术指标解读
-- 支撑阻力位分析
-- 成交量分析
-- 投资建议"""
+**输出格式要求（必须严格遵守）：**
+
+请按照以下专业格式输出报告，不要使用emoji符号（如📊📈📉💭等），使用纯文本标题：
+
+# **{company_name}（{ticker}）技术分析报告**
+**分析日期：[当前日期]**
+**数据来源：Tushare金融数据库**
+
+---
+
+## 一、股票基本信息
+
+- **公司名称**：{company_name}
+- **股票代码**：{ticker}
+- **所属市场**：{market_info['market_name']}
+- **当前价格**：[从工具数据中获取] {market_info['currency_symbol']}
+- **涨跌幅**：[从工具数据中获取]
+- **成交量**：[从工具数据中获取]
+
+---
+
+## 二、技术指标分析
+
+### 1. 移动平均线（MA）分析
+
+[分析MA5、MA10、MA20、MA60等均线系统，包括：]
+- 当前各均线数值
+- 均线排列形态（多头/空头）
+- 价格与均线的位置关系
+- 均线交叉信号
+
+### 2. MACD指标分析
+
+[分析MACD指标，包括：]
+- DIF、DEA、MACD柱状图当前数值
+- 金叉/死叉信号
+- 背离现象
+- 趋势强度判断
+
+### 3. RSI相对强弱指标
+
+[分析RSI指标，包括：]
+- RSI当前数值
+- 超买/超卖区域判断
+- 背离信号
+- 趋势确认
+
+### 4. 布林带（BOLL）分析
+
+[分析布林带指标，包括：]
+- 上轨、中轨、下轨数值
+- 价格在布林带中的位置
+- 带宽变化趋势
+- 突破信号
+
+---
+
+## 三、价格趋势分析
+
+### 1. 短期趋势（5-10个交易日）
+
+[分析短期价格走势，包括支撑位、压力位、关键价格区间]
+
+### 2. 中期趋势（20-60个交易日）
+
+[分析中期价格走势，结合均线系统判断趋势方向]
+
+### 3. 成交量分析
+
+[分析成交量变化，量价配合情况]
+
+---
+
+## 四、投资建议
+
+### 1. 综合评估
+
+[基于上述技术指标，给出综合评估]
+
+### 2. 操作建议
+
+- **投资评级**：买入/持有/卖出
+- **目标价位**：[给出具体价格区间] {market_info['currency_symbol']}
+- **止损位**：[给出止损价格] {market_info['currency_symbol']}
+- **风险提示**：[列出主要风险因素]
+
+### 3. 关键价格区间
+
+- **支撑位**：[具体价格]
+- **压力位**：[具体价格]
+- **突破买入价**：[具体价格]
+- **跌破卖出价**：[具体价格]
+
+---
+
+**重要提醒：**
+- 必须严格按照上述格式输出，使用标准的Markdown标题（#、##、###）
+- 不要使用emoji符号（📊📈📉💭等）
+- 所有价格数据使用{market_info['currency_name']}（{market_info['currency_symbol']}）表示
+- 确保在分析中正确使用公司名称"{company_name}"和股票代码"{ticker}"
+- 报告标题必须是：# **{company_name}（{ticker}）技术分析报告**
+- 报告必须基于工具返回的真实数据进行分析
+- 包含具体的技术指标数值和专业分析
+- 提供明确的投资建议和风险提示
+- 报告长度不少于800字
+- 使用中文撰写
+- 使用表格展示数据时，确保格式规范"""
 
                     # 构建完整的消息序列
                     messages = state["messages"] + [result] + tool_messages + [HumanMessage(content=analysis_prompt)]
