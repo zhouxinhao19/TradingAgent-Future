@@ -2234,9 +2234,23 @@ class SimpleAnalysisService:
                     # A股：使用统一接口获取股票信息
                     from tradingagents.dataflows.interface import get_china_stock_info_unified
                     stock_info = get_china_stock_info_unified(stock_symbol)
-                    if "股票名称:" in stock_info:
+                    logger.debug(f"📊 获取股票信息返回: {stock_info[:200] if stock_info else 'None'}...")
+
+                    if stock_info and "股票名称:" in stock_info:
                         stock_name = stock_info.split("股票名称:")[1].split("\n")[0].strip()
-                        logger.info(f"📊 获取A股名称: {stock_symbol} -> {stock_name}")
+                        logger.info(f"✅ 获取A股名称: {stock_symbol} -> {stock_name}")
+                    else:
+                        # 降级方案：尝试直接从数据源管理器获取
+                        logger.warning(f"⚠️ 无法从统一接口解析股票名称: {stock_symbol}，尝试降级方案")
+                        try:
+                            from tradingagents.dataflows.data_source_manager import get_china_stock_info_unified as get_info_dict
+                            info_dict = get_info_dict(stock_symbol)
+                            if info_dict and info_dict.get('name'):
+                                stock_name = info_dict['name']
+                                logger.info(f"✅ 降级方案成功获取股票名称: {stock_symbol} -> {stock_name}")
+                        except Exception as fallback_e:
+                            logger.error(f"❌ 降级方案也失败: {fallback_e}")
+
                 elif market_info.get("market") == "hong_kong":
                     # 港股：使用改进的港股工具
                     try:
