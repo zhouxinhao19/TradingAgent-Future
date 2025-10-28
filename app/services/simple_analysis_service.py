@@ -1853,10 +1853,14 @@ class SimpleAnalysisService:
                     count += 1
                     # 兼容 user_id 或 user 字段
                     user_field_val = doc.get("user_id", doc.get("user"))
+                    # 🔧 兼容多种股票代码字段名：symbol, stock_code, stock_symbol
+                    stock_code_value = doc.get("symbol") or doc.get("stock_code") or doc.get("stock_symbol")
                     item = {
                         "task_id": doc.get("task_id"),
                         "user_id": str(user_field_val) if user_field_val is not None else None,
-                        "stock_code": doc.get("stock_code") or doc.get("stock_symbol"),
+                        "symbol": stock_code_value,  # 🔧 添加 symbol 字段（前端优先使用）
+                        "stock_code": stock_code_value,  # 🔧 兼容字段
+                        "stock_symbol": stock_code_value,  # 🔧 兼容字段
                         "stock_name": doc.get("stock_name"),
                         "status": str(doc.get("status", "pending")),
                         "progress": int(doc.get("progress", 0) or 0),

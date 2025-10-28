@@ -20,10 +20,53 @@ def create_bear_researcher(llm, memory):
         fundamentals_report = state["fundamentals_report"]
 
         # 使用统一的股票类型检测
-        company_name = state.get('company_of_interest', 'Unknown')
+        ticker = state.get('company_of_interest', 'Unknown')
         from tradingagents.utils.stock_utils import StockUtils
-        market_info = StockUtils.get_market_info(company_name)
+        market_info = StockUtils.get_market_info(ticker)
         is_china = market_info['is_china']
+
+        # 获取公司名称
+        def _get_company_name(ticker_code: str, market_info_dict: dict) -> str:
+            """根据股票代码获取公司名称"""
+            try:
+                if market_info_dict['is_china']:
+                    from tradingagents.dataflows.interface import get_china_stock_info_unified
+                    stock_info = get_china_stock_info_unified(ticker_code)
+                    if stock_info and "股票名称:" in stock_info:
+                        name = stock_info.split("股票名称:")[1].split("\n")[0].strip()
+                        logger.info(f"✅ [空头研究员] 成功获取中国股票名称: {ticker_code} -> {name}")
+                        return name
+                    else:
+                        # 降级方案
+                        try:
+                            from tradingagents.dataflows.data_source_manager import get_china_stock_info_unified as get_info_dict
+                            info_dict = get_info_dict(ticker_code)
+                            if info_dict and info_dict.get('name'):
+                                name = info_dict['name']
+                                logger.info(f"✅ [空头研究员] 降级方案成功获取股票名称: {ticker_code} -> {name}")
+                                return name
+                        except Exception as e:
+                            logger.error(f"❌ [空头研究员] 降级方案也失败: {e}")
+                elif market_info_dict['is_hk']:
+                    try:
+                        from tradingagents.dataflows.improved_hk_utils import get_hk_company_name_improved
+                        name = get_hk_company_name_improved(ticker_code)
+                        return name
+                    except Exception:
+                        clean_ticker = ticker_code.replace('.HK', '').replace('.hk', '')
+                        return f"港股{clean_ticker}"
+                elif market_info_dict['is_us']:
+                    us_stock_names = {
+                        'AAPL': '苹果公司', 'TSLA': '特斯拉', 'NVDA': '英伟达',
+                        'MSFT': '微软', 'GOOGL': '谷歌', 'AMZN': '亚马逊',
+                        'META': 'Meta', 'NFLX': '奈飞'
+                    }
+                    return us_stock_names.get(ticker_code.upper(), f"美股{ticker_code}")
+            except Exception as e:
+                logger.error(f"❌ [空头研究员] 获取公司名称失败: {e}")
+            return f"股票代码{ticker_code}"
+
+        company_name = _get_company_name(ticker, market_info)
         is_hk = market_info['is_hk']
         is_us = market_info['is_us']
 
@@ -43,9 +86,10 @@ def create_bear_researcher(llm, memory):
         for i, rec in enumerate(past_memories, 1):
             past_memory_str += rec["recommendation"] + "\n\n"
 
-        prompt = f"""你是一位看跌分析师，负责论证不投资股票 {company_name} 的理由。
+        prompt = f"""你是一位看跌分析师，负责论证不投资股票 {company_name}（股票代码：{ticker}）的理由。
 
 ⚠️ 重要提醒：当前分析的是 {market_info['market_name']}，所有价格和估值请使用 {currency}（{currency_symbol}）作为单位。
+⚠️ 在你的分析中，请始终使用公司名称"{company_name}"而不是股票代码"{ticker}"来称呼这家公司。
 
 你的目标是提出合理的论证，强调风险、挑战和负面指标。利用提供的研究和数据来突出潜在的不利因素并有效反驳看涨论点。
 

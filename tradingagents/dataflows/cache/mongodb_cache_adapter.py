@@ -86,6 +86,7 @@ class MongoDBCacheAdapter:
                 StockMarket.HONG_KONG: 'hk_stocks',
             }
             market_category = market_mapping.get(market)
+            logger.info(f"📊 [数据源优先级] 股票代码: {symbol}, 市场分类: {market_category}")
 
             # 2. 从数据库读取配置
             if self.db is not None:
@@ -97,20 +98,31 @@ class MongoDBCacheAdapter:
 
                 if config_data and config_data.get('data_source_configs'):
                     configs = config_data['data_source_configs']
+                    logger.info(f"📊 [数据源优先级] 从数据库读取到 {len(configs)} 个数据源配置")
 
                     # 3. 过滤启用的数据源
                     enabled = []
                     for ds in configs:
-                        if not ds.get('enabled', True):
+                        ds_type = ds.get('type', '')
+                        ds_enabled = ds.get('enabled', True)
+                        ds_priority = ds.get('priority', 0)
+                        ds_categories = ds.get('market_categories', [])
+
+                        logger.info(f"📊 [数据源配置] 类型: {ds_type}, 启用: {ds_enabled}, 优先级: {ds_priority}, 市场: {ds_categories}")
+
+                        if not ds_enabled:
+                            logger.info(f"⚠️ [数据源优先级] {ds_type} 未启用，跳过")
                             continue
 
                         # 检查市场分类
-                        categories = ds.get('market_categories', [])
-                        if categories and market_category:
-                            if market_category not in categories:
+                        if ds_categories and market_category:
+                            if market_category not in ds_categories:
+                                logger.info(f"⚠️ [数据源优先级] {ds_type} 不支持市场 {market_category}，跳过")
                                 continue
 
                         enabled.append(ds)
+
+                    logger.info(f"📊 [数据源优先级] 过滤后启用的数据源: {len(enabled)} 个")
 
                     # 4. 按优先级排序（数字越大优先级越高）
                     enabled.sort(key=lambda x: x.get('priority', 0), reverse=True)
@@ -118,13 +130,18 @@ class MongoDBCacheAdapter:
                     # 5. 返回数据源类型列表
                     result = [ds.get('type', '').lower() for ds in enabled if ds.get('type')]
                     if result:
-                        logger.debug(f"📊 [数据源优先级] {symbol} ({market_category}): {result}")
+                        logger.info(f"✅ [数据源优先级] {symbol} ({market_category}): {result}")
                         return result
+                    else:
+                        logger.warning(f"⚠️ [数据源优先级] 没有可用的数据源配置，使用默认顺序")
+                else:
+                    logger.warning(f"⚠️ [数据源优先级] 数据库中没有找到数据源配置")
 
         except Exception as e:
-            logger.warning(f"⚠️ 获取数据源优先级失败: {e}")
+            logger.error(f"❌ 获取数据源优先级失败: {e}", exc_info=True)
 
         # 默认顺序：Tushare > AKShare > BaoStock
+        logger.info(f"📊 [数据源优先级] 使用默认顺序: ['tushare', 'akshare', 'baostock']")
         return ['tushare', 'akshare', 'baostock']
 
     def get_historical_data(self, symbol: str, start_date: str = None, end_date: str = None,

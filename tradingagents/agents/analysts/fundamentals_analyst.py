@@ -269,7 +269,8 @@ def create_fundamentals_analyst(llm, toolkit):
         logger.info(f"🔍 [股票代码追踪] LLM调用前，ticker参数: '{ticker}'")
         logger.info(f"🔍 [股票代码追踪] 传递给LLM的消息数量: {len(state['messages'])}")
 
-        result = chain.invoke(state["messages"])
+        # 修复：传递字典而不是直接传递消息列表，以便 ChatPromptTemplate 能正确处理所有变量
+        result = chain.invoke({"messages": state["messages"]})
         logger.info(f"📊 [基本面分析师] LLM调用完成")
         
         # 🔍 [调试日志] 打印AIMessage的详细内容

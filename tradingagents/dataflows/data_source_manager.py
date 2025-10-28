@@ -1362,12 +1362,34 @@ class DataSourceManager:
         return {'symbol': symbol, 'name': f'股票{symbol}', 'source': 'unknown'}
 
     def _get_akshare_stock_info(self, symbol: str) -> Dict:
-        """使用AKShare获取股票基本信息"""
+        """使用AKShare获取股票基本信息
+
+        🔥 重要：AKShare 需要区分股票和指数
+        - 对于 000001，如果不加后缀，会被识别为"深圳成指"（指数）
+        - 对于股票，需要使用完整代码（如 sz000001 或 sh600000）
+        """
         try:
             import akshare as ak
 
+            # 🔥 转换为 AKShare 格式的股票代码
+            # AKShare 的 stock_individual_info_em 需要使用 "sz000001" 或 "sh600000" 格式
+            if symbol.startswith('6'):
+                # 上海股票：600000 -> sh600000
+                akshare_symbol = f"sh{symbol}"
+            elif symbol.startswith(('0', '3', '2')):
+                # 深圳股票：000001 -> sz000001
+                akshare_symbol = f"sz{symbol}"
+            elif symbol.startswith(('8', '4')):
+                # 北京股票：830000 -> bj830000
+                akshare_symbol = f"bj{symbol}"
+            else:
+                # 其他情况，直接使用原始代码
+                akshare_symbol = symbol
+
+            logger.debug(f"📊 [AKShare股票信息] 原始代码: {symbol}, AKShare格式: {akshare_symbol}")
+
             # 尝试获取个股信息
-            stock_info = ak.stock_individual_info_em(symbol=symbol)
+            stock_info = ak.stock_individual_info_em(symbol=akshare_symbol)
 
             if stock_info is not None and not stock_info.empty:
                 # 转换为字典格式
@@ -1376,9 +1398,12 @@ class DataSourceManager:
                 # 提取股票名称
                 name_row = stock_info[stock_info['item'] == '股票简称']
                 if not name_row.empty:
-                    info['name'] = name_row['value'].iloc[0]
+                    stock_name = name_row['value'].iloc[0]
+                    info['name'] = stock_name
+                    logger.info(f"✅ [AKShare股票信息] {symbol} -> {stock_name}")
                 else:
                     info['name'] = f'股票{symbol}'
+                    logger.warning(f"⚠️ [AKShare股票信息] 未找到股票简称: {symbol}")
 
                 # 提取其他信息
                 info['area'] = '未知'  # AKShare没有地区信息
@@ -1388,10 +1413,11 @@ class DataSourceManager:
 
                 return info
             else:
+                logger.warning(f"⚠️ [AKShare股票信息] 返回空数据: {symbol}")
                 return {'symbol': symbol, 'name': f'股票{symbol}', 'source': 'akshare'}
 
         except Exception as e:
-            logger.error(f"❌ [股票信息] AKShare获取失败: {e}")
+            logger.error(f"❌ [股票信息] AKShare获取失败: {symbol}, 错误: {e}")
             return {'symbol': symbol, 'name': f'股票{symbol}', 'source': 'akshare', 'error': str(e)}
 
     def _get_baostock_stock_info(self, symbol: str) -> Dict:

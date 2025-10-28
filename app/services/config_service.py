@@ -237,12 +237,18 @@ class ConfigService:
             return False
 
     async def update_category_datasource_order(self, category_id: str, ordered_datasources: List[Dict[str, Any]]) -> bool:
-        """更新分类中数据源的排序"""
+        """更新分类中数据源的排序
+
+        🔥 重要：同时更新 datasource_groupings 和 system_configs 两个集合
+        - datasource_groupings: 用于前端展示和管理
+        - system_configs.data_source_configs: 用于实际数据获取时的优先级判断
+        """
         try:
             db = await self._get_db()
             groupings_collection = db.datasource_groupings
+            config_collection = db.system_configs
 
-            # 批量更新优先级
+            # 1. 批量更新 datasource_groupings 集合中的优先级
             for item in ordered_datasources:
                 await groupings_collection.update_one(
                     {
@@ -256,9 +262,52 @@ class ConfigService:
                         }
                     }
                 )
+
+            # 2. 🔥 同步更新 system_configs 集合中的 data_source_configs
+            # 获取当前激活的配置
+            config_data = await config_collection.find_one(
+                {"is_active": True},
+                sort=[("version", -1)]
+            )
+
+            if config_data:
+                # 构建数据源名称到优先级的映射
+                priority_map = {item["name"]: item["priority"] for item in ordered_datasources}
+
+                # 更新 data_source_configs 中对应数据源的优先级
+                data_source_configs = config_data.get("data_source_configs", [])
+                updated = False
+
+                for ds_config in data_source_configs:
+                    ds_name = ds_config.get("name")
+                    if ds_name in priority_map:
+                        ds_config["priority"] = priority_map[ds_name]
+                        updated = True
+                        print(f"📊 [优先级同步] 更新数据源 {ds_name} 的优先级为 {priority_map[ds_name]}")
+
+                # 如果有更新，保存回数据库
+                if updated:
+                    await config_collection.update_one(
+                        {"_id": config_data["_id"]},
+                        {
+                            "$set": {
+                                "data_source_configs": data_source_configs,
+                                "updated_at": now_tz(),
+                                "version": config_data.get("version", 0) + 1
+                            }
+                        }
+                    )
+                    print(f"✅ [优先级同步] 已同步更新 system_configs 集合，新版本: {config_data.get('version', 0) + 1}")
+                else:
+                    print(f"⚠️ [优先级同步] 没有找到需要更新的数据源配置")
+            else:
+                print(f"⚠️ [优先级同步] 未找到激活的系统配置")
+
             return True
         except Exception as e:
             print(f"❌ 更新分类数据源排序失败: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     async def get_system_config(self) -> Optional[SystemConfig]:

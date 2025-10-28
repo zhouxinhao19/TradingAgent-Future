@@ -212,12 +212,36 @@ def create_market_analyst(llm, toolkit):
         logger.info(f"📊 [市场分析师] LLM类型: {llm.__class__.__name__}")
         logger.info(f"📊 [市场分析师] LLM模型: {getattr(llm, 'model_name', 'unknown')}")
         logger.info(f"📊 [市场分析师] 消息历史数量: {len(state['messages'])}")
+        logger.info(f"📊 [市场分析师] 公司名称: {company_name}")
+        logger.info(f"📊 [市场分析师] 股票代码: {ticker}")
+
+        # 打印完整的系统提示词
+        logger.info(f"📊 [市场分析师] ========== 系统提示词开始 ==========")
+        logger.info(f"{system_message}")
+        logger.info(f"📊 [市场分析师] ========== 系统提示词结束 ==========")
+
+        # 打印实际传递给LLM的消息
+        logger.info(f"📊 [市场分析师] ========== 传递给LLM的消息 ==========")
+        for i, msg in enumerate(state["messages"]):
+            msg_type = type(msg).__name__
+            msg_content = str(msg.content)[:200] if hasattr(msg, 'content') else str(msg)[:200]
+            logger.info(f"📊 [市场分析师] 消息[{i}] 类型={msg_type}, 内容前200字符={msg_content}...")
+        logger.info(f"📊 [市场分析师] ========== 消息列表结束 ==========")
 
         chain = prompt | llm.bind_tools(tools)
 
         logger.info(f"📊 [市场分析师] 开始调用LLM...")
-        result = chain.invoke(state["messages"])
+        # 修复：传递字典而不是直接传递消息列表，以便 ChatPromptTemplate 能正确处理所有变量
+        result = chain.invoke({"messages": state["messages"]})
         logger.info(f"📊 [市场分析师] LLM调用完成")
+
+        # 打印LLM响应
+        logger.info(f"📊 [市场分析师] ========== LLM响应开始 ==========")
+        logger.info(f"📊 [市场分析师] 响应类型: {type(result).__name__}")
+        logger.info(f"📊 [市场分析师] 响应内容: {str(result.content)[:1000]}...")
+        if hasattr(result, 'tool_calls') and result.tool_calls:
+            logger.info(f"📊 [市场分析师] 工具调用: {result.tool_calls}")
+        logger.info(f"📊 [市场分析师] ========== LLM响应结束 ==========")
 
         # 使用统一的Google工具调用处理器
         if GoogleToolCallHandler.is_google_model(llm):
