@@ -202,9 +202,14 @@ async def get_kline(code: str, period: str = "day", limit: int = 120, adj: str =
     """获取K线数据（MongoDB缓存优先，Tushare/AkShare兜底）
     period: day/week/month/5m/15m/30m/60m
     adj: none/qfq/hfq
+
+    🔥 新增功能：当天实时K线数据
+    - 交易时间内（09:30-15:00）：从 market_quotes 获取实时数据
+    - 收盘后：检查历史数据是否有当天数据，没有则从 market_quotes 获取
     """
     import logging
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, time as dtime
+    from zoneinfo import ZoneInfo
     logger = logging.getLogger(__name__)
 
     valid_periods = {"day","week","month","5m","15m","30m","60m"}
@@ -228,14 +233,20 @@ async def get_kline(code: str, period: str = "day", limit: int = 120, adj: str =
     }
     mongodb_period = period_map.get(period, "daily")
 
+    # 获取当前时间（北京时间）
+    from app.core.config import settings
+    tz = ZoneInfo(settings.TIMEZONE)
+    now = datetime.now(tz)
+    today_str = now.strftime("%Y%m%d")  # 格式：20251028
+
     # 1. 优先从 MongoDB 缓存获取
     try:
         from tradingagents.dataflows.cache.mongodb_cache_adapter import get_mongodb_cache_adapter
         adapter = get_mongodb_cache_adapter()
 
         # 计算日期范围
-        end_date = datetime.now().strftime("%Y-%m-%d")
-        start_date = (datetime.now() - timedelta(days=limit * 2)).strftime("%Y-%m-%d")
+        end_date = now.strftime("%Y-%m-%d")
+        start_date = (now - timedelta(days=limit * 2)).strftime("%Y-%m-%d")
 
         logger.info(f"🔍 尝试从 MongoDB 获取 K 线数据: {code_padded}, period={period} (MongoDB: {mongodb_period}), limit={limit}")
         df = adapter.get_historical_data(code_padded, start_date, end_date, period=mongodb_period)
@@ -277,6 +288,60 @@ async def get_kline(code: str, period: str = "day", limit: int = 120, adj: str =
         except Exception as e:
             logger.error(f"❌ 外部 API 获取 K 线失败: {e}")
             raise HTTPException(status_code=500, detail=f"获取K线数据失败: {str(e)}")
+
+    # 🔥 3. 检查是否需要添加当天实时数据（仅针对日线）
+    if period == "day" and items:
+        try:
+            # 检查历史数据中是否已有当天的数据
+            has_today_data = any(item.get("time") == today_str for item in items)
+
+            # 判断是否在交易时间内
+            current_time = now.time()
+            is_trading_time = (
+                dtime(9, 30) <= current_time <= dtime(15, 0) and
+                now.weekday() < 5  # 周一到周五
+            )
+
+            # 如果在交易时间内，或者收盘后但历史数据没有当天数据，则从 market_quotes 获取
+            should_fetch_realtime = is_trading_time or not has_today_data
+
+            if should_fetch_realtime:
+                logger.info(f"🔥 尝试从 market_quotes 获取当天实时数据: {code_padded} (交易时间: {is_trading_time}, 已有当天数据: {has_today_data})")
+
+                from app.core.database import get_mongo_db
+                db = get_mongo_db()
+                market_quotes_coll = db["market_quotes"]
+
+                # 查询当天的实时行情
+                realtime_quote = await market_quotes_coll.find_one({"code": code_padded})
+
+                if realtime_quote:
+                    # 构造当天的K线数据
+                    today_kline = {
+                        "time": today_str,
+                        "open": float(realtime_quote.get("open", 0)),
+                        "high": float(realtime_quote.get("high", 0)),
+                        "low": float(realtime_quote.get("low", 0)),
+                        "close": float(realtime_quote.get("close", 0)),
+                        "volume": float(realtime_quote.get("volume", 0)),
+                        "amount": float(realtime_quote.get("amount", 0)),
+                    }
+
+                    # 如果历史数据中已有当天数据，替换；否则追加
+                    if has_today_data:
+                        # 替换最后一条数据（假设最后一条是当天的）
+                        items[-1] = today_kline
+                        logger.info(f"✅ 替换当天K线数据: {code_padded}")
+                    else:
+                        # 追加到末尾
+                        items.append(today_kline)
+                        logger.info(f"✅ 追加当天K线数据: {code_padded}")
+
+                    source = f"{source}+market_quotes"
+                else:
+                    logger.warning(f"⚠️ market_quotes 中未找到当天数据: {code_padded}")
+        except Exception as e:
+            logger.warning(f"⚠️ 获取当天实时数据失败（忽略）: {e}")
 
     data = {
         "code": code_padded,

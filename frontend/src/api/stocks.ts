@@ -23,15 +23,22 @@ export interface FundamentalsResponse {
   name?: string
   industry?: string
   market?: string
+  sector?: string  // 板块
   pe?: number
   pb?: number
+  ps?: number      // 🔥 新增：市销率
   pe_ttm?: number
   pb_mrq?: number
+  ps_ttm?: number  // 🔥 新增：市销率（TTM）
   roe?: number
+  debt_ratio?: number  // 🔥 新增：负债率
   total_mv?: number
   circ_mv?: number
   turnover_rate?: number
   volume_ratio?: number
+  pe_is_realtime?: boolean  // PE是否为实时数据
+  pe_source?: string        // PE数据来源
+  pe_updated_at?: string    // PE更新时间
   updated_at?: string
 }
 

@@ -135,9 +135,17 @@ class QuotesIngestionService:
             # 添加分钟数
             doc["interval_minutes"] = doc.get("interval_seconds", 0) / 60
 
-            # 格式化时间
+            # 🔥 格式化时间（确保转换为本地时区）
             if "last_sync_time" in doc and doc["last_sync_time"]:
-                doc["last_sync_time"] = doc["last_sync_time"].strftime("%Y-%m-%d %H:%M:%S")
+                dt = doc["last_sync_time"]
+                # MongoDB 返回的是 UTC 时间的 datetime 对象（aware 或 naive）
+                # 如果是 naive，添加 UTC 时区；如果是 aware，转换为本地时区
+                if dt.tzinfo is None:
+                    # naive datetime，假设是 UTC
+                    dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+                # 转换为本地时区
+                dt_local = dt.astimezone(self.tz)
+                doc["last_sync_time"] = dt_local.strftime("%Y-%m-%d %H:%M:%S")
 
             return doc
 

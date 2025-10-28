@@ -42,7 +42,7 @@
         <div class="sync-status" v-if="syncStatus">
           <el-icon><Clock /></el-icon>
           <span class="sync-info">
-            后端同步: {{ syncStatus.last_sync_time || '未同步' }}
+            后端同步: {{ formatSyncTime(syncStatus.last_sync_time) }}
             <span v-if="syncStatus.interval_minutes">(每{{ syncStatus.interval_minutes }}分钟)</span>
             <el-tag
               v-if="syncStatus.data_source"
@@ -204,6 +204,14 @@
                 <el-tag v-if="basics.peIsRealtime" type="success" size="small" style="margin-left: 4px">实时</el-tag>
               </b>
             </div>
+            <div class="fact">
+              <span>PB(市净率)</span>
+              <b>
+                {{ Number.isFinite(basics.pb) ? basics.pb.toFixed(2) : '-' }}
+                <el-tag v-if="basics.peIsRealtime" type="success" size="small" style="margin-left: 4px">实时</el-tag>
+              </b>
+            </div>
+            <div class="fact"><span>PS(TTM)</span><b>{{ Number.isFinite(basics.ps) ? basics.ps.toFixed(2) : '-' }}</b></div>
             <div class="fact"><span>ROE</span><b>{{ fmtPercent(basics.roe) }}</b></div>
             <div class="fact"><span>负债率</span><b>{{ fmtPercent(basics.debtRatio) }}</b></div>
           </div>
@@ -410,6 +418,11 @@ async function fetchFundamentals() {
     basics.marketCap = Number.isFinite(f.total_mv) ? Number(f.total_mv) * 1e8 : basics.marketCap
     // 优先使用 pe_ttm，其次 pe
     basics.pe = Number.isFinite(f.pe_ttm) ? Number(f.pe_ttm) : (Number.isFinite(f.pe) ? Number(f.pe) : basics.pe)
+    // 🔥 新增：PB（市净率）
+    basics.pb = Number.isFinite(f.pb) ? Number(f.pb) : basics.pb
+    // 🔥 新增：PS（市销率）- 优先使用 ps_ttm，其次 ps
+    basics.ps = Number.isFinite(f.ps_ttm) ? Number(f.ps_ttm) : (Number.isFinite(f.ps) ? Number(f.ps) : basics.ps)
+    // ROE 和负债率
     basics.roe = Number.isFinite(f.roe) ? Number(f.roe) : basics.roe
     const ff: any = f
     basics.debtRatio = Number.isFinite(ff.debt_ratio) ? Number(ff.debt_ratio) : basics.debtRatio
@@ -571,6 +584,8 @@ const basics = reactive({
   sector: '-',
   marketCap: NaN,
   pe: NaN,
+  pb: NaN,              // 🔥 新增：市净率
+  ps: NaN,              // 🔥 新增：市销率
   roe: NaN,
   debtRatio: NaN,
   peIsRealtime: false,  // PE是否为实时数据
@@ -712,6 +727,12 @@ function fmtAmount(v: any) {
   if (n >= 1e8) return (n/1e8).toFixed(2) + '亿'
   if (n >= 1e4) return (n/1e4).toFixed(2) + '万'
   return n.toFixed(0)
+}
+// 🔥 新增：格式化同步时间（添加时区标识）
+function formatSyncTime(timeStr: string | null | undefined): string {
+  if (!timeStr) return '未同步'
+  // 后端返回的时间已经是 UTC+8 时区，添加时区标识
+  return `${timeStr} (UTC+8)`
 }
 function fmtConf(v: any) {
   const n = Number(v)
