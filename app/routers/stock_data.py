@@ -311,6 +311,12 @@ async def get_market_summary(
             "message": "获取成功"
         }
 
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取市场概览失败: {str(e)}"
+        )
+
 
 @router.get("/quotes/sync-status")
 async def get_quotes_sync_status(
