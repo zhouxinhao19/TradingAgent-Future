@@ -156,10 +156,14 @@ def calculate_realtime_pe_pb(
             if pre_close and pre_close > 0:
                 yesterday_mv_yi = (total_shares_wan * pre_close) / 10000
                 logger.info(f"   ✓ 昨日市值: {total_shares_wan:.2f}万股 × {pre_close:.2f}元 / 10000 = {yesterday_mv_yi:.2f}亿元")
-            else:
+            elif total_mv_yi and total_mv_yi > 0:
                 # 如果没有昨日收盘价，使用 stock_basic_info 的市值（假设是昨天的）
                 yesterday_mv_yi = total_mv_yi
-                logger.info(f"   ✓ 使用 stock_basic_info 市值作为昨日市值: {yesterday_mv_yi:.2f}亿元")
+                logger.info(f"   ⚠️ market_quotes 中无 pre_close，使用 stock_basic_info 市值作为昨日市值: {yesterday_mv_yi:.2f}亿元")
+            else:
+                # 既没有 pre_close，也没有 total_mv_yi，无法计算
+                logger.warning(f"⚠️ [动态PE计算-失败] 无法获取昨日市值: pre_close={pre_close}, total_mv={total_mv_yi}")
+                return None
 
         # 方案2：使用 market_quotes 的 pre_close（昨日收盘价）反推股本
         elif pre_close and pre_close > 0 and total_mv_yi and total_mv_yi > 0:
@@ -191,9 +195,21 @@ def calculate_realtime_pe_pb(
                 logger.info(f"   ✓ stock_basic_info 是今天的数据，用 realtime_price 反推总股本: {total_mv_yi:.2f}亿元 / {realtime_price:.2f}元 = {total_shares_wan:.2f}万股")
                 logger.info(f"   ✓ 昨日市值: {total_shares_wan:.2f}万股 × {pre_close:.2f}元 / 10000 = {yesterday_mv_yi:.2f}亿元")
 
-        # 方案3：如果都没有，无法计算
+        # 方案3：只有 total_mv_yi，没有 pre_close（market_quotes 数据不完整）
+        elif total_mv_yi and total_mv_yi > 0:
+            # 使用 realtime_price 反推股本，假设 total_mv_yi 是昨天的市值
+            total_shares_wan = (total_mv_yi * 10000) / realtime_price
+            yesterday_mv_yi = total_mv_yi
+            logger.warning(f"   ⚠️ market_quotes 中无 pre_close，假设 stock_basic_info.total_mv 是昨日市值")
+            logger.info(f"   ✓ 用 realtime_price 反推总股本: {total_mv_yi:.2f}亿元 / {realtime_price:.2f}元 = {total_shares_wan:.2f}万股")
+            logger.info(f"   ✓ 昨日市值（假设）: {yesterday_mv_yi:.2f}亿元")
+
+        # 方案4：如果都没有，无法计算
         else:
             logger.warning(f"⚠️ [动态PE计算-失败] 无法获取总股本数据")
+            logger.warning(f"   - total_share: {total_share}")
+            logger.warning(f"   - pre_close: {pre_close}")
+            logger.warning(f"   - total_mv: {total_mv_yi}")
             return None
 
         # 5. 从 Tushare pe_ttm 反推 TTM 净利润（使用昨日市值）

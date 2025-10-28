@@ -811,10 +811,12 @@ class OptimizedChinaDataProvider:
             # 🔥 优先从 market_quotes 获取实时股价，替换传入的 price_value
             from tradingagents.config.database_manager import get_database_manager
             db_manager = get_database_manager()
+            db_client = None
+
             if db_manager.is_mongodb_available():
                 try:
-                    client = db_manager.get_mongodb_client()
-                    db = client['tradingagents']
+                    db_client = db_manager.get_mongodb_client()
+                    db = db_client['tradingagents']
 
                     # 标准化股票代码为6位
                     code6 = symbol.replace('.SH', '').replace('.SZ', '').zfill(6)
@@ -829,6 +831,8 @@ class OptimizedChinaDataProvider:
                         logger.info(f"⚠️ market_quotes 中未找到{code6}的实时股价，使用传入价格: {price_value}元")
                 except Exception as e:
                     logger.warning(f"⚠️ 从 market_quotes 获取实时股价失败: {e}，使用传入价格: {price_value}元")
+            else:
+                logger.info(f"⚠️ MongoDB 不可用，使用传入价格: {price_value}元")
 
             # 第一优先级：从 MongoDB stock_financial_data 集合获取标准化财务数据
             from tradingagents.config.runtime_settings import use_app_cache_enabled
@@ -1242,6 +1246,56 @@ class OptimizedChinaDataProvider:
             # 计算财务指标
             metrics = {}
 
+            # 🔥 优先尝试使用实时 PE/PB 计算（与 MongoDB 解析保持一致）
+            pe_value = None
+            pe_ttm_value = None
+            pb_value = None
+
+            try:
+                # 获取股票代码
+                stock_code = stock_info.get('code', '').replace('.SH', '').replace('.SZ', '').zfill(6)
+                if stock_code:
+                    logger.info(f"📊 [AKShare-PE计算-第1层] 尝试使用实时PE/PB计算: {stock_code}")
+
+                    from tradingagents.config.database_manager import get_database_manager
+                    from tradingagents.dataflows.realtime_metrics import get_pe_pb_with_fallback
+
+                    db_manager = get_database_manager()
+                    if db_manager.is_mongodb_available():
+                        client = db_manager.get_mongodb_client()
+
+                        # 获取实时PE/PB
+                        realtime_metrics = get_pe_pb_with_fallback(stock_code, client)
+
+                        if realtime_metrics:
+                            # 使用实时PE
+                            pe_value = realtime_metrics.get('pe')
+                            if pe_value is not None and pe_value > 0:
+                                is_realtime = realtime_metrics.get('is_realtime', False)
+                                realtime_tag = " (实时)" if is_realtime else ""
+                                metrics["pe"] = f"{pe_value:.1f}倍{realtime_tag}"
+                                logger.info(f"✅ [AKShare-PE计算-第1层成功] PE={pe_value:.2f}倍 | 来源={realtime_metrics.get('source')} | 实时={is_realtime}")
+
+                            # 使用实时PE_TTM
+                            pe_ttm_value = realtime_metrics.get('pe_ttm')
+                            if pe_ttm_value is not None and pe_ttm_value > 0:
+                                is_realtime = realtime_metrics.get('is_realtime', False)
+                                realtime_tag = " (实时)" if is_realtime else ""
+                                metrics["pe_ttm"] = f"{pe_ttm_value:.1f}倍{realtime_tag}"
+                                logger.info(f"✅ [AKShare-PE_TTM计算-第1层成功] PE_TTM={pe_ttm_value:.2f}倍")
+
+                            # 使用实时PB
+                            pb_value = realtime_metrics.get('pb')
+                            if pb_value is not None and pb_value > 0:
+                                is_realtime = realtime_metrics.get('is_realtime', False)
+                                realtime_tag = " (实时)" if is_realtime else ""
+                                metrics["pb"] = f"{pb_value:.2f}倍{realtime_tag}"
+                                logger.info(f"✅ [AKShare-PB计算-第1层成功] PB={pb_value:.2f}倍")
+                        else:
+                            logger.warning(f"⚠️ [AKShare-PE计算-第1层失败] 实时计算返回空结果，将尝试降级计算")
+            except Exception as e:
+                logger.warning(f"⚠️ [AKShare-PE计算-第1层异常] 实时计算失败: {e}，将尝试降级计算")
+
             # 获取ROE - 直接从指标中获取
             roe_value = indicators_dict.get('净资产收益率(ROE)')
             if roe_value is not None and str(roe_value) != 'nan' and roe_value != '--':
@@ -1255,75 +1309,88 @@ class OptimizedChinaDataProvider:
             else:
                 metrics["roe"] = "N/A"
 
-            # 计算 PE - 优先使用 TTM 数据
-            # 尝试从 main_indicators DataFrame 计算 TTM EPS
-            ttm_eps = None
-            try:
-                # main_indicators 是 DataFrame，包含多期数据
-                # 尝试计算 TTM EPS
-                if '基本每股收益' in main_indicators['指标'].values:
-                    # 提取基本每股收益的所有期数数据
-                    eps_row = main_indicators[main_indicators['指标'] == '基本每股收益']
-                    if not eps_row.empty:
-                        # 获取所有数值列（排除'指标'列）
-                        value_cols = [col for col in eps_row.columns if col != '指标']
+            # 🔥 如果实时计算失败，降级到传统计算方式
+            if pe_value is None:
+                logger.info(f"📊 [AKShare-PE计算-第2层] 尝试使用股价/EPS计算")
 
-                        # 构建 DataFrame 用于 TTM 计算
-                        import pandas as pd
-                        eps_data = []
-                        for col in value_cols:
-                            eps_val = eps_row[col].iloc[0]
-                            if eps_val is not None and str(eps_val) != 'nan' and eps_val != '--':
-                                eps_data.append({'报告期': col, '基本每股收益': eps_val})
-
-                        if len(eps_data) >= 2:
-                            eps_df = pd.DataFrame(eps_data)
-                            # 使用 TTM 计算函数
-                            from scripts.sync_financial_data import _calculate_ttm_metric
-                            ttm_eps = _calculate_ttm_metric(eps_df, '基本每股收益')
-                            if ttm_eps:
-                                logger.info(f"✅ 计算 TTM EPS: {ttm_eps:.4f} 元")
-            except Exception as e:
-                logger.debug(f"计算 TTM EPS 失败: {e}")
-
-            # 使用 TTM EPS 或单期 EPS 计算 PE
-            eps_for_pe = ttm_eps if ttm_eps else None
-            pe_type = "TTM" if ttm_eps else "单期"
-
-            if not eps_for_pe:
-                # 降级到单期 EPS
-                eps_value = indicators_dict.get('基本每股收益')
-                if eps_value is not None and str(eps_value) != 'nan' and eps_value != '--':
-                    try:
-                        eps_for_pe = float(eps_value)
-                    except (ValueError, TypeError):
-                        pass
-
-            if eps_for_pe and eps_for_pe > 0:
-                pe_val = price_value / eps_for_pe
-                metrics["pe"] = f"{pe_val:.1f}倍"
-                logger.info(f"✅ 计算PE({pe_type}): 股价{price_value} / EPS{eps_for_pe:.4f} = {metrics['pe']}")
-            elif eps_for_pe and eps_for_pe <= 0:
-                metrics["pe"] = "N/A（亏损）"
-            else:
-                metrics["pe"] = "N/A"
-
-            # 获取每股净资产 - 用于计算PB
-            bps_value = indicators_dict.get('每股净资产_最新股数')
-            if bps_value is not None and str(bps_value) != 'nan' and bps_value != '--':
+                # 计算 PE - 优先使用 TTM 数据
+                # 尝试从 main_indicators DataFrame 计算 TTM EPS
+                ttm_eps = None
                 try:
-                    bps_val = float(bps_value)
-                    if bps_val > 0:
-                        # 计算PB = 股价 / 每股净资产
-                        pb_val = price_value / bps_val
-                        metrics["pb"] = f"{pb_val:.2f}倍"
-                        logger.debug(f"✅ 计算PB: 股价{price_value} / BPS{bps_val} = {metrics['pb']}")
-                    else:
+                    # main_indicators 是 DataFrame，包含多期数据
+                    # 尝试计算 TTM EPS
+                    if '基本每股收益' in main_indicators['指标'].values:
+                        # 提取基本每股收益的所有期数数据
+                        eps_row = main_indicators[main_indicators['指标'] == '基本每股收益']
+                        if not eps_row.empty:
+                            # 获取所有数值列（排除'指标'列）
+                            value_cols = [col for col in eps_row.columns if col != '指标']
+
+                            # 构建 DataFrame 用于 TTM 计算
+                            import pandas as pd
+                            eps_data = []
+                            for col in value_cols:
+                                eps_val = eps_row[col].iloc[0]
+                                if eps_val is not None and str(eps_val) != 'nan' and eps_val != '--':
+                                    eps_data.append({'报告期': col, '基本每股收益': eps_val})
+
+                            if len(eps_data) >= 2:
+                                eps_df = pd.DataFrame(eps_data)
+                                # 使用 TTM 计算函数
+                                from scripts.sync_financial_data import _calculate_ttm_metric
+                                ttm_eps = _calculate_ttm_metric(eps_df, '基本每股收益')
+                                if ttm_eps:
+                                    logger.info(f"✅ 计算 TTM EPS: {ttm_eps:.4f} 元")
+                except Exception as e:
+                    logger.debug(f"计算 TTM EPS 失败: {e}")
+
+                # 使用 TTM EPS 或单期 EPS 计算 PE
+                eps_for_pe = ttm_eps if ttm_eps else None
+                pe_type = "TTM" if ttm_eps else "单期"
+
+                if not eps_for_pe:
+                    # 降级到单期 EPS
+                    eps_value = indicators_dict.get('基本每股收益')
+                    if eps_value is not None and str(eps_value) != 'nan' and eps_value != '--':
+                        try:
+                            eps_for_pe = float(eps_value)
+                        except (ValueError, TypeError):
+                            pass
+
+                if eps_for_pe and eps_for_pe > 0:
+                    pe_val = price_value / eps_for_pe
+                    metrics["pe"] = f"{pe_val:.1f}倍"
+                    logger.info(f"✅ [AKShare-PE计算-第2层成功] PE({pe_type}): 股价{price_value} / EPS{eps_for_pe:.4f} = {metrics['pe']}")
+                elif eps_for_pe and eps_for_pe <= 0:
+                    metrics["pe"] = "N/A（亏损）"
+                    logger.warning(f"⚠️ [AKShare-PE计算-第2层失败] 亏损股票，EPS={eps_for_pe}")
+                else:
+                    metrics["pe"] = "N/A"
+                    logger.error(f"❌ [AKShare-PE计算-全部失败] 无可用EPS数据")
+
+            # 🔥 如果实时PB计算失败，降级到传统计算方式
+            if pb_value is None:
+                logger.info(f"📊 [AKShare-PB计算-第2层] 尝试使用股价/BPS计算")
+
+                # 获取每股净资产 - 用于计算PB
+                bps_value = indicators_dict.get('每股净资产_最新股数')
+                if bps_value is not None and str(bps_value) != 'nan' and bps_value != '--':
+                    try:
+                        bps_val = float(bps_value)
+                        if bps_val > 0:
+                            # 计算PB = 股价 / 每股净资产
+                            pb_val = price_value / bps_val
+                            metrics["pb"] = f"{pb_val:.2f}倍"
+                            logger.info(f"✅ [AKShare-PB计算-第2层成功] PB: 股价{price_value} / BPS{bps_val} = {metrics['pb']}")
+                        else:
+                            metrics["pb"] = "N/A"
+                            logger.warning(f"⚠️ [AKShare-PB计算-第2层失败] BPS无效: {bps_val}")
+                    except (ValueError, TypeError) as e:
                         metrics["pb"] = "N/A"
-                except (ValueError, TypeError):
+                        logger.error(f"❌ [AKShare-PB计算-第2层异常] {e}")
+                else:
                     metrics["pb"] = "N/A"
-            else:
-                metrics["pb"] = "N/A"
+                    logger.error(f"❌ [AKShare-PB计算-全部失败] 无可用BPS数据")
 
             # 尝试获取其他指标
             # 总资产收益率(ROA)
