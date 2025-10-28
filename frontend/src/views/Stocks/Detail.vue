@@ -38,6 +38,22 @@
           <div class="item"><span>换手率</span><b>{{ fmtPercent(quote.turnover) }}</b></div>
           <div class="item"><span>量比</span><b>{{ Number.isFinite(quote.volumeRatio) ? quote.volumeRatio.toFixed(2) : '-' }}</b></div>
         </div>
+        <!-- 同步状态提示 -->
+        <div class="sync-status" v-if="syncStatus">
+          <el-icon><Clock /></el-icon>
+          <span class="sync-info">
+            后端同步: {{ syncStatus.last_sync_time || '未同步' }}
+            <span v-if="syncStatus.interval_minutes">(每{{ syncStatus.interval_minutes }}分钟)</span>
+            <el-tag
+              v-if="syncStatus.data_source"
+              size="small"
+              type="success"
+              style="margin-left: 4px"
+            >
+              {{ syncStatus.data_source }}
+            </el-tag>
+          </span>
+        </div>
       </div>
     </el-card>
 
@@ -247,6 +263,7 @@ import { CreditCard } from '@element-plus/icons-vue'
 import { marked } from 'marked'
 import { stocksApi } from '@/api/stocks'
 import { analysisApi } from '@/api/analysis'
+import { ApiClient } from '@/api/request'
 import { use as echartsUse } from 'echarts/core'
 import { CandlestickChart } from 'echarts/charts'
 
@@ -349,6 +366,9 @@ const lastRefreshAt = ref<Date | null>(null)
 const refreshText = computed(() => lastRefreshAt.value ? `已刷新 ${lastRefreshAt.value.toLocaleTimeString()}` : '未刷新')
 const changeClass = computed(() => quote.changePercent > 0 ? 'up' : quote.changePercent < 0 ? 'down' : '')
 
+// 同步状态
+const syncStatus = ref<any>(null)
+
 async function refreshMockQuote() {
   // 改为调用后端接口获取真实数据
   await fetchQuote()
@@ -403,6 +423,16 @@ async function fetchFundamentals() {
   }
 }
 
+async function fetchSyncStatus() {
+  try {
+    const res = await ApiClient.get('/api/stock-data/quotes/sync-status')
+    const d: any = (res as any)?.data || {}
+    syncStatus.value = d
+  } catch (e) {
+    console.warn('获取同步状态失败', e)
+  }
+}
+
 let timer: any = null
 async function checkFavorite() {
   try {
@@ -421,7 +451,8 @@ onMounted(async () => {
     fetchKline(),
     fetchNews(),
     checkFavorite(),
-    fetchLatestAnalysis()  // 获取最新的历史分析报告
+    fetchLatestAnalysis(),  // 获取最新的历史分析报告
+    fetchSyncStatus()  // 获取同步状态
   ])
   // 每30秒刷新一次报价
   timer = setInterval(fetchQuote, 30000)
@@ -1094,5 +1125,31 @@ function exportReport() {
   word-wrap: break-word;
   word-break: break-word;
   white-space: pre-wrap;
+}
+
+/* 同步状态提示 */
+.sync-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: #f0f9ff;
+  border-radius: 6px;
+  border: 1px solid #bae6fd;
+  font-size: 13px;
+  color: #0369a1;
+}
+
+.sync-status .el-icon {
+  font-size: 14px;
+  color: #0284c7;
+}
+
+.sync-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
 }
 </style>
