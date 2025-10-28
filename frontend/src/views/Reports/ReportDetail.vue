@@ -350,7 +350,8 @@ const downloadReport = async () => {
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${report.value.stock_symbol}_${report.value.analysis_date}_report.md`
+    // 🔥 统一文件名格式：{code}_分析报告_{date}.md
+    a.download = `${report.value.stock_symbol}_分析报告_${report.value.analysis_date}.md`
     document.body.appendChild(a)
     a.click()
     window.URL.revokeObjectURL(url)

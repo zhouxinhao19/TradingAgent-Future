@@ -355,7 +355,8 @@ const downloadReport = async (analysis: AnalysisTask) => {
     a.href = url
     const code = (analysis as any).stock_code || (analysis as any).stock_symbol || 'stock'
     const dateStr = (analysis as any).analysis_date || (analysis as any).start_time || ''
-    a.download = `${code}_${String(dateStr).slice(0,10)}_report.md`
+    // 🔥 统一文件名格式：{code}_分析报告_{date}.md
+    a.download = `${code}_分析报告_${String(dateStr).slice(0,10)}.md`
     document.body.appendChild(a)
     a.click()
     window.URL.revokeObjectURL(url)

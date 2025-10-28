@@ -1421,7 +1421,8 @@ const downloadReport = async () => {
       analysisResults.value?.symbol ||
       'stock'
     const dateStr = analysisResults.value?.analysis_date || new Date().toISOString().slice(0, 10)
-    a.download = `${String(code)}_${String(dateStr).slice(0, 10)}_report.md`
+    // 🔥 统一文件名格式：{code}_分析报告_{date}.md
+    a.download = `${String(code)}_分析报告_${String(dateStr).slice(0, 10)}.md`
     document.body.appendChild(a)
     a.click()
     window.URL.revokeObjectURL(url)

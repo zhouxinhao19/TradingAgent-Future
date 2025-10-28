@@ -288,7 +288,8 @@ const downloadReport = async (report: any) => {
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${report.stock_code}_${report.analysis_date}_report.md`
+    // 🔥 统一文件名格式：{code}_分析报告_{date}.md
+    a.download = `${report.stock_code}_分析报告_${report.analysis_date}.md`
     document.body.appendChild(a)
     a.click()
     window.URL.revokeObjectURL(url)
