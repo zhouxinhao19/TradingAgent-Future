@@ -119,6 +119,10 @@ async def get_fundamentals(code: str, current_user: dict = Depends(get_current_u
     )
 
     # 4. 构建返回数据
+    # 🔥 优先使用实时市值，降级到 stock_basic_info 的静态市值
+    realtime_market_cap = realtime_metrics.get("market_cap")  # 实时市值（亿元）
+    total_mv = realtime_market_cap if realtime_market_cap else b.get("total_mv")
+
     data = {
         "code": code6,
         "name": b.get("name"),
@@ -134,7 +138,7 @@ async def get_fundamentals(code: str, current_user: dict = Depends(get_current_u
         "pe_ttm": realtime_metrics.get("pe_ttm") or b.get("pe_ttm"),
         "pb_mrq": realtime_metrics.get("pb_mrq") or b.get("pb_mrq"),
 
-        # 🔥 市销率（PS）- 动态计算
+        # 🔥 市销率（PS）- 动态计算（使用实时市值）
         "ps": None,
         "ps_ttm": None,
 
@@ -149,9 +153,12 @@ async def get_fundamentals(code: str, current_user: dict = Depends(get_current_u
         # 负债率（从 stock_financial_data 获取）
         "debt_ratio": None,
 
-        # 市值：已在同步服务中转换为亿元
-        "total_mv": b.get("total_mv"),
+        # 市值：优先使用实时市值，降级到静态市值
+        "total_mv": total_mv,
         "circ_mv": b.get("circ_mv"),
+
+        # 🔥 市值来源标识
+        "mv_is_realtime": bool(realtime_market_cap),
 
         # 交易指标（可能为空）
         "turnover_rate": b.get("turnover_rate"),
@@ -174,15 +181,14 @@ async def get_fundamentals(code: str, current_user: dict = Depends(get_current_u
         if data["debt_ratio"] is None:
             data["debt_ratio"] = financial_data.get("debt_to_assets")
 
-        # 🔥 动态计算 PS（市销率）
+        # 🔥 动态计算 PS（市销率）- 使用实时市值
         # 优先使用 TTM 营业收入，如果没有则使用单期营业收入
         revenue_ttm = financial_data.get("revenue_ttm")
         revenue = financial_data.get("revenue")
         revenue_for_ps = revenue_ttm if revenue_ttm and revenue_ttm > 0 else revenue
 
         if revenue_for_ps and revenue_for_ps > 0:
-            # 市值（亿元）
-            total_mv = b.get("total_mv")
+            # 🔥 使用实时市值（如果有），否则使用静态市值
             if total_mv and total_mv > 0:
                 # 营业收入单位：元，需要转换为亿元
                 revenue_yi = revenue_for_ps / 100000000

@@ -808,6 +808,28 @@ class OptimizedChinaDataProvider:
     def _get_real_financial_metrics(self, symbol: str, price_value: float) -> dict:
         """获取真实财务指标 - 优先使用数据库缓存，再使用API"""
         try:
+            # 🔥 优先从 market_quotes 获取实时股价，替换传入的 price_value
+            from tradingagents.config.database_manager import get_database_manager
+            db_manager = get_database_manager()
+            if db_manager.is_mongodb_available():
+                try:
+                    client = db_manager.get_mongodb_client()
+                    db = client['tradingagents']
+
+                    # 标准化股票代码为6位
+                    code6 = symbol.replace('.SH', '').replace('.SZ', '').zfill(6)
+
+                    # 从 market_quotes 获取实时股价
+                    quote = db.market_quotes.find_one({"code": code6})
+                    if quote and quote.get("close"):
+                        realtime_price = float(quote.get("close"))
+                        logger.info(f"✅ 从 market_quotes 获取实时股价: {code6} = {realtime_price}元 (原价格: {price_value}元)")
+                        price_value = realtime_price
+                    else:
+                        logger.info(f"⚠️ market_quotes 中未找到{code6}的实时股价，使用传入价格: {price_value}元")
+                except Exception as e:
+                    logger.warning(f"⚠️ 从 market_quotes 获取实时股价失败: {e}，使用传入价格: {price_value}元")
+
             # 第一优先级：从 MongoDB stock_financial_data 集合获取标准化财务数据
             from tradingagents.config.runtime_settings import use_app_cache_enabled
             if use_app_cache_enabled(False):
