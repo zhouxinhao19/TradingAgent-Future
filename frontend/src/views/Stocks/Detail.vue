@@ -425,7 +425,7 @@ async function fetchFundamentals() {
 
 async function fetchSyncStatus() {
   try {
-    const res = await ApiClient.get('/api/stock-data/quotes/sync-status')
+    const res = await ApiClient.get('/api/stock-data/sync-status/quotes')
     const d: any = (res as any)?.data || {}
     syncStatus.value = d
   } catch (e) {

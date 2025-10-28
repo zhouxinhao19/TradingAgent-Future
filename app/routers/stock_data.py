@@ -318,7 +318,7 @@ async def get_market_summary(
         )
 
 
-@router.get("/quotes/sync-status")
+@router.get("/sync-status/quotes")
 async def get_quotes_sync_status(
     current_user: dict = Depends(get_current_user)
 ):
@@ -345,16 +345,16 @@ async def get_quotes_sync_status(
         from app.services.quotes_ingestion_service import QuotesIngestionService
 
         service = QuotesIngestionService()
-        status = await service.get_sync_status()
+        status_data = await service.get_sync_status()
 
         return {
             "success": True,
-            "data": status,
+            "data": status_data,
             "message": "获取成功"
         }
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"获取市场概览失败: {str(e)}"
+            detail=f"获取同步状态失败: {str(e)}"
         )
