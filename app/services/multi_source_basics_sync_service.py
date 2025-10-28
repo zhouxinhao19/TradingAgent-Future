@@ -166,6 +166,8 @@ class MultiSourceBasicsSyncService:
             batch_size = 500  # 🔥 每批处理 500 只股票，避免超时
             total_stocks = len(stock_df)
 
+            logger.info(f"🚀 开始处理 {total_stocks} 只股票，数据源: {source_used}")
+
             for idx, (_, row) in enumerate(stock_df.iterrows(), 1):
                 try:
                     # 提取基础信息
@@ -245,11 +247,12 @@ class MultiSourceBasicsSyncService:
                 if len(ops) >= batch_size or idx == total_stocks:
                     if ops:
                         try:
-                            logger.info(f"📝 执行批量写入: {len(ops)} 条记录 ({idx}/{total_stocks})")
+                            progress_pct = (idx / total_stocks) * 100
+                            logger.info(f"📝 执行批量写入: {len(ops)} 条记录 ({idx}/{total_stocks}, {progress_pct:.1f}%)")
                             result = await db[COLLECTION_NAME].bulk_write(ops, ordered=False)
                             inserted += result.upserted_count
                             updated += result.modified_count
-                            logger.info(f"✅ 批量写入完成: 新增 {result.upserted_count}, 更新 {result.modified_count}")
+                            logger.info(f"✅ 批量写入完成: 新增 {result.upserted_count}, 更新 {result.modified_count} | 累计: 新增 {inserted}, 更新 {updated}, 错误 {errors}")
                         except Exception as e:
                             logger.error(f"❌ 批量写入失败: {e}")
                             errors += len(ops)

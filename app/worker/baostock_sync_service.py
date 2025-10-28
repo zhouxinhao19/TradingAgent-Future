@@ -115,26 +115,118 @@ class BaoStockSyncService:
             return stats
     
     async def _sync_basic_info_batch(self, stock_batch: List[Dict[str, Any]]) -> BaoStockSyncStats:
-        """同步基础信息批次"""
+        """同步基础信息批次（包含估值数据和总市值）"""
         stats = BaoStockSyncStats()
-        
+
         for stock in stock_batch:
             try:
                 code = stock['code']
+
+                # 1. 获取基础信息
                 basic_info = await self.provider.get_stock_basic_info(code)
-                
-                if basic_info:
-                    # 更新数据库
-                    await self._update_stock_basic_info(basic_info)
-                    stats.basic_info_count += 1
-                else:
+
+                if not basic_info:
                     stats.errors.append(f"获取{code}基础信息失败")
-                    
+                    continue
+
+                # 2. 获取估值数据（PE、PB、PS、PCF等）
+                try:
+                    valuation_data = await self.provider.get_valuation_data(code)
+                    if valuation_data:
+                        # 合并估值数据到基础信息
+                        basic_info['pe'] = valuation_data.get('pe_ttm')  # 市盈率（TTM）
+                        basic_info['pb'] = valuation_data.get('pb_mrq')  # 市净率（MRQ）
+                        basic_info['pe_ttm'] = valuation_data.get('pe_ttm')
+                        basic_info['pb_mrq'] = valuation_data.get('pb_mrq')
+                        basic_info['ps'] = valuation_data.get('ps_ttm')  # 市销率
+                        basic_info['pcf'] = valuation_data.get('pcf_ttm')  # 市现率
+                        basic_info['close'] = valuation_data.get('close')  # 最新价格
+
+                        # 3. 计算总市值（需要获取总股本）
+                        close_price = valuation_data.get('close')
+                        if close_price and close_price > 0:
+                            # 尝试从财务数据获取总股本
+                            total_shares_wan = await self._get_total_shares(code)
+                            if total_shares_wan and total_shares_wan > 0:
+                                # 总市值（亿元）= 股价（元）× 总股本（万股）/ 10000
+                                total_mv_yi = (close_price * total_shares_wan) / 10000
+                                basic_info['total_mv'] = total_mv_yi
+                                logger.debug(f"✅ {code} 总市值计算: {close_price}元 × {total_shares_wan}万股 / 10000 = {total_mv_yi:.2f}亿元")
+                            else:
+                                logger.debug(f"⚠️ {code} 无法获取总股本，跳过市值计算")
+
+                        logger.debug(f"✅ {code} 估值数据: PE={basic_info.get('pe')}, PB={basic_info.get('pb')}, 市值={basic_info.get('total_mv')}")
+                except Exception as e:
+                    logger.warning(f"⚠️ 获取{code}估值数据失败: {e}")
+                    # 估值数据获取失败不影响基础信息同步
+
+                # 4. 更新数据库
+                await self._update_stock_basic_info(basic_info)
+                stats.basic_info_count += 1
+
             except Exception as e:
                 stats.errors.append(f"处理{stock.get('code', 'unknown')}失败: {e}")
-        
+
         return stats
     
+    async def _get_total_shares(self, code: str) -> Optional[float]:
+        """
+        获取股票总股本（万股）
+
+        Args:
+            code: 股票代码
+
+        Returns:
+            总股本（万股），如果获取失败返回 None
+        """
+        try:
+            # 尝试从财务数据获取总股本
+            financial_data = await self.provider.get_financial_data(code)
+
+            if financial_data:
+                # BaoStock 财务数据中的总股本字段
+                # 盈利能力数据中有 totalShare（总股本，单位：万股）
+                profit_data = financial_data.get('profit_data', {})
+                if profit_data:
+                    total_shares = profit_data.get('totalShare')
+                    if total_shares:
+                        return self._safe_float(total_shares)
+
+                # 成长能力数据中也可能有总股本
+                growth_data = financial_data.get('growth_data', {})
+                if growth_data:
+                    total_shares = growth_data.get('totalShare')
+                    if total_shares:
+                        return self._safe_float(total_shares)
+
+            # 如果财务数据中没有，尝试从数据库中已有的数据获取
+            collection = self.db.stock_financial_data
+            doc = await collection.find_one(
+                {"code": code},
+                {"total_shares": 1, "totalShare": 1},
+                sort=[("report_period", -1)]
+            )
+
+            if doc:
+                total_shares = doc.get('total_shares') or doc.get('totalShare')
+                if total_shares:
+                    return self._safe_float(total_shares)
+
+            return None
+
+        except Exception as e:
+            logger.debug(f"获取{code}总股本失败: {e}")
+            return None
+
+    def _safe_float(self, value) -> Optional[float]:
+        """安全转换为浮点数"""
+        try:
+            if value is None or value == '' or value == 'None':
+                return None
+            return float(value)
+        except (ValueError, TypeError):
+            return None
+
     async def _update_stock_basic_info(self, basic_info: Dict[str, Any]):
         """更新股票基础信息到数据库"""
         try:
