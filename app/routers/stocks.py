@@ -134,9 +134,9 @@ async def get_fundamentals(code: str, current_user: dict = Depends(get_current_u
         "pe_ttm": realtime_metrics.get("pe_ttm") or b.get("pe_ttm"),
         "pb_mrq": realtime_metrics.get("pb_mrq") or b.get("pb_mrq"),
 
-        # 🔥 新增：市销率（PS）
-        "ps": b.get("ps"),  # 市销率（Price-to-Sales Ratio）
-        "ps_ttm": b.get("ps_ttm"),  # 市销率（TTM）
+        # 🔥 市销率（PS）- 动态计算
+        "ps": None,
+        "ps_ttm": None,
 
         # PE/PB 数据来源标识
         "pe_source": realtime_metrics.get("source", "unknown"),
@@ -160,7 +160,7 @@ async def get_fundamentals(code: str, current_user: dict = Depends(get_current_u
         "updated_at": b.get("updated_at"),
     }
 
-    # 5. 从财务数据中提取 ROE 和负债率
+    # 5. 从财务数据中提取 ROE、负债率和计算 PS
     if financial_data:
         # ROE（净资产收益率）
         if financial_data.get("financial_indicators"):
@@ -173,6 +173,22 @@ async def get_fundamentals(code: str, current_user: dict = Depends(get_current_u
             data["roe"] = financial_data.get("roe")
         if data["debt_ratio"] is None:
             data["debt_ratio"] = financial_data.get("debt_to_assets")
+
+        # 🔥 动态计算 PS（市销率）
+        # 优先使用 TTM 营业收入，如果没有则使用单期营业收入
+        revenue_ttm = financial_data.get("revenue_ttm")
+        revenue = financial_data.get("revenue")
+        revenue_for_ps = revenue_ttm if revenue_ttm and revenue_ttm > 0 else revenue
+
+        if revenue_for_ps and revenue_for_ps > 0:
+            # 市值（亿元）
+            total_mv = b.get("total_mv")
+            if total_mv and total_mv > 0:
+                # 营业收入单位：元，需要转换为亿元
+                revenue_yi = revenue_for_ps / 100000000
+                ps_calculated = total_mv / revenue_yi
+                data["ps"] = round(ps_calculated, 2)
+                data["ps_ttm"] = round(ps_calculated, 2) if revenue_ttm else None
 
     # 6. 如果财务数据中没有 ROE，使用 stock_basic_info 中的
     if data["roe"] is None:
