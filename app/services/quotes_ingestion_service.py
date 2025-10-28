@@ -27,6 +27,7 @@ class QuotesIngestionService:
 
     def __init__(self, collection_name: str = "market_quotes") -> None:
         self.collection_name = collection_name
+        self.status_collection_name = "quotes_ingestion_status"  # 状态记录集合
         self.tz = ZoneInfo(settings.TIMEZONE)
 
         # 接口轮换状态
@@ -49,6 +50,109 @@ class QuotesIngestionService:
             await coll.create_index("updated_at")
         except Exception as e:
             logger.warning(f"创建行情表索引失败（忽略）: {e}")
+
+    async def _record_sync_status(
+        self,
+        success: bool,
+        source: Optional[str] = None,
+        records_count: int = 0,
+        error_msg: Optional[str] = None
+    ) -> None:
+        """
+        记录同步状态
+
+        Args:
+            success: 是否成功
+            source: 数据源名称
+            records_count: 记录数量
+            error_msg: 错误信息
+        """
+        try:
+            db = get_mongo_db()
+            status_coll = db[self.status_collection_name]
+
+            now = datetime.now(self.tz)
+
+            status_doc = {
+                "job": "quotes_ingestion",
+                "last_sync_time": now,
+                "last_sync_time_iso": now.isoformat(),
+                "success": success,
+                "data_source": source,
+                "records_count": records_count,
+                "interval_seconds": settings.QUOTES_INGEST_INTERVAL_SECONDS,
+                "error_message": error_msg,
+                "updated_at": now,
+            }
+
+            await status_coll.update_one(
+                {"job": "quotes_ingestion"},
+                {"$set": status_doc},
+                upsert=True
+            )
+
+        except Exception as e:
+            logger.warning(f"记录同步状态失败（忽略）: {e}")
+
+    async def get_sync_status(self) -> Dict[str, any]:
+        """
+        获取同步状态
+
+        Returns:
+            {
+                "last_sync_time": "2025-10-28 15:06:00",
+                "last_sync_time_iso": "2025-10-28T15:06:00+08:00",
+                "interval_seconds": 360,
+                "interval_minutes": 6,
+                "data_source": "tushare",
+                "success": True,
+                "records_count": 5440,
+                "error_message": None
+            }
+        """
+        try:
+            db = get_mongo_db()
+            status_coll = db[self.status_collection_name]
+
+            doc = await status_coll.find_one({"job": "quotes_ingestion"})
+
+            if not doc:
+                return {
+                    "last_sync_time": None,
+                    "last_sync_time_iso": None,
+                    "interval_seconds": settings.QUOTES_INGEST_INTERVAL_SECONDS,
+                    "interval_minutes": settings.QUOTES_INGEST_INTERVAL_SECONDS / 60,
+                    "data_source": None,
+                    "success": None,
+                    "records_count": 0,
+                    "error_message": "尚未执行过同步"
+                }
+
+            # 移除 _id 字段
+            doc.pop("_id", None)
+            doc.pop("job", None)
+
+            # 添加分钟数
+            doc["interval_minutes"] = doc.get("interval_seconds", 0) / 60
+
+            # 格式化时间
+            if "last_sync_time" in doc and doc["last_sync_time"]:
+                doc["last_sync_time"] = doc["last_sync_time"].strftime("%Y-%m-%d %H:%M:%S")
+
+            return doc
+
+        except Exception as e:
+            logger.error(f"获取同步状态失败: {e}")
+            return {
+                "last_sync_time": None,
+                "last_sync_time_iso": None,
+                "interval_seconds": settings.QUOTES_INGEST_INTERVAL_SECONDS,
+                "interval_minutes": settings.QUOTES_INGEST_INTERVAL_SECONDS / 60,
+                "data_source": None,
+                "success": None,
+                "records_count": 0,
+                "error_message": f"获取状态失败: {str(e)}"
+            }
 
     def _check_tushare_permission(self) -> bool:
         """
@@ -159,6 +263,19 @@ class QuotesIngestionService:
             return "akshare", "sina"
 
     def _is_trading_time(self, now: Optional[datetime] = None) -> bool:
+        """
+        判断是否在交易时间或收盘后缓冲期
+
+        交易时间：
+        - 上午：9:30-11:30
+        - 下午：13:00-15:00
+        - 收盘后缓冲期：15:00-15:30（确保获取到收盘价）
+
+        收盘后缓冲期说明：
+        - 交易时间结束后继续获取30分钟
+        - 假设6分钟一次，可以增加3次同步机会（15:06, 15:12, 15:18）
+        - 大大降低错过收盘价的风险
+        """
         now = now or datetime.now(self.tz)
         # 工作日 Mon-Fri
         if now.weekday() > 4:
@@ -168,8 +285,10 @@ class QuotesIngestionService:
         morning = dtime(9, 30)
         noon = dtime(11, 30)
         afternoon_start = dtime(13, 0)
-        afternoon_end = dtime(15, 0)
-        return (morning <= t <= noon) or (afternoon_start <= t <= afternoon_end)
+        # 收盘后缓冲期（延长30分钟到15:30）
+        buffer_end = dtime(15, 30)
+
+        return (morning <= t <= noon) or (afternoon_start <= t <= buffer_end)
 
     async def _collection_empty(self) -> bool:
         db = get_mongo_db()
@@ -361,6 +480,13 @@ class QuotesIngestionService:
 
             if not quotes_map:
                 logger.warning(f"⚠️ {source_name or source_type} 未获取到行情数据，跳过本次入库")
+                # 记录失败状态
+                await self._record_sync_status(
+                    success=False,
+                    source=source_name or source_type,
+                    records_count=0,
+                    error_msg="未获取到行情数据"
+                )
                 return
 
             # 获取交易日
@@ -373,6 +499,21 @@ class QuotesIngestionService:
             # 入库
             await self._bulk_upsert(quotes_map, trade_date, source_name)
 
+            # 记录成功状态
+            await self._record_sync_status(
+                success=True,
+                source=source_name,
+                records_count=len(quotes_map),
+                error_msg=None
+            )
+
         except Exception as e:
             logger.error(f"❌ 行情入库失败: {e}")
+            # 记录失败状态
+            await self._record_sync_status(
+                success=False,
+                source=None,
+                records_count=0,
+                error_msg=str(e)
+            )
 

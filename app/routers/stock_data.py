@@ -271,16 +271,16 @@ async def get_market_summary(
 ):
     """
     获取市场概览
-    
+
     Returns:
         dict: 各市场的股票数量统计
     """
     try:
         from app.core.database import get_mongo_db
-        
+
         db = get_mongo_db()
         collection = db.stock_basic_info
-        
+
         # 统计各市场股票数量
         pipeline = [
             {
@@ -293,13 +293,13 @@ async def get_market_summary(
                 "$sort": {"count": -1}
             }
         ]
-        
+
         cursor = collection.aggregate(pipeline)
         market_stats = await cursor.to_list(length=None)
-        
+
         # 总数统计
         total_count = await collection.count_documents({})
-        
+
         return {
             "success": True,
             "data": {
@@ -308,6 +308,42 @@ async def get_market_summary(
                 "supported_markets": ["CN"],  # 当前支持的市场
                 "last_updated": None  # 可以从数据中获取最新更新时间
             },
+            "message": "获取成功"
+        }
+
+
+@router.get("/quotes/sync-status")
+async def get_quotes_sync_status(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    获取实时行情同步状态
+
+    Returns:
+        dict: {
+            "success": True,
+            "data": {
+                "last_sync_time": "2025-10-28 15:06:00",
+                "last_sync_time_iso": "2025-10-28T15:06:00+08:00",
+                "interval_seconds": 360,
+                "interval_minutes": 6,
+                "data_source": "tushare",
+                "success": True,
+                "records_count": 5440,
+                "error_message": None
+            },
+            "message": "获取成功"
+        }
+    """
+    try:
+        from app.services.quotes_ingestion_service import QuotesIngestionService
+
+        service = QuotesIngestionService()
+        status = await service.get_sync_status()
+
+        return {
+            "success": True,
+            "data": status,
             "message": "获取成功"
         }
         
