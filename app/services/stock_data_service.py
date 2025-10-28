@@ -119,11 +119,12 @@ class StockDataService:
             return None
     
     async def get_stock_list(
-        self, 
+        self,
         market: Optional[str] = None,
         industry: Optional[str] = None,
         page: int = 1,
-        page_size: int = 20
+        page_size: int = 20,
+        source: Optional[str] = None
     ) -> List[StockBasicInfoExtended]:
         """
         获取股票列表
@@ -132,34 +133,52 @@ class StockDataService:
             industry: 行业筛选
             page: 页码
             page_size: 每页大小
+            source: 数据源（可选），默认使用优先级最高的数据源
         Returns:
             List[StockBasicInfoExtended]: 股票列表
         """
         try:
             db = get_mongo_db()
-            
+
+            # 🔥 获取数据源优先级配置
+            if not source:
+                from app.core.unified_config import UnifiedConfigManager
+                config = UnifiedConfigManager()
+                data_source_configs = await config.get_data_source_configs_async()
+
+                # 提取启用的数据源，按优先级排序
+                enabled_sources = [
+                    ds.type.lower() for ds in data_source_configs
+                    if ds.enabled and ds.type.lower() in ['tushare', 'akshare', 'baostock']
+                ]
+
+                if not enabled_sources:
+                    enabled_sources = ['tushare', 'akshare', 'baostock']
+
+                source = enabled_sources[0] if enabled_sources else 'tushare'
+
             # 构建查询条件
-            query = {}
+            query = {"source": source}  # 🔥 添加数据源筛选
             if market:
                 query["market"] = market
             if industry:
                 query["industry"] = industry
-            
+
             # 分页查询
             skip = (page - 1) * page_size
             cursor = db[self.basic_info_collection].find(
-                query, 
+                query,
                 {"_id": 0}
             ).skip(skip).limit(page_size)
-            
+
             docs = await cursor.to_list(length=page_size)
-            
+
             # 数据标准化处理
             result = []
             for doc in docs:
                 standardized_doc = self._standardize_basic_info(doc)
                 result.append(StockBasicInfoExtended(**standardized_doc))
-            
+
             return result
             
         except Exception as e:

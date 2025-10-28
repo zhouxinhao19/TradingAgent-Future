@@ -42,8 +42,31 @@ async def get_quote(code: str, current_user: dict = Depends(get_current_user)):
 
     # 行情
     q = await db["market_quotes"].find_one({"code": code6}, {"_id": 0})
-    # 基础信息
-    b = await db["stock_basic_info"].find_one({"code": code6}, {"_id": 0})
+
+    # 🔥 基础信息 - 按数据源优先级查询
+    from app.core.unified_config import UnifiedConfigManager
+    config = UnifiedConfigManager()
+    data_source_configs = await config.get_data_source_configs_async()
+
+    # 提取启用的数据源，按优先级排序
+    enabled_sources = [
+        ds.type.lower() for ds in data_source_configs
+        if ds.enabled and ds.type.lower() in ['tushare', 'akshare', 'baostock']
+    ]
+
+    if not enabled_sources:
+        enabled_sources = ['tushare', 'akshare', 'baostock']
+
+    # 按优先级查询基础信息
+    b = None
+    for src in enabled_sources:
+        b = await db["stock_basic_info"].find_one({"code": code6, "source": src}, {"_id": 0})
+        if b:
+            break
+
+    # 如果所有数据源都没有，尝试不带 source 条件查询（兼容旧数据）
+    if not b:
+        b = await db["stock_basic_info"].find_one({"code": code6}, {"_id": 0})
 
     if not q and not b:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="未找到该股票的任何信息")
