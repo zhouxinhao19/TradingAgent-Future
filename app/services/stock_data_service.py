@@ -169,13 +169,15 @@ class StockDataService:
     async def update_stock_basic_info(
         self,
         symbol: str,
-        update_data: Dict[str, Any]
+        update_data: Dict[str, Any],
+        source: str = "tushare"
     ) -> bool:
         """
         更新股票基础信息
         Args:
             symbol: 6位股票代码
             update_data: 更新数据
+            source: 数据源 (tushare/akshare/baostock)，默认 tushare
         Returns:
             bool: 更新是否成功
         """
@@ -190,9 +192,17 @@ class StockDataService:
             if "symbol" not in update_data:
                 update_data["symbol"] = symbol6
 
-            # 执行更新 (使用symbol字段)
+            # 🔥 确保 code 字段存在
+            if "code" not in update_data:
+                update_data["code"] = symbol6
+
+            # 🔥 确保 source 字段存在
+            if "source" not in update_data:
+                update_data["source"] = source
+
+            # 🔥 执行更新 (使用 code + source 联合查询)
             result = await db[self.basic_info_collection].update_one(
-                {"symbol": symbol6},
+                {"code": symbol6, "source": source},
                 {"$set": update_data},
                 upsert=True
             )
@@ -200,7 +210,7 @@ class StockDataService:
             return result.modified_count > 0 or result.upserted_id is not None
 
         except Exception as e:
-            logger.error(f"更新股票基础信息失败 symbol={symbol}: {e}")
+            logger.error(f"更新股票基础信息失败 symbol={symbol}, source={source}: {e}")
             return False
     
     async def update_market_quotes(

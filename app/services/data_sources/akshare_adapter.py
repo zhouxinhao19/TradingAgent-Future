@@ -150,13 +150,16 @@ class AKShareAdapter(DataSourceAdapter):
                             value = row.get('value', '')
                             info_dict[item] = value
                         latest_price = self._safe_float(info_dict.get('最新', 0))
-                        total_mv = self._safe_float(info_dict.get('总市值', 0))
+                        # 🔥 AKShare 的"总市值"单位是亿元，需要转换为万元（与 Tushare 一致）
+                        # 后续会由 add_financial_metrics() 统一转换为亿元存储
+                        total_mv_yi = self._safe_float(info_dict.get('总市值', 0))  # 亿元
+                        total_mv_wan = total_mv_yi * 10000 if total_mv_yi else None  # 转换为万元
                         basic_data.append({
                             'ts_code': ts_code,
                             'trade_date': trade_date,
                             'name': name,
                             'close': latest_price,
-                            'total_mv': total_mv,
+                            'total_mv': total_mv_wan,  # 万元（与 Tushare 一致）
                             'turnover_rate': None,
                             'pe': None,
                             'pb': None,

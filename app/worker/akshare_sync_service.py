@@ -162,10 +162,18 @@ class AKShareSyncService:
                     else:
                         basic_data = basic_info
                     
-                    # 更新到数据库
+                    # 🔥 确保 source 字段存在
+                    if "source" not in basic_data:
+                        basic_data["source"] = "akshare"
+
+                    # 🔥 确保 symbol 字段存在
+                    if "symbol" not in basic_data:
+                        basic_data["symbol"] = code
+
+                    # 更新到数据库（使用 code + source 联合查询）
                     try:
                         await self.db.stock_basic_info.update_one(
-                            {"code": code},
+                            {"code": code, "source": "akshare"},
                             {"$set": basic_data},
                             upsert=True
                         )

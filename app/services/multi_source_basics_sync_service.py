@@ -208,7 +208,12 @@ class MultiSourceBasicsSyncService:
 
                     # 🔥 确定数据源标识
                     # 根据实际使用的数据源设置 source 字段
-                    data_source = source_used if source_used else "multi_source"
+                    # 注意：不再使用 "multi_source" 作为默认值，必须有明确的数据源
+                    if not source_used:
+                        logger.warning(f"⚠️ 股票 {code} 没有明确的数据源，跳过")
+                        errors += 1
+                        continue
+                    data_source = source_used
 
                     # 构建文档
                     doc = {

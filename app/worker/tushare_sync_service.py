@@ -158,8 +158,8 @@ class TushareSyncService:
                             batch_stats["skipped_count"] += 1
                             continue
 
-                # 更新到数据库
-                success = await self.stock_service.update_stock_basic_info(code, stock_data)
+                # 更新到数据库（指定数据源为 tushare）
+                success = await self.stock_service.update_stock_basic_info(code, stock_data, source="tushare")
                 if success:
                     batch_stats["success_count"] += 1
                 else:
