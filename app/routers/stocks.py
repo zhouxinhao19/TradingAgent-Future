@@ -5,11 +5,14 @@
 - 路径前缀在 main.py 中挂载为 /api，当前路由自身前缀为 /stocks
 """
 from typing import Optional, Dict, Any, List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+import logging
 
 from app.routers.auth_db import get_current_user
 from app.core.database import get_mongo_db
 from app.core.response import ok
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])
 
@@ -79,21 +82,57 @@ async def get_quote(code: str, current_user: dict = Depends(get_current_user)):
 
 
 @router.get("/{code}/fundamentals", response_model=dict)
-async def get_fundamentals(code: str, current_user: dict = Depends(get_current_user)):
+async def get_fundamentals(
+    code: str,
+    source: Optional[str] = Query(None, description="数据源 (tushare/akshare/baostock/multi_source)"),
+    current_user: dict = Depends(get_current_user)
+):
     """
     获取基础面快照（优先从 MongoDB 获取）
 
     数据来源优先级：
     1. stock_basic_info 集合（基础信息、估值指标）
     2. stock_financial_data 集合（财务指标：ROE、负债率等）
+
+    参数：
+    - code: 股票代码
+    - source: 数据源（可选），默认按优先级：tushare > multi_source > akshare > baostock
     """
     db = get_mongo_db()
     code6 = _zfill_code(code)
 
-    # 1. 获取基础信息
-    b = await db["stock_basic_info"].find_one({"code": code6}, {"_id": 0})
-    if not b:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="未找到该股票的基础信息")
+    # 1. 获取基础信息（支持数据源筛选）
+    query = {"code": code6}
+
+    if source:
+        # 指定数据源
+        query["source"] = source
+        b = await db["stock_basic_info"].find_one(query, {"_id": 0})
+        if not b:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"未找到该股票在数据源 {source} 中的基础信息"
+            )
+    else:
+        # 🔥 未指定数据源，按优先级查询
+        source_priority = ["tushare", "multi_source", "akshare", "baostock"]
+        b = None
+
+        for src in source_priority:
+            query_with_source = {"code": code6, "source": src}
+            b = await db["stock_basic_info"].find_one(query_with_source, {"_id": 0})
+            if b:
+                logger.info(f"✅ 使用数据源: {src} 查询股票 {code6}")
+                break
+
+        # 如果所有数据源都没有，尝试不带 source 条件查询（兼容旧数据）
+        if not b:
+            b = await db["stock_basic_info"].find_one({"code": code6}, {"_id": 0})
+            if b:
+                logger.warning(f"⚠️ 使用旧数据（无 source 字段）: {code6}")
+
+        if not b:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="未找到该股票的基础信息")
 
     # 2. 尝试从 stock_financial_data 获取最新财务指标
     financial_data = None

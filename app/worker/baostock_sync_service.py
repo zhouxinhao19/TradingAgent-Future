@@ -145,9 +145,13 @@ class BaoStockSyncService:
             if "symbol" not in basic_info and "code" in basic_info:
                 basic_info["symbol"] = basic_info["code"]
 
-            # 使用upsert更新或插入
+            # 🔥 确保 source 字段存在
+            if "source" not in basic_info:
+                basic_info["source"] = "baostock"
+
+            # 🔥 使用 (code, source) 联合查询条件
             await collection.update_one(
-                {"code": basic_info["code"]},
+                {"code": basic_info["code"], "source": "baostock"},
                 {"$set": basic_info},
                 upsert=True
             )

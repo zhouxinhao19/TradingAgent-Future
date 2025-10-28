@@ -204,6 +204,10 @@ class MultiSourceBasicsSyncService:
                     # 生成 full_symbol（确保不为空）
                     full_symbol = ts_code if ts_code else self._generate_full_symbol(code)
 
+                    # 🔥 确定数据源标识
+                    # 根据实际使用的数据源设置 source 字段
+                    data_source = source_used if source_used else "multi_source"
+
                     # 构建文档
                     doc = {
                         "code": code,
@@ -216,15 +220,15 @@ class MultiSourceBasicsSyncService:
                         "sse": sse,
                         "full_symbol": full_symbol,  # 添加 full_symbol 字段
                         "category": category,
-                        "source": "multi_source",
+                        "source": data_source,  # 🔥 使用实际数据源
                         "updated_at": datetime.now(),
                     }
 
                     # 添加财务指标
                     self._add_financial_metrics(doc, daily_metrics)
 
-                    # 创建更新操作
-                    ops.append(UpdateOne({"code": code}, {"$set": doc}, upsert=True))
+                    # 🔥 使用 (code, source) 联合查询条件
+                    ops.append(UpdateOne({"code": code, "source": data_source}, {"$set": doc}, upsert=True))
 
                 except Exception as e:
                     logger.error(f"Error processing stock {row.get('ts_code', 'unknown')}: {e}")
