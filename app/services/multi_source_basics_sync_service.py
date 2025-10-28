@@ -160,11 +160,13 @@ class MultiSourceBasicsSyncService:
                             daily_data_map[ts_code] = row.to_dict()
                     stats.data_sources_used.append(f"daily_data:{daily_source}")
 
-            # Step 5: 处理和更新数据
+            # Step 5: 处理和更新数据（分批处理）
             ops = []
             inserted = updated = errors = 0
+            batch_size = 500  # 🔥 每批处理 500 只股票，避免超时
+            total_stocks = len(stock_df)
 
-            for _, row in stock_df.iterrows():
+            for idx, (_, row) in enumerate(stock_df.iterrows(), 1):
                 try:
                     # 提取基础信息
                     name = row.get("name") or ""
@@ -234,14 +236,23 @@ class MultiSourceBasicsSyncService:
                     logger.error(f"Error processing stock {row.get('ts_code', 'unknown')}: {e}")
                     errors += 1
 
-            # Step 6: 批量执行数据库操作
-            if ops:
-                result = await db[COLLECTION_NAME].bulk_write(ops, ordered=False)
-                inserted = result.upserted_count
-                updated = result.modified_count
+                # 🔥 分批执行数据库操作
+                if len(ops) >= batch_size or idx == total_stocks:
+                    if ops:
+                        try:
+                            logger.info(f"📝 执行批量写入: {len(ops)} 条记录 ({idx}/{total_stocks})")
+                            result = await db[COLLECTION_NAME].bulk_write(ops, ordered=False)
+                            inserted += result.upserted_count
+                            updated += result.modified_count
+                            logger.info(f"✅ 批量写入完成: 新增 {result.upserted_count}, 更新 {result.modified_count}")
+                        except Exception as e:
+                            logger.error(f"❌ 批量写入失败: {e}")
+                            errors += len(ops)
+                        finally:
+                            ops = []  # 清空操作列表
 
             # Step 7: 更新统计信息
-            stats.total = len(ops)
+            stats.total = total_stocks  # 🔥 使用总股票数
             stats.inserted = inserted
             stats.updated = updated
             stats.errors = errors
@@ -250,7 +261,7 @@ class MultiSourceBasicsSyncService:
 
             await self._persist_status(db, stats.__dict__.copy())
             logger.info(
-                f"Multi-source sync finished: total={stats.total} inserted={inserted} "
+                f"✅ Multi-source sync finished: total={stats.total} inserted={inserted} "
                 f"updated={updated} errors={errors} sources={stats.data_sources_used}"
             )
             return stats.__dict__

@@ -19,9 +19,17 @@
 
 import asyncio
 import logging
+import sys
+from pathlib import Path
 from datetime import datetime
 from pymongo import ASCENDING
 from motor.motor_asyncio import AsyncIOMotorClient
+
+# 添加项目根目录到 Python 路径
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+from app.core.config import get_settings
 
 # 配置日志
 logging.basicConfig(
@@ -34,10 +42,11 @@ logger = logging.getLogger(__name__)
 
 async def migrate_stock_basic_info():
     """迁移 stock_basic_info 集合"""
-    
-    # 连接数据库
-    client = AsyncIOMotorClient("mongodb://localhost:27017")
-    db = client["tradingagents"]
+
+    # 🔥 使用配置文件中的连接信息
+    settings = get_settings()
+    client = AsyncIOMotorClient(settings.MONGO_URI)
+    db = client[settings.MONGO_DB]
     collection = db["stock_basic_info"]
     
     try:
@@ -115,23 +124,37 @@ async def migrate_stock_basic_info():
         else:
             logger.info("   ✅ 没有重复的 (code, source) 组合")
         
-        # 步骤4：删除旧的 code 唯一索引
-        logger.info("\n🗑️  步骤4：删除旧的 code 唯一索引")
+        # 步骤4：删除旧的唯一索引
+        logger.info("\n🗑️  步骤4：删除旧的唯一索引")
         indexes = await collection.index_information()
-        
+
         # 查找 code 唯一索引
         code_unique_index = None
         for idx_name, idx_info in indexes.items():
             if idx_info.get("unique") and idx_info.get("key") == [("code", 1)]:
                 code_unique_index = idx_name
                 break
-        
+
         if code_unique_index:
-            logger.info(f"   发现旧的唯一索引: {code_unique_index}")
+            logger.info(f"   发现旧的 code 唯一索引: {code_unique_index}")
             await collection.drop_index(code_unique_index)
             logger.info(f"   ✅ 已删除索引: {code_unique_index}")
         else:
             logger.info("   ⚠️ 未找到 code 唯一索引（可能已被删除）")
+
+        # 🔥 查找并删除 full_symbol 唯一索引
+        full_symbol_unique_index = None
+        for idx_name, idx_info in indexes.items():
+            if idx_info.get("unique") and idx_info.get("key") == [("full_symbol", 1)]:
+                full_symbol_unique_index = idx_name
+                break
+
+        if full_symbol_unique_index:
+            logger.info(f"   发现旧的 full_symbol 唯一索引: {full_symbol_unique_index}")
+            await collection.drop_index(full_symbol_unique_index)
+            logger.info(f"   ✅ 已删除索引: {full_symbol_unique_index}")
+        else:
+            logger.info("   ⚠️ 未找到 full_symbol 唯一索引（可能已被删除）")
         
         # 步骤5：创建新的 (code, source) 联合唯一索引
         logger.info("\n🔧 步骤5：创建新的 (code, source) 联合唯一索引")

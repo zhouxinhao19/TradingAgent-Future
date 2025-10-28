@@ -33,23 +33,18 @@ class BaoStockSyncStats:
 
 class BaoStockSyncService:
     """BaoStock数据同步服务"""
-    
-    def __init__(self, require_db: bool = True):
+
+    def __init__(self):
         """
         初始化同步服务
 
-        Args:
-            require_db: 是否需要数据库连接
+        注意：数据库连接在 initialize() 方法中异步初始化
         """
         try:
             self.settings = get_settings()
             self.provider = BaoStockProvider()
             self.historical_service = None  # 延迟初始化
-
-            if require_db:
-                self.db = get_database()
-            else:
-                self.db = None
+            self.db = None  # 🔥 延迟初始化，在 initialize() 中设置
 
             logger.info("✅ BaoStock同步服务初始化成功")
         except Exception as e:
@@ -59,6 +54,10 @@ class BaoStockSyncService:
     async def initialize(self):
         """异步初始化服务"""
         try:
+            # 🔥 初始化数据库连接（必须在异步上下文中）
+            from app.core.database import get_mongo_db
+            self.db = get_mongo_db()
+
             # 初始化历史数据服务
             if self.historical_service is None:
                 from app.services.historical_data_service import get_historical_data_service
@@ -476,6 +475,7 @@ async def run_baostock_basic_info_sync():
     """运行BaoStock基础信息同步任务"""
     try:
         service = BaoStockSyncService()
+        await service.initialize()  # 🔥 必须先初始化
         stats = await service.sync_stock_basic_info()
         logger.info(f"🎯 BaoStock基础信息同步完成: {stats.basic_info_count}条记录, {len(stats.errors)}个错误")
     except Exception as e:
@@ -486,6 +486,7 @@ async def run_baostock_daily_quotes_sync():
     """运行BaoStock日K线同步任务（最新交易日）"""
     try:
         service = BaoStockSyncService()
+        await service.initialize()  # 🔥 必须先初始化
         stats = await service.sync_daily_quotes()
         logger.info(f"🎯 BaoStock日K线同步完成: {stats.quotes_count}条记录, {len(stats.errors)}个错误")
     except Exception as e:
@@ -496,6 +497,7 @@ async def run_baostock_historical_sync():
     """运行BaoStock历史数据同步任务"""
     try:
         service = BaoStockSyncService()
+        await service.initialize()  # 🔥 必须先初始化
         stats = await service.sync_historical_data()
         logger.info(f"🎯 BaoStock历史数据同步完成: {stats.historical_records}条记录, {len(stats.errors)}个错误")
     except Exception as e:
@@ -506,6 +508,7 @@ async def run_baostock_status_check():
     """运行BaoStock状态检查任务"""
     try:
         service = BaoStockSyncService()
+        await service.initialize()  # 🔥 必须先初始化
         status = await service.check_service_status()
         logger.info(f"🔍 BaoStock服务状态: {status['status']}")
     except Exception as e:

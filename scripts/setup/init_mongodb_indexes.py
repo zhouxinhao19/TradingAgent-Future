@@ -44,7 +44,14 @@ def ensure_indexes():
         sbi.drop_index("uniq_code")
         print("✅ 已删除旧的 code 唯一索引")
     except Exception as e:
-        print(f"⚠️ 删除旧索引失败（可能不存在）: {e}")
+        print(f"⚠️ 删除 uniq_code 索引失败（可能不存在）: {e}")
+
+    try:
+        # 🔥 删除旧的 full_symbol 唯一索引（如果存在）
+        sbi.drop_index("full_symbol_1_unique")
+        print("✅ 已删除旧的 full_symbol 唯一索引")
+    except Exception as e:
+        print(f"⚠️ 删除 full_symbol_1_unique 索引失败（可能不存在）: {e}")
 
     # 创建新的联合唯一索引
     sbi.create_index([("code", ASCENDING), ("source", ASCENDING)], unique=True, name="uniq_code_source")
