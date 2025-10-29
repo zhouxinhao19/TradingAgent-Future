@@ -75,7 +75,9 @@ services:
       - "8000"
     volumes:
       - ./logs:/app/logs
-      - ./config:/app/config
+      # 不映射config目录，使用镜像内的配置文件
+      # 如需修改配置，请修改代码后重新构建镜像
+      # - ./config:/app/config
       - ./data:/app/data
     env_file:
       - .env
