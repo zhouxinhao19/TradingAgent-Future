@@ -38,6 +38,18 @@ class SimpleJsonFormatter(logging.Formatter):
         }
         return json.dumps(obj, ensure_ascii=False)
 
+
+def _parse_size(size_str: str) -> int:
+    """解析大小字符串（如 '10MB'）为字节数"""
+    if isinstance(size_str, int):
+        return size_str
+    if isinstance(size_str, str) and size_str.upper().endswith("MB"):
+        try:
+            return int(float(size_str[:-2]) * 1024 * 1024)
+        except Exception:
+            return 10 * 1024 * 1024
+    return 10 * 1024 * 1024
+
 def setup_logging(log_level: str = "INFO"):
     """
     设置应用日志配置：
@@ -83,22 +95,39 @@ def setup_logging(log_level: str = "INFO"):
             backup_count = int(file_handler_cfg.get("backup_count", 5))
 
             Path(file_dir).mkdir(parents=True, exist_ok=True)
-            webapi_log = str(Path(file_dir) / "webapi.log")
-            worker_log = str(Path(file_dir) / "worker.log")
-            error_log = str(Path(file_dir) / "error.log")
 
-            # 读取错误日志处理器配置
+            # 从TOML配置读取各个日志文件路径
+            main_handler_cfg = handlers_cfg.get("main", {})
+            webapi_handler_cfg = handlers_cfg.get("webapi", {})
+            worker_handler_cfg = handlers_cfg.get("worker", {})
+
+            # 主日志文件（tradingagents.log）
+            main_log = main_handler_cfg.get("filename", str(Path(file_dir) / "tradingagents.log"))
+            main_enabled = main_handler_cfg.get("enabled", True)
+            main_level = main_handler_cfg.get("level", "INFO")
+            main_max_bytes = _parse_size(main_handler_cfg.get("max_size", "100MB"))
+            main_backup_count = int(main_handler_cfg.get("backup_count", 5))
+
+            # WebAPI日志文件
+            webapi_log = webapi_handler_cfg.get("filename", str(Path(file_dir) / "webapi.log"))
+            webapi_enabled = webapi_handler_cfg.get("enabled", True)
+            webapi_level = webapi_handler_cfg.get("level", "DEBUG")
+            webapi_max_bytes = _parse_size(webapi_handler_cfg.get("max_size", "100MB"))
+            webapi_backup_count = int(webapi_handler_cfg.get("backup_count", 5))
+
+            # Worker日志文件
+            worker_log = worker_handler_cfg.get("filename", str(Path(file_dir) / "worker.log"))
+            worker_enabled = worker_handler_cfg.get("enabled", True)
+            worker_level = worker_handler_cfg.get("level", "DEBUG")
+            worker_max_bytes = _parse_size(worker_handler_cfg.get("max_size", "100MB"))
+            worker_backup_count = int(worker_handler_cfg.get("backup_count", 5))
+
+            # 错误日志文件
             error_handler_cfg = handlers_cfg.get("error", {})
+            error_log = error_handler_cfg.get("filename", str(Path(file_dir) / "error.log"))
             error_enabled = error_handler_cfg.get("enabled", True)
             error_level = error_handler_cfg.get("level", "WARNING")
-            error_max_bytes = error_handler_cfg.get("max_size", "10MB")
-            if isinstance(error_max_bytes, str) and error_max_bytes.upper().endswith("MB"):
-                try:
-                    error_max_bytes = int(float(error_max_bytes[:-2]) * 1024 * 1024)
-                except Exception:
-                    error_max_bytes = 10 * 1024 * 1024
-            elif not isinstance(error_max_bytes, int):
-                error_max_bytes = 10 * 1024 * 1024
+            error_max_bytes = _parse_size(error_handler_cfg.get("max_size", "100MB"))
             error_backup_count = int(error_handler_cfg.get("backup_count", 5))
 
             # JSON 开关：保持向后兼容（json/mode 仅控制台）；新增 file_json/file_mode 控制文件 handler
@@ -118,27 +147,46 @@ def setup_logging(log_level: str = "INFO"):
                     "filters": ["request_context"],
                     "stream": sys.stdout,
                 },
-                "file": {
-                    "class": "logging.handlers.RotatingFileHandler",
-                    "formatter": "json_file_fmt" if use_json_file else "file_fmt",
-                    "level": file_level,
-                    "filename": webapi_log,
-                    "maxBytes": max_bytes,
-                    "backupCount": backup_count,
-                    "encoding": "utf-8",
-                    "filters": ["request_context"],
-                },
-                "worker_file": {
-                    "class": "logging.handlers.RotatingFileHandler",
-                    "formatter": "json_file_fmt" if use_json_file else "file_fmt",
-                    "level": file_level,
-                    "filename": worker_log,
-                    "maxBytes": max_bytes,
-                    "backupCount": backup_count,
-                    "encoding": "utf-8",
-                    "filters": ["request_context"],
-                },
             }
+
+            # 主日志文件（tradingagents.log）
+            if main_enabled:
+                handlers_config["main_file"] = {
+                    "class": "logging.handlers.RotatingFileHandler",
+                    "formatter": "json_file_fmt" if use_json_file else "file_fmt",
+                    "level": main_level,
+                    "filename": main_log,
+                    "maxBytes": main_max_bytes,
+                    "backupCount": main_backup_count,
+                    "encoding": "utf-8",
+                    "filters": ["request_context"],
+                }
+
+            # WebAPI日志文件
+            if webapi_enabled:
+                handlers_config["file"] = {
+                    "class": "logging.handlers.RotatingFileHandler",
+                    "formatter": "json_file_fmt" if use_json_file else "file_fmt",
+                    "level": webapi_level,
+                    "filename": webapi_log,
+                    "maxBytes": webapi_max_bytes,
+                    "backupCount": webapi_backup_count,
+                    "encoding": "utf-8",
+                    "filters": ["request_context"],
+                }
+
+            # Worker日志文件
+            if worker_enabled:
+                handlers_config["worker_file"] = {
+                    "class": "logging.handlers.RotatingFileHandler",
+                    "formatter": "json_file_fmt" if use_json_file else "file_fmt",
+                    "level": worker_level,
+                    "filename": worker_log,
+                    "maxBytes": worker_max_bytes,
+                    "backupCount": worker_backup_count,
+                    "encoding": "utf-8",
+                    "filters": ["request_context"],
+                }
 
             # 添加错误日志处理器（如果启用）
             if error_enabled:
@@ -152,6 +200,29 @@ def setup_logging(log_level: str = "INFO"):
                     "encoding": "utf-8",
                     "filters": ["request_context"],
                 }
+
+            # 构建logger handlers列表
+            main_handlers = ["console"]
+            if main_enabled:
+                main_handlers.append("main_file")
+            if error_enabled:
+                main_handlers.append("error_file")
+
+            webapi_handlers = ["console"]
+            if webapi_enabled:
+                webapi_handlers.append("file")
+            if main_enabled:
+                webapi_handlers.append("main_file")
+            if error_enabled:
+                webapi_handlers.append("error_file")
+
+            worker_handlers = ["console"]
+            if worker_enabled:
+                worker_handlers.append("worker_file")
+            if main_enabled:
+                worker_handlers.append("main_file")
+            if error_enabled:
+                worker_handlers.append("error_file")
 
             logging_config = {
                 "version": 1,
@@ -177,28 +248,38 @@ def setup_logging(log_level: str = "INFO"):
                 },
                 "handlers": handlers_config,
                 "loggers": {
+                    "tradingagents": {
+                        "level": "INFO",
+                        "handlers": main_handlers,
+                        "propagate": False
+                    },
                     "webapi": {
                         "level": "INFO",
-                        "handlers": ["console", "file"] + (["error_file"] if error_enabled else []),
+                        "handlers": webapi_handlers,
                         "propagate": True
                     },
                     "worker": {
                         "level": "DEBUG",
-                        "handlers": ["console", "worker_file"] + (["error_file"] if error_enabled else []),
+                        "handlers": worker_handlers,
                         "propagate": False
                     },
                     "uvicorn": {
                         "level": "INFO",
-                        "handlers": ["console", "file"] + (["error_file"] if error_enabled else []),
+                        "handlers": webapi_handlers,
                         "propagate": False
                     },
                     "fastapi": {
                         "level": "INFO",
-                        "handlers": ["console", "file"] + (["error_file"] if error_enabled else []),
+                        "handlers": webapi_handlers,
+                        "propagate": False
+                    },
+                    "app": {
+                        "level": "INFO",
+                        "handlers": main_handlers,
                         "propagate": False
                     },
                 },
-                "root": {"level": level, "handlers": ["console"]},
+                "root": {"level": level, "handlers": main_handlers},
             }
             logging.config.dictConfig(logging_config)
             logging.getLogger("webapi").info(f"Logging configured from {cfg_path}")
