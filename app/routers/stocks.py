@@ -305,7 +305,8 @@ async def get_kline(code: str, period: str = "day", limit: int = 120, adj: str =
     from app.core.config import settings
     tz = ZoneInfo(settings.TIMEZONE)
     now = datetime.now(tz)
-    today_str = now.strftime("%Y%m%d")  # 格式：20251028
+    today_str_yyyymmdd = now.strftime("%Y%m%d")  # 格式：20251028（用于查询）
+    today_str_formatted = now.strftime("%Y-%m-%d")  # 格式：2025-10-28（用于返回）
 
     # 1. 优先从 MongoDB 缓存获取
     try:
@@ -360,8 +361,11 @@ async def get_kline(code: str, period: str = "day", limit: int = 120, adj: str =
     # 🔥 3. 检查是否需要添加当天实时数据（仅针对日线）
     if period == "day" and items:
         try:
-            # 检查历史数据中是否已有当天的数据
-            has_today_data = any(item.get("time") == today_str for item in items)
+            # 检查历史数据中是否已有当天的数据（支持两种日期格式）
+            has_today_data = any(
+                item.get("time") in [today_str_yyyymmdd, today_str_formatted]
+                for item in items
+            )
 
             # 判断是否在交易时间内
             current_time = now.time()
@@ -384,9 +388,9 @@ async def get_kline(code: str, period: str = "day", limit: int = 120, adj: str =
                 realtime_quote = await market_quotes_coll.find_one({"code": code_padded})
 
                 if realtime_quote:
-                    # 构造当天的K线数据
+                    # 🔥 构造当天的K线数据（使用统一的日期格式 YYYY-MM-DD）
                     today_kline = {
-                        "time": today_str,
+                        "time": today_str_formatted,  # 🔥 使用 YYYY-MM-DD 格式，与历史数据保持一致
                         "open": float(realtime_quote.get("open", 0)),
                         "high": float(realtime_quote.get("high", 0)),
                         "low": float(realtime_quote.get("low", 0)),
