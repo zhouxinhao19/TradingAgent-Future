@@ -337,12 +337,17 @@ _log_export_service: Optional[LogExportService] = None
 def get_log_export_service() -> LogExportService:
     """获取日志导出服务实例"""
     global _log_export_service
-    
+
     if _log_export_service is None:
         # 从配置中获取日志目录
-        from app.core.config import settings
-        log_dir = settings.log_dir if hasattr(settings, 'log_dir') else "./logs"
+        try:
+            from app.core.config import settings
+            log_dir = settings.log_dir
+        except Exception as e:
+            logger.warning(f"无法从配置获取日志目录: {e}，使用默认值 ./logs")
+            log_dir = "./logs"
+
         _log_export_service = LogExportService(log_dir=log_dir)
-    
+
     return _log_export_service
 
