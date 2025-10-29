@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from app.routers.auth_db import get_current_user
 from app.services.log_export_service import get_log_export_service
 
-router = APIRouter(prefix="/logs", tags=["日志管理"])
+router = APIRouter(prefix="/system-logs", tags=["系统日志"])
 logger = logging.getLogger("webapi")
 
 
