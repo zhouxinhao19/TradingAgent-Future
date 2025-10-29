@@ -128,11 +128,13 @@ async def sync_single_stock(
             (not request.sync_historical or result["historical_sync"].get("success", False)) and
             (not request.sync_financial or result["financial_sync"].get("success", False))
         )
-        
+
+        # 添加整体成功标志到结果中
+        result["overall_success"] = overall_success
+
         return ok(
-            success=overall_success,
             data=result,
-            message=f"股票 {request.symbol} 数据同步完成"
+            message=f"股票 {request.symbol} 数据同步{'成功' if overall_success else '部分失败'}"
         )
         
     except Exception as e:
@@ -245,9 +247,12 @@ async def sync_batch_stocks(
         hist_success = result["historical_sync"].get("success_count", 0) if request.sync_historical else 0
         fin_success = result["financial_sync"].get("success_count", 0) if request.sync_financial else 0
         total_success = max(hist_success, fin_success)
-        
+
+        # 添加统计信息到结果中
+        result["total_success"] = total_success
+        result["total_symbols"] = len(request.symbols)
+
         return ok(
-            success=total_success > 0,
             data=result,
             message=f"批量同步完成: {total_success}/{len(request.symbols)} 只股票成功"
         )
