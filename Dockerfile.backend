@@ -12,22 +12,12 @@ WORKDIR /app
 
 # 创建必需的目录并安装系统依赖
 # - curl: 健康检查
-# - pandoc: Markdown 转换为 Word/PDF
-# - wkhtmltopdf: HTML 转 PDF 引擎（推荐）
-# - xfonts-*: 中文字体支持
+# - pandoc: Markdown 转换为 Word/PDF（包含内置 PDF 引擎）
 RUN mkdir -p /app/logs /app/data /app/config && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         curl \
-        pandoc \
-        wkhtmltopdf \
-        xfonts-utils \
-        xfonts-encodings \
-        xfonts-base \
-        fontconfig \
-        fonts-wqy-zenhei \
-        fonts-wqy-microhei && \
-    fc-cache -fv && \
+        pandoc && \
     rm -rf /var/lib/apt/lists/*
 
 # 复制pyproject.toml和README.md（pip安装需要）
