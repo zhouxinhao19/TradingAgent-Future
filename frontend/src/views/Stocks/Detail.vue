@@ -114,7 +114,7 @@
                 <el-icon><Reading /></el-icon>
                 分析摘要
               </div>
-              <div class="summary-text">{{ lastAnalysis?.summary || '-' }}</div>
+              <div class="summary-text markdown-body" v-html="renderMarkdown(lastAnalysis?.summary || '-')"></div>
             </div>
 
             <!-- 详细报告展示 -->
