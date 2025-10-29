@@ -339,15 +339,78 @@ def get_log_export_service() -> LogExportService:
     global _log_export_service
 
     if _log_export_service is None:
-        # 从配置中获取日志目录
-        try:
-            from app.core.config import settings
-            log_dir = settings.log_dir
-        except Exception as e:
-            logger.warning(f"无法从配置获取日志目录: {e}，使用默认值 ./logs")
-            log_dir = "./logs"
-
+        # 从日志配置中获取日志目录
+        log_dir = _get_log_directory()
         _log_export_service = LogExportService(log_dir=log_dir)
 
     return _log_export_service
+
+
+def _get_log_directory() -> str:
+    """
+    获取日志目录路径
+    优先级：
+    1. 从日志配置文件读取（支持Docker环境）
+    2. 从settings配置读取
+    3. 使用默认值 ./logs
+    """
+    import os
+    from pathlib import Path
+
+    try:
+        # 检查是否是Docker环境
+        is_docker = os.environ.get("DOCKER", "").lower() in {"1", "true", "yes"} or Path("/.dockerenv").exists()
+
+        # 尝试从日志配置文件读取
+        try:
+            import tomllib as toml_loader
+        except ImportError:
+            try:
+                import tomli as toml_loader
+            except ImportError:
+                toml_loader = None
+
+        if toml_loader:
+            # 根据环境选择配置文件
+            profile = os.environ.get("LOGGING_PROFILE", "").lower()
+            cfg_path = Path("config/logging_docker.toml") if profile == "docker" or is_docker else Path("config/logging.toml")
+
+            if cfg_path.exists():
+                try:
+                    with cfg_path.open("rb") as f:
+                        toml_data = toml_loader.load(f)
+
+                    # 从配置文件读取日志目录
+                    handlers_cfg = toml_data.get("logging", {}).get("handlers", {})
+                    file_handler_cfg = handlers_cfg.get("file", {})
+                    log_dir = file_handler_cfg.get("directory")
+
+                    if log_dir:
+                        logger.info(f"📁 从日志配置文件读取日志目录: {log_dir}")
+                        return log_dir
+                except Exception as e:
+                    logger.warning(f"读取日志配置文件失败: {e}")
+
+        # 回退到settings配置
+        try:
+            from app.core.config import settings
+            log_dir = settings.log_dir
+            if log_dir:
+                logger.info(f"📁 从settings读取日志目录: {log_dir}")
+                return log_dir
+        except Exception as e:
+            logger.warning(f"从settings读取日志目录失败: {e}")
+
+        # Docker环境默认使用 /app/logs
+        if is_docker:
+            logger.info("📁 Docker环境，使用默认日志目录: /app/logs")
+            return "/app/logs"
+
+        # 非Docker环境默认使用 ./logs
+        logger.info("📁 使用默认日志目录: ./logs")
+        return "./logs"
+
+    except Exception as e:
+        logger.error(f"获取日志目录失败: {e}，使用默认值 ./logs")
+        return "./logs"
 
