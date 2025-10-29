@@ -154,7 +154,7 @@ async def lifespan(app: FastAPI):
 
     await init_db()
 
-    # 🔧 配置桥接：将统一配置写入环境变量，供 TradingAgents 核心库使用
+    #  配置桥接：将统一配置写入环境变量，供 TradingAgents 核心库使用
     try:
         from app.core.config_bridge import bridge_config_to_env
         bridge_config_to_env()
