@@ -2,7 +2,7 @@
  * 日志管理 API
  */
 
-import { ApiClient } from './client'
+import { ApiClient } from './request'
 
 export interface LogFileInfo {
   name: string
