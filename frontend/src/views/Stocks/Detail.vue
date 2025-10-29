@@ -11,6 +11,9 @@
         <el-button @click="onToggleFavorite">
           <el-icon><Star /></el-icon> {{ isFav ? '已自选' : '加自选' }}
         </el-button>
+        <el-button type="primary" @click="showSyncDialog" :loading="syncLoading">
+          <el-icon><Refresh /></el-icon> 同步数据
+        </el-button>
         <el-button type="success" @click="goPaperTrading">
           <el-icon><CreditCard /></el-icon> 模拟交易
         </el-button>
@@ -259,6 +262,47 @@
         <el-button type="primary" @click="exportReport">导出报告</el-button>
       </template>
     </el-dialog>
+
+    <!-- 数据同步对话框 -->
+    <el-dialog
+      v-model="syncDialogVisible"
+      title="同步股票数据"
+      width="500px"
+    >
+      <el-form :model="syncForm" label-width="120px">
+        <el-form-item label="股票代码">
+          <el-input v-model="code" disabled />
+        </el-form-item>
+        <el-form-item label="股票名称">
+          <el-input v-model="stockName" disabled />
+        </el-form-item>
+        <el-form-item label="同步内容">
+          <el-checkbox-group v-model="syncForm.syncTypes">
+            <el-checkbox label="historical">历史行情数据</el-checkbox>
+            <el-checkbox label="financial">财务数据</el-checkbox>
+          </el-checkbox-group>
+        </el-form-item>
+        <el-form-item label="数据源">
+          <el-radio-group v-model="syncForm.dataSource">
+            <el-radio label="tushare">Tushare</el-radio>
+            <el-radio label="akshare">AKShare</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="历史数据天数" v-if="syncForm.syncTypes.includes('historical')">
+          <el-input-number v-model="syncForm.days" :min="1" :max="3650" />
+          <span style="margin-left: 10px; color: #909399; font-size: 12px;">
+            (最多3650天，约10年)
+          </span>
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="syncDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSync" :loading="syncLoading">
+          开始同步
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -266,12 +310,12 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { TrendCharts, Star, Refresh, Link, Document, Clock, Reading } from '@element-plus/icons-vue'
-import { CreditCard } from '@element-plus/icons-vue'
+import { TrendCharts, Star, Refresh, Link, Document, Clock, Reading, CreditCard } from '@element-plus/icons-vue'
 import { marked } from 'marked'
 import { stocksApi } from '@/api/stocks'
 import { analysisApi } from '@/api/analysis'
 import { ApiClient } from '@/api/request'
+import { stockSyncApi } from '@/api/stockSync'
 import { use as echartsUse } from 'echarts/core'
 import { CandlestickChart } from 'echarts/charts'
 
@@ -376,6 +420,74 @@ const changeClass = computed(() => quote.changePercent > 0 ? 'up' : quote.change
 
 // 同步状态
 const syncStatus = ref<any>(null)
+
+// 数据同步对话框
+const syncDialogVisible = ref(false)
+const syncLoading = ref(false)
+const syncForm = reactive({
+  syncTypes: ['historical', 'financial'],
+  dataSource: 'tushare' as 'tushare' | 'akshare',
+  days: 365
+})
+
+// 显示同步对话框
+function showSyncDialog() {
+  syncDialogVisible.value = true
+}
+
+// 执行同步
+async function handleSync() {
+  if (syncForm.syncTypes.length === 0) {
+    ElMessage.warning('请至少选择一种同步内容')
+    return
+  }
+
+  syncLoading.value = true
+  try {
+    const res = await stockSyncApi.syncSingle({
+      symbol: code.value,
+      sync_historical: syncForm.syncTypes.includes('historical'),
+      sync_financial: syncForm.syncTypes.includes('financial'),
+      data_source: syncForm.dataSource,
+      days: syncForm.days
+    })
+
+    if (res.success) {
+      const data = res.data
+      let message = `股票 ${code.value} 数据同步完成\n`
+
+      if (data.historical_sync) {
+        if (data.historical_sync.success) {
+          message += `✅ 历史数据: ${data.historical_sync.records || 0} 条记录\n`
+        } else {
+          message += `❌ 历史数据同步失败: ${data.historical_sync.error || '未知错误'}\n`
+        }
+      }
+
+      if (data.financial_sync) {
+        if (data.financial_sync.success) {
+          message += `✅ 财务数据同步成功\n`
+        } else {
+          message += `❌ 财务数据同步失败: ${data.financial_sync.error || '未知错误'}\n`
+        }
+      }
+
+      ElMessage.success(message)
+      syncDialogVisible.value = false
+
+      // 刷新页面数据
+      await fetchQuote()
+      await fetchFundamentals()
+    } else {
+      ElMessage.error(res.message || '同步失败')
+    }
+  } catch (error: any) {
+    console.error('同步失败:', error)
+    ElMessage.error(error.message || '同步失败，请稍后重试')
+  } finally {
+    syncLoading.value = false
+  }
+}
 
 async function refreshMockQuote() {
   // 改为调用后端接口获取真实数据

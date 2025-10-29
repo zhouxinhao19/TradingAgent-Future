@@ -30,6 +30,7 @@ from app.routers import auth_db as auth, analysis, screening, queue, sse, health
 from app.routers import sync as sync_router, multi_source_sync
 from app.routers import stocks as stocks_router
 from app.routers import stock_data as stock_data_router
+from app.routers import stock_sync as stock_sync_router
 from app.routers import notifications as notifications_router
 from app.routers import websocket_notifications as websocket_notifications_router
 from app.routers import scheduler as scheduler_router
@@ -602,6 +603,7 @@ app.include_router(queue.router, prefix="/api/queue", tags=["queue"])
 app.include_router(favorites.router, prefix="/api", tags=["favorites"])
 app.include_router(stocks_router.router, prefix="/api", tags=["stocks"])
 app.include_router(stock_data_router.router, tags=["stock-data"])
+app.include_router(stock_sync_router.router, tags=["stock-sync"])
 app.include_router(tags.router, prefix="/api", tags=["tags"])
 app.include_router(config.router, prefix="/api", tags=["config"])
 app.include_router(model_capabilities.router, tags=["model-capabilities"])

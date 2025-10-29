@@ -69,6 +69,14 @@
               <el-icon><Refresh /></el-icon>
               刷新
             </el-button>
+            <el-button
+              type="primary"
+              @click="showBatchSyncDialog"
+              :disabled="selectedStocks.length === 0"
+            >
+              <el-icon><Download /></el-icon>
+              批量同步数据
+            </el-button>
             <el-button @click="openTagManager">
               标签管理
             </el-button>
@@ -83,7 +91,13 @@
 
     <!-- 自选股列表 -->
     <el-card class="favorites-list-card" shadow="never">
-      <el-table :data="filteredFavorites" v-loading="loading" style="width: 100%">
+      <el-table
+        :data="filteredFavorites"
+        v-loading="loading"
+        style="width: 100%"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="55" />
         <el-table-column prop="stock_code" label="股票代码" width="120">
           <template #default="{ row }">
             <el-link type="primary" @click="viewStockDetail(row)">
@@ -359,6 +373,56 @@
       </template>
     </el-dialog>
 
+    <!-- 批量同步对话框 -->
+    <el-dialog
+      v-model="batchSyncDialogVisible"
+      title="批量同步股票数据"
+      width="500px"
+    >
+      <el-alert
+        type="info"
+        :closable="false"
+        style="margin-bottom: 16px;"
+      >
+        已选择 <strong>{{ selectedStocks.length }}</strong> 只股票
+      </el-alert>
+
+      <el-form :model="batchSyncForm" label-width="120px">
+        <el-form-item label="同步内容">
+          <el-checkbox-group v-model="batchSyncForm.syncTypes">
+            <el-checkbox label="historical">历史行情数据</el-checkbox>
+            <el-checkbox label="financial">财务数据</el-checkbox>
+          </el-checkbox-group>
+        </el-form-item>
+        <el-form-item label="数据源">
+          <el-radio-group v-model="batchSyncForm.dataSource">
+            <el-radio label="tushare">Tushare</el-radio>
+            <el-radio label="akshare">AKShare</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="历史数据天数" v-if="batchSyncForm.syncTypes.includes('historical')">
+          <el-input-number v-model="batchSyncForm.days" :min="1" :max="3650" />
+          <span style="margin-left: 10px; color: #909399; font-size: 12px;">
+            (最多3650天，约10年)
+          </span>
+        </el-form-item>
+      </el-form>
+
+      <el-alert
+        type="warning"
+        :closable="false"
+        style="margin-top: 16px;"
+      >
+        批量同步可能需要较长时间，请耐心等待
+      </el-alert>
+
+      <template #footer>
+        <el-button @click="batchSyncDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleBatchSync" :loading="batchSyncLoading">
+          开始同步
+        </el-button>
+      </template>
+    </el-dialog>
 
   </div>
 </template>
@@ -371,10 +435,12 @@ import {
   Star,
   Search,
   Refresh,
-  Plus
+  Plus,
+  Download
 } from '@element-plus/icons-vue'
 import { favoritesApi } from '@/api/favorites'
 import { tagsApi } from '@/api/tags'
+import { stockSyncApi } from '@/api/stockSync'
 import { normalizeMarketForAnalysis } from '@/utils/market'
 
 import type { FavoriteItem } from '@/api/favorites'
@@ -403,6 +469,18 @@ const selectedTag = ref('')
 const selectedMarket = ref('')
 const selectedBoard = ref('')
 const selectedExchange = ref('')
+
+// 批量选择
+const selectedStocks = ref<FavoriteItem[]>([])
+
+// 批量同步对话框
+const batchSyncDialogVisible = ref(false)
+const batchSyncLoading = ref(false)
+const batchSyncForm = ref({
+  syncTypes: ['historical', 'financial'],
+  dataSource: 'tushare' as 'tushare' | 'akshare',
+  days: 365
+})
 
 // 添加对话框
 const addDialogVisible = ref(false)
@@ -719,6 +797,67 @@ const viewStockDetail = (row: any) => {
     name: 'StockDetail',
     params: { code: String(row.stock_code || '').toUpperCase() }
   })
+}
+
+// 处理表格选择变化
+const handleSelectionChange = (selection: FavoriteItem[]) => {
+  selectedStocks.value = selection
+}
+
+// 显示批量同步对话框
+const showBatchSyncDialog = () => {
+  if (selectedStocks.value.length === 0) {
+    ElMessage.warning('请先选择要同步的股票')
+    return
+  }
+  batchSyncDialogVisible.value = true
+}
+
+// 执行批量同步
+const handleBatchSync = async () => {
+  if (batchSyncForm.value.syncTypes.length === 0) {
+    ElMessage.warning('请至少选择一种同步内容')
+    return
+  }
+
+  batchSyncLoading.value = true
+  try {
+    const symbols = selectedStocks.value.map(stock => stock.stock_code)
+
+    const res = await stockSyncApi.syncBatch({
+      symbols,
+      sync_historical: batchSyncForm.value.syncTypes.includes('historical'),
+      sync_financial: batchSyncForm.value.syncTypes.includes('financial'),
+      data_source: batchSyncForm.value.dataSource,
+      days: batchSyncForm.value.days
+    })
+
+    if (res.success) {
+      const data = res.data
+      let message = `批量同步完成 (共 ${symbols.length} 只股票)\n`
+
+      if (data.historical_sync) {
+        message += `✅ 历史数据: ${data.historical_sync.success_count}/${data.historical_sync.success_count + data.historical_sync.error_count} 成功，共 ${data.historical_sync.total_records} 条记录\n`
+      }
+
+      if (data.financial_sync) {
+        message += `✅ 财务数据: ${data.financial_sync.success_count}/${data.financial_sync.total_symbols} 成功\n`
+      }
+
+      ElMessage.success(message)
+      batchSyncDialogVisible.value = false
+
+      // 刷新列表
+      await loadFavorites()
+    } else {
+      ElMessage.error(res.message || '批量同步失败')
+    }
+  } catch (error: any) {
+    console.error('批量同步失败:', error)
+    ElMessage.error(error.message || '批量同步失败，请稍后重试')
+  } finally {
+    batchSyncLoading.value = false
+  }
 }
 
 const getChangeClass = (changePercent: number) => {
