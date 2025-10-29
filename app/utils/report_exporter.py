@@ -240,8 +240,11 @@ class ReportExporter:
                 # Pandoc 参数
                 extra_args = [
                     '--from=markdown-yaml_metadata_block',  # 禁用 YAML 元数据块解析
+                    '-V', 'mainfont=Noto Sans CJK SC',  # 设置中文字体（wkhtmltopdf）
+                    '-V', 'sansfont=Noto Sans CJK SC',
+                    '-V', 'monofont=Noto Sans Mono CJK SC',
                 ]
-                
+
                 if engine:
                     extra_args.append(f'--pdf-engine={engine}')
                     logger.info(f"🔧 使用 PDF 引擎: {engine}")
