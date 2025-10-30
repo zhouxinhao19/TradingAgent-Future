@@ -56,12 +56,24 @@ async def get_data_sources_status():
                 "baostock": "免费开源的证券数据平台，提供历史数据"
             }
 
-            status_list.append({
+            status_item = {
                 "name": adapter.name,
                 "priority": adapter.priority,
                 "available": is_available,
                 "description": descriptions.get(adapter.name, f"{adapter.name}数据源")
-            })
+            }
+
+            # 添加 Token 来源信息（仅 Tushare）
+            if adapter.name == "tushare" and is_available and hasattr(adapter, 'get_token_source'):
+                token_source = adapter.get_token_source()
+                if token_source:
+                    status_item["token_source"] = token_source
+                    if token_source == 'database':
+                        status_item["description"] += " (Token来源: 数据库)"
+                    elif token_source == 'env':
+                        status_item["description"] += " (Token来源: .env)"
+
+            status_list.append(status_item)
 
         return SyncResponse(
             success=True,
@@ -71,6 +83,55 @@ async def get_data_sources_status():
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get data sources status: {str(e)}")
+
+
+@router.get("/sources/current")
+async def get_current_data_source():
+    """获取当前正在使用的数据源（优先级最高且可用的）"""
+    try:
+        manager = DataSourceManager()
+        available_adapters = manager.get_available_adapters()
+
+        if not available_adapters:
+            return SyncResponse(
+                success=False,
+                message="No available data sources",
+                data={"name": None, "priority": None}
+            )
+
+        # 获取优先级最高的可用数据源（优先级数字越大越高）
+        current_adapter = max(available_adapters, key=lambda x: x.priority)
+
+        # 根据数据源类型提供描述
+        descriptions = {
+            "tushare": "专业金融数据API",
+            "akshare": "开源金融数据库",
+            "baostock": "免费证券数据平台"
+        }
+
+        result = {
+            "name": current_adapter.name,
+            "priority": current_adapter.priority,
+            "description": descriptions.get(current_adapter.name, current_adapter.name)
+        }
+
+        # 添加 Token 来源信息（仅 Tushare）
+        if current_adapter.name == "tushare" and hasattr(current_adapter, 'get_token_source'):
+            token_source = current_adapter.get_token_source()
+            if token_source:
+                result["token_source"] = token_source
+                if token_source == 'database':
+                    result["token_source_display"] = "数据库配置"
+                elif token_source == 'env':
+                    result["token_source_display"] = ".env 配置"
+
+        return SyncResponse(
+            success=True,
+            message="Current data source retrieved successfully",
+            data=result
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get current data source: {str(e)}")
 
 
 @router.get("/status")
@@ -145,24 +206,52 @@ async def _test_single_adapter(adapter) -> dict:
     test_timeout = 10
 
     try:
-        # 测试连通性 - 只获取 1 条数据验证
+        # 测试连通性 - 强制重新连接以使用最新配置
         logger.info(f"🧪 测试 {adapter.name} 连通性 (超时: {test_timeout}秒)...")
 
         try:
-            # 在线程池中运行同步方法，避免阻塞事件循环
-            df = await asyncio.wait_for(
-                asyncio.to_thread(adapter.get_stock_list),
+            # 对于 Tushare，强制重新连接以使用最新的数据库配置
+            if adapter.name == "tushare" and hasattr(adapter, '_provider'):
+                logger.info(f"🔄 强制 {adapter.name} 重新连接以使用最新配置...")
+                provider = adapter._provider
+                if provider:
+                    # 重置连接状态
+                    provider.connected = False
+                    provider.token_source = None
+                    # 重新连接
+                    await asyncio.wait_for(
+                        asyncio.to_thread(provider.connect_sync),
+                        timeout=test_timeout
+                    )
+
+            # 在线程池中运行 is_available() 检查
+            is_available = await asyncio.wait_for(
+                asyncio.to_thread(adapter.is_available),
                 timeout=test_timeout
             )
 
-            if df is not None and not df.empty:
+            if is_available:
                 result["available"] = True
-                result["message"] = f"✅ 连接成功 (获取 {len(df)} 条数据)"
-                logger.info(f"✅ {adapter.name} 连通性测试成功")
+
+                # 获取 Token 来源（仅 Tushare）
+                token_source = None
+                if adapter.name == "tushare" and hasattr(adapter, 'get_token_source'):
+                    token_source = adapter.get_token_source()
+
+                if token_source == 'database':
+                    result["message"] = "✅ 连接成功 (Token来源: 数据库)"
+                    result["token_source"] = "database"
+                elif token_source == 'env':
+                    result["message"] = "✅ 连接成功 (Token来源: .env)"
+                    result["token_source"] = "env"
+                else:
+                    result["message"] = "✅ 连接成功"
+
+                logger.info(f"✅ {adapter.name} 连通性测试成功，Token来源: {token_source}")
             else:
                 result["available"] = False
-                result["message"] = "❌ 无法获取数据"
-                logger.warning(f"⚠️ {adapter.name} 返回空数据")
+                result["message"] = "❌ 数据源不可用"
+                logger.warning(f"⚠️ {adapter.name} 不可用")
         except asyncio.TimeoutError:
             result["available"] = False
             result["message"] = f"❌ 连接超时 ({test_timeout}秒)"
@@ -186,7 +275,7 @@ class TestSourceRequest(BaseModel):
 
 
 @router.post("/test-sources")
-async def test_data_sources(request: TestSourceRequest | None = None):
+async def test_data_sources(request: TestSourceRequest = TestSourceRequest()):
     """
     测试数据源的连通性
 
@@ -203,7 +292,8 @@ async def test_data_sources(request: TestSourceRequest | None = None):
         all_adapters = manager.adapters
 
         # 从请求体中获取数据源名称
-        source_name = request.source_name if request else None
+        source_name = request.source_name
+        logger.info(f"📥 接收到测试请求，source_name={source_name}")
 
         # 如果指定了数据源名称，只测试该数据源
         if source_name:

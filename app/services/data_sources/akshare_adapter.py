@@ -14,13 +14,15 @@ logger = logging.getLogger(__name__)
 class AKShareAdapter(DataSourceAdapter):
     """AKShare数据源适配器"""
 
+    def __init__(self):
+        super().__init__()  # 调用父类初始化
+
     @property
     def name(self) -> str:
         return "akshare"
 
-    @property
-    def priority(self) -> int:
-        return 2
+    def _get_default_priority(self) -> int:
+        return 2  # 数字越大优先级越高
 
     def is_available(self) -> bool:
         """检查AKShare是否可用"""

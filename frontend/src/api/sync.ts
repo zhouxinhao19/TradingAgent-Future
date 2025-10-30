@@ -9,6 +9,7 @@ export interface DataSourceStatus {
   priority: number
   available: boolean
   description: string
+  token_source?: 'database' | 'env'  // Token 来源（仅 Tushare）
 }
 
 // 同步状态接口
@@ -54,6 +55,7 @@ export interface DataSourceTestResult {
   priority: number
   available: boolean
   message: string
+  token_source?: 'database' | 'env'  // Token 来源（仅 Tushare）
 }
 
 // 使用建议接口
@@ -76,6 +78,19 @@ export interface SyncRecommendations {
  */
 export const getDataSourcesStatus = (): Promise<ApiResponse<DataSourceStatus[]>> => {
   return ApiClient.get('/api/sync/multi-source/sources/status')
+}
+
+/**
+ * 获取当前正在使用的数据源
+ */
+export const getCurrentDataSource = (): Promise<ApiResponse<{
+  name: string
+  priority: number
+  description: string
+  token_source?: 'database' | 'env'
+  token_source_display?: string
+}>> => {
+  return ApiClient.get('/api/sync/multi-source/sources/current')
 }
 
 /**
