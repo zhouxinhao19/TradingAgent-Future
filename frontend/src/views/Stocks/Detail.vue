@@ -46,7 +46,7 @@
           <el-icon><Clock /></el-icon>
           <span class="sync-info">
             后端同步: {{ formatSyncTime(syncStatus.last_sync_time) }}
-            <span v-if="syncStatus.interval_minutes">(每{{ syncStatus.interval_minutes }}分钟)</span>
+            <span v-if="syncStatus.interval_seconds">{{ formatSyncInterval(syncStatus.interval_seconds) }}</span>
             <el-tag
               v-if="syncStatus.data_source"
               size="small"
@@ -845,6 +845,24 @@ function formatSyncTime(timeStr: string | null | undefined): string {
   if (!timeStr) return '未同步'
   // 后端返回的时间已经是 UTC+8 时区，添加时区标识
   return `${timeStr} (UTC+8)`
+}
+
+// 🔥 新增：格式化同步间隔
+function formatSyncInterval(seconds: number): string {
+  if (!seconds || seconds <= 0) return ''
+
+  if (seconds < 60) {
+    // 小于60秒，显示秒数
+    return `(每${seconds}秒)`
+  } else if (seconds < 3600) {
+    // 小于1小时，显示分钟数
+    const minutes = Math.round(seconds / 60)
+    return `(每${minutes}分钟)`
+  } else {
+    // 大于等于1小时，显示小时数
+    const hours = Math.round(seconds / 3600)
+    return `(每${hours}小时)`
+  }
 }
 function fmtConf(v: any) {
   const n = Number(v)

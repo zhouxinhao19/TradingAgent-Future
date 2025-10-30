@@ -786,31 +786,42 @@ class DataSourceManager:
 
         try:
             # 根据数据源调用相应的获取方法
+            actual_source = None  # 实际使用的数据源
+
             if self.current_source == ChinaDataSource.MONGODB:
-                result = self._get_mongodb_data(symbol, start_date, end_date, period)
+                result, actual_source = self._get_mongodb_data(symbol, start_date, end_date, period)
             elif self.current_source == ChinaDataSource.TUSHARE:
                 logger.info(f"🔍 [股票代码追踪] 调用 Tushare 数据源，传入参数: symbol='{symbol}', period='{period}'")
                 result = self._get_tushare_data(symbol, start_date, end_date, period)
+                actual_source = "tushare"
             elif self.current_source == ChinaDataSource.AKSHARE:
                 result = self._get_akshare_data(symbol, start_date, end_date, period)
+                actual_source = "akshare"
             elif self.current_source == ChinaDataSource.BAOSTOCK:
                 result = self._get_baostock_data(symbol, start_date, end_date, period)
+                actual_source = "baostock"
             # TDX 已移除
             else:
                 result = f"❌ 不支持的数据源: {self.current_source.value}"
+                actual_source = None
 
             # 记录详细的输出结果
             duration = time.time() - start_time
             result_length = len(result) if result else 0
             is_success = result and "❌" not in result and "错误" not in result
 
+            # 使用实际数据源名称，如果没有则使用 current_source
+            display_source = actual_source or self.current_source.value
+
             if is_success:
-                logger.info(f"✅ [数据来源: {self.current_source.value}] 成功获取股票数据: {symbol} ({result_length}字符, 耗时{duration:.2f}秒)",
+                logger.info(f"✅ [数据来源: {display_source}] 成功获取股票数据: {symbol} ({result_length}字符, 耗时{duration:.2f}秒)",
                            extra={
                                'symbol': symbol,
                                'start_date': start_date,
                                'end_date': end_date,
-                               'data_source': self.current_source.value,
+                               'data_source': display_source,
+                               'actual_source': actual_source,
+                               'requested_source': self.current_source.value,
                                'duration': duration,
                                'result_length': result_length,
                                'result_preview': result[:200] + '...' if result_length > 200 else result,
@@ -853,8 +864,13 @@ class DataSourceManager:
                         }, exc_info=True)
             return self._try_fallback_sources(symbol, start_date, end_date)
 
-    def _get_mongodb_data(self, symbol: str, start_date: str, end_date: str, period: str = "daily") -> str:
-        """从MongoDB获取多周期数据"""
+    def _get_mongodb_data(self, symbol: str, start_date: str, end_date: str, period: str = "daily") -> tuple[str, str | None]:
+        """
+        从MongoDB获取多周期数据
+
+        Returns:
+            tuple[str, str | None]: (结果字符串, 实际使用的数据源名称)
+        """
         logger.debug(f"📊 [MongoDB] 调用参数: symbol={symbol}, start_date={start_date}, end_date={end_date}, period={period}")
 
         try:
@@ -865,9 +881,9 @@ class DataSourceManager:
             df = adapter.get_historical_data(symbol, start_date, end_date, period=period)
 
             if df is not None and not df.empty:
-                logger.info(f"✅ [数据来源: MongoDB] 成功获取{period}数据: {symbol} ({len(df)}条记录)")
-                # 转换为字符串格式返回
-                return df.to_string()
+                logger.info(f"✅ [数据来源: MongoDB缓存] 成功获取{period}数据: {symbol} ({len(df)}条记录)")
+                # 转换为字符串格式返回，数据源标记为 mongodb
+                return df.to_string(), "mongodb"
             else:
                 # MongoDB没有数据（adapter内部已记录详细的数据源信息），降级到其他数据源
                 logger.info(f"🔄 [MongoDB] 未找到{period}数据: {symbol}，开始尝试备用数据源")
@@ -1103,8 +1119,13 @@ class DataSourceManager:
             logger.error(f"❌ 获取成交量失败: {e}")
             return 0
 
-    def _try_fallback_sources(self, symbol: str, start_date: str, end_date: str, period: str = "daily") -> str:
-        """尝试备用数据源 - 避免递归调用"""
+    def _try_fallback_sources(self, symbol: str, start_date: str, end_date: str, period: str = "daily") -> tuple[str, str | None]:
+        """
+        尝试备用数据源 - 避免递归调用
+
+        Returns:
+            tuple[str, str | None]: (结果字符串, 实际使用的数据源名称)
+        """
         logger.info(f"🔄 [{self.current_source.value}] 失败，尝试备用数据源获取{period}数据: {symbol}")
 
         # 🔥 从数据库获取数据源优先级顺序（根据股票代码识别市场）
@@ -1130,7 +1151,7 @@ class DataSourceManager:
 
                     if "❌" not in result:
                         logger.info(f"✅ [备用数据源-{source.value}] 成功获取{period}数据: {symbol}")
-                        return result
+                        return result, source.value  # 返回结果和实际使用的数据源
                     else:
                         logger.warning(f"⚠️ [备用数据源-{source.value}] 返回错误结果: {symbol}")
 
@@ -1139,7 +1160,7 @@ class DataSourceManager:
                     continue
 
         logger.error(f"❌ [所有数据源失败] 无法获取{period}数据: {symbol}")
-        return f"❌ 所有数据源都无法获取{symbol}的{period}数据"
+        return f"❌ 所有数据源都无法获取{symbol}的{period}数据", None
 
     def get_stock_info(self, symbol: str) -> Dict:
         """
