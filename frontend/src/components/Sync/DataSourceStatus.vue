@@ -132,7 +132,7 @@ const fetchDataSourcesStatus = async () => {
     if (response.success) {
       console.log('🔍 [DataSourceStatus] API调用成功，数据源数量:', response.data?.length || 0)
       console.log('🔍 [DataSourceStatus] 数据源详情:', response.data)
-      dataSources.value = response.data.sort((a, b) => a.priority - b.priority)
+      dataSources.value = response.data.sort((a, b) => b.priority - a.priority) // 倒序：优先级高的在前
       console.log('🔍 [DataSourceStatus] 排序后的数据源:', dataSources.value)
     } else {
       console.error('🔍 [DataSourceStatus] API调用失败')
