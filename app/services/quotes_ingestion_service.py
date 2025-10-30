@@ -30,17 +30,45 @@ class QuotesIngestionService:
         self.status_collection_name = "quotes_ingestion_status"  # 状态记录集合
         self.tz = ZoneInfo(settings.TIMEZONE)
 
-        # 接口轮换状态
-        self._rotation_index = 0  # 当前轮换索引：0=Tushare, 1=AKShare东方财富, 2=AKShare新浪财经
-        self._rotation_sources = ["tushare", "akshare_eastmoney", "akshare_sina"]
+    @staticmethod
+    def _normalize_stock_code(code: str) -> str:
+        """
+        标准化股票代码为6位数字
 
-        # Tushare 调用次数限制（每小时）
-        self._tushare_call_times: deque = deque(maxlen=100)  # 记录最近的调用时间
-        self._tushare_hourly_limit = settings.QUOTES_TUSHARE_HOURLY_LIMIT
+        处理以下情况：
+        - sz000001 -> 000001
+        - sh600036 -> 600036
+        - 000001 -> 000001
+        - 1 -> 000001
 
-        # Tushare 权限检测
-        self._tushare_has_premium = None  # None=未检测, True=付费, False=免费
-        self._tushare_permission_checked = False
+        Args:
+            code: 原始股票代码
+
+        Returns:
+            str: 标准化后的6位股票代码
+        """
+        if not code:
+            return ""
+
+        code_str = str(code).strip()
+
+        # 如果代码长度超过6位，去掉前面的交易所前缀（如 sz, sh）
+        if len(code_str) > 6:
+            # 提取所有数字字符
+            code_str = ''.join(filter(str.isdigit, code_str))
+
+        # 如果是纯数字，补齐到6位
+        if code_str.isdigit():
+            code_clean = code_str.lstrip('0') or '0'  # 移除前导0，如果全是0则保留一个0
+            return code_clean.zfill(6)  # 补齐到6位
+
+        # 如果不是纯数字，尝试提取数字部分
+        code_digits = ''.join(filter(str.isdigit, code_str))
+        if code_digits:
+            return code_digits.zfill(6)
+
+        # 无法提取有效代码，返回空字符串
+        return ""
 
     async def ensure_indexes(self) -> None:
         db = get_mongo_db()
@@ -330,7 +358,10 @@ class QuotesIngestionService:
         for code, q in quotes_map.items():
             if not code:
                 continue
-            code6 = str(code).zfill(6)
+            # 使用标准化方法处理股票代码（去掉交易所前缀，如 sz000001 -> 000001）
+            code6 = self._normalize_stock_code(code)
+            if not code6:
+                continue
             ops.append(
                 UpdateOne(
                     {"code": code6},
