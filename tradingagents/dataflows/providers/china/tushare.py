@@ -74,34 +74,75 @@ class TushareProvider(BaseStockDataProvider):
             self.logger.error("❌ Tushare库不可用")
             return False
 
+        # 测试连接超时时间（秒）- 只是测试连通性，不需要很长时间
+        test_timeout = 10
+
         try:
-            # 🔥 优先从数据库读取 Token（用户在 Web 后台修改后立即生效）
-            token = self._get_token_from_database()
-            token_source = "数据库"
+            # 🔥 优先从数据库读取 Token
+            db_token = self._get_token_from_database()
+            env_token = self.config.get('token')
 
-            # 降级到环境变量
-            if not token:
-                token = self.config.get('token')
-                token_source = "环境变量"
+            # 尝试数据库 Token
+            if db_token:
+                try:
+                    self.logger.info(f"🔄 尝试使用数据库中的 Tushare Token (超时: {test_timeout}秒)...")
+                    ts.set_token(db_token)
+                    self.api = ts.pro_api()
 
-            if not token:
-                self.logger.error("❌ Tushare token未配置，请在 Web 后台或 .env 文件中配置 TUSHARE_TOKEN")
-                return False
+                    # 测试连接 - 使用超时
+                    try:
+                        test_data = asyncio.run(
+                            asyncio.wait_for(
+                                asyncio.to_thread(self.api.stock_basic, list_status='L', limit=1),
+                                timeout=test_timeout
+                            )
+                        )
+                    except asyncio.TimeoutError:
+                        self.logger.warning(f"⚠️ 数据库 Token 测试超时 ({test_timeout}秒)，尝试降级到 .env 配置...")
+                        test_data = None
 
-            # 设置token并初始化API
-            ts.set_token(token)
-            self.api = ts.pro_api()
+                    if test_data is not None and not test_data.empty:
+                        self.connected = True
+                        self.logger.info(f"✅ Tushare连接成功 (Token来源: 数据库)")
+                        return True
+                    else:
+                        self.logger.warning("⚠️ 数据库 Token 测试失败，尝试降级到 .env 配置...")
+                except Exception as e:
+                    self.logger.warning(f"⚠️ 数据库 Token 连接失败: {e}，尝试降级到 .env 配置...")
 
-            # 测试连接（同步）
-            test_data = self.api.stock_basic(list_status='L', limit=1)
+            # 降级到环境变量 Token
+            if env_token:
+                try:
+                    self.logger.info(f"🔄 尝试使用 .env 中的 Tushare Token (超时: {test_timeout}秒)...")
+                    ts.set_token(env_token)
+                    self.api = ts.pro_api()
 
-            if test_data is not None and not test_data.empty:
-                self.connected = True
-                self.logger.info(f"✅ Tushare连接成功 (Token来源: {token_source})")
-                return True
-            else:
-                self.logger.error("❌ Tushare连接测试失败")
-                return False
+                    # 测试连接 - 使用超时
+                    try:
+                        test_data = asyncio.run(
+                            asyncio.wait_for(
+                                asyncio.to_thread(self.api.stock_basic, list_status='L', limit=1),
+                                timeout=test_timeout
+                            )
+                        )
+                    except asyncio.TimeoutError:
+                        self.logger.error(f"❌ .env Token 测试超时 ({test_timeout}秒)")
+                        return False
+
+                    if test_data is not None and not test_data.empty:
+                        self.connected = True
+                        self.logger.info(f"✅ Tushare连接成功 (Token来源: .env 环境变量)")
+                        return True
+                    else:
+                        self.logger.error("❌ .env Token 测试失败")
+                        return False
+                except Exception as e:
+                    self.logger.error(f"❌ .env Token 连接失败: {e}")
+                    return False
+
+            # 两个都没有
+            self.logger.error("❌ Tushare token未配置，请在 Web 后台或 .env 文件中配置 TUSHARE_TOKEN")
+            return False
 
         except Exception as e:
             self.logger.error(f"❌ Tushare连接失败: {e}")
@@ -113,38 +154,79 @@ class TushareProvider(BaseStockDataProvider):
             self.logger.error("❌ Tushare库不可用")
             return False
 
+        # 测试连接超时时间（秒）- 只是测试连通性，不需要很长时间
+        test_timeout = 10
+
         try:
-            # 🔥 优先从数据库读取 Token（用户在 Web 后台修改后立即生效）
-            token = self._get_token_from_database()
-            token_source = "数据库"
+            # 🔥 优先从数据库读取 Token
+            db_token = self._get_token_from_database()
+            env_token = self.config.get('token')
 
-            # 降级到环境变量
-            if not token:
-                token = self.config.get('token')
-                token_source = "环境变量"
+            # 尝试数据库 Token
+            if db_token:
+                try:
+                    self.logger.info(f"🔄 尝试使用数据库中的 Tushare Token (超时: {test_timeout}秒)...")
+                    ts.set_token(db_token)
+                    self.api = ts.pro_api()
 
-            if not token:
-                self.logger.error("❌ Tushare token未配置，请在 Web 后台或 .env 文件中配置 TUSHARE_TOKEN")
-                return False
+                    # 测试连接（异步）- 使用超时
+                    try:
+                        test_data = await asyncio.wait_for(
+                            asyncio.to_thread(
+                                self.api.stock_basic,
+                                list_status='L',
+                                limit=1
+                            ),
+                            timeout=test_timeout
+                        )
+                    except asyncio.TimeoutError:
+                        self.logger.warning(f"⚠️ 数据库 Token 测试超时 ({test_timeout}秒)，尝试降级到 .env 配置...")
+                        test_data = None
 
-            # 设置token并初始化API
-            ts.set_token(token)
-            self.api = ts.pro_api()
+                    if test_data is not None and not test_data.empty:
+                        self.connected = True
+                        self.logger.info(f"✅ Tushare连接成功 (Token来源: 数据库)")
+                        return True
+                    else:
+                        self.logger.warning("⚠️ 数据库 Token 测试失败，尝试降级到 .env 配置...")
+                except Exception as e:
+                    self.logger.warning(f"⚠️ 数据库 Token 连接失败: {e}，尝试降级到 .env 配置...")
 
-            # 测试连接（异步）
-            test_data = await asyncio.to_thread(
-                self.api.stock_basic,
-                list_status='L',
-                limit=1
-            )
+            # 降级到环境变量 Token
+            if env_token:
+                try:
+                    self.logger.info(f"🔄 尝试使用 .env 中的 Tushare Token (超时: {test_timeout}秒)...")
+                    ts.set_token(env_token)
+                    self.api = ts.pro_api()
 
-            if test_data is not None and not test_data.empty:
-                self.connected = True
-                self.logger.info(f"✅ Tushare连接成功 (Token来源: {token_source})")
-                return True
-            else:
-                self.logger.error("❌ Tushare连接测试失败")
-                return False
+                    # 测试连接（异步）- 使用超时
+                    try:
+                        test_data = await asyncio.wait_for(
+                            asyncio.to_thread(
+                                self.api.stock_basic,
+                                list_status='L',
+                                limit=1
+                            ),
+                            timeout=test_timeout
+                        )
+                    except asyncio.TimeoutError:
+                        self.logger.error(f"❌ .env Token 测试超时 ({test_timeout}秒)")
+                        return False
+
+                    if test_data is not None and not test_data.empty:
+                        self.connected = True
+                        self.logger.info(f"✅ Tushare连接成功 (Token来源: .env 环境变量)")
+                        return True
+                    else:
+                        self.logger.error("❌ .env Token 测试失败")
+                        return False
+                except Exception as e:
+                    self.logger.error(f"❌ .env Token 连接失败: {e}")
+                    return False
+
+            # 两个都没有
+            self.logger.error("❌ Tushare token未配置，请在 Web 后台或 .env 文件中配置 TUSHARE_TOKEN")
+            return False
 
         except Exception as e:
             self.logger.error(f"❌ Tushare连接失败: {e}")
