@@ -131,90 +131,51 @@ async def run_stock_basics_sync(
 
 async def _test_single_adapter(adapter) -> dict:
     """
-    在后台线程中测试单个数据源适配器
-    避免阻塞事件循环
+    测试单个数据源适配器的连通性
+    只做轻量级连通性测试，不获取完整数据
     """
     result = {
         "name": adapter.name,
         "priority": adapter.priority,
-        "available": True,
-        "tests": {}
+        "available": False,
+        "message": "连接失败"
     }
 
-    # 测试股票列表获取
-    try:
-        # 在线程池中运行同步方法，避免阻塞事件循环
-        df = await asyncio.to_thread(adapter.get_stock_list)
-        if df is not None and not df.empty:
-            result["tests"]["stock_list"] = {
-                "success": True,
-                "count": len(df),
-                "message": f"Successfully fetched {len(df)} stocks"
-            }
-        else:
-            result["tests"]["stock_list"] = {
-                "success": False,
-                "count": 0,
-                "message": "No stock data returned"
-            }
-    except Exception as e:
-        result["tests"]["stock_list"] = {
-            "success": False,
-            "count": 0,
-            "message": f"Error: {str(e)}"
-        }
+    # 连通性测试超时时间（秒）
+    test_timeout = 10
 
-    # 测试最新交易日期查找
     try:
-        trade_date = await asyncio.to_thread(adapter.find_latest_trade_date)
-        if trade_date:
-            result["tests"]["trade_date"] = {
-                "success": True,
-                "date": trade_date,
-                "message": f"Found latest trade date: {trade_date}"
-            }
-        else:
-            result["tests"]["trade_date"] = {
-                "success": False,
-                "date": None,
-                "message": "No trade date found"
-            }
-    except Exception as e:
-        result["tests"]["trade_date"] = {
-            "success": False,
-            "date": None,
-            "message": f"Error: {str(e)}"
-        }
+        # 测试连通性 - 只获取 1 条数据验证
+        logger.info(f"🧪 测试 {adapter.name} 连通性 (超时: {test_timeout}秒)...")
 
-    # 测试每日基础数据获取（如果支持）
-    try:
-        trade_date = result["tests"]["trade_date"].get("date")
-        if trade_date:
-            df = await asyncio.to_thread(adapter.get_daily_basic, trade_date)
+        try:
+            # 在线程池中运行同步方法，避免阻塞事件循环
+            df = await asyncio.wait_for(
+                asyncio.to_thread(adapter.get_stock_list),
+                timeout=test_timeout
+            )
+
             if df is not None and not df.empty:
-                result["tests"]["daily_basic"] = {
-                    "success": True,
-                    "count": len(df),
-                    "message": f"Successfully fetched daily data for {len(df)} stocks"
-                }
+                result["available"] = True
+                result["message"] = f"✅ 连接成功 (获取 {len(df)} 条数据)"
+                logger.info(f"✅ {adapter.name} 连通性测试成功")
             else:
-                result["tests"]["daily_basic"] = {
-                    "success": False,
-                    "count": 0,
-                    "message": "No daily basic data available or not supported"
-                }
-        else:
-            result["tests"]["daily_basic"] = {
-                "success": False,
-                "count": 0,
-                "message": "Cannot test without valid trade date"
-            }
+                result["available"] = False
+                result["message"] = "❌ 无法获取数据"
+                logger.warning(f"⚠️ {adapter.name} 返回空数据")
+        except asyncio.TimeoutError:
+            result["available"] = False
+            result["message"] = f"❌ 连接超时 ({test_timeout}秒)"
+            logger.warning(f"⚠️ {adapter.name} 连接超时")
+        except Exception as e:
+            result["available"] = False
+            result["message"] = f"❌ 连接失败: {str(e)}"
+            logger.error(f"❌ {adapter.name} 连接失败: {e}")
+
     except Exception as e:
-        result["tests"]["daily_basic"] = {
-            "success": False,
-            "count": 0,
-            "message": f"Error: {str(e)}"
-        }
+        result["available"] = False
+        result["message"] = f"❌ 测试异常: {str(e)}"
+        logger.error(f"❌ 测试 {adapter.name} 时出错: {e}")
 
     return result
 
@@ -222,45 +183,44 @@ async def _test_single_adapter(adapter) -> dict:
 @router.post("/test-sources")
 async def test_data_sources():
     """
-    测试所有数据源的连接和数据获取能力
+    测试所有数据源的连通性
 
-    注意：此接口会执行耗时操作（获取股票列表等），
-    所有同步操作都在后台线程中执行，避免阻塞事件循环
+    只做轻量级连通性测试，不获取完整数据
+    - 测试超时: 10秒
+    - 只获取1条数据验证连接
+    - 快速返回结果
     """
     try:
         manager = DataSourceManager()
-        available_adapters = manager.get_available_adapters()
+        all_adapters = manager.adapters
 
-        logger.info(f"🧪 开始测试 {len(available_adapters)} 个数据源...")
+        logger.info(f"🧪 开始测试 {len(all_adapters)} 个数据源的连通性...")
 
         # 并发测试所有适配器（在后台线程中执行）
-        test_tasks = [_test_single_adapter(adapter) for adapter in available_adapters]
+        test_tasks = [_test_single_adapter(adapter) for adapter in all_adapters]
         test_results = await asyncio.gather(*test_tasks, return_exceptions=True)
 
         # 处理异常结果
         final_results = []
         for i, result in enumerate(test_results):
             if isinstance(result, Exception):
-                logger.error(f"❌ 测试适配器 {available_adapters[i].name} 时出错: {result}")
+                logger.error(f"❌ 测试适配器 {all_adapters[i].name} 时出错: {result}")
                 final_results.append({
-                    "name": available_adapters[i].name,
-                    "priority": available_adapters[i].priority,
+                    "name": all_adapters[i].name,
+                    "priority": all_adapters[i].priority,
                     "available": False,
-                    "tests": {
-                        "error": {
-                            "success": False,
-                            "message": f"Test failed: {str(result)}"
-                        }
-                    }
+                    "message": f"❌ 测试异常: {str(result)}"
                 })
             else:
                 final_results.append(result)
 
-        logger.info(f"✅ 数据源测试完成，共测试 {len(final_results)} 个数据源")
+        # 统计结果
+        available_count = sum(1 for r in final_results if r.get("available"))
+        logger.info(f"✅ 数据源连通性测试完成: {available_count}/{len(final_results)} 可用")
 
         return SyncResponse(
             success=True,
-            message=f"Tested {len(final_results)} data sources",
+            message=f"Tested {len(final_results)} data sources, {available_count} available",
             data={"test_results": final_results}
         )
 
