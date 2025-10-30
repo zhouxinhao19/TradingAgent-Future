@@ -199,6 +199,7 @@ class MongoDBCacheAdapter:
                         query["trade_date"] = {"$lte": end_date}
 
                 # 查询数据
+                logger.debug(f"🔍 [MongoDB查询] 尝试数据源: {data_source}, symbol={code6}, period={period}")
                 cursor = collection.find(query, {"_id": 0}).sort("trade_date", 1)
                 data = list(cursor)
 
@@ -206,9 +207,11 @@ class MongoDBCacheAdapter:
                     df = pd.DataFrame(data)
                     logger.info(f"✅ [数据来源: MongoDB-{data_source}] {symbol}, {len(df)}条记录 (period={period})")
                     return df
+                else:
+                    logger.debug(f"⚠️ [MongoDB-{data_source}] 未找到{period}数据: {symbol}")
 
             # 所有数据源都没有数据
-            logger.debug(f"📊 [数据来源: MongoDB] 所有数据源都没有{period}数据: {symbol}")
+            logger.warning(f"⚠️ [数据来源: MongoDB] 所有数据源({', '.join(priority_order)})都没有{period}数据: {symbol}，降级到其他数据源")
             return None
 
         except Exception as e:

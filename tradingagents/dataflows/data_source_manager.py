@@ -865,18 +865,18 @@ class DataSourceManager:
             df = adapter.get_historical_data(symbol, start_date, end_date, period=period)
 
             if df is not None and not df.empty:
-                logger.info(f"✅ [数据来源: MongoDB-{period}] 成功获取数据: {symbol} ({len(df)}条记录)")
+                logger.info(f"✅ [数据来源: MongoDB] 成功获取{period}数据: {symbol} ({len(df)}条记录)")
                 # 转换为字符串格式返回
                 return df.to_string()
             else:
-                logger.warning(f"⚠️ [数据来源: MongoDB] 未找到{period}数据: {symbol}，降级到其他数据源")
-                # MongoDB没有数据，降级到其他数据源
+                # MongoDB没有数据（adapter内部已记录详细的数据源信息），降级到其他数据源
+                logger.info(f"🔄 [MongoDB] 未找到{period}数据: {symbol}，开始尝试备用数据源")
                 return self._try_fallback_sources(symbol, start_date, end_date, period)
 
         except Exception as e:
-            logger.error(f"❌ [数据来源: MongoDB异常] 获取失败: {e}")
+            logger.error(f"❌ [数据来源: MongoDB异常] 获取{period}数据失败: {symbol}, 错误: {e}")
             # MongoDB异常，降级到其他数据源
-            return self._try_fallback_sources(symbol, start_date, end_date)
+            return self._try_fallback_sources(symbol, start_date, end_date, period)
 
     def _get_tushare_data(self, symbol: str, start_date: str, end_date: str, period: str = "daily") -> str:
         """使用Tushare获取多周期数据 - 使用provider + 统一缓存"""
@@ -1105,7 +1105,7 @@ class DataSourceManager:
 
     def _try_fallback_sources(self, symbol: str, start_date: str, end_date: str, period: str = "daily") -> str:
         """尝试备用数据源 - 避免递归调用"""
-        logger.error(f"🔄 {self.current_source.value}失败，尝试备用数据源获取{period}数据...")
+        logger.info(f"🔄 [{self.current_source.value}] 失败，尝试备用数据源获取{period}数据: {symbol}")
 
         # 🔥 从数据库获取数据源优先级顺序（根据股票代码识别市场）
         # 注意：不包含MongoDB，因为MongoDB是最高优先级，如果失败了就不再尝试
@@ -1114,7 +1114,7 @@ class DataSourceManager:
         for source in fallback_order:
             if source != self.current_source and source in self.available_sources:
                 try:
-                    logger.info(f"🔄 尝试备用数据源获取{period}数据: {source.value}")
+                    logger.info(f"🔄 [备用数据源] 尝试 {source.value} 获取{period}数据: {symbol}")
 
                     # 直接调用具体的数据源方法，避免递归
                     if source == ChinaDataSource.TUSHARE:
@@ -1129,15 +1129,16 @@ class DataSourceManager:
                         continue
 
                     if "❌" not in result:
-                        logger.info(f"✅ [数据来源: 备用数据源] 降级成功获取{period}数据: {source.value}")
+                        logger.info(f"✅ [备用数据源-{source.value}] 成功获取{period}数据: {symbol}")
                         return result
                     else:
-                        logger.warning(f"⚠️ 备用数据源{source.value}返回错误结果")
+                        logger.warning(f"⚠️ [备用数据源-{source.value}] 返回错误结果: {symbol}")
 
                 except Exception as e:
-                    logger.error(f"❌ 备用数据源{source.value}也失败: {e}")
+                    logger.error(f"❌ [备用数据源-{source.value}] 获取失败: {symbol}, 错误: {e}")
                     continue
 
+        logger.error(f"❌ [所有数据源失败] 无法获取{period}数据: {symbol}")
         return f"❌ 所有数据源都无法获取{symbol}的{period}数据"
 
     def get_stock_info(self, symbol: str) -> Dict:
