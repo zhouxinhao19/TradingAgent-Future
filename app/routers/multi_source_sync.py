@@ -180,10 +180,18 @@ async def _test_single_adapter(adapter) -> dict:
     return result
 
 
+class TestSourceRequest(BaseModel):
+    """测试数据源请求"""
+    source_name: str | None = None
+
+
 @router.post("/test-sources")
-async def test_data_sources():
+async def test_data_sources(request: TestSourceRequest | None = None):
     """
-    测试所有数据源的连通性
+    测试数据源的连通性
+
+    参数:
+    - source_name: 可选，指定要测试的数据源名称。如果不指定，则测试所有数据源
 
     只做轻量级连通性测试，不获取完整数据
     - 测试超时: 10秒
@@ -194,20 +202,34 @@ async def test_data_sources():
         manager = DataSourceManager()
         all_adapters = manager.adapters
 
-        logger.info(f"🧪 开始测试 {len(all_adapters)} 个数据源的连通性...")
+        # 从请求体中获取数据源名称
+        source_name = request.source_name if request else None
 
-        # 并发测试所有适配器（在后台线程中执行）
-        test_tasks = [_test_single_adapter(adapter) for adapter in all_adapters]
+        # 如果指定了数据源名称，只测试该数据源
+        if source_name:
+            adapters_to_test = [a for a in all_adapters if a.name.lower() == source_name.lower()]
+            if not adapters_to_test:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Data source '{source_name}' not found"
+                )
+            logger.info(f"🧪 开始测试数据源: {source_name}")
+        else:
+            adapters_to_test = all_adapters
+            logger.info(f"🧪 开始测试 {len(all_adapters)} 个数据源的连通性...")
+
+        # 并发测试适配器（在后台线程中执行）
+        test_tasks = [_test_single_adapter(adapter) for adapter in adapters_to_test]
         test_results = await asyncio.gather(*test_tasks, return_exceptions=True)
 
         # 处理异常结果
         final_results = []
         for i, result in enumerate(test_results):
             if isinstance(result, Exception):
-                logger.error(f"❌ 测试适配器 {all_adapters[i].name} 时出错: {result}")
+                logger.error(f"❌ 测试适配器 {adapters_to_test[i].name} 时出错: {result}")
                 final_results.append({
-                    "name": all_adapters[i].name,
-                    "priority": all_adapters[i].priority,
+                    "name": adapters_to_test[i].name,
+                    "priority": adapters_to_test[i].priority,
                     "available": False,
                     "message": f"❌ 测试异常: {str(result)}"
                 })
@@ -216,7 +238,10 @@ async def test_data_sources():
 
         # 统计结果
         available_count = sum(1 for r in final_results if r.get("available"))
-        logger.info(f"✅ 数据源连通性测试完成: {available_count}/{len(final_results)} 可用")
+        if source_name:
+            logger.info(f"✅ 数据源 {source_name} 测试完成: {'可用' if available_count > 0 else '不可用'}")
+        else:
+            logger.info(f"✅ 数据源连通性测试完成: {available_count}/{len(final_results)} 可用")
 
         return SyncResponse(
             success=True,
@@ -224,6 +249,8 @@ async def test_data_sources():
             data={"test_results": final_results}
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ 测试数据源时出错: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to test data sources: {str(e)}")
