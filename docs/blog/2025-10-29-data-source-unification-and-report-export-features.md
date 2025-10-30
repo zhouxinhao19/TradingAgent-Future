@@ -250,9 +250,349 @@ RUN apt-get update && apt-get install -y \
 
 ---
 
-### 3. 数据同步进度优化
+### 3. 系统日志导出功能
 
-#### 3.1 问题背景
+#### 3.1 功能背景
+
+**提交记录**：
+- `98d173b` - feat: 添加系统日志导出功能
+- `7205e52` - feat: 统一日志配置到TOML，支持Docker环境生成tradingagents.log
+- `c93c20c` - fix: 修复Docker环境下日志导出服务找不到日志文件的问题
+
+**功能描述**：
+
+用户反馈问题较多，但不方便查看日志。新增系统日志导出功能，让用户能在界面上查看和导出日志。
+
+1. **后端服务**
+   - 日志文件列表查询
+   - 日志内容读取（支持过滤）
+   - 日志导出（ZIP/TXT格式）
+   - 日志统计信息
+
+2. **前端功能**
+   - 日志文件列表展示
+   - 日志统计信息展示
+   - 在线查看日志内容
+   - 日志过滤（级别、关键词、行数）
+   - 单个/批量日志导出
+
+3. **日志配置统一**
+   - 日志配置从代码迁移到 TOML 文件
+   - Docker 环境支持生成 tradingagents.log
+   - 所有应用日志汇总到主日志文件
+
+#### 3.2 技术实现
+
+**步骤 1：后端日志导出服务**
+
+```python
+# app/services/log_export_service.py
+class LogExportService:
+    """日志导出服务"""
+
+    async def get_log_files(self) -> List[Dict]:
+        """获取日志文件列表"""
+        log_dir = Path(self.log_directory)
+        files = []
+        for log_file in log_dir.glob("*.log"):
+            stat = log_file.stat()
+            files.append({
+                "filename": log_file.name,
+                "size": stat.st_size,
+                "modified": stat.st_mtime,
+                "lines": self._count_lines(log_file)
+            })
+        return files
+
+    async def read_logs(
+        self,
+        filename: str,
+        level: Optional[str] = None,
+        keyword: Optional[str] = None,
+        lines: int = 100
+    ) -> str:
+        """读取日志内容，支持过滤"""
+        log_file = self.log_directory / filename
+
+        with open(log_file, 'r', encoding='utf-8') as f:
+            all_lines = f.readlines()
+
+        # 过滤日志
+        filtered_lines = all_lines
+        if level:
+            filtered_lines = [l for l in filtered_lines if level in l]
+        if keyword:
+            filtered_lines = [l for l in filtered_lines if keyword in l]
+
+        # 返回最后N行
+        return ''.join(filtered_lines[-lines:])
+
+    async def export_logs(
+        self,
+        filenames: List[str],
+        format: str = "zip"
+    ) -> bytes:
+        """导出日志文件"""
+        if format == "zip":
+            return self._create_zip(filenames)
+        else:
+            return self._create_txt(filenames)
+
+    async def get_statistics(self) -> Dict:
+        """获取日志统计信息"""
+        stats = {
+            "total_files": 0,
+            "total_size": 0,
+            "error_count": 0,
+            "warning_count": 0,
+            "info_count": 0
+        }
+
+        for log_file in Path(self.log_directory).glob("*.log"):
+            stats["total_files"] += 1
+            stats["total_size"] += log_file.stat().st_size
+
+            with open(log_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if "ERROR" in line:
+                        stats["error_count"] += 1
+                    elif "WARNING" in line:
+                        stats["warning_count"] += 1
+                    elif "INFO" in line:
+                        stats["info_count"] += 1
+
+        return stats
+```
+
+**步骤 2：后端 API 路由**
+
+```python
+# app/routers/logs.py
+@router.get("/api/system/logs/files")
+async def get_log_files():
+    """获取日志文件列表"""
+    service = LogExportService()
+    return await service.get_log_files()
+
+@router.post("/api/system/logs/read")
+async def read_logs(request: ReadLogsRequest):
+    """读取日志内容"""
+    service = LogExportService()
+    content = await service.read_logs(
+        request.filename,
+        request.level,
+        request.keyword,
+        request.lines
+    )
+    return {"content": content}
+
+@router.post("/api/system/logs/export")
+async def export_logs(request: ExportLogsRequest):
+    """导出日志文件"""
+    service = LogExportService()
+    content = await service.export_logs(request.filenames, request.format)
+    return StreamingResponse(
+        iter([content]),
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=logs.zip"}
+    )
+
+@router.get("/api/system/logs/statistics")
+async def get_statistics():
+    """获取日志统计"""
+    service = LogExportService()
+    return await service.get_statistics()
+```
+
+**步骤 3：前端日志管理页面**
+
+```vue
+<!-- frontend/src/views/System/LogManagement.vue -->
+<template>
+  <div class="log-management">
+    <!-- 统计信息 -->
+    <el-row :gutter="20" style="margin-bottom: 20px;">
+      <el-col :xs="24" :sm="12" :md="6">
+        <el-statistic title="日志文件数" :value="statistics.total_files" />
+      </el-col>
+      <el-col :xs="24" :sm="12" :md="6">
+        <el-statistic title="总大小" :value="formatSize(statistics.total_size)" />
+      </el-col>
+      <el-col :xs="24" :sm="12" :md="6">
+        <el-statistic title="错误数" :value="statistics.error_count" />
+      </el-col>
+      <el-col :xs="24" :sm="12" :md="6">
+        <el-statistic title="警告数" :value="statistics.warning_count" />
+      </el-col>
+    </el-row>
+
+    <!-- 日志文件列表 -->
+    <el-card>
+      <template #header>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span>日志文件</span>
+          <el-button type="primary" @click="exportSelected">导出选中</el-button>
+        </div>
+      </template>
+
+      <el-table v-model:data="logFiles" @selection-change="handleSelectionChange">
+        <el-table-column type="selection" width="50" />
+        <el-table-column prop="filename" label="文件名" />
+        <el-table-column prop="size" label="大小" :formatter="formatSize" />
+        <el-table-column prop="lines" label="行数" />
+        <el-table-column label="操作" width="200">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="viewLog(row)">查看</el-button>
+            <el-button link type="primary" @click="downloadLog(row)">下载</el-button>
+            <el-button link type="danger" @click="deleteLog(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <!-- 日志查看对话框 -->
+    <el-dialog v-model="viewDialogVisible" title="查看日志" width="80%">
+      <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+        <el-select v-model="filterLevel" placeholder="日志级别" style="width: 150px;">
+          <el-option label="全部" value="" />
+          <el-option label="ERROR" value="ERROR" />
+          <el-option label="WARNING" value="WARNING" />
+          <el-option label="INFO" value="INFO" />
+        </el-select>
+        <el-input v-model="filterKeyword" placeholder="关键词" style="width: 200px;" />
+        <el-input-number v-model="filterLines" :min="10" :max="1000" placeholder="行数" />
+        <el-button type="primary" @click="loadLogContent">刷新</el-button>
+      </div>
+      <el-input
+        v-model="logContent"
+        type="textarea"
+        :rows="20"
+        readonly
+        style="font-family: monospace; font-size: 12px;"
+      />
+    </el-dialog>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+import { getLogFiles, readLogs, exportLogs, getStatistics } from '@/api/logs'
+
+const logFiles = ref([])
+const statistics = ref({})
+const selectedFiles = ref([])
+const viewDialogVisible = ref(false)
+const currentLogFile = ref('')
+const logContent = ref('')
+const filterLevel = ref('')
+const filterKeyword = ref('')
+const filterLines = ref(100)
+
+onMounted(async () => {
+  await loadLogFiles()
+  await loadStatistics()
+})
+
+const loadLogFiles = async () => {
+  logFiles.value = await getLogFiles()
+}
+
+const loadStatistics = async () => {
+  statistics.value = await getStatistics()
+}
+
+const viewLog = async (row) => {
+  currentLogFile.value = row.filename
+  viewDialogVisible.value = true
+  await loadLogContent()
+}
+
+const loadLogContent = async () => {
+  logContent.value = await readLogs({
+    filename: currentLogFile.value,
+    level: filterLevel.value,
+    keyword: filterKeyword.value,
+    lines: filterLines.value
+  })
+}
+
+const downloadLog = async (row) => {
+  await exportLogs([row.filename], 'zip')
+}
+
+const exportSelected = async () => {
+  if (selectedFiles.value.length === 0) {
+    ElMessage.warning('请选择要导出的日志文件')
+    return
+  }
+  const filenames = selectedFiles.value.map(f => f.filename)
+  await exportLogs(filenames, 'zip')
+}
+
+const handleSelectionChange = (selection) => {
+  selectedFiles.value = selection
+}
+
+const formatSize = (bytes) => {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+}
+</script>
+```
+
+**步骤 4：日志配置统一到 TOML**
+
+```toml
+# config/logging_docker.toml
+[handlers.file_main]
+class = "logging.handlers.RotatingFileHandler"
+filename = "/app/logs/tradingagents.log"
+maxBytes = 10485760  # 10MB
+backupCount = 5
+formatter = "standard"
+
+[handlers.file_webapi]
+class = "logging.handlers.RotatingFileHandler"
+filename = "/app/logs/webapi.log"
+maxBytes = 10485760
+backupCount = 5
+formatter = "standard"
+
+[handlers.file_worker]
+class = "logging.handlers.RotatingFileHandler"
+filename = "/app/logs/worker.log"
+maxBytes = 10485760
+backupCount = 5
+formatter = "standard"
+
+[handlers.file_error]
+class = "logging.handlers.RotatingFileHandler"
+filename = "/app/logs/error.log"
+maxBytes = 10485760
+backupCount = 5
+formatter = "standard"
+
+[loggers.tradingagents]
+level = "INFO"
+handlers = ["console", "file_main"]
+propagate = false
+```
+
+**效果**：
+- ✅ 用户可在界面查看日志
+- ✅ 支持多种过滤条件
+- ✅ 支持日志导出和下载
+- ✅ 日志配置统一管理
+- ✅ Docker 环境完整支持
+
+---
+
+### 4. 数据同步进度优化
+
+#### 4.1 问题背景
 
 **提交记录**：
 - `49f2d39` - feat: 增加多数据源同步详细进度日志
@@ -269,7 +609,7 @@ RUN apt-get update && apt-get install -y \
    - 无法快速定位同步失败的位置
    - 错误统计不清楚
 
-#### 3.2 解决方案
+#### 4.2 解决方案
 
 **步骤 1：BaoStock 适配器增加进度日志**
 
@@ -280,7 +620,7 @@ def sync_stock_data(self, symbols: List[str]):
     total = len(symbols)
     success_count = 0
     fail_count = 0
-    
+
     for i, symbol in enumerate(symbols):
         try:
             data = self._fetch_data(symbol)
@@ -289,12 +629,12 @@ def sync_stock_data(self, symbols: List[str]):
             fail_count += 1
             if fail_count % 50 == 0:
                 logger.warning(f"⚠️ 已失败 {fail_count} 次")
-        
+
         # 每处理50只股票输出一次进度
         if (i + 1) % 50 == 0:
             progress = (i + 1) / total * 100
             logger.info(f"📊 同步进度: {progress:.1f}% ({i + 1}/{total}), 最新: {symbol}")
-    
+
     logger.info(f"✅ 同步完成: 成功 {success_count}, 失败 {fail_count}")
 ```
 
@@ -305,17 +645,17 @@ def sync_stock_data(self, symbols: List[str]):
 async def sync_all_sources(self, symbols: List[str]):
     """同步所有数据源，添加进度日志"""
     logger.info(f"🚀 开始同步 {len(symbols)} 只股票")
-    
+
     for source in self.sources:
         logger.info(f"📊 处理数据源: {source.name}")
-        
+
         # 批量写入时显示进度
         for i in range(0, len(symbols), 100):
             batch = symbols[i:i+100]
             progress = (i + 100) / len(symbols) * 100
             logger.info(f"📝 批量写入进度: {progress:.1f}%")
             await self.write_batch(batch)
-        
+
         logger.info(f"✅ {source.name} 同步完成")
 ```
 
@@ -340,17 +680,24 @@ const syncRequest = axios.create({
 
 ### 提交统计（2025-10-29）
 - **总提交数**: 21 个
-- **修改文件数**: 30+ 个
-- **新增代码**: ~1500 行
-- **删除代码**: ~200 行
-- **净增代码**: ~1300 行
+- **修改文件数**: 40+ 个
+- **新增代码**: ~2500 行
+- **删除代码**: ~300 行
+- **净增代码**: ~2200 行
 
 ### 功能分类
 - **数据源统一**: 1 项
 - **报告导出**: 4 项
+- **系统日志**: 3 项
 - **数据同步**: 1 项
-- **日志系统**: 3 项
 - **其他优化**: 12 项
+
+### 代码行数分布
+- **系统日志功能**: ~1100 行（后端服务 + API + 前端页面）
+- **报告导出功能**: ~900 行（导出工具 + API + 前端）
+- **数据源统一**: ~160 行
+- **数据同步进度**: ~250 行
+- **其他优化**: ~400 行
 
 ---
 
@@ -367,10 +714,28 @@ const syncRequest = axios.create({
 
 **特点**：
 - 模块化的导出工具类
-- 支持多种格式转换
+- 支持多种格式转换（Markdown、JSON、DOCX、PDF）
 - Docker 完整集成
 
-### 3. 进度反馈机制
+### 3. 系统日志管理
+
+**特点**：
+- 完整的日志查看和导出功能
+- 灵活的日志过滤（级别、关键词、行数）
+- 日志统计和分析
+- 安全的文件操作（防止路径遍历）
+- 支持大文件分页读取
+- 支持 ZIP 压缩导出
+
+### 4. 日志配置统一
+
+**特点**：
+- 日志配置从代码迁移到 TOML 文件
+- 支持多个日志文件（主日志、WebAPI、Worker、错误日志）
+- Docker 环境完整支持
+- 灵活的日志级别和处理器配置
+
+### 5. 进度反馈机制
 
 **特点**：
 - 详细的进度日志
@@ -385,8 +750,8 @@ const syncRequest = axios.create({
 
 **提交统计**：
 - ✅ **21 次提交**
-- ✅ **30+ 个文件修改**
-- ✅ **1500+ 行新增代码**
+- ✅ **40+ 个文件修改**
+- ✅ **2500+ 行新增代码**
 
 **核心价值**：
 
@@ -397,6 +762,7 @@ const syncRequest = axios.create({
 
 2. **功能完整性增强**
    - 支持 4 种报告导出格式
+   - 新增系统日志管理功能
    - 用户体验更友好
    - 满足不同使用场景
 
@@ -404,11 +770,21 @@ const syncRequest = axios.create({
    - 详细的进度日志
    - 错误统计清晰
    - 调试更容易
+   - 日志配置统一管理
 
 4. **用户体验优化**
    - 数据一致性保证
    - 多格式导出选择
    - 同步进度可见
+   - 日志查看和导出便捷
+   - 问题诊断更容易
+
+5. **系统日志管理**
+   - 完整的日志查看界面
+   - 灵活的日志过滤和搜索
+   - 日志统计和分析
+   - 支持批量导出
+   - Docker 环境完整支持
 
 ---
 
