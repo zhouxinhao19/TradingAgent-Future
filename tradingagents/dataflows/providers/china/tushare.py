@@ -117,18 +117,13 @@ class TushareProvider(BaseStockDataProvider):
                     ts.set_token(db_token)
                     self.api = ts.pro_api()
 
-                    # 测试连接 - 使用超时
+                    # 测试连接 - 直接调用同步方法（不使用 asyncio.run）
                     try:
                         self.logger.info("🔄 [步骤3.1] 调用 stock_basic API 测试连接...")
-                        test_data = asyncio.run(
-                            asyncio.wait_for(
-                                asyncio.to_thread(self.api.stock_basic, list_status='L', limit=1),
-                                timeout=test_timeout
-                            )
-                        )
+                        test_data = self.api.stock_basic(list_status='L', limit=1)
                         self.logger.info(f"✅ [步骤3.1] API 调用成功，返回数据: {len(test_data) if test_data is not None else 0} 条")
-                    except asyncio.TimeoutError:
-                        self.logger.warning(f"⚠️ [步骤3.1] 数据库 Token 测试超时 ({test_timeout}秒)，尝试降级到 .env 配置...")
+                    except Exception as e:
+                        self.logger.warning(f"⚠️ [步骤3.1] 数据库 Token 测试失败: {e}，尝试降级到 .env 配置...")
                         test_data = None
 
                     if test_data is not None and not test_data.empty:
@@ -148,18 +143,13 @@ class TushareProvider(BaseStockDataProvider):
                     ts.set_token(env_token)
                     self.api = ts.pro_api()
 
-                    # 测试连接 - 使用超时
+                    # 测试连接 - 直接调用同步方法（不使用 asyncio.run）
                     try:
                         self.logger.info("🔄 [步骤4.1] 调用 stock_basic API 测试连接...")
-                        test_data = asyncio.run(
-                            asyncio.wait_for(
-                                asyncio.to_thread(self.api.stock_basic, list_status='L', limit=1),
-                                timeout=test_timeout
-                            )
-                        )
+                        test_data = self.api.stock_basic(list_status='L', limit=1)
                         self.logger.info(f"✅ [步骤4.1] API 调用成功，返回数据: {len(test_data) if test_data is not None else 0} 条")
-                    except asyncio.TimeoutError:
-                        self.logger.error(f"❌ [步骤4.1] .env Token 测试超时 ({test_timeout}秒)")
+                    except Exception as e:
+                        self.logger.error(f"❌ [步骤4.1] .env Token 测试失败: {e}")
                         return False
 
                     if test_data is not None and not test_data.empty:
