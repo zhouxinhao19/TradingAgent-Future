@@ -67,7 +67,7 @@ class HistoricalDataService:
             # 准备批量操作
             operations = []
             saved_count = 0
-            batch_size = 500  # 减小批量大小，避免超时
+            batch_size = 200  # 进一步减小批量大小，避免超时（从500改为200）
 
             for date_index, row in data.iterrows():
                 try:
@@ -119,7 +119,7 @@ class HistoricalDataService:
         self,
         symbol: str,
         operations: List,
-        max_retries: int = 3
+        max_retries: int = 5  # 增加重试次数：从3次改为5次
     ) -> int:
         """
         执行批量写入，带重试机制
@@ -145,16 +145,28 @@ class HistoricalDataService:
             except asyncio.TimeoutError as e:
                 retry_count += 1
                 if retry_count < max_retries:
-                    wait_time = 2 ** retry_count  # 指数退避：2秒、4秒、8秒
-                    logger.warning(f"⚠️ {symbol} 批量写入超时 (第{retry_count}次重试)，等待{wait_time}秒后重试...")
+                    wait_time = 3 ** retry_count  # 更长的指数退避：3秒、9秒、27秒、81秒
+                    logger.warning(f"⚠️ {symbol} 批量写入超时 (第{retry_count}/{max_retries}次重试)，等待{wait_time}秒后重试...")
                     await asyncio.sleep(wait_time)
                 else:
                     logger.error(f"❌ {symbol} 批量写入失败，已重试{max_retries}次: {e}")
                     return 0
 
             except Exception as e:
-                logger.error(f"❌ {symbol} 批量写入失败: {e}")
-                return 0
+                # 检查是否是超时相关的错误
+                error_msg = str(e).lower()
+                if 'timeout' in error_msg or 'timed out' in error_msg:
+                    retry_count += 1
+                    if retry_count < max_retries:
+                        wait_time = 3 ** retry_count
+                        logger.warning(f"⚠️ {symbol} 批量写入超时 (第{retry_count}/{max_retries}次重试)，等待{wait_time}秒后重试... 错误: {e}")
+                        await asyncio.sleep(wait_time)
+                    else:
+                        logger.error(f"❌ {symbol} 批量写入失败，已重试{max_retries}次: {e}")
+                        return 0
+                else:
+                    logger.error(f"❌ {symbol} 批量写入失败: {e}")
+                    return 0
 
         return saved_count
 
