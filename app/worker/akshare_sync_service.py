@@ -256,8 +256,11 @@ class AKShareSyncService:
         try:
             # 1. 确定要同步的股票列表
             if symbols is None:
-                # 从数据库获取所有股票代码
-                basic_info_cursor = self.db.stock_basic_info.find({}, {"code": 1})
+                # 从数据库获取所有上市状态的股票代码（排除退市股票）
+                basic_info_cursor = self.db.stock_basic_info.find(
+                    {"list_status": "L"},  # 只获取上市状态的股票
+                    {"code": 1}
+                )
                 symbols = [doc["code"] async for doc in basic_info_cursor]
 
             if not symbols:
