@@ -739,12 +739,19 @@ class SimpleAnalysisService:
                 logger.error(error_msg)
                 logger.error(f"💡 建议: {validation_result.suggestion}")
 
+                # 构建用户友好的错误消息
+                user_friendly_error = (
+                    f"❌ 股票代码无效\n\n"
+                    f"{validation_result.error_message}\n\n"
+                    f"💡 {validation_result.suggestion}"
+                )
+
                 # 更新任务状态为失败
                 await self.memory_manager.update_task_status(
                     task_id=task_id,
                     status=AnalysisStatus.FAILED,
                     progress=0,
-                    error_message=validation_result.error_message
+                    error_message=user_friendly_error
                 )
 
                 # 更新MongoDB状态
@@ -752,7 +759,7 @@ class SimpleAnalysisService:
                     task_id,
                     AnalysisStatus.FAILED,
                     0,
-                    error_message=validation_result.error_message
+                    error_message=user_friendly_error
                 )
 
                 return
@@ -880,9 +887,30 @@ class SimpleAnalysisService:
         except Exception as e:
             logger.error(f"❌ 后台分析任务失败: {task_id} - {e}")
 
+            # 格式化错误信息为用户友好的提示
+            from ..utils.error_formatter import ErrorFormatter
+
+            # 收集上下文信息
+            error_context = {}
+            if hasattr(request, 'parameters') and request.parameters:
+                if hasattr(request.parameters, 'quick_model'):
+                    error_context['model'] = request.parameters.quick_model
+                if hasattr(request.parameters, 'deep_model'):
+                    error_context['model'] = request.parameters.deep_model
+
+            # 格式化错误
+            formatted_error = ErrorFormatter.format_error(str(e), error_context)
+
+            # 构建用户友好的错误消息
+            user_friendly_error = (
+                f"{formatted_error['title']}\n\n"
+                f"{formatted_error['message']}\n\n"
+                f"💡 {formatted_error['suggestion']}"
+            )
+
             # 标记进度跟踪器失败
             if progress_tracker:
-                progress_tracker.mark_failed(str(e))
+                progress_tracker.mark_failed(user_friendly_error)
 
             # 更新状态为失败
             await self.memory_manager.update_task_status(
@@ -891,11 +919,11 @@ class SimpleAnalysisService:
                 progress=0,
                 message="分析失败",
                 current_step="failed",
-                error_message=str(e)
+                error_message=user_friendly_error
             )
 
             # 同步更新MongoDB状态为失败
-            await self._update_task_status(task_id, AnalysisStatus.FAILED, 0, str(e))
+            await self._update_task_status(task_id, AnalysisStatus.FAILED, 0, user_friendly_error)
         finally:
             # 清理进度跟踪器缓存
             if task_id in self._progress_trackers:
@@ -1585,7 +1613,30 @@ class SimpleAnalysisService:
 
         except Exception as e:
             logger.error(f"❌ [线程池] 分析执行失败: {task_id} - {e}")
-            raise
+
+            # 格式化错误信息为用户友好的提示
+            from ..utils.error_formatter import ErrorFormatter
+
+            # 收集上下文信息
+            error_context = {}
+            if request and hasattr(request, 'parameters') and request.parameters:
+                if hasattr(request.parameters, 'quick_model'):
+                    error_context['model'] = request.parameters.quick_model
+                if hasattr(request.parameters, 'deep_model'):
+                    error_context['model'] = request.parameters.deep_model
+
+            # 格式化错误
+            formatted_error = ErrorFormatter.format_error(str(e), error_context)
+
+            # 构建用户友好的错误消息
+            user_friendly_error = (
+                f"{formatted_error['title']}\n\n"
+                f"{formatted_error['message']}\n\n"
+                f"💡 {formatted_error['suggestion']}"
+            )
+
+            # 抛出包含友好错误信息的异常
+            raise Exception(user_friendly_error) from e
 
     async def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """获取任务状态"""
