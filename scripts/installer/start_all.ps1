@@ -1,211 +1,334 @@
-<#
-TradingAgents-CN Windows Portable Starter
-Starts MongoDB, Redis, backend (FastAPI), optional Nginx.
-Encoding-safe version: ASCII-only output.
-#>
+# TradingAgents-CN Portable - Start All Services
+# This script starts MongoDB, Redis, Backend, and Nginx
 
 [CmdletBinding()]
 param(
-    [switch]$SkipMongo,
-    [switch]$SkipRedis,
-    [switch]$SkipNginx
+    [switch]$ForceImport  # Force import configuration even if already imported
 )
 
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = "Continue"
+$root = $PSScriptRoot
 
-function Read-DotEnv {
-    param([string]$Path)
-    $result = @{}
-    if (-not (Test-Path -LiteralPath $Path)) { return $result }
-    Get-Content -LiteralPath $Path | ForEach-Object {
-        $line = $_.Trim()
-        if ($line -eq '' -or $line.StartsWith('#')) { return }
-        $kv = $line -split '=', 2
-        if ($kv.Count -eq 2) { $result[$kv[0]] = $kv[1] }
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "TradingAgents-CN Portable - Start All" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
+
+# Step 1: Start MongoDB and Redis
+Write-Host "[1/4] Starting MongoDB and Redis..." -ForegroundColor Yellow
+$servicesScript = Join-Path $root "start_services_clean.ps1"
+if (Test-Path $servicesScript) {
+    & powershell -ExecutionPolicy Bypass -File $servicesScript
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: Failed to start services" -ForegroundColor Red
+        exit 1
     }
-    return $result
+} else {
+    Write-Host "ERROR: Services script not found: $servicesScript" -ForegroundColor Red
+    exit 1
 }
 
-function Ensure-Dir {
-    param([string]$Path)
-    if (-not (Test-Path -LiteralPath $Path)) { New-Item -ItemType Directory -Path $Path | Out-Null }
-}
+Write-Host ""
+Write-Host "[2/4] Waiting for services to be ready..." -ForegroundColor Yellow
+Start-Sleep -Seconds 3
 
-function Write-Ascii {
-    param([string]$Path, [string]$Content)
-    Set-Content -Path $Path -Value $Content -Encoding ASCII
-}
+# Step 2: Import configuration and create user (first time only)
+$importMarkerFile = Join-Path $root 'runtime\.config_imported'
+$needsImport = (-not (Test-Path $importMarkerFile)) -or $ForceImport
 
-function Find-FreePort {
-    param([int]$Preferred, [int]$MaxTries = 20)
-    $ports = @($Preferred)
-    for ($i = 1; $i -le $MaxTries; $i++) { $ports += ($Preferred + $i) }
-    foreach ($p in $ports) {
-        $tcpClient = New-Object System.Net.Sockets.TcpClient
+if ($needsImport) {
+    Write-Host ""
+    if ($ForceImport) {
+        Write-Host "[2.5/4] Force importing configuration and creating default user..." -ForegroundColor Yellow
+    } else {
+        Write-Host "[2.5/4] First time setup: Importing configuration and creating default user..." -ForegroundColor Yellow
+    }
+
+    $pythonExe = Join-Path $root 'venv\Scripts\python.exe'
+    if (-not (Test-Path $pythonExe)) {
+        $pythonExe = 'python'
+    }
+
+    $importScript = Join-Path $root 'scripts\import_config_and_create_user.py'
+    $configFile = Join-Path $root 'install\database_export_config_2025-10-31.json'
+
+    if ((Test-Path $importScript) -and (Test-Path $configFile)) {
         try {
-            $tcpClient.Connect('127.0.0.1', $p)
-            $tcpClient.Close()
+            Write-Host "  Running import script..." -ForegroundColor Gray
+            & $pythonExe $importScript $configFile 2>&1 | Out-Null
+
+            # Check if import was successful
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "  Configuration imported successfully" -ForegroundColor Green
+
+                # Create marker file to indicate import is done
+                $runtimeDir = Join-Path $root 'runtime'
+                if (-not (Test-Path $runtimeDir)) {
+                    New-Item -ItemType Directory -Path $runtimeDir -Force | Out-Null
+                }
+                Set-Content -Path $importMarkerFile -Value (Get-Date).ToString() -Encoding ASCII
+                Write-Host "  Import marker created: $importMarkerFile" -ForegroundColor Gray
+            } else {
+                Write-Host "  WARNING: Import script returned non-zero exit code" -ForegroundColor Yellow
+                Write-Host "  This is normal if configuration already exists" -ForegroundColor Gray
+            }
         } catch {
-            return $p
+            Write-Host "  WARNING: Failed to import configuration: $_" -ForegroundColor Yellow
+            Write-Host "  Continuing with startup..." -ForegroundColor Gray
+        }
+    } else {
+        if (-not (Test-Path $importScript)) {
+            Write-Host "  WARNING: Import script not found: $importScript" -ForegroundColor Yellow
+        }
+        if (-not (Test-Path $configFile)) {
+            Write-Host "  WARNING: Config file not found: $configFile" -ForegroundColor Yellow
+        }
+        Write-Host "  Skipping configuration import" -ForegroundColor Gray
+    }
+} else {
+    Write-Host ""
+    Write-Host "[2.5/4] Configuration already imported, skipping..." -ForegroundColor Gray
+    Write-Host "  (Use -ForceImport parameter to force re-import)" -ForegroundColor Gray
+}
+
+# Step 3: Start Backend
+Write-Host ""
+Write-Host "[3/4] Starting Backend..." -ForegroundColor Yellow
+
+# Check if port 8000 is already in use
+Write-Host "  Checking port 8000..." -ForegroundColor Gray
+$port8000InUse = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
+if ($port8000InUse) {
+    Write-Host "  WARNING: Port 8000 is already in use!" -ForegroundColor Yellow
+    foreach ($conn in $port8000InUse) {
+        $process = Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue
+        if ($process) {
+            Write-Host "    Process: $($process.ProcessName) (PID: $($process.Id))" -ForegroundColor Gray
+            Write-Host "    Path: $($process.Path)" -ForegroundColor Gray
+
+            # Check if it's a Python process (likely our backend)
+            if ($process.ProcessName -eq "python" -or $process.ProcessName -eq "pythonw") {
+                Write-Host "  Stopping existing backend process (PID: $($process.Id))..." -ForegroundColor Yellow
+                try {
+                    Stop-Process -Id $process.Id -Force -ErrorAction Stop
+                    Start-Sleep -Seconds 2
+                    Write-Host "  Existing backend process stopped" -ForegroundColor Green
+                } catch {
+                    Write-Host "  ERROR: Failed to stop process: $_" -ForegroundColor Red
+                    Write-Host "  Please manually stop the process and try again" -ForegroundColor Yellow
+                    exit 1
+                }
+            } else {
+                Write-Host "  ERROR: Port 8000 is occupied by another application" -ForegroundColor Red
+                Write-Host "  Please stop the process manually and try again" -ForegroundColor Yellow
+                exit 1
+            }
         }
     }
-    return $Preferred
 }
 
-function Start-Proc {
-    param(
-        [string]$FilePath,
-        [string]$Arguments = '',
-        [string]$WorkingDirectory = '',
-        [string]$Name = 'process'
-    )
-    Write-Host "Starting $Name ..."
-    $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = $FilePath
-    $psi.Arguments = $Arguments
-    if ($WorkingDirectory -ne '') { $psi.WorkingDirectory = $WorkingDirectory }
-    $psi.UseShellExecute = $false
-    $psi.RedirectStandardOutput = $true
-    $psi.RedirectStandardError = $true
-    $proc = [System.Diagnostics.Process]::Start($psi)
-    Start-Sleep -Milliseconds 100
-    return $proc
-}
-
-$root = (Get-Location).Path
-$envFile = Join-Path $root '.env'
-$env = Read-DotEnv $envFile
-
-Ensure-Dir (Join-Path $root 'runtime')
-Ensure-Dir (Join-Path $root 'logs')
-
-$vendors = Join-Path $root 'vendors'
-$mongoExeCandidates = Get-ChildItem -LiteralPath (Join-Path $vendors 'mongodb') -Recurse -Filter 'mongod.exe' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
-$mongoExe = $mongoExeCandidates | Select-Object -First 1
-
-$redisExeCandidates = Get-ChildItem -LiteralPath (Join-Path $vendors 'redis') -Recurse -Filter 'redis-server.exe' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
-$redisExe = $redisExeCandidates | Select-Object -First 1
-
-$nginxExeCandidates = Get-ChildItem -LiteralPath (Join-Path $vendors 'nginx') -Recurse -Filter 'nginx.exe' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
-$nginxExe = $nginxExeCandidates | Select-Object -First 1
-
-$mongoData = Join-Path $root 'data\mongodb\db'
-$redisData = Join-Path $root 'data\redis\data'
-$runtimePid = Join-Path $root 'runtime\pids.json'
-
-$backendHost = if ($env.ContainsKey('HOST')) { $env['HOST'] } else { '127.0.0.1' }
-$port = if ($env.ContainsKey('PORT')) { [int]$env['PORT'] } else { 8000 }
-$debug = if ($env.ContainsKey('DEBUG')) { $env['DEBUG'] } else { $null }
-$serveFrontend = ($env['SERVE_FRONTEND'] -eq 'true')
-$frontendPath = if ($env.ContainsKey('FRONTEND_STATIC')) { $env['FRONTEND_STATIC'] } else { 'frontend\dist' }
-$autoOpen = ($env['AUTO_OPEN_BROWSER'] -eq 'true')
-
-$selectedPort = Find-FreePort -Preferred $port
-if ($selectedPort -ne $port) {
-    Write-Host "Backend port $port is busy, using $selectedPort"
-}
-
-$procs = @{}
-
-if (-not $SkipMongo -and $mongoExe -and (Test-Path -LiteralPath $mongoExe)) {
-    Ensure-Dir $mongoData
-    $mongoArgs = "--dbpath `"$mongoData`" --bind_ip 127.0.0.1 --port 27017"
-    $p = Start-Proc -FilePath $mongoExe -Arguments $mongoArgs -Name 'MongoDB'
-    $procs['mongodb'] = $p.Id
-} else { Write-Host "MongoDB skipped or binary not found" }
-
-if (-not $SkipRedis -and $redisExe -and (Test-Path -LiteralPath $redisExe)) {
-    Ensure-Dir $redisData
-    $redisConf = Join-Path $root 'runtime\redis.conf'
-    $conf = @(
-        "bind 127.0.0.1",
-        "port 6379",
-        "dir `"$redisData`"",
-        "save 900 1",
-        "save 300 10",
-        "save 60 10000"
-    )
-    Set-Content -Path $redisConf -Value ($conf -join "`n") -Encoding ASCII
-    $p = Start-Proc -FilePath $redisExe -Arguments "`"$redisConf`"" -Name 'Redis'
-    $procs['redis'] = $p.Id
-} else { Write-Host "Redis skipped or binary not found" }
-
-# Backend
 $pythonExe = Join-Path $root 'venv\Scripts\python.exe'
-if (-not (Test-Path -LiteralPath $pythonExe)) { $pythonExe = 'python' }
-$backendArgs = "-m app"
-$env:PORT = $selectedPort
-$env:HOST = $backendHost
-if ($debug -ne $null) { $env:DEBUG = $debug }
-$p = Start-Proc -FilePath $pythonExe -Arguments $backendArgs -Name 'Backend'
-$procs['backend'] = $p.Id
-
-Start-Sleep -Seconds 2
-if ($autoOpen) {
-    $url = "http://${backendHost}:$selectedPort"
-    Write-Host "Opening browser: $url"
-    Start-Process $url | Out-Null
+if (-not (Test-Path $pythonExe)) {
+    $pythonExe = 'python'
 }
 
-if (-not $SkipNginx -and $nginxExe -and (Test-Path -LiteralPath $nginxExe)) {
-    $nginxRoot = Split-Path -Parent $nginxExe
-    $confDir = Join-Path $nginxRoot 'conf'
-    Ensure-Dir $confDir
-    $nginxConf = Join-Path $confDir 'nginx.conf'
-    if (-not (Test-Path -LiteralPath $nginxConf)) {
-        $relRoot = '../../frontend/dist'
-        $conf = @"
-worker_processes  1;
+# Start backend in background
+$backendProcess = Start-Process -FilePath $pythonExe -ArgumentList "-m", "app" -WorkingDirectory $root -WindowStyle Hidden -PassThru
+if ($backendProcess) {
+    Write-Host "  Backend started with PID: $($backendProcess.Id)" -ForegroundColor Green
+} else {
+    Write-Host "ERROR: Failed to start backend" -ForegroundColor Red
+    exit 1
+}
 
-events { worker_connections 1024; }
+# Wait for backend to be ready
+Write-Host "  Waiting for backend to be ready..."
+$maxRetries = 30
+$retryCount = 0
+$backendReady = $false
 
-http {
-    include       mime.types;
-    default_type  application/octet-stream;
-    sendfile      on;
-    keepalive_timeout 65;
+while ($retryCount -lt $maxRetries) {
+    try {
+        $response = Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/health" -TimeoutSec 2 -UseBasicParsing -ErrorAction SilentlyContinue
+        if ($response.StatusCode -eq 200) {
+            $backendReady = $true
+            break
+        }
+    } catch {
+        # Backend not ready yet
+    }
+    Start-Sleep -Seconds 1
+    $retryCount++
+    Write-Host "." -NoNewline
+}
 
-    map \$http_upgrade \$connection_upgrade { default close; 'websocket' upgrade; }
+Write-Host ""
+if ($backendReady) {
+    Write-Host "  Backend is ready!" -ForegroundColor Green
+} else {
+    Write-Host "WARNING: Backend may not be fully ready yet" -ForegroundColor Yellow
+}
 
-    server {
-        listen 80;
-        server_name localhost;
+# Step 3: Start Nginx
+Write-Host ""
+Write-Host "[4/4] Starting Nginx..." -ForegroundColor Yellow
 
-        root $relRoot;
-        index index.html;
+$nginxExe = Join-Path $root 'vendors\nginx\nginx-1.29.3\nginx.exe'
+$nginxConf = Join-Path $root 'runtime\nginx.conf'
+$nginxWorkDir = Join-Path $root 'vendors\nginx\nginx-1.29.3'
+$nginxErrorLog = Join-Path $root 'logs\nginx_error.log'
 
-        gzip on;
-        gzip_types text/plain text/css application/json application/javascript application/xml image/svg+xml;
+if (-not (Test-Path $nginxExe)) {
+    Write-Host "ERROR: Nginx executable not found: $nginxExe" -ForegroundColor Red
+    exit 1
+}
 
-        location = /index.html { add_header Cache-Control "no-cache, no-store, must-revalidate"; }
-        location /assets/ { expires 7d; add_header Cache-Control "public, max-age=604800, immutable"; }
-        location /favicon.ico { expires 7d; }
+if (-not (Test-Path $nginxConf)) {
+    Write-Host "ERROR: Nginx config not found: $nginxConf" -ForegroundColor Red
+    exit 1
+}
 
-        location / { try_files \$uri \$uri/ /index.html; }
+# Check if port 80 is already in use
+$port80InUse = Get-NetTCPConnection -LocalPort 80 -ErrorAction SilentlyContinue
+if ($port80InUse) {
+    Write-Host "  WARNING: Port 80 is already in use!" -ForegroundColor Yellow
+    foreach ($conn in $port80InUse) {
+        $process = Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue
+        if ($process) {
+            Write-Host "    Process: $($process.ProcessName) (PID: $($process.Id))" -ForegroundColor Gray
+        }
+    }
+    Write-Host "  Attempting to stop conflicting processes..." -ForegroundColor Yellow
+}
 
-        location /api/ {
-            proxy_pass http://${backendHost}:${selectedPort}/api/;
-            proxy_http_version 1.1;
-            proxy_set_header Host \$host;
-            proxy_set_header X-Real-IP \$remote_addr;
-            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-            proxy_set_header Upgrade \$http_upgrade;
-            proxy_set_header Connection \$connection_upgrade;
-            proxy_read_timeout 600s;
-            proxy_send_timeout 600s;
+# Check if Nginx is already running
+$existingNginx = Get-Process -Name "nginx" -ErrorAction SilentlyContinue
+if ($existingNginx) {
+    Write-Host "  Stopping existing Nginx processes..." -ForegroundColor Yellow
+    Stop-Process -Name "nginx" -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+}
+
+# Clean up old PID file if exists
+$nginxPidFile = Join-Path $root 'logs\nginx.pid'
+if (Test-Path $nginxPidFile) {
+    Remove-Item $nginxPidFile -Force -ErrorAction SilentlyContinue
+}
+
+# Create temp directories for Nginx
+$tempDirs = @("temp\client_body_temp", "temp\proxy_temp", "temp\fastcgi_temp", "temp\uwsgi_temp", "temp\scgi_temp")
+foreach ($dir in $tempDirs) {
+    $fullPath = Join-Path $root $dir
+    if (-not (Test-Path $fullPath)) {
+        New-Item -ItemType Directory -Path $fullPath -Force | Out-Null
+    }
+}
+
+# Create logs directory if not exists
+$logsDir = Join-Path $root 'logs'
+if (-not (Test-Path $logsDir)) {
+    New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
+}
+
+# Start Nginx with absolute paths
+try {
+    $nginxConfAbs = (Resolve-Path $nginxConf).Path
+    $rootAbs = (Resolve-Path $root).Path
+
+    $nginxArgs = @("-c", "`"$nginxConfAbs`"", "-p", "`"$rootAbs`"")
+    $nginxProcess = Start-Process -FilePath $nginxExe -ArgumentList $nginxArgs -WorkingDirectory $root -WindowStyle Hidden -PassThru
+
+    Start-Sleep -Seconds 3
+
+    # Check if Nginx is running
+    $nginxRunning = Get-Process -Name "nginx" -ErrorAction SilentlyContinue
+    if ($nginxRunning) {
+        Write-Host "  Nginx started successfully" -ForegroundColor Green
+    } else {
+        Write-Host "WARNING: Nginx process may have exited" -ForegroundColor Yellow
+
+        # Try to read error log
+        if (Test-Path $nginxErrorLog) {
+            Write-Host "  Last error from nginx_error.log:" -ForegroundColor Yellow
+            $lastErrors = Get-Content $nginxErrorLog -Tail 5 -ErrorAction SilentlyContinue
+            if ($lastErrors) {
+                foreach ($line in $lastErrors) {
+                    Write-Host "    $line" -ForegroundColor Gray
+                }
+            }
         }
 
-        location = /health { return 200 'ok'; add_header Content-Type text/plain; }
+        Write-Host "  💡 Tip: Run 'powershell -ExecutionPolicy Bypass -File scripts\diagnose_nginx.ps1' for detailed diagnosis" -ForegroundColor Cyan
     }
+} catch {
+    Write-Host "ERROR: Failed to start Nginx: $_" -ForegroundColor Red
+    Write-Host "Check logs/nginx_error.log for details" -ForegroundColor Yellow
+    exit 1
 }
-"@
-        Write-Ascii -Path $nginxConf -Content $conf
-    }
-    $p = Start-Proc -FilePath $nginxExe -Arguments '' -WorkingDirectory $nginxRoot -Name 'Nginx'
-    $procs['nginx'] = $p.Id
-} else { Write-Host "Nginx skipped or binary not found" }
 
-# Save pids.json (ASCII)
-Set-Content -Path $runtimePid -Value (ConvertTo-Json $procs -Compress) -Encoding ASCII
-Write-Host "All components started. PID file: runtime\pids.json"
-Write-Host "Backend: http://${backendHost}:${selectedPort}"
+# Summary
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "All Services Started Successfully!" -ForegroundColor Green
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Service Status:" -ForegroundColor White
+Write-Host "  MongoDB:  127.0.0.1:27017" -ForegroundColor Green
+Write-Host "  Redis:    127.0.0.1:6379" -ForegroundColor Green
+Write-Host "  Backend:  http://127.0.0.1:8000" -ForegroundColor Green
+Write-Host "  Frontend: http://127.0.0.1:80" -ForegroundColor Green
+Write-Host ""
+Write-Host "Access the application:" -ForegroundColor White
+Write-Host "  Web UI:   http://localhost" -ForegroundColor Cyan
+Write-Host "  API Docs: http://localhost/docs" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Default Login:" -ForegroundColor White
+Write-Host "  Username: admin" -ForegroundColor Cyan
+Write-Host "  Password: admin123" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Press Ctrl+C to stop all services" -ForegroundColor Yellow
+Write-Host ""
+
+# Keep script running
+try {
+    while ($true) {
+        Start-Sleep -Seconds 10
+        
+        # Check if processes are still running
+        $mongoRunning = Get-Process -Name "mongod" -ErrorAction SilentlyContinue
+        $redisRunning = Get-Process -Name "redis-server" -ErrorAction SilentlyContinue
+        $backendRunning = Get-Process -Id $backendProcess.Id -ErrorAction SilentlyContinue
+        $nginxRunning = Get-Process -Name "nginx" -ErrorAction SilentlyContinue
+        
+        if (-not $mongoRunning) {
+            Write-Host "WARNING: MongoDB process stopped" -ForegroundColor Red
+        }
+        if (-not $redisRunning) {
+            Write-Host "WARNING: Redis process stopped" -ForegroundColor Red
+        }
+        if (-not $backendRunning) {
+            Write-Host "WARNING: Backend process stopped" -ForegroundColor Red
+        }
+        if (-not $nginxRunning) {
+            Write-Host "WARNING: Nginx process stopped" -ForegroundColor Red
+        }
+    }
+} finally {
+    Write-Host ""
+    Write-Host "Stopping all services..." -ForegroundColor Yellow
+    
+    # Stop Nginx
+    Stop-Process -Name "nginx" -Force -ErrorAction SilentlyContinue
+    
+    # Stop Backend
+    if ($backendProcess) {
+        Stop-Process -Id $backendProcess.Id -Force -ErrorAction SilentlyContinue
+    }
+    
+    # Stop MongoDB and Redis
+    Stop-Process -Name "mongod" -Force -ErrorAction SilentlyContinue
+    Stop-Process -Name "redis-server" -Force -ErrorAction SilentlyContinue
+    
+    Write-Host "All services stopped" -ForegroundColor Green
+}
+
