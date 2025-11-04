@@ -273,6 +273,59 @@ def create_fundamentals_analyst(llm, toolkit):
         logger.info(f"🔍 [股票代码追踪] LLM调用前，ticker参数: '{ticker}'")
         logger.info(f"🔍 [股票代码追踪] 传递给LLM的消息数量: {len(state['messages'])}")
 
+        # 🔥 打印提交给大模型的完整内容
+        logger.info("=" * 80)
+        logger.info("📝 [提示词调试] 开始打印提交给大模型的完整内容")
+        logger.info("=" * 80)
+
+        # 1. 打印系统提示词
+        logger.info("📋 [提示词调试] 1️⃣ 系统提示词 (System Message):")
+        logger.info("-" * 80)
+        logger.info(system_message)
+        logger.info("-" * 80)
+
+        # 2. 打印完整的提示模板
+        logger.info("📋 [提示词调试] 2️⃣ 完整提示模板 (Prompt Template):")
+        logger.info("-" * 80)
+        logger.info(f"工具名称: {', '.join(tool_names)}")
+        logger.info(f"当前日期: {current_date}")
+        logger.info(f"股票代码: {ticker}")
+        logger.info(f"公司名称: {company_name}")
+        logger.info("-" * 80)
+
+        # 3. 打印消息历史
+        logger.info("📋 [提示词调试] 3️⃣ 消息历史 (Message History):")
+        logger.info("-" * 80)
+        for i, msg in enumerate(state['messages']):
+            msg_type = type(msg).__name__
+            if hasattr(msg, 'content'):
+                content_preview = str(msg.content)[:500] + "..." if len(str(msg.content)) > 500 else str(msg.content)
+                logger.info(f"消息 {i+1} [{msg_type}]:")
+                logger.info(f"  内容: {content_preview}")
+            if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                logger.info(f"  工具调用: {[tc.get('name', 'unknown') for tc in msg.tool_calls]}")
+            if hasattr(msg, 'name'):
+                logger.info(f"  工具名称: {msg.name}")
+            logger.info("-" * 40)
+        logger.info("-" * 80)
+
+        # 4. 打印绑定的工具信息
+        logger.info("📋 [提示词调试] 4️⃣ 绑定的工具 (Bound Tools):")
+        logger.info("-" * 80)
+        for i, tool in enumerate(tools):
+            tool_name = getattr(tool, 'name', None) or getattr(tool, '__name__', 'unknown')
+            tool_desc = getattr(tool, 'description', 'No description')
+            logger.info(f"工具 {i+1}: {tool_name}")
+            logger.info(f"  描述: {tool_desc}")
+            if hasattr(tool, 'args_schema'):
+                logger.info(f"  参数: {tool.args_schema}")
+            logger.info("-" * 40)
+        logger.info("-" * 80)
+
+        logger.info("=" * 80)
+        logger.info("📝 [提示词调试] 完整内容打印结束，开始调用LLM")
+        logger.info("=" * 80)
+
         # 修复：传递字典而不是直接传递消息列表，以便 ChatPromptTemplate 能正确处理所有变量
         result = chain.invoke({"messages": state["messages"]})
         logger.info(f"📊 [基本面分析师] LLM调用完成")
@@ -373,6 +426,23 @@ def create_fundamentals_analyst(llm, toolkit):
                             'curr_date': current_date
                         })
                         logger.debug(f"📊 [DEBUG] 统一工具数据获取成功，长度: {len(combined_data)}字符")
+                        # 将统一工具返回的数据写入日志，便于排查与分析
+                        try:
+                            if isinstance(combined_data, (dict, list)):
+                                import json
+                                _preview = json.dumps(combined_data, ensure_ascii=False, default=str)
+                                _full = _preview
+                            else:
+                                _preview = str(combined_data)
+                                _full = _preview
+
+                            # 预览信息控制长度，避免日志过长
+                            _preview_truncated = (_preview[:6000] + ("..." if len(_preview) > 2000 else ""))
+                            logger.info(f"📦 [基本面分析师] 统一工具返回数据预览(前6000字符):\n{_preview_truncated}")
+                            # 完整数据写入DEBUG级别
+                            logger.debug(f"🧾 [基本面分析师] 统一工具返回完整数据:\n{_full}")
+                        except Exception as _log_err:
+                            logger.warning(f"⚠️ [基本面分析师] 记录统一工具数据时出错: {_log_err}")
                     else:
                         combined_data = "统一基本面分析工具不可用"
                         logger.debug(f"📊 [DEBUG] 统一工具未找到")

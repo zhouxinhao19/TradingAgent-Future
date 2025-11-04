@@ -935,41 +935,66 @@ class OptimizedChinaDataProvider:
             # 直接从 financial_data 中提取指标
             latest_indicators = financial_data
 
-            # ROE - 净资产收益率
+            # ROE - 净资产收益率 (添加范围验证)
             roe = latest_indicators.get('roe') or latest_indicators.get('roe_waa')
             if roe is not None and str(roe) != 'nan' and roe != '--':
                 try:
-                    metrics["roe"] = f"{float(roe):.1f}%"
+                    roe_val = float(roe)
+                    # ROE 通常在 -100% 到 100% 之间，极端情况可能超出
+                    if -200 <= roe_val <= 200:
+                        metrics["roe"] = f"{roe_val:.1f}%"
+                    else:
+                        logger.warning(f"⚠️ ROE 数据异常: {roe_val}，超出合理范围 [-200%, 200%]，设为 N/A")
+                        metrics["roe"] = "N/A"
                 except (ValueError, TypeError):
                     metrics["roe"] = "N/A"
             else:
                 metrics["roe"] = "N/A"
 
-            # ROA - 总资产收益率
+            # ROA - 总资产收益率 (添加范围验证)
             roa = latest_indicators.get('roa') or latest_indicators.get('roa2')
             if roa is not None and str(roa) != 'nan' and roa != '--':
                 try:
-                    metrics["roa"] = f"{float(roa):.1f}%"
+                    roa_val = float(roa)
+                    # ROA 通常在 -50% 到 50% 之间
+                    if -100 <= roa_val <= 100:
+                        metrics["roa"] = f"{roa_val:.1f}%"
+                    else:
+                        logger.warning(f"⚠️ ROA 数据异常: {roa_val}，超出合理范围 [-100%, 100%]，设为 N/A")
+                        metrics["roa"] = "N/A"
                 except (ValueError, TypeError):
                     metrics["roa"] = "N/A"
             else:
                 metrics["roa"] = "N/A"
 
-            # 毛利率
+            # 毛利率 - 添加范围验证
             gross_margin = latest_indicators.get('gross_margin')
             if gross_margin is not None and str(gross_margin) != 'nan' and gross_margin != '--':
                 try:
-                    metrics["gross_margin"] = f"{float(gross_margin):.1f}%"
+                    gross_margin_val = float(gross_margin)
+                    # 验证范围：毛利率应该在 -100% 到 100% 之间
+                    # 如果超出范围，可能是数据错误（如存储的是绝对金额而不是百分比）
+                    if -100 <= gross_margin_val <= 100:
+                        metrics["gross_margin"] = f"{gross_margin_val:.1f}%"
+                    else:
+                        logger.warning(f"⚠️ 毛利率数据异常: {gross_margin_val}，超出合理范围 [-100%, 100%]，设为 N/A")
+                        metrics["gross_margin"] = "N/A"
                 except (ValueError, TypeError):
                     metrics["gross_margin"] = "N/A"
             else:
                 metrics["gross_margin"] = "N/A"
 
-            # 净利率
+            # 净利率 - 添加范围验证
             net_margin = latest_indicators.get('netprofit_margin')
             if net_margin is not None and str(net_margin) != 'nan' and net_margin != '--':
                 try:
-                    metrics["net_margin"] = f"{float(net_margin):.1f}%"
+                    net_margin_val = float(net_margin)
+                    # 验证范围：净利率应该在 -100% 到 100% 之间
+                    if -100 <= net_margin_val <= 100:
+                        metrics["net_margin"] = f"{net_margin_val:.1f}%"
+                    else:
+                        logger.warning(f"⚠️ 净利率数据异常: {net_margin_val}，超出合理范围 [-100%, 100%]，设为 N/A")
+                        metrics["net_margin"] = "N/A"
                 except (ValueError, TypeError):
                     metrics["net_margin"] = "N/A"
             else:
