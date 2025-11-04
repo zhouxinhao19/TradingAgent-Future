@@ -213,6 +213,12 @@ class HistoricalDataService:
         }
         
         # OHLCV数据
+        # 🔥 成交额单位转换：Tushare 返回的是千元，需要转换为元
+        amount_value = self._safe_float(row.get('amount') or row.get('turnover'))
+        if amount_value is not None and data_source == "tushare":
+            amount_value = amount_value * 1000  # 千元 -> 元
+            logger.debug(f"📊 [单位转换] Tushare成交额: {amount_value/1000:.2f}千元 -> {amount_value:.2f}元")
+
         doc.update({
             "open": self._safe_float(row.get('open')),
             "high": self._safe_float(row.get('high')),
@@ -220,7 +226,7 @@ class HistoricalDataService:
             "close": self._safe_float(row.get('close')),
             "pre_close": self._safe_float(row.get('pre_close') or row.get('preclose')),
             "volume": self._safe_float(row.get('volume') or row.get('vol')),
-            "amount": self._safe_float(row.get('amount') or row.get('turnover'))
+            "amount": amount_value
         })
         
         # 计算涨跌数据
