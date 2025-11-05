@@ -25,6 +25,10 @@ async def _sync_latest_to_market_quotes(symbol: str) -> None:
     """
     将 stock_daily_quotes 中的最新数据同步到 market_quotes
 
+    智能判断逻辑：
+    - 如果 market_quotes 中已有更新的数据（trade_date 更新），则不覆盖
+    - 如果 market_quotes 中没有数据或数据较旧，则更新
+
     Args:
         symbol: 股票代码（6位）
     """
@@ -40,6 +44,31 @@ async def _sync_latest_to_market_quotes(symbol: str) -> None:
     if not latest_doc:
         logger.warning(f"⚠️ {symbol6}: stock_daily_quotes 中没有数据")
         return
+
+    historical_trade_date = latest_doc.get("trade_date")
+
+    # 🔥 检查 market_quotes 中是否已有更新的数据
+    existing_quote = await db.market_quotes.find_one({"code": symbol6})
+
+    if existing_quote:
+        existing_trade_date = existing_quote.get("trade_date")
+
+        # 如果 market_quotes 中的数据日期更新，则不覆盖
+        if existing_trade_date and historical_trade_date:
+            # 比较日期字符串（格式：YYYY-MM-DD 或 YYYYMMDD）
+            existing_date_str = str(existing_trade_date).replace("-", "")
+            historical_date_str = str(historical_trade_date).replace("-", "")
+
+            if existing_date_str > historical_date_str:
+                logger.info(
+                    f"⏭️ {symbol6}: market_quotes 中的数据更新 "
+                    f"(market_quotes: {existing_trade_date}, historical: {historical_trade_date})，跳过覆盖"
+                )
+                return
+            elif existing_date_str == historical_date_str:
+                logger.info(
+                    f"📅 {symbol6}: market_quotes 和 historical 数据日期相同 ({existing_trade_date})，使用历史数据更新"
+                )
 
     # 提取需要的字段
     quote_data = {
@@ -58,7 +87,10 @@ async def _sync_latest_to_market_quotes(symbol: str) -> None:
     }
 
     # 🔥 日志：记录同步的成交量
-    logger.info(f"📊 [同步到market_quotes] {symbol6} - volume={quote_data['volume']}, amount={quote_data['amount']}, trade_date={quote_data['trade_date']}")
+    logger.info(
+        f"📊 [同步到market_quotes] {symbol6} - "
+        f"volume={quote_data['volume']}, amount={quote_data['amount']}, trade_date={quote_data['trade_date']}"
+    )
 
     # 更新 market_quotes
     await db.market_quotes.update_one(
@@ -194,24 +226,25 @@ async def sync_single_stock(
                     except Exception as e:
                         logger.warning(f"⚠️ {request.symbol} 同步到 market_quotes 失败: {e}")
 
-                # 🔥 如果没有勾选实时行情，但在交易时间内，自动同步实时行情
-                if not request.sync_realtime:
-                    from app.utils.trading_time import is_trading_time
-                    if is_trading_time():
-                        logger.info(f"📊 {request.symbol} 当前在交易时间内，自动同步实时行情")
-                        try:
-                            realtime_result = await service.sync_realtime_quotes(
-                                symbols=[request.symbol],
-                                force=True
-                            )
-                            if realtime_result.get("success_count", 0) > 0:
-                                logger.info(f"✅ {request.symbol} 实时行情自动同步成功")
-                                result["realtime_sync"] = {
-                                    "success": True,
-                                    "message": "实时行情自动同步成功（交易时间内）"
-                                }
-                        except Exception as e:
-                            logger.warning(f"⚠️ {request.symbol} 实时行情自动同步失败: {e}")
+                # 🔥 【已禁用】如果没有勾选实时行情，但在交易时间内，自动同步实时行情
+                # 用户反馈：不希望自动同步实时行情，应该严格按照用户的选择
+                # if not request.sync_realtime:
+                #     from app.utils.trading_time import is_trading_time
+                #     if is_trading_time():
+                #         logger.info(f"📊 {request.symbol} 当前在交易时间内，自动同步实时行情")
+                #         try:
+                #             realtime_result = await service.sync_realtime_quotes(
+                #                 symbols=[request.symbol],
+                #                 force=True
+                #             )
+                #             if realtime_result.get("success_count", 0) > 0:
+                #                 logger.info(f"✅ {request.symbol} 实时行情自动同步成功")
+                #                 result["realtime_sync"] = {
+                #                     "success": True,
+                #                     "message": "实时行情自动同步成功（交易时间内）"
+                #                 }
+                #         except Exception as e:
+                #             logger.warning(f"⚠️ {request.symbol} 实时行情自动同步失败: {e}")
 
             except Exception as e:
                 logger.error(f"❌ {request.symbol} 历史数据同步失败: {e}")
