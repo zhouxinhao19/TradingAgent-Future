@@ -1173,8 +1173,9 @@ class TushareProvider(BaseStockDataProvider):
             "pct_chg": self._convert_to_float(raw_data.get('pct_chg')),
 
             # 成交数据
+            # 🔥 成交量单位转换：Tushare 返回的是手，需要转换为股
+            "volume": self._convert_to_float(raw_data.get('vol')) * 100 if raw_data.get('vol') else None,
             # 🔥 成交额单位转换：Tushare daily 接口返回的是千元，需要转换为元
-            "volume": self._convert_to_float(raw_data.get('vol')),
             "amount": self._convert_to_float(raw_data.get('amount')) * 1000 if raw_data.get('amount') else None,
 
             # 财务指标
