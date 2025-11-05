@@ -412,69 +412,96 @@ pre, code {
         html_content = markdown.markdown(md_content, extensions=extensions)
 
         # 添加 HTML 模板和样式
+        # WeasyPrint 优化的 CSS（移除不支持的属性）
         html_template = f"""
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" dir="ltr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>分析报告</title>
     <style>
-        /* 🔥 强制横排显示 */
-        * {{
-            writing-mode: horizontal-tb !important;
-            text-orientation: mixed !important;
-            direction: ltr !important;
+        /* 基础样式 - 确保文本方向正确 */
+        html {{
+            direction: ltr;
         }}
 
         body {{
-            font-family: "Microsoft YaHei", "SimHei", "Arial", sans-serif;
-            line-height: 1.6;
+            font-family: "Noto Sans CJK SC", "Microsoft YaHei", "SimHei", "Arial", sans-serif;
+            line-height: 1.8;
             color: #333;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
+            margin: 20mm;
+            padding: 0;
             background: white;
+            direction: ltr;
         }}
 
+        /* 标题样式 */
         h1, h2, h3, h4, h5, h6 {{
             color: #2c3e50;
-            margin-top: 24px;
-            margin-bottom: 16px;
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
             font-weight: 600;
             page-break-after: avoid;
+            direction: ltr;
         }}
 
-        h1 {{ font-size: 2em; border-bottom: 2px solid #3498db; padding-bottom: 10px; }}
-        h2 {{ font-size: 1.5em; border-bottom: 1px solid #bdc3c7; padding-bottom: 8px; }}
-        h3 {{ font-size: 1.25em; }}
+        h1 {{
+            font-size: 2em;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 0.3em;
+            page-break-before: always;
+        }}
 
+        h1:first-child {{
+            page-break-before: avoid;
+        }}
+
+        h2 {{
+            font-size: 1.6em;
+            border-bottom: 2px solid #bdc3c7;
+            padding-bottom: 0.25em;
+        }}
+
+        h3 {{
+            font-size: 1.3em;
+            color: #34495e;
+        }}
+
+        /* 段落样式 */
         p {{
-            margin: 12px 0;
-            text-align: justify;
+            margin: 0.8em 0;
+            text-align: left;
+            direction: ltr;
         }}
 
-        /* 表格样式 */
+        /* 表格样式 - 优化分页 */
         table {{
             width: 100%;
             border-collapse: collapse;
-            margin: 20px 0;
-            page-break-inside: auto;
+            margin: 1.5em 0;
+            font-size: 0.9em;
+            direction: ltr;
         }}
 
-        tr {{
-            page-break-inside: avoid;
-            page-break-after: auto;
-        }}
-
+        /* 表头在每页重复 */
         thead {{
             display: table-header-group;
         }}
 
+        tbody {{
+            display: table-row-group;
+        }}
+
+        /* 表格行避免跨页断开 */
+        tr {{
+            page-break-inside: avoid;
+        }}
+
         th, td {{
             border: 1px solid #ddd;
-            padding: 12px;
+            padding: 10px 12px;
             text-align: left;
+            direction: ltr;
         }}
 
         th {{
@@ -483,8 +510,12 @@ pre, code {
             font-weight: bold;
         }}
 
-        tr:nth-child(even) {{
-            background-color: #f2f2f2;
+        tbody tr:nth-child(even) {{
+            background-color: #f8f9fa;
+        }}
+
+        tbody tr:hover {{
+            background-color: #e9ecef;
         }}
 
         /* 代码块样式 */
@@ -492,15 +523,18 @@ pre, code {
             background-color: #f4f4f4;
             padding: 2px 6px;
             border-radius: 3px;
-            font-family: "Consolas", "Monaco", monospace;
+            font-family: "Consolas", "Monaco", "Courier New", monospace;
+            font-size: 0.9em;
+            direction: ltr;
         }}
 
         pre {{
             background-color: #f4f4f4;
             padding: 15px;
             border-radius: 5px;
-            overflow-x: auto;
+            border-left: 4px solid #3498db;
             page-break-inside: avoid;
+            direction: ltr;
         }}
 
         pre code {{
@@ -510,35 +544,83 @@ pre, code {
 
         /* 列表样式 */
         ul, ol {{
-            margin: 12px 0;
-            padding-left: 30px;
+            margin: 0.8em 0;
+            padding-left: 2em;
+            direction: ltr;
         }}
 
         li {{
-            margin: 6px 0;
-            page-break-inside: avoid;
+            margin: 0.4em 0;
+            direction: ltr;
         }}
 
-        /* 分页控制 */
-        @media print {{
-            body {{
-                max-width: 100%;
-            }}
+        /* 强调文本 */
+        strong, b {{
+            font-weight: 700;
+            color: #2c3e50;
+        }}
 
-            h1, h2, h3, h4, h5, h6 {{
-                page-break-after: avoid;
-            }}
-
-            table, figure {{
-                page-break-inside: avoid;
-            }}
+        em, i {{
+            font-style: italic;
+            color: #555;
         }}
 
         /* 水平线 */
         hr {{
             border: none;
-            border-top: 1px solid #ddd;
-            margin: 24px 0;
+            border-top: 2px solid #ecf0f1;
+            margin: 2em 0;
+        }}
+
+        /* 链接样式 */
+        a {{
+            color: #3498db;
+            text-decoration: none;
+        }}
+
+        a:hover {{
+            text-decoration: underline;
+        }}
+
+        /* 分页控制 */
+        @page {{
+            size: A4;
+            margin: 20mm;
+
+            @top-center {{
+                content: "分析报告";
+                font-size: 10pt;
+                color: #999;
+            }}
+
+            @bottom-right {{
+                content: "第 " counter(page) " 页";
+                font-size: 10pt;
+                color: #999;
+            }}
+        }}
+
+        /* 避免孤行和寡行 */
+        p, li {{
+            orphans: 3;
+            widows: 3;
+        }}
+
+        /* 图片样式 */
+        img {{
+            max-width: 100%;
+            height: auto;
+            page-break-inside: avoid;
+        }}
+
+        /* 引用块样式 */
+        blockquote {{
+            margin: 1em 0;
+            padding: 0.5em 1em;
+            border-left: 4px solid #3498db;
+            background-color: #f8f9fa;
+            font-style: italic;
+            page-break-inside: avoid;
         }}
     </style>
 </head>
