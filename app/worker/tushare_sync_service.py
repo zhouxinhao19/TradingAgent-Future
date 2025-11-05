@@ -560,6 +560,12 @@ class TushareSyncService:
                         else:
                             symbol_start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
 
+                    # 记录请求参数
+                    logger.debug(
+                        f"🔍 {symbol}: 请求{period_name}数据 "
+                        f"start={symbol_start_date}, end={end_date}, period={period}"
+                    )
+
                     # 获取历史数据（指定周期）
                     df = await self.provider.get_historical_data(symbol, symbol_start_date, end_date, period=period)
 
@@ -571,7 +577,10 @@ class TushareSyncService:
 
                         logger.debug(f"✅ {symbol}: 保存 {records_saved} 条{period_name}记录")
                     else:
-                        logger.warning(f"⚠️ {symbol}: 无{period_name}数据")
+                        logger.warning(
+                            f"⚠️ {symbol}: 无{period_name}数据 "
+                            f"(start={symbol_start_date}, end={end_date})"
+                        )
 
                     # 进度日志
                     if (i + 1) % 50 == 0:

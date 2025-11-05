@@ -549,13 +549,24 @@ class TushareProvider(BaseStockDataProvider):
                     start_date=start_str,
                     end_date=end_str
                 )
-            
+
             if df is None or df.empty:
+                self.logger.warning(
+                    f"⚠️ Tushare API 返回空数据: symbol={symbol}, ts_code={ts_code}, "
+                    f"period={period}, start={start_str}, end={end_str}"
+                )
+                self.logger.warning(
+                    f"💡 可能原因: "
+                    f"1) 该股票在此期间无交易数据 "
+                    f"2) 日期范围不正确 "
+                    f"3) 股票代码格式错误 "
+                    f"4) Tushare API 限制或积分不足"
+                )
                 return None
-            
+
             # 数据标准化
             df = self._standardize_historical_data(df)
-            
+
             self.logger.info(f"✅ 获取{period}历史数据: {symbol} {len(df)}条记录")
             return df
             
