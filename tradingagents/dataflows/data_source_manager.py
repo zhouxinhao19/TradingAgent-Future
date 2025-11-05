@@ -662,31 +662,35 @@ class DataSourceManager:
             data['ma20'] = data['close'].rolling(window=20, min_periods=1).mean()
             data['ma60'] = data['close'].rolling(window=60, min_periods=1).mean()
 
-            # 计算RSI（相对强弱指标）- 同花顺风格：RSI(6, 12, 24)
+            # 计算RSI（相对强弱指标）- 同花顺风格：使用中国式SMA（EMA with adjust=True）
+            # 参考：https://blog.csdn.net/u011218867/article/details/117427927
+            # 同花顺/通达信的RSI使用SMA函数，等价于pandas的ewm(com=N-1, adjust=True)
             delta = data['close'].diff()
+            gain = delta.where(delta > 0, 0)
+            loss = -delta.where(delta < 0, 0)
 
-            # RSI6
-            gain6 = (delta.where(delta > 0, 0)).rolling(window=6, min_periods=1).mean()
-            loss6 = (-delta.where(delta < 0, 0)).rolling(window=6, min_periods=1).mean()
-            rs6 = gain6 / (loss6.replace(0, np.nan))
+            # RSI6 - 使用中国式SMA
+            avg_gain6 = gain.ewm(com=5, adjust=True).mean()  # com = N - 1
+            avg_loss6 = loss.ewm(com=5, adjust=True).mean()
+            rs6 = avg_gain6 / avg_loss6.replace(0, np.nan)
             data['rsi6'] = 100 - (100 / (1 + rs6))
 
-            # RSI12
-            gain12 = (delta.where(delta > 0, 0)).rolling(window=12, min_periods=1).mean()
-            loss12 = (-delta.where(delta < 0, 0)).rolling(window=12, min_periods=1).mean()
-            rs12 = gain12 / (loss12.replace(0, np.nan))
+            # RSI12 - 使用中国式SMA
+            avg_gain12 = gain.ewm(com=11, adjust=True).mean()
+            avg_loss12 = loss.ewm(com=11, adjust=True).mean()
+            rs12 = avg_gain12 / avg_loss12.replace(0, np.nan)
             data['rsi12'] = 100 - (100 / (1 + rs12))
 
-            # RSI24
-            gain24 = (delta.where(delta > 0, 0)).rolling(window=24, min_periods=1).mean()
-            loss24 = (-delta.where(delta < 0, 0)).rolling(window=24, min_periods=1).mean()
-            rs24 = gain24 / (loss24.replace(0, np.nan))
+            # RSI24 - 使用中国式SMA
+            avg_gain24 = gain.ewm(com=23, adjust=True).mean()
+            avg_loss24 = loss.ewm(com=23, adjust=True).mean()
+            rs24 = avg_gain24 / avg_loss24.replace(0, np.nan)
             data['rsi24'] = 100 - (100 / (1 + rs24))
 
-            # 保留RSI14作为国际标准参考
-            gain14 = (delta.where(delta > 0, 0)).rolling(window=14, min_periods=1).mean()
-            loss14 = (-delta.where(delta < 0, 0)).rolling(window=14, min_periods=1).mean()
-            rs14 = gain14 / (loss14.replace(0, np.nan))
+            # 保留RSI14作为国际标准参考（使用简单移动平均）
+            gain14 = gain.rolling(window=14, min_periods=1).mean()
+            loss14 = loss.rolling(window=14, min_periods=1).mean()
+            rs14 = gain14 / loss14.replace(0, np.nan)
             data['rsi14'] = 100 - (100 / (1 + rs14))
 
             # 计算MACD
