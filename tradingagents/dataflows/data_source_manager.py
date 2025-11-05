@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, Any
 from enum import Enum
 import warnings
 import pandas as pd
+import numpy as np
 
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
@@ -634,7 +635,7 @@ class DataSourceManager:
     def _format_stock_data_response(self, data: pd.DataFrame, symbol: str, stock_name: str,
                                     start_date: str, end_date: str) -> str:
         """
-        格式化股票数据响应
+        格式化股票数据响应（包含技术指标）
 
         Args:
             data: 股票数据DataFrame
@@ -644,44 +645,158 @@ class DataSourceManager:
             end_date: 结束日期
 
         Returns:
-            str: 格式化的数据报告
+            str: 格式化的数据报告（包含技术指标）
         """
         try:
-            # 🔧 优化：只保留最后3天的数据，减少token消耗
-            # 获取了10天的数据是为了确保能拿到数据（处理周末/节假日）
-            # 但给AI分析时只需要最后2-3天的数据
             original_data_count = len(data)
-            if len(data) > 3:
-                logger.info(f"📊 [数据优化] 原始数据: {original_data_count}条，保留最后3条以减少token消耗")
-                data = data.tail(3)
+            logger.info(f"📊 [技术指标] 开始计算技术指标，原始数据: {original_data_count}条")
+
+            # 🔧 计算技术指标（使用完整数据）
+            # 确保数据按日期排序
+            if 'date' in data.columns:
+                data = data.sort_values('date')
+
+            # 计算移动平均线
+            data['ma5'] = data['close'].rolling(window=5, min_periods=1).mean()
+            data['ma10'] = data['close'].rolling(window=10, min_periods=1).mean()
+            data['ma20'] = data['close'].rolling(window=20, min_periods=1).mean()
+            data['ma60'] = data['close'].rolling(window=60, min_periods=1).mean()
+
+            # 计算RSI（相对强弱指标）
+            delta = data['close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14, min_periods=1).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14, min_periods=1).mean()
+            rs = gain / (loss.replace(0, np.nan))
+            data['rsi'] = 100 - (100 / (1 + rs))
+
+            # 计算MACD
+            ema12 = data['close'].ewm(span=12, adjust=False).mean()
+            ema26 = data['close'].ewm(span=26, adjust=False).mean()
+            data['macd_dif'] = ema12 - ema26
+            data['macd_dea'] = data['macd_dif'].ewm(span=9, adjust=False).mean()
+            data['macd'] = (data['macd_dif'] - data['macd_dea']) * 2
+
+            # 计算布林带
+            data['boll_mid'] = data['close'].rolling(window=20, min_periods=1).mean()
+            std = data['close'].rolling(window=20, min_periods=1).std()
+            data['boll_upper'] = data['boll_mid'] + 2 * std
+            data['boll_lower'] = data['boll_mid'] - 2 * std
+
+            logger.info(f"✅ [技术指标] 技术指标计算完成")
+
+            # 🔧 只保留最后3-5天的数据用于展示（减少token消耗）
+            display_rows = min(5, len(data))
+            display_data = data.tail(display_rows)
+            latest_data = data.iloc[-1]
 
             # 计算最新价格和涨跌幅
-            latest_data = data.iloc[-1]
             latest_price = latest_data.get('close', 0)
             prev_close = data.iloc[-2].get('close', latest_price) if len(data) > 1 else latest_price
             change = latest_price - prev_close
             change_pct = (change / prev_close * 100) if prev_close != 0 else 0
 
             # 格式化数据报告
-            result = f"📊 {stock_name}({symbol}) - 数据\n"
+            result = f"📊 {stock_name}({symbol}) - 技术分析数据\n"
             result += f"数据期间: {start_date} 至 {end_date}\n"
-            result += f"数据条数: {len(data)}条 (最近{len(data)}个交易日)\n\n"
+            result += f"数据条数: {original_data_count}条 (展示最近{display_rows}个交易日)\n\n"
 
             result += f"💰 最新价格: ¥{latest_price:.2f}\n"
             result += f"📈 涨跌额: {change:+.2f} ({change_pct:+.2f}%)\n\n"
 
-            # 添加统计信息（基于保留的数据）
-            result += f"📊 价格统计 (最近{len(data)}个交易日):\n"
-            result += f"   最高价: ¥{data['high'].max():.2f}\n"
-            result += f"   最低价: ¥{data['low'].min():.2f}\n"
-            result += f"   平均价: ¥{data['close'].mean():.2f}\n"
+            # 添加技术指标
+            result += f"📊 移动平均线 (MA):\n"
+            result += f"   MA5:  ¥{latest_data['ma5']:.2f}"
+            if latest_price > latest_data['ma5']:
+                result += " (价格在MA5上方 ↑)\n"
+            else:
+                result += " (价格在MA5下方 ↓)\n"
+
+            result += f"   MA10: ¥{latest_data['ma10']:.2f}"
+            if latest_price > latest_data['ma10']:
+                result += " (价格在MA10上方 ↑)\n"
+            else:
+                result += " (价格在MA10下方 ↓)\n"
+
+            result += f"   MA20: ¥{latest_data['ma20']:.2f}"
+            if latest_price > latest_data['ma20']:
+                result += " (价格在MA20上方 ↑)\n"
+            else:
+                result += " (价格在MA20下方 ↓)\n"
+
+            result += f"   MA60: ¥{latest_data['ma60']:.2f}"
+            if latest_price > latest_data['ma60']:
+                result += " (价格在MA60上方 ↑)\n\n"
+            else:
+                result += " (价格在MA60下方 ↓)\n\n"
+
+            # MACD指标
+            result += f"📈 MACD指标:\n"
+            result += f"   DIF:  {latest_data['macd_dif']:.3f}\n"
+            result += f"   DEA:  {latest_data['macd_dea']:.3f}\n"
+            result += f"   MACD: {latest_data['macd']:.3f}"
+            if latest_data['macd'] > 0:
+                result += " (多头 ↑)\n"
+            else:
+                result += " (空头 ↓)\n"
+
+            # 判断金叉/死叉
+            if len(data) > 1:
+                prev_dif = data.iloc[-2]['macd_dif']
+                prev_dea = data.iloc[-2]['macd_dea']
+                curr_dif = latest_data['macd_dif']
+                curr_dea = latest_data['macd_dea']
+
+                if prev_dif <= prev_dea and curr_dif > curr_dea:
+                    result += "   ⚠️ MACD金叉信号（DIF上穿DEA）\n\n"
+                elif prev_dif >= prev_dea and curr_dif < curr_dea:
+                    result += "   ⚠️ MACD死叉信号（DIF下穿DEA）\n\n"
+                else:
+                    result += "\n"
+            else:
+                result += "\n"
+
+            # RSI指标
+            rsi_value = latest_data['rsi']
+            result += f"📉 RSI指标: {rsi_value:.2f}"
+            if rsi_value >= 70:
+                result += " (超买区域 ⚠️)\n\n"
+            elif rsi_value <= 30:
+                result += " (超卖区域 ⚠️)\n\n"
+            elif rsi_value >= 50:
+                result += " (强势区域 ↑)\n\n"
+            else:
+                result += " (弱势区域 ↓)\n\n"
+
+            # 布林带
+            result += f"📊 布林带 (BOLL):\n"
+            result += f"   上轨: ¥{latest_data['boll_upper']:.2f}\n"
+            result += f"   中轨: ¥{latest_data['boll_mid']:.2f}\n"
+            result += f"   下轨: ¥{latest_data['boll_lower']:.2f}\n"
+
+            # 判断价格在布林带的位置
+            boll_position = (latest_price - latest_data['boll_lower']) / (latest_data['boll_upper'] - latest_data['boll_lower']) * 100
+            result += f"   价格位置: {boll_position:.1f}%"
+            if boll_position >= 80:
+                result += " (接近上轨，可能超买 ⚠️)\n\n"
+            elif boll_position <= 20:
+                result += " (接近下轨，可能超卖 ⚠️)\n\n"
+            else:
+                result += " (中性区域)\n\n"
+
+            # 价格统计
+            result += f"📊 价格统计 (最近{display_rows}个交易日):\n"
+            result += f"   最高价: ¥{display_data['high'].max():.2f}\n"
+            result += f"   最低价: ¥{display_data['low'].min():.2f}\n"
+            result += f"   平均价: ¥{display_data['close'].mean():.2f}\n"
+
             # 防御性获取成交量数据
-            volume_value = self._get_volume_safely(data)
-            result += f"   成交量: {volume_value:,.0f}股\n"
+            volume_value = self._get_volume_safely(display_data)
+            result += f"   平均成交量: {volume_value:,.0f}股\n"
 
             return result
+
         except Exception as e:
-            logger.error(f"❌ 格式化数据响应失败: {e}")
+            logger.error(f"❌ 格式化数据响应失败: {e}", exc_info=True)
             return f"❌ 格式化{symbol}数据失败: {e}"
 
     def get_stock_dataframe(self, symbol: str, start_date: str = None, end_date: str = None, period: str = "daily") -> pd.DataFrame:
