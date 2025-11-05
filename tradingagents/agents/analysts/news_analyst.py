@@ -306,12 +306,13 @@ def create_news_analyst(llm, toolkit):
         else:
             # 非Google模型的处理逻辑
             logger.info(f"[新闻分析师] 非Google模型 ({llm.__class__.__name__})，使用标准处理逻辑")
-            
+
             # 检查工具调用情况
-            tool_call_count = len(result.tool_calls) if hasattr(result, 'tool_calls') else 0
-            logger.info(f"[新闻分析师] LLM调用了 {tool_call_count} 个工具")
-            
-            if tool_call_count == 0:
+            current_tool_calls = len(result.tool_calls) if hasattr(result, 'tool_calls') else 0
+            logger.info(f"[新闻分析师] LLM调用了 {current_tool_calls} 个工具")
+            logger.debug(f"📊 [DEBUG] 累计工具调用次数: {tool_call_count}/{max_tool_calls}")
+
+            if current_tool_calls == 0:
                 logger.warning(f"[新闻分析师] ⚠️ {llm.__class__.__name__} 没有调用任何工具，启动补救机制...")
                 logger.warning(f"[新闻分析师] 📄 LLM原始响应内容 (前500字符): {result.content[:500] if hasattr(result, 'content') else 'No content'}")
 

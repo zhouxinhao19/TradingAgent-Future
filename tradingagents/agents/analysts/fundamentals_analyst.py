@@ -398,11 +398,12 @@ def create_fundamentals_analyst(llm, toolkit):
             logger.debug(f"📊 [DEBUG] 非Google模型 ({fresh_llm.__class__.__name__})，使用标准处理逻辑")
             
             # 检查工具调用情况
-            tool_call_count = len(result.tool_calls) if hasattr(result, 'tool_calls') else 0
-            logger.debug(f"📊 [DEBUG] 工具调用数量: {tool_call_count}")
-            
-            if tool_call_count > 0:
-                # 🔧 死循环修复：检查工具调用次数限制
+            current_tool_calls = len(result.tool_calls) if hasattr(result, 'tool_calls') else 0
+            logger.debug(f"📊 [DEBUG] 当前消息的工具调用数量: {current_tool_calls}")
+            logger.debug(f"📊 [DEBUG] 累计工具调用次数: {tool_call_count}/{max_tool_calls}")
+
+            if current_tool_calls > 0:
+                # 🔧 死循环修复：检查累计工具调用次数限制
                 if tool_call_count >= max_tool_calls:
                     logger.warning(f"🔧 [死循环修复] 达到最大工具调用次数 {max_tool_calls}，强制生成报告")
                     # 强制生成基本面报告，避免死循环

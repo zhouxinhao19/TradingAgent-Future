@@ -147,7 +147,7 @@ class ConditionalLogic:
         # 死循环修复: 添加工具调用次数检查
         tool_call_count = state.get("fundamentals_tool_call_count", 0)
         max_tool_calls = 3
-        
+
         # 检查是否已经有基本面报告
         fundamentals_report = state.get("fundamentals_report", "")
 
