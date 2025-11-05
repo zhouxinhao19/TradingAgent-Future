@@ -593,13 +593,24 @@ class TushareSyncService:
                                    f"总等待时间: {limiter_stats['total_wait_time']:.1f}秒")
 
                 except Exception as e:
+                    import traceback
+                    error_details = traceback.format_exc()
                     stats["error_count"] += 1
                     stats["errors"].append({
                         "code": symbol,
                         "error": str(e),
-                        "context": f"sync_historical_data_{period}"
+                        "error_type": type(e).__name__,
+                        "context": f"sync_historical_data_{period}",
+                        "traceback": error_details
                     })
-                    logger.error(f"❌ {symbol} {period_name}数据同步失败: {e}")
+                    logger.error(
+                        f"❌ {symbol} {period_name}数据同步失败\n"
+                        f"   参数: start={symbol_start_date if 'symbol_start_date' in locals() else 'N/A'}, "
+                        f"end={end_date}, period={period}\n"
+                        f"   错误类型: {type(e).__name__}\n"
+                        f"   错误信息: {str(e)}\n"
+                        f"   堆栈跟踪:\n{error_details}"
+                    )
 
             # 4. 完成统计
             stats["end_time"] = datetime.utcnow()
@@ -614,8 +625,20 @@ class TushareSyncService:
             return stats
 
         except Exception as e:
-            logger.error(f"❌ 历史数据同步失败: {e}")
-            stats["errors"].append({"error": str(e), "context": "sync_historical_data"})
+            import traceback
+            error_details = traceback.format_exc()
+            logger.error(
+                f"❌ 历史数据同步失败（外层异常）\n"
+                f"   错误类型: {type(e).__name__}\n"
+                f"   错误信息: {str(e)}\n"
+                f"   堆栈跟踪:\n{error_details}"
+            )
+            stats["errors"].append({
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "context": "sync_historical_data",
+                "traceback": error_details
+            })
             return stats
 
     async def _save_historical_data(self, symbol: str, df, period: str = "daily") -> int:
