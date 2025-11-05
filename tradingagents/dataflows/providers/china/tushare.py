@@ -529,7 +529,7 @@ class TushareProvider(BaseStockDataProvider):
 
             # 🔧 使用 pro_bar 接口获取前复权数据（与同花顺一致）
             # 注意：Tushare 的 daily/weekly/monthly 接口不支持复权
-            # 必须使用 pro_bar 接口并指定 adj='qfq' 参数
+            # 必须使用 ts.pro_bar() 函数并指定 adj='qfq' 参数
 
             # 周期映射
             freq_map = {
@@ -539,10 +539,12 @@ class TushareProvider(BaseStockDataProvider):
             }
             freq = freq_map.get(period, "D")
 
-            # 使用 pro_bar 接口获取前复权数据
+            # 使用 ts.pro_bar() 函数获取前复权数据
+            # 注意：pro_bar 是 tushare 模块的函数，不是 api 对象的方法
             df = await asyncio.to_thread(
-                self.api.pro_bar,
+                ts.pro_bar,
                 ts_code=ts_code,
+                api=self.api,  # 传入 api 对象
                 start_date=start_str,
                 end_date=end_str,
                 freq=freq,
