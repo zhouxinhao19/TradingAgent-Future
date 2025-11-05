@@ -38,31 +38,9 @@ except ImportError as e:
     logger.warning(f"⚠️ 导出功能依赖包缺失: {e}")
     logger.info("💡 请安装: pip install pypandoc markdown")
 
-# 检查替代的 PDF 生成工具
-WEASYPRINT_AVAILABLE = False
+# 检查 pdfkit（唯一的 PDF 生成工具）
 PDFKIT_AVAILABLE = False
-WEASYPRINT_ERROR = None
 PDFKIT_ERROR = None
-
-try:
-    import weasyprint
-    # 尝试创建一个简单的 HTML 来测试 Cairo 库
-    try:
-        weasyprint.HTML(string="<html><body>test</body></html>").write_pdf()
-        WEASYPRINT_AVAILABLE = True
-        logger.info("✅ WeasyPrint 可用（推荐的 PDF 生成工具）")
-    except OSError as e:
-        WEASYPRINT_ERROR = str(e)
-        if "cairo" in str(e).lower():
-            logger.warning("⚠️ WeasyPrint 已安装但缺少 Cairo 库（Windows 需要 GTK3 运行时）")
-            logger.warning("   下载地址: https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases")
-        else:
-            logger.warning(f"⚠️ WeasyPrint 不可用: {e}")
-except ImportError:
-    logger.info("ℹ️ WeasyPrint 不可用，可选安装: pip install weasyprint")
-except Exception as e:
-    WEASYPRINT_ERROR = str(e)
-    logger.warning(f"⚠️ WeasyPrint 检测失败: {e}")
 
 try:
     import pdfkit
@@ -70,12 +48,14 @@ try:
     try:
         pdfkit.configuration()
         PDFKIT_AVAILABLE = True
-        logger.info("✅ pdfkit + wkhtmltopdf 可用")
+        logger.info("✅ pdfkit + wkhtmltopdf 可用（PDF 生成工具）")
     except Exception as e:
         PDFKIT_ERROR = str(e)
-        logger.info("ℹ️ wkhtmltopdf 未安装")
+        logger.warning("⚠️ wkhtmltopdf 未安装，PDF 导出功能不可用")
+        logger.info("💡 安装方法: https://wkhtmltopdf.org/downloads.html")
 except ImportError:
-    logger.info("ℹ️ pdfkit 不可用，可选安装: pip install pdfkit")
+    logger.warning("⚠️ pdfkit 未安装，PDF 导出功能不可用")
+    logger.info("💡 安装方法: pip install pdfkit")
 except Exception as e:
     PDFKIT_ERROR = str(e)
     logger.warning(f"⚠️ pdfkit 检测失败: {e}")
@@ -87,13 +67,11 @@ class ReportExporter:
     def __init__(self):
         self.export_available = EXPORT_AVAILABLE
         self.pandoc_available = PANDOC_AVAILABLE
-        self.weasyprint_available = WEASYPRINT_AVAILABLE
         self.pdfkit_available = PDFKIT_AVAILABLE
 
-        logger.info(f"📋 ReportExporter 初始化:")
+        logger.info("📋 ReportExporter 初始化:")
         logger.info(f"  - export_available: {self.export_available}")
         logger.info(f"  - pandoc_available: {self.pandoc_available}")
-        logger.info(f"  - weasyprint_available: {self.weasyprint_available}")
         logger.info(f"  - pdfkit_available: {self.pdfkit_available}")
     
     def generate_markdown_report(self, report_doc: Dict[str, Any]) -> str:
@@ -631,31 +609,6 @@ pre, code {
 """
         return html_template
 
-    def _generate_pdf_with_weasyprint(self, html_content: str) -> bytes:
-        """使用 WeasyPrint 生成 PDF"""
-        import weasyprint
-
-        logger.info("🔧 使用 WeasyPrint 生成 PDF...")
-
-        try:
-            # 创建 PDF
-            pdf_bytes = weasyprint.HTML(string=html_content).write_pdf()
-
-            logger.info(f"✅ WeasyPrint PDF 生成成功，大小: {len(pdf_bytes)} 字节")
-            return pdf_bytes
-        except OSError as e:
-            if "cairo" in str(e).lower():
-                error_msg = (
-                    "WeasyPrint 缺少 Cairo 库。\n"
-                    "Windows 用户请安装 GTK3 运行时:\n"
-                    "https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases\n"
-                    "或使用其他 PDF 生成工具: pip install pdfkit"
-                )
-                logger.error(f"❌ {error_msg}")
-                raise Exception(error_msg) from e
-            else:
-                raise
-
     def _generate_pdf_with_pdfkit(self, html_content: str) -> bytes:
         """使用 pdfkit 生成 PDF"""
         import pdfkit
@@ -680,164 +633,34 @@ pre, code {
         return pdf_bytes
 
     def generate_pdf_report(self, report_doc: Dict[str, Any]) -> bytes:
-        """生成 PDF 格式报告（优先使用 WeasyPrint/pdfkit，回退到 Pandoc）"""
+        """生成 PDF 格式报告（使用 pdfkit + wkhtmltopdf）"""
         logger.info("📊 开始生成 PDF 文档...")
+
+        # 检查 pdfkit 是否可用
+        if not self.pdfkit_available:
+            error_msg = (
+                "pdfkit 不可用，无法生成 PDF。\n\n"
+                "安装方法:\n"
+                "1. 安装 pdfkit: pip install pdfkit\n"
+                "2. 安装 wkhtmltopdf: https://wkhtmltopdf.org/downloads.html\n"
+            )
+            if PDFKIT_ERROR:
+                error_msg += f"\n错误详情: {PDFKIT_ERROR}"
+
+            logger.error(f"❌ {error_msg}")
+            raise Exception(error_msg)
 
         # 生成 Markdown 内容
         md_content = self.generate_markdown_report(report_doc)
 
-        # 收集所有错误信息
-        errors = []
-
-        # 🔥 策略 1: 优先使用 WeasyPrint（最可靠）
-        if self.weasyprint_available:
-            try:
-                html_content = self._markdown_to_html(md_content)
-                return self._generate_pdf_with_weasyprint(html_content)
-            except Exception as e:
-                error_msg = f"WeasyPrint 生成失败: {e}"
-                errors.append(error_msg)
-                logger.warning(f"⚠️ {error_msg}，尝试其他方法...")
-
-        # 🔥 策略 2: 使用 pdfkit + wkhtmltopdf
-        if self.pdfkit_available:
-            try:
-                html_content = self._markdown_to_html(md_content)
-                return self._generate_pdf_with_pdfkit(html_content)
-            except Exception as e:
-                error_msg = f"pdfkit 生成失败: {e}"
-                errors.append(error_msg)
-                logger.warning(f"⚠️ {error_msg}，尝试其他方法...")
-
-        # 🔥 策略 3: 回退到 Pandoc（原有方法）
-        if not self.pandoc_available:
-            # 生成详细的错误消息
-            error_details = "\n".join(errors) if errors else "无可用的 PDF 生成工具"
-
-            help_msg = (
-                "所有 PDF 生成工具都不可用。\n\n"
-                "推荐解决方案:\n"
-                "1. 安装 WeasyPrint (推荐):\n"
-                "   pip install weasyprint\n"
-                "   Windows 用户还需安装 GTK3 运行时:\n"
-                "   https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases\n\n"
-                "2. 或安装 pdfkit:\n"
-                "   pip install pdfkit\n"
-                "   并安装 wkhtmltopdf: https://wkhtmltopdf.org/downloads.html\n\n"
-                "3. 或安装 Pandoc:\n"
-                "   https://pandoc.org/installing.html\n\n"
-                f"错误详情:\n{error_details}"
-            )
-
-            logger.error(f"❌ {help_msg}")
-            raise Exception(help_msg)
-
-        logger.info("📝 使用 Pandoc 生成 PDF（回退方案）...")
-
-        # PDF 引擎列表（按优先级）
-        pdf_engines = [
-            ('wkhtmltopdf', 'HTML 转 PDF 引擎（推荐）'),
-            ('weasyprint', '现代 HTML 转 PDF 引擎'),
-            (None, 'Pandoc 默认引擎')
-        ]
-
-        last_error = None
-
-        for engine, description in pdf_engines:
-            try:
-                # 创建临时文件
-                with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_file:
-                    output_file = tmp_file.name
-
-                # 创建临时 CSS 文件
-                with tempfile.NamedTemporaryFile(mode='w', suffix='.css', delete=False, encoding='utf-8') as css_file:
-                    css_file_path = css_file.name
-                    css_file.write(self._create_pdf_css())
-
-                # Pandoc 参数
-                extra_args = [
-                    '--from=markdown-yaml_metadata_block',  # 禁用 YAML 元数据块解析
-                    '-V', 'mainfont=Noto Sans CJK SC',  # 设置中文字体（wkhtmltopdf）
-                    '-V', 'sansfont=Noto Sans CJK SC',
-                    '-V', 'monofont=Noto Sans Mono CJK SC',
-                    '--wrap=preserve',  # 保留换行
-                    '--columns=120',  # 设置列宽
-                    '-V', 'geometry:margin=2cm',  # 设置页边距
-                    '-M', 'lang=zh-CN',  # 🔥 明确指定语言为简体中文
-                    '-M', 'dir=ltr',  # 🔥 明确指定文本方向为从左到右
-                    f'--css={css_file_path}',  # 使用自定义 CSS 控制分页
-                ]
-
-                if engine:
-                    extra_args.append(f'--pdf-engine={engine}')
-                    logger.info(f"🔧 使用 PDF 引擎: {engine}")
-                else:
-                    logger.info(f"🔧 使用默认 PDF 引擎")
-
-                # 清理内容
-                cleaned_content = self._clean_markdown_for_pandoc(md_content)
-                
-                # 转换为 PDF
-                pypandoc.convert_text(
-                    cleaned_content,
-                    'pdf',
-                    format='markdown',
-                    outputfile=output_file,
-                    extra_args=extra_args
-                )
-                
-                # 检查文件是否生成
-                if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
-                    # 读取生成的文件
-                    with open(output_file, 'rb') as f:
-                        pdf_content = f.read()
-                    
-                    logger.info(f"✅ PDF 生成成功，使用引擎: {engine or '默认'}，大小: {len(pdf_content)} 字节")
-
-                    # 清理临时文件
-                    os.unlink(output_file)
-                    if 'css_file_path' in locals() and os.path.exists(css_file_path):
-                        os.unlink(css_file_path)
-
-                    return pdf_content
-                else:
-                    raise Exception("PDF 文件生成失败或为空")
-
-            except Exception as e:
-                last_error = str(e)
-                logger.warning(f"⚠️ PDF 引擎 {engine or '默认'} 失败: {e}")
-
-                # 清理临时文件
-                try:
-                    if 'output_file' in locals() and os.path.exists(output_file):
-                        os.unlink(output_file)
-                    if 'css_file_path' in locals() and os.path.exists(css_file_path):
-                        os.unlink(css_file_path)
-                except:
-                    pass
-
-                continue
-        
-        # 所有引擎都失败
-        error_msg = f"""PDF 生成失败，最后错误: {last_error}
-
-可能的解决方案:
-1. 安装 wkhtmltopdf (推荐):
-   Windows: choco install wkhtmltopdf
-   macOS: brew install wkhtmltopdf  
-   Linux: sudo apt-get install wkhtmltopdf
-
-2. 安装 LaTeX:
-   Windows: choco install miktex
-   macOS: brew install mactex
-   Linux: sudo apt-get install texlive-full
-
-3. 使用替代格式:
-   - Markdown 格式 - 轻量级，兼容性好
-   - Word 格式 - 适合进一步编辑
-"""
-        logger.error(error_msg)
-        raise Exception(error_msg)
+        # 使用 pdfkit 生成 PDF
+        try:
+            html_content = self._markdown_to_html(md_content)
+            return self._generate_pdf_with_pdfkit(html_content)
+        except Exception as e:
+            error_msg = f"PDF 生成失败: {e}"
+            logger.error(f"❌ {error_msg}")
+            raise Exception(error_msg)
 
 
 # 创建全局导出器实例

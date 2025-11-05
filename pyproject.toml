@@ -68,6 +68,7 @@ dependencies = [
     "markdown>=3.4.0",
     "pypandoc>=1.11",
     "python-docx>=0.8.11",  # Word文档处理，用于修复文本方向
+    "pdfkit>=1.0.0",  # PDF生成工具，需要wkhtmltopdf
 
     # 工具和辅助
     "psutil>=6.1.0",
@@ -84,16 +85,6 @@ dependencies = [
 
 [project.optional-dependencies]
 qianfan = ["qianfan>=0.4.20"]
-# PDF导出工具（推荐安装至少一个）
-pdf = [
-    "weasyprint>=60.0",  # 推荐：纯Python实现，中文支持好
-    "pdfkit>=1.0.0",     # 可选：需要wkhtmltopdf
-]
-# 完整的PDF导出支持（包含所有工具）
-pdf-full = [
-    "weasyprint>=60.0",
-    "pdfkit>=1.0.0",
-]
 
 [project.scripts]
 tradingagents = "main:main"
