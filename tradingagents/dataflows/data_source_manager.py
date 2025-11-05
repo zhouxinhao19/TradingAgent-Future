@@ -662,12 +662,32 @@ class DataSourceManager:
             data['ma20'] = data['close'].rolling(window=20, min_periods=1).mean()
             data['ma60'] = data['close'].rolling(window=60, min_periods=1).mean()
 
-            # 计算RSI（相对强弱指标）
+            # 计算RSI（相对强弱指标）- 同花顺风格：RSI(6, 12, 24)
             delta = data['close'].diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=14, min_periods=1).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=14, min_periods=1).mean()
-            rs = gain / (loss.replace(0, np.nan))
-            data['rsi'] = 100 - (100 / (1 + rs))
+
+            # RSI6
+            gain6 = (delta.where(delta > 0, 0)).rolling(window=6, min_periods=1).mean()
+            loss6 = (-delta.where(delta < 0, 0)).rolling(window=6, min_periods=1).mean()
+            rs6 = gain6 / (loss6.replace(0, np.nan))
+            data['rsi6'] = 100 - (100 / (1 + rs6))
+
+            # RSI12
+            gain12 = (delta.where(delta > 0, 0)).rolling(window=12, min_periods=1).mean()
+            loss12 = (-delta.where(delta < 0, 0)).rolling(window=12, min_periods=1).mean()
+            rs12 = gain12 / (loss12.replace(0, np.nan))
+            data['rsi12'] = 100 - (100 / (1 + rs12))
+
+            # RSI24
+            gain24 = (delta.where(delta > 0, 0)).rolling(window=24, min_periods=1).mean()
+            loss24 = (-delta.where(delta < 0, 0)).rolling(window=24, min_periods=1).mean()
+            rs24 = gain24 / (loss24.replace(0, np.nan))
+            data['rsi24'] = 100 - (100 / (1 + rs24))
+
+            # 保留RSI14作为国际标准参考
+            gain14 = (delta.where(delta > 0, 0)).rolling(window=14, min_periods=1).mean()
+            loss14 = (-delta.where(delta < 0, 0)).rolling(window=14, min_periods=1).mean()
+            rs14 = gain14 / (loss14.replace(0, np.nan))
+            data['rsi14'] = 100 - (100 / (1 + rs14))
 
             # 计算MACD
             ema12 = data['close'].ewm(span=12, adjust=False).mean()
@@ -696,7 +716,8 @@ class DataSourceManager:
                 logger.info(f"   价格: 开={row.get('open', 0):.2f}, 高={row.get('high', 0):.2f}, 低={row.get('low', 0):.2f}, 收={row.get('close', 0):.2f}")
                 logger.info(f"   MA: MA5={row.get('ma5', 0):.2f}, MA10={row.get('ma10', 0):.2f}, MA20={row.get('ma20', 0):.2f}, MA60={row.get('ma60', 0):.2f}")
                 logger.info(f"   MACD: DIF={row.get('macd_dif', 0):.4f}, DEA={row.get('macd_dea', 0):.4f}, MACD={row.get('macd', 0):.4f}")
-                logger.info(f"   RSI: {row.get('rsi', 0):.2f}")
+                logger.info(f"   RSI: RSI6={row.get('rsi6', 0):.2f}, RSI12={row.get('rsi12', 0):.2f}, RSI24={row.get('rsi24', 0):.2f} (同花顺风格)")
+                logger.info(f"   RSI14: {row.get('rsi14', 0):.2f} (国际标准)")
                 logger.info(f"   BOLL: 上={row.get('boll_upper', 0):.2f}, 中={row.get('boll_mid', 0):.2f}, 下={row.get('boll_lower', 0):.2f}")
 
             logger.info(f"🔍 [技术指标详情] ===== 数据详情结束 =====")
@@ -767,17 +788,42 @@ class DataSourceManager:
             else:
                 result += "\n"
 
-            # RSI指标
-            rsi_value = latest_data['rsi']
-            result += f"📉 RSI指标: {rsi_value:.2f}"
-            if rsi_value >= 70:
-                result += " (超买区域 ⚠️)\n\n"
-            elif rsi_value <= 30:
-                result += " (超卖区域 ⚠️)\n\n"
-            elif rsi_value >= 50:
-                result += " (强势区域 ↑)\n\n"
+            # RSI指标 - 同花顺风格 (6, 12, 24)
+            rsi6 = latest_data['rsi6']
+            rsi12 = latest_data['rsi12']
+            rsi24 = latest_data['rsi24']
+            result += f"📉 RSI指标 (同花顺风格):\n"
+            result += f"   RSI6:  {rsi6:.2f}"
+            if rsi6 >= 80:
+                result += " (超买 ⚠️)\n"
+            elif rsi6 <= 20:
+                result += " (超卖 ⚠️)\n"
             else:
-                result += " (弱势区域 ↓)\n\n"
+                result += "\n"
+
+            result += f"   RSI12: {rsi12:.2f}"
+            if rsi12 >= 80:
+                result += " (超买 ⚠️)\n"
+            elif rsi12 <= 20:
+                result += " (超卖 ⚠️)\n"
+            else:
+                result += "\n"
+
+            result += f"   RSI24: {rsi24:.2f}"
+            if rsi24 >= 80:
+                result += " (超买 ⚠️)\n"
+            elif rsi24 <= 20:
+                result += " (超卖 ⚠️)\n"
+            else:
+                result += "\n"
+
+            # 判断RSI趋势
+            if rsi6 > rsi12 > rsi24:
+                result += "   趋势: 多头排列 ↑\n\n"
+            elif rsi6 < rsi12 < rsi24:
+                result += "   趋势: 空头排列 ↓\n\n"
+            else:
+                result += "   趋势: 震荡整理 ↔\n\n"
 
             # 布林带
             result += f"📊 布林带 (BOLL):\n"
