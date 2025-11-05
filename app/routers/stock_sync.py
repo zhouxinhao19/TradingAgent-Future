@@ -116,12 +116,18 @@ async def sync_single_stock(
         # 同步实时行情
         if request.sync_realtime:
             try:
+                # 🔥 单个股票实时行情同步：优先使用 AKShare（避免 Tushare 接口限制）
+                actual_data_source = request.data_source
                 if request.data_source == "tushare":
+                    logger.info(f"💡 单个股票实时行情同步，自动切换到 AKShare 数据源（避免 Tushare 接口限制）")
+                    actual_data_source = "akshare"
+
+                if actual_data_source == "tushare":
                     service = await get_tushare_sync_service()
-                elif request.data_source == "akshare":
+                elif actual_data_source == "akshare":
                     service = await get_akshare_sync_service()
                 else:
-                    raise ValueError(f"不支持的数据源: {request.data_source}")
+                    raise ValueError(f"不支持的数据源: {actual_data_source}")
 
                 # 同步实时行情（只同步指定的股票）
                 realtime_result = await service.sync_realtime_quotes(
@@ -130,9 +136,16 @@ async def sync_single_stock(
                 )
 
                 success = realtime_result.get("success_count", 0) > 0
+
+                # 🔥 如果切换了数据源，在消息中说明
+                message = f"实时行情同步{'成功' if success else '失败'}"
+                if request.data_source == "tushare" and actual_data_source == "akshare":
+                    message += "（已自动切换到 AKShare 数据源）"
+
                 result["realtime_sync"] = {
                     "success": success,
-                    "message": f"实时行情同步{'成功' if success else '失败'}"
+                    "message": message,
+                    "data_source_used": actual_data_source  # 🔥 返回实际使用的数据源
                 }
                 logger.info(f"✅ {request.symbol} 实时行情同步完成: {success}")
 
@@ -152,12 +165,12 @@ async def sync_single_stock(
                     service = await get_akshare_sync_service()
                 else:
                     raise ValueError(f"不支持的数据源: {request.data_source}")
-                
+
                 # 计算日期范围
                 from datetime import datetime, timedelta
                 end_date = datetime.now().strftime('%Y-%m-%d')
                 start_date = (datetime.now() - timedelta(days=request.days)).strftime('%Y-%m-%d')
-                
+
                 # 同步历史数据
                 hist_result = await service.sync_historical_data(
                     symbols=[request.symbol],
@@ -180,7 +193,26 @@ async def sync_single_stock(
                         logger.info(f"✅ {request.symbol} 最新数据已同步到 market_quotes")
                     except Exception as e:
                         logger.warning(f"⚠️ {request.symbol} 同步到 market_quotes 失败: {e}")
-                
+
+                # 🔥 如果没有勾选实时行情，但在交易时间内，自动同步实时行情
+                if not request.sync_realtime:
+                    from app.utils.trading_time import is_trading_time
+                    if is_trading_time():
+                        logger.info(f"📊 {request.symbol} 当前在交易时间内，自动同步实时行情")
+                        try:
+                            realtime_result = await service.sync_realtime_quotes(
+                                symbols=[request.symbol],
+                                force=True
+                            )
+                            if realtime_result.get("success_count", 0) > 0:
+                                logger.info(f"✅ {request.symbol} 实时行情自动同步成功")
+                                result["realtime_sync"] = {
+                                    "success": True,
+                                    "message": "实时行情自动同步成功（交易时间内）"
+                                }
+                        except Exception as e:
+                            logger.warning(f"⚠️ {request.symbol} 实时行情自动同步失败: {e}")
+
             except Exception as e:
                 logger.error(f"❌ {request.symbol} 历史数据同步失败: {e}")
                 result["historical_sync"] = {
