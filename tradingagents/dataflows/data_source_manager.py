@@ -1045,7 +1045,7 @@ class DataSourceManager:
 
     def _get_mongodb_data(self, symbol: str, start_date: str, end_date: str, period: str = "daily") -> tuple[str, str | None]:
         """
-        从MongoDB获取多周期数据
+        从MongoDB获取多周期数据 - 包含技术指标计算
 
         Returns:
             tuple[str, str | None]: (结果字符串, 实际使用的数据源名称)
@@ -1061,8 +1061,18 @@ class DataSourceManager:
 
             if df is not None and not df.empty:
                 logger.info(f"✅ [数据来源: MongoDB缓存] 成功获取{period}数据: {symbol} ({len(df)}条记录)")
-                # 转换为字符串格式返回，数据源标记为 mongodb
-                return df.to_string(), "mongodb"
+
+                # 🔧 修复：使用统一的格式化方法，包含技术指标计算
+                # 获取股票名称（从DataFrame中提取或使用默认值）
+                stock_name = f'股票{symbol}'
+                if 'name' in df.columns and not df['name'].empty:
+                    stock_name = df['name'].iloc[0]
+
+                # 调用统一的格式化方法（包含技术指标计算）
+                result = self._format_stock_data_response(df, symbol, stock_name, start_date, end_date)
+
+                logger.info(f"✅ [MongoDB] 已计算技术指标: MA5/10/20/60, MACD, RSI, BOLL")
+                return result, "mongodb"
             else:
                 # MongoDB没有数据（adapter内部已记录详细的数据源信息），降级到其他数据源
                 logger.info(f"🔄 [MongoDB] 未找到{period}数据: {symbol}，开始尝试备用数据源")
@@ -1166,7 +1176,7 @@ class DataSourceManager:
             raise
 
     def _get_akshare_data(self, symbol: str, start_date: str, end_date: str, period: str = "daily") -> str:
-        """使用AKShare获取多周期数据"""
+        """使用AKShare获取多周期数据 - 包含技术指标计算"""
         logger.debug(f"📊 [AKShare] 调用参数: symbol={symbol}, start_date={start_date}, end_date={end_date}, period={period}")
 
         start_time = time.time()
@@ -1192,37 +1202,16 @@ class DataSourceManager:
             duration = time.time() - start_time
 
             if data is not None and not data.empty:
-                result = f"股票代码: {symbol}\n"
-                result += f"数据期间: {start_date} 至 {end_date}\n"
-                result += f"数据条数: {len(data)}条\n\n"
+                # 🔧 修复：使用统一的格式化方法，包含技术指标计算
+                # 获取股票基本信息
+                stock_info = loop.run_until_complete(provider.get_stock_basic_info(symbol))
+                stock_name = stock_info.get('name', f'股票{symbol}') if stock_info else f'股票{symbol}'
 
-                # 显示最新3天数据，确保在各种显示环境下都能完整显示
-                display_rows = min(3, len(data))
-                result += f"最新{display_rows}天数据:\n"
-
-                # 使用pandas选项确保显示完整数据
-                with pd.option_context('display.max_rows', None,
-                                     'display.max_columns', None,
-                                     'display.width', None,
-                                     'display.max_colwidth', None):
-                    result += data.tail(display_rows).to_string(index=False)
-
-                # 如果数据超过3天，也显示一些统计信息
-                if len(data) > 3:
-                    latest_price = data.iloc[-1]['收盘'] if '收盘' in data.columns else data.iloc[-1].get('close', 'N/A')
-                    first_price = data.iloc[0]['收盘'] if '收盘' in data.columns else data.iloc[0].get('close', 'N/A')
-                    if latest_price != 'N/A' and first_price != 'N/A':
-                        try:
-                            change = float(latest_price) - float(first_price)
-                            change_pct = (change / float(first_price)) * 100
-                            result += f"\n\n📊 期间统计:\n"
-                            result += f"期间涨跌: {change:+.2f} ({change_pct:+.2f}%)\n"
-                            result += f"最高价: {data['最高'].max() if '最高' in data.columns else data.get('high', pd.Series()).max():.2f}\n"
-                            result += f"最低价: {data['最低'].min() if '最低' in data.columns else data.get('low', pd.Series()).min():.2f}"
-                        except (ValueError, TypeError):
-                            pass
+                # 调用统一的格式化方法（包含技术指标计算）
+                result = self._format_stock_data_response(data, symbol, stock_name, start_date, end_date)
 
                 logger.debug(f"📊 [AKShare] 调用成功: 耗时={duration:.2f}s, 数据条数={len(data)}, 结果长度={len(result)}")
+                logger.info(f"✅ [AKShare] 已计算技术指标: MA5/10/20/60, MACD, RSI, BOLL")
                 return result
             else:
                 result = f"❌ 未能获取{symbol}的股票数据"
@@ -1235,7 +1224,7 @@ class DataSourceManager:
             return f"❌ AKShare获取{symbol}数据失败: {e}"
 
     def _get_baostock_data(self, symbol: str, start_date: str, end_date: str, period: str = "daily") -> str:
-        """使用BaoStock获取多周期数据"""
+        """使用BaoStock获取多周期数据 - 包含技术指标计算"""
         # 使用BaoStock的统一接口
         from .providers.china.baostock import get_baostock_provider
         provider = get_baostock_provider()
@@ -1255,20 +1244,15 @@ class DataSourceManager:
         data = loop.run_until_complete(provider.get_historical_data(symbol, start_date, end_date, period))
 
         if data is not None and not data.empty:
-            result = f"股票代码: {symbol}\n"
-            result += f"数据期间: {start_date} 至 {end_date}\n"
-            result += f"数据条数: {len(data)}条\n\n"
+            # 🔧 修复：使用统一的格式化方法，包含技术指标计算
+            # 获取股票基本信息
+            stock_info = loop.run_until_complete(provider.get_stock_basic_info(symbol))
+            stock_name = stock_info.get('name', f'股票{symbol}') if stock_info else f'股票{symbol}'
 
-            # 显示最新3天数据，确保在各种显示环境下都能完整显示
-            display_rows = min(3, len(data))
-            result += f"最新{display_rows}天数据:\n"
+            # 调用统一的格式化方法（包含技术指标计算）
+            result = self._format_stock_data_response(data, symbol, stock_name, start_date, end_date)
 
-            # 使用pandas选项确保显示完整数据
-            with pd.option_context('display.max_rows', None,
-                                 'display.max_columns', None,
-                                 'display.width', None,
-                                 'display.max_colwidth', None):
-                result += data.tail(display_rows).to_string(index=False)
+            logger.info(f"✅ [BaoStock] 已计算技术指标: MA5/10/20/60, MACD, RSI, BOLL")
             return result
         else:
             return f"❌ 未能获取{symbol}的股票数据"
