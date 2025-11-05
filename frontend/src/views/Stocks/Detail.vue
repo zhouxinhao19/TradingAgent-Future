@@ -36,8 +36,24 @@
           <div class="item"><span>最高</span><b>{{ fmtPrice(quote.high) }}</b></div>
           <div class="item"><span>最低</span><b>{{ fmtPrice(quote.low) }}</b></div>
           <div class="item"><span>昨收</span><b>{{ fmtPrice(quote.prevClose) }}</b></div>
-          <div class="item"><span>成交量</span><b>{{ fmtVolume(quote.volume) }}</b></div>
-          <div class="item"><span>成交额</span><b>{{ fmtAmount(quote.amount) }}</b></div>
+          <div class="item">
+            <span>成交量</span>
+            <b>
+              {{ fmtVolume(quote.volume) }}
+              <el-tooltip v-if="quote.tradeDate && !isToday(quote.tradeDate)" :content="`数据日期: ${quote.tradeDate}`" placement="top">
+                <el-tag size="small" type="warning" style="margin-left: 4px;">{{ formatDateTag(quote.tradeDate) }}</el-tag>
+              </el-tooltip>
+            </b>
+          </div>
+          <div class="item">
+            <span>成交额</span>
+            <b>
+              {{ fmtAmount(quote.amount) }}
+              <el-tooltip v-if="quote.tradeDate && !isToday(quote.tradeDate)" :content="`数据日期: ${quote.tradeDate}`" placement="top">
+                <el-tag size="small" type="warning" style="margin-left: 4px;">{{ formatDateTag(quote.tradeDate) }}</el-tag>
+              </el-tooltip>
+            </b>
+          </div>
           <div class="item">
             <span>换手率</span>
             <b>
@@ -429,6 +445,7 @@ const quote = reactive({
   amount: NaN,
   turnover: NaN,
   amplitude: NaN,  // 振幅（替代量比）
+  tradeDate: null as string | null,  // 交易日期（用于成交量、成交额）
   turnoverDate: null as string | null,  // 换手率数据日期
   amplitudeDate: null as string | null  // 振幅数据日期
 })
@@ -557,6 +574,7 @@ async function fetchQuote() {
     quote.amplitude = Number.isFinite(d.amplitude) ? Number(d.amplitude) : quote.amplitude
 
     // 🔥 获取数据日期（用于标注非当天数据）
+    quote.tradeDate = d.trade_date || null  // 交易日期（用于成交量、成交额）
     quote.turnoverDate = d.turnover_rate_date || d.trade_date || null
     quote.amplitudeDate = d.amplitude_date || d.trade_date || null
 
