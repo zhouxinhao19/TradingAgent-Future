@@ -186,7 +186,8 @@ class SchedulerService:
                 job_id=job_id,
                 status="running",
                 scheduled_time=now.replace(tzinfo=None),  # 移除时区信息
-                progress=0
+                progress=0,
+                is_manual=True  # 标记为手动触发
             )
 
             return True
@@ -324,6 +325,7 @@ class SchedulerService:
         self,
         job_id: Optional[str] = None,
         status: Optional[str] = None,
+        is_manual: Optional[bool] = None,
         limit: int = 50,
         offset: int = 0
     ) -> List[Dict[str, Any]]:
@@ -332,7 +334,8 @@ class SchedulerService:
 
         Args:
             job_id: 任务ID（可选，不指定则返回所有任务）
-            status: 状态过滤（success/failed/missed）
+            status: 状态过滤（success/failed/missed/running）
+            is_manual: 是否手动触发（True=手动，False=自动，None=全部）
             limit: 返回数量限制
             offset: 偏移量
 
@@ -348,6 +351,8 @@ class SchedulerService:
                 query["job_id"] = job_id
             if status:
                 query["status"] = status
+            if is_manual is not None:
+                query["is_manual"] = is_manual
 
             cursor = db.scheduler_executions.find(query).sort("timestamp", -1).skip(offset).limit(limit)
 
@@ -359,6 +364,8 @@ class SchedulerService:
                     doc["scheduled_time"] = doc["scheduled_time"].isoformat()
                 if doc.get("timestamp"):
                     doc["timestamp"] = doc["timestamp"].isoformat()
+                if doc.get("updated_at"):
+                    doc["updated_at"] = doc["updated_at"].isoformat()
                 executions.append(doc)
 
             return executions
@@ -369,7 +376,8 @@ class SchedulerService:
     async def count_job_executions(
         self,
         job_id: Optional[str] = None,
-        status: Optional[str] = None
+        status: Optional[str] = None,
+        is_manual: Optional[bool] = None
     ) -> int:
         """
         统计任务执行历史数量
@@ -377,6 +385,7 @@ class SchedulerService:
         Args:
             job_id: 任务ID（可选）
             status: 状态过滤（可选）
+            is_manual: 是否手动触发（可选）
 
         Returns:
             执行历史数量
@@ -390,6 +399,8 @@ class SchedulerService:
                 query["job_id"] = job_id
             if status:
                 query["status"] = status
+            if is_manual is not None:
+                query["is_manual"] = is_manual
 
             count = await db.scheduler_executions.count_documents(query)
             return count
@@ -583,7 +594,8 @@ class SchedulerService:
         return_value: str = None,
         error_message: str = None,
         traceback: str = None,
-        progress: int = None
+        progress: int = None,
+        is_manual: bool = False
     ):
         """
         记录任务执行历史
@@ -597,6 +609,7 @@ class SchedulerService:
             error_message: 错误信息
             traceback: 错误堆栈
             progress: 执行进度（0-100）
+            is_manual: 是否手动触发
         """
         try:
             db = self._get_db()
@@ -605,13 +618,58 @@ class SchedulerService:
             job = self.scheduler.get_job(job_id)
             job_name = job.name if job else job_id
 
+            # 如果是完成状态（success/failed），先查找是否有对应的 running 记录
+            if status in ["success", "failed"]:
+                # 查找最近的 running 记录（5分钟内）
+                five_minutes_ago = datetime.now() - timedelta(minutes=5)
+                existing_record = await db.scheduler_executions.find_one(
+                    {
+                        "job_id": job_id,
+                        "status": "running",
+                        "timestamp": {"$gte": five_minutes_ago}
+                    },
+                    sort=[("timestamp", -1)]
+                )
+
+                if existing_record:
+                    # 更新现有记录
+                    update_data = {
+                        "status": status,
+                        "execution_time": execution_time,
+                        "updated_at": datetime.now()
+                    }
+
+                    if return_value:
+                        update_data["return_value"] = return_value
+                    if error_message:
+                        update_data["error_message"] = error_message
+                    if traceback:
+                        update_data["traceback"] = traceback
+                    if progress is not None:
+                        update_data["progress"] = progress
+
+                    await db.scheduler_executions.update_one(
+                        {"_id": existing_record["_id"]},
+                        {"$set": update_data}
+                    )
+
+                    # 记录日志
+                    if status == "success":
+                        logger.info(f"✅ [任务执行] {job_name} 执行成功，耗时: {execution_time:.2f}秒")
+                    elif status == "failed":
+                        logger.error(f"❌ [任务执行] {job_name} 执行失败: {error_message}")
+
+                    return
+
+            # 如果没有找到 running 记录，或者是 running/missed 状态，插入新记录
             execution_record = {
                 "job_id": job_id,
                 "job_name": job_name,
                 "status": status,
                 "scheduled_time": scheduled_time,
                 "execution_time": execution_time,
-                "timestamp": datetime.now()
+                "timestamp": datetime.now(),
+                "is_manual": is_manual
             }
 
             if return_value:
@@ -633,7 +691,8 @@ class SchedulerService:
             elif status == "missed":
                 logger.warning(f"⚠️ [任务执行] {job_name} 错过执行时间")
             elif status == "running":
-                logger.info(f"🔄 [任务执行] {job_name} 正在执行，进度: {progress}%")
+                trigger_type = "手动触发" if is_manual else "自动触发"
+                logger.info(f"🔄 [任务执行] {job_name} 开始执行 ({trigger_type})，进度: {progress}%")
 
         except Exception as e:
             logger.error(f"❌ 记录任务执行历史失败: {e}")

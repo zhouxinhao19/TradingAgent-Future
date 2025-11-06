@@ -735,18 +735,31 @@ const showHistoryDialog = async () => {
 const loadHistory = async () => {
   historyLoading.value = true
   try {
-    const params = {
+    const params: any = {
       limit: historyPageSize.value,
       offset: (historyPage.value - 1) * historyPageSize.value,
-      ...(currentHistoryJobId.value ? { job_id: currentHistoryJobId.value } : {})
+      is_manual: true  // 只显示手动触发的执行记录
+    }
+
+    if (currentHistoryJobId.value) {
+      params.job_id = currentHistoryJobId.value
     }
 
     const res = currentHistoryJobId.value
-      ? await getJobHistory(currentHistoryJobId.value, params)
-      : await getAllHistory(params)
+      ? await getSingleJobExecutions(currentHistoryJobId.value, params)
+      : await getJobExecutions(params)
 
-    // request.get 已经返回了 response.data
-    historyList.value = Array.isArray(res.data?.history) ? res.data.history : []
+    // 将执行记录转换为历史记录格式
+    const executions = Array.isArray(res.data?.items) ? res.data.items : []
+    historyList.value = executions.map((exec: any) => ({
+      job_id: exec.job_id,
+      job_name: exec.job_name,
+      action: 'trigger',
+      status: exec.status === 'success' ? 'success' : 'failed',
+      timestamp: exec.timestamp,
+      error_message: exec.error_message,
+      note: exec.progress_message || exec.current_item
+    }))
     historyTotal.value = res.data?.total || 0
   } catch (error: any) {
     ElMessage.error(error.message || '加载执行历史失败')
@@ -811,7 +824,8 @@ const loadExecutions = async () => {
   try {
     const params: any = {
       limit: executionPageSize.value,
-      offset: (executionPage.value - 1) * executionPageSize.value
+      offset: (executionPage.value - 1) * executionPageSize.value,
+      is_manual: false  // 只显示自动触发的执行记录
     }
 
     if (currentHistoryJobId.value) {

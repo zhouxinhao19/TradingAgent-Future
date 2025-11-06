@@ -340,16 +340,18 @@ async def get_job_executions(
     user: dict = Depends(get_current_user),
     service: SchedulerService = Depends(get_scheduler_service),
     job_id: Optional[str] = Query(None, description="任务ID过滤"),
-    status: Optional[str] = Query(None, description="状态过滤（success/failed/missed）"),
+    status: Optional[str] = Query(None, description="状态过滤（success/failed/missed/running）"),
+    is_manual: Optional[bool] = Query(None, description="是否手动触发（true=手动，false=自动，None=全部）"),
     limit: int = Query(50, ge=1, le=200, description="返回数量限制"),
     offset: int = Query(0, ge=0, description="偏移量")
 ):
     """
-    获取任务执行历史（自动执行记录）
+    获取任务执行历史
 
     Args:
         job_id: 任务ID过滤（可选）
         status: 状态过滤（可选）
+        is_manual: 是否手动触发（可选）
         limit: 返回数量限制
         offset: 偏移量
 
@@ -360,10 +362,11 @@ async def get_job_executions(
         executions = await service.get_job_executions(
             job_id=job_id,
             status=status,
+            is_manual=is_manual,
             limit=limit,
             offset=offset
         )
-        total = await service.count_job_executions(job_id=job_id, status=status)
+        total = await service.count_job_executions(job_id=job_id, status=status, is_manual=is_manual)
         return ok(data={
             "items": executions,
             "total": total,

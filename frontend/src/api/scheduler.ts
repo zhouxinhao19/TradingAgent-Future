@@ -43,6 +43,7 @@ export interface JobExecution {
   total_items?: number
   processed_items?: number
   updated_at?: string
+  is_manual?: boolean
 }
 
 export interface JobExecutionStats {
