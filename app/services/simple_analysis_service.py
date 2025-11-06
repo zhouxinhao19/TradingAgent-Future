@@ -1090,6 +1090,7 @@ class SimpleAnalysisService:
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
                     try:
+                        # 更新内存中的任务状态
                         loop.run_until_complete(
                             self.memory_manager.update_task_status(
                                 task_id=task_id,
@@ -1097,6 +1098,24 @@ class SimpleAnalysisService:
                                 progress=progress,
                                 message=message,
                                 current_step=step
+                            )
+                        )
+
+                        # 🔥 同时更新 MongoDB 中的任务进度
+                        from app.core.database import get_mongo_db
+                        from datetime import datetime
+                        db = get_mongo_db()
+                        loop.run_until_complete(
+                            db.analysis_tasks.update_one(
+                                {"task_id": task_id},
+                                {
+                                    "$set": {
+                                        "progress": progress,
+                                        "current_step": step,
+                                        "message": message,
+                                        "updated_at": datetime.utcnow()
+                                    }
+                                }
                             )
                         )
                     finally:
