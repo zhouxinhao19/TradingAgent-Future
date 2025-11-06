@@ -30,13 +30,19 @@ export interface JobHistory {
 export interface JobExecution {
   job_id: string
   job_name: string
-  status: 'success' | 'failed' | 'missed'
+  status: 'running' | 'success' | 'failed' | 'missed'
   scheduled_time: string
   execution_time?: number
   timestamp: string
   return_value?: string
   error_message?: string
   traceback?: string
+  progress?: number
+  progress_message?: string
+  current_item?: string
+  total_items?: number
+  processed_items?: number
+  updated_at?: string
 }
 
 export interface JobExecutionStats {

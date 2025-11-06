@@ -344,11 +344,33 @@
             <el-table-column prop="status" label="状态" width="100">
               <template #default="{ row }">
                 <el-tag
-                  :type="row.status === 'success' ? 'success' : row.status === 'failed' ? 'danger' : 'warning'"
+                  :type="row.status === 'success' ? 'success' : row.status === 'failed' ? 'danger' : row.status === 'running' ? 'info' : 'warning'"
                   size="small"
                 >
                   {{ formatExecutionStatus(row.status) }}
                 </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="progress" label="进度" width="150">
+              <template #default="{ row }">
+                <div v-if="row.status === 'running' && row.progress !== undefined">
+                  <el-progress :percentage="row.progress" :stroke-width="6" />
+                  <el-text v-if="row.processed_items && row.total_items" size="small" type="info" style="margin-top: 4px">
+                    {{ row.processed_items }}/{{ row.total_items }}
+                  </el-text>
+                </div>
+                <el-text v-else type="info" size="small">-</el-text>
+              </template>
+            </el-table-column>
+            <el-table-column prop="progress_message" label="当前操作" min-width="180" show-overflow-tooltip>
+              <template #default="{ row }">
+                <el-text v-if="row.progress_message" size="small">
+                  {{ row.progress_message }}
+                </el-text>
+                <el-text v-else-if="row.current_item" size="small">
+                  {{ row.current_item }}
+                </el-text>
+                <el-text v-else type="info" size="small">-</el-text>
               </template>
             </el-table-column>
             <el-table-column prop="execution_time" label="执行时长" width="120">
@@ -364,23 +386,15 @@
                 {{ formatDateTime(row.scheduled_time) }}
               </template>
             </el-table-column>
-            <el-table-column prop="timestamp" label="完成时间" width="180">
+            <el-table-column prop="timestamp" label="更新时间" width="180">
               <template #default="{ row }">
-                {{ formatDateTime(row.timestamp) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="error_message" label="错误信息" min-width="200">
-              <template #default="{ row }">
-                <el-text v-if="row.error_message" type="danger" size="small">
-                  {{ row.error_message }}
-                </el-text>
-                <el-text v-else type="info" size="small">-</el-text>
+                {{ formatDateTime(row.updated_at || row.timestamp) }}
               </template>
             </el-table-column>
             <el-table-column label="操作" width="100" fixed="right">
               <template #default="{ row }">
                 <el-button
-                  v-if="row.error_message"
+                  v-if="row.error_message || row.status === 'running'"
                   link
                   type="primary"
                   size="small"
@@ -425,22 +439,28 @@
         </el-descriptions-item>
         <el-descriptions-item label="状态">
           <el-tag
-            :type="currentExecution.status === 'success' ? 'success' : currentExecution.status === 'failed' ? 'danger' : 'warning'"
+            :type="currentExecution.status === 'success' ? 'success' : currentExecution.status === 'failed' ? 'danger' : currentExecution.status === 'running' ? 'info' : 'warning'"
           >
             {{ formatExecutionStatus(currentExecution.status) }}
           </el-tag>
         </el-descriptions-item>
+        <el-descriptions-item label="进度" v-if="currentExecution.status === 'running' && currentExecution.progress !== undefined">
+          <el-progress :percentage="currentExecution.progress" :stroke-width="8" />
+          <div v-if="currentExecution.processed_items && currentExecution.total_items" style="margin-top: 8px">
+            <el-text size="small">已处理: {{ currentExecution.processed_items }} / {{ currentExecution.total_items }}</el-text>
+          </div>
+        </el-descriptions-item>
+        <el-descriptions-item label="当前操作" v-if="currentExecution.progress_message || currentExecution.current_item">
+          <el-text>{{ currentExecution.progress_message || currentExecution.current_item }}</el-text>
+        </el-descriptions-item>
         <el-descriptions-item label="计划时间">
           {{ formatDateTime(currentExecution.scheduled_time) }}
         </el-descriptions-item>
-        <el-descriptions-item label="完成时间">
-          {{ formatDateTime(currentExecution.timestamp) }}
+        <el-descriptions-item label="更新时间">
+          {{ formatDateTime(currentExecution.updated_at || currentExecution.timestamp) }}
         </el-descriptions-item>
-        <el-descriptions-item label="执行时长">
-          <span v-if="currentExecution.execution_time !== undefined">
-            {{ currentExecution.execution_time.toFixed(2) }}秒
-          </span>
-          <span v-else>-</span>
+        <el-descriptions-item label="执行时长" v-if="currentExecution.execution_time !== undefined">
+          {{ currentExecution.execution_time.toFixed(2) }}秒
         </el-descriptions-item>
         <el-descriptions-item label="错误信息" v-if="currentExecution.error_message">
           <el-text type="danger">{{ currentExecution.error_message }}</el-text>
@@ -458,7 +478,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, reactive } from 'vue'
+import { ref, computed, onMounted, reactive, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Timer,
@@ -745,11 +765,45 @@ const handleHistoryTabChange = (tabName: string) => {
   if (tabName === 'execution') {
     executionPage.value = 1
     loadExecutions()
+    // 启动自动刷新
+    startAutoRefresh()
   } else {
     historyPage.value = 1
     loadHistory()
+    // 停止自动刷新
+    stopAutoRefresh()
   }
 }
+
+// 自动刷新定时器
+let autoRefreshTimer: number | null = null
+
+const startAutoRefresh = () => {
+  // 清除旧的定时器
+  stopAutoRefresh()
+
+  // 每5秒刷新一次
+  autoRefreshTimer = window.setInterval(() => {
+    // 只有在执行监控标签页且对话框打开时才刷新
+    if (activeHistoryTab.value === 'execution' && historyDialogVisible.value) {
+      loadExecutions()
+    }
+  }, 5000)
+}
+
+const stopAutoRefresh = () => {
+  if (autoRefreshTimer) {
+    window.clearInterval(autoRefreshTimer)
+    autoRefreshTimer = null
+  }
+}
+
+// 监听对话框关闭，停止自动刷新
+watch(historyDialogVisible, (newVal) => {
+  if (!newVal) {
+    stopAutoRefresh()
+  }
+})
 
 const loadExecutions = async () => {
   executionLoading.value = true
@@ -794,6 +848,7 @@ const showExecutionDetail = (execution: JobExecution) => {
 
 const formatExecutionStatus = (status: string) => {
   const statusMap: Record<string, string> = {
+    running: '执行中',
     success: '成功',
     failed: '失败',
     missed: '错过'

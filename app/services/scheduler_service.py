@@ -540,7 +540,8 @@ class SchedulerService:
             status="success",
             scheduled_time=event.scheduled_run_time,
             execution_time=(datetime.now() - event.scheduled_run_time).total_seconds(),
-            return_value=str(event.retval) if event.retval else None
+            return_value=str(event.retval) if event.retval else None,
+            progress=100  # 任务完成，进度100%
         ))
 
     def _on_job_error(self, event: JobExecutionEvent):
@@ -551,7 +552,8 @@ class SchedulerService:
             scheduled_time=event.scheduled_run_time,
             execution_time=(datetime.now() - event.scheduled_run_time).total_seconds() if event.scheduled_run_time else None,
             error_message=str(event.exception) if event.exception else None,
-            traceback=event.traceback if hasattr(event, 'traceback') else None
+            traceback=event.traceback if hasattr(event, 'traceback') else None,
+            progress=None  # 失败时不设置进度
         ))
 
     def _on_job_missed(self, event: JobExecutionEvent):
@@ -559,7 +561,8 @@ class SchedulerService:
         asyncio.create_task(self._record_job_execution(
             job_id=event.job_id,
             status="missed",
-            scheduled_time=event.scheduled_run_time
+            scheduled_time=event.scheduled_run_time,
+            progress=None  # 错过时不设置进度
         ))
 
     async def _record_job_execution(
@@ -570,19 +573,21 @@ class SchedulerService:
         execution_time: float = None,
         return_value: str = None,
         error_message: str = None,
-        traceback: str = None
+        traceback: str = None,
+        progress: int = None
     ):
         """
         记录任务执行历史
 
         Args:
             job_id: 任务ID
-            status: 状态 (success/failed/missed)
+            status: 状态 (running/success/failed/missed)
             scheduled_time: 计划执行时间
             execution_time: 实际执行时长（秒）
             return_value: 返回值
             error_message: 错误信息
             traceback: 错误堆栈
+            progress: 执行进度（0-100）
         """
         try:
             db = self._get_db()
@@ -606,6 +611,8 @@ class SchedulerService:
                 execution_record["error_message"] = error_message
             if traceback:
                 execution_record["traceback"] = traceback
+            if progress is not None:
+                execution_record["progress"] = progress
 
             await db.scheduler_executions.insert_one(execution_record)
 
@@ -616,6 +623,8 @@ class SchedulerService:
                 logger.error(f"❌ [任务执行] {job_name} 执行失败: {error_message}")
             elif status == "missed":
                 logger.warning(f"⚠️ [任务执行] {job_name} 错过执行时间")
+            elif status == "running":
+                logger.info(f"🔄 [任务执行] {job_name} 正在执行，进度: {progress}%")
 
         except Exception as e:
             logger.error(f"❌ 记录任务执行历史失败: {e}")
@@ -738,18 +747,109 @@ def set_scheduler_instance(scheduler: AsyncIOScheduler):
 def get_scheduler_service() -> SchedulerService:
     """
     获取调度器服务实例
-    
+
     Returns:
         调度器服务实例
     """
     global _scheduler_service, _scheduler_instance
-    
+
     if _scheduler_instance is None:
         raise RuntimeError("调度器实例未设置，请先调用 set_scheduler_instance()")
-    
+
     if _scheduler_service is None:
         _scheduler_service = SchedulerService(_scheduler_instance)
         logger.info("✅ 调度器服务实例已创建")
-    
+
     return _scheduler_service
+
+
+async def update_job_progress(
+    job_id: str,
+    progress: int,
+    message: str = None,
+    current_item: str = None,
+    total_items: int = None,
+    processed_items: int = None
+):
+    """
+    更新任务执行进度（供定时任务内部调用）
+
+    Args:
+        job_id: 任务ID
+        progress: 进度百分比（0-100）
+        message: 进度消息
+        current_item: 当前处理项
+        total_items: 总项数
+        processed_items: 已处理项数
+    """
+    try:
+        from pymongo import MongoClient
+        from app.core.config import settings
+
+        # 使用同步客户端避免事件循环冲突
+        sync_client = MongoClient(settings.MONGO_URI)
+        sync_db = sync_client[settings.MONGO_DB]
+
+        # 查找最近的执行记录
+        latest_execution = sync_db.scheduler_executions.find_one(
+            {"job_id": job_id, "status": {"$in": ["running", "success", "failed"]}},
+            sort=[("timestamp", -1)]
+        )
+
+        if latest_execution:
+            # 更新现有记录
+            update_data = {
+                "progress": progress,
+                "status": "running",
+                "updated_at": datetime.now()
+            }
+
+            if message:
+                update_data["progress_message"] = message
+            if current_item:
+                update_data["current_item"] = current_item
+            if total_items is not None:
+                update_data["total_items"] = total_items
+            if processed_items is not None:
+                update_data["processed_items"] = processed_items
+
+            sync_db.scheduler_executions.update_one(
+                {"_id": latest_execution["_id"]},
+                {"$set": update_data}
+            )
+        else:
+            # 创建新的执行记录（任务刚开始）
+            from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+            # 获取任务名称
+            job_name = job_id
+            if _scheduler_instance:
+                job = _scheduler_instance.get_job(job_id)
+                if job:
+                    job_name = job.name
+
+            execution_record = {
+                "job_id": job_id,
+                "job_name": job_name,
+                "status": "running",
+                "progress": progress,
+                "scheduled_time": datetime.now(),
+                "timestamp": datetime.now()
+            }
+
+            if message:
+                execution_record["progress_message"] = message
+            if current_item:
+                execution_record["current_item"] = current_item
+            if total_items is not None:
+                execution_record["total_items"] = total_items
+            if processed_items is not None:
+                execution_record["processed_items"] = processed_items
+
+            sync_db.scheduler_executions.insert_one(execution_record)
+
+        sync_client.close()
+
+    except Exception as e:
+        logger.error(f"❌ 更新任务进度失败: {e}")
 
