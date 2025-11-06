@@ -324,7 +324,7 @@ async def scheduler_health_check(
 ):
     """
     调度器健康检查
-    
+
     Returns:
         调度器健康状态
     """
@@ -333,4 +333,104 @@ async def scheduler_health_check(
         return ok(data=health, message="调度器运行正常")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"健康检查失败: {str(e)}")
+
+
+@router.get("/executions")
+async def get_job_executions(
+    user: dict = Depends(get_current_user),
+    service: SchedulerService = Depends(get_scheduler_service),
+    job_id: Optional[str] = Query(None, description="任务ID过滤"),
+    status: Optional[str] = Query(None, description="状态过滤（success/failed/missed）"),
+    limit: int = Query(50, ge=1, le=200, description="返回数量限制"),
+    offset: int = Query(0, ge=0, description="偏移量")
+):
+    """
+    获取任务执行历史（自动执行记录）
+
+    Args:
+        job_id: 任务ID过滤（可选）
+        status: 状态过滤（可选）
+        limit: 返回数量限制
+        offset: 偏移量
+
+    Returns:
+        执行历史列表
+    """
+    try:
+        executions = await service.get_job_executions(
+            job_id=job_id,
+            status=status,
+            limit=limit,
+            offset=offset
+        )
+        total = await service.count_job_executions(job_id=job_id, status=status)
+        return ok(data={
+            "items": executions,
+            "total": total,
+            "limit": limit,
+            "offset": offset
+        }, message=f"获取到 {len(executions)} 条执行记录")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取执行历史失败: {str(e)}")
+
+
+@router.get("/jobs/{job_id}/executions")
+async def get_single_job_executions(
+    job_id: str,
+    user: dict = Depends(get_current_user),
+    service: SchedulerService = Depends(get_scheduler_service),
+    status: Optional[str] = Query(None, description="状态过滤（success/failed/missed）"),
+    limit: int = Query(50, ge=1, le=200, description="返回数量限制"),
+    offset: int = Query(0, ge=0, description="偏移量")
+):
+    """
+    获取指定任务的执行历史
+
+    Args:
+        job_id: 任务ID
+        status: 状态过滤（可选）
+        limit: 返回数量限制
+        offset: 偏移量
+
+    Returns:
+        执行历史列表
+    """
+    try:
+        executions = await service.get_job_executions(
+            job_id=job_id,
+            status=status,
+            limit=limit,
+            offset=offset
+        )
+        total = await service.count_job_executions(job_id=job_id, status=status)
+        return ok(data={
+            "items": executions,
+            "total": total,
+            "limit": limit,
+            "offset": offset
+        }, message=f"获取到 {len(executions)} 条执行记录")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取执行历史失败: {str(e)}")
+
+
+@router.get("/jobs/{job_id}/execution-stats")
+async def get_job_execution_stats(
+    job_id: str,
+    user: dict = Depends(get_current_user),
+    service: SchedulerService = Depends(get_scheduler_service)
+):
+    """
+    获取任务执行统计信息
+
+    Args:
+        job_id: 任务ID
+
+    Returns:
+        统计信息
+    """
+    try:
+        stats = await service.get_job_execution_stats(job_id)
+        return ok(data=stats, message="获取统计信息成功")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取统计信息失败: {str(e)}")
 

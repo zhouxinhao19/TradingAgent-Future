@@ -10,6 +10,12 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.job import Job
+from apscheduler.events import (
+    EVENT_JOB_EXECUTED,
+    EVENT_JOB_ERROR,
+    EVENT_JOB_MISSED,
+    JobExecutionEvent
+)
 
 from app.core.database import get_mongo_db
 from tradingagents.utils.logging_manager import get_logger
@@ -19,16 +25,19 @@ logger = get_logger(__name__)
 
 class SchedulerService:
     """定时任务管理服务"""
-    
+
     def __init__(self, scheduler: AsyncIOScheduler):
         """
         初始化服务
-        
+
         Args:
             scheduler: APScheduler调度器实例
         """
         self.scheduler = scheduler
         self.db = None
+
+        # 添加事件监听器，监控任务执行
+        self._setup_event_listeners()
     
     def _get_db(self):
         """获取数据库连接"""
@@ -278,29 +287,164 @@ class SchedulerService:
     ) -> int:
         """
         统计所有任务执行历史数量
-        
+
         Args:
             job_id: 任务ID过滤
             status: 状态过滤
-            
+
         Returns:
             历史记录数量
         """
         try:
             db = self._get_db()
-            
+
             # 构建查询条件
             query = {}
             if job_id:
                 query["job_id"] = job_id
             if status:
                 query["status"] = status
-            
+
             count = await db.scheduler_history.count_documents(query)
             return count
         except Exception as e:
             logger.error(f"❌ 统计执行历史失败: {e}")
             return 0
+
+    async def get_job_executions(
+        self,
+        job_id: Optional[str] = None,
+        status: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        获取任务执行历史
+
+        Args:
+            job_id: 任务ID（可选，不指定则返回所有任务）
+            status: 状态过滤（success/failed/missed）
+            limit: 返回数量限制
+            offset: 偏移量
+
+        Returns:
+            执行历史列表
+        """
+        try:
+            db = self._get_db()
+
+            # 构建查询条件
+            query = {}
+            if job_id:
+                query["job_id"] = job_id
+            if status:
+                query["status"] = status
+
+            cursor = db.scheduler_executions.find(query).sort("timestamp", -1).skip(offset).limit(limit)
+
+            executions = []
+            async for doc in cursor:
+                doc.pop("_id", None)
+                # 格式化时间
+                if doc.get("scheduled_time"):
+                    doc["scheduled_time"] = doc["scheduled_time"].isoformat()
+                if doc.get("timestamp"):
+                    doc["timestamp"] = doc["timestamp"].isoformat()
+                executions.append(doc)
+
+            return executions
+        except Exception as e:
+            logger.error(f"❌ 获取任务执行历史失败: {e}")
+            return []
+
+    async def count_job_executions(
+        self,
+        job_id: Optional[str] = None,
+        status: Optional[str] = None
+    ) -> int:
+        """
+        统计任务执行历史数量
+
+        Args:
+            job_id: 任务ID（可选）
+            status: 状态过滤（可选）
+
+        Returns:
+            执行历史数量
+        """
+        try:
+            db = self._get_db()
+
+            # 构建查询条件
+            query = {}
+            if job_id:
+                query["job_id"] = job_id
+            if status:
+                query["status"] = status
+
+            count = await db.scheduler_executions.count_documents(query)
+            return count
+        except Exception as e:
+            logger.error(f"❌ 统计任务执行历史失败: {e}")
+            return 0
+
+    async def get_job_execution_stats(self, job_id: str) -> Dict[str, Any]:
+        """
+        获取任务执行统计信息
+
+        Args:
+            job_id: 任务ID
+
+        Returns:
+            统计信息
+        """
+        try:
+            db = self._get_db()
+
+            # 统计各状态的执行次数
+            pipeline = [
+                {"$match": {"job_id": job_id}},
+                {"$group": {
+                    "_id": "$status",
+                    "count": {"$sum": 1},
+                    "avg_execution_time": {"$avg": "$execution_time"}
+                }}
+            ]
+
+            stats = {
+                "total": 0,
+                "success": 0,
+                "failed": 0,
+                "missed": 0,
+                "avg_execution_time": 0
+            }
+
+            async for doc in db.scheduler_executions.aggregate(pipeline):
+                status = doc["_id"]
+                count = doc["count"]
+                stats["total"] += count
+                stats[status] = count
+
+                if status == "success" and doc.get("avg_execution_time"):
+                    stats["avg_execution_time"] = round(doc["avg_execution_time"], 2)
+
+            # 获取最近一次执行
+            last_execution = await db.scheduler_executions.find_one(
+                {"job_id": job_id},
+                sort=[("timestamp", -1)]
+            )
+
+            if last_execution:
+                stats["last_execution"] = {
+                    "status": last_execution.get("status"),
+                    "timestamp": last_execution.get("timestamp").isoformat() if last_execution.get("timestamp") else None,
+                    "execution_time": last_execution.get("execution_time")
+                }
+
+            return stats
+        except Exception as e:
+            logger.error(f"❌ 获取任务执行统计失败: {e}")
+            return {}
     
     async def get_stats(self) -> Dict[str, Any]:
         """
@@ -367,6 +511,115 @@ class SchedulerService:
         
         return result
     
+    def _setup_event_listeners(self):
+        """设置APScheduler事件监听器"""
+        # 监听任务执行成功事件
+        self.scheduler.add_listener(
+            self._on_job_executed,
+            EVENT_JOB_EXECUTED
+        )
+
+        # 监听任务执行失败事件
+        self.scheduler.add_listener(
+            self._on_job_error,
+            EVENT_JOB_ERROR
+        )
+
+        # 监听任务错过执行事件
+        self.scheduler.add_listener(
+            self._on_job_missed,
+            EVENT_JOB_MISSED
+        )
+
+        logger.info("✅ APScheduler事件监听器已设置")
+
+    def _on_job_executed(self, event: JobExecutionEvent):
+        """任务执行成功回调"""
+        asyncio.create_task(self._record_job_execution(
+            job_id=event.job_id,
+            status="success",
+            scheduled_time=event.scheduled_run_time,
+            execution_time=(datetime.now() - event.scheduled_run_time).total_seconds(),
+            return_value=str(event.retval) if event.retval else None
+        ))
+
+    def _on_job_error(self, event: JobExecutionEvent):
+        """任务执行失败回调"""
+        asyncio.create_task(self._record_job_execution(
+            job_id=event.job_id,
+            status="failed",
+            scheduled_time=event.scheduled_run_time,
+            execution_time=(datetime.now() - event.scheduled_run_time).total_seconds() if event.scheduled_run_time else None,
+            error_message=str(event.exception) if event.exception else None,
+            traceback=event.traceback if hasattr(event, 'traceback') else None
+        ))
+
+    def _on_job_missed(self, event: JobExecutionEvent):
+        """任务错过执行回调"""
+        asyncio.create_task(self._record_job_execution(
+            job_id=event.job_id,
+            status="missed",
+            scheduled_time=event.scheduled_run_time
+        ))
+
+    async def _record_job_execution(
+        self,
+        job_id: str,
+        status: str,
+        scheduled_time: datetime = None,
+        execution_time: float = None,
+        return_value: str = None,
+        error_message: str = None,
+        traceback: str = None
+    ):
+        """
+        记录任务执行历史
+
+        Args:
+            job_id: 任务ID
+            status: 状态 (success/failed/missed)
+            scheduled_time: 计划执行时间
+            execution_time: 实际执行时长（秒）
+            return_value: 返回值
+            error_message: 错误信息
+            traceback: 错误堆栈
+        """
+        try:
+            db = self._get_db()
+
+            # 获取任务名称
+            job = self.scheduler.get_job(job_id)
+            job_name = job.name if job else job_id
+
+            execution_record = {
+                "job_id": job_id,
+                "job_name": job_name,
+                "status": status,
+                "scheduled_time": scheduled_time,
+                "execution_time": execution_time,
+                "timestamp": datetime.now()
+            }
+
+            if return_value:
+                execution_record["return_value"] = return_value
+            if error_message:
+                execution_record["error_message"] = error_message
+            if traceback:
+                execution_record["traceback"] = traceback
+
+            await db.scheduler_executions.insert_one(execution_record)
+
+            # 记录日志
+            if status == "success":
+                logger.info(f"✅ [任务执行] {job_name} 执行成功，耗时: {execution_time:.2f}秒")
+            elif status == "failed":
+                logger.error(f"❌ [任务执行] {job_name} 执行失败: {error_message}")
+            elif status == "missed":
+                logger.warning(f"⚠️ [任务执行] {job_name} 错过执行时间")
+
+        except Exception as e:
+            logger.error(f"❌ 记录任务执行历史失败: {e}")
+
     async def _record_job_action(
         self,
         job_id: str,
