@@ -329,6 +329,7 @@
                 @change="loadExecutions"
               >
                 <el-option label="全部状态" value="" />
+                <el-option label="执行中" value="running" />
                 <el-option label="成功" value="success" />
                 <el-option label="失败" value="failed" />
                 <el-option label="错过" value="missed" />

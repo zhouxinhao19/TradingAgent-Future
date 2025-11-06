@@ -180,6 +180,15 @@ class SchedulerService:
                 action_note += f", 参数: {kwargs}"
             action_note += ")"
             await self._record_job_action(job_id, "trigger", "success", action_note)
+
+            # 立即创建一个"running"状态的执行记录，让用户能看到任务正在执行
+            await self._record_job_execution(
+                job_id=job_id,
+                status="running",
+                scheduled_time=now.replace(tzinfo=None),  # 移除时区信息
+                progress=0
+            )
+
             return True
         except Exception as e:
             logger.error(f"❌ 触发任务 {job_id} 失败: {e}")
