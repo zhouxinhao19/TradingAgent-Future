@@ -553,6 +553,50 @@ class SchedulerService:
 
         logger.info("✅ APScheduler事件监听器已设置")
 
+        # 添加定时任务，检测僵尸任务（长时间处于running状态）
+        self.scheduler.add_job(
+            self._check_zombie_tasks,
+            'interval',
+            minutes=5,
+            id='check_zombie_tasks',
+            name='检测僵尸任务',
+            replace_existing=True
+        )
+        logger.info("✅ 僵尸任务检测定时任务已添加")
+
+    async def _check_zombie_tasks(self):
+        """检测僵尸任务（长时间处于running状态的任务）"""
+        try:
+            db = self._get_db()
+
+            # 查找超过30分钟仍处于running状态的任务
+            threshold_time = datetime.now() - timedelta(minutes=30)
+
+            zombie_tasks = await db.scheduler_executions.find({
+                "status": "running",
+                "timestamp": {"$lt": threshold_time}
+            }).to_list(length=100)
+
+            for task in zombie_tasks:
+                # 更新为failed状态
+                await db.scheduler_executions.update_one(
+                    {"_id": task["_id"]},
+                    {
+                        "$set": {
+                            "status": "failed",
+                            "error_message": "任务执行超时或进程异常终止",
+                            "updated_at": datetime.now()
+                        }
+                    }
+                )
+                logger.warning(f"⚠️ 检测到僵尸任务: {task.get('job_name', task.get('job_id'))} (开始时间: {task.get('timestamp')})")
+
+            if zombie_tasks:
+                logger.info(f"✅ 已标记 {len(zombie_tasks)} 个僵尸任务为失败状态")
+
+        except Exception as e:
+            logger.error(f"❌ 检测僵尸任务失败: {e}")
+
     def _on_job_executed(self, event: JobExecutionEvent):
         """任务执行成功回调"""
         asyncio.create_task(self._record_job_execution(

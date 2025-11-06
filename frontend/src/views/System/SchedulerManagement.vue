@@ -277,30 +277,63 @@
         <!-- 手动操作历史 -->
         <el-tab-pane label="手动操作历史" name="manual">
           <el-table :data="historyList" v-loading="historyLoading" stripe max-height="500">
-            <el-table-column prop="job_id" label="任务ID" width="200" />
-            <el-table-column prop="action" label="操作" width="100">
-              <template #default="{ row }">
-                <el-tag size="small">{{ formatAction(row.action) }}</el-tag>
-              </template>
-            </el-table-column>
+            <el-table-column prop="job_name" label="任务名称" min-width="200" show-overflow-tooltip />
             <el-table-column prop="status" label="状态" width="100">
               <template #default="{ row }">
-                <el-tag :type="row.status === 'success' ? 'success' : 'danger'" size="small">
-                  {{ row.status === 'success' ? '成功' : '失败' }}
+                <el-tag
+                  :type="row.status === 'success' ? 'success' : row.status === 'failed' ? 'danger' : row.status === 'running' ? 'info' : 'warning'"
+                  size="small"
+                >
+                  {{ formatExecutionStatus(row.status) }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="timestamp" label="时间" width="180">
+            <el-table-column prop="progress" label="进度" width="150">
               <template #default="{ row }">
-                {{ formatDateTime(row.timestamp) }}
+                <div v-if="row.status === 'running' && row.progress !== undefined">
+                  <el-progress :percentage="row.progress" :stroke-width="6" />
+                  <el-text v-if="row.processed_items && row.total_items" size="small" type="info" style="margin-top: 4px">
+                    {{ row.processed_items }}/{{ row.total_items }}
+                  </el-text>
+                </div>
+                <el-text v-else type="info" size="small">-</el-text>
               </template>
             </el-table-column>
-            <el-table-column prop="error_message" label="错误信息" min-width="200">
+            <el-table-column prop="progress_message" label="当前操作" min-width="180" show-overflow-tooltip>
               <template #default="{ row }">
-                <el-text v-if="row.error_message" type="danger" size="small">
-                  {{ row.error_message }}
+                <el-text v-if="row.progress_message" size="small">
+                  {{ row.progress_message }}
+                </el-text>
+                <el-text v-else-if="row.current_item" size="small">
+                  {{ row.current_item }}
                 </el-text>
                 <el-text v-else type="info" size="small">-</el-text>
+              </template>
+            </el-table-column>
+            <el-table-column prop="execution_time" label="执行时长" width="120">
+              <template #default="{ row }">
+                <span v-if="row.execution_time !== undefined">
+                  {{ row.execution_time.toFixed(2) }}秒
+                </span>
+                <el-text v-else type="info" size="small">-</el-text>
+              </template>
+            </el-table-column>
+            <el-table-column prop="timestamp" label="更新时间" width="180">
+              <template #default="{ row }">
+                {{ formatDateTime(row.updated_at || row.timestamp) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="100" fixed="right">
+              <template #default="{ row }">
+                <el-button
+                  v-if="row.error_message || row.status === 'running'"
+                  link
+                  type="primary"
+                  size="small"
+                  @click="showExecutionDetail(row)"
+                >
+                  详情
+                </el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -749,17 +782,9 @@ const loadHistory = async () => {
       ? await getSingleJobExecutions(currentHistoryJobId.value, params)
       : await getJobExecutions(params)
 
-    // 将执行记录转换为历史记录格式
+    // 直接使用执行记录，不需要转换格式
     const executions = Array.isArray(res.data?.items) ? res.data.items : []
-    historyList.value = executions.map((exec: any) => ({
-      job_id: exec.job_id,
-      job_name: exec.job_name,
-      action: 'trigger',
-      status: exec.status === 'success' ? 'success' : 'failed',
-      timestamp: exec.timestamp,
-      error_message: exec.error_message,
-      note: exec.progress_message || exec.current_item
-    }))
+    historyList.value = executions
     historyTotal.value = res.data?.total || 0
   } catch (error: any) {
     ElMessage.error(error.message || '加载执行历史失败')
@@ -779,14 +804,12 @@ const handleHistoryTabChange = (tabName: string) => {
   if (tabName === 'execution') {
     executionPage.value = 1
     loadExecutions()
-    // 启动自动刷新
-    startAutoRefresh()
   } else {
     historyPage.value = 1
     loadHistory()
-    // 停止自动刷新
-    stopAutoRefresh()
   }
+  // 两个标签页都启动自动刷新
+  startAutoRefresh()
 }
 
 // 自动刷新定时器
@@ -798,9 +821,13 @@ const startAutoRefresh = () => {
 
   // 每5秒刷新一次
   autoRefreshTimer = window.setInterval(() => {
-    // 只有在执行监控标签页且对话框打开时才刷新
-    if (activeHistoryTab.value === 'execution' && historyDialogVisible.value) {
-      loadExecutions()
+    // 根据当前标签页刷新对应的数据
+    if (historyDialogVisible.value) {
+      if (activeHistoryTab.value === 'execution') {
+        loadExecutions()
+      } else {
+        loadHistory()
+      }
     }
   }, 5000)
 }
