@@ -759,13 +759,14 @@ class TushareSyncService:
 
     # ==================== 财务数据同步 ====================
 
-    async def sync_financial_data(self, symbols: List[str] = None, limit: int = 20) -> Dict[str, Any]:
+    async def sync_financial_data(self, symbols: List[str] = None, limit: int = 20, job_id: str = None) -> Dict[str, Any]:
         """
         同步财务数据
 
         Args:
             symbols: 股票代码列表，None表示同步所有股票
             limit: 获取财报期数，默认20期（约5年数据）
+            job_id: 任务ID（用于进度跟踪）
         """
         logger.info(f"🔄 开始同步财务数据 (获取最近 {limit} 期)...")
 
@@ -815,13 +816,26 @@ class TushareSyncService:
                     else:
                         logger.warning(f"⚠️ {symbol}: 无财务数据")
 
-                    # 进度日志
+                    # 进度日志和进度跟踪
                     if (i + 1) % 20 == 0:
-                        logger.info(f"📈 财务数据同步进度: {i + 1}/{len(symbols)} "
+                        progress = int((i + 1) / len(symbols) * 100)
+                        logger.info(f"📈 财务数据同步进度: {i + 1}/{len(symbols)} ({progress}%) "
                                    f"(成功: {stats['success_count']}, 错误: {stats['error_count']})")
                         # 输出速率限制器统计
                         limiter_stats = self.rate_limiter.get_stats()
                         logger.info(f"   速率限制: {limiter_stats['current_calls']}/{limiter_stats['max_calls']}次")
+
+                        # 更新任务进度
+                        if job_id:
+                            from app.services.scheduler_service import update_job_progress
+                            await update_job_progress(
+                                job_id=job_id,
+                                progress=progress,
+                                message=f"正在同步 {symbol} 财务数据",
+                                current_item=symbol,
+                                total_items=len(symbols),
+                                processed_items=i + 1
+                            )
 
                 except Exception as e:
                     stats["error_count"] += 1
@@ -1116,7 +1130,7 @@ async def run_tushare_financial_sync():
     """APScheduler任务：同步财务数据（获取最近20期，约5年）"""
     try:
         service = await get_tushare_sync_service()
-        result = await service.sync_financial_data(limit=20)  # 获取最近20期（约5年数据）
+        result = await service.sync_financial_data(limit=20, job_id="tushare_financial_sync")  # 获取最近20期（约5年数据）
         logger.info(f"✅ Tushare财务数据同步完成: {result}")
         return result
     except Exception as e:
