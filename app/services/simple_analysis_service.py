@@ -1384,11 +1384,52 @@ class SimpleAnalysisService:
 
                         # 只在进度增加时更新，避免覆盖虚拟步骤的进度
                         if int(progress_pct) > current_progress:
+                            # 更新 Redis 进度跟踪器
                             progress_tracker.update_progress({
                                 'progress_percentage': int(progress_pct),
                                 'last_message': message
                             })
                             logger.info(f"📊 [Graph进度] 进度已更新: {current_progress}% → {int(progress_pct)}% - {message}")
+
+                            # 🔥 同时更新内存和 MongoDB
+                            try:
+                                import asyncio
+                                loop = asyncio.new_event_loop()
+                                asyncio.set_event_loop(loop)
+                                try:
+                                    # 更新内存中的任务状态
+                                    loop.run_until_complete(
+                                        self.memory_manager.update_task_status(
+                                            task_id=task_id,
+                                            status=TaskStatus.RUNNING,
+                                            progress=int(progress_pct),
+                                            message=message,
+                                            current_step=message
+                                        )
+                                    )
+
+                                    # 更新 MongoDB 中的任务进度
+                                    from app.core.database import get_mongo_db
+                                    from datetime import datetime
+                                    db = get_mongo_db()
+                                    loop.run_until_complete(
+                                        db.analysis_tasks.update_one(
+                                            {"task_id": task_id},
+                                            {
+                                                "$set": {
+                                                    "progress": int(progress_pct),
+                                                    "current_step": message,
+                                                    "message": message,
+                                                    "updated_at": datetime.utcnow()
+                                                }
+                                            }
+                                        )
+                                    )
+                                    logger.debug(f"✅ [Graph进度] 已同步更新内存和MongoDB: {int(progress_pct)}%")
+                                finally:
+                                    loop.close()
+                            except Exception as sync_err:
+                                logger.warning(f"⚠️ [Graph进度] 同步更新失败: {sync_err}")
                         else:
                             # 进度没有增加，只更新消息
                             progress_tracker.update_progress({
