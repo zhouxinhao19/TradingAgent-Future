@@ -1116,12 +1116,12 @@ class SimpleAnalysisService:
                             "last_message": message
                         })
 
-                    # 创建新的事件循环来执行异步操作
+                    # 🔥 使用同步方式更新内存和 MongoDB，避免事件循环冲突
+                    # 1. 更新内存中的任务状态（使用新事件循环）
                     import asyncio
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
                     try:
-                        # 更新内存中的任务状态
                         loop.run_until_complete(
                             self.memory_manager.update_task_status(
                                 task_id=task_id,
@@ -1131,26 +1131,30 @@ class SimpleAnalysisService:
                                 current_step=step
                             )
                         )
-
-                        # 🔥 同时更新 MongoDB 中的任务进度
-                        from app.core.database import get_mongo_db
-                        from datetime import datetime
-                        db = get_mongo_db()
-                        loop.run_until_complete(
-                            db.analysis_tasks.update_one(
-                                {"task_id": task_id},
-                                {
-                                    "$set": {
-                                        "progress": progress,
-                                        "current_step": step,
-                                        "message": message,
-                                        "updated_at": datetime.utcnow()
-                                    }
-                                }
-                            )
-                        )
                     finally:
                         loop.close()
+
+                    # 2. 更新 MongoDB（使用同步客户端，避免事件循环冲突）
+                    from pymongo import MongoClient
+                    from app.core.config import settings
+                    from datetime import datetime
+
+                    sync_client = MongoClient(settings.MONGO_URI)
+                    sync_db = sync_client[settings.MONGO_DB]
+
+                    sync_db.analysis_tasks.update_one(
+                        {"task_id": task_id},
+                        {
+                            "$set": {
+                                "progress": progress,
+                                "current_step": step,
+                                "message": message,
+                                "updated_at": datetime.utcnow()
+                            }
+                        }
+                    )
+                    sync_client.close()
+
                 except Exception as e:
                     logger.warning(f"⚠️ 进度更新失败: {e}")
 
