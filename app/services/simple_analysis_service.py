@@ -2056,10 +2056,8 @@ class SimpleAnalysisService:
             )
             logger.info(f"📋 [Tasks] 内存返回数量: {len(tasks_in_mem)}")
 
-            # 2) 如果只查询 processing/running 状态，且内存中有数据，直接返回
-            if task_status == TaskStatus.RUNNING and tasks_in_mem:
-                logger.info(f"📋 [Tasks] 查询进行中任务，使用内存结果")
-                return self._enrich_stock_names(tasks_in_mem[offset:offset + limit])
+            # 2) 🔧 对于 processing/running 状态，需要合并 MongoDB 数据以获取最新进度
+            # 因为 graph_progress_callback 可能直接更新了 MongoDB，而内存数据可能是旧的
 
             # 3) 从 MongoDB 读取历史任务（用于合并或兜底）
             logger.info(f"📋 [Tasks] 从 MongoDB 读取历史任务")
@@ -2148,19 +2146,39 @@ class SimpleAnalysisService:
                 logger.error(f"❌ MongoDB 查询任务列表失败: {mongo_e}", exc_info=True)
                 # MongoDB 查询失败，继续使用内存数据
 
-            # 4) 合并内存和 MongoDB 数据，去重（优先使用内存中的数据，因为有实时进度）
+            # 4) 合并内存和 MongoDB 数据，去重
+            # 🔧 对于 processing/running 状态，优先使用 MongoDB 中的进度数据
+            # 因为 graph_progress_callback 直接更新 MongoDB，而内存数据可能是旧的
             task_dict = {}
 
-            # 先添加 MongoDB 中的任务
-            for task in mongo_tasks:
+            # 先添加内存中的任务
+            for task in tasks_in_mem:
                 task_id = task.get("task_id")
                 if task_id:
                     task_dict[task_id] = task
 
-            # 再添加内存中的任务（覆盖 MongoDB 中的同名任务）
-            for task in tasks_in_mem:
+            # 再添加 MongoDB 中的任务
+            # 对于 processing/running 状态，使用 MongoDB 中的进度数据（更新）
+            # 对于其他状态，如果内存中已有，则跳过（内存优先）
+            for task in mongo_tasks:
                 task_id = task.get("task_id")
-                if task_id:
+                if not task_id:
+                    continue
+
+                # 如果内存中已有这个任务
+                if task_id in task_dict:
+                    mem_task = task_dict[task_id]
+                    mongo_task = task
+
+                    # 如果是 processing/running 状态，使用 MongoDB 中的进度数据
+                    if mongo_task.get("status") in ["processing", "running"]:
+                        # 保留内存中的基本信息，但更新进度相关字段
+                        mem_task["progress"] = mongo_task.get("progress", mem_task.get("progress", 0))
+                        mem_task["message"] = mongo_task.get("message", mem_task.get("message", ""))
+                        mem_task["current_step"] = mongo_task.get("current_step", mem_task.get("current_step", ""))
+                        logger.debug(f"🔄 [Tasks] 更新任务进度: {task_id}, progress={mem_task['progress']}%")
+                else:
+                    # 内存中没有，直接添加 MongoDB 中的任务
                     task_dict[task_id] = task
 
             # 转换为列表并按时间排序
