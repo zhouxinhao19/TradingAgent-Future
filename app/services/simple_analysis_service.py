@@ -595,6 +595,22 @@ class SimpleAnalysisService:
         self._trading_graph_cache = {}
         self.memory_manager = get_memory_state_manager()
 
+        # 进度跟踪器缓存
+        self._progress_trackers: Dict[str, RedisProgressTracker] = {}
+
+        # 🔧 创建共享的线程池，支持并发执行多个分析任务
+        # 默认最多同时执行3个分析任务（可根据服务器资源调整）
+        import concurrent.futures
+        self._thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=3)
+
+        logger.info(f"🔧 [服务初始化] SimpleAnalysisService 实例ID: {id(self)}")
+        logger.info(f"🔧 [服务初始化] 内存管理器实例ID: {id(self.memory_manager)}")
+        logger.info(f"🔧 [服务初始化] 线程池最大并发数: 3")
+
+        # 设置 WebSocket 管理器
+        # 简单的股票名称缓存，减少重复查询
+        self._stock_name_cache: Dict[str, str] = {}
+
     async def _update_progress_async(self, task_id: str, progress: int, message: str):
         """异步更新进度（内存和MongoDB）"""
         try:
@@ -625,21 +641,6 @@ class SimpleAnalysisService:
             logger.debug(f"✅ [异步更新] 已更新内存和MongoDB: {progress}%")
         except Exception as e:
             logger.warning(f"⚠️ [异步更新] 失败: {e}")
-        # 进度跟踪器缓存
-        self._progress_trackers: Dict[str, RedisProgressTracker] = {}
-
-        # 🔧 创建共享的线程池，支持并发执行多个分析任务
-        # 默认最多同时执行3个分析任务（可根据服务器资源调整）
-        import concurrent.futures
-        self._thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=3)
-
-        logger.info(f"🔧 [服务初始化] SimpleAnalysisService 实例ID: {id(self)}")
-        logger.info(f"🔧 [服务初始化] 内存管理器实例ID: {id(self.memory_manager)}")
-        logger.info(f"🔧 [服务初始化] 线程池最大并发数: 3")
-
-        # 设置 WebSocket 管理器
-        # 简单的股票名称缓存，减少重复查询
-        self._stock_name_cache: Dict[str, str] = {}
 
         def _resolve_stock_name(code: Optional[str]) -> str:
             if not code:
@@ -1441,8 +1442,8 @@ class SimpleAnalysisService:
                                     from app.core.config import settings
 
                                     # 创建同步 MongoDB 客户端
-                                    sync_client = MongoClient(settings.MONGODB_URL)
-                                    sync_db = sync_client[settings.MONGODB_DB_NAME]
+                                    sync_client = MongoClient(settings.MONGO_URI)
+                                    sync_db = sync_client[settings.MONGO_DB]
 
                                     # 同步更新 MongoDB
                                     sync_db.analysis_tasks.update_one(
