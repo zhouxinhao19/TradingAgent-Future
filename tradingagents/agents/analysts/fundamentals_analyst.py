@@ -427,25 +427,35 @@ def create_fundamentals_analyst(llm, toolkit):
                     # 已经有工具结果了，LLM 不应该再调用工具，强制生成报告
                     logger.warning(f"⚠️ [强制生成报告] 工具已返回数据，但LLM仍尝试调用工具，强制基于现有数据生成报告")
 
-                    # 重新调用 LLM，明确要求生成报告
-                    force_report_prompt = (
-                        f"你已经收到了 get_stock_fundamentals_unified 工具返回的数据。"
-                        f"🚨 现在你必须基于这些数据生成完整的基本面分析报告，不要再调用任何工具！🚨"
-                        f"请立即生成包含以下内容的分析报告："
-                        f"1. 公司基本信息和财务数据分析"
-                        f"2. PE、PB、PEG等估值指标分析"
-                        f"3. 当前股价是否被低估或高估的判断"
-                        f"4. 合理价位区间和目标价位建议"
-                        f"5. 基于基本面的投资建议（买入/持有/卖出）"
+                    # 创建专门的强制报告提示词（不提及工具）
+                    force_system_prompt = (
+                        f"你是专业的股票基本面分析师。"
+                        f"你已经收到了股票 {company_name}（代码：{ticker}）的基本面数据。"
+                        f"🚨 现在你必须基于这些数据生成完整的基本面分析报告！🚨\n\n"
+                        f"报告必须包含以下内容：\n"
+                        f"1. 公司基本信息和财务数据分析\n"
+                        f"2. PE、PB、PEG等估值指标分析\n"
+                        f"3. 当前股价是否被低估或高估的判断\n"
+                        f"4. 合理价位区间和目标价位建议\n"
+                        f"5. 基于基本面的投资建议（买入/持有/卖出）\n\n"
+                        f"要求：\n"
+                        f"- 使用中文撰写报告\n"
+                        f"- 基于消息历史中的真实数据进行分析\n"
+                        f"- 分析要详细且专业\n"
+                        f"- 投资建议必须明确（买入/持有/卖出）"
                     )
 
-                    # 添加强制提示到消息历史
-                    from langchain_core.messages import HumanMessage
-                    force_messages = messages + [HumanMessage(content=force_report_prompt)]
+                    # 创建专门的提示模板（不绑定工具）
+                    force_prompt = ChatPromptTemplate.from_messages([
+                        ("system", force_system_prompt),
+                        MessagesPlaceholder(variable_name="messages"),
+                    ])
 
                     # 不绑定工具，强制LLM生成文本
-                    force_chain = prompt | fresh_llm
-                    force_result = force_chain.invoke({"messages": force_messages})
+                    force_chain = force_prompt | fresh_llm
+
+                    logger.info(f"🔧 [强制生成报告] 使用专门的提示词重新调用LLM...")
+                    force_result = force_chain.invoke({"messages": messages})
 
                     report = str(force_result.content) if hasattr(force_result, 'content') else "基本面分析完成"
                     logger.info(f"✅ [强制生成报告] 成功生成报告，长度: {len(report)}字符")
