@@ -594,6 +594,37 @@ class SimpleAnalysisService:
     def __init__(self):
         self._trading_graph_cache = {}
         self.memory_manager = get_memory_state_manager()
+
+    async def _update_progress_async(self, task_id: str, progress: int, message: str):
+        """异步更新进度（内存和MongoDB）"""
+        try:
+            # 更新内存
+            await self.memory_manager.update_task_status(
+                task_id=task_id,
+                status=TaskStatus.RUNNING,
+                progress=progress,
+                message=message,
+                current_step=message
+            )
+
+            # 更新 MongoDB
+            from app.core.database import get_mongo_db
+            from datetime import datetime
+            db = get_mongo_db()
+            await db.analysis_tasks.update_one(
+                {"task_id": task_id},
+                {
+                    "$set": {
+                        "progress": progress,
+                        "current_step": message,
+                        "message": message,
+                        "updated_at": datetime.utcnow()
+                    }
+                }
+            )
+            logger.debug(f"✅ [异步更新] 已更新内存和MongoDB: {progress}%")
+        except Exception as e:
+            logger.warning(f"⚠️ [异步更新] 失败: {e}")
         # 进度跟踪器缓存
         self._progress_trackers: Dict[str, RedisProgressTracker] = {}
 
@@ -1394,40 +1425,56 @@ class SimpleAnalysisService:
                             # 🔥 同时更新内存和 MongoDB
                             try:
                                 import asyncio
-                                loop = asyncio.new_event_loop()
-                                asyncio.set_event_loop(loop)
-                                try:
-                                    # 更新内存中的任务状态
-                                    loop.run_until_complete(
-                                        self.memory_manager.update_task_status(
-                                            task_id=task_id,
-                                            status=TaskStatus.RUNNING,
-                                            progress=int(progress_pct),
-                                            message=message,
-                                            current_step=message
-                                        )
-                                    )
+                                from datetime import datetime
 
-                                    # 更新 MongoDB 中的任务进度
-                                    from app.core.database import get_mongo_db
-                                    from datetime import datetime
-                                    db = get_mongo_db()
-                                    loop.run_until_complete(
-                                        db.analysis_tasks.update_one(
-                                            {"task_id": task_id},
-                                            {
-                                                "$set": {
-                                                    "progress": int(progress_pct),
-                                                    "current_step": message,
-                                                    "message": message,
-                                                    "updated_at": datetime.utcnow()
-                                                }
-                                            }
-                                        )
+                                # 尝试获取当前运行的事件循环
+                                try:
+                                    loop = asyncio.get_running_loop()
+                                    # 如果在事件循环中，使用 create_task
+                                    asyncio.create_task(
+                                        self._update_progress_async(task_id, int(progress_pct), message)
                                     )
+                                    logger.debug(f"✅ [Graph进度] 已提交异步更新任务: {int(progress_pct)}%")
+                                except RuntimeError:
+                                    # 没有运行的事件循环，使用同步方式更新 MongoDB
+                                    from pymongo import MongoClient
+                                    from app.core.config import settings
+
+                                    # 创建同步 MongoDB 客户端
+                                    sync_client = MongoClient(settings.MONGODB_URL)
+                                    sync_db = sync_client[settings.MONGODB_DB_NAME]
+
+                                    # 同步更新 MongoDB
+                                    sync_db.analysis_tasks.update_one(
+                                        {"task_id": task_id},
+                                        {
+                                            "$set": {
+                                                "progress": int(progress_pct),
+                                                "current_step": message,
+                                                "message": message,
+                                                "updated_at": datetime.utcnow()
+                                            }
+                                        }
+                                    )
+                                    sync_client.close()
+
+                                    # 异步更新内存（创建新的事件循环）
+                                    loop = asyncio.new_event_loop()
+                                    asyncio.set_event_loop(loop)
+                                    try:
+                                        loop.run_until_complete(
+                                            self.memory_manager.update_task_status(
+                                                task_id=task_id,
+                                                status=TaskStatus.RUNNING,
+                                                progress=int(progress_pct),
+                                                message=message,
+                                                current_step=message
+                                            )
+                                        )
+                                    finally:
+                                        loop.close()
+
                                     logger.debug(f"✅ [Graph进度] 已同步更新内存和MongoDB: {int(progress_pct)}%")
-                                finally:
-                                    loop.close()
                             except Exception as sync_err:
                                 logger.warning(f"⚠️ [Graph进度] 同步更新失败: {sync_err}")
                         else:
