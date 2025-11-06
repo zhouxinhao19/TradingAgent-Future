@@ -611,6 +611,13 @@ class SimpleAnalysisService:
         # 简单的股票名称缓存，减少重复查询
         self._stock_name_cache: Dict[str, str] = {}
 
+        # 设置 WebSocket 管理器
+        try:
+            from app.services.websocket_manager import get_websocket_manager
+            self.memory_manager.set_websocket_manager(get_websocket_manager())
+        except ImportError:
+            logger.warning("⚠️ WebSocket 管理器不可用")
+
     async def _update_progress_async(self, task_id: str, progress: int, message: str):
         """异步更新进度（内存和MongoDB）"""
         try:
@@ -642,28 +649,26 @@ class SimpleAnalysisService:
         except Exception as e:
             logger.warning(f"⚠️ [异步更新] 失败: {e}")
 
-        def _resolve_stock_name(code: Optional[str]) -> str:
-            if not code:
-                return ""
-            # 命中缓存
-            if code in self._stock_name_cache:
-                return self._stock_name_cache[code]
-            name = None
-            try:
-                if _get_stock_info_safe:
-                    info = _get_stock_info_safe(code)
-                    if isinstance(info, dict):
-                        name = info.get("name")
-            except Exception as e:
-                logger.warning(f"⚠️ 获取股票名称失败: {code} - {e}")
-            if not name:
-                name = f"股票{code}"
-            # 写缓存
-            self._stock_name_cache[code] = name
-            return name
-
-        # 绑定到实例（避免破坏现有结构且便于在异步方法中使用）
-        self._resolve_stock_name = _resolve_stock_name  # type: ignore
+    def _resolve_stock_name(self, code: Optional[str]) -> str:
+        """解析股票名称（带缓存）"""
+        if not code:
+            return ""
+        # 命中缓存
+        if code in self._stock_name_cache:
+            return self._stock_name_cache[code]
+        name = None
+        try:
+            if _get_stock_info_safe:
+                info = _get_stock_info_safe(code)
+                if isinstance(info, dict):
+                    name = info.get("name")
+        except Exception as e:
+            logger.warning(f"⚠️ 获取股票名称失败: {code} - {e}")
+        if not name:
+            name = f"股票{code}"
+        # 写缓存
+        self._stock_name_cache[code] = name
+        return name
 
     def _enrich_stock_names(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """为任务列表补齐股票名称(就地更新)"""
@@ -672,16 +677,10 @@ class SimpleAnalysisService:
                 code = t.get("stock_code") or t.get("stock_symbol")
                 name = t.get("stock_name")
                 if not name and code:
-                    t["stock_name"] = self._resolve_stock_name(code)  # type: ignore
+                    t["stock_name"] = self._resolve_stock_name(code)
         except Exception as e:
             logger.warning(f"⚠️ 补齐股票名称时出现异常: {e}")
         return tasks
-
-        try:
-            from app.services.websocket_manager import get_websocket_manager
-            self.memory_manager.set_websocket_manager(get_websocket_manager())
-        except ImportError:
-            logger.warning("⚠️ WebSocket 管理器不可用")
 
     def _convert_user_id(self, user_id: str) -> PyObjectId:
         """将字符串用户ID转换为PyObjectId"""
