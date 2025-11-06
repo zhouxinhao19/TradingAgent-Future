@@ -270,50 +270,188 @@
     <el-dialog
       v-model="historyDialogVisible"
       title="执行历史"
-      width="900px"
+      width="1200px"
       :close-on-click-modal="false"
     >
-      <el-table :data="historyList" v-loading="historyLoading" stripe max-height="500">
-        <el-table-column prop="job_id" label="任务ID" width="200" />
-        <el-table-column prop="action" label="操作" width="100">
-          <template #default="{ row }">
-            <el-tag size="small">{{ formatAction(row.action) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="row.status === 'success' ? 'success' : 'danger'" size="small">
-              {{ row.status === 'success' ? '成功' : '失败' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="timestamp" label="时间" width="180">
-          <template #default="{ row }">
-            {{ formatDateTime(row.timestamp) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="error_message" label="错误信息" min-width="200">
-          <template #default="{ row }">
-            <el-text v-if="row.error_message" type="danger" size="small">
-              {{ row.error_message }}
-            </el-text>
-            <el-text v-else type="info" size="small">-</el-text>
-          </template>
-        </el-table-column>
-      </el-table>
+      <el-tabs v-model="activeHistoryTab" @tab-change="handleHistoryTabChange">
+        <!-- 手动操作历史 -->
+        <el-tab-pane label="手动操作历史" name="manual">
+          <el-table :data="historyList" v-loading="historyLoading" stripe max-height="500">
+            <el-table-column prop="job_id" label="任务ID" width="200" />
+            <el-table-column prop="action" label="操作" width="100">
+              <template #default="{ row }">
+                <el-tag size="small">{{ formatAction(row.action) }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="status" label="状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="row.status === 'success' ? 'success' : 'danger'" size="small">
+                  {{ row.status === 'success' ? '成功' : '失败' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="timestamp" label="时间" width="180">
+              <template #default="{ row }">
+                {{ formatDateTime(row.timestamp) }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="error_message" label="错误信息" min-width="200">
+              <template #default="{ row }">
+                <el-text v-if="row.error_message" type="danger" size="small">
+                  {{ row.error_message }}
+                </el-text>
+                <el-text v-else type="info" size="small">-</el-text>
+              </template>
+            </el-table-column>
+          </el-table>
 
-      <el-pagination
-        v-if="historyTotal > historyPageSize"
-        class="pagination"
-        :current-page="historyPage"
-        :page-size="historyPageSize"
-        :total="historyTotal"
-        layout="total, prev, pager, next"
-        @current-change="handleHistoryPageChange"
-      />
+          <el-pagination
+            v-if="historyTotal > historyPageSize"
+            class="pagination"
+            :current-page="historyPage"
+            :page-size="historyPageSize"
+            :total="historyTotal"
+            layout="total, prev, pager, next"
+            @current-change="handleHistoryPageChange"
+          />
+        </el-tab-pane>
+
+        <!-- 自动执行监控 -->
+        <el-tab-pane label="自动执行监控" name="execution">
+          <!-- 筛选条件 -->
+          <el-form :inline="true" style="margin-bottom: 16px">
+            <el-form-item label="状态">
+              <el-select
+                v-model="executionStatusFilter"
+                placeholder="全部状态"
+                clearable
+                style="width: 150px"
+                @change="loadExecutions"
+              >
+                <el-option label="全部状态" value="" />
+                <el-option label="成功" value="success" />
+                <el-option label="失败" value="failed" />
+                <el-option label="错过" value="missed" />
+              </el-select>
+            </el-form-item>
+            <el-form-item>
+              <el-button :icon="Refresh" @click="loadExecutions">刷新</el-button>
+            </el-form-item>
+          </el-form>
+
+          <el-table :data="executionList" v-loading="executionLoading" stripe max-height="500">
+            <el-table-column prop="job_name" label="任务名称" min-width="200" show-overflow-tooltip />
+            <el-table-column prop="status" label="状态" width="100">
+              <template #default="{ row }">
+                <el-tag
+                  :type="row.status === 'success' ? 'success' : row.status === 'failed' ? 'danger' : 'warning'"
+                  size="small"
+                >
+                  {{ formatExecutionStatus(row.status) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="execution_time" label="执行时长" width="120">
+              <template #default="{ row }">
+                <span v-if="row.execution_time !== undefined">
+                  {{ row.execution_time.toFixed(2) }}秒
+                </span>
+                <el-text v-else type="info" size="small">-</el-text>
+              </template>
+            </el-table-column>
+            <el-table-column prop="scheduled_time" label="计划时间" width="180">
+              <template #default="{ row }">
+                {{ formatDateTime(row.scheduled_time) }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="timestamp" label="完成时间" width="180">
+              <template #default="{ row }">
+                {{ formatDateTime(row.timestamp) }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="error_message" label="错误信息" min-width="200">
+              <template #default="{ row }">
+                <el-text v-if="row.error_message" type="danger" size="small">
+                  {{ row.error_message }}
+                </el-text>
+                <el-text v-else type="info" size="small">-</el-text>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="100" fixed="right">
+              <template #default="{ row }">
+                <el-button
+                  v-if="row.error_message"
+                  link
+                  type="primary"
+                  size="small"
+                  @click="showExecutionDetail(row)"
+                >
+                  详情
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <el-pagination
+            v-if="executionTotal > executionPageSize"
+            class="pagination"
+            :current-page="executionPage"
+            :page-size="executionPageSize"
+            :total="executionTotal"
+            layout="total, prev, pager, next"
+            @current-change="handleExecutionPageChange"
+          />
+        </el-tab-pane>
+      </el-tabs>
 
       <template #footer>
         <el-button @click="historyDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 执行详情对话框 -->
+    <el-dialog
+      v-model="executionDetailDialogVisible"
+      title="执行详情"
+      width="800px"
+      :close-on-click-modal="false"
+    >
+      <el-descriptions v-if="currentExecution" :column="1" border>
+        <el-descriptions-item label="任务名称">
+          {{ currentExecution.job_name }}
+        </el-descriptions-item>
+        <el-descriptions-item label="任务ID">
+          {{ currentExecution.job_id }}
+        </el-descriptions-item>
+        <el-descriptions-item label="状态">
+          <el-tag
+            :type="currentExecution.status === 'success' ? 'success' : currentExecution.status === 'failed' ? 'danger' : 'warning'"
+          >
+            {{ formatExecutionStatus(currentExecution.status) }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="计划时间">
+          {{ formatDateTime(currentExecution.scheduled_time) }}
+        </el-descriptions-item>
+        <el-descriptions-item label="完成时间">
+          {{ formatDateTime(currentExecution.timestamp) }}
+        </el-descriptions-item>
+        <el-descriptions-item label="执行时长">
+          <span v-if="currentExecution.execution_time !== undefined">
+            {{ currentExecution.execution_time.toFixed(2) }}秒
+          </span>
+          <span v-else>-</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="错误信息" v-if="currentExecution.error_message">
+          <el-text type="danger">{{ currentExecution.error_message }}</el-text>
+        </el-descriptions-item>
+        <el-descriptions-item label="错误堆栈" v-if="currentExecution.traceback">
+          <pre style="max-height: 300px; overflow-y: auto; background: #f5f5f5; padding: 12px; border-radius: 4px;">{{ currentExecution.traceback }}</pre>
+        </el-descriptions-item>
+      </el-descriptions>
+
+      <template #footer>
+        <el-button @click="executionDetailDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
   </div>
@@ -344,8 +482,11 @@ import {
   getAllHistory,
   updateJobMetadata,
   getSchedulerStats,
+  getJobExecutions,
+  getSingleJobExecutions,
   type Job,
   type JobHistory,
+  type JobExecution,
   type SchedulerStats
 } from '@/api/scheduler'
 import { formatDateTime, formatRelativeTime } from '@/utils/datetime'
@@ -382,6 +523,17 @@ const historyTotal = ref(0)
 const historyPage = ref(1)
 const historyPageSize = ref(20)
 const currentHistoryJobId = ref<string | null>(null)
+const activeHistoryTab = ref('manual')
+
+// 任务执行监控
+const executionLoading = ref(false)
+const executionList = ref<JobExecution[]>([])
+const executionTotal = ref(0)
+const executionPage = ref(1)
+const executionPageSize = ref(20)
+const executionStatusFilter = ref('')
+const executionDetailDialogVisible = ref(false)
+const currentExecution = ref<JobExecution | null>(null)
 
 // 计算属性
 const filteredJobs = computed(() => {
@@ -587,6 +739,66 @@ const loadHistory = async () => {
 const handleHistoryPageChange = (page: number) => {
   historyPage.value = page
   loadHistory()
+}
+
+const handleHistoryTabChange = (tabName: string) => {
+  if (tabName === 'execution') {
+    executionPage.value = 1
+    loadExecutions()
+  } else {
+    historyPage.value = 1
+    loadHistory()
+  }
+}
+
+const loadExecutions = async () => {
+  executionLoading.value = true
+  try {
+    const params: any = {
+      limit: executionPageSize.value,
+      offset: (executionPage.value - 1) * executionPageSize.value
+    }
+
+    if (currentHistoryJobId.value) {
+      params.job_id = currentHistoryJobId.value
+    }
+
+    if (executionStatusFilter.value) {
+      params.status = executionStatusFilter.value
+    }
+
+    const res = currentHistoryJobId.value
+      ? await getSingleJobExecutions(currentHistoryJobId.value, params)
+      : await getJobExecutions(params)
+
+    executionList.value = Array.isArray(res.data?.items) ? res.data.items : []
+    executionTotal.value = res.data?.total || 0
+  } catch (error: any) {
+    ElMessage.error(error.message || '加载执行历史失败')
+    executionList.value = []
+    executionTotal.value = 0
+  } finally {
+    executionLoading.value = false
+  }
+}
+
+const handleExecutionPageChange = (page: number) => {
+  executionPage.value = page
+  loadExecutions()
+}
+
+const showExecutionDetail = (execution: JobExecution) => {
+  currentExecution.value = execution
+  executionDetailDialogVisible.value = true
+}
+
+const formatExecutionStatus = (status: string) => {
+  const statusMap: Record<string, string> = {
+    success: '成功',
+    failed: '失败',
+    missed: '错过'
+  }
+  return statusMap[status] || status
 }
 
 const formatTrigger = (trigger: string) => {

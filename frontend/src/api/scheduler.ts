@@ -27,6 +27,31 @@ export interface JobHistory {
   timestamp: string
 }
 
+export interface JobExecution {
+  job_id: string
+  job_name: string
+  status: 'success' | 'failed' | 'missed'
+  scheduled_time: string
+  execution_time?: number
+  timestamp: string
+  return_value?: string
+  error_message?: string
+  traceback?: string
+}
+
+export interface JobExecutionStats {
+  total: number
+  success: number
+  failed: number
+  missed: number
+  avg_execution_time: number
+  last_execution?: {
+    status: string
+    timestamp: string
+    execution_time?: number
+  }
+}
+
 export interface SchedulerStats {
   total_jobs: number
   running_jobs: number
@@ -128,5 +153,48 @@ export function updateJobMetadata(
   data: { display_name?: string; description?: string }
 ) {
   return ApiClient.put<void>(`/api/scheduler/jobs/${jobId}/metadata`, data)
+}
+
+/**
+ * 获取任务执行历史（自动执行记录）
+ */
+export function getJobExecutions(params?: {
+  job_id?: string
+  status?: 'success' | 'failed' | 'missed'
+  limit?: number
+  offset?: number
+}) {
+  return ApiClient.get<{
+    items: JobExecution[]
+    total: number
+    limit: number
+    offset: number
+  }>('/api/scheduler/executions', params)
+}
+
+/**
+ * 获取指定任务的执行历史
+ */
+export function getSingleJobExecutions(
+  jobId: string,
+  params?: {
+    status?: 'success' | 'failed' | 'missed'
+    limit?: number
+    offset?: number
+  }
+) {
+  return ApiClient.get<{
+    items: JobExecution[]
+    total: number
+    limit: number
+    offset: number
+  }>(`/api/scheduler/jobs/${jobId}/executions`, params)
+}
+
+/**
+ * 获取任务执行统计信息
+ */
+export function getJobExecutionStats(jobId: string) {
+  return ApiClient.get<JobExecutionStats>(`/api/scheduler/jobs/${jobId}/execution-stats`)
 }
 
