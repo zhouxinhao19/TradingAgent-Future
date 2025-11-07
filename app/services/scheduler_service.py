@@ -356,8 +356,16 @@ class SchedulerService:
                 query["job_id"] = job_id
             if status:
                 query["status"] = status
+
+            # 处理 is_manual 过滤
             if is_manual is not None:
-                query["is_manual"] = is_manual
+                if is_manual:
+                    # 手动触发：is_manual 必须为 true
+                    query["is_manual"] = True
+                else:
+                    # 自动触发：is_manual 字段不存在或为 false
+                    # 使用 $ne (not equal) 来排除 is_manual=true 的记录
+                    query["is_manual"] = {"$ne": True}
 
             cursor = db.scheduler_executions.find(query).sort("timestamp", -1).skip(offset).limit(limit)
 
@@ -406,8 +414,15 @@ class SchedulerService:
                 query["job_id"] = job_id
             if status:
                 query["status"] = status
+
+            # 处理 is_manual 过滤
             if is_manual is not None:
-                query["is_manual"] = is_manual
+                if is_manual:
+                    # 手动触发：is_manual 必须为 true
+                    query["is_manual"] = True
+                else:
+                    # 自动触发：is_manual 字段不存在或为 false
+                    query["is_manual"] = {"$ne": True}
 
             count = await db.scheduler_executions.count_documents(query)
             return count
@@ -500,6 +515,45 @@ class SchedulerService:
 
         except Exception as e:
             logger.error(f"❌ 标记执行记录为失败失败: {e}")
+            return False
+
+    async def delete_execution(self, execution_id: str) -> bool:
+        """
+        删除执行记录
+
+        Args:
+            execution_id: 执行记录ID（MongoDB _id）
+
+        Returns:
+            是否成功
+        """
+        try:
+            from bson import ObjectId
+            db = self._get_db()
+
+            # 查找执行记录
+            execution = await db.scheduler_executions.find_one({"_id": ObjectId(execution_id)})
+            if not execution:
+                logger.error(f"❌ 执行记录不存在: {execution_id}")
+                return False
+
+            # 不允许删除正在执行的任务
+            if execution.get("status") == "running":
+                logger.error(f"❌ 不能删除正在执行的任务: {execution_id}")
+                return False
+
+            # 删除记录
+            result = await db.scheduler_executions.delete_one({"_id": ObjectId(execution_id)})
+
+            if result.deleted_count > 0:
+                logger.info(f"✅ 已删除执行记录: {execution.get('job_name', execution.get('job_id'))} (execution_id={execution_id})")
+                return True
+            else:
+                logger.error(f"❌ 删除执行记录失败: {execution_id}")
+                return False
+
+        except Exception as e:
+            logger.error(f"❌ 删除执行记录失败: {e}")
             return False
 
     async def get_job_execution_stats(self, job_id: str) -> Dict[str, Any]:

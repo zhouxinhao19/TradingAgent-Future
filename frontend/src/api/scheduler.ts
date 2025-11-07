@@ -165,11 +165,12 @@ export function updateJobMetadata(
 }
 
 /**
- * 获取任务执行历史（自动执行记录）
+ * 获取任务执行历史
  */
 export function getJobExecutions(params?: {
   job_id?: string
-  status?: 'success' | 'failed' | 'missed'
+  status?: 'success' | 'failed' | 'missed' | 'running'
+  is_manual?: boolean
   limit?: number
   offset?: number
 }) {
@@ -187,7 +188,8 @@ export function getJobExecutions(params?: {
 export function getSingleJobExecutions(
   jobId: string,
   params?: {
-    status?: 'success' | 'failed' | 'missed'
+    status?: 'success' | 'failed' | 'missed' | 'running'
+    is_manual?: boolean
     limit?: number
     offset?: number
   }
@@ -221,4 +223,11 @@ export function markExecutionFailed(executionId: string, reason?: string) {
   return ApiClient.post<void>(`/api/scheduler/executions/${executionId}/mark-failed`, null, {
     params: { reason: reason || '用户手动标记为失败' }
   })
+}
+
+/**
+ * 删除执行记录
+ */
+export function deleteExecution(executionId: string) {
+  return ApiClient.delete<void>(`/api/scheduler/executions/${executionId}`)
 }

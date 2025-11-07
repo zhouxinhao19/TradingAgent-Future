@@ -327,7 +327,7 @@
                 {{ formatDateTime(row.updated_at || row.timestamp) }}
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="180" fixed="right">
+            <el-table-column label="操作" width="220" fixed="right">
               <template #default="{ row }">
                 <el-button
                   v-if="row.error_message || row.status === 'running'"
@@ -355,6 +355,15 @@
                   @click="handleMarkFailed(row)"
                 >
                   标记失败
+                </el-button>
+                <el-button
+                  v-if="row.status !== 'running'"
+                  link
+                  type="danger"
+                  size="small"
+                  @click="handleDeleteExecution(row)"
+                >
+                  删除
                 </el-button>
               </template>
             </el-table-column>
@@ -451,7 +460,7 @@
                 {{ formatDateTime(row.updated_at || row.timestamp) }}
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="180" fixed="right">
+            <el-table-column label="操作" width="220" fixed="right">
               <template #default="{ row }">
                 <el-button
                   v-if="row.error_message || row.status === 'running'"
@@ -479,6 +488,15 @@
                   @click="handleMarkFailed(row)"
                 >
                   标记失败
+                </el-button>
+                <el-button
+                  v-if="row.status !== 'running'"
+                  link
+                  type="danger"
+                  size="small"
+                  @click="handleDeleteExecution(row)"
+                >
+                  删除
                 </el-button>
               </template>
             </el-table-column>
@@ -582,6 +600,7 @@ import {
   getSingleJobExecutions,
   cancelExecution,
   markExecutionFailed,
+  deleteExecution,
   type Job,
   type JobHistory,
   type JobExecution,
@@ -1050,6 +1069,35 @@ const handleMarkFailed = async (execution: any) => {
   } catch (error: any) {
     if (error !== 'cancel') {
       ElMessage.error(error.message || '标记失败')
+    }
+  }
+}
+
+// 删除执行记录
+const handleDeleteExecution = async (execution: any) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除这条执行记录吗？此操作不可恢复。`,
+      '确认删除',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    await deleteExecution(execution._id)
+    ElMessage.success('执行记录已删除')
+
+    // 刷新列表
+    if (activeHistoryTab.value === 'execution') {
+      await loadExecutions()
+    } else {
+      await loadHistory()
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '删除失败')
     }
   }
 }

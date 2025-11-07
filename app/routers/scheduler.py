@@ -382,7 +382,8 @@ async def get_single_job_executions(
     job_id: str,
     user: dict = Depends(get_current_user),
     service: SchedulerService = Depends(get_scheduler_service),
-    status: Optional[str] = Query(None, description="状态过滤（success/failed/missed）"),
+    status: Optional[str] = Query(None, description="状态过滤（success/failed/missed/running）"),
+    is_manual: Optional[bool] = Query(None, description="是否手动触发（true=手动，false=自动，None=全部）"),
     limit: int = Query(50, ge=1, le=200, description="返回数量限制"),
     offset: int = Query(0, ge=0, description="偏移量")
 ):
@@ -392,6 +393,7 @@ async def get_single_job_executions(
     Args:
         job_id: 任务ID
         status: 状态过滤（可选）
+        is_manual: 是否手动触发（可选）
         limit: 返回数量限制
         offset: 偏移量
 
@@ -402,10 +404,11 @@ async def get_single_job_executions(
         executions = await service.get_job_executions(
             job_id=job_id,
             status=status,
+            is_manual=is_manual,
             limit=limit,
             offset=offset
         )
-        total = await service.count_job_executions(job_id=job_id, status=status)
+        total = await service.count_job_executions(job_id=job_id, status=status, is_manual=is_manual)
         return ok(data={
             "items": executions,
             "total": total,
@@ -497,3 +500,30 @@ async def mark_execution_failed(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"标记失败: {str(e)}")
+
+
+@router.delete("/executions/{execution_id}")
+async def delete_execution(
+    execution_id: str,
+    user: dict = Depends(get_current_user),
+    service: SchedulerService = Depends(get_scheduler_service)
+):
+    """
+    删除执行记录
+
+    Args:
+        execution_id: 执行记录ID（MongoDB _id）
+
+    Returns:
+        操作结果
+    """
+    try:
+        success = await service.delete_execution(execution_id)
+        if success:
+            return ok(message="执行记录已删除")
+        else:
+            raise HTTPException(status_code=400, detail="删除失败")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"删除执行记录失败: {str(e)}")
