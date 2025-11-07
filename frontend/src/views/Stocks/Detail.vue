@@ -313,6 +313,7 @@
             <el-checkbox label="realtime">实时行情</el-checkbox>
             <el-checkbox label="historical">历史行情数据</el-checkbox>
             <el-checkbox label="financial">财务数据</el-checkbox>
+            <el-checkbox label="basic">基础数据</el-checkbox>
           </el-checkbox-group>
         </el-form-item>
         <el-form-item label="数据源">
@@ -545,6 +546,14 @@ async function handleSync() {
           message += `✅ 财务数据同步成功\n`
         } else {
           message += `❌ 财务数据同步失败: ${data.financial_sync.error || '未知错误'}\n`
+        }
+      }
+
+      if (data.basic_sync) {
+        if (data.basic_sync.success) {
+          message += `✅ 基础数据同步成功\n`
+        } else {
+          message += `❌ 基础数据同步失败: ${data.basic_sync.error || '未知错误'}\n`
         }
       }
 

@@ -408,6 +408,7 @@
           <el-checkbox-group v-model="batchSyncForm.syncTypes">
             <el-checkbox label="historical">历史行情数据</el-checkbox>
             <el-checkbox label="financial">财务数据</el-checkbox>
+            <el-checkbox label="basic">基础数据</el-checkbox>
           </el-checkbox-group>
         </el-form-item>
         <el-form-item label="数据源">
@@ -458,6 +459,7 @@
             <el-checkbox label="realtime">实时行情</el-checkbox>
             <el-checkbox label="historical">历史行情数据</el-checkbox>
             <el-checkbox label="financial">财务数据</el-checkbox>
+            <el-checkbox label="basic">基础数据</el-checkbox>
           </el-checkbox-group>
         </el-form-item>
         <el-form-item label="数据源">
@@ -958,6 +960,14 @@ const handleSingleSync = async () => {
         }
       }
 
+      if (data.basic_sync) {
+        if (data.basic_sync.success) {
+          message += `✅ 基础数据同步成功\n`
+        } else {
+          message += `❌ 基础数据同步失败: ${data.basic_sync.error || '未知错误'}\n`
+        }
+      }
+
       ElMessage.success(message)
       singleSyncDialogVisible.value = false
 
@@ -1012,6 +1022,10 @@ const handleBatchSync = async () => {
 
       if (data.financial_sync) {
         message += `✅ 财务数据: ${data.financial_sync.success_count}/${data.financial_sync.total_symbols} 成功\n`
+      }
+
+      if (data.basic_sync) {
+        message += `✅ 基础数据: ${data.basic_sync.success_count}/${data.basic_sync.total_symbols} 成功\n`
       }
 
       ElMessage.success(message)
