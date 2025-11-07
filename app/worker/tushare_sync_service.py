@@ -827,15 +827,23 @@ class TushareSyncService:
 
                         # 更新任务进度
                         if job_id:
-                            from app.services.scheduler_service import update_job_progress
-                            await update_job_progress(
-                                job_id=job_id,
-                                progress=progress,
-                                message=f"正在同步 {symbol} 财务数据",
-                                current_item=symbol,
-                                total_items=len(symbols),
-                                processed_items=i + 1
-                            )
+                            from app.services.scheduler_service import update_job_progress, TaskCancelledException
+                            try:
+                                await update_job_progress(
+                                    job_id=job_id,
+                                    progress=progress,
+                                    message=f"正在同步 {symbol} 财务数据",
+                                    current_item=symbol,
+                                    total_items=len(symbols),
+                                    processed_items=i + 1
+                                )
+                            except TaskCancelledException:
+                                # 任务被取消，记录并退出
+                                logger.warning(f"⚠️ 财务数据同步任务被用户取消 (已处理 {i + 1}/{len(symbols)})")
+                                stats["end_time"] = datetime.utcnow()
+                                stats["duration"] = (stats["end_time"] - stats["start_time"]).total_seconds()
+                                stats["cancelled"] = True
+                                raise
 
                 except Exception as e:
                     stats["error_count"] += 1

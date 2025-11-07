@@ -323,7 +323,7 @@
                 {{ formatDateTime(row.updated_at || row.timestamp) }}
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="100" fixed="right">
+            <el-table-column label="操作" width="180" fixed="right">
               <template #default="{ row }">
                 <el-button
                   v-if="row.error_message || row.status === 'running'"
@@ -333,6 +333,24 @@
                   @click="showExecutionDetail(row)"
                 >
                   详情
+                </el-button>
+                <el-button
+                  v-if="row.status === 'running'"
+                  link
+                  type="warning"
+                  size="small"
+                  @click="handleCancelExecution(row)"
+                >
+                  终止
+                </el-button>
+                <el-button
+                  v-if="row.status === 'running'"
+                  link
+                  type="danger"
+                  size="small"
+                  @click="handleMarkFailed(row)"
+                >
+                  标记失败
                 </el-button>
               </template>
             </el-table-column>
@@ -425,7 +443,7 @@
                 {{ formatDateTime(row.updated_at || row.timestamp) }}
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="100" fixed="right">
+            <el-table-column label="操作" width="180" fixed="right">
               <template #default="{ row }">
                 <el-button
                   v-if="row.error_message || row.status === 'running'"
@@ -435,6 +453,24 @@
                   @click="showExecutionDetail(row)"
                 >
                   详情
+                </el-button>
+                <el-button
+                  v-if="row.status === 'running'"
+                  link
+                  type="warning"
+                  size="small"
+                  @click="handleCancelExecution(row)"
+                >
+                  终止
+                </el-button>
+                <el-button
+                  v-if="row.status === 'running'"
+                  link
+                  type="danger"
+                  size="small"
+                  @click="handleMarkFailed(row)"
+                >
+                  标记失败
                 </el-button>
               </template>
             </el-table-column>
@@ -532,12 +568,12 @@ import {
   pauseJob,
   resumeJob,
   triggerJob,
-  getJobHistory,
-  getAllHistory,
   updateJobMetadata,
   getSchedulerStats,
   getJobExecutions,
   getSingleJobExecutions,
+  cancelExecution,
+  markExecutionFailed,
   type Job,
   type JobHistory,
   type JobExecution,
@@ -927,6 +963,65 @@ const handleReset = () => {
   searchKeyword.value = ''
   filterDataSource.value = ''
   filterStatus.value = ''
+}
+
+// 取消/终止任务执行
+const handleCancelExecution = async (execution: any) => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要终止这个任务吗？任务将在下次检查时停止执行。',
+      '确认终止',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    await cancelExecution(execution._id)
+    ElMessage.success('已设置取消标记，任务将在下次检查时停止')
+
+    // 刷新列表
+    if (activeHistoryTab.value === 'execution') {
+      await loadExecutions()
+    } else {
+      await loadHistory()
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '终止任务失败')
+    }
+  }
+}
+
+// 标记执行记录为失败
+const handleMarkFailed = async (execution: any) => {
+  try {
+    const { value: reason } = await ElMessageBox.prompt(
+      '请输入失败原因（可选）',
+      '标记为失败',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        inputPlaceholder: '例如：进程已手动终止',
+        inputValue: '进程已手动终止'
+      }
+    )
+
+    await markExecutionFailed(execution._id, reason || '用户手动标记为失败')
+    ElMessage.success('已标记为失败状态')
+
+    // 刷新列表
+    if (activeHistoryTab.value === 'execution') {
+      await loadExecutions()
+    } else {
+      await loadHistory()
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '标记失败')
+    }
+  }
 }
 
 // 生命周期

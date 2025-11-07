@@ -28,6 +28,7 @@ export interface JobHistory {
 }
 
 export interface JobExecution {
+  _id: string
   job_id: string
   job_name: string
   status: 'running' | 'success' | 'failed' | 'missed'
@@ -44,6 +45,7 @@ export interface JobExecution {
   processed_items?: number
   updated_at?: string
   is_manual?: boolean
+  cancel_requested?: boolean
 }
 
 export interface JobExecutionStats {
@@ -205,3 +207,18 @@ export function getJobExecutionStats(jobId: string) {
   return ApiClient.get<JobExecutionStats>(`/api/scheduler/jobs/${jobId}/execution-stats`)
 }
 
+/**
+ * 取消/终止任务执行
+ */
+export function cancelExecution(executionId: string) {
+  return ApiClient.post<void>(`/api/scheduler/executions/${executionId}/cancel`)
+}
+
+/**
+ * 标记执行记录为失败
+ */
+export function markExecutionFailed(executionId: string, reason?: string) {
+  return ApiClient.post<void>(`/api/scheduler/executions/${executionId}/mark-failed`, null, {
+    params: { reason: reason || '用户手动标记为失败' }
+  })
+}

@@ -23,6 +23,11 @@ from tradingagents.utils.logging_manager import get_logger
 logger = get_logger(__name__)
 
 
+class TaskCancelledException(Exception):
+    """任务被取消异常"""
+    pass
+
+
 class SchedulerService:
     """定时任务管理服务"""
 
@@ -358,7 +363,9 @@ class SchedulerService:
 
             executions = []
             async for doc in cursor:
-                doc.pop("_id", None)
+                # 转换 _id 为字符串
+                if "_id" in doc:
+                    doc["_id"] = str(doc["_id"])
                 # 格式化时间
                 if doc.get("scheduled_time"):
                     doc["scheduled_time"] = doc["scheduled_time"].isoformat()
@@ -407,6 +414,93 @@ class SchedulerService:
         except Exception as e:
             logger.error(f"❌ 统计任务执行历史失败: {e}")
             return 0
+
+    async def cancel_job_execution(self, execution_id: str) -> bool:
+        """
+        取消/终止任务执行
+
+        对于正在执行的任务，设置取消标记；
+        对于已经退出但数据库中仍为running的任务，直接标记为failed
+
+        Args:
+            execution_id: 执行记录ID（MongoDB _id）
+
+        Returns:
+            是否成功
+        """
+        try:
+            from bson import ObjectId
+            db = self._get_db()
+
+            # 查找执行记录
+            execution = await db.scheduler_executions.find_one({"_id": ObjectId(execution_id)})
+            if not execution:
+                logger.error(f"❌ 执行记录不存在: {execution_id}")
+                return False
+
+            if execution.get("status") != "running":
+                logger.warning(f"⚠️ 执行记录状态不是running: {execution_id} (status={execution.get('status')})")
+                return False
+
+            # 设置取消标记
+            await db.scheduler_executions.update_one(
+                {"_id": ObjectId(execution_id)},
+                {
+                    "$set": {
+                        "cancel_requested": True,
+                        "updated_at": datetime.now()
+                    }
+                }
+            )
+
+            logger.info(f"✅ 已设置取消标记: {execution.get('job_name', execution.get('job_id'))} (execution_id={execution_id})")
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ 取消任务执行失败: {e}")
+            return False
+
+    async def mark_execution_as_failed(self, execution_id: str, reason: str = "用户手动标记为失败") -> bool:
+        """
+        将执行记录标记为失败状态
+
+        用于处理已经退出但数据库中仍为running的任务
+
+        Args:
+            execution_id: 执行记录ID（MongoDB _id）
+            reason: 失败原因
+
+        Returns:
+            是否成功
+        """
+        try:
+            from bson import ObjectId
+            db = self._get_db()
+
+            # 查找执行记录
+            execution = await db.scheduler_executions.find_one({"_id": ObjectId(execution_id)})
+            if not execution:
+                logger.error(f"❌ 执行记录不存在: {execution_id}")
+                return False
+
+            # 更新为failed状态
+            await db.scheduler_executions.update_one(
+                {"_id": ObjectId(execution_id)},
+                {
+                    "$set": {
+                        "status": "failed",
+                        "error_message": reason,
+                        "updated_at": datetime.now()
+                    }
+                }
+            )
+
+            logger.info(f"✅ 已标记为失败: {execution.get('job_name', execution.get('job_id'))} (execution_id={execution_id}, reason={reason})")
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ 标记执行记录为失败失败: {e}")
+            return False
 
     async def get_job_execution_stats(self, job_id: str) -> Dict[str, Any]:
         """
@@ -909,6 +1003,12 @@ async def update_job_progress(
         )
 
         if latest_execution:
+            # 检查是否有取消请求
+            if latest_execution.get("cancel_requested"):
+                sync_client.close()
+                logger.warning(f"⚠️ 任务 {job_id} 收到取消请求，即将停止")
+                raise TaskCancelledException(f"任务 {job_id} 已被用户取消")
+
             # 更新现有记录
             update_data = {
                 "progress": progress,

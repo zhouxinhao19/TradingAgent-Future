@@ -437,3 +437,63 @@ async def get_job_execution_stats(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取统计信息失败: {str(e)}")
 
+
+@router.post("/executions/{execution_id}/cancel")
+async def cancel_execution(
+    execution_id: str,
+    user: dict = Depends(get_current_user),
+    service: SchedulerService = Depends(get_scheduler_service)
+):
+    """
+    取消/终止任务执行
+
+    对于正在执行的任务，设置取消标记；
+    对于已经退出但数据库中仍为running的任务，直接标记为failed
+
+    Args:
+        execution_id: 执行记录ID（MongoDB _id）
+
+    Returns:
+        操作结果
+    """
+    try:
+        success = await service.cancel_job_execution(execution_id)
+        if success:
+            return ok(message="已设置取消标记，任务将在下次检查时停止")
+        else:
+            raise HTTPException(status_code=400, detail="取消任务失败")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"取消任务失败: {str(e)}")
+
+
+@router.post("/executions/{execution_id}/mark-failed")
+async def mark_execution_failed(
+    execution_id: str,
+    reason: str = Query("用户手动标记为失败", description="失败原因"),
+    user: dict = Depends(get_current_user),
+    service: SchedulerService = Depends(get_scheduler_service)
+):
+    """
+    将执行记录标记为失败状态
+
+    用于处理已经退出但数据库中仍为running的任务
+
+    Args:
+        execution_id: 执行记录ID（MongoDB _id）
+        reason: 失败原因
+
+    Returns:
+        操作结果
+    """
+    try:
+        success = await service.mark_execution_as_failed(execution_id, reason)
+        if success:
+            return ok(message="已标记为失败状态")
+        else:
+            raise HTTPException(status_code=400, detail="标记失败")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"标记失败: {str(e)}")
