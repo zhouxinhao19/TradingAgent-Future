@@ -296,6 +296,7 @@
                     {{ row.processed_items }}/{{ row.total_items }}
                   </el-text>
                 </div>
+                <el-text v-else-if="row.progress !== undefined" type="info" size="small">{{ row.progress }}%</el-text>
                 <el-text v-else type="info" size="small">-</el-text>
               </template>
             </el-table-column>
@@ -310,15 +311,18 @@
                 <el-text v-else type="info" size="small">-</el-text>
               </template>
             </el-table-column>
-            <el-table-column prop="execution_time" label="执行时长" width="120">
+            <el-table-column prop="timestamp" label="执行时长" width="180">
               <template #default="{ row }">
-                <span v-if="row.execution_time !== undefined">
+                <span v-if="row.execution_time !== undefined && row.execution_time !== null">
                   {{ row.execution_time.toFixed(2) }}秒
+                </span>
+                <span v-else-if="row.status === 'running' && row.timestamp">
+                  {{ calculateRunningTime(row.updated_at || row.timestamp) }}
                 </span>
                 <el-text v-else type="info" size="small">-</el-text>
               </template>
             </el-table-column>
-            <el-table-column prop="timestamp" label="更新时间" width="180">
+            <el-table-column prop="updated_at" label="更新时间" width="180">
               <template #default="{ row }">
                 {{ formatDateTime(row.updated_at || row.timestamp) }}
               </template>
@@ -411,6 +415,7 @@
                     {{ row.processed_items }}/{{ row.total_items }}
                   </el-text>
                 </div>
+                <el-text v-else-if="row.progress !== undefined" type="info" size="small">{{ row.progress }}%</el-text>
                 <el-text v-else type="info" size="small">-</el-text>
               </template>
             </el-table-column>
@@ -425,10 +430,13 @@
                 <el-text v-else type="info" size="small">-</el-text>
               </template>
             </el-table-column>
-            <el-table-column prop="execution_time" label="执行时长" width="120">
+            <el-table-column prop="execution_time" label="执行时长" width="180">
               <template #default="{ row }">
-                <span v-if="row.execution_time !== undefined">
+                <span v-if="row.execution_time !== undefined && row.execution_time !== null">
                   {{ row.execution_time.toFixed(2) }}秒
+                </span>
+                <span v-else-if="row.status === 'running' && row.timestamp">
+                  {{ calculateRunningTime(row.updated_at || row.timestamp) }}
                 </span>
                 <el-text v-else type="info" size="small">-</el-text>
               </template>
@@ -438,7 +446,7 @@
                 {{ formatDateTime(row.scheduled_time) }}
               </template>
             </el-table-column>
-            <el-table-column prop="timestamp" label="更新时间" width="180">
+            <el-table-column prop="updated_at" label="更新时间" width="180">
               <template #default="{ row }">
                 {{ formatDateTime(row.updated_at || row.timestamp) }}
               </template>
@@ -932,6 +940,28 @@ const formatExecutionStatus = (status: string) => {
     missed: '错过'
   }
   return statusMap[status] || status
+}
+
+const calculateRunningTime = (startTime: string) => {
+  try {
+    const start = new Date(startTime)
+    const now = new Date()
+    const seconds = Math.floor((now.getTime() - start.getTime()) / 1000)
+
+    if (seconds < 60) {
+      return `${seconds}秒`
+    } else if (seconds < 3600) {
+      const minutes = Math.floor(seconds / 60)
+      const remainingSeconds = seconds % 60
+      return `${minutes}分${remainingSeconds}秒`
+    } else {
+      const hours = Math.floor(seconds / 3600)
+      const minutes = Math.floor((seconds % 3600) / 60)
+      return `${hours}小时${minutes}分`
+    }
+  } catch (error) {
+    return '-'
+  }
 }
 
 const formatTrigger = (trigger: string) => {
