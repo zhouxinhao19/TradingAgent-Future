@@ -145,7 +145,10 @@ class AnalysisService:
                                 "retry_times": llm_config.get("retry_times", 3),
                                 "api_base": llm_config.get("api_base")
                             }
-                            logger.info(f"✅ 读取快速模型配置: {quick_model} - {quick_model_config}")
+                            logger.info(f"✅ 读取快速模型配置: {quick_model}")
+                            logger.info(f"   max_tokens={quick_model_config['max_tokens']}, temperature={quick_model_config['temperature']}")
+                            logger.info(f"   timeout={quick_model_config['timeout']}, retry_times={quick_model_config['retry_times']}")
+                            logger.info(f"   api_base={quick_model_config['api_base']}")
 
                         if llm_config.get("model_name") == deep_model:
                             deep_model_config = {
@@ -270,7 +273,10 @@ class AnalysisService:
                                 "retry_times": llm_config.get("retry_times", 3),
                                 "api_base": llm_config.get("api_base")
                             }
-                            logger.info(f"✅ 读取快速模型配置: {quick_model} - {quick_model_config}")
+                            logger.info(f"✅ 读取快速模型配置: {quick_model}")
+                            logger.info(f"   max_tokens={quick_model_config['max_tokens']}, temperature={quick_model_config['temperature']}")
+                            logger.info(f"   timeout={quick_model_config['timeout']}, retry_times={quick_model_config['retry_times']}")
+                            logger.info(f"   api_base={quick_model_config['api_base']}")
 
                         if llm_config.get("model_name") == deep_model:
                             deep_model_config = {
