@@ -61,8 +61,22 @@ class HistoricalDataService:
             if data is None or data.empty:
                 logger.warning(f"⚠️ {symbol} 历史数据为空，跳过保存")
                 return 0
-            
+
             logger.info(f"💾 开始保存 {symbol} 历史数据: {len(data)}条记录 (数据源: {data_source})")
+
+            # 🔥 在 DataFrame 层面做单位转换（向量化操作，比逐行快得多）
+            if data_source == "tushare":
+                # 成交额：千元 -> 元
+                if 'amount' in data.columns:
+                    data['amount'] = data['amount'] * 1000
+                elif 'turnover' in data.columns:
+                    data['turnover'] = data['turnover'] * 1000
+
+                # 成交量：手 -> 股
+                if 'volume' in data.columns:
+                    data['volume'] = data['volume'] * 100
+                elif 'vol' in data.columns:
+                    data['vol'] = data['vol'] * 100
 
             # 准备批量操作
             operations = []
@@ -212,21 +226,9 @@ class HistoricalDataService:
             "version": 1
         }
         
-        # OHLCV数据
-        # 🔥 成交额单位转换：Tushare 返回的是千元，需要转换为元
+        # OHLCV数据（单位转换已在 DataFrame 层面完成）
         amount_value = self._safe_float(row.get('amount') or row.get('turnover'))
-        logger.info(f"📊 [成交额] {symbol} - 原始值: {amount_value}, 数据源: {data_source}")
-        if amount_value is not None and data_source == "tushare":
-            amount_value = amount_value * 1000  # 千元 -> 元
-            logger.info(f"📊 [单位转换] Tushare成交额: {amount_value/1000:.2f}千元 -> {amount_value:.2f}元")
-
-        # 🔥 成交量单位转换：Tushare 返回的是手，需要转换为股
         volume_value = self._safe_float(row.get('volume') or row.get('vol'))
-        logger.info(f"📊 [成交量] {symbol} - 原始值: {volume_value}, 字段: volume={row.get('volume')}, vol={row.get('vol')}, 数据源: {data_source}")
-        if volume_value is not None and data_source == "tushare":
-            original_volume = volume_value
-            volume_value = volume_value * 100  # 手 -> 股
-            logger.info(f"📊 [单位转换] Tushare成交量: {original_volume:.2f}手 -> {volume_value:.2f}股")
 
         doc.update({
             "open": self._safe_float(row.get('open')),

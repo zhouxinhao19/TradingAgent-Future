@@ -3,7 +3,7 @@ Tushare数据同步服务
 负责将Tushare数据同步到MongoDB标准化集合
 """
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 import logging
 
@@ -14,8 +14,22 @@ from app.services.news_data_service import get_news_data_service
 from app.core.database import get_mongo_db
 from app.core.config import settings
 from app.core.rate_limiter import get_tushare_rate_limiter
+from app.utils.timezone import now_tz
 
 logger = logging.getLogger(__name__)
+
+# UTC+8 时区
+UTC_8 = timezone(timedelta(hours=8))
+
+
+def get_utc8_now():
+    """
+    获取 UTC+8 当前时间（naive datetime）
+
+    注意：返回 naive datetime（不带时区信息），MongoDB 会按原样存储本地时间值
+    这样前端可以直接添加 +08:00 后缀显示
+    """
+    return now_tz().replace(tzinfo=None)
 
 
 class TushareSyncService:
@@ -564,22 +578,33 @@ class TushareSyncService:
         }
 
         try:
-            # 1. 获取股票列表
+            # 1. 获取股票列表（排除退市股票）
             if symbols is None:
-                # 查询所有A股股票（兼容不同的数据结构）
+                # 查询所有A股股票（兼容不同的数据结构），排除退市股票
                 # 优先使用 market_info.market，降级到 category 字段
                 cursor = self.db.stock_basic_info.find(
                     {
-                        "$or": [
-                            {"market_info.market": "CN"},  # 新数据结构
-                            {"category": "stock_cn"},      # 旧数据结构
-                            {"market": {"$in": ["主板", "创业板", "科创板", "北交所"]}}  # 按市场类型
+                        "$and": [
+                            {
+                                "$or": [
+                                    {"market_info.market": "CN"},  # 新数据结构
+                                    {"category": "stock_cn"},      # 旧数据结构
+                                    {"market": {"$in": ["主板", "创业板", "科创板", "北交所"]}}  # 按市场类型
+                                ]
+                            },
+                            # 排除退市股票
+                            {
+                                "$or": [
+                                    {"status": {"$ne": "D"}},  # status 不是 D（退市）
+                                    {"status": {"$exists": False}}  # 或者 status 字段不存在
+                                ]
+                            }
                         ]
                     },
                     {"code": 1}
                 )
                 symbols = [doc["code"] async for doc in cursor]
-                logger.info(f"📋 从 stock_basic_info 获取到 {len(symbols)} 只股票")
+                logger.info(f"📋 从 stock_basic_info 获取到 {len(symbols)} 只股票（已排除退市股票）")
 
             stats["total_processed"] = len(symbols)
 
@@ -601,6 +626,9 @@ class TushareSyncService:
 
             # 4. 批量处理
             for i, symbol in enumerate(symbols):
+                # 记录单个股票开始时间
+                stock_start_time = datetime.now()
+
                 try:
                     # 检查是否需要退出
                     if job_id and await self._should_stop(job_id):
@@ -638,26 +666,31 @@ class TushareSyncService:
                         stats["success_count"] += 1
                         stats["total_records"] += records_saved
 
-                        logger.debug(f"✅ {symbol}: 保存 {records_saved} 条{period_name}记录")
+                        # 计算单个股票耗时
+                        stock_duration = (datetime.now() - stock_start_time).total_seconds()
+                        logger.info(f"✅ {symbol}: 保存 {records_saved} 条{period_name}记录，耗时 {stock_duration:.2f}秒")
                     else:
+                        stock_duration = (datetime.now() - stock_start_time).total_seconds()
                         logger.warning(
                             f"⚠️ {symbol}: 无{period_name}数据 "
-                            f"(start={symbol_start_date}, end={end_date})"
+                            f"(start={symbol_start_date}, end={end_date})，耗时 {stock_duration:.2f}秒"
                         )
 
-                    # 进度日志和进度更新
+                    # 每个股票都更新进度
+                    progress_percent = int(((i + 1) / len(symbols)) * 100)
+
+                    # 更新任务进度
+                    if job_id:
+                        await self._update_progress(
+                            job_id,
+                            progress_percent,
+                            f"正在同步 {symbol} ({i + 1}/{len(symbols)})"
+                        )
+
+                    # 每50个股票输出一次详细日志
                     if (i + 1) % 50 == 0 or (i + 1) == len(symbols):
-                        progress_percent = int(((i + 1) / len(symbols)) * 100)
                         logger.info(f"📈 {period_name}数据同步进度: {i + 1}/{len(symbols)} ({progress_percent}%) "
                                    f"(成功: {stats['success_count']}, 记录: {stats['total_records']})")
-
-                        # 更新任务进度
-                        if job_id:
-                            await self._update_progress(
-                                job_id,
-                                progress_percent,
-                                f"已处理 {i + 1}/{len(symbols)} 只股票，保存 {stats['total_records']} 条记录"
-                            )
 
                         # 输出速率限制器统计
                         limiter_stats = self.rate_limiter.get_stats()
@@ -1168,9 +1201,11 @@ class TushareSyncService:
             from pymongo import MongoClient
             from app.core.config import settings
 
+            logger.info(f"📊 [进度更新] 开始更新任务 {job_id} 进度: {progress}% - {message}")
+
             # 使用同步 PyMongo 客户端（避免事件循环冲突）
-            sync_client = MongoClient(settings.MONGODB_URL)
-            sync_db = sync_client[settings.MONGODB_DB_NAME]
+            sync_client = MongoClient(settings.MONGO_URI)
+            sync_db = sync_client[settings.MONGODB_DATABASE]
 
             # 查找最新的 running 记录
             execution = sync_db.scheduler_executions.find_one(
@@ -1183,30 +1218,34 @@ class TushareSyncService:
                 sync_client.close()
                 return
 
+            logger.info(f"📊 [进度更新] 找到执行记录: _id={execution['_id']}, 当前进度={execution.get('progress', 0)}%")
+
             # 检查是否收到取消请求
             if execution.get("cancel_requested"):
                 sync_client.close()
                 raise TaskCancelledException(f"任务 {job_id} 已被用户取消")
 
-            # 更新进度
-            sync_db.scheduler_executions.update_one(
+            # 更新进度（使用 UTC+8 时间）
+            result = sync_db.scheduler_executions.update_one(
                 {"_id": execution["_id"]},
                 {
                     "$set": {
                         "progress": progress,
                         "progress_message": message,
-                        "updated_at": datetime.utcnow()
+                        "updated_at": get_utc8_now()
                     }
                 }
             )
 
+            logger.info(f"📊 [进度更新] 更新结果: matched={result.matched_count}, modified={result.modified_count}")
+
             sync_client.close()
-            logger.debug(f"📊 任务 {job_id} 进度更新: {progress}% - {message}")
+            logger.info(f"✅ 任务 {job_id} 进度更新成功: {progress}% - {message}")
 
         except Exception as e:
             if "TaskCancelledException" in str(type(e).__name__):
                 raise
-            logger.error(f"❌ 更新任务进度失败: {e}")
+            logger.error(f"❌ 更新任务进度失败: {e}", exc_info=True)
 
 
 # 全局同步服务实例
