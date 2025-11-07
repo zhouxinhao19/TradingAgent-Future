@@ -347,8 +347,21 @@ def create_fundamentals_analyst(llm, toolkit):
         logger.info("📝 [提示词调试] 完整内容打印结束，开始调用LLM")
         logger.info("=" * 80)
 
+        # 🔥 修复阿里百炼 error code 20015: 过滤/转换消息历史
+        # 某些 LLM 提供商（如阿里百炼）对 messages 格式有严格要求
+        filtered_messages = []
+        for msg in state["messages"]:
+            # 跳过 ToolMessage（阿里百炼可能不支持）
+            if isinstance(msg, ToolMessage):
+                logger.debug(f"🔧 [消息过滤] 跳过 ToolMessage: {msg.content[:100] if msg.content else 'empty'}...")
+                continue
+            # 保留其他消息类型
+            filtered_messages.append(msg)
+
+        logger.info(f"🔧 [消息过滤] 原始消息数: {len(state['messages'])}, 过滤后: {len(filtered_messages)}")
+
         # 修复：传递字典而不是直接传递消息列表，以便 ChatPromptTemplate 能正确处理所有变量
-        result = chain.invoke({"messages": state["messages"]})
+        result = chain.invoke({"messages": filtered_messages})
         logger.info(f"📊 [基本面分析师] LLM调用完成")
         
         # 🔍 [调试日志] 打印AIMessage的详细内容
