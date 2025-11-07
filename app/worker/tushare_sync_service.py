@@ -58,18 +58,19 @@ class TushareSyncService:
     
     # ==================== 基础信息同步 ====================
     
-    async def sync_stock_basic_info(self, force_update: bool = False) -> Dict[str, Any]:
+    async def sync_stock_basic_info(self, force_update: bool = False, job_id: str = None) -> Dict[str, Any]:
         """
         同步股票基础信息
-        
+
         Args:
             force_update: 是否强制更新所有数据
-            
+            job_id: 任务ID（用于进度跟踪）
+
         Returns:
             同步结果统计
         """
         logger.info("🔄 开始同步股票基础信息...")
-        
+
         stats = {
             "total_processed": 0,
             "success_count": 0,
@@ -88,23 +89,38 @@ class TushareSyncService:
             
             stats["total_processed"] = len(stock_list)
             logger.info(f"📊 获取到 {len(stock_list)} 只股票信息")
-            
+
             # 2. 批量处理
             for i in range(0, len(stock_list), self.batch_size):
+                # 检查是否需要退出
+                if job_id and await self._should_stop(job_id):
+                    logger.warning(f"⚠️ 任务 {job_id} 收到停止信号，正在退出...")
+                    stats["stopped"] = True
+                    break
+
                 batch = stock_list[i:i + self.batch_size]
                 batch_stats = await self._process_basic_info_batch(batch, force_update)
-                
+
                 # 更新统计
                 stats["success_count"] += batch_stats["success_count"]
                 stats["error_count"] += batch_stats["error_count"]
                 stats["skipped_count"] += batch_stats["skipped_count"]
                 stats["errors"].extend(batch_stats["errors"])
-                
-                # 进度日志
+
+                # 进度日志和进度更新
                 progress = min(i + self.batch_size, len(stock_list))
-                logger.info(f"📈 基础信息同步进度: {progress}/{len(stock_list)} "
+                progress_percent = int((progress / len(stock_list)) * 100)
+                logger.info(f"📈 基础信息同步进度: {progress}/{len(stock_list)} ({progress_percent}%) "
                            f"(成功: {stats['success_count']}, 错误: {stats['error_count']})")
-                
+
+                # 更新任务进度
+                if job_id:
+                    await self._update_progress(
+                        job_id,
+                        progress_percent,
+                        f"已处理 {progress}/{len(stock_list)} 只股票"
+                    )
+
                 # API限流
                 if i + self.batch_size < len(stock_list):
                     await asyncio.sleep(self.rate_limit_delay)
@@ -517,7 +533,8 @@ class TushareSyncService:
         end_date: str = None,
         incremental: bool = True,
         all_history: bool = False,
-        period: str = "daily"
+        period: str = "daily",
+        job_id: str = None
     ) -> Dict[str, Any]:
         """
         同步历史数据
@@ -529,6 +546,7 @@ class TushareSyncService:
             incremental: 是否增量同步
             all_history: 是否同步所有历史数据
             period: 数据周期 (daily/weekly/monthly)
+            job_id: 任务ID（用于进度跟踪）
 
         Returns:
             同步结果统计
@@ -584,6 +602,12 @@ class TushareSyncService:
             # 4. 批量处理
             for i, symbol in enumerate(symbols):
                 try:
+                    # 检查是否需要退出
+                    if job_id and await self._should_stop(job_id):
+                        logger.warning(f"⚠️ 任务 {job_id} 收到停止信号，正在退出...")
+                        stats["stopped"] = True
+                        break
+
                     # 速率限制
                     await self.rate_limiter.acquire()
 
@@ -621,10 +645,20 @@ class TushareSyncService:
                             f"(start={symbol_start_date}, end={end_date})"
                         )
 
-                    # 进度日志
-                    if (i + 1) % 50 == 0:
-                        logger.info(f"📈 {period_name}数据同步进度: {i + 1}/{len(symbols)} "
+                    # 进度日志和进度更新
+                    if (i + 1) % 50 == 0 or (i + 1) == len(symbols):
+                        progress_percent = int(((i + 1) / len(symbols)) * 100)
+                        logger.info(f"📈 {period_name}数据同步进度: {i + 1}/{len(symbols)} ({progress_percent}%) "
                                    f"(成功: {stats['success_count']}, 记录: {stats['total_records']})")
+
+                        # 更新任务进度
+                        if job_id:
+                            await self._update_progress(
+                                job_id,
+                                progress_percent,
+                                f"已处理 {i + 1}/{len(symbols)} 只股票，保存 {stats['total_records']} 条记录"
+                            )
+
                         # 输出速率限制器统计
                         limiter_stats = self.rate_limiter.get_stats()
                         logger.info(f"   速率限制: {limiter_stats['current_calls']}/{limiter_stats['max_calls']}次, "
@@ -947,7 +981,8 @@ class TushareSyncService:
         symbols: List[str] = None,
         hours_back: int = 24,
         max_news_per_stock: int = 20,
-        force_update: bool = False
+        force_update: bool = False,
+        job_id: str = None
     ) -> Dict[str, Any]:
         """
         同步新闻数据
@@ -957,6 +992,7 @@ class TushareSyncService:
             hours_back: 回溯小时数，默认24小时
             max_news_per_stock: 每只股票最大新闻数量
             force_update: 是否强制更新
+            job_id: 任务ID（用于进度跟踪）
 
         Returns:
             同步结果统计
@@ -987,6 +1023,12 @@ class TushareSyncService:
 
             # 2. 批量处理
             for i in range(0, len(symbols), self.batch_size):
+                # 检查是否需要退出
+                if job_id and await self._should_stop(job_id):
+                    logger.warning(f"⚠️ 任务 {job_id} 收到停止信号，正在退出...")
+                    stats["stopped"] = True
+                    break
+
                 batch = symbols[i:i + self.batch_size]
                 batch_stats = await self._process_news_batch(
                     batch, hours_back, max_news_per_stock
@@ -998,10 +1040,19 @@ class TushareSyncService:
                 stats["news_count"] += batch_stats["news_count"]
                 stats["errors"].extend(batch_stats["errors"])
 
-                # 进度日志
+                # 进度日志和进度更新
                 progress = min(i + self.batch_size, len(symbols))
-                logger.info(f"📈 新闻同步进度: {progress}/{len(symbols)} "
+                progress_percent = int((progress / len(symbols)) * 100)
+                logger.info(f"📈 新闻同步进度: {progress}/{len(symbols)} ({progress_percent}%) "
                            f"(成功: {stats['success_count']}, 新闻: {stats['news_count']})")
+
+                # 更新任务进度
+                if job_id:
+                    await self._update_progress(
+                        job_id,
+                        progress_percent,
+                        f"已处理 {progress}/{len(symbols)} 只股票，获取 {stats['news_count']} 条新闻"
+                    )
 
                 # API限流
                 if i + self.batch_size < len(symbols):
@@ -1075,6 +1126,88 @@ class TushareSyncService:
 
         return batch_stats
 
+    # ==================== 进度跟踪辅助方法 ====================
+
+    async def _should_stop(self, job_id: str) -> bool:
+        """
+        检查任务是否应该停止
+
+        Args:
+            job_id: 任务ID
+
+        Returns:
+            是否应该停止
+        """
+        try:
+            # 查询执行记录，检查 cancel_requested 标记
+            execution = await self.db.scheduler_executions.find_one(
+                {"job_id": job_id, "status": "running"},
+                sort=[("timestamp", -1)]
+            )
+
+            if execution and execution.get("cancel_requested"):
+                return True
+
+            return False
+
+        except Exception as e:
+            logger.error(f"❌ 检查任务停止标记失败: {e}")
+            return False
+
+    async def _update_progress(self, job_id: str, progress: int, message: str):
+        """
+        更新任务进度
+
+        Args:
+            job_id: 任务ID
+            progress: 进度百分比 (0-100)
+            message: 进度消息
+        """
+        try:
+            from app.services.scheduler_service import TaskCancelledException
+            from pymongo import MongoClient
+            from app.core.config import settings
+
+            # 使用同步 PyMongo 客户端（避免事件循环冲突）
+            sync_client = MongoClient(settings.MONGODB_URL)
+            sync_db = sync_client[settings.MONGODB_DB_NAME]
+
+            # 查找最新的 running 记录
+            execution = sync_db.scheduler_executions.find_one(
+                {"job_id": job_id, "status": "running"},
+                sort=[("timestamp", -1)]
+            )
+
+            if not execution:
+                logger.warning(f"⚠️ 未找到任务 {job_id} 的执行记录")
+                sync_client.close()
+                return
+
+            # 检查是否收到取消请求
+            if execution.get("cancel_requested"):
+                sync_client.close()
+                raise TaskCancelledException(f"任务 {job_id} 已被用户取消")
+
+            # 更新进度
+            sync_db.scheduler_executions.update_one(
+                {"_id": execution["_id"]},
+                {
+                    "$set": {
+                        "progress": progress,
+                        "progress_message": message,
+                        "updated_at": datetime.utcnow()
+                    }
+                }
+            )
+
+            sync_client.close()
+            logger.debug(f"📊 任务 {job_id} 进度更新: {progress}% - {message}")
+
+        except Exception as e:
+            if "TaskCancelledException" in str(type(e).__name__):
+                raise
+            logger.error(f"❌ 更新任务进度失败: {e}")
+
 
 # 全局同步服务实例
 _tushare_sync_service = None
@@ -1093,7 +1226,7 @@ async def run_tushare_basic_info_sync(force_update: bool = False):
     """APScheduler任务：同步股票基础信息"""
     try:
         service = await get_tushare_sync_service()
-        result = await service.sync_stock_basic_info(force_update)
+        result = await service.sync_stock_basic_info(force_update, job_id="tushare_basic_info_sync")
         logger.info(f"✅ Tushare基础信息同步完成: {result}")
         return result
     except Exception as e:
@@ -1124,7 +1257,7 @@ async def run_tushare_historical_sync(incremental: bool = True):
     try:
         service = await get_tushare_sync_service()
         logger.info(f"✅ [APScheduler] Tushare 同步服务已初始化")
-        result = await service.sync_historical_data(incremental=incremental)
+        result = await service.sync_historical_data(incremental=incremental, job_id="tushare_historical_sync")
         logger.info(f"✅ [APScheduler] Tushare历史数据同步完成: {result}")
         return result
     except Exception as e:
@@ -1164,7 +1297,8 @@ async def run_tushare_news_sync(hours_back: int = 24, max_news_per_stock: int = 
         service = await get_tushare_sync_service()
         result = await service.sync_news_data(
             hours_back=hours_back,
-            max_news_per_stock=max_news_per_stock
+            max_news_per_stock=max_news_per_stock,
+            job_id="tushare_news_sync"
         )
         logger.info(f"✅ Tushare新闻数据同步完成: {result}")
         return result
