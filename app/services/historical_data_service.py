@@ -28,10 +28,44 @@ class HistoricalDataService:
         try:
             self.db = get_database()
             self.collection = self.db.stock_daily_quotes
+
+            # 🔥 确保索引存在（提升查询和 upsert 性能）
+            await self._ensure_indexes()
+
             logger.info("✅ 历史数据服务初始化成功")
         except Exception as e:
             logger.error(f"❌ 历史数据服务初始化失败: {e}")
             raise
+
+    async def _ensure_indexes(self):
+        """确保必要的索引存在"""
+        try:
+            logger.info("📊 检查并创建历史数据索引...")
+
+            # 1. 复合唯一索引：股票代码+交易日期+数据源+周期（用于 upsert）
+            await self.collection.create_index([
+                ("symbol", 1),
+                ("trade_date", 1),
+                ("data_source", 1),
+                ("period", 1)
+            ], unique=True, name="symbol_date_source_period_unique", background=True)
+
+            # 2. 股票代码索引（查询单只股票的历史数据）
+            await self.collection.create_index([("symbol", 1)], name="symbol_index", background=True)
+
+            # 3. 交易日期索引（按日期范围查询）
+            await self.collection.create_index([("trade_date", -1)], name="trade_date_index", background=True)
+
+            # 4. 复合索引：股票代码+交易日期（常用查询）
+            await self.collection.create_index([
+                ("symbol", 1),
+                ("trade_date", -1)
+            ], name="symbol_date_index", background=True)
+
+            logger.info("✅ 历史数据索引检查完成")
+        except Exception as e:
+            # 索引创建失败不应该阻止服务启动
+            logger.warning(f"⚠️ 创建索引时出现警告（可能已存在）: {e}")
     
     async def save_historical_data(
         self,
@@ -62,8 +96,13 @@ class HistoricalDataService:
                 logger.warning(f"⚠️ {symbol} 历史数据为空，跳过保存")
                 return 0
 
+            from datetime import datetime
+            total_start = datetime.now()
+
             logger.info(f"💾 开始保存 {symbol} 历史数据: {len(data)}条记录 (数据源: {data_source})")
 
+            # ⏱️ 性能监控：单位转换
+            convert_start = datetime.now()
             # 🔥 在 DataFrame 层面做单位转换（向量化操作，比逐行快得多）
             if data_source == "tushare":
                 # 成交额：千元 -> 元
@@ -77,7 +116,10 @@ class HistoricalDataService:
                     data['volume'] = data['volume'] * 100
                 elif 'vol' in data.columns:
                     data['vol'] = data['vol'] * 100
+            convert_duration = (datetime.now() - convert_start).total_seconds()
 
+            # ⏱️ 性能监控：构建操作列表
+            prepare_start = datetime.now()
             # 准备批量操作
             operations = []
             saved_count = 0
@@ -103,11 +145,13 @@ class HistoricalDataService:
                         upsert=True
                     ))
 
-                    # 批量执行（每500条）
+                    # 批量执行（每200条）
                     if len(operations) >= batch_size:
-                        saved_count += await self._execute_bulk_write_with_retry(
-                            symbol, operations
-                        )
+                        batch_write_start = datetime.now()
+                        batch_saved = await self._execute_bulk_write_with_retry(symbol, operations)
+                        batch_write_duration = (datetime.now() - batch_write_start).total_seconds()
+                        logger.debug(f"   批量写入 {len(operations)} 条，耗时 {batch_write_duration:.2f}秒")
+                        saved_count += batch_saved
                         operations = []
 
                 except Exception as e:
@@ -116,13 +160,23 @@ class HistoricalDataService:
                     logger.error(f"❌ 处理记录失败 {symbol} {date_str}: {e}")
                     continue
 
+            prepare_duration = (datetime.now() - prepare_start).total_seconds()
+
+            # ⏱️ 性能监控：最后一批写入
+            final_write_start = datetime.now()
             # 执行剩余操作
             if operations:
                 saved_count += await self._execute_bulk_write_with_retry(
                     symbol, operations
                 )
-            
-            logger.info(f"✅ {symbol} 历史数据保存完成: {saved_count}条记录")
+            final_write_duration = (datetime.now() - final_write_start).total_seconds()
+
+            total_duration = (datetime.now() - total_start).total_seconds()
+            logger.info(
+                f"✅ {symbol} 历史数据保存完成: {saved_count}条记录，"
+                f"总耗时 {total_duration:.2f}秒 "
+                f"(转换: {convert_duration:.3f}秒, 准备: {prepare_duration:.2f}秒, 最后写入: {final_write_duration:.2f}秒)"
+            )
             return saved_count
             
         except Exception as e:

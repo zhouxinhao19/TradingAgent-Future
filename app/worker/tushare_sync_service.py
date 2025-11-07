@@ -657,18 +657,27 @@ class TushareSyncService:
                         f"start={symbol_start_date}, end={end_date}, period={period}"
                     )
 
-                    # 获取历史数据（指定周期）
+                    # ⏱️ 性能监控：API 调用
+                    api_start = datetime.now()
                     df = await self.provider.get_historical_data(symbol, symbol_start_date, end_date, period=period)
+                    api_duration = (datetime.now() - api_start).total_seconds()
 
                     if df is not None and not df.empty:
-                        # 保存到数据库（指定周期）
+                        # ⏱️ 性能监控：数据保存
+                        save_start = datetime.now()
                         records_saved = await self._save_historical_data(symbol, df, period=period)
+                        save_duration = (datetime.now() - save_start).total_seconds()
+
                         stats["success_count"] += 1
                         stats["total_records"] += records_saved
 
                         # 计算单个股票耗时
                         stock_duration = (datetime.now() - stock_start_time).total_seconds()
-                        logger.info(f"✅ {symbol}: 保存 {records_saved} 条{period_name}记录，耗时 {stock_duration:.2f}秒")
+                        logger.info(
+                            f"✅ {symbol}: 保存 {records_saved} 条{period_name}记录，"
+                            f"总耗时 {stock_duration:.2f}秒 "
+                            f"(API: {api_duration:.2f}秒, 保存: {save_duration:.2f}秒)"
+                        )
                     else:
                         stock_duration = (datetime.now() - stock_start_time).total_seconds()
                         logger.warning(
