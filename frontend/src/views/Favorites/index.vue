@@ -502,6 +502,7 @@ import { favoritesApi } from '@/api/favorites'
 import { tagsApi } from '@/api/tags'
 import { stockSyncApi } from '@/api/stockSync'
 import { normalizeMarketForAnalysis } from '@/utils/market'
+import { ApiClient } from '@/api/request'
 
 import type { FavoriteItem } from '@/api/favorites'
 import { useAuthStore } from '@/stores/auth'
@@ -810,9 +811,24 @@ const showAddDialog = () => {
 const fetchStockInfo = async () => {
   if (!addForm.value.stock_code) return
 
-  // 模拟获取股票信息
-  if (addForm.value.stock_code === '000002') {
-    addForm.value.stock_name = '万科A'
+  try {
+    // 🔥 从后台获取股票基础信息
+    const symbol = addForm.value.stock_code.trim()
+    const res = await ApiClient.get(`/api/stock-data/basic-info/${symbol}`)
+
+    if ((res as any)?.success && (res as any)?.data) {
+      const stockInfo = (res as any).data
+      // 自动填充股票名称
+      if (stockInfo.name) {
+        addForm.value.stock_name = stockInfo.name
+        ElMessage.success(`已自动填充股票名称: ${stockInfo.name}`)
+      }
+    } else {
+      ElMessage.warning('未找到该股票信息，请手动输入股票名称')
+    }
+  } catch (error: any) {
+    console.error('获取股票信息失败:', error)
+    ElMessage.warning('获取股票信息失败，请手动输入股票名称')
   }
 }
 
