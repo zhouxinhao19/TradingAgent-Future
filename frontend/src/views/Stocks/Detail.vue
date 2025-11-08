@@ -512,6 +512,7 @@ async function handleSync() {
       sync_realtime: syncForm.syncTypes.includes('realtime'),
       sync_historical: syncForm.syncTypes.includes('historical'),
       sync_financial: syncForm.syncTypes.includes('financial'),
+      sync_basic: syncForm.syncTypes.includes('basic'),
       data_source: syncForm.dataSource,
       days: syncForm.days
     })
