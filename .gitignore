@@ -1,5 +1,14 @@
 # Python环境和缓存
 env/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+.venv/
 __pycache__/
 *.pyc
 *.pyo
@@ -13,10 +22,18 @@ __pycache__/
 .env.*.local
 .env.db
 .env.mongodb*
-frontend
+frontend/dist
+frontend/node_modules
+frontend/.env*
+!frontend/src/**
+!frontend/public/**
+!frontend/index.html
+!frontend/vite.config.*
+!frontend/package*.json
+!frontend/tsconfig*.json
+!frontend/.eslintrc*
+!frontend/.prettier*
 backend
-.venv
-
 
 # 系统文件
 .DS_Store
@@ -24,22 +41,41 @@ Thumbs.db
 
 # 数据文件
 *.csv
-*.json
 *.xlsx
 *.xls
 
+# JSON文件规则
+# 排除运行时数据和敏感配置，但保留代码必需的配置文件
+config/*.json
+!config/*.json.example
+data/**/*.json
+eval_results/**/*.json
+web/data/**/*.json
+web/eval_results/**/*.json
+web/config/*.json
+*.cache.json
+*_cache.json
+hk_stock_cache.json
+
+# 保留前端必需的JSON文件（已在前面的规则中处理）
+# !frontend/package*.json
+# !frontend/tsconfig*.json
+# !frontend/public/*.json
+
 # 项目特定目录
-src/
+# 注意：排除规则必须在忽略规则之前
 eval_results/
 eval_data/
 results/
 logs/
 temp/
+# 忽略根目录的 src/，但不影响 frontend/src/
+/src/
 
 # 数据缓存目录 (不纳入版本控制)
-cache/
+# 注意：不要忽略 tradingagents/dataflows/cache/ 目录（这是代码模块）
+/cache/
 data/
-data_backup_*/
 web/data/
 dataflows/data_cache/
 tradingagents/dataflows/data_cache/
@@ -48,7 +84,12 @@ enhanced_analysis_reports/
 web/finnhub_data/
 web/results/
 web/eval_results/
-docs/v1.0.0-preview/
+
+# 运行时数据和配置 (不纳入版本控制)
+runtime/
+
+# 第三方软件和依赖 (不纳入版本控制)
+vendors/
 
 # 股票数据缓存文件 (不纳入版本控制)
 *_stock_data_*.txt
@@ -77,6 +118,9 @@ site/
 # 贡献相关文档 (不纳入版本控制)
 docs/contribution/
 
+# 版本预览文档 (不纳入版本控制)
+docs/v1.0.0-preview/
+
 # AI工具目录 (不纳入版本控制)
 .trae/
 .augment/
@@ -92,8 +136,6 @@ tradingagents.egg-info/
 .vscode/settings.json
 # 日志文件
 *.log
-
-*.tar
 
 # 过时的版本文档
 *_PREVIEW_README.md
@@ -126,3 +168,90 @@ COMMIT_SUMMARY.md
 *.temp
 *.pyc.*
 *.pyo.*
+
+# ----- Repository hygiene additions (v1.0.0-preview) -----
+# Node/TS build artifacts
+node_modules/
+*.tsbuildinfo
+frontend/.vite
+
+# Installers and archives
+*.msi
+*.msix
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.tgz
+*.xz
+*.archive
+*.bak
+*.old
+
+# Build outputs
+/dist/
+build/
+/build/
+**/build/
+frontend/dist/
+frontend/build/
+app/build/
+
+# Logs and runtime artifacts
+*.log*
+*.pid
+*.pid.lock
+
+# Local OS thumbnails
+ehthumbs.db
+
+
+# Historical backup snapshots (do not track)
+data_backup_*/
+backups/
+config/backup/
+
+tradingagents/dataflows/cache/data_cache/metadata/
+
+frontend/.eslintrc-auto-import.json
+
+
+frontend/components.d.ts
+
+# ----- Portable Release Build (v1.0.0-preview) -----
+# Release build directory
+release/
+
+# Temporary test scripts
+test_mongodb_connection.py
+test_mongodb_fix.py
+verify_database_fix.py
+setup_mongodb_user.py
+
+# Local service scripts
+start_local_services.bat
+stop_local_services.bat
+
+# Local Nginx configuration
+nginx/local.nginx.conf
+
+# Frontend auto-generated files
+frontend/.eslintrc-auto-import.json
+frontend/auto-imports.d.ts
+frontend/tsconfig.tsbuildinfo
+
+# Package lock files (use yarn.lock only)
+frontend/package-lock.json
+
+# Deprecated deployment scripts (old versions)
+scripts/deployment/assemble_portable_release.ps1
+scripts/deployment/assemble_portable_release_fixed.ps1
+scripts/deployment/build_portable_release.ps1
+scripts/deployment/package_with_7zip.ps1
+scripts/deployment/quick_sync_and_build.ps1
+scripts/deployment/stage_local_vendors.ps1
+
+# Temporary scripts
+scripts/test_time_serialization.py
+scripts/create_mongodb_admin.py
