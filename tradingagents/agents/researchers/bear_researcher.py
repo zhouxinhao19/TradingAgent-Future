@@ -49,7 +49,7 @@ def create_bear_researcher(llm, memory):
                             logger.error(f"❌ [空头研究员] 降级方案也失败: {e}")
                 elif market_info_dict['is_hk']:
                     try:
-                        from tradingagents.dataflows.improved_hk_utils import get_hk_company_name_improved
+                        from tradingagents.dataflows.providers.hk.improved_hk import get_hk_company_name_improved
                         name = get_hk_company_name_improved(ticker_code)
                         return name
                     except Exception:

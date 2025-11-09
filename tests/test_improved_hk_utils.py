@@ -16,7 +16,7 @@ def test_improved_hk_provider():
     print("=" * 80)
     
     try:
-        from tradingagents.dataflows.improved_hk_utils import get_improved_hk_provider
+        from tradingagents.dataflows.providers.hk.improved_hk import get_improved_hk_provider
         
         provider = get_improved_hk_provider()
         print("✅ 改进港股提供器初始化成功")
@@ -103,7 +103,7 @@ def test_cache_functionality():
     print("=" * 80)
     
     try:
-        from tradingagents.dataflows.improved_hk_utils import get_improved_hk_provider
+        from tradingagents.dataflows.providers.hk.improved_hk import get_improved_hk_provider
         import time
         
         provider = get_improved_hk_provider()
