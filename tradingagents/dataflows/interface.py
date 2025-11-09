@@ -1595,6 +1595,31 @@ def get_hk_stock_data_unified(symbol: str, start_date: str = None, end_date: str
     try:
         logger.info(f"🇭🇰 获取港股数据: {symbol}")
 
+        # 🔧 智能日期范围处理：自动扩展到配置的回溯天数，处理周末/节假日
+        from tradingagents.utils.dataflow_utils import get_trading_date_range
+        from app.core.config import get_settings
+
+        original_start_date = start_date
+        original_end_date = end_date
+
+        # 从配置获取市场分析回溯天数（默认60天）
+        try:
+            settings = get_settings()
+            lookback_days = settings.MARKET_ANALYST_LOOKBACK_DAYS
+            logger.info(f"📅 [港股配置验证] MARKET_ANALYST_LOOKBACK_DAYS: {lookback_days}天")
+        except Exception as e:
+            lookback_days = 60  # 默认60天
+            logger.warning(f"⚠️ [港股配置验证] 无法获取配置，使用默认值: {lookback_days}天")
+            logger.warning(f"⚠️ [港股配置验证] 错误详情: {e}")
+
+        # 使用 end_date 作为目标日期，向前回溯指定天数
+        start_date, end_date = get_trading_date_range(end_date, lookback_days=lookback_days)
+
+        logger.info(f"📅 [港股智能日期] 原始输入: {original_start_date} 至 {original_end_date}")
+        logger.info(f"📅 [港股智能日期] 回溯天数: {lookback_days}天")
+        logger.info(f"📅 [港股智能日期] 计算结果: {start_date} 至 {end_date}")
+        logger.info(f"📅 [港股智能日期] 实际天数: {(datetime.strptime(end_date, '%Y-%m-%d') - datetime.strptime(start_date, '%Y-%m-%d')).days}天")
+
         # 🔥 从数据库读取用户启用的数据源配置
         enabled_sources = _get_enabled_hk_data_sources()
 
