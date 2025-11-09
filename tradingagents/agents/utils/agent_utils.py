@@ -966,8 +966,8 @@ class Toolkit:
 - 或使用其他数据源
 - 检查股票代码格式是否正确
 """
-                            result_data.append(fallback_info)
-                            logger.error(f"❌ [统一基本面工具] 港股所有数据源都失败: {e2}")
+                        result_data.append(fallback_info)
+                        logger.error(f"❌ [统一基本面工具] 港股所有数据源都失败: {e2}")
 
             else:
                 # 美股：使用OpenAI/Finnhub数据源

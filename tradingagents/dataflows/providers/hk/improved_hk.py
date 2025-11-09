@@ -132,10 +132,22 @@ class ImprovedHKStockProvider:
         """检查缓存是否有效"""
         if key not in self.cache:
             return False
-        
+
         cache_time = self.cache[key].get('timestamp', 0)
         return (time.time() - cache_time) < self.cache_ttl
-    
+
+    def _rate_limit(self):
+        """速率限制：确保两次请求之间有足够的间隔"""
+        current_time = time.time()
+        time_since_last_request = current_time - self.last_request_time
+
+        if time_since_last_request < self.rate_limit_wait:
+            wait_time = self.rate_limit_wait - time_since_last_request
+            logger.debug(f"⏱️ [速率限制] 等待 {wait_time:.2f} 秒")
+            time.sleep(wait_time)
+
+        self.last_request_time = time.time()
+
     def _normalize_hk_symbol(self, symbol: str) -> str:
         """标准化港股代码"""
         # 移除.HK后缀
@@ -278,19 +290,115 @@ class ImprovedHKStockProvider:
             clean_symbol = self._normalize_hk_symbol(symbol)
             return f"港股{clean_symbol}"
     
+    def get_financial_indicators(self, symbol: str) -> Dict[str, Any]:
+        """
+        获取港股财务指标
+
+        使用 AKShare 的 stock_financial_hk_analysis_indicator_em 接口
+        获取主要财务指标，包括 EPS、BPS、ROE、ROA 等
+
+        Args:
+            symbol: 港股代码
+
+        Returns:
+            Dict: 财务指标数据
+        """
+        try:
+            import akshare as ak
+
+            # 标准化代码
+            normalized_symbol = self._normalize_hk_symbol(symbol)
+
+            # 检查缓存
+            cache_key = f"financial_{normalized_symbol}"
+            if self._is_cache_valid(cache_key):
+                logger.debug(f"📊 [港股财务指标] 使用缓存: {normalized_symbol}")
+                return self.cache[cache_key]['data']
+
+            # 速率限制
+            self._rate_limit()
+
+            logger.info(f"📊 [港股财务指标] 获取财务指标: {normalized_symbol}")
+
+            # 调用 AKShare 接口
+            df = ak.stock_financial_hk_analysis_indicator_em(symbol=normalized_symbol)
+
+            if df is None or df.empty:
+                logger.warning(f"⚠️ [港股财务指标] 未获取到数据: {normalized_symbol}")
+                return {}
+
+            # 获取最新一期数据
+            latest = df.iloc[0]
+
+            # 提取关键指标
+            indicators = {
+                # 基本信息
+                'report_date': str(latest.get('REPORT_DATE', '')),
+                'fiscal_year': str(latest.get('FISCAL_YEAR', '')),
+
+                # 每股指标
+                'eps_basic': float(latest.get('BASIC_EPS', 0)) if pd.notna(latest.get('BASIC_EPS')) else None,
+                'eps_diluted': float(latest.get('DILUTED_EPS', 0)) if pd.notna(latest.get('DILUTED_EPS')) else None,
+                'eps_ttm': float(latest.get('EPS_TTM', 0)) if pd.notna(latest.get('EPS_TTM')) else None,
+                'bps': float(latest.get('BPS', 0)) if pd.notna(latest.get('BPS')) else None,
+                'per_netcash_operate': float(latest.get('PER_NETCASH_OPERATE', 0)) if pd.notna(latest.get('PER_NETCASH_OPERATE')) else None,
+
+                # 盈利能力指标
+                'roe_avg': float(latest.get('ROE_AVG', 0)) if pd.notna(latest.get('ROE_AVG')) else None,
+                'roe_yearly': float(latest.get('ROE_YEARLY', 0)) if pd.notna(latest.get('ROE_YEARLY')) else None,
+                'roa': float(latest.get('ROA', 0)) if pd.notna(latest.get('ROA')) else None,
+                'roic_yearly': float(latest.get('ROIC_YEARLY', 0)) if pd.notna(latest.get('ROIC_YEARLY')) else None,
+                'net_profit_ratio': float(latest.get('NET_PROFIT_RATIO', 0)) if pd.notna(latest.get('NET_PROFIT_RATIO')) else None,
+                'gross_profit_ratio': float(latest.get('GROSS_PROFIT_RATIO', 0)) if pd.notna(latest.get('GROSS_PROFIT_RATIO')) else None,
+
+                # 营收指标
+                'operate_income': float(latest.get('OPERATE_INCOME', 0)) if pd.notna(latest.get('OPERATE_INCOME')) else None,
+                'operate_income_yoy': float(latest.get('OPERATE_INCOME_YOY', 0)) if pd.notna(latest.get('OPERATE_INCOME_YOY')) else None,
+                'operate_income_qoq': float(latest.get('OPERATE_INCOME_QOQ', 0)) if pd.notna(latest.get('OPERATE_INCOME_QOQ')) else None,
+                'gross_profit': float(latest.get('GROSS_PROFIT', 0)) if pd.notna(latest.get('GROSS_PROFIT')) else None,
+                'gross_profit_yoy': float(latest.get('GROSS_PROFIT_YOY', 0)) if pd.notna(latest.get('GROSS_PROFIT_YOY')) else None,
+                'holder_profit': float(latest.get('HOLDER_PROFIT', 0)) if pd.notna(latest.get('HOLDER_PROFIT')) else None,
+                'holder_profit_yoy': float(latest.get('HOLDER_PROFIT_YOY', 0)) if pd.notna(latest.get('HOLDER_PROFIT_YOY')) else None,
+
+                # 偿债能力指标
+                'debt_asset_ratio': float(latest.get('DEBT_ASSET_RATIO', 0)) if pd.notna(latest.get('DEBT_ASSET_RATIO')) else None,
+                'current_ratio': float(latest.get('CURRENT_RATIO', 0)) if pd.notna(latest.get('CURRENT_RATIO')) else None,
+
+                # 现金流指标
+                'ocf_sales': float(latest.get('OCF_SALES', 0)) if pd.notna(latest.get('OCF_SALES')) else None,
+
+                # 数据源
+                'source': 'akshare_eastmoney',
+                'data_count': len(df)
+            }
+
+            # 缓存数据
+            self.cache[cache_key] = {
+                'data': indicators,
+                'timestamp': time.time()
+            }
+            self._save_cache()
+
+            logger.info(f"✅ [港股财务指标] 成功获取: {normalized_symbol}, 报告期: {indicators['report_date']}")
+            return indicators
+
+        except Exception as e:
+            logger.error(f"❌ [港股财务指标] 获取失败: {symbol} - {e}")
+            return {}
+
     def get_stock_info(self, symbol: str) -> Dict[str, Any]:
         """
         获取港股基本信息
-        
+
         Args:
             symbol: 港股代码
-            
+
         Returns:
             Dict: 港股信息
         """
         try:
             company_name = self.get_company_name(symbol)
-            
+
             return {
                 'symbol': symbol,
                 'name': company_name,
@@ -353,6 +461,29 @@ def get_hk_stock_info_improved(symbol: str) -> Dict[str, Any]:
     return provider.get_stock_info(symbol)
 
 
+def get_hk_financial_indicators(symbol: str) -> Dict[str, Any]:
+    """
+    获取港股财务指标
+
+    Args:
+        symbol: 港股代码
+
+    Returns:
+        Dict: 财务指标数据，包括：
+            - eps_basic: 基本每股收益
+            - eps_ttm: 滚动每股收益
+            - bps: 每股净资产
+            - roe_avg: 平均净资产收益率
+            - roa: 总资产收益率
+            - operate_income: 营业收入
+            - operate_income_yoy: 营业收入同比增长率
+            - debt_asset_ratio: 资产负债率
+            等
+    """
+    provider = get_improved_hk_provider()
+    return provider.get_financial_indicators(symbol)
+
+
 # 兼容性函数：为了兼容旧的 akshare_utils 导入
 def get_hk_stock_data_akshare(symbol: str, start_date: str = None, end_date: str = None):
     """
@@ -410,8 +541,66 @@ def get_hk_stock_data_akshare(symbol: str, start_date: str = None, end_date: str
         from tradingagents.tools.analysis.indicators import add_all_indicators
         df = add_all_indicators(df, close_col='close', high_col='high', low_col='low')
 
+        # 🔥 获取财务指标并计算 PE、PB
+        financial_indicators = provider.get_financial_indicators(symbol)
+
         # 格式化输出（包含价格数据和技术指标）
         latest = df.iloc[-1]
+        current_price = latest['close']
+
+        # 计算 PE、PB
+        pe_ratio = None
+        pb_ratio = None
+        financial_section = ""
+
+        if financial_indicators:
+            eps_ttm = financial_indicators.get('eps_ttm')
+            bps = financial_indicators.get('bps')
+
+            if eps_ttm and eps_ttm > 0:
+                pe_ratio = current_price / eps_ttm
+
+            if bps and bps > 0:
+                pb_ratio = current_price / bps
+
+            # 构建财务指标部分（处理 None 值）
+            def format_value(value, format_str=".2f", suffix="", default="N/A"):
+                """格式化数值，处理 None 情况"""
+                if value is None:
+                    return default
+                try:
+                    return f"{value:{format_str}}{suffix}"
+                except:
+                    return default
+
+            financial_section = f"""
+### 财务指标（最新报告期：{financial_indicators.get('report_date', 'N/A')}）
+**估值指标**:
+- PE (市盈率): {f'{pe_ratio:.2f}' if pe_ratio else 'N/A'} (当前价 / EPS_TTM)
+- PB (市净率): {f'{pb_ratio:.2f}' if pb_ratio else 'N/A'} (当前价 / BPS)
+
+**每股指标**:
+- 基本每股收益 (EPS): HK${format_value(financial_indicators.get('eps_basic'))}
+- 滚动每股收益 (EPS_TTM): HK${format_value(financial_indicators.get('eps_ttm'))}
+- 每股净资产 (BPS): HK${format_value(financial_indicators.get('bps'))}
+- 每股经营现金流: HK${format_value(financial_indicators.get('per_netcash_operate'))}
+
+**盈利能力**:
+- 净资产收益率 (ROE): {format_value(financial_indicators.get('roe_avg'), suffix='%')}
+- 总资产收益率 (ROA): {format_value(financial_indicators.get('roa'), suffix='%')}
+- 净利率: {format_value(financial_indicators.get('net_profit_ratio'), suffix='%')}
+- 毛利率: {format_value(financial_indicators.get('gross_profit_ratio'), suffix='%')}
+
+**营收情况**:
+- 营业收入: {format_value(financial_indicators.get('operate_income') / 1e8 if financial_indicators.get('operate_income') else None, suffix=' 亿港元')}
+- 营收同比增长: {format_value(financial_indicators.get('operate_income_yoy'), suffix='%')}
+- 归母净利润: {format_value(financial_indicators.get('holder_profit') / 1e8 if financial_indicators.get('holder_profit') else None, suffix=' 亿港元')}
+- 净利润同比增长: {format_value(financial_indicators.get('holder_profit_yoy'), suffix='%')}
+
+**偿债能力**:
+- 资产负债率: {format_value(financial_indicators.get('debt_asset_ratio'), suffix='%')}
+- 流动比率: {format_value(financial_indicators.get('current_ratio'))}
+"""
 
         result = f"""## 港股历史数据 ({symbol})
 **数据源**: AKShare (新浪财经)
@@ -446,7 +635,7 @@ def get_hk_stock_data_akshare(symbol: str, start_date: str = None, end_date: str
 - 上轨: HK${latest['boll_upper']:.2f}
 - 中轨: HK${latest['boll_mid']:.2f}
 - 下轨: HK${latest['boll_lower']:.2f}
-
+{financial_section}
 ### 最近10个交易日价格
 {df[['date', 'open', 'high', 'low', 'close', 'pre_close', 'change', 'pct_change', 'volume']].tail(10).to_string(index=False)}
 

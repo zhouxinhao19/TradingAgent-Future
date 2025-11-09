@@ -1130,6 +1130,8 @@ class OptimizedChinaDataProvider:
                 logger.info(f"📊 [PE计算-第2层] 尝试使用市值/净利润计算")
 
                 net_profit = latest_indicators.get('net_profit')
+
+                # 🔥 关键修复：检查净利润是否为正数（亏损股不计算PE）
                 if net_profit and net_profit > 0:
                     try:
                         # 使用市值/净利润计算PE
@@ -1142,13 +1144,19 @@ class OptimizedChinaDataProvider:
                         else:
                             logger.warning(f"⚠️ [PE计算-第2层失败] 市值无效: {money_cap}，尝试第3层")
 
-                            # 第三层降级：直接使用 latest_indicators 中的 pe 字段
+                            # 第三层降级：直接使用 latest_indicators 中的 pe 字段（仅当为正数时）
                             pe_static = latest_indicators.get('pe')
                             if pe_static is not None and str(pe_static) != 'nan' and pe_static != '--':
                                 try:
-                                    metrics["pe"] = f"{float(pe_static):.1f}倍"
-                                    logger.info(f"✅ [PE计算-第3层成功] 使用静态PE: {metrics['pe']}")
-                                    logger.info(f"   └─ 数据来源: stock_basic_info.pe")
+                                    pe_float = float(pe_static)
+                                    # 🔥 只接受正数的 PE
+                                    if pe_float > 0:
+                                        metrics["pe"] = f"{pe_float:.1f}倍"
+                                        logger.info(f"✅ [PE计算-第3层成功] 使用静态PE: {metrics['pe']}")
+                                        logger.info(f"   └─ 数据来源: stock_basic_info.pe")
+                                    else:
+                                        metrics["pe"] = "N/A"
+                                        logger.info(f"⚠️ [PE计算-第3层跳过] 静态PE为负数或零（亏损股）: {pe_float}")
                                 except (ValueError, TypeError):
                                     metrics["pe"] = "N/A"
                                     logger.error(f"❌ [PE计算-第3层失败] 静态PE格式错误: {pe_static}")
@@ -1158,16 +1166,26 @@ class OptimizedChinaDataProvider:
                     except (ValueError, TypeError, ZeroDivisionError) as e:
                         metrics["pe"] = "N/A"
                         logger.error(f"❌ [PE计算-第2层异常] 计算失败: {e}")
+                elif net_profit and net_profit < 0:
+                    # 🔥 亏损股：PE 设置为 N/A
+                    metrics["pe"] = "N/A"
+                    logger.info(f"⚠️ [PE计算-亏损股] 净利润为负数（{net_profit}万元），PE设置为N/A")
                 else:
                     logger.warning(f"⚠️ [PE计算-第2层跳过] 净利润无效: {net_profit}，尝试第3层")
 
-                    # 第三层降级：直接使用 latest_indicators 中的 pe 字段
+                    # 第三层降级：直接使用 latest_indicators 中的 pe 字段（仅当为正数时）
                     pe_static = latest_indicators.get('pe')
                     if pe_static is not None and str(pe_static) != 'nan' and pe_static != '--':
                         try:
-                            metrics["pe"] = f"{float(pe_static):.1f}倍"
-                            logger.info(f"✅ [PE计算-第3层成功] 使用静态PE: {metrics['pe']}")
-                            logger.info(f"   └─ 数据来源: stock_basic_info.pe")
+                            pe_float = float(pe_static)
+                            # 🔥 只接受正数的 PE
+                            if pe_float > 0:
+                                metrics["pe"] = f"{pe_float:.1f}倍"
+                                logger.info(f"✅ [PE计算-第3层成功] 使用静态PE: {metrics['pe']}")
+                                logger.info(f"   └─ 数据来源: stock_basic_info.pe")
+                            else:
+                                metrics["pe"] = "N/A"
+                                logger.info(f"⚠️ [PE计算-第3层跳过] 静态PE为负数或零（亏损股）: {pe_float}")
                         except (ValueError, TypeError):
                             metrics["pe"] = "N/A"
                             logger.error(f"❌ [PE计算-第3层失败] 静态PE格式错误: {pe_static}")
@@ -1181,9 +1199,15 @@ class OptimizedChinaDataProvider:
                 pe_ttm_static = latest_indicators.get('pe_ttm')
                 if pe_ttm_static is not None and str(pe_ttm_static) != 'nan' and pe_ttm_static != '--':
                     try:
-                        metrics["pe_ttm"] = f"{float(pe_ttm_static):.1f}倍"
-                        logger.info(f"✅ [PE_TTM计算-第2层成功] 使用静态PE_TTM: {metrics['pe_ttm']}")
-                        logger.info(f"   └─ 数据来源: stock_basic_info.pe_ttm")
+                        pe_ttm_float = float(pe_ttm_static)
+                        # 🔥 只接受正数的 PE_TTM（亏损股不显示PE_TTM）
+                        if pe_ttm_float > 0:
+                            metrics["pe_ttm"] = f"{pe_ttm_float:.1f}倍"
+                            logger.info(f"✅ [PE_TTM计算-第2层成功] 使用静态PE_TTM: {metrics['pe_ttm']}")
+                            logger.info(f"   └─ 数据来源: stock_basic_info.pe_ttm")
+                        else:
+                            metrics["pe_ttm"] = "N/A"
+                            logger.info(f"⚠️ [PE_TTM计算-第2层跳过] 静态PE_TTM为负数或零（亏损股）: {pe_ttm_float}")
                     except (ValueError, TypeError):
                         metrics["pe_ttm"] = "N/A"
                         logger.error(f"❌ [PE_TTM计算-第2层失败] 静态PE_TTM格式错误: {pe_ttm_static}")
