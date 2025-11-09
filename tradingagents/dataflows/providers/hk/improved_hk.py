@@ -211,25 +211,27 @@ class ImprovedHKStockProvider:
 
                     # 尝试获取港股实时行情（包含名称）
                     try:
-                        df = ak.stock_hk_spot_em()
+                        # 使用新浪财经接口（更稳定）
+                        df = ak.stock_hk_spot()
                         if df is not None and not df.empty:
                             # 查找匹配的股票
                             matched = df[df['代码'] == normalized_symbol]
                             if not matched.empty:
-                                akshare_name = matched.iloc[0]['名称']
+                                # 新浪接口返回的列名是 '中文名称'
+                                akshare_name = matched.iloc[0]['中文名称']
                                 if akshare_name and not str(akshare_name).startswith('港股'):
                                     # 缓存AKShare结果
                                     self.cache[cache_key] = {
                                         'data': akshare_name,
                                         'timestamp': time.time(),
-                                        'source': 'akshare_api'
+                                        'source': 'akshare_sina'
                                     }
                                     self._save_cache()
 
-                                    logger.debug(f"📊 [港股AKShare] 获取公司名称: {symbol} -> {akshare_name}")
+                                    logger.debug(f"📊 [港股AKShare-新浪] 获取公司名称: {symbol} -> {akshare_name}")
                                     return akshare_name
                     except Exception as e:
-                        logger.debug(f"📊 [港股AKShare] 获取实时行情失败: {e}")
+                        logger.debug(f"📊 [港股AKShare-新浪] 获取实时行情失败: {e}")
 
                 except Exception as e:
                     logger.debug(f"📊 [港股AKShare] AKShare获取失败: {e}")
@@ -386,21 +388,22 @@ def get_hk_stock_info_akshare(symbol: str) -> Dict[str, Any]:
 
         # 尝试从 akshare 获取实时行情
         try:
-            df = ak.stock_hk_spot_em()
+            # 使用新浪财经接口（更稳定）
+            df = ak.stock_hk_spot()
             if df is not None and not df.empty:
                 matched = df[df['代码'] == normalized_symbol]
                 if not matched.empty:
                     row = matched.iloc[0]
                     return {
                         'symbol': symbol,
-                        'name': row['名称'],
+                        'name': row['中文名称'],  # 新浪接口的列名
                         'currency': 'HKD',
                         'exchange': 'HKG',
                         'market': '港股',
-                        'source': 'akshare'
+                        'source': 'akshare_sina'
                     }
         except Exception as e:
-            logger.debug(f"📊 [港股AKShare] 获取失败: {e}")
+            logger.debug(f"📊 [港股AKShare-新浪] 获取失败: {e}")
 
         # 如果失败，返回基本信息
         return {
@@ -413,7 +416,7 @@ def get_hk_stock_info_akshare(symbol: str) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        logger.error(f"❌ [港股AKShare] 获取信息失败: {e}")
+        logger.error(f"❌ [港股AKShare-新浪] 获取信息失败: {e}")
         return {
             'symbol': symbol,
             'name': f'港股{symbol}',

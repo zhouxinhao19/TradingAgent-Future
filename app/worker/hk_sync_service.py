@@ -81,7 +81,8 @@ class HKDataService:
             logger.info("🔄 从 AKShare 获取港股列表...")
 
             # 获取所有港股实时行情（包含代码和名称）
-            df = ak.stock_hk_spot_em()
+            # 使用新浪财经接口（更稳定）
+            df = ak.stock_hk_spot()
 
             if df is None or df.empty:
                 logger.warning("⚠️ AKShare 返回空数据，使用备用列表")
@@ -248,7 +249,8 @@ class HKDataService:
             logger.info("🇭🇰 开始批量同步港股基础信息 (数据源: akshare)")
 
             # 获取所有港股实时行情（包含代码、名称等基础信息）
-            df = ak.stock_hk_spot_em()
+            # 使用新浪财经接口（更稳定）
+            df = ak.stock_hk_spot()
 
             if df is None or df.empty:
                 logger.error("❌ AKShare 返回空数据")
@@ -263,7 +265,8 @@ class HKDataService:
                 try:
                     # 提取股票代码和名称
                     stock_code = str(row.get('代码', '')).strip()
-                    stock_name = str(row.get('名称', '')).strip()
+                    # 新浪接口的列名是 '中文名称'
+                    stock_name = str(row.get('中文名称', '')).strip()
 
                     if not stock_code or not stock_name:
                         failed_count += 1
