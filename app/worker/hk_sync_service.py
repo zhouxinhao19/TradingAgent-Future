@@ -147,6 +147,11 @@ class HKSyncService:
         Returns:
             Dict: 同步统计信息 {updated: int, inserted: int, failed: int}
         """
+        # AKShare 数据源使用批量同步
+        if source == "akshare":
+            return await self._sync_basic_info_from_akshare_batch(force_update)
+
+        # yfinance 数据源使用逐个同步
         provider = self.providers.get(source)
         if not provider:
             logger.error(f"❌ 不支持的数据源: {source}")
@@ -174,18 +179,18 @@ class HKSyncService:
             try:
                 # 从数据源获取数据
                 stock_info = provider.get_stock_info(stock_code)
-                
+
                 if not stock_info or not stock_info.get('name'):
                     logger.warning(f"⚠️ 跳过无效数据: {stock_code}")
                     failed_count += 1
                     continue
-                
+
                 # 标准化数据格式
                 normalized_info = self._normalize_stock_info(stock_info, source)
                 normalized_info["code"] = stock_code.lstrip('0').zfill(5)  # 标准化为5位代码
                 normalized_info["source"] = source
                 normalized_info["updated_at"] = datetime.now()
-                
+
                 # 批量更新操作
                 operations.append(
                     UpdateOne(
@@ -194,22 +199,22 @@ class HKSyncService:
                         upsert=True
                     )
                 )
-                
+
                 logger.debug(f"✅ 准备同步: {stock_code} ({stock_info.get('name')}) from {source}")
-                
+
             except Exception as e:
                 logger.error(f"❌ 同步失败: {stock_code} from {source}: {e}")
                 failed_count += 1
-        
+
         # 执行批量操作
         result = {"updated": 0, "inserted": 0, "failed": failed_count}
-        
+
         if operations:
             try:
                 bulk_result = await self.db.stock_basic_info_hk.bulk_write(operations)
                 result["updated"] = bulk_result.modified_count
                 result["inserted"] = bulk_result.upserted_count
-                
+
                 logger.info(
                     f"✅ 港股基础信息同步完成 ({source}): "
                     f"更新 {result['updated']} 条, "
@@ -219,9 +224,114 @@ class HKSyncService:
             except Exception as e:
                 logger.error(f"❌ 批量写入失败: {e}")
                 result["failed"] += len(operations)
-        
+
         return result
-    
+
+    async def _sync_basic_info_from_akshare_batch(self, force_update: bool = False) -> Dict[str, int]:
+        """
+        从 AKShare 批量同步港股基础信息（一次 API 调用获取所有数据）
+
+        Args:
+            force_update: 是否强制更新（强制刷新数据）
+
+        Returns:
+            Dict: 同步统计信息 {updated: int, inserted: int, failed: int}
+        """
+        try:
+            import akshare as ak
+            from datetime import datetime
+
+            logger.info("🇭🇰 开始批量同步港股基础信息 (数据源: akshare)")
+
+            # 获取所有港股实时行情（包含代码、名称等基础信息）
+            df = ak.stock_hk_spot_em()
+
+            if df is None or df.empty:
+                logger.error("❌ AKShare 返回空数据")
+                return {"updated": 0, "inserted": 0, "failed": 0}
+
+            logger.info(f"📊 获取到 {len(df)} 只港股数据")
+
+            operations = []
+            failed_count = 0
+
+            for _, row in df.iterrows():
+                try:
+                    # 提取股票代码和名称
+                    stock_code = str(row.get('代码', '')).strip()
+                    stock_name = str(row.get('名称', '')).strip()
+
+                    if not stock_code or not stock_name:
+                        failed_count += 1
+                        continue
+
+                    # 标准化代码格式（确保是5位数字）
+                    normalized_code = stock_code.lstrip('0').zfill(5)
+
+                    # 构建基础信息
+                    stock_info = {
+                        "code": normalized_code,
+                        "name": stock_name,
+                        "currency": "HKD",
+                        "exchange": "HKG",
+                        "market": "香港交易所",
+                        "area": "香港",
+                        "source": "akshare",
+                        "updated_at": datetime.now()
+                    }
+
+                    # 可选字段：提取行情数据中的其他信息
+                    if '最新价' in row and row['最新价']:
+                        stock_info["latest_price"] = float(row['最新价'])
+
+                    if '涨跌幅' in row and row['涨跌幅']:
+                        stock_info["change_percent"] = float(row['涨跌幅'])
+
+                    if '总市值' in row and row['总市值']:
+                        # 转换为亿港币
+                        stock_info["total_mv"] = float(row['总市值']) / 100000000
+
+                    if '市盈率' in row and row['市盈率']:
+                        stock_info["pe"] = float(row['市盈率'])
+
+                    # 批量更新操作
+                    operations.append(
+                        UpdateOne(
+                            {"code": normalized_code, "source": "akshare"},
+                            {"$set": stock_info},
+                            upsert=True
+                        )
+                    )
+
+                except Exception as e:
+                    logger.debug(f"⚠️ 处理股票数据失败: {stock_code}: {e}")
+                    failed_count += 1
+
+            # 执行批量操作
+            result = {"updated": 0, "inserted": 0, "failed": failed_count}
+
+            if operations:
+                try:
+                    bulk_result = await self.db.stock_basic_info_hk.bulk_write(operations)
+                    result["updated"] = bulk_result.modified_count
+                    result["inserted"] = bulk_result.upserted_count
+
+                    logger.info(
+                        f"✅ 港股基础信息批量同步完成 (akshare): "
+                        f"更新 {result['updated']} 条, "
+                        f"插入 {result['inserted']} 条, "
+                        f"失败 {result['failed']} 条"
+                    )
+                except Exception as e:
+                    logger.error(f"❌ 批量写入失败: {e}")
+                    result["failed"] += len(operations)
+
+            return result
+
+        except Exception as e:
+            logger.error(f"❌ AKShare 批量同步失败: {e}")
+            return {"updated": 0, "inserted": 0, "failed": 0}
+
     def _normalize_stock_info(self, stock_info: Dict, source: str) -> Dict:
         """
         标准化股票信息格式
