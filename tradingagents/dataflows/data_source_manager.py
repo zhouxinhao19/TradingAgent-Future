@@ -1565,9 +1565,8 @@ class DataSourceManager:
 
                 # 根据数据源类型获取股票信息
                 if source == ChinaDataSource.TUSHARE:
-                    from .interface import get_china_stock_info_tushare
-                    info_str = get_china_stock_info_tushare(symbol)
-                    result = self._parse_stock_info_string(info_str, symbol)
+                    # 🔥 直接调用 Tushare 适配器，避免循环调用
+                    result = self._get_tushare_stock_info(symbol)
                 elif source == ChinaDataSource.AKSHARE:
                     result = self._get_akshare_stock_info(symbol)
                 elif source == ChinaDataSource.BAOSTOCK:
