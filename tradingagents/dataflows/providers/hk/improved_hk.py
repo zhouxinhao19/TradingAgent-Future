@@ -7,6 +7,7 @@
 import time
 import json
 import os
+import pandas as pd
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 
@@ -355,7 +356,7 @@ def get_hk_stock_info_improved(symbol: str) -> Dict[str, Any]:
 # 兼容性函数：为了兼容旧的 akshare_utils 导入
 def get_hk_stock_data_akshare(symbol: str, start_date: str = None, end_date: str = None):
     """
-    兼容性函数：使用改进的港股提供器获取数据
+    兼容性函数：使用 AKShare 新浪财经接口获取港股历史数据
 
     Args:
         symbol: 港股代码
@@ -363,10 +364,62 @@ def get_hk_stock_data_akshare(symbol: str, start_date: str = None, end_date: str
         end_date: 结束日期
 
     Returns:
-        港股数据
+        港股数据（格式化字符串）
     """
-    from .hk_stock import get_hk_stock_data
-    return get_hk_stock_data(symbol, start_date, end_date)
+    try:
+        import akshare as ak
+        from datetime import datetime, timedelta
+
+        # 标准化代码
+        provider = get_improved_hk_provider()
+        normalized_symbol = provider._normalize_hk_symbol(symbol)
+
+        # 设置默认日期
+        if not end_date:
+            end_date = datetime.now().strftime('%Y-%m-%d')
+        if not start_date:
+            start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+
+        logger.info(f"🔄 [AKShare-新浪] 获取港股历史数据: {symbol} ({start_date} ~ {end_date})")
+
+        # 使用新浪财经接口获取历史数据
+        df = ak.stock_hk_daily(symbol=normalized_symbol, adjust="qfq")
+
+        if df is None or df.empty:
+            logger.warning(f"⚠️ [AKShare-新浪] 返回空数据: {symbol}")
+            return f"❌ 无法获取港股{symbol}的历史数据"
+
+        # 过滤日期范围
+        df['date'] = pd.to_datetime(df['date'])
+        mask = (df['date'] >= start_date) & (df['date'] <= end_date)
+        df = df.loc[mask]
+
+        if df.empty:
+            logger.warning(f"⚠️ [AKShare-新浪] 日期范围内无数据: {symbol}")
+            return f"❌ 港股{symbol}在指定日期范围内无数据"
+
+        # 格式化输出
+        result = f"""## 港股历史数据 ({symbol})
+**数据源**: AKShare (新浪财经)
+**日期范围**: {start_date} ~ {end_date}
+**数据条数**: {len(df)} 条
+
+### 最近10个交易日
+{df.tail(10).to_string(index=False)}
+
+### 数据统计
+- 最高价: {df['high'].max():.2f}
+- 最低价: {df['low'].min():.2f}
+- 平均收盘价: {df['close'].mean():.2f}
+- 总成交量: {df['volume'].sum():,.0f}
+"""
+
+        logger.info(f"✅ [AKShare-新浪] 港股历史数据获取成功: {symbol} ({len(df)}条)")
+        return result
+
+    except Exception as e:
+        logger.error(f"❌ [AKShare-新浪] 港股历史数据获取失败: {symbol} - {e}")
+        return f"❌ 港股{symbol}历史数据获取失败: {str(e)}"
 
 
 def get_hk_stock_info_akshare(symbol: str) -> Dict[str, Any]:
