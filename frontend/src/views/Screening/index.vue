@@ -43,10 +43,8 @@
           <!-- 基础信息 -->
           <el-col :span="8">
             <el-form-item label="市场类型">
-              <el-select v-model="filters.market" placeholder="选择市场">
+              <el-select v-model="filters.market" placeholder="选择市场" disabled>
                 <el-option label="A股" value="A股" />
-                <el-option label="美股" value="美股" />
-                <el-option label="港股" value="港股" />
               </el-select>
             </el-form-item>
           </el-col>
