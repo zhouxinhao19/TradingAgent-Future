@@ -904,12 +904,29 @@ class Toolkit:
 
                 # 根据数据深度调整获取策略
                 if data_depth in ["basic", "standard"]:
-                    # 基础和标准级别：只获取基础港股信息
+                    # 基础和标准级别：获取基础信息 + 当前价格
                     try:
                         from tradingagents.dataflows.interface import get_hk_stock_info_unified
                         hk_info = get_hk_stock_info_unified(ticker)
 
-                        basic_info = f"""## 港股基础信息
+                        # 🔥 获取最近几天的价格数据（用于基本面分析）
+                        try:
+                            from tradingagents.dataflows.interface import get_hk_stock_data_unified
+                            from datetime import datetime, timedelta
+
+                            # 获取最近10天数据（确保能获取到最新价格）
+                            recent_end_date = curr_date
+                            recent_start_date = (datetime.strptime(curr_date, '%Y-%m-%d') - timedelta(days=10)).strftime('%Y-%m-%d')
+
+                            logger.info(f"🔍 [港股基本面] 获取最近价格数据: {recent_start_date} ~ {recent_end_date}")
+                            hk_price_data = get_hk_stock_data_unified(ticker, recent_start_date, recent_end_date)
+
+                            # 🔍 调试：打印返回数据的前500字符
+                            logger.info(f"🔍 [基本面工具调试] 港股价格数据返回长度: {len(hk_price_data)}")
+                            logger.info(f"🔍 [基本面工具调试] 港股价格数据前500字符:\n{hk_price_data[:500]}")
+
+                            # 组合基础信息和价格数据
+                            combined_info = f"""## 港股基础信息
 
 **股票代码**: {ticker}
 **股票名称**: {hk_info.get('name', f'港股{ticker}')}
@@ -917,14 +934,39 @@ class Toolkit:
 **交易所**: 香港交易所 (HKG)
 **数据源**: {hk_info.get('source', '基础信息')}
 
+## 港股当前价格信息
+{hk_price_data}
+
 **基本面分析建议**：
 - 建议查看公司最新财报
 - 关注港股市场整体走势
 - 考虑汇率因素对投资的影响
 """
-                        result_data.append(basic_info)
-                        hk_data_success = True
-                        logger.info(f"✅ [统一基本面工具] 港股基础信息成功")
+                            result_data.append(combined_info)
+                            hk_data_success = True
+                            logger.info(f"✅ [统一基本面工具] 港股基础信息+价格数据成功")
+
+                        except Exception as price_error:
+                            logger.error(f"⚠️ [统一基本面工具] 港股价格数据获取失败: {price_error}")
+                            # 如果价格数据获取失败，至少返回基础信息
+                            basic_info = f"""## 港股基础信息
+
+**股票代码**: {ticker}
+**股票名称**: {hk_info.get('name', f'港股{ticker}')}
+**交易货币**: 港币 (HK$)
+**交易所**: 香港交易所 (HKG)
+**数据源**: {hk_info.get('source', '基础信息')}
+
+⚠️ 注意：当前价格数据暂时无法获取: {str(price_error)}
+
+**基本面分析建议**：
+- 建议查看公司最新财报
+- 关注港股市场整体走势
+- 考虑汇率因素对投资的影响
+"""
+                            result_data.append(basic_info)
+                            hk_data_success = True
+                            logger.info(f"✅ [统一基本面工具] 港股基础信息成功（无价格数据）")
 
                     except Exception as e:
                         logger.error(f"⚠️ [统一基本面工具] 港股基础信息失败: {e}")
