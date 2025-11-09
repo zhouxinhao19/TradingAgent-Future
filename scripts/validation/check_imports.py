@@ -60,7 +60,9 @@ class ImportChecker:
                     for alias in node.names:
                         imports.append((alias.name, node.lineno, 'import'))
                 elif isinstance(node, ast.ImportFrom):
-                    if node.module:
+                    # 跳过相对导入（如 from .module import ...）
+                    # node.level > 0 表示相对导入（. 或 .. 等）
+                    if node.module and node.level == 0:
                         imports.append((node.module, node.lineno, 'from'))
         
         except SyntaxError as e:

@@ -25,7 +25,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from tradingagents.dataflows.providers.us.us_stock import USStockProvider
+from tradingagents.dataflows.providers.us.optimized import OptimizedUSDataProvider
 from app.core.database import get_mongo_db
 from app.core.config import settings
 
@@ -41,7 +41,7 @@ class USDataService:
 
         # 数据提供器映射
         self.providers = {
-            "yfinance": USStockProvider(),
+            "yfinance": OptimizedUSDataProvider(),
             # 可以添加更多数据源，如 finnhub
         }
         
