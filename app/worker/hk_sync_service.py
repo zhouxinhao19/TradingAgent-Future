@@ -10,7 +10,7 @@
 4. 使用 (code, source) 联合查询进行 upsert 操作
 
 设计说明：
-- 参考A股多数据源同步服务设计
+- 参考A股多数据源同步服务设计（Tushare/AKShare/BaoStock）
 - 每个数据源独立同步任务
 - 批量更新操作提高性能
 """
@@ -18,7 +18,7 @@
 import asyncio
 import logging
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from pymongo import UpdateOne
 
 # 导入港股数据提供器
@@ -29,24 +29,87 @@ sys.path.insert(0, str(project_root))
 
 from tradingagents.dataflows.providers.hk.hk_stock import HKStockProvider
 from tradingagents.dataflows.providers.hk.improved_hk import ImprovedHKStockProvider
+from app.core.database import get_mongo_db
+from app.core.config import settings
 
-logger = logging.getLogger("worker")
+logger = logging.getLogger(__name__)
 
 
 class HKSyncService:
     """港股数据同步服务（支持多数据源）"""
-    
-    def __init__(self, db):
-        self.db = db
-        
+
+    def __init__(self):
+        self.db = get_mongo_db()
+        self.settings = settings
+
         # 数据提供器映射
         self.providers = {
             "yfinance": HKStockProvider(),
             "akshare": ImprovedHKStockProvider(),
         }
-        
-        # 港股列表（主要港股标的）
-        self.hk_stock_list = [
+
+        # 港股列表缓存（从 AKShare 动态获取）
+        self.hk_stock_list = []
+        self._stock_list_cache_time = None
+        self._stock_list_cache_ttl = 3600 * 24  # 缓存24小时
+
+    async def initialize(self):
+        """初始化同步服务"""
+        logger.info("✅ 港股同步服务初始化完成")
+
+    def _get_hk_stock_list_from_akshare(self) -> List[str]:
+        """
+        从 AKShare 获取所有港股列表
+
+        Returns:
+            List[str]: 港股代码列表
+        """
+        try:
+            import akshare as ak
+            from datetime import datetime, timedelta
+
+            # 检查缓存是否有效
+            if (self.hk_stock_list and self._stock_list_cache_time and
+                datetime.now() - self._stock_list_cache_time < timedelta(seconds=self._stock_list_cache_ttl)):
+                logger.debug(f"📦 使用缓存的港股列表: {len(self.hk_stock_list)} 只")
+                return self.hk_stock_list
+
+            logger.info("🔄 从 AKShare 获取港股列表...")
+
+            # 获取所有港股实时行情（包含代码和名称）
+            df = ak.stock_hk_spot_em()
+
+            if df is None or df.empty:
+                logger.warning("⚠️ AKShare 返回空数据，使用备用列表")
+                return self._get_fallback_stock_list()
+
+            # 提取股票代码列表
+            stock_codes = df['代码'].tolist()
+
+            # 标准化代码格式（确保是5位数字）
+            stock_codes = [code.zfill(5) for code in stock_codes if code]
+
+            logger.info(f"✅ 成功获取 {len(stock_codes)} 只港股")
+
+            # 更新缓存
+            self.hk_stock_list = stock_codes
+            self._stock_list_cache_time = datetime.now()
+
+            return stock_codes
+
+        except Exception as e:
+            logger.error(f"❌ 从 AKShare 获取港股列表失败: {e}")
+            logger.info("📋 使用备用港股列表")
+            return self._get_fallback_stock_list()
+
+    def _get_fallback_stock_list(self) -> List[str]:
+        """
+        获取备用港股列表（主要港股标的）
+
+        Returns:
+            List[str]: 港股代码列表
+        """
+        return [
             "00700",  # 腾讯控股
             "09988",  # 阿里巴巴
             "03690",  # 美团
@@ -70,17 +133,17 @@ class HKSyncService:
         ]
     
     async def sync_basic_info_from_source(
-        self, 
+        self,
         source: str,
         force_update: bool = False
     ) -> Dict[str, int]:
         """
         从指定数据源同步港股基础信息
-        
+
         Args:
             source: 数据源名称 (yfinance/akshare)
-            force_update: 是否强制更新
-        
+            force_update: 是否强制更新（强制刷新股票列表）
+
         Returns:
             Dict: 同步统计信息 {updated: int, inserted: int, failed: int}
         """
@@ -88,14 +151,26 @@ class HKSyncService:
         if not provider:
             logger.error(f"❌ 不支持的数据源: {source}")
             return {"updated": 0, "inserted": 0, "failed": 0}
-        
+
+        # 如果强制更新，清除缓存
+        if force_update:
+            self._stock_list_cache_time = None
+            logger.info("🔄 强制刷新港股列表")
+
+        # 获取港股列表（从 AKShare 或缓存）
+        stock_list = self._get_hk_stock_list_from_akshare()
+
+        if not stock_list:
+            logger.error("❌ 无法获取港股列表")
+            return {"updated": 0, "inserted": 0, "failed": 0}
+
         logger.info(f"🇭🇰 开始同步港股基础信息 (数据源: {source})")
-        logger.info(f"📊 待同步股票数量: {len(self.hk_stock_list)}")
-        
+        logger.info(f"📊 待同步股票数量: {len(stock_list)}")
+
         operations = []
         failed_count = 0
-        
-        for stock_code in self.hk_stock_list:
+
+        for stock_code in stock_list:
             try:
                 # 从数据源获取数据
                 stock_info = provider.get_stock_info(stock_code)
@@ -267,61 +342,74 @@ class HKSyncService:
         return result
 
 
-# ==================== 同步任务函数 ====================
+# ==================== 全局服务实例 ====================
+
+_hk_sync_service = None
+
+async def get_hk_sync_service() -> HKSyncService:
+    """获取港股同步服务实例"""
+    global _hk_sync_service
+    if _hk_sync_service is None:
+        _hk_sync_service = HKSyncService()
+        await _hk_sync_service.initialize()
+    return _hk_sync_service
+
+
+# ==================== APScheduler 兼容的任务函数 ====================
 
 async def run_hk_yfinance_basic_info_sync(force_update: bool = False):
-    """港股基础信息同步（yfinance）"""
-    from app.core.database import get_mongo_db
-
-    logger.info("🚀 开始执行港股基础信息同步任务 (yfinance)")
-
+    """APScheduler任务：港股基础信息同步（yfinance）"""
     try:
-        db = get_mongo_db()
-        service = HKSyncService(db)
+        service = await get_hk_sync_service()
         result = await service.sync_basic_info_from_source("yfinance", force_update)
-
-        logger.info(f"✅ 港股基础信息同步任务完成 (yfinance): {result}")
+        logger.info(f"✅ 港股基础信息同步完成 (yfinance): {result}")
         return result
-
     except Exception as e:
-        logger.error(f"❌ 港股基础信息同步任务失败 (yfinance): {e}")
+        logger.error(f"❌ 港股基础信息同步失败 (yfinance): {e}")
         raise
 
 
 async def run_hk_akshare_basic_info_sync(force_update: bool = False):
-    """港股基础信息同步（AKShare）"""
-    from app.core.database import get_mongo_db
-
-    logger.info("🚀 开始执行港股基础信息同步任务 (AKShare)")
-
+    """APScheduler任务：港股基础信息同步（akshare）"""
     try:
-        db = get_mongo_db()
-        service = HKSyncService(db)
+        service = await get_hk_sync_service()
         result = await service.sync_basic_info_from_source("akshare", force_update)
-
-        logger.info(f"✅ 港股基础信息同步任务完成 (AKShare): {result}")
+        logger.info(f"✅ 港股基础信息同步完成 (AKShare): {result}")
         return result
-
     except Exception as e:
-        logger.error(f"❌ 港股基础信息同步任务失败 (AKShare): {e}")
+        logger.error(f"❌ 港股基础信息同步失败 (AKShare): {e}")
         raise
 
 
 async def run_hk_yfinance_quotes_sync():
-    """港股实时行情同步（yfinance）"""
-    from app.core.database import get_mongo_db
-
-    logger.info("🚀 开始执行港股实时行情同步任务 (yfinance)")
-
+    """APScheduler任务：港股实时行情同步（yfinance）"""
     try:
-        db = get_mongo_db()
-        service = HKSyncService(db)
+        service = await get_hk_sync_service()
         result = await service.sync_quotes_from_source("yfinance")
-
-        logger.info(f"✅ 港股实时行情同步任务完成: {result}")
+        logger.info(f"✅ 港股实时行情同步完成: {result}")
         return result
-
     except Exception as e:
-        logger.error(f"❌ 港股实时行情同步任务失败: {e}")
+        logger.error(f"❌ 港股实时行情同步失败: {e}")
         raise
+
+
+async def run_hk_status_check():
+    """APScheduler任务：港股数据源状态检查"""
+    try:
+        service = await get_hk_sync_service()
+        # 刷新股票列表（如果缓存过期）
+        stock_list = service._get_hk_stock_list_from_akshare()
+
+        # 简单的状态检查：返回股票列表数量
+        result = {
+            "status": "ok",
+            "stock_count": len(stock_list),
+            "data_sources": list(service.providers.keys()),
+            "timestamp": datetime.now().isoformat()
+        }
+        logger.info(f"✅ 港股状态检查完成: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"❌ 港股状态检查失败: {e}")
+        return {"status": "error", "error": str(e)}
 

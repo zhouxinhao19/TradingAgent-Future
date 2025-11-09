@@ -32,6 +32,7 @@ from app.routers import sync as sync_router, multi_source_sync
 from app.routers import stocks as stocks_router
 from app.routers import stock_data as stock_data_router
 from app.routers import stock_sync as stock_sync_router
+from app.routers import multi_market_stocks as multi_market_stocks_router
 from app.routers import notifications as notifications_router
 from app.routers import websocket_notifications as websocket_notifications_router
 from app.routers import scheduler as scheduler_router
@@ -57,6 +58,17 @@ from app.worker.baostock_sync_service import (
     run_baostock_daily_quotes_sync,
     run_baostock_historical_sync,
     run_baostock_status_check
+)
+from app.worker.hk_sync_service import (
+    run_hk_yfinance_basic_info_sync,
+    run_hk_akshare_basic_info_sync,
+    run_hk_yfinance_quotes_sync,
+    run_hk_status_check
+)
+from app.worker.us_sync_service import (
+    run_us_yfinance_basic_info_sync,
+    run_us_yfinance_quotes_sync,
+    run_us_status_check
 )
 from app.middleware.operation_log_middleware import OperationLogMiddleware
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -549,13 +561,6 @@ async def lifespan(app: FastAPI):
         # ==================== 港股数据同步任务配置 ====================
         logger.info("🇭🇰 配置港股数据同步任务...")
 
-        # 导入港股同步服务
-        from app.worker.hk_sync_service import (
-            run_hk_yfinance_basic_info_sync,
-            run_hk_akshare_basic_info_sync,
-            run_hk_yfinance_quotes_sync
-        )
-
         # 港股基础信息同步任务 - yfinance
         scheduler.add_job(
             run_hk_yfinance_basic_info_sync,
@@ -599,12 +604,6 @@ async def lifespan(app: FastAPI):
 
         # ==================== 美股数据同步任务配置 ====================
         logger.info("🇺🇸 配置美股数据同步任务...")
-
-        # 导入美股同步服务
-        from app.worker.us_sync_service import (
-            run_us_yfinance_basic_info_sync,
-            run_us_yfinance_quotes_sync
-        )
 
         # 美股基础信息同步任务 - yfinance
         scheduler.add_job(
@@ -651,7 +650,8 @@ async def lifespan(app: FastAPI):
         set_scheduler_instance(scheduler)
         logger.info("✅ 调度器服务已初始化")
     except Exception as e:
-        logger.warning(f"Failed to start scheduler: {e}")
+        logger.error(f"❌ 调度器启动失败: {e}", exc_info=True)
+        raise  # 抛出异常，阻止应用启动
 
     try:
         yield
@@ -758,6 +758,7 @@ app.include_router(screening.router, prefix="/api/screening", tags=["screening"]
 app.include_router(queue.router, prefix="/api/queue", tags=["queue"])
 app.include_router(favorites.router, prefix="/api", tags=["favorites"])
 app.include_router(stocks_router.router, prefix="/api", tags=["stocks"])
+app.include_router(multi_market_stocks_router.router, prefix="/api", tags=["multi-market"])
 app.include_router(stock_data_router.router, tags=["stock-data"])
 app.include_router(stock_sync_router.router, tags=["stock-sync"])
 app.include_router(tags.router, prefix="/api", tags=["tags"])

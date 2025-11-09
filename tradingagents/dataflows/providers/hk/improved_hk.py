@@ -202,23 +202,35 @@ class ImprovedHKStockProvider:
 
                 # 优先尝试AKShare获取
                 try:
-                    # 使用本地的兼容性函数，避免循环导入
+                    # 直接使用 akshare 库获取，避免循环调用
                     logger.debug(f"📊 [港股API] 优先使用AKShare获取: {symbol}")
 
-                    akshare_info = get_hk_stock_info_akshare(symbol)
-                    if akshare_info and isinstance(akshare_info, dict) and 'name' in akshare_info:
-                        akshare_name = akshare_info['name']
-                        if not akshare_name.startswith('港股'):
-                            # 缓存AKShare结果
-                            self.cache[cache_key] = {
-                                'data': akshare_name,
-                                'timestamp': time.time(),
-                                'source': 'akshare_api'
-                            }
-                            self._save_cache()
+                    import akshare as ak
+                    # 标准化代码格式（akshare 需要 5 位数字格式）
+                    normalized_symbol = self._normalize_hk_symbol(symbol)
 
-                            logger.debug(f"📊 [港股AKShare] 获取公司名称: {symbol} -> {akshare_name}")
-                            return akshare_name
+                    # 尝试获取港股实时行情（包含名称）
+                    try:
+                        df = ak.stock_hk_spot_em()
+                        if df is not None and not df.empty:
+                            # 查找匹配的股票
+                            matched = df[df['代码'] == normalized_symbol]
+                            if not matched.empty:
+                                akshare_name = matched.iloc[0]['名称']
+                                if akshare_name and not str(akshare_name).startswith('港股'):
+                                    # 缓存AKShare结果
+                                    self.cache[cache_key] = {
+                                        'data': akshare_name,
+                                        'timestamp': time.time(),
+                                        'source': 'akshare_api'
+                                    }
+                                    self._save_cache()
+
+                                    logger.debug(f"📊 [港股AKShare] 获取公司名称: {symbol} -> {akshare_name}")
+                                    return akshare_name
+                    except Exception as e:
+                        logger.debug(f"📊 [港股AKShare] 获取实时行情失败: {e}")
+
                 except Exception as e:
                     logger.debug(f"📊 [港股AKShare] AKShare获取失败: {e}")
 
@@ -357,7 +369,7 @@ def get_hk_stock_data_akshare(symbol: str, start_date: str = None, end_date: str
 
 def get_hk_stock_info_akshare(symbol: str) -> Dict[str, Any]:
     """
-    兼容性函数：使用改进的港股提供器获取信息
+    兼容性函数：直接使用 akshare 获取港股信息（避免循环调用）
 
     Args:
         symbol: 港股代码
@@ -365,4 +377,49 @@ def get_hk_stock_info_akshare(symbol: str) -> Dict[str, Any]:
     Returns:
         Dict: 港股信息
     """
-    return get_hk_stock_info_improved(symbol)
+    try:
+        import akshare as ak
+
+        # 标准化代码
+        provider = get_improved_hk_provider()
+        normalized_symbol = provider._normalize_hk_symbol(symbol)
+
+        # 尝试从 akshare 获取实时行情
+        try:
+            df = ak.stock_hk_spot_em()
+            if df is not None and not df.empty:
+                matched = df[df['代码'] == normalized_symbol]
+                if not matched.empty:
+                    row = matched.iloc[0]
+                    return {
+                        'symbol': symbol,
+                        'name': row['名称'],
+                        'currency': 'HKD',
+                        'exchange': 'HKG',
+                        'market': '港股',
+                        'source': 'akshare'
+                    }
+        except Exception as e:
+            logger.debug(f"📊 [港股AKShare] 获取失败: {e}")
+
+        # 如果失败，返回基本信息
+        return {
+            'symbol': symbol,
+            'name': f'港股{normalized_symbol}',
+            'currency': 'HKD',
+            'exchange': 'HKG',
+            'market': '港股',
+            'source': 'akshare_fallback'
+        }
+
+    except Exception as e:
+        logger.error(f"❌ [港股AKShare] 获取信息失败: {e}")
+        return {
+            'symbol': symbol,
+            'name': f'港股{symbol}',
+            'currency': 'HKD',
+            'exchange': 'HKG',
+            'market': '港股',
+            'source': 'error',
+            'error': str(e)
+        }

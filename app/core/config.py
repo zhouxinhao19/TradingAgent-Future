@@ -290,7 +290,7 @@ class Settings(BaseSettings):
     US_YFINANCE_BASIC_INFO_SYNC_ENABLED: bool = Field(default=True, description="启用美股基础信息同步（yfinance）")
     US_YFINANCE_BASIC_INFO_SYNC_CRON: str = Field(default="0 4 * * *", description="美股基础信息同步CRON表达式（yfinance）")  # 每日凌晨4点（北京时间）
     US_YFINANCE_QUOTES_SYNC_ENABLED: bool = Field(default=True, description="启用美股行情同步（yfinance）")
-    US_YFINANCE_QUOTES_SYNC_CRON: str = Field(default="*/30 21-4 * * 1-5", description="美股行情同步CRON表达式（yfinance）")  # 美股交易时间 21:30-04:00（北京时间），每30分钟
+    US_YFINANCE_QUOTES_SYNC_CRON: str = Field(default="*/30 21-23,0-4 * * 1-5", description="美股行情同步CRON表达式（yfinance）")  # 美股交易时间 21:30-04:00（北京时间），每30分钟
 
     # 美股数据初始化配置
     US_INIT_HISTORICAL_DAYS: int = Field(default=365, ge=1, le=3650, description="美股初始化历史数据天数")

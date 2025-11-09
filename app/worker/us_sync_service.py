@@ -9,7 +9,7 @@
 3. 使用 (code, source) 联合查询进行 upsert 操作
 
 设计说明：
-- 参考A股多数据源同步服务设计
+- 参考A股多数据源同步服务设计（Tushare/AKShare/BaoStock）
 - 主要使用 yfinance 作为数据源
 - 批量更新操作提高性能
 """
@@ -17,7 +17,7 @@
 import asyncio
 import logging
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from pymongo import UpdateOne
 
 # 导入美股数据提供器
@@ -27,21 +27,116 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from tradingagents.dataflows.providers.us.yfinance import YFinanceUtils
+from app.core.database import get_mongo_db
+from app.core.config import settings
 
-logger = logging.getLogger("worker")
+logger = logging.getLogger(__name__)
 
 
 class USSyncService:
     """美股数据同步服务（支持多数据源）"""
-    
-    def __init__(self, db):
-        self.db = db
-        
+
+    def __init__(self):
+        self.db = get_mongo_db()
+        self.settings = settings
+
         # 数据提供器
         self.yfinance_provider = YFinanceUtils()
-        
-        # 美股列表（主要美股标的）
-        self.us_stock_list = [
+
+        # 美股列表缓存（从 Finnhub 动态获取）
+        self.us_stock_list = []
+        self._stock_list_cache_time = None
+        self._stock_list_cache_ttl = 3600 * 24  # 缓存24小时
+
+        # Finnhub 客户端（延迟初始化）
+        self._finnhub_client = None
+
+    async def initialize(self):
+        """初始化同步服务"""
+        logger.info("✅ 美股同步服务初始化完成")
+
+    def _get_finnhub_client(self):
+        """获取 Finnhub 客户端（延迟初始化）"""
+        if self._finnhub_client is None:
+            try:
+                import finnhub
+                import os
+
+                api_key = os.getenv('FINNHUB_API_KEY')
+                if not api_key:
+                    logger.warning("⚠️ 未配置 FINNHUB_API_KEY，无法使用 Finnhub 数据源")
+                    return None
+
+                self._finnhub_client = finnhub.Client(api_key=api_key)
+                logger.info("✅ Finnhub 客户端初始化成功")
+            except Exception as e:
+                logger.error(f"❌ Finnhub 客户端初始化失败: {e}")
+                return None
+
+        return self._finnhub_client
+
+    def _get_us_stock_list_from_finnhub(self) -> List[str]:
+        """
+        从 Finnhub 获取所有美股列表
+
+        Returns:
+            List[str]: 美股代码列表
+        """
+        try:
+            from datetime import datetime, timedelta
+
+            # 检查缓存是否有效
+            if (self.us_stock_list and self._stock_list_cache_time and
+                datetime.now() - self._stock_list_cache_time < timedelta(seconds=self._stock_list_cache_ttl)):
+                logger.debug(f"📦 使用缓存的美股列表: {len(self.us_stock_list)} 只")
+                return self.us_stock_list
+
+            logger.info("🔄 从 Finnhub 获取美股列表...")
+
+            # 获取 Finnhub 客户端
+            client = self._get_finnhub_client()
+            if not client:
+                logger.warning("⚠️ Finnhub 客户端不可用，使用备用列表")
+                return self._get_fallback_stock_list()
+
+            # 获取美股列表（US 交易所）
+            symbols = client.stock_symbols('US')
+
+            if not symbols:
+                logger.warning("⚠️ Finnhub 返回空数据，使用备用列表")
+                return self._get_fallback_stock_list()
+
+            # 提取股票代码列表（只保留普通股票，过滤掉 ETF、基金等）
+            stock_codes = []
+            for symbol_info in symbols:
+                symbol = symbol_info.get('symbol', '')
+                symbol_type = symbol_info.get('type', '')
+
+                # 只保留普通股票（Common Stock）
+                if symbol and symbol_type == 'Common Stock':
+                    stock_codes.append(symbol)
+
+            logger.info(f"✅ 成功获取 {len(stock_codes)} 只美股（普通股）")
+
+            # 更新缓存
+            self.us_stock_list = stock_codes
+            self._stock_list_cache_time = datetime.now()
+
+            return stock_codes
+
+        except Exception as e:
+            logger.error(f"❌ 从 Finnhub 获取美股列表失败: {e}")
+            logger.info("📋 使用备用美股列表")
+            return self._get_fallback_stock_list()
+
+    def _get_fallback_stock_list(self) -> List[str]:
+        """
+        获取备用美股列表（主要美股标的）
+
+        Returns:
+            List[str]: 美股代码列表
+        """
+        return [
             # 科技巨头
             "AAPL",   # 苹果
             "MSFT",   # 微软
@@ -74,33 +169,45 @@ class USSyncService:
             "XOM",    # 埃克森美孚
             "CVX",    # 雪佛龙
         ]
-    
+
     async def sync_basic_info_from_source(
-        self, 
+        self,
         source: str = "yfinance",
         force_update: bool = False
     ) -> Dict[str, int]:
         """
         从指定数据源同步美股基础信息
-        
+
         Args:
             source: 数据源名称 (默认 yfinance)
-            force_update: 是否强制更新
-        
+            force_update: 是否强制更新（强制刷新股票列表）
+
         Returns:
             Dict: 同步统计信息 {updated: int, inserted: int, failed: int}
         """
         if source != "yfinance":
             logger.error(f"❌ 不支持的数据源: {source}")
             return {"updated": 0, "inserted": 0, "failed": 0}
-        
+
+        # 如果强制更新，清除缓存
+        if force_update:
+            self._stock_list_cache_time = None
+            logger.info("🔄 强制刷新美股列表")
+
+        # 获取美股列表（从 Finnhub 或缓存）
+        stock_list = self._get_us_stock_list_from_finnhub()
+
+        if not stock_list:
+            logger.error("❌ 无法获取美股列表")
+            return {"updated": 0, "inserted": 0, "failed": 0}
+
         logger.info(f"🇺🇸 开始同步美股基础信息 (数据源: {source})")
-        logger.info(f"📊 待同步股票数量: {len(self.us_stock_list)}")
-        
+        logger.info(f"📊 待同步股票数量: {len(stock_list)}")
+
         operations = []
         failed_count = 0
-        
-        for stock_code in self.us_stock_list:
+
+        for stock_code in stock_list:
             try:
                 # 从 yfinance 获取数据
                 stock_info = self.yfinance_provider.get_stock_info(stock_code)
@@ -275,42 +382,62 @@ class USSyncService:
         return result
 
 
-# ==================== 同步任务函数 ====================
+# ==================== 全局服务实例 ====================
+
+_us_sync_service = None
+
+async def get_us_sync_service() -> USSyncService:
+    """获取美股同步服务实例"""
+    global _us_sync_service
+    if _us_sync_service is None:
+        _us_sync_service = USSyncService()
+        await _us_sync_service.initialize()
+    return _us_sync_service
+
+
+# ==================== APScheduler 兼容的任务函数 ====================
 
 async def run_us_yfinance_basic_info_sync(force_update: bool = False):
-    """美股基础信息同步（yfinance）"""
-    from app.core.database import get_mongo_db
-
-    logger.info("🚀 开始执行美股基础信息同步任务 (yfinance)")
-
+    """APScheduler任务：美股基础信息同步（yfinance）"""
     try:
-        db = get_mongo_db()
-        service = USSyncService(db)
+        service = await get_us_sync_service()
         result = await service.sync_basic_info_from_source("yfinance", force_update)
-        
-        logger.info(f"✅ 美股基础信息同步任务完成 (yfinance): {result}")
+        logger.info(f"✅ 美股基础信息同步完成 (yfinance): {result}")
         return result
-        
     except Exception as e:
-        logger.error(f"❌ 美股基础信息同步任务失败 (yfinance): {e}")
+        logger.error(f"❌ 美股基础信息同步失败 (yfinance): {e}")
         raise
 
 
 async def run_us_yfinance_quotes_sync():
-    """美股实时行情同步（yfinance）"""
-    from app.core.database import get_mongo_db
-
-    logger.info("🚀 开始执行美股实时行情同步任务 (yfinance)")
-
+    """APScheduler任务：美股实时行情同步（yfinance）"""
     try:
-        db = get_mongo_db()
-        service = USSyncService(db)
+        service = await get_us_sync_service()
         result = await service.sync_quotes_from_source("yfinance")
-
-        logger.info(f"✅ 美股实时行情同步任务完成: {result}")
+        logger.info(f"✅ 美股实时行情同步完成: {result}")
         return result
-
     except Exception as e:
-        logger.error(f"❌ 美股实时行情同步任务失败: {e}")
+        logger.error(f"❌ 美股实时行情同步失败: {e}")
         raise
+
+
+async def run_us_status_check():
+    """APScheduler任务：美股数据源状态检查"""
+    try:
+        service = await get_us_sync_service()
+        # 刷新股票列表（如果缓存过期）
+        stock_list = service._get_us_stock_list_from_finnhub()
+
+        # 简单的状态检查：返回股票列表数量
+        result = {
+            "status": "ok",
+            "stock_count": len(stock_list),
+            "data_source": "yfinance + finnhub",
+            "timestamp": datetime.now().isoformat()
+        }
+        logger.info(f"✅ 美股状态检查完成: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"❌ 美股状态检查失败: {e}")
+        return {"status": "error", "error": str(e)}
 
