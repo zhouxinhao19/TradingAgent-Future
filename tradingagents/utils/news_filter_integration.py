@@ -166,15 +166,6 @@ def create_filtered_realtime_news_function():
                     # 暂时跳过，返回原始报告
                     logger.warning(f"[增强实时新闻] AKShare新闻功能暂未实现，返回原始报告")
                     return original_report
-                            
-                            report += f"🔗 {row.get('新闻链接', '无链接')}\n\n"
-                            report += f"{row.get('新闻内容', '无内容')}\n\n"
-                        
-                        logger.info(f"[增强实时新闻] ✅ 成功生成过滤新闻报告，包含 {news_count} 条高质量新闻")
-                        return report
-                    else:
-                        logger.warning(f"[增强实时新闻] 过滤后无符合条件的新闻，返回原始报告")
-                        return original_report
                         
                 except Exception as filter_error:
                     logger.error(f"[增强实时新闻] 新闻过滤失败: {filter_error}")
