@@ -398,14 +398,22 @@ def get_hk_stock_data_akshare(symbol: str, start_date: str = None, end_date: str
             logger.warning(f"⚠️ [AKShare-新浪] 日期范围内无数据: {symbol}")
             return f"❌ 港股{symbol}在指定日期范围内无数据"
 
-        # 格式化输出
+        # 🔥 添加 pre_close 字段（从前一天的 close 获取）
+        # AKShare 不返回 pre_close 字段，需要手动计算
+        df['pre_close'] = df['close'].shift(1)
+
+        # 计算涨跌额和涨跌幅
+        df['change'] = df['close'] - df['pre_close']
+        df['pct_change'] = (df['change'] / df['pre_close'] * 100).round(2)
+
+        # 格式化输出（包含昨收、涨跌额、涨跌幅）
         result = f"""## 港股历史数据 ({symbol})
 **数据源**: AKShare (新浪财经)
 **日期范围**: {start_date} ~ {end_date}
 **数据条数**: {len(df)} 条
 
 ### 最近10个交易日
-{df.tail(10).to_string(index=False)}
+{df[['date', 'open', 'high', 'low', 'close', 'pre_close', 'change', 'pct_change', 'volume']].tail(10).to_string(index=False)}
 
 ### 数据统计
 - 最高价: {df['high'].max():.2f}
