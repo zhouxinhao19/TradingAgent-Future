@@ -1086,6 +1086,12 @@ class OptimizedChinaDataProvider:
 
                                 logger.info(f"✅ [PE计算-第1层成功] PE={pe_value:.2f}倍 | 来源={source} | 实时={is_realtime}")
                                 logger.info(f"   └─ 计算数据: 股价={price}元, 市值={market_cap_log}亿元, 更新时间={updated_at}")
+                            elif pe_value is None:
+                                # 🔥 PE 为 None，检查是否是亏损股
+                                pe_ttm_check = latest_indicators.get('pe_ttm')
+                                if pe_ttm_check is not None and (pe_ttm_check <= 0 or str(pe_ttm_check) == 'nan' or pe_ttm_check == '--'):
+                                    is_loss_stock = True
+                                    logger.info(f"⚠️ [PE计算-第1层] PE为None且pe_ttm={pe_ttm_check}，确认为亏损股")
 
                             # 使用实时PE_TTM（TTM市盈率）
                             pe_ttm_value = realtime_metrics.get('pe_ttm')
@@ -1094,6 +1100,12 @@ class OptimizedChinaDataProvider:
                                 realtime_tag = " (实时)" if is_realtime else ""
                                 metrics["pe_ttm"] = f"{pe_ttm_value:.1f}倍{realtime_tag}"
                                 logger.info(f"✅ [PE_TTM计算-第1层成功] PE_TTM={pe_ttm_value:.2f}倍 | 来源={source} | 实时={is_realtime}")
+                            elif pe_ttm_value is None and not is_loss_stock:
+                                # 🔥 PE_TTM 为 None，再次检查是否是亏损股
+                                pe_ttm_check = latest_indicators.get('pe_ttm')
+                                if pe_ttm_check is not None and (pe_ttm_check <= 0 or str(pe_ttm_check) == 'nan' or pe_ttm_check == '--'):
+                                    is_loss_stock = True
+                                    logger.info(f"⚠️ [PE_TTM计算-第1层] PE_TTM为None且pe_ttm={pe_ttm_check}，确认为亏损股")
 
                             # 使用实时PB
                             pb_value = realtime_metrics.get('pb')
