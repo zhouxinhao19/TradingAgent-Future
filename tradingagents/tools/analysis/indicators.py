@@ -75,22 +75,47 @@ def macd(close: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> p
     return pd.DataFrame({"dif": dif, "dea": dea, "macd_hist": hist})
 
 
-def rsi(close: pd.Series, n: int = 14) -> pd.Series:
+def rsi(close: pd.Series, n: int = 14, method: str = 'ema') -> pd.Series:
     """
     计算RSI指标（Relative Strength Index）
 
     Args:
         close: 收盘价序列
         n: 周期，默认14
+        method: 计算方法
+            - 'ema': 指数移动平均（国际标准，Wilder's方法）
+            - 'sma': 简单移动平均
+            - 'china': 中国式SMA（同花顺/通达信风格）
 
     Returns:
         RSI序列（0-100）
+
+    说明：
+        - 'ema': 使用 ewm(alpha=1/n, adjust=False)，适用于国际市场
+        - 'sma': 使用 rolling(window=n).mean()，简单移动平均
+        - 'china': 使用 ewm(com=n-1, adjust=True)，与同花顺/通达信一致
     """
     delta = close.diff()
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
-    avg_gain = gain.ewm(alpha=1 / float(n), adjust=False).mean()
-    avg_loss = loss.ewm(alpha=1 / float(n), adjust=False).mean()
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+
+    if method == 'ema':
+        # 国际标准：Wilder's指数移动平均
+        avg_gain = gain.ewm(alpha=1 / float(n), adjust=False).mean()
+        avg_loss = loss.ewm(alpha=1 / float(n), adjust=False).mean()
+    elif method == 'sma':
+        # 简单移动平均
+        avg_gain = gain.rolling(window=int(n), min_periods=1).mean()
+        avg_loss = loss.rolling(window=int(n), min_periods=1).mean()
+    elif method == 'china':
+        # 中国式SMA：同花顺/通达信风格
+        # SMA(X, N, 1) = ewm(com=N-1, adjust=True).mean()
+        # 参考：https://blog.csdn.net/u011218867/article/details/117427927
+        avg_gain = gain.ewm(com=int(n) - 1, adjust=True).mean()
+        avg_loss = loss.ewm(com=int(n) - 1, adjust=True).mean()
+    else:
+        raise ValueError(f"不支持的RSI计算方法: {method}，支持的方法: 'ema', 'sma', 'china'")
+
     rs = avg_gain / (avg_loss.replace(0, np.nan))
     rsi_val = 100 - (100 / (1 + rs))
     return rsi_val
@@ -252,7 +277,8 @@ def last_values(df: pd.DataFrame, columns: List[str]) -> Dict[str, Any]:
 
 
 def add_all_indicators(df: pd.DataFrame, close_col: str = 'close',
-                       high_col: str = 'high', low_col: str = 'low') -> pd.DataFrame:
+                       high_col: str = 'high', low_col: str = 'low',
+                       rsi_style: str = 'international') -> pd.DataFrame:
     """
     为DataFrame添加所有常用技术指标
 
@@ -261,15 +287,20 @@ def add_all_indicators(df: pd.DataFrame, close_col: str = 'close',
     Args:
         df: 包含价格数据的DataFrame
         close_col: 收盘价列名，默认'close'
-        high_col: 最高价列名，默认'high'
-        low_col: 最低价列名，默认'low'
+        high_col: 最高价列名，默认'high'（预留，暂未使用）
+        low_col: 最低价列名，默认'low'（预留，暂未使用）
+        rsi_style: RSI计算风格
+            - 'international': 国际标准（RSI14，使用EMA）
+            - 'china': 中国风格（RSI6/12/24 + RSI14，使用中国式SMA）
 
     Returns:
         添加了技术指标列的DataFrame（原地修改）
 
     添加的指标列：
         - ma5, ma10, ma20, ma60: 移动平均线
-        - rsi: RSI指标（14日）
+        - rsi: RSI指标（14日，国际标准）
+        - rsi6, rsi12, rsi24: RSI指标（中国风格，仅当 rsi_style='china' 时）
+        - rsi14: RSI指标（14日，简单移动平均，仅当 rsi_style='china' 时）
         - macd_dif, macd_dea, macd: MACD指标
         - boll_mid, boll_upper, boll_lower: 布林带
 
@@ -277,6 +308,10 @@ def add_all_indicators(df: pd.DataFrame, close_col: str = 'close',
         >>> df = pd.DataFrame({'close': [100, 101, 102, 103, 104]})
         >>> df = add_all_indicators(df)
         >>> print(df[['close', 'ma5', 'rsi']].tail())
+        >>>
+        >>> # 中国风格
+        >>> df = add_all_indicators(df, rsi_style='china')
+        >>> print(df[['close', 'rsi6', 'rsi12', 'rsi24']].tail())
     """
     # 检查必要的列
     if close_col not in df.columns:
@@ -288,8 +323,19 @@ def add_all_indicators(df: pd.DataFrame, close_col: str = 'close',
     df['ma20'] = ma(df[close_col], 20, min_periods=1)
     df['ma60'] = ma(df[close_col], 60, min_periods=1)
 
-    # 计算RSI（14日）
-    df['rsi'] = rsi(df[close_col], 14)
+    # 计算RSI指标
+    if rsi_style == 'china':
+        # 中国风格：RSI6, RSI12, RSI24（使用中国式SMA）
+        df['rsi6'] = rsi(df[close_col], 6, method='china')
+        df['rsi12'] = rsi(df[close_col], 12, method='china')
+        df['rsi24'] = rsi(df[close_col], 24, method='china')
+        # 保留RSI14作为国际标准参考（使用简单移动平均）
+        df['rsi14'] = rsi(df[close_col], 14, method='sma')
+        # 为了兼容性，也添加 'rsi' 列（指向 rsi12）
+        df['rsi'] = df['rsi12']
+    else:
+        # 国际标准：RSI14（使用EMA）
+        df['rsi'] = rsi(df[close_col], 14, method='ema')
 
     # 计算MACD
     macd_df = macd(df[close_col], fast=12, slow=26, signal=9)
