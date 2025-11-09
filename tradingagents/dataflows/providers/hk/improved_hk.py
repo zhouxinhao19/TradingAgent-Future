@@ -406,32 +406,9 @@ def get_hk_stock_data_akshare(symbol: str, start_date: str = None, end_date: str
         df['change'] = df['close'] - df['pre_close']
         df['pct_change'] = (df['change'] / df['pre_close'] * 100).round(2)
 
-        # 🔥 计算技术指标（与A股数据保持一致）
-        # 计算移动平均线
-        df['ma5'] = df['close'].rolling(window=5, min_periods=1).mean()
-        df['ma10'] = df['close'].rolling(window=10, min_periods=1).mean()
-        df['ma20'] = df['close'].rolling(window=20, min_periods=1).mean()
-        df['ma60'] = df['close'].rolling(window=60, min_periods=1).mean()
-
-        # 计算RSI（相对强弱指标）
-        delta = df['close'].diff()
-        gain = delta.where(delta > 0, 0).rolling(window=14, min_periods=1).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=14, min_periods=1).mean()
-        rs = gain / loss.replace(0, pd.NA)
-        df['rsi'] = 100 - (100 / (1 + rs))
-
-        # 计算MACD
-        ema12 = df['close'].ewm(span=12, adjust=False).mean()
-        ema26 = df['close'].ewm(span=26, adjust=False).mean()
-        df['macd_dif'] = ema12 - ema26
-        df['macd_dea'] = df['macd_dif'].ewm(span=9, adjust=False).mean()
-        df['macd'] = (df['macd_dif'] - df['macd_dea']) * 2
-
-        # 计算布林带
-        df['boll_mid'] = df['close'].rolling(window=20, min_periods=1).mean()
-        std = df['close'].rolling(window=20, min_periods=1).std()
-        df['boll_upper'] = df['boll_mid'] + 2 * std
-        df['boll_lower'] = df['boll_mid'] - 2 * std
+        # 🔥 使用统一的技术指标计算函数
+        from tradingagents.tools.analysis.indicators import add_all_indicators
+        df = add_all_indicators(df, close_col='close', high_col='high', low_col='low')
 
         # 格式化输出（包含价格数据和技术指标）
         latest = df.iloc[-1]

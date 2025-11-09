@@ -22,15 +22,53 @@ def _require_cols(df: pd.DataFrame, cols: Iterable[str]):
         raise ValueError(f"DataFrame缺少必要列: {missing}, 现有列: {list(df.columns)[:10]}...")
 
 
-def ma(close: pd.Series, n: int) -> pd.Series:
-    return close.rolling(window=int(n), min_periods=int(n)).mean()
+def ma(close: pd.Series, n: int, min_periods: int = None) -> pd.Series:
+    """
+    计算移动平均线（Moving Average）
+
+    Args:
+        close: 收盘价序列
+        n: 周期
+        min_periods: 最小周期数，默认为1（允许前期数据不足时也计算）
+
+    Returns:
+        移动平均线序列
+    """
+    if min_periods is None:
+        min_periods = 1  # 默认为1，与现有代码保持一致
+    return close.rolling(window=int(n), min_periods=min_periods).mean()
 
 
 def ema(close: pd.Series, n: int) -> pd.Series:
+    """
+    计算指数移动平均线（Exponential Moving Average）
+
+    Args:
+        close: 收盘价序列
+        n: 周期
+
+    Returns:
+        指数移动平均线序列
+    """
     return close.ewm(span=int(n), adjust=False).mean()
 
 
 def macd(close: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> pd.DataFrame:
+    """
+    计算MACD指标（Moving Average Convergence Divergence）
+
+    Args:
+        close: 收盘价序列
+        fast: 快线周期，默认12
+        slow: 慢线周期，默认26
+        signal: 信号线周期，默认9
+
+    Returns:
+        包含 dif, dea, macd_hist 的 DataFrame
+        - dif: 快线与慢线的差值（DIF）
+        - dea: DIF的信号线（DEA）
+        - macd_hist: MACD柱状图（DIF - DEA）
+    """
     dif = ema(close, fast) - ema(close, slow)
     dea = dif.ewm(span=int(signal), adjust=False).mean()
     hist = dif - dea
@@ -38,6 +76,16 @@ def macd(close: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> p
 
 
 def rsi(close: pd.Series, n: int = 14) -> pd.Series:
+    """
+    计算RSI指标（Relative Strength Index）
+
+    Args:
+        close: 收盘价序列
+        n: 周期，默认14
+
+    Returns:
+        RSI序列（0-100）
+    """
     delta = close.diff()
     gain = delta.clip(lower=0)
     loss = -delta.clip(upper=0)
@@ -48,9 +96,26 @@ def rsi(close: pd.Series, n: int = 14) -> pd.Series:
     return rsi_val
 
 
-def boll(close: pd.Series, n: int = 20, k: float = 2.0) -> pd.DataFrame:
-    mid = close.rolling(window=int(n), min_periods=int(n)).mean()
-    std = close.rolling(window=int(n), min_periods=int(n)).std()
+def boll(close: pd.Series, n: int = 20, k: float = 2.0, min_periods: int = None) -> pd.DataFrame:
+    """
+    计算布林带指标（Bollinger Bands）
+
+    Args:
+        close: 收盘价序列
+        n: 周期，默认20
+        k: 标准差倍数，默认2.0
+        min_periods: 最小周期数，默认为1（允许前期数据不足时也计算）
+
+    Returns:
+        包含 boll_mid, boll_upper, boll_lower 的 DataFrame
+        - boll_mid: 中轨（n日移动平均）
+        - boll_upper: 上轨（中轨 + k倍标准差）
+        - boll_lower: 下轨（中轨 - k倍标准差）
+    """
+    if min_periods is None:
+        min_periods = 1  # 默认为1，与现有代码保持一致
+    mid = close.rolling(window=int(n), min_periods=min_periods).mean()
+    std = close.rolling(window=int(n), min_periods=min_periods).std()
     upper = mid + k * std
     lower = mid - k * std
     return pd.DataFrame({"boll_mid": mid, "boll_upper": upper, "boll_lower": lower})
@@ -184,4 +249,59 @@ def last_values(df: pd.DataFrame, columns: List[str]) -> Dict[str, Any]:
         return {c: None for c in columns}
     last = df.iloc[-1]
     return {c: (None if c not in df.columns else (None if pd.isna(last.get(c)) else last.get(c))) for c in columns}
+
+
+def add_all_indicators(df: pd.DataFrame, close_col: str = 'close',
+                       high_col: str = 'high', low_col: str = 'low') -> pd.DataFrame:
+    """
+    为DataFrame添加所有常用技术指标
+
+    这是一个统一的技术指标计算函数，用于替代各个数据源模块中重复的计算代码。
+
+    Args:
+        df: 包含价格数据的DataFrame
+        close_col: 收盘价列名，默认'close'
+        high_col: 最高价列名，默认'high'
+        low_col: 最低价列名，默认'low'
+
+    Returns:
+        添加了技术指标列的DataFrame（原地修改）
+
+    添加的指标列：
+        - ma5, ma10, ma20, ma60: 移动平均线
+        - rsi: RSI指标（14日）
+        - macd_dif, macd_dea, macd: MACD指标
+        - boll_mid, boll_upper, boll_lower: 布林带
+
+    示例：
+        >>> df = pd.DataFrame({'close': [100, 101, 102, 103, 104]})
+        >>> df = add_all_indicators(df)
+        >>> print(df[['close', 'ma5', 'rsi']].tail())
+    """
+    # 检查必要的列
+    if close_col not in df.columns:
+        raise ValueError(f"DataFrame缺少收盘价列: {close_col}")
+
+    # 计算移动平均线（MA5, MA10, MA20, MA60）
+    df['ma5'] = ma(df[close_col], 5, min_periods=1)
+    df['ma10'] = ma(df[close_col], 10, min_periods=1)
+    df['ma20'] = ma(df[close_col], 20, min_periods=1)
+    df['ma60'] = ma(df[close_col], 60, min_periods=1)
+
+    # 计算RSI（14日）
+    df['rsi'] = rsi(df[close_col], 14)
+
+    # 计算MACD
+    macd_df = macd(df[close_col], fast=12, slow=26, signal=9)
+    df['macd_dif'] = macd_df['dif']
+    df['macd_dea'] = macd_df['dea']
+    df['macd'] = macd_df['macd_hist'] * 2  # 注意：这里乘以2是为了与通达信/同花顺保持一致
+
+    # 计算布林带（20日，2倍标准差）
+    boll_df = boll(df[close_col], n=20, k=2.0, min_periods=1)
+    df['boll_mid'] = boll_df['boll_mid']
+    df['boll_upper'] = boll_df['boll_upper']
+    df['boll_lower'] = boll_df['boll_lower']
+
+    return df
 

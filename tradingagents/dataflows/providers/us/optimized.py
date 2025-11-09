@@ -218,17 +218,13 @@ class OptimizedUSDataProvider:
         price_change = data['Close'].iloc[-1] - data['Close'].iloc[0]
         price_change_pct = (price_change / data['Close'].iloc[0]) * 100
 
-        # 计算技术指标
-        data['MA5'] = data['Close'].rolling(window=5).mean()
-        data['MA10'] = data['Close'].rolling(window=10).mean()
-        data['MA20'] = data['Close'].rolling(window=20).mean()
+        # 🔥 使用统一的技术指标计算函数
+        # 注意：美股数据列名是大写的 Close, High, Low
+        from tradingagents.tools.analysis.indicators import add_all_indicators
+        data = add_all_indicators(data, close_col='Close', high_col='High', low_col='Low')
 
-        # 计算RSI
-        delta = data['Close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-        rs = gain / loss
-        rsi = 100 - (100 / (1 + rs))
+        # 获取最新技术指标
+        latest = data.iloc[-1]
 
         # 格式化输出
         result = f"""# {symbol} 美股数据分析
@@ -245,14 +241,28 @@ class OptimizedUSDataProvider:
 - 期间最低: ${data['Low'].min():.2f}
 - 平均成交量: {data['Volume'].mean():,.0f}
 
-## 🔍 技术指标
-- MA5: ${data['MA5'].iloc[-1]:.2f}
-- MA10: ${data['MA10'].iloc[-1]:.2f}
-- MA20: ${data['MA20'].iloc[-1]:.2f}
-- RSI: {rsi.iloc[-1]:.2f}
+## 🔍 技术指标（最新值）
+**移动平均线**:
+- MA5: ${latest['ma5']:.2f}
+- MA10: ${latest['ma10']:.2f}
+- MA20: ${latest['ma20']:.2f}
+- MA60: ${latest['ma60']:.2f}
+
+**MACD指标**:
+- DIF: {latest['macd_dif']:.2f}
+- DEA: {latest['macd_dea']:.2f}
+- MACD: {latest['macd']:.2f}
+
+**RSI指标**:
+- RSI(14): {latest['rsi']:.2f}
+
+**布林带**:
+- 上轨: ${latest['boll_upper']:.2f}
+- 中轨: ${latest['boll_mid']:.2f}
+- 下轨: ${latest['boll_lower']:.2f}
 
 ## 📋 最近5日数据
-{data.tail().to_string()}
+{data[['Open', 'High', 'Low', 'Close', 'Volume']].tail().to_string()}
 
 数据来源: Yahoo Finance API
 更新时间: {datetime.now(ZoneInfo(get_timezone_name())).strftime('%Y-%m-%d %H:%M:%S')}
