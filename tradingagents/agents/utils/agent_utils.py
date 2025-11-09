@@ -863,14 +863,18 @@ class Toolkit:
                     from datetime import datetime, timedelta
                     recent_end_date = curr_date
                     recent_start_date = (datetime.strptime(curr_date, '%Y-%m-%d') - timedelta(days=2)).strftime('%Y-%m-%d')
-                    
+
                     from tradingagents.dataflows.interface import get_china_stock_data_unified
                     logger.info(f"🔍 [股票代码追踪] 调用 get_china_stock_data_unified（仅获取最新价格），传入参数: ticker='{ticker}', start_date='{recent_start_date}', end_date='{recent_end_date}'")
                     current_price_data = get_china_stock_data_unified(ticker, recent_start_date, recent_end_date)
-                    logger.info(f"🔍 [股票代码追踪] get_china_stock_data_unified 返回结果前200字符: {current_price_data[:200] if current_price_data else 'None'}")
+
+                    # 🔍 调试：打印返回数据的前500字符
+                    logger.info(f"🔍 [基本面工具调试] A股价格数据返回长度: {len(current_price_data)}")
+                    logger.info(f"🔍 [基本面工具调试] A股价格数据前500字符:\n{current_price_data[:500]}")
+
                     result_data.append(f"## A股当前价格信息\n{current_price_data}")
                 except Exception as e:
-                    logger.error(f"🔍 [股票代码追踪] get_china_stock_data_unified 调用失败: {e}")
+                    logger.error(f"❌ [基本面工具调试] A股价格数据获取失败: {e}")
                     result_data.append(f"## A股当前价格信息\n获取失败: {e}")
                     current_price_data = ""
 
@@ -879,14 +883,17 @@ class Toolkit:
                     from tradingagents.dataflows.optimized_china_data import OptimizedChinaDataProvider
                     analyzer = OptimizedChinaDataProvider()
                     logger.info(f"🔍 [股票代码追踪] 调用 OptimizedChinaDataProvider._generate_fundamentals_report，传入参数: ticker='{ticker}', analysis_modules='{analysis_modules}'")
-                    
+
                     # 传递分析模块参数到基本面分析方法
                     fundamentals_data = analyzer._generate_fundamentals_report(ticker, current_price_data, analysis_modules)
-                    
-                    logger.info(f"🔍 [股票代码追踪] _generate_fundamentals_report 返回结果前200字符: {fundamentals_data[:200] if fundamentals_data else 'None'}")
+
+                    # 🔍 调试：打印返回数据的前500字符
+                    logger.info(f"🔍 [基本面工具调试] A股基本面数据返回长度: {len(fundamentals_data)}")
+                    logger.info(f"🔍 [基本面工具调试] A股基本面数据前500字符:\n{fundamentals_data[:500]}")
+
                     result_data.append(f"## A股基本面财务数据\n{fundamentals_data}")
                 except Exception as e:
-                    logger.error(f"🔍 [股票代码追踪] _generate_fundamentals_report 调用失败: {e}")
+                    logger.error(f"❌ [基本面工具调试] A股基本面数据获取失败: {e}")
                     result_data.append(f"## A股基本面财务数据\n获取失败: {e}")
 
             elif is_hk:
@@ -945,6 +952,10 @@ class Toolkit:
                         from tradingagents.dataflows.interface import get_hk_stock_data_unified
                         hk_data = get_hk_stock_data_unified(ticker, start_date, end_date)
 
+                        # 🔍 调试：打印返回数据的前500字符
+                        logger.info(f"🔍 [基本面工具调试] 港股数据返回长度: {len(hk_data)}")
+                        logger.info(f"🔍 [基本面工具调试] 港股数据前500字符:\n{hk_data[:500]}")
+
                         # 检查数据质量
                         if hk_data and len(hk_data) > 100 and "❌" not in hk_data:
                             result_data.append(f"## 港股数据\n{hk_data}")
@@ -954,7 +965,7 @@ class Toolkit:
                             logger.warning(f"⚠️ [统一基本面工具] 港股主要数据源质量不佳")
 
                     except Exception as e:
-                        logger.error(f"⚠️ [统一基本面工具] 港股主要数据源失败: {e}")
+                        logger.error(f"❌ [基本面工具调试] 港股数据获取失败: {e}")
 
                     # 备用方案：基础港股信息
                     if not hk_data_success:
@@ -1206,8 +1217,14 @@ class Toolkit:
                 try:
                     from tradingagents.dataflows.interface import get_china_stock_data_unified
                     stock_data = get_china_stock_data_unified(ticker, start_date, end_date)
+
+                    # 🔍 调试：打印返回数据的前500字符
+                    logger.info(f"🔍 [市场工具调试] A股数据返回长度: {len(stock_data)}")
+                    logger.info(f"🔍 [市场工具调试] A股数据前500字符:\n{stock_data[:500]}")
+
                     result_data.append(f"## A股市场数据\n{stock_data}")
                 except Exception as e:
+                    logger.error(f"❌ [市场工具调试] A股数据获取失败: {e}")
                     result_data.append(f"## A股市场数据\n获取失败: {e}")
 
             elif is_hk:
@@ -1217,8 +1234,14 @@ class Toolkit:
                 try:
                     from tradingagents.dataflows.interface import get_hk_stock_data_unified
                     hk_data = get_hk_stock_data_unified(ticker, start_date, end_date)
+
+                    # 🔍 调试：打印返回数据的前500字符
+                    logger.info(f"🔍 [市场工具调试] 港股数据返回长度: {len(hk_data)}")
+                    logger.info(f"🔍 [市场工具调试] 港股数据前500字符:\n{hk_data[:500]}")
+
                     result_data.append(f"## 港股市场数据\n{hk_data}")
                 except Exception as e:
+                    logger.error(f"❌ [市场工具调试] 港股数据获取失败: {e}")
                     result_data.append(f"## 港股市场数据\n获取失败: {e}")
 
             else:
