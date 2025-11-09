@@ -406,19 +406,77 @@ def get_hk_stock_data_akshare(symbol: str, start_date: str = None, end_date: str
         df['change'] = df['close'] - df['pre_close']
         df['pct_change'] = (df['change'] / df['pre_close'] * 100).round(2)
 
-        # 格式化输出（包含昨收、涨跌额、涨跌幅）
+        # 🔥 计算技术指标（与A股数据保持一致）
+        # 计算移动平均线
+        df['ma5'] = df['close'].rolling(window=5, min_periods=1).mean()
+        df['ma10'] = df['close'].rolling(window=10, min_periods=1).mean()
+        df['ma20'] = df['close'].rolling(window=20, min_periods=1).mean()
+        df['ma60'] = df['close'].rolling(window=60, min_periods=1).mean()
+
+        # 计算RSI（相对强弱指标）
+        delta = df['close'].diff()
+        gain = delta.where(delta > 0, 0).rolling(window=14, min_periods=1).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14, min_periods=1).mean()
+        rs = gain / loss.replace(0, pd.NA)
+        df['rsi'] = 100 - (100 / (1 + rs))
+
+        # 计算MACD
+        ema12 = df['close'].ewm(span=12, adjust=False).mean()
+        ema26 = df['close'].ewm(span=26, adjust=False).mean()
+        df['macd_dif'] = ema12 - ema26
+        df['macd_dea'] = df['macd_dif'].ewm(span=9, adjust=False).mean()
+        df['macd'] = (df['macd_dif'] - df['macd_dea']) * 2
+
+        # 计算布林带
+        df['boll_mid'] = df['close'].rolling(window=20, min_periods=1).mean()
+        std = df['close'].rolling(window=20, min_periods=1).std()
+        df['boll_upper'] = df['boll_mid'] + 2 * std
+        df['boll_lower'] = df['boll_mid'] - 2 * std
+
+        # 格式化输出（包含价格数据和技术指标）
+        latest = df.iloc[-1]
+
         result = f"""## 港股历史数据 ({symbol})
 **数据源**: AKShare (新浪财经)
 **日期范围**: {start_date} ~ {end_date}
 **数据条数**: {len(df)} 条
 
-### 最近10个交易日
+### 最新价格信息
+- 最新价: HK${latest['close']:.2f}
+- 昨收: HK${latest['pre_close']:.2f}
+- 涨跌额: HK${latest['change']:.2f}
+- 涨跌幅: {latest['pct_change']:.2f}%
+- 最高: HK${latest['high']:.2f}
+- 最低: HK${latest['low']:.2f}
+- 成交量: {latest['volume']:,.0f}
+
+### 技术指标（最新值）
+**移动平均线**:
+- MA5: HK${latest['ma5']:.2f}
+- MA10: HK${latest['ma10']:.2f}
+- MA20: HK${latest['ma20']:.2f}
+- MA60: HK${latest['ma60']:.2f}
+
+**MACD指标**:
+- DIF: {latest['macd_dif']:.2f}
+- DEA: {latest['macd_dea']:.2f}
+- MACD: {latest['macd']:.2f}
+
+**RSI指标**:
+- RSI(14): {latest['rsi']:.2f}
+
+**布林带**:
+- 上轨: HK${latest['boll_upper']:.2f}
+- 中轨: HK${latest['boll_mid']:.2f}
+- 下轨: HK${latest['boll_lower']:.2f}
+
+### 最近10个交易日价格
 {df[['date', 'open', 'high', 'low', 'close', 'pre_close', 'change', 'pct_change', 'volume']].tail(10).to_string(index=False)}
 
 ### 数据统计
-- 最高价: {df['high'].max():.2f}
-- 最低价: {df['low'].min():.2f}
-- 平均收盘价: {df['close'].mean():.2f}
+- 最高价: HK${df['high'].max():.2f}
+- 最低价: HK${df['low'].min():.2f}
+- 平均收盘价: HK${df['close'].mean():.2f}
 - 总成交量: {df['volume'].sum():,.0f}
 """
 
