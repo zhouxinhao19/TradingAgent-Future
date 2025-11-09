@@ -49,6 +49,124 @@ except (ImportError, AttributeError) as e:
     def get_hk_stock_info_akshare(*args, **kwargs):
         return None
 
+
+# ==================== 数据源配置读取 ====================
+
+def _get_enabled_hk_data_sources() -> list:
+    """
+    从数据库读取用户启用的港股数据源配置
+
+    Returns:
+        list: 按优先级排序的数据源列表，如 ['akshare', 'yfinance']
+    """
+    try:
+        # 尝试从数据库读取配置
+        from app.core.database import get_mongo_db_sync
+        db = get_mongo_db_sync()
+
+        # 获取最新的激活配置
+        config_data = db.system_configs.find_one(
+            {"is_active": True},
+            sort=[("version", -1)]
+        )
+
+        if config_data and config_data.get('data_source_configs'):
+            data_source_configs = config_data.get('data_source_configs', [])
+
+            # 过滤出启用的港股数据源
+            enabled_sources = []
+            for ds in data_source_configs:
+                if not ds.get('enabled', True):
+                    continue
+
+                # 检查是否支持港股市场
+                market_categories = ds.get('market_categories', [])
+                if market_categories and '港股' not in market_categories:
+                    continue
+
+                # 映射数据源类型
+                ds_type = ds.get('type', '').lower()
+                if ds_type in ['akshare', 'yfinance', 'finnhub']:
+                    enabled_sources.append({
+                        'type': ds_type,
+                        'priority': ds.get('priority', 0)
+                    })
+
+            # 按优先级排序（数字越大优先级越高）
+            enabled_sources.sort(key=lambda x: x['priority'], reverse=True)
+
+            result = [s['type'] for s in enabled_sources]
+            if result:
+                logger.info(f"✅ [港股数据源] 从数据库读取: {result}")
+                return result
+            else:
+                logger.warning(f"⚠️ [港股数据源] 数据库中没有启用的港股数据源，使用默认顺序")
+        else:
+            logger.warning("⚠️ [港股数据源] 数据库中没有配置，使用默认顺序")
+    except Exception as e:
+        logger.warning(f"⚠️ [港股数据源] 从数据库读取失败: {e}，使用默认顺序")
+
+    # 回退到默认顺序
+    return ['akshare', 'yfinance']
+
+
+def _get_enabled_us_data_sources() -> list:
+    """
+    从数据库读取用户启用的美股数据源配置
+
+    Returns:
+        list: 按优先级排序的数据源列表，如 ['yfinance', 'finnhub']
+    """
+    try:
+        # 尝试从数据库读取配置
+        from app.core.database import get_mongo_db_sync
+        db = get_mongo_db_sync()
+
+        # 获取最新的激活配置
+        config_data = db.system_configs.find_one(
+            {"is_active": True},
+            sort=[("version", -1)]
+        )
+
+        if config_data and config_data.get('data_source_configs'):
+            data_source_configs = config_data.get('data_source_configs', [])
+
+            # 过滤出启用的美股数据源
+            enabled_sources = []
+            for ds in data_source_configs:
+                if not ds.get('enabled', True):
+                    continue
+
+                # 检查是否支持美股市场
+                market_categories = ds.get('market_categories', [])
+                if market_categories and '美股' not in market_categories:
+                    continue
+
+                # 映射数据源类型
+                ds_type = ds.get('type', '').lower()
+                if ds_type in ['yfinance', 'finnhub']:
+                    enabled_sources.append({
+                        'type': ds_type,
+                        'priority': ds.get('priority', 0)
+                    })
+
+            # 按优先级排序（数字越大优先级越高）
+            enabled_sources.sort(key=lambda x: x['priority'], reverse=True)
+
+            result = [s['type'] for s in enabled_sources]
+            if result:
+                logger.info(f"✅ [美股数据源] 从数据库读取: {result}")
+                return result
+            else:
+                logger.warning(f"⚠️ [美股数据源] 数据库中没有启用的美股数据源，使用默认顺序")
+        else:
+            logger.warning("⚠️ [美股数据源] 数据库中没有配置，使用默认顺序")
+    except Exception as e:
+        logger.warning(f"⚠️ [美股数据源] 从数据库读取失败: {e}，使用默认顺序")
+
+    # 回退到默认顺序
+    return ['yfinance', 'finnhub']
+
 # 尝试导入yfinance相关模块，如果失败则跳过
 try:
     from .providers.us.yfinance import *
@@ -1460,7 +1578,7 @@ def get_current_china_data_source() -> str:
 
 def get_hk_stock_data_unified(symbol: str, start_date: str = None, end_date: str = None) -> str:
     """
-    获取港股数据的统一接口
+    获取港股数据的统一接口（根据用户配置选择数据源）
 
     Args:
         symbol: 港股代码 (如: 0700.HK)
@@ -1473,52 +1591,58 @@ def get_hk_stock_data_unified(symbol: str, start_date: str = None, end_date: str
     try:
         logger.info(f"🇭🇰 获取港股数据: {symbol}")
 
-        # 优先使用AKShare港股数据（国内数据源，港股支持更好，更稳定）
-        if AKSHARE_HK_AVAILABLE:
-            try:
-                logger.info(f"🔄 优先使用AKShare获取港股数据: {symbol}")
-                result = get_hk_stock_data_akshare(symbol, start_date, end_date)
-                if result and "❌" not in result:
-                    logger.info(f"✅ AKShare港股数据获取成功: {symbol}")
-                    return result
-                else:
-                    logger.error(f"⚠️ AKShare返回错误结果，尝试备用方案")
-            except Exception as e:
-                logger.error(f"⚠️ AKShare港股数据获取失败: {e}")
+        # 🔥 从数据库读取用户启用的数据源配置
+        enabled_sources = _get_enabled_hk_data_sources()
 
-        # 备用方案1：使用Yahoo Finance港股工具
-        if HK_STOCK_AVAILABLE:
-            try:
-                logger.info(f"🔄 使用Yahoo Finance备用方案获取港股数据: {symbol}")
-                result = get_hk_stock_data(symbol, start_date, end_date)
-                if result and "❌" not in result:
-                    logger.info(f"✅ Yahoo Finance港股数据获取成功: {symbol}")
-                    return result
-                else:
-                    logger.error(f"⚠️ Yahoo Finance返回错误结果")
-            except Exception as e:
-                logger.error(f"⚠️ Yahoo Finance港股数据获取失败: {e}")
+        # 按优先级尝试各个数据源
+        for source in enabled_sources:
+            if source == 'akshare' and AKSHARE_HK_AVAILABLE:
+                try:
+                    logger.info(f"🔄 使用AKShare获取港股数据: {symbol}")
+                    result = get_hk_stock_data_akshare(symbol, start_date, end_date)
+                    if result and "❌" not in result:
+                        logger.info(f"✅ AKShare港股数据获取成功: {symbol}")
+                        return result
+                    else:
+                        logger.warning(f"⚠️ AKShare返回错误结果，尝试下一个数据源")
+                except Exception as e:
+                    logger.error(f"⚠️ AKShare港股数据获取失败: {e}，尝试下一个数据源")
 
-        # 备用方案2：使用FINNHUB（付费用户可用）
-        try:
-            # 导入美股数据提供器（支持新旧路径）
-            try:
-                from .providers.us import OptimizedUSDataProvider
-                provider = OptimizedUSDataProvider()
-                get_us_stock_data_cached = provider.get_stock_data
-            except ImportError:
-                from tradingagents.dataflows.providers.us.optimized import get_us_stock_data_cached
+            elif source == 'yfinance' and HK_STOCK_AVAILABLE:
+                try:
+                    logger.info(f"🔄 使用Yahoo Finance获取港股数据: {symbol}")
+                    result = get_hk_stock_data(symbol, start_date, end_date)
+                    if result and "❌" not in result:
+                        logger.info(f"✅ Yahoo Finance港股数据获取成功: {symbol}")
+                        return result
+                    else:
+                        logger.warning(f"⚠️ Yahoo Finance返回错误结果，尝试下一个数据源")
+                except Exception as e:
+                    logger.error(f"⚠️ Yahoo Finance港股数据获取失败: {e}，尝试下一个数据源")
 
-            logger.info(f"🔄 使用FINNHUB获取港股数据: {symbol}")
-            result = get_us_stock_data_cached(symbol, start_date, end_date)
-            if result and "❌" not in result:
-                return result
-        except Exception as e:
-            logger.error(f"⚠️ FINNHUB港股数据获取失败: {e}")
+            elif source == 'finnhub':
+                try:
+                    # 导入美股数据提供器（支持新旧路径）
+                    try:
+                        from .providers.us import OptimizedUSDataProvider
+                        provider = OptimizedUSDataProvider()
+                        get_us_stock_data_cached = provider.get_stock_data
+                    except ImportError:
+                        from tradingagents.dataflows.providers.us.optimized import get_us_stock_data_cached
+
+                    logger.info(f"🔄 使用FINNHUB获取港股数据: {symbol}")
+                    result = get_us_stock_data_cached(symbol, start_date, end_date)
+                    if result and "❌" not in result:
+                        logger.info(f"✅ FINNHUB港股数据获取成功: {symbol}")
+                        return result
+                    else:
+                        logger.warning(f"⚠️ FINNHUB返回错误结果，尝试下一个数据源")
+                except Exception as e:
+                    logger.error(f"⚠️ FINNHUB港股数据获取失败: {e}，尝试下一个数据源")
 
         # 所有数据源都失败
-        error_msg = f"❌ 无法获取港股{symbol}数据 - 所有数据源都不可用"
-        print(error_msg)
+        error_msg = f"❌ 无法获取港股{symbol}数据 - 所有启用的数据源都不可用"
+        logger.error(error_msg)
         return error_msg
 
     except Exception as e:
@@ -1528,7 +1652,7 @@ def get_hk_stock_data_unified(symbol: str, start_date: str = None, end_date: str
 
 def get_hk_stock_info_unified(symbol: str) -> Dict:
     """
-    获取港股信息的统一接口
+    获取港股信息的统一接口（根据用户配置选择数据源）
 
     Args:
         symbol: 港股代码
@@ -1537,34 +1661,37 @@ def get_hk_stock_info_unified(symbol: str) -> Dict:
         Dict: 港股信息
     """
     try:
-        # 优先使用AKShare（国内数据源，港股支持更好）
-        if AKSHARE_HK_AVAILABLE:
-            try:
-                logger.info(f"🔄 优先使用AKShare获取港股信息: {symbol}")
-                result = get_hk_stock_info_akshare(symbol)
-                if result and 'error' not in result and not result.get('name', '').startswith('港股'):
-                    logger.info(f"✅ AKShare成功获取港股信息: {symbol} -> {result.get('name', 'N/A')}")
-                    return result
-                else:
-                    logger.warning(f"⚠️ AKShare返回默认信息，尝试备用方案")
-            except Exception as e:
-                logger.error(f"⚠️ AKShare港股信息获取失败: {e}")
+        # 🔥 从数据库读取用户启用的数据源配置
+        enabled_sources = _get_enabled_hk_data_sources()
 
-        # 备用方案1：使用Yahoo Finance港股工具
-        if HK_STOCK_AVAILABLE:
-            try:
-                logger.info(f"🔄 使用Yahoo Finance备用方案获取港股信息: {symbol}")
-                result = get_hk_stock_info(symbol)
-                if result and 'error' not in result and not result.get('name', '').startswith('港股'):
-                    logger.info(f"✅ Yahoo Finance成功获取港股信息: {symbol} -> {result.get('name', 'N/A')}")
-                    return result
-                else:
-                    logger.warning(f"⚠️ Yahoo Finance返回默认信息")
-            except Exception as e:
-                logger.error(f"⚠️ Yahoo Finance港股信息获取失败: {e}")
+        # 按优先级尝试各个数据源
+        for source in enabled_sources:
+            if source == 'akshare' and AKSHARE_HK_AVAILABLE:
+                try:
+                    logger.info(f"🔄 使用AKShare获取港股信息: {symbol}")
+                    result = get_hk_stock_info_akshare(symbol)
+                    if result and 'error' not in result and not result.get('name', '').startswith('港股'):
+                        logger.info(f"✅ AKShare成功获取港股信息: {symbol} -> {result.get('name', 'N/A')}")
+                        return result
+                    else:
+                        logger.warning(f"⚠️ AKShare返回默认信息，尝试下一个数据源")
+                except Exception as e:
+                    logger.error(f"⚠️ AKShare港股信息获取失败: {e}，尝试下一个数据源")
 
-        # 备用方案2：返回基本信息
-        logger.info(f"🔄 使用默认信息: {symbol}")
+            elif source == 'yfinance' and HK_STOCK_AVAILABLE:
+                try:
+                    logger.info(f"🔄 使用Yahoo Finance获取港股信息: {symbol}")
+                    result = get_hk_stock_info(symbol)
+                    if result and 'error' not in result and not result.get('name', '').startswith('港股'):
+                        logger.info(f"✅ Yahoo Finance成功获取港股信息: {symbol} -> {result.get('name', 'N/A')}")
+                        return result
+                    else:
+                        logger.warning(f"⚠️ Yahoo Finance返回默认信息，尝试下一个数据源")
+                except Exception as e:
+                    logger.error(f"⚠️ Yahoo Finance港股信息获取失败: {e}，尝试下一个数据源")
+
+        # 所有数据源都失败，返回基本信息
+        logger.warning(f"⚠️ 所有启用的数据源都失败，使用默认信息: {symbol}")
         return {
             'symbol': symbol,
             'name': f'港股{symbol}',
