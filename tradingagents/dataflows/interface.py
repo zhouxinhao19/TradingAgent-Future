@@ -79,10 +79,12 @@ def _get_enabled_hk_data_sources() -> list:
                 if not ds.get('enabled', True):
                     continue
 
-                # 检查是否支持港股市场
+                # 检查是否支持港股市场（支持中英文标识）
                 market_categories = ds.get('market_categories', [])
-                if market_categories and '港股' not in market_categories:
-                    continue
+                if market_categories:
+                    # 支持 '港股' 或 'hk_stocks'
+                    if '港股' not in market_categories and 'hk_stocks' not in market_categories:
+                        continue
 
                 # 映射数据源类型
                 ds_type = ds.get('type', '').lower()
@@ -137,10 +139,12 @@ def _get_enabled_us_data_sources() -> list:
                 if not ds.get('enabled', True):
                     continue
 
-                # 检查是否支持美股市场
+                # 检查是否支持美股市场（支持中英文标识）
                 market_categories = ds.get('market_categories', [])
-                if market_categories and '美股' not in market_categories:
-                    continue
+                if market_categories:
+                    # 支持 '美股' 或 'us_stocks'
+                    if '美股' not in market_categories and 'us_stocks' not in market_categories:
+                        continue
 
                 # 映射数据源类型
                 ds_type = ds.get('type', '').lower()
