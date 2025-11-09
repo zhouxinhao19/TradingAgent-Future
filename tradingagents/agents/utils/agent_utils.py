@@ -1179,20 +1179,30 @@ class Toolkit:
     @log_tool_call(tool_name="get_stock_market_data_unified", log_args=True)
     def get_stock_market_data_unified(
         ticker: Annotated[str, "股票代码（支持A股、港股、美股）"],
-        start_date: Annotated[str, "开始日期，格式：YYYY-MM-DD"],
-        end_date: Annotated[str, "结束日期，格式：YYYY-MM-DD"]
+        start_date: Annotated[str, "开始日期，格式：YYYY-MM-DD。注意：系统会自动扩展到配置的回溯天数（通常为365天），你只需要传递分析日期即可"],
+        end_date: Annotated[str, "结束日期，格式：YYYY-MM-DD。通常与start_date相同，传递当前分析日期即可"]
     ) -> str:
         """
         统一的股票市场数据工具
         自动识别股票类型（A股、港股、美股）并调用相应的数据源获取价格和技术指标数据
 
+        ⚠️ 重要：系统会自动扩展日期范围到配置的回溯天数（通常为365天），以确保技术指标计算有足够的历史数据。
+        你只需要传递当前分析日期作为 start_date 和 end_date 即可，无需手动计算历史日期范围。
+
         Args:
             ticker: 股票代码（如：000001、0700.HK、AAPL）
-            start_date: 开始日期（格式：YYYY-MM-DD）
-            end_date: 结束日期（格式：YYYY-MM-DD）
+            start_date: 开始日期（格式：YYYY-MM-DD）。传递当前分析日期即可，系统会自动扩展
+            end_date: 结束日期（格式：YYYY-MM-DD）。传递当前分析日期即可
 
         Returns:
             str: 市场数据和技术分析报告
+
+        示例：
+            如果分析日期是 2025-11-09，传递：
+            - ticker: "00700.HK"
+            - start_date: "2025-11-09"
+            - end_date: "2025-11-09"
+            系统会自动获取 2024-11-09 到 2025-11-09 的365天历史数据
         """
         logger.info(f"📈 [统一市场工具] 分析股票: {ticker}")
 
