@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-港股数据同步服务（支持多数据源）
+港股数据服务（按需获取+缓存模式）
 
 功能：
-1. 从 yfinance 同步港股基础信息和行情
-2. 从 akshare 同步港股基础信息（备用数据源）
-3. 支持多数据源存储：同一股票可有多个数据源记录
+1. 按需从数据源获取港股信息（yfinance/akshare）
+2. 自动缓存到 MongoDB，避免重复请求
+3. 支持多数据源：同一股票可有多个数据源记录
 4. 使用 (code, source) 联合查询进行 upsert 操作
 
 设计说明：
-- 参考A股多数据源同步服务设计（Tushare/AKShare/BaoStock）
-- 每个数据源独立同步任务
-- 批量更新操作提高性能
+- 采用按需获取+缓存模式，避免批量同步触发速率限制
+- 参考A股数据源管理方式（Tushare/AKShare/BaoStock）
+- 缓存时长可配置（默认24小时）
 """
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Any
 from pymongo import UpdateOne
 
@@ -35,8 +35,8 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
-class HKSyncService:
-    """港股数据同步服务（支持多数据源）"""
+class HKDataService:
+    """港股数据服务（按需获取+缓存模式）"""
 
     def __init__(self):
         self.db = get_mongo_db()
@@ -47,6 +47,10 @@ class HKSyncService:
             "yfinance": HKStockProvider(),
             "akshare": ImprovedHKStockProvider(),
         }
+
+        # 缓存配置
+        self.cache_hours = getattr(settings, 'HK_DATA_CACHE_HOURS', 24)
+        self.default_source = getattr(settings, 'HK_DEFAULT_DATA_SOURCE', 'yfinance')
 
         # 港股列表缓存（从 AKShare 动态获取）
         self.hk_stock_list = []

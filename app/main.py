@@ -59,17 +59,9 @@ from app.worker.baostock_sync_service import (
     run_baostock_historical_sync,
     run_baostock_status_check
 )
-from app.worker.hk_sync_service import (
-    run_hk_yfinance_basic_info_sync,
-    run_hk_akshare_basic_info_sync,
-    run_hk_yfinance_quotes_sync,
-    run_hk_status_check
-)
-from app.worker.us_sync_service import (
-    run_us_yfinance_basic_info_sync,
-    run_us_yfinance_quotes_sync,
-    run_us_status_check
-)
+# 港股和美股改为按需获取+缓存模式，不再需要定时同步任务
+# from app.worker.hk_sync_service import ...
+# from app.worker.us_sync_service import ...
 from app.middleware.operation_log_middleware import OperationLogMiddleware
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -558,79 +550,10 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.error(f"❌ 新闻同步失败: {e}", exc_info=True)
 
-        # ==================== 港股数据同步任务配置 ====================
-        logger.info("🇭🇰 配置港股数据同步任务...")
-
-        # 港股基础信息同步任务 - yfinance
-        scheduler.add_job(
-            run_hk_yfinance_basic_info_sync,
-            CronTrigger.from_crontab(settings.HK_YFINANCE_BASIC_INFO_SYNC_CRON, timezone=settings.TIMEZONE),
-            id="hk_yfinance_basic_info_sync",
-            name="港股基础信息同步（yfinance）",
-            kwargs={"force_update": False}
-        )
-        if not (settings.HK_SYNC_ENABLED and settings.HK_YFINANCE_SYNC_ENABLED and settings.HK_YFINANCE_BASIC_INFO_SYNC_ENABLED):
-            scheduler.pause_job("hk_yfinance_basic_info_sync")
-            logger.info(f"⏸️ 港股基础信息同步（yfinance）已添加但暂停: {settings.HK_YFINANCE_BASIC_INFO_SYNC_CRON}")
-        else:
-            logger.info(f"📅 港股基础信息同步（yfinance）已配置: {settings.HK_YFINANCE_BASIC_INFO_SYNC_CRON}")
-
-        # 港股基础信息同步任务 - AKShare
-        scheduler.add_job(
-            run_hk_akshare_basic_info_sync,
-            CronTrigger.from_crontab(settings.HK_AKSHARE_BASIC_INFO_SYNC_CRON, timezone=settings.TIMEZONE),
-            id="hk_akshare_basic_info_sync",
-            name="港股基础信息同步（AKShare）",
-            kwargs={"force_update": False}
-        )
-        if not (settings.HK_SYNC_ENABLED and settings.HK_AKSHARE_SYNC_ENABLED and settings.HK_AKSHARE_BASIC_INFO_SYNC_ENABLED):
-            scheduler.pause_job("hk_akshare_basic_info_sync")
-            logger.info(f"⏸️ 港股基础信息同步（AKShare）已添加但暂停: {settings.HK_AKSHARE_BASIC_INFO_SYNC_CRON}")
-        else:
-            logger.info(f"📅 港股基础信息同步（AKShare）已配置: {settings.HK_AKSHARE_BASIC_INFO_SYNC_CRON}")
-
-        # 港股实时行情同步任务 - yfinance
-        scheduler.add_job(
-            run_hk_yfinance_quotes_sync,
-            CronTrigger.from_crontab(settings.HK_YFINANCE_QUOTES_SYNC_CRON, timezone=settings.TIMEZONE),
-            id="hk_yfinance_quotes_sync",
-            name="港股实时行情同步（yfinance）"
-        )
-        if not (settings.HK_SYNC_ENABLED and settings.HK_YFINANCE_SYNC_ENABLED and settings.HK_YFINANCE_QUOTES_SYNC_ENABLED):
-            scheduler.pause_job("hk_yfinance_quotes_sync")
-            logger.info(f"⏸️ 港股实时行情同步（yfinance）已添加但暂停: {settings.HK_YFINANCE_QUOTES_SYNC_CRON}")
-        else:
-            logger.info(f"📅 港股实时行情同步（yfinance）已配置: {settings.HK_YFINANCE_QUOTES_SYNC_CRON}")
-
-        # ==================== 美股数据同步任务配置 ====================
-        logger.info("🇺🇸 配置美股数据同步任务...")
-
-        # 美股基础信息同步任务 - yfinance
-        scheduler.add_job(
-            run_us_yfinance_basic_info_sync,
-            CronTrigger.from_crontab(settings.US_YFINANCE_BASIC_INFO_SYNC_CRON, timezone=settings.TIMEZONE),
-            id="us_yfinance_basic_info_sync",
-            name="美股基础信息同步（yfinance）",
-            kwargs={"force_update": False}
-        )
-        if not (settings.US_SYNC_ENABLED and settings.US_YFINANCE_SYNC_ENABLED and settings.US_YFINANCE_BASIC_INFO_SYNC_ENABLED):
-            scheduler.pause_job("us_yfinance_basic_info_sync")
-            logger.info(f"⏸️ 美股基础信息同步（yfinance）已添加但暂停: {settings.US_YFINANCE_BASIC_INFO_SYNC_CRON}")
-        else:
-            logger.info(f"📅 美股基础信息同步（yfinance）已配置: {settings.US_YFINANCE_BASIC_INFO_SYNC_CRON}")
-
-        # 美股实时行情同步任务 - yfinance
-        scheduler.add_job(
-            run_us_yfinance_quotes_sync,
-            CronTrigger.from_crontab(settings.US_YFINANCE_QUOTES_SYNC_CRON, timezone=settings.TIMEZONE),
-            id="us_yfinance_quotes_sync",
-            name="美股实时行情同步（yfinance）"
-        )
-        if not (settings.US_SYNC_ENABLED and settings.US_YFINANCE_SYNC_ENABLED and settings.US_YFINANCE_QUOTES_SYNC_ENABLED):
-            scheduler.pause_job("us_yfinance_quotes_sync")
-            logger.info(f"⏸️ 美股实时行情同步（yfinance）已添加但暂停: {settings.US_YFINANCE_QUOTES_SYNC_CRON}")
-        else:
-            logger.info(f"📅 美股实时行情同步（yfinance）已配置: {settings.US_YFINANCE_QUOTES_SYNC_CRON}")
+        # ==================== 港股/美股数据配置 ====================
+        # 港股和美股采用按需获取+缓存模式，不再配置定时同步任务
+        logger.info("🇭🇰 港股数据采用按需获取+缓存模式")
+        logger.info("🇺🇸 美股数据采用按需获取+缓存模式")
 
         scheduler.add_job(
             run_news_sync,

@@ -258,44 +258,17 @@ class Settings(BaseSettings):
         """获取日志目录"""
         return os.path.dirname(self.LOG_FILE)
 
-    # ==================== 港股数据同步配置 ====================
+    # ==================== 港股数据配置 ====================
 
-    # 港股统一数据同步总开关
-    HK_SYNC_ENABLED: bool = Field(default=True, description="启用港股统一数据同步")
+    # 港股数据源配置（按需获取+缓存模式）
+    HK_DATA_CACHE_HOURS: int = Field(default=24, ge=1, le=168, description="港股数据缓存时长（小时）")
+    HK_DEFAULT_DATA_SOURCE: str = Field(default="yfinance", description="港股默认数据源（yfinance/akshare）")
 
-    # 港股 yfinance 数据源配置
-    HK_YFINANCE_SYNC_ENABLED: bool = Field(default=True, description="启用港股yfinance数据源同步")
-    HK_YFINANCE_BASIC_INFO_SYNC_ENABLED: bool = Field(default=True, description="启用港股基础信息同步（yfinance）")
-    HK_YFINANCE_BASIC_INFO_SYNC_CRON: str = Field(default="0 3 * * *", description="港股基础信息同步CRON表达式（yfinance）")  # 每日凌晨3点
-    HK_YFINANCE_QUOTES_SYNC_ENABLED: bool = Field(default=True, description="启用港股行情同步（yfinance）")
-    HK_YFINANCE_QUOTES_SYNC_CRON: str = Field(default="*/30 9-16 * * 1-5", description="港股行情同步CRON表达式（yfinance）")  # 港股交易时间 09:30-16:00，每30分钟
+    # ==================== 美股数据配置 ====================
 
-    # 港股 AKShare 数据源配置
-    HK_AKSHARE_SYNC_ENABLED: bool = Field(default=True, description="启用港股AKShare数据源同步")
-    HK_AKSHARE_BASIC_INFO_SYNC_ENABLED: bool = Field(default=True, description="启用港股基础信息同步（AKShare）")
-    HK_AKSHARE_BASIC_INFO_SYNC_CRON: str = Field(default="0 4 * * *", description="港股基础信息同步CRON表达式（AKShare）")  # 每日凌晨4点
-
-    # 港股数据初始化配置
-    HK_INIT_HISTORICAL_DAYS: int = Field(default=365, ge=1, le=3650, description="港股初始化历史数据天数")
-    HK_INIT_BATCH_SIZE: int = Field(default=50, ge=10, le=500, description="港股初始化批处理大小")
-    HK_INIT_AUTO_START: bool = Field(default=False, description="应用启动时自动检查并初始化港股数据")
-
-    # ==================== 美股数据同步配置 ====================
-
-    # 美股统一数据同步总开关
-    US_SYNC_ENABLED: bool = Field(default=True, description="启用美股统一数据同步")
-
-    # 美股 yfinance 数据源配置
-    US_YFINANCE_SYNC_ENABLED: bool = Field(default=True, description="启用美股yfinance数据源同步")
-    US_YFINANCE_BASIC_INFO_SYNC_ENABLED: bool = Field(default=True, description="启用美股基础信息同步（yfinance）")
-    US_YFINANCE_BASIC_INFO_SYNC_CRON: str = Field(default="0 4 * * *", description="美股基础信息同步CRON表达式（yfinance）")  # 每日凌晨4点（北京时间）
-    US_YFINANCE_QUOTES_SYNC_ENABLED: bool = Field(default=True, description="启用美股行情同步（yfinance）")
-    US_YFINANCE_QUOTES_SYNC_CRON: str = Field(default="*/30 21-23,0-4 * * 1-5", description="美股行情同步CRON表达式（yfinance）")  # 美股交易时间 21:30-04:00（北京时间），每30分钟
-
-    # 美股数据初始化配置
-    US_INIT_HISTORICAL_DAYS: int = Field(default=365, ge=1, le=3650, description="美股初始化历史数据天数")
-    US_INIT_BATCH_SIZE: int = Field(default=50, ge=10, le=500, description="美股初始化批处理大小")
-    US_INIT_AUTO_START: bool = Field(default=False, description="应用启动时自动检查并初始化美股数据")
+    # 美股数据源配置（按需获取+缓存模式）
+    US_DATA_CACHE_HOURS: int = Field(default=24, ge=1, le=168, description="美股数据缓存时长（小时）")
+    US_DEFAULT_DATA_SOURCE: str = Field(default="yfinance", description="美股默认数据源（yfinance/finnhub）")
 
     # ===== 新闻数据同步服务配置 =====
     NEWS_SYNC_ENABLED: bool = Field(default=True)
