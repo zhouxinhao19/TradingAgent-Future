@@ -1089,7 +1089,8 @@ class OptimizedChinaDataProvider:
                             elif pe_value is None:
                                 # 🔥 PE 为 None，检查是否是亏损股
                                 pe_ttm_check = latest_indicators.get('pe_ttm')
-                                if pe_ttm_check is not None and (pe_ttm_check <= 0 or str(pe_ttm_check) == 'nan' or pe_ttm_check == '--'):
+                                # pe_ttm 为 None、<= 0、'nan'、'--' 都认为是亏损股
+                                if pe_ttm_check is None or pe_ttm_check <= 0 or str(pe_ttm_check) == 'nan' or pe_ttm_check == '--':
                                     is_loss_stock = True
                                     logger.info(f"⚠️ [PE计算-第1层] PE为None且pe_ttm={pe_ttm_check}，确认为亏损股")
 
@@ -1103,7 +1104,8 @@ class OptimizedChinaDataProvider:
                             elif pe_ttm_value is None and not is_loss_stock:
                                 # 🔥 PE_TTM 为 None，再次检查是否是亏损股
                                 pe_ttm_check = latest_indicators.get('pe_ttm')
-                                if pe_ttm_check is not None and (pe_ttm_check <= 0 or str(pe_ttm_check) == 'nan' or pe_ttm_check == '--'):
+                                # pe_ttm 为 None、<= 0、'nan'、'--' 都认为是亏损股
+                                if pe_ttm_check is None or pe_ttm_check <= 0 or str(pe_ttm_check) == 'nan' or pe_ttm_check == '--':
                                     is_loss_stock = True
                                     logger.info(f"⚠️ [PE_TTM计算-第1层] PE_TTM为None且pe_ttm={pe_ttm_check}，确认为亏损股")
 
@@ -1118,7 +1120,8 @@ class OptimizedChinaDataProvider:
                             # 🔥 检查是否因为亏损导致返回 None
                             # 从 stock_basic_info 获取 pe_ttm 判断是否亏损
                             pe_ttm_static = latest_indicators.get('pe_ttm')
-                            if pe_ttm_static is not None and (pe_ttm_static <= 0 or str(pe_ttm_static) == 'nan' or pe_ttm_static == '--'):
+                            # pe_ttm 为 None、<= 0、'nan'、'--' 都认为是亏损股
+                            if pe_ttm_static is None or pe_ttm_static <= 0 or str(pe_ttm_static) == 'nan' or pe_ttm_static == '--':
                                 is_loss_stock = True
                                 logger.info(f"⚠️ [PE计算-第1层失败] 检测到亏损股（pe_ttm={pe_ttm_static}），跳过降级计算")
                             else:
