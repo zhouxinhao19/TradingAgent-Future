@@ -305,7 +305,7 @@ def setup_logging(log_level: str = "INFO"):
                     "webapi": {
                         "level": "INFO",
                         "handlers": webapi_handlers,
-                        "propagate": True
+                        "propagate": False
                     },
                     "worker": {
                         "level": "DEBUG",
