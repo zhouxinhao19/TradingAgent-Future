@@ -302,6 +302,7 @@ class UsageRecord(BaseModel):
     input_tokens: int = Field(..., description="输入token数")
     output_tokens: int = Field(..., description="输出token数")
     cost: float = Field(..., description="成本")
+    currency: str = Field(default="CNY", description="货币单位")
     session_id: str = Field(..., description="会话ID")
     analysis_type: str = Field(default="stock_analysis", description="分析类型")
     stock_code: Optional[str] = Field(None, description="股票代码")

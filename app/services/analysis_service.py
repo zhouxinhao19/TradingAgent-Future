@@ -909,10 +909,12 @@ class AnalysisService:
 
             # 计算成本
             cost = 0.0
+            currency = "CNY"  # 默认货币单位
             if llm_config:
                 input_price = llm_config.input_price_per_1k or 0.0
                 output_price = llm_config.output_price_per_1k or 0.0
                 cost = (input_tokens / 1000 * input_price) + (output_tokens / 1000 * output_price)
+                currency = llm_config.currency or "CNY"
 
             # 创建使用记录
             usage_record = UsageRecord(
@@ -922,6 +924,7 @@ class AnalysisService:
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
                 cost=cost,
+                currency=currency,
                 session_id=task.task_id,
                 analysis_type="stock_analysis",
                 stock_code=task.symbol
