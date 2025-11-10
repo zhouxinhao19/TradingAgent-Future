@@ -13,7 +13,17 @@ def create_fundamentals_analyst(llm, toolkit):
 
         current_date = state["trade_date"]
         ticker = state["company_of_interest"]
-        start_date = '2025-05-28'
+
+        # 🔧 基本面分析数据范围：固定获取10天数据（处理周末/节假日/数据延迟）
+        from datetime import datetime, timedelta
+        try:
+            end_date_dt = datetime.strptime(current_date, "%Y-%m-%d")
+            start_date_dt = end_date_dt - timedelta(days=10)
+            start_date = start_date_dt.strftime("%Y-%m-%d")
+            print(f"📅 [基本面分析师] 数据范围: {start_date} 至 {current_date} (固定10天)")
+        except Exception as e:
+            print(f"⚠️ [基本面分析师] 日期解析失败，使用默认范围: {e}")
+            start_date = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d")
 
         print(f"📊 [DEBUG] 输入参数: ticker={ticker}, date={current_date}")
         print(f"📊 [DEBUG] 当前状态中的消息数量: {len(state.get('messages', []))}")
