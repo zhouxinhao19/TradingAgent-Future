@@ -1,4 +1,4 @@
-﻿"""
+"""
 Thin re-export: ProgressLogHandler moved to app.services.progress.log_handler
 This module keeps exports for backward compatibility. Prefer importing from the new path.
 """
@@ -11,4 +11,3 @@ __all__ = [
     "register_analysis_tracker",
     "unregister_analysis_tracker",
 ]
-

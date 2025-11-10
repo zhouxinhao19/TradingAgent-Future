@@ -143,7 +143,7 @@ class MongoDBReportManager:
                 elif market_info.get("market") == "hong_kong":
                     # 港股：使用改进的港股工具
                     try:
-                        from tradingagents.dataflows.improved_hk_utils import get_hk_company_name_improved
+                        from tradingagents.dataflows.providers.hk.improved_hk import get_hk_company_name_improved
                         stock_name = get_hk_company_name_improved(stock_symbol)
                         logger.info(f"📊 获取港股名称: {stock_symbol} -> {stock_name}")
                     except Exception:

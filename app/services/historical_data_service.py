@@ -116,6 +116,13 @@ class HistoricalDataService:
                     data['volume'] = data['volume'] * 100
                 elif 'vol' in data.columns:
                     data['vol'] = data['vol'] * 100
+
+            # 🔥 港股/美股数据：添加 pre_close 字段（从前一天的 close 获取）
+            if market in ["HK", "US"] and 'pre_close' not in data.columns and 'close' in data.columns:
+                # 使用 shift(1) 将 close 列向下移动一行，得到前一天的收盘价
+                data['pre_close'] = data['close'].shift(1)
+                logger.debug(f"✅ {symbol} 添加 pre_close 字段（从前一天的 close 获取）")
+
             convert_duration = (datetime.now() - convert_start).total_seconds()
 
             # ⏱️ 性能监控：构建操作列表

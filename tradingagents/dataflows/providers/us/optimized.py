@@ -218,17 +218,13 @@ class OptimizedUSDataProvider:
         price_change = data['Close'].iloc[-1] - data['Close'].iloc[0]
         price_change_pct = (price_change / data['Close'].iloc[0]) * 100
 
-        # 计算技术指标
-        data['MA5'] = data['Close'].rolling(window=5).mean()
-        data['MA10'] = data['Close'].rolling(window=10).mean()
-        data['MA20'] = data['Close'].rolling(window=20).mean()
+        # 🔥 使用统一的技术指标计算函数
+        # 注意：美股数据列名是大写的 Close, High, Low
+        from tradingagents.tools.analysis.indicators import add_all_indicators
+        data = add_all_indicators(data, close_col='Close', high_col='High', low_col='Low')
 
-        # 计算RSI
-        delta = data['Close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-        rs = gain / loss
-        rsi = 100 - (100 / (1 + rs))
+        # 获取最新技术指标
+        latest = data.iloc[-1]
 
         # 格式化输出
         result = f"""# {symbol} 美股数据分析
@@ -245,14 +241,28 @@ class OptimizedUSDataProvider:
 - 期间最低: ${data['Low'].min():.2f}
 - 平均成交量: {data['Volume'].mean():,.0f}
 
-## 🔍 技术指标
-- MA5: ${data['MA5'].iloc[-1]:.2f}
-- MA10: ${data['MA10'].iloc[-1]:.2f}
-- MA20: ${data['MA20'].iloc[-1]:.2f}
-- RSI: {rsi.iloc[-1]:.2f}
+## 🔍 技术指标（最新值）
+**移动平均线**:
+- MA5: ${latest['ma5']:.2f}
+- MA10: ${latest['ma10']:.2f}
+- MA20: ${latest['ma20']:.2f}
+- MA60: ${latest['ma60']:.2f}
+
+**MACD指标**:
+- DIF: {latest['macd_dif']:.2f}
+- DEA: {latest['macd_dea']:.2f}
+- MACD: {latest['macd']:.2f}
+
+**RSI指标**:
+- RSI(14): {latest['rsi']:.2f}
+
+**布林带**:
+- 上轨: ${latest['boll_upper']:.2f}
+- 中轨: ${latest['boll_mid']:.2f}
+- 下轨: ${latest['boll_lower']:.2f}
 
 ## 📋 最近5日数据
-{data.tail().to_string()}
+{data[['Open', 'High', 'Low', 'Close', 'Volume']].tail().to_string()}
 
 数据来源: Yahoo Finance API
 更新时间: {datetime.now(ZoneInfo(get_timezone_name())).strftime('%Y-%m-%d %H:%M:%S')}
@@ -388,5 +398,31 @@ def get_us_stock_data_cached(symbol: str, start_date: str, end_date: str,
     Returns:
         格式化的股票数据字符串
     """
+    # 🔧 智能日期范围处理：自动扩展到配置的回溯天数，处理周末/节假日
+    from tradingagents.utils.dataflow_utils import get_trading_date_range
+    from app.core.config import get_settings
+    from datetime import datetime
+
+    original_start_date = start_date
+    original_end_date = end_date
+
+    # 从配置获取市场分析回溯天数（默认60天）
+    try:
+        settings = get_settings()
+        lookback_days = settings.MARKET_ANALYST_LOOKBACK_DAYS
+        logger.info(f"📅 [美股配置验证] MARKET_ANALYST_LOOKBACK_DAYS: {lookback_days}天")
+    except Exception as e:
+        lookback_days = 60  # 默认60天
+        logger.warning(f"⚠️ [美股配置验证] 无法获取配置，使用默认值: {lookback_days}天")
+        logger.warning(f"⚠️ [美股配置验证] 错误详情: {e}")
+
+    # 使用 end_date 作为目标日期，向前回溯指定天数
+    start_date, end_date = get_trading_date_range(end_date, lookback_days=lookback_days)
+
+    logger.info(f"📅 [美股智能日期] 原始输入: {original_start_date} 至 {original_end_date}")
+    logger.info(f"📅 [美股智能日期] 回溯天数: {lookback_days}天")
+    logger.info(f"📅 [美股智能日期] 计算结果: {start_date} 至 {end_date}")
+    logger.info(f"📅 [美股智能日期] 实际天数: {(datetime.strptime(end_date, '%Y-%m-%d') - datetime.strptime(start_date, '%Y-%m-%d')).days}天")
+
     provider = get_optimized_us_data_provider()
     return provider.get_stock_data(symbol, start_date, end_date, force_refresh)

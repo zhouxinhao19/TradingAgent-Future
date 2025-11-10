@@ -1,4 +1,4 @@
-﻿"""
+"""
 Thin re-export: RedisProgressTracker moved to app.services.progress.tracker
 This module keeps exports for backward compatibility. Prefer importing from the new path.
 """
@@ -11,4 +11,3 @@ __all__ = [
     "RedisProgressTracker",
     "get_progress_by_id",
 ]
-

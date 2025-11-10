@@ -1041,6 +1041,7 @@ class OptimizedChinaDataProvider:
             pe_value = None
             pe_ttm_value = None
             pb_value = None
+            is_loss_stock = False  # 🔥 标记是否为亏损股
 
             try:
                 # 优先使用实时计算
@@ -1085,6 +1086,13 @@ class OptimizedChinaDataProvider:
 
                                 logger.info(f"✅ [PE计算-第1层成功] PE={pe_value:.2f}倍 | 来源={source} | 实时={is_realtime}")
                                 logger.info(f"   └─ 计算数据: 股价={price}元, 市值={market_cap_log}亿元, 更新时间={updated_at}")
+                            elif pe_value is None:
+                                # 🔥 PE 为 None，检查是否是亏损股
+                                pe_ttm_check = latest_indicators.get('pe_ttm')
+                                # pe_ttm 为 None、<= 0、'nan'、'--' 都认为是亏损股
+                                if pe_ttm_check is None or pe_ttm_check <= 0 or str(pe_ttm_check) == 'nan' or pe_ttm_check == '--':
+                                    is_loss_stock = True
+                                    logger.info(f"⚠️ [PE计算-第1层] PE为None且pe_ttm={pe_ttm_check}，确认为亏损股")
 
                             # 使用实时PE_TTM（TTM市盈率）
                             pe_ttm_value = realtime_metrics.get('pe_ttm')
@@ -1093,6 +1101,13 @@ class OptimizedChinaDataProvider:
                                 realtime_tag = " (实时)" if is_realtime else ""
                                 metrics["pe_ttm"] = f"{pe_ttm_value:.1f}倍{realtime_tag}"
                                 logger.info(f"✅ [PE_TTM计算-第1层成功] PE_TTM={pe_ttm_value:.2f}倍 | 来源={source} | 实时={is_realtime}")
+                            elif pe_ttm_value is None and not is_loss_stock:
+                                # 🔥 PE_TTM 为 None，再次检查是否是亏损股
+                                pe_ttm_check = latest_indicators.get('pe_ttm')
+                                # pe_ttm 为 None、<= 0、'nan'、'--' 都认为是亏损股
+                                if pe_ttm_check is None or pe_ttm_check <= 0 or str(pe_ttm_check) == 'nan' or pe_ttm_check == '--':
+                                    is_loss_stock = True
+                                    logger.info(f"⚠️ [PE_TTM计算-第1层] PE_TTM为None且pe_ttm={pe_ttm_check}，确认为亏损股")
 
                             # 使用实时PB
                             pb_value = realtime_metrics.get('pb')
@@ -1102,7 +1117,15 @@ class OptimizedChinaDataProvider:
                                 metrics["pb"] = f"{pb_value:.2f}倍{realtime_tag}"
                                 logger.info(f"✅ [PB计算-第1层成功] PB={pb_value:.2f}倍 | 来源={realtime_metrics.get('source')} | 实时={is_realtime}")
                         else:
-                            logger.warning(f"⚠️ [PE计算-第1层失败] 实时计算返回空结果，将尝试降级计算")
+                            # 🔥 检查是否因为亏损导致返回 None
+                            # 从 stock_basic_info 获取 pe_ttm 判断是否亏损
+                            pe_ttm_static = latest_indicators.get('pe_ttm')
+                            # pe_ttm 为 None、<= 0、'nan'、'--' 都认为是亏损股
+                            if pe_ttm_static is None or pe_ttm_static <= 0 or str(pe_ttm_static) == 'nan' or pe_ttm_static == '--':
+                                is_loss_stock = True
+                                logger.info(f"⚠️ [PE计算-第1层失败] 检测到亏损股（pe_ttm={pe_ttm_static}），跳过降级计算")
+                            else:
+                                logger.warning(f"⚠️ [PE计算-第1层失败] 实时计算返回空结果，将尝试降级计算")
 
             except Exception as e:
                 logger.warning(f"⚠️ [PE计算-第1层异常] 实时计算失败: {e}，将尝试降级计算")
@@ -1127,25 +1150,16 @@ class OptimizedChinaDataProvider:
 
             # 如果实时计算失败，尝试传统计算方式
             if pe_value is None:
-                logger.info(f"📊 [PE计算-第2层] 尝试使用市值/净利润计算")
-
-                # 🔥 关键修复：检查净利率，如果为负数则公司亏损，不计算PE
-                net_margin = latest_indicators.get('netprofit_margin')
-                is_loss = False
-                if net_margin is not None and str(net_margin) != 'nan' and net_margin != '--':
-                    try:
-                        net_margin_val = float(net_margin)
-                        if net_margin_val < 0:
-                            is_loss = True
-                            logger.info(f"   ⚠️ 净利率为负({net_margin_val:.2f}%)，公司亏损，PE设为N/A")
-                    except (ValueError, TypeError):
-                        pass
-
-                if is_loss:
-                    metrics["pe"] = "N/A（亏损）"
-                    logger.info(f"✅ [PE计算-第2层完成] PE=N/A（亏损）")
+                # 🔥 如果已经确认是亏损股，直接设置 PE 为 N/A，不再尝试降级计算
+                if is_loss_stock:
+                    metrics["pe"] = "N/A"
+                    logger.info(f"⚠️ [PE计算-亏损股] 已确认为亏损股，PE设置为N/A，跳过第2层计算")
                 else:
+                    logger.info(f"📊 [PE计算-第2层] 尝试使用市值/净利润计算")
+
                     net_profit = latest_indicators.get('net_profit')
+
+                    # 🔥 关键修复：检查净利润是否为正数（亏损股不计算PE）
                     if net_profit and net_profit > 0:
                         try:
                             # 使用市值/净利润计算PE
@@ -1158,13 +1172,19 @@ class OptimizedChinaDataProvider:
                             else:
                                 logger.warning(f"⚠️ [PE计算-第2层失败] 市值无效: {money_cap}，尝试第3层")
 
-                                # 第三层降级：直接使用 latest_indicators 中的 pe 字段
+                                # 第三层降级：直接使用 latest_indicators 中的 pe 字段（仅当为正数时）
                                 pe_static = latest_indicators.get('pe')
                                 if pe_static is not None and str(pe_static) != 'nan' and pe_static != '--':
                                     try:
-                                        metrics["pe"] = f"{float(pe_static):.1f}倍"
-                                        logger.info(f"✅ [PE计算-第3层成功] 使用静态PE: {metrics['pe']}")
-                                        logger.info(f"   └─ 数据来源: stock_basic_info.pe")
+                                        pe_float = float(pe_static)
+                                        # 🔥 只接受正数的 PE
+                                        if pe_float > 0:
+                                            metrics["pe"] = f"{pe_float:.1f}倍"
+                                            logger.info(f"✅ [PE计算-第3层成功] 使用静态PE: {metrics['pe']}")
+                                            logger.info(f"   └─ 数据来源: stock_basic_info.pe")
+                                        else:
+                                            metrics["pe"] = "N/A"
+                                            logger.info(f"⚠️ [PE计算-第3层跳过] 静态PE为负数或零（亏损股）: {pe_float}")
                                     except (ValueError, TypeError):
                                         metrics["pe"] = "N/A"
                                         logger.error(f"❌ [PE计算-第3层失败] 静态PE格式错误: {pe_static}")
@@ -1174,16 +1194,26 @@ class OptimizedChinaDataProvider:
                         except (ValueError, TypeError, ZeroDivisionError) as e:
                             metrics["pe"] = "N/A"
                             logger.error(f"❌ [PE计算-第2层异常] 计算失败: {e}")
+                    elif net_profit and net_profit < 0:
+                        # 🔥 亏损股：PE 设置为 N/A
+                        metrics["pe"] = "N/A"
+                        logger.info(f"⚠️ [PE计算-亏损股] 净利润为负数（{net_profit}万元），PE设置为N/A")
                     else:
                         logger.warning(f"⚠️ [PE计算-第2层跳过] 净利润无效: {net_profit}，尝试第3层")
 
-                        # 第三层降级：直接使用 latest_indicators 中的 pe 字段
+                        # 第三层降级：直接使用 latest_indicators 中的 pe 字段（仅当为正数时）
                         pe_static = latest_indicators.get('pe')
                         if pe_static is not None and str(pe_static) != 'nan' and pe_static != '--':
                             try:
-                                metrics["pe"] = f"{float(pe_static):.1f}倍"
-                                logger.info(f"✅ [PE计算-第3层成功] 使用静态PE: {metrics['pe']}")
-                                logger.info(f"   └─ 数据来源: stock_basic_info.pe")
+                                pe_float = float(pe_static)
+                                # 🔥 只接受正数的 PE
+                                if pe_float > 0:
+                                    metrics["pe"] = f"{pe_float:.1f}倍"
+                                    logger.info(f"✅ [PE计算-第3层成功] 使用静态PE: {metrics['pe']}")
+                                    logger.info(f"   └─ 数据来源: stock_basic_info.pe")
+                                else:
+                                    metrics["pe"] = "N/A"
+                                    logger.info(f"⚠️ [PE计算-第3层跳过] 静态PE为负数或零（亏损股）: {pe_float}")
                             except (ValueError, TypeError):
                                 metrics["pe"] = "N/A"
                                 logger.error(f"❌ [PE计算-第3层失败] 静态PE格式错误: {pe_static}")
@@ -1193,19 +1223,30 @@ class OptimizedChinaDataProvider:
 
             # 如果 PE_TTM 未获取到，尝试从静态数据获取
             if pe_ttm_value is None:
-                logger.info(f"📊 [PE_TTM计算-第2层] 尝试从静态数据获取")
-                pe_ttm_static = latest_indicators.get('pe_ttm')
-                if pe_ttm_static is not None and str(pe_ttm_static) != 'nan' and pe_ttm_static != '--':
-                    try:
-                        metrics["pe_ttm"] = f"{float(pe_ttm_static):.1f}倍"
-                        logger.info(f"✅ [PE_TTM计算-第2层成功] 使用静态PE_TTM: {metrics['pe_ttm']}")
-                        logger.info(f"   └─ 数据来源: stock_basic_info.pe_ttm")
-                    except (ValueError, TypeError):
-                        metrics["pe_ttm"] = "N/A"
-                        logger.error(f"❌ [PE_TTM计算-第2层失败] 静态PE_TTM格式错误: {pe_ttm_static}")
-                else:
+                # 🔥 如果已经确认是亏损股，直接设置 PE_TTM 为 N/A
+                if is_loss_stock:
                     metrics["pe_ttm"] = "N/A"
-                    logger.warning(f"⚠️ [PE_TTM计算-全部失败] 无可用PE_TTM数据")
+                    logger.info(f"⚠️ [PE_TTM计算-亏损股] 已确认为亏损股，PE_TTM设置为N/A")
+                else:
+                    logger.info(f"📊 [PE_TTM计算-第2层] 尝试从静态数据获取")
+                    pe_ttm_static = latest_indicators.get('pe_ttm')
+                    if pe_ttm_static is not None and str(pe_ttm_static) != 'nan' and pe_ttm_static != '--':
+                        try:
+                            pe_ttm_float = float(pe_ttm_static)
+                            # 🔥 只接受正数的 PE_TTM（亏损股不显示PE_TTM）
+                            if pe_ttm_float > 0:
+                                metrics["pe_ttm"] = f"{pe_ttm_float:.1f}倍"
+                                logger.info(f"✅ [PE_TTM计算-第2层成功] 使用静态PE_TTM: {metrics['pe_ttm']}")
+                                logger.info(f"   └─ 数据来源: stock_basic_info.pe_ttm")
+                            else:
+                                metrics["pe_ttm"] = "N/A"
+                                logger.info(f"⚠️ [PE_TTM计算-第2层跳过] 静态PE_TTM为负数或零（亏损股）: {pe_ttm_float}")
+                        except (ValueError, TypeError):
+                            metrics["pe_ttm"] = "N/A"
+                            logger.error(f"❌ [PE_TTM计算-第2层失败] 静态PE_TTM格式错误: {pe_ttm_static}")
+                    else:
+                        metrics["pe_ttm"] = "N/A"
+                        logger.warning(f"⚠️ [PE_TTM计算-全部失败] 无可用PE_TTM数据")
 
             if pb_value is None:
                 total_equity = latest_indicators.get('total_hldr_eqy_exc_min_int')

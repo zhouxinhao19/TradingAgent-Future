@@ -221,24 +221,9 @@ class TokenTrackerCompat:
         self._usage_data[key]["total_output_tokens"] += output_tokens
         self._usage_data[key]["total_cost"] += cost
         self._usage_data[key]["call_count"] += 1
-        
-        # 尝试保存到数据库
-        try:
-            from app.services.llm_usage_service import llm_usage_service
-            
-            loop = asyncio.get_event_loop()
-            if not loop.is_running():
-                loop.run_until_complete(
-                    llm_usage_service.record_usage(
-                        provider=provider,
-                        model_name=model_name,
-                        input_tokens=input_tokens,
-                        output_tokens=output_tokens,
-                        cost=cost
-                    )
-                )
-        except Exception:
-            pass
+
+        # 注意：此兼容层仅提供内存缓存，不持久化到数据库
+        # 如需持久化，请使用 app.services.llm_service 中的相关功能
     
     def get_usage_summary(self) -> Dict[str, Any]:
         """

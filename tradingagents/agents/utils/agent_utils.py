@@ -863,14 +863,18 @@ class Toolkit:
                     from datetime import datetime, timedelta
                     recent_end_date = curr_date
                     recent_start_date = (datetime.strptime(curr_date, '%Y-%m-%d') - timedelta(days=2)).strftime('%Y-%m-%d')
-                    
+
                     from tradingagents.dataflows.interface import get_china_stock_data_unified
                     logger.info(f"🔍 [股票代码追踪] 调用 get_china_stock_data_unified（仅获取最新价格），传入参数: ticker='{ticker}', start_date='{recent_start_date}', end_date='{recent_end_date}'")
                     current_price_data = get_china_stock_data_unified(ticker, recent_start_date, recent_end_date)
-                    logger.info(f"🔍 [股票代码追踪] get_china_stock_data_unified 返回结果前200字符: {current_price_data[:200] if current_price_data else 'None'}")
+
+                    # 🔍 调试：打印返回数据的前500字符
+                    logger.info(f"🔍 [基本面工具调试] A股价格数据返回长度: {len(current_price_data)}")
+                    logger.info(f"🔍 [基本面工具调试] A股价格数据前500字符:\n{current_price_data[:500]}")
+
                     result_data.append(f"## A股当前价格信息\n{current_price_data}")
                 except Exception as e:
-                    logger.error(f"🔍 [股票代码追踪] get_china_stock_data_unified 调用失败: {e}")
+                    logger.error(f"❌ [基本面工具调试] A股价格数据获取失败: {e}")
                     result_data.append(f"## A股当前价格信息\n获取失败: {e}")
                     current_price_data = ""
 
@@ -879,14 +883,17 @@ class Toolkit:
                     from tradingagents.dataflows.optimized_china_data import OptimizedChinaDataProvider
                     analyzer = OptimizedChinaDataProvider()
                     logger.info(f"🔍 [股票代码追踪] 调用 OptimizedChinaDataProvider._generate_fundamentals_report，传入参数: ticker='{ticker}', analysis_modules='{analysis_modules}'")
-                    
+
                     # 传递分析模块参数到基本面分析方法
                     fundamentals_data = analyzer._generate_fundamentals_report(ticker, current_price_data, analysis_modules)
-                    
-                    logger.info(f"🔍 [股票代码追踪] _generate_fundamentals_report 返回结果前200字符: {fundamentals_data[:200] if fundamentals_data else 'None'}")
+
+                    # 🔍 调试：打印返回数据的前500字符
+                    logger.info(f"🔍 [基本面工具调试] A股基本面数据返回长度: {len(fundamentals_data)}")
+                    logger.info(f"🔍 [基本面工具调试] A股基本面数据前500字符:\n{fundamentals_data[:500]}")
+
                     result_data.append(f"## A股基本面财务数据\n{fundamentals_data}")
                 except Exception as e:
-                    logger.error(f"🔍 [股票代码追踪] _generate_fundamentals_report 调用失败: {e}")
+                    logger.error(f"❌ [基本面工具调试] A股基本面数据获取失败: {e}")
                     result_data.append(f"## A股基本面财务数据\n获取失败: {e}")
 
             elif is_hk:
@@ -895,9 +902,32 @@ class Toolkit:
 
                 hk_data_success = False
 
-                # 根据数据深度调整获取策略
-                if data_depth in ["basic", "standard"]:
-                    # 基础和标准级别：只获取基础港股信息
+                # 🔥 统一策略：所有级别都获取完整数据
+                # 原因：提示词是统一的，如果数据不完整会导致LLM基于不存在的数据进行分析（幻觉）
+                logger.info(f"🔍 [港股基本面] 统一策略：获取完整数据（忽略 data_depth 参数）")
+
+                # 主要数据源：AKShare
+                try:
+                    from tradingagents.dataflows.interface import get_hk_stock_data_unified
+                    hk_data = get_hk_stock_data_unified(ticker, start_date, end_date)
+
+                    # 🔍 调试：打印返回数据的前500字符
+                    logger.info(f"🔍 [基本面工具调试] 港股数据返回长度: {len(hk_data)}")
+                    logger.info(f"🔍 [基本面工具调试] 港股数据前500字符:\n{hk_data[:500]}")
+
+                    # 检查数据质量
+                    if hk_data and len(hk_data) > 100 and "❌" not in hk_data:
+                        result_data.append(f"## 港股数据\n{hk_data}")
+                        hk_data_success = True
+                        logger.info(f"✅ [统一基本面工具] 港股主要数据源成功")
+                    else:
+                        logger.warning(f"⚠️ [统一基本面工具] 港股主要数据源质量不佳")
+
+                except Exception as e:
+                    logger.error(f"❌ [基本面工具调试] 港股数据获取失败: {e}")
+
+                # 备用方案：基础港股信息
+                if not hk_data_success:
                     try:
                         from tradingagents.dataflows.interface import get_hk_stock_info_unified
                         hk_info = get_hk_stock_info_unified(ticker)
@@ -910,17 +940,17 @@ class Toolkit:
 **交易所**: 香港交易所 (HKG)
 **数据源**: {hk_info.get('source', '基础信息')}
 
+⚠️ 注意：详细的价格和财务数据暂时无法获取，建议稍后重试或使用其他数据源。
+
 **基本面分析建议**：
 - 建议查看公司最新财报
 - 关注港股市场整体走势
 - 考虑汇率因素对投资的影响
 """
                         result_data.append(basic_info)
-                        hk_data_success = True
-                        logger.info(f"✅ [统一基本面工具] 港股基础信息成功")
+                        logger.info(f"✅ [统一基本面工具] 港股备用信息成功")
 
-                    except Exception as e:
-                        logger.error(f"⚠️ [统一基本面工具] 港股基础信息失败: {e}")
+                    except Exception as e2:
                         # 最终备用方案
                         fallback_info = f"""## 港股信息（备用）
 
@@ -929,66 +959,6 @@ class Toolkit:
 **交易货币**: 港币 (HK$)
 **交易所**: 香港交易所 (HKG)
 
-❌ 数据获取遇到问题: {str(e)}
-
-**建议**：
-- 请稍后重试
-- 或使用其他数据源
-- 检查股票代码格式是否正确
-"""
-                        result_data.append(fallback_info)
-
-                elif data_depth in ["full", "detailed", "comprehensive"]:
-                    # 完整、详细和全面级别：获取完整港股数据
-                    # 主要数据源：AKShare
-                    try:
-                        from tradingagents.dataflows.interface import get_hk_stock_data_unified
-                        hk_data = get_hk_stock_data_unified(ticker, start_date, end_date)
-
-                        # 检查数据质量
-                        if hk_data and len(hk_data) > 100 and "❌" not in hk_data:
-                            result_data.append(f"## 港股数据\n{hk_data}")
-                            hk_data_success = True
-                            logger.info(f"✅ [统一基本面工具] 港股主要数据源成功")
-                        else:
-                            logger.warning(f"⚠️ [统一基本面工具] 港股主要数据源质量不佳")
-
-                    except Exception as e:
-                        logger.error(f"⚠️ [统一基本面工具] 港股主要数据源失败: {e}")
-
-                    # 备用方案：基础港股信息
-                    if not hk_data_success:
-                        try:
-                            from tradingagents.dataflows.interface import get_hk_stock_info_unified
-                            hk_info = get_hk_stock_info_unified(ticker)
-
-                            basic_info = f"""## 港股基础信息
-
-**股票代码**: {ticker}
-**股票名称**: {hk_info.get('name', f'港股{ticker}')}
-**交易货币**: 港币 (HK$)
-**交易所**: 香港交易所 (HKG)
-**数据源**: {hk_info.get('source', '基础信息')}
-
-⚠️ 注意：详细的价格和财务数据暂时无法获取，建议稍后重试或使用其他数据源。
-
-**基本面分析建议**：
-- 建议查看公司最新财报
-- 关注港股市场整体走势
-- 考虑汇率因素对投资的影响
-"""
-                            result_data.append(basic_info)
-                            logger.info(f"✅ [统一基本面工具] 港股备用信息成功")
-
-                        except Exception as e2:
-                            # 最终备用方案
-                            fallback_info = f"""## 港股信息（备用）
-
-**股票代码**: {ticker}
-**股票类型**: 港股
-**交易货币**: 港币 (HK$)
-**交易所**: 香港交易所 (HKG)
-
 ❌ 数据获取遇到问题: {str(e2)}
 
 **建议**：
@@ -996,120 +966,25 @@ class Toolkit:
 - 或使用其他数据源
 - 检查股票代码格式是否正确
 """
-                            result_data.append(fallback_info)
-                            logger.error(f"❌ [统一基本面工具] 港股所有数据源都失败: {e2}")
-
-                else:
-                    # 默认情况：获取完整数据
-                    # 主要数据源：AKShare
-                    try:
-                        from tradingagents.dataflows.interface import get_hk_stock_data_unified
-                        hk_data = get_hk_stock_data_unified(ticker, start_date, end_date)
-
-                        # 检查数据质量
-                        if hk_data and len(hk_data) > 100 and "❌" not in hk_data:
-                            result_data.append(f"## 港股数据\n{hk_data}")
-                            hk_data_success = True
-                            logger.info(f"✅ [统一基本面工具] 港股主要数据源成功")
-                        else:
-                            logger.warning(f"⚠️ [统一基本面工具] 港股主要数据源质量不佳")
-
-                    except Exception as e:
-                        logger.error(f"⚠️ [统一基本面工具] 港股主要数据源失败: {e}")
-
-                    # 备用方案：基础港股信息
-                    if not hk_data_success:
-                        try:
-                            from tradingagents.dataflows.interface import get_hk_stock_info_unified
-                            hk_info = get_hk_stock_info_unified(ticker)
-
-                            basic_info = f"""## 港股基础信息
-
-**股票代码**: {ticker}
-**股票名称**: {hk_info.get('name', f'港股{ticker}')}
-**交易货币**: 港币 (HK$)
-**交易所**: 香港交易所 (HKG)
-**数据源**: {hk_info.get('source', '基础信息')}
-
-⚠️ 注意：详细的价格和财务数据暂时无法获取，建议稍后重试或使用其他数据源。
-
-**基本面分析建议**：
-- 建议查看公司最新财报
-- 关注港股市场整体走势
-- 考虑汇率因素对投资的影响
-"""
-                            result_data.append(basic_info)
-                            logger.info(f"✅ [统一基本面工具] 港股备用信息成功")
-
-                        except Exception as e2:
-                            # 最终备用方案
-                            fallback_info = f"""## 港股信息（备用）
-
-**股票代码**: {ticker}
-**股票类型**: 港股
-**交易货币**: 港币 (HK$)
-**交易所**: 香港交易所 (HKG)
-
-❌ 数据获取遇到问题: {str(e2)}
-
-**建议**：
-1. 检查网络连接
-2. 稍后重试分析
-3. 使用其他港股数据源
-4. 查看公司官方财报
-"""
                         result_data.append(fallback_info)
-                        logger.warning(f"⚠️ [统一基本面工具] 港股使用最终备用方案")
+                        logger.error(f"❌ [统一基本面工具] 港股所有数据源都失败: {e2}")
 
             else:
                 # 美股：使用OpenAI/Finnhub数据源
-                logger.info(f"🇺🇸 [统一基本面工具] 处理美股数据，数据深度: {data_depth}...")
+                logger.info(f"🇺🇸 [统一基本面工具] 处理美股数据...")
 
-                # 根据数据深度调整获取策略
-                if data_depth in ["basic", "standard"]:
-                    # 基础和标准级别：获取基础美股信息
-                    try:
-                        # 简化的美股基础信息
-                        basic_us_info = f"""## 美股基础信息
+                # 🔥 统一策略：所有级别都获取完整数据
+                # 原因：提示词是统一的，如果数据不完整会导致LLM基于不存在的数据进行分析（幻觉）
+                logger.info(f"🔍 [美股基本面] 统一策略：获取完整数据（忽略 data_depth 参数）")
 
-**股票代码**: {ticker}
-**股票类型**: 美股
-**交易货币**: 美元 (USD)
-**交易所**: 美国证券交易所
-
-**基本面分析建议**：
-- 建议查看公司最新财报
-- 关注美股市场整体走势
-- 考虑美元汇率因素对投资的影响
-- 关注美联储政策对股市的影响
-"""
-                        result_data.append(basic_us_info)
-                        logger.info(f"✅ [统一基本面工具] 美股基础信息成功")
-                    except Exception as e:
-                        result_data.append(f"## 美股基础信息\n获取失败: {e}")
-                        logger.error(f"❌ [统一基本面工具] 美股基础信息失败: {e}")
-
-                elif data_depth in ["full", "detailed", "comprehensive"]:
-                    # 完整、详细和全面级别：获取完整美股数据
-                    try:
-                        from tradingagents.dataflows.interface import get_fundamentals_openai
-                        us_data = get_fundamentals_openai(ticker, curr_date)
-                        result_data.append(f"## 美股基本面数据\n{us_data}")
-                        logger.info(f"✅ [统一基本面工具] 美股完整数据成功")
-                    except Exception as e:
-                        result_data.append(f"## 美股基本面数据\n获取失败: {e}")
-                        logger.error(f"❌ [统一基本面工具] 美股完整数据失败: {e}")
-
-                else:
-                    # 默认情况：获取完整数据
-                    try:
-                        from tradingagents.dataflows.interface import get_fundamentals_openai
-                        us_data = get_fundamentals_openai(ticker, curr_date)
-                        result_data.append(f"## 美股基本面数据\n{us_data}")
-                        logger.info(f"✅ [统一基本面工具] 美股默认数据成功")
-                    except Exception as e:
-                        result_data.append(f"## 美股基本面数据\n获取失败: {e}")
-                        logger.error(f"❌ [统一基本面工具] 美股默认数据失败: {e}")
+                try:
+                    from tradingagents.dataflows.interface import get_fundamentals_openai
+                    us_data = get_fundamentals_openai(ticker, curr_date)
+                    result_data.append(f"## 美股基本面数据\n{us_data}")
+                    logger.info(f"✅ [统一基本面工具] 美股数据获取成功")
+                except Exception as e:
+                    result_data.append(f"## 美股基本面数据\n获取失败: {e}")
+                    logger.error(f"❌ [统一基本面工具] 美股数据获取失败: {e}")
 
             # 组合所有数据
             combined_result = f"""# {ticker} 基本面分析数据
@@ -1168,20 +1043,30 @@ class Toolkit:
     @log_tool_call(tool_name="get_stock_market_data_unified", log_args=True)
     def get_stock_market_data_unified(
         ticker: Annotated[str, "股票代码（支持A股、港股、美股）"],
-        start_date: Annotated[str, "开始日期，格式：YYYY-MM-DD"],
-        end_date: Annotated[str, "结束日期，格式：YYYY-MM-DD"]
+        start_date: Annotated[str, "开始日期，格式：YYYY-MM-DD。注意：系统会自动扩展到配置的回溯天数（通常为365天），你只需要传递分析日期即可"],
+        end_date: Annotated[str, "结束日期，格式：YYYY-MM-DD。通常与start_date相同，传递当前分析日期即可"]
     ) -> str:
         """
         统一的股票市场数据工具
         自动识别股票类型（A股、港股、美股）并调用相应的数据源获取价格和技术指标数据
 
+        ⚠️ 重要：系统会自动扩展日期范围到配置的回溯天数（通常为365天），以确保技术指标计算有足够的历史数据。
+        你只需要传递当前分析日期作为 start_date 和 end_date 即可，无需手动计算历史日期范围。
+
         Args:
             ticker: 股票代码（如：000001、0700.HK、AAPL）
-            start_date: 开始日期（格式：YYYY-MM-DD）
-            end_date: 结束日期（格式：YYYY-MM-DD）
+            start_date: 开始日期（格式：YYYY-MM-DD）。传递当前分析日期即可，系统会自动扩展
+            end_date: 结束日期（格式：YYYY-MM-DD）。传递当前分析日期即可
 
         Returns:
             str: 市场数据和技术分析报告
+
+        示例：
+            如果分析日期是 2025-11-09，传递：
+            - ticker: "00700.HK"
+            - start_date: "2025-11-09"
+            - end_date: "2025-11-09"
+            系统会自动获取 2024-11-09 到 2025-11-09 的365天历史数据
         """
         logger.info(f"📈 [统一市场工具] 分析股票: {ticker}")
 
@@ -1206,8 +1091,14 @@ class Toolkit:
                 try:
                     from tradingagents.dataflows.interface import get_china_stock_data_unified
                     stock_data = get_china_stock_data_unified(ticker, start_date, end_date)
+
+                    # 🔍 调试：打印返回数据的前500字符
+                    logger.info(f"🔍 [市场工具调试] A股数据返回长度: {len(stock_data)}")
+                    logger.info(f"🔍 [市场工具调试] A股数据前500字符:\n{stock_data[:500]}")
+
                     result_data.append(f"## A股市场数据\n{stock_data}")
                 except Exception as e:
+                    logger.error(f"❌ [市场工具调试] A股数据获取失败: {e}")
                     result_data.append(f"## A股市场数据\n获取失败: {e}")
 
             elif is_hk:
@@ -1217,8 +1108,14 @@ class Toolkit:
                 try:
                     from tradingagents.dataflows.interface import get_hk_stock_data_unified
                     hk_data = get_hk_stock_data_unified(ticker, start_date, end_date)
+
+                    # 🔍 调试：打印返回数据的前500字符
+                    logger.info(f"🔍 [市场工具调试] 港股数据返回长度: {len(hk_data)}")
+                    logger.info(f"🔍 [市场工具调试] 港股数据前500字符:\n{hk_data[:500]}")
+
                     result_data.append(f"## 港股市场数据\n{hk_data}")
                 except Exception as e:
+                    logger.error(f"❌ [市场工具调试] 港股数据获取失败: {e}")
                     result_data.append(f"## 港股市场数据\n获取失败: {e}")
 
             else:

@@ -32,6 +32,7 @@ from app.routers import sync as sync_router, multi_source_sync
 from app.routers import stocks as stocks_router
 from app.routers import stock_data as stock_data_router
 from app.routers import stock_sync as stock_sync_router
+from app.routers import multi_market_stocks as multi_market_stocks_router
 from app.routers import notifications as notifications_router
 from app.routers import websocket_notifications as websocket_notifications_router
 from app.routers import scheduler as scheduler_router
@@ -58,6 +59,9 @@ from app.worker.baostock_sync_service import (
     run_baostock_historical_sync,
     run_baostock_status_check
 )
+# 港股和美股改为按需获取+缓存模式，不再需要定时同步任务
+# from app.worker.hk_sync_service import ...
+# from app.worker.us_sync_service import ...
 from app.middleware.operation_log_middleware import OperationLogMiddleware
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -74,7 +78,7 @@ def get_version() -> str:
             return version_file.read_text(encoding='utf-8').strip()
     except Exception:
         pass
-    return "0.1.16"  # 默认版本号
+    return "1.0.0"  # 默认版本号
 
 
 async def _print_config_summary(logger):
@@ -546,6 +550,11 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.error(f"❌ 新闻同步失败: {e}", exc_info=True)
 
+        # ==================== 港股/美股数据配置 ====================
+        # 港股和美股采用按需获取+缓存模式，不再配置定时同步任务
+        logger.info("🇭🇰 港股数据采用按需获取+缓存模式")
+        logger.info("🇺🇸 美股数据采用按需获取+缓存模式")
+
         scheduler.add_job(
             run_news_sync,
             CronTrigger.from_crontab(settings.NEWS_SYNC_CRON, timezone=settings.TIMEZONE),
@@ -564,7 +573,8 @@ async def lifespan(app: FastAPI):
         set_scheduler_instance(scheduler)
         logger.info("✅ 调度器服务已初始化")
     except Exception as e:
-        logger.warning(f"Failed to start scheduler: {e}")
+        logger.error(f"❌ 调度器启动失败: {e}", exc_info=True)
+        raise  # 抛出异常，阻止应用启动
 
     try:
         yield
@@ -671,6 +681,7 @@ app.include_router(screening.router, prefix="/api/screening", tags=["screening"]
 app.include_router(queue.router, prefix="/api/queue", tags=["queue"])
 app.include_router(favorites.router, prefix="/api", tags=["favorites"])
 app.include_router(stocks_router.router, prefix="/api", tags=["stocks"])
+app.include_router(multi_market_stocks_router.router, prefix="/api", tags=["multi-market"])
 app.include_router(stock_data_router.router, tags=["stock-data"])
 app.include_router(stock_sync_router.router, tags=["stock-sync"])
 app.include_router(tags.router, prefix="/api", tags=["tags"])

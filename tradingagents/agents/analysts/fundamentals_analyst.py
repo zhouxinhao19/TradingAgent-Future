@@ -60,7 +60,7 @@ def _get_company_name_for_fundamentals(ticker: str, market_info: dict) -> str:
         elif market_info['is_hk']:
             # 港股：使用改进的港股工具
             try:
-                from tradingagents.dataflows.improved_hk_utils import get_hk_company_name_improved
+                from tradingagents.dataflows.providers.hk.improved_hk import get_hk_company_name_improved
                 company_name = get_hk_company_name_improved(ticker)
                 logger.debug(f"📊 [基本面分析师] 使用改进港股工具获取名称: {ticker} -> {company_name}")
                 return company_name
@@ -320,9 +320,11 @@ def create_fundamentals_analyst(llm, toolkit):
         for i, msg in enumerate(state['messages']):
             msg_type = type(msg).__name__
             if hasattr(msg, 'content'):
-                content_preview = str(msg.content)[:500] + "..." if len(str(msg.content)) > 500 else str(msg.content)
+                # 🔥 调试模式：打印完整内容，不截断
+                content_full = str(msg.content)
                 logger.info(f"消息 {i+1} [{msg_type}]:")
-                logger.info(f"  内容: {content_preview}")
+                logger.info(f"  内容长度: {len(content_full)} 字符")
+                logger.info(f"  内容: {content_full}")
             if hasattr(msg, 'tool_calls') and msg.tool_calls:
                 logger.info(f"  工具调用: {[tc.get('name', 'unknown') for tc in msg.tool_calls]}")
             if hasattr(msg, 'name'):
@@ -356,9 +358,9 @@ def create_fundamentals_analyst(llm, toolkit):
         logger.info(f"🤖 [基本面分析师] - 消息类型: {type(result).__name__}")
         logger.info(f"🤖 [基本面分析师] - 内容长度: {len(result.content) if hasattr(result, 'content') else 0}")
         if hasattr(result, 'content') and result.content:
-            # 截取前500字符避免日志过长
-            content_preview = result.content[:500] + "..." if len(result.content) > 500 else result.content
-            logger.info(f"🤖 [基本面分析师] - 内容预览: {content_preview}")
+            # 🔥 调试模式：打印完整内容，不截断
+            logger.info(f"🤖 [基本面分析师] - 完整内容:")
+            logger.info(f"{result.content}")
         
         # 🔍 [调试日志] 打印tool_calls的详细信息
         # 详细记录 LLM 返回结果

@@ -98,14 +98,20 @@ class StockBasicInfoExtended(BaseModel):
     # 新增标准化字段
     board: Optional[str] = Field(None, description="板块标准化")
     industry_code: Optional[str] = Field(None, description="行业代码")
-    sector: Optional[str] = Field(None, description="所属板块标准化")
+    sector: Optional[str] = Field(None, description="所属板块标准化（GICS行业）")
     delist_date: Optional[str] = Field(None, description="退市日期")
     status: Optional[StockStatus] = Field(None, description="上市状态")
     is_hs: Optional[bool] = Field(None, description="是否沪深港通标的")
-    
+
     # 新增股本信息
     total_shares: Optional[float] = Field(None, description="总股本")
     float_shares: Optional[float] = Field(None, description="流通股本")
+
+    # 港股特有字段
+    lot_size: Optional[int] = Field(None, description="每手股数（港股特有）")
+
+    # 货币字段
+    currency: Optional[CurrencyType] = Field(None, description="交易货币")
     
     # 版本控制
     data_version: Optional[int] = Field(None, description="数据版本")

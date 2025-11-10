@@ -57,7 +57,7 @@ def _get_company_name(ticker: str, market_info: dict) -> str:
         elif market_info['is_hk']:
             # 港股：使用改进的港股工具
             try:
-                from tradingagents.dataflows.improved_hk_utils import get_hk_company_name_improved
+                from tradingagents.dataflows.providers.hk.improved_hk import get_hk_company_name_improved
                 company_name = get_hk_company_name_improved(ticker)
                 logger.debug(f"📊 [DEBUG] 使用改进港股工具获取名称: {ticker} -> {company_name}")
                 return company_name
@@ -155,6 +155,10 @@ def create_market_analyst(llm, toolkit):
                     "你可以使用以下工具：{tool_names}\n"
                     "⚠️ 重要工作流程：\n"
                     "1. 如果消息历史中没有工具结果，立即调用 get_stock_market_data_unified 工具\n"
+                    "   - ticker: {ticker}\n"
+                    "   - start_date: {current_date}\n"
+                    "   - end_date: {current_date}\n"
+                    "   注意：系统会自动扩展到365天历史数据，你只需要传递当前分析日期即可\n"
                     "2. 如果消息历史中已经有工具结果（ToolMessage），立即基于工具数据生成最终分析报告\n"
                     "3. 不要重复调用工具！一次工具调用就足够了！\n"
                     "4. 接收到工具数据后，必须立即生成完整的技术分析报告，不要再调用任何工具\n"

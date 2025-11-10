@@ -54,7 +54,7 @@ def _get_company_name_for_social_media(ticker: str, market_info: dict) -> str:
         elif market_info['is_hk']:
             # 港股：使用改进的港股工具
             try:
-                from tradingagents.dataflows.improved_hk_utils import get_hk_company_name_improved
+                from tradingagents.dataflows.providers.hk.improved_hk import get_hk_company_name_improved
                 company_name = get_hk_company_name_improved(ticker)
                 logger.debug(f"📊 [社交媒体分析师] 使用改进港股工具获取名称: {ticker} -> {company_name}")
                 return company_name
