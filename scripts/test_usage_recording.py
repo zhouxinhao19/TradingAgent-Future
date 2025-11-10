@@ -139,10 +139,12 @@ async def test_analysis_service_recording():
         
         from app.services.analysis_service import AnalysisService
         from app.models.analysis import AnalysisTask, AnalysisResult
-        
+        from bson import ObjectId
+
         # 创建模拟任务
         task = AnalysisTask(
             task_id="test_task_001",
+            user_id=ObjectId(),  # 添加必需的 user_id 字段
             symbol="600519",
             market="CN",
             start_date="2024-01-01",
