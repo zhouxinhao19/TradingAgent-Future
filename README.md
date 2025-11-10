@@ -17,9 +17,9 @@
 
 **🎯 我们的使命**: 为中国用户提供完整的中文化体验，支持A股/港股市场，集成国产大模型，推动AI金融技术在中文社区的普及应用。
 
-## 🎉 v1.0.0-preview 内测版本 - 全新架构升级
+## 🎉 v1.0.0-preview 版本上线 - 全新架构升级
 
-> 🚀 **重磅发布**: v1.0.0-preview 版本现已开启内测！全新的 FastAPI + Vue 3 架构，带来企业级的性能和体验！
+> 🚀 **重磅发布**: v1.0.0-preview 版本现已正式！全新的 FastAPI + Vue 3 架构，带来企业级的性能和体验！
 
 ### ✨ 核心特性
 
@@ -75,13 +75,11 @@
 
 | 部署方式 | 适用场景 | 难度 | 文档链接 |
 |---------|---------|------|---------|
-| 🟢 **绿色版** | Windows 用户、快速体验 | ⭐ 简单 | [绿色版安装指南](./docs/guides/portable-installation-guide.md) |
-| 🐳 **Docker版** | 生产环境、跨平台 | ⭐⭐ 中等 | [Docker 部署指南](./docs/guides/docker-deployment-guide.md) |
-| 💻 **本地代码版** | 开发者、定制需求 | ⭐⭐⭐ 较难 | [本地安装指南](./docs/guides/installation-guide.md) |
+| 🟢 **绿色版** | Windows 用户、快速体验 | ⭐ 简单 | [绿色版安装指南](https://mp.weixin.qq.com/s/uAk4RevdJHMuMvlqpdGUEw) |
+| 🐳 **Docker版** | 生产环境、跨平台 | ⭐⭐ 中等 | [Docker 部署指南](https://mp.weixin.qq.com/s/JkA0cOu8xJnoY_3LC5oXNw) |
+| 💻 **本地代码版** | 开发者、定制需求 | ⭐⭐⭐ 较难 | [本地安装指南](https://mp.weixin.qq.com/s/bmqTuLcl7leiv-PP05S5IA) |
 
-**快速开始**：
-- 📖 [5分钟快速安装](./docs/guides/INSTALLATION_QUICK_START.md) - 快速上手指南
-- 📖 [完整安装指南](./docs/guides/INSTALLATION_GUIDE_V1.md) - 详细安装文档
+
 
 #### 📚 使用指南
 
@@ -142,16 +140,22 @@
 
 ## 📄 许可证
 
-本项目基于 Apache 2.0 许可证开源。详见 [LICENSE](LICENSE) 文件。
+本项目采用**混合许可证**模式，详见 [LICENSE](LICENSE) 文件：
 
-### 许可证说明
+### 🔓 开源部分（Apache 2.0）
+- **适用范围**：除 `app/` 和 `frontend/` 外的所有文件
+- **权限**：商业使用 ✅ | 修改分发 ✅ | 私人使用 ✅ | 专利使用 ✅
+- **条件**：保留版权声明 ❗ | 包含许可证副本 ❗
 
-- ✅ 商业使用
-- ✅ 修改和分发
-- ✅ 私人使用
-- ✅ 专利使用
-- ❗ 需要保留版权声明
-- ❗ 需要包含许可证副本
+### 🔒 专有部分（需商业授权）
+- **适用范围**：`app/`（FastAPI后端）和 `frontend/`（Vue前端）目录
+- **商业使用**：需要单独许可协议
+- **联系授权**：[hsliup@163.com](mailto:hsliup@163.com)
+
+### 📋 许可证选择建议
+- **个人学习/研究**：可自由使用全部功能
+- **商业应用**：请联系获取专有组件授权
+- **定制开发**：欢迎咨询商业合作方案
 
 ## 🙏 致谢与感恩
 

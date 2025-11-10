@@ -11,21 +11,26 @@
 ```powershell
 # 1. 下载绿色版压缩包
 # 2. 解压到任意目录（如 D:\TradingAgentsCN-portable）
-# 3. 编辑 .env 文件，配置 API 密钥
-# 4. 以管理员身份运行 PowerShell，执行：
+# 3. 以管理员身份运行 PowerShell，执行：
 cd D:\TradingAgentsCN-portable
 powershell -ExecutionPolicy Bypass -File start_all.ps1
 
-# 5. 打开浏览器访问 http://localhost:5173
+# 4. 打开浏览器访问 http://localhost
 ```
 
 **优点**: ✅ 开箱即用 ✅ 无需配置环境 ✅ 一键启动  
 **缺点**: ⚠️ 仅支持 Windows
 
 📥 **下载地址**: 
-- GitHub Releases: https://github.com/hsliuping/TradingAgents-CN/releases
+
 - 关注公众号 "TradingAgents-CN" 获取网盘链接
 
+操作手册：
+
+https://mp.weixin.qq.com/s/uAk4RevdJHMuMvlqpdGUEw
+TradingAgents-CN v1.0.0-preview绿色版（目前只支持windows）简单使用手册
+https://mp.weixin.qq.com/s/o5QdNuh2-iKkIHzJXCj7vQ
+TradingAgents-CN v1.0.0-preview绿色版绿色版端口配置说明
 ---
 
 ### 方式二：Docker版（最稳定）⭐ 推荐生产环境
