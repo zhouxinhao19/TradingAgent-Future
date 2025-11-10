@@ -31,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### 实时PE/PB计算
 
-- **实时数据**: 基于30秒更新的实时行情计算PE/PB
+- **实时数据**: 基于300秒更新的实时行情计算PE/PB
 - **数据实时性提升**: 从"每日"提升到"30秒"，提升2880倍
 - **降级机制**: 实时计算失败时自动降级到静态数据
 - **数据验证**: PE范围[-100, 1000]，PB范围[0.1, 100]
@@ -161,12 +161,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 修复路由跳转问题
 - 修复表格排序问题
 
-### 🗑️ 移除
-
-- 移除价格预警功能（未完成）
-- 移除批量收藏和批量标签功能（未实现）
-- 移除最大并发任务配置（改为后端控制）
-- 移除TDX数据源（已弃用）
 
 ### 📚 文档
 
@@ -288,9 +282,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **修订版本号**: Bug修复和小优化
 - **预览版**: `-preview` 后缀表示预览版本
 
-### 升级指南
-
-从旧版本升级到v1.0.0-preview，请参考 [升级指南](docs/releases/upgrade-guide.md)
 
 ### 反馈渠道
 
