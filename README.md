@@ -79,6 +79,8 @@
 | 🐳 **Docker版** | 生产环境、跨平台 | ⭐⭐ 中等 | [Docker 部署指南](https://mp.weixin.qq.com/s/JkA0cOu8xJnoY_3LC5oXNw) |
 | 💻 **本地代码版** | 开发者、定制需求 | ⭐⭐⭐ 较难 | [本地安装指南](https://mp.weixin.qq.com/s/bmqTuLcl7leiv-PP05S5IA) |
 
+⚠️ **重要提醒**：在分析股票之前，请按相关文档要求，将股票数据同步完成，否则分析结果将会出现数据错误。
+
 
 
 #### 📚 使用指南
@@ -90,6 +92,7 @@
 - **[3、📘 从 Docker Hub 更新 TradingAgents‑CN 镜像](https://mp.weixin.qq.com/s/WKYhW8J80Watpg8K6E_dSQ)**
 - **[4、📘 TradingAgents-CN v1.0.0-preview绿色版（目前只支持windows）简单使用手册](https://mp.weixin.qq.com/s/uAk4RevdJHMuMvlqpdGUEw)**
 - **[5、📘 TradingAgents-CN v1.0.0-preview绿色版端口配置说明](https://mp.weixin.qq.com/s/o5QdNuh2-iKkIHzJXCj7vQ)**
+- **[6、📘 TradingAgents v1.0.0-preview 源码版安装手册](https://mp.weixin.qq.com/s/bmqTuLcl7leiv-PP05S5IA)**
 
 使用指南包含：
 - ✅ 完整的功能介绍和操作演示
