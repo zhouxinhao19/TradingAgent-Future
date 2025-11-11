@@ -7,16 +7,139 @@ import json
 import os
 import gzip
 import asyncio
+import subprocess
+import shutil
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+import logging
 
 from bson import ObjectId
 
 from app.core.database import get_mongo_db
+from app.core.config import settings
 from .serialization import serialize_document
+
+logger = logging.getLogger(__name__)
+
+
+def _check_mongodump_available() -> bool:
+    """检查 mongodump 命令是否可用"""
+    return shutil.which("mongodump") is not None
+
+
+async def create_backup_native(name: str, backup_dir: str, collections: Optional[List[str]] = None, user_id: str | None = None) -> Dict[str, Any]:
+    """
+    使用 MongoDB 原生 mongodump 命令创建备份（推荐，速度快）
+
+    优势：
+    - 速度快（直接操作 BSON，不需要 JSON 转换）
+    - 压缩效率高
+    - 支持大数据量
+    - 并行处理多个集合
+
+    要求：
+    - 系统中需要安装 MongoDB Database Tools
+    - mongodump 命令在 PATH 中可用
+    """
+    if not _check_mongodump_available():
+        raise Exception("mongodump 命令不可用，请安装 MongoDB Database Tools 或使用 create_backup() 方法")
+
+    db = get_mongo_db()
+
+    backup_id = str(ObjectId())
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    backup_dirname = f"backup_{name}_{timestamp}"
+    backup_path = os.path.join(backup_dir, backup_dirname)
+
+    os.makedirs(backup_dir, exist_ok=True)
+
+    # 构建 mongodump 命令
+    cmd = [
+        "mongodump",
+        "--uri", settings.MONGO_URI,
+        "--out", backup_path,
+        "--gzip"  # 启用压缩
+    ]
+
+    # 如果指定了集合，只备份这些集合
+    if collections:
+        for collection_name in collections:
+            cmd.extend(["--collection", collection_name])
+
+    logger.info(f"🔄 开始执行 mongodump 备份: {name}")
+
+    # 🔥 使用 asyncio.to_thread 在线程池中执行阻塞的 subprocess 调用
+    def _run_mongodump():
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=3600  # 1小时超时
+        )
+        if result.returncode != 0:
+            raise Exception(f"mongodump 执行失败: {result.stderr}")
+        return result
+
+    try:
+        await asyncio.to_thread(_run_mongodump)
+        logger.info(f"✅ mongodump 备份完成: {name}")
+    except subprocess.TimeoutExpired:
+        raise Exception("备份超时（超过1小时）")
+    except Exception as e:
+        logger.error(f"❌ mongodump 备份失败: {e}")
+        # 清理失败的备份目录
+        if os.path.exists(backup_path):
+            await asyncio.to_thread(shutil.rmtree, backup_path)
+        raise
+
+    # 计算备份大小
+    def _get_dir_size(path):
+        total = 0
+        for dirpath, dirnames, filenames in os.walk(path):
+            for filename in filenames:
+                filepath = os.path.join(dirpath, filename)
+                total += os.path.getsize(filepath)
+        return total
+
+    file_size = await asyncio.to_thread(_get_dir_size, backup_path)
+
+    # 获取实际备份的集合列表
+    if not collections:
+        collections = await db.list_collection_names()
+        collections = [c for c in collections if not c.startswith("system.")]
+
+    backup_meta = {
+        "_id": ObjectId(backup_id),
+        "name": name,
+        "filename": backup_dirname,
+        "file_path": backup_path,
+        "size": file_size,
+        "collections": collections,
+        "created_at": datetime.utcnow(),
+        "created_by": user_id,
+        "backup_type": "mongodump",  # 标记备份类型
+    }
+
+    await db.database_backups.insert_one(backup_meta)
+
+    return {
+        "id": backup_id,
+        "name": name,
+        "filename": backup_dirname,
+        "file_path": backup_path,
+        "size": file_size,
+        "collections": collections,
+        "created_at": backup_meta["created_at"].isoformat(),
+        "backup_type": "mongodump",
+    }
 
 
 async def create_backup(name: str, backup_dir: str, collections: Optional[List[str]] = None, user_id: str | None = None) -> Dict[str, Any]:
+    """
+    创建数据库备份（Python 实现，兼容性好但速度较慢）
+
+    对于大数据量（>100MB），建议使用 create_backup_native() 方法
+    """
     db = get_mongo_db()
 
     backup_id = str(ObjectId())
@@ -44,10 +167,14 @@ async def create_backup(name: str, backup_dir: str, collections: Optional[List[s
         backup_data["data"][collection_name] = documents
 
     os.makedirs(backup_dir, exist_ok=True)
-    with gzip.open(backup_path, "wt", encoding="utf-8") as f:
-        json.dump(backup_data, f, ensure_ascii=False, indent=2)
 
-    file_size = os.path.getsize(backup_path)
+    # 🔥 使用 asyncio.to_thread 将阻塞的文件 I/O 操作放到线程池执行
+    def _write_backup():
+        with gzip.open(backup_path, "wt", encoding="utf-8") as f:
+            json.dump(backup_data, f, ensure_ascii=False, indent=2)
+        return os.path.getsize(backup_path)
+
+    file_size = await asyncio.to_thread(_write_backup)
 
     backup_meta = {
         "_id": ObjectId(backup_id),
@@ -95,7 +222,14 @@ async def delete_backup(backup_id: str) -> None:
     if not backup:
         raise Exception("备份不存在")
     if os.path.exists(backup["file_path"]):
-        os.remove(backup["file_path"])
+        # 🔥 使用 asyncio.to_thread 将阻塞的文件删除操作放到线程池执行
+        backup_type = backup.get("backup_type", "python")
+        if backup_type == "mongodump":
+            # mongodump 备份是目录，需要递归删除
+            await asyncio.to_thread(shutil.rmtree, backup["file_path"])
+        else:
+            # Python 备份是单个文件
+            await asyncio.to_thread(os.remove, backup["file_path"])
     await db.database_backups.delete_one({"_id": ObjectId(backup_id)})
 
 
@@ -104,7 +238,11 @@ async def import_data(content: bytes, collection: str, *, format: str = "json", 
     collection_obj = db[collection]
 
     if format.lower() == "json":
-        data = json.loads(content.decode("utf-8"))
+        # 🔥 使用 asyncio.to_thread 将阻塞的 JSON 解析放到线程池执行
+        def _parse_json():
+            return json.loads(content.decode("utf-8"))
+
+        data = await asyncio.to_thread(_parse_json)
     else:
         raise Exception(f"不支持的格式: {format}")
 
