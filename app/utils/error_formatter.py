@@ -14,13 +14,14 @@ class ErrorCategory(str, Enum):
     LLM_API_KEY = "llm_api_key"  # 大模型 API Key 错误
     LLM_NETWORK = "llm_network"  # 大模型网络错误
     LLM_QUOTA = "llm_quota"  # 大模型配额/限流错误
+    LLM_CONTENT_FILTER = "llm_content_filter"  # 大模型内容审核失败
     LLM_OTHER = "llm_other"  # 大模型其他错误
-    
+
     DATA_SOURCE_API_KEY = "data_source_api_key"  # 数据源 API Key 错误
     DATA_SOURCE_NETWORK = "data_source_network"  # 数据源网络错误
     DATA_SOURCE_NOT_FOUND = "data_source_not_found"  # 数据源找不到数据
     DATA_SOURCE_OTHER = "data_source_other"  # 数据源其他错误
-    
+
     STOCK_CODE_INVALID = "stock_code_invalid"  # 股票代码无效
     NETWORK = "network"  # 网络连接错误
     SYSTEM = "system"  # 系统错误
@@ -108,13 +109,20 @@ class ErrorFormatter:
                 "insufficient_quota", "billing"
             ]):
                 return ErrorCategory.LLM_QUOTA, llm_provider
-            
+
+            # LLM 内容审核失败
+            if any(keyword in error_lower for keyword in [
+                "data_inspection_failed", "inappropriate content", "content filter",
+                "内容审核", "敏感内容", "违规内容", "content policy"
+            ]):
+                return ErrorCategory.LLM_CONTENT_FILTER, llm_provider
+
             # LLM 网络错误
             if any(keyword in error_lower for keyword in [
                 "connection", "network", "timeout", "unreachable", "dns", "ssl"
             ]):
                 return ErrorCategory.LLM_NETWORK, llm_provider
-            
+
             # LLM 其他错误
             return ErrorCategory.LLM_OTHER, llm_provider
         
@@ -231,7 +239,24 @@ class ErrorFormatter:
                 ),
                 "technical_detail": original_error
             }
-        
+
+        elif category == ErrorCategory.LLM_CONTENT_FILTER:
+            return {
+                "category": "内容审核失败",
+                "title": f"🚫 {friendly_name or '大模型'} 内容审核未通过",
+                "message": f"{friendly_name or '大模型'} 检测到输入内容可能包含不适当的内容，拒绝处理请求。",
+                "suggestion": (
+                    "这通常是由于分析内容中包含了敏感词汇或不当表述。建议：\n"
+                    "1. 这可能是股票新闻或财报中包含了敏感词汇（如政治、暴力等）\n"
+                    "2. 尝试切换到其他大模型（如 DeepSeek、Google Gemini）\n"
+                    "3. 如果是阿里百炼，可以尝试使用 qwen-max 或 qwen-plus 模型\n"
+                    "4. 联系技术支持报告此问题，我们会优化内容过滤逻辑\n"
+                    "\n"
+                    "💡 提示：不同大模型的内容审核策略不同，切换模型通常可以解决此问题。"
+                ),
+                "technical_detail": original_error
+            }
+
         elif category == ErrorCategory.LLM_NETWORK:
             return {
                 "category": "大模型网络错误",

@@ -44,6 +44,15 @@ class OptimizedUSDataProvider:
         self.last_api_call = 0
         self.min_api_interval = get_float("TA_US_MIN_API_INTERVAL_SECONDS", "ta_us_min_api_interval_seconds", 1.0)
 
+        # 🔥 初始化数据源管理器（从数据库读取配置）
+        try:
+            from tradingagents.dataflows.data_source_manager import USDataSourceManager
+            self.us_manager = USDataSourceManager()
+            logger.info(f"✅ 美股数据源管理器初始化成功")
+        except Exception as e:
+            logger.warning(f"⚠️ 美股数据源管理器初始化失败: {e}，将使用默认顺序")
+            self.us_manager = None
+
         logger.info(f"📊 优化美股数据提供器初始化完成")
 
     def _wait_for_rate_limit(self):
@@ -76,53 +85,94 @@ class OptimizedUSDataProvider:
 
         # 检查缓存（除非强制刷新）
         if not force_refresh:
-            # 优先查找FINNHUB缓存
-            cache_key = self.cache.find_cached_stock_data(
-                symbol=symbol,
-                start_date=start_date,
-                end_date=end_date,
-                data_source="finnhub"
-            )
+            # 🔥 按照数据源优先级顺序查找缓存
+            from ...data_source_manager import get_us_data_source_manager, USDataSource
+            us_manager = get_us_data_source_manager()
 
-            # 如果没有FINNHUB缓存，查找Yahoo Finance缓存
-            if not cache_key:
-                cache_key = self.cache.find_cached_stock_data(
-                    symbol=symbol,
-                    start_date=start_date,
-                    end_date=end_date,
-                    data_source="yfinance"
-                )
+            # 获取数据源优先级顺序
+            priority_order = us_manager._get_data_source_priority_order(symbol)
 
-            if cache_key:
-                cached_data = self.cache.load_stock_data(cache_key)
-                if cached_data:
-                    # 识别缓存来源
-                    cache_source = "FINNHUB" if "finnhub" in cache_key.lower() else "Yahoo Finance"
-                    logger.info(f"⚡ [数据来源: 文件缓存-{cache_source}] 从缓存加载美股数据: {symbol}")
-                    return cached_data
+            # 数据源名称映射
+            source_name_mapping = {
+                USDataSource.ALPHA_VANTAGE: "alpha_vantage",
+                USDataSource.YFINANCE: "yfinance",
+                USDataSource.FINNHUB: "finnhub",
+            }
 
-        # 缓存未命中，从API获取 - 优先使用FINNHUB
+            # 按优先级顺序查找缓存
+            for source in priority_order:
+                if source == USDataSource.MONGODB:
+                    continue  # MongoDB 缓存单独处理
+
+                source_name = source_name_mapping.get(source)
+                if source_name:
+                    cache_key = self.cache.find_cached_stock_data(
+                        symbol=symbol,
+                        start_date=start_date,
+                        end_date=end_date,
+                        data_source=source_name
+                    )
+
+                    if cache_key:
+                        cached_data = self.cache.load_stock_data(cache_key)
+                        if cached_data:
+                            logger.info(f"⚡ [数据来源: 缓存-{source_name}] 从缓存加载美股数据: {symbol}")
+                            return cached_data
+
+        # 缓存未命中，从API获取 - 使用数据源管理器的优先级顺序
         formatted_data = None
         data_source = None
 
-        # 尝试FINNHUB API（优先）
-        try:
-            logger.info(f"🌐 [数据来源: API调用-FINNHUB] 从FINNHUB API获取数据: {symbol}")
-            self._wait_for_rate_limit()
+        # 🔥 从数据源管理器获取优先级顺序
+        if self.us_manager:
+            try:
+                source_priority = self.us_manager._get_data_source_priority_order(symbol)
+                logger.info(f"📊 [美股数据源优先级] 从数据库读取: {[s.value for s in source_priority]}")
+            except Exception as e:
+                logger.warning(f"⚠️ 获取数据源优先级失败: {e}，使用默认顺序")
+                source_priority = None
+        else:
+            source_priority = None
 
-            formatted_data = self._get_data_from_finnhub(symbol, start_date, end_date)
-            if formatted_data and "❌" not in formatted_data:
-                data_source = "finnhub"
-                logger.info(f"✅ [数据来源: API调用成功-FINNHUB] FINNHUB数据获取成功: {symbol}")
-            else:
-                logger.error(f"⚠️ [数据来源: API失败-FINNHUB] FINNHUB数据获取失败，尝试备用方案")
+        # 如果没有配置优先级，使用默认顺序
+        if not source_priority:
+            # 默认顺序：yfinance > alpha_vantage > finnhub
+            from tradingagents.dataflows.data_source_manager import USDataSource
+            source_priority = [USDataSource.YFINANCE, USDataSource.ALPHA_VANTAGE, USDataSource.FINNHUB]
+            logger.info(f"📊 [美股数据源优先级] 使用默认顺序: {[s.value for s in source_priority]}")
+
+        # 按优先级尝试各个数据源
+        for source in source_priority:
+            try:
+                source_name = source.value
+                logger.info(f"🌐 [数据来源: API调用-{source_name.upper()}] 尝试从 {source_name.upper()} 获取数据: {symbol}")
+                self._wait_for_rate_limit()
+
+                # 根据数据源类型调用不同的方法
+                if source_name == 'finnhub':
+                    formatted_data = self._get_data_from_finnhub(symbol, start_date, end_date)
+                elif source_name == 'alpha_vantage':
+                    formatted_data = self._get_data_from_alpha_vantage(symbol, start_date, end_date)
+                elif source_name == 'yfinance':
+                    formatted_data = self._get_data_from_yfinance(symbol, start_date, end_date)
+                else:
+                    logger.warning(f"⚠️ 未知的数据源类型: {source_name}")
+                    continue
+
+                if formatted_data and "❌" not in formatted_data:
+                    data_source = source_name
+                    logger.info(f"✅ [数据来源: API调用成功-{source_name.upper()}] {source_name.upper()} 数据获取成功: {symbol}")
+                    break  # 成功获取数据，跳出循环
+                else:
+                    logger.warning(f"⚠️ [数据来源: API失败-{source_name.upper()}] {source_name.upper()} 数据获取失败，尝试下一个数据源")
+                    formatted_data = None
+
+            except Exception as e:
+                logger.error(f"❌ [数据来源: API异常-{source.value.upper()}] {source.value.upper()} API调用失败: {e}")
                 formatted_data = None
+                continue  # 尝试下一个数据源
 
-        except Exception as e:
-            logger.error(f"❌ [数据来源: API异常-FINNHUB] FINNHUB API调用失败: {e}")
-            formatted_data = None
-
-        # 备用方案：根据股票类型选择合适的数据源
+        # 如果所有配置的数据源都失败，尝试备用方案
         if not formatted_data:
             try:
                 # 检测股票类型
@@ -350,6 +400,91 @@ class OptimizedUSDataProvider:
 
         except Exception as e:
             logger.error(f"❌ FINNHUB数据获取失败: {e}")
+            return None
+
+    def _get_data_from_yfinance(self, symbol: str, start_date: str, end_date: str) -> str:
+        """从 Yahoo Finance API 获取股票数据"""
+        try:
+            # 获取数据
+            ticker = yf.Ticker(symbol.upper())
+            data = ticker.history(start=start_date, end=end_date)
+
+            if data.empty:
+                error_msg = f"未找到股票 '{symbol}' 在 {start_date} 到 {end_date} 期间的数据"
+                logger.error(f"❌ Yahoo Finance数据为空: {error_msg}")
+                return None
+
+            # 格式化数据
+            formatted_data = self._format_stock_data(symbol, data, start_date, end_date)
+            return formatted_data
+
+        except Exception as e:
+            logger.error(f"❌ Yahoo Finance数据获取失败: {e}")
+            return None
+
+    def _get_data_from_alpha_vantage(self, symbol: str, start_date: str, end_date: str) -> str:
+        """从 Alpha Vantage API 获取股票数据"""
+        try:
+            from tradingagents.dataflows.providers.us.alpha_vantage_common import get_api_key
+            import requests
+            from datetime import datetime
+
+            # 获取 API Key
+            api_key = get_api_key()
+            if not api_key:
+                logger.warning("⚠️ Alpha Vantage API Key 未配置")
+                return None
+
+            # 调用 Alpha Vantage API (TIME_SERIES_DAILY)
+            url = f"https://www.alphavantage.co/query"
+            params = {
+                "function": "TIME_SERIES_DAILY",
+                "symbol": symbol.upper(),
+                "apikey": api_key,
+                "outputsize": "full"  # 获取完整历史数据
+            }
+
+            response = requests.get(url, params=params, timeout=30)
+            response.raise_for_status()
+            data_json = response.json()
+
+            # 检查错误
+            if "Error Message" in data_json:
+                logger.error(f"❌ Alpha Vantage API 错误: {data_json['Error Message']}")
+                return None
+
+            if "Note" in data_json:
+                logger.warning(f"⚠️ Alpha Vantage API 限制: {data_json['Note']}")
+                return None
+
+            # 解析时间序列数据
+            time_series = data_json.get("Time Series (Daily)", {})
+            if not time_series:
+                logger.error("❌ Alpha Vantage 返回数据为空")
+                return None
+
+            # 转换为 DataFrame
+            df = pd.DataFrame.from_dict(time_series, orient='index')
+            df.index = pd.to_datetime(df.index)
+            df = df.sort_index()
+
+            # 重命名列
+            df.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+            df = df.astype(float)
+
+            # 过滤日期范围
+            df = df[(df.index >= start_date) & (df.index <= end_date)]
+
+            if df.empty:
+                logger.error(f"❌ Alpha Vantage 数据在指定日期范围内为空")
+                return None
+
+            # 格式化数据
+            formatted_data = self._format_stock_data(symbol, df, start_date, end_date)
+            return formatted_data
+
+        except Exception as e:
+            logger.error(f"❌ Alpha Vantage数据获取失败: {e}")
             return None
 
     def _generate_fallback_data(self, symbol: str, start_date: str, end_date: str, error_msg: str) -> str:

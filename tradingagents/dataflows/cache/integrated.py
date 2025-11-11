@@ -191,7 +191,42 @@ class IntegratedCacheManager:
             return self.adaptive_cache.load_data(cache_key)
         else:
             return self.legacy_cache.load_fundamentals_data(cache_key)
-    
+
+    def find_cached_fundamentals_data(self, symbol: str, data_source: str = None,
+                                     max_age_hours: int = None) -> Optional[str]:
+        """
+        查找匹配的基本面缓存数据
+
+        Args:
+            symbol: 股票代码
+            data_source: 数据源（如 "openai", "finnhub"）
+            max_age_hours: 最大缓存时间（小时），None时使用智能配置
+
+        Returns:
+            cache_key: 如果找到有效缓存则返回缓存键，否则返回None
+        """
+        if self.use_adaptive:
+            # 自适应缓存暂不支持查找功能，降级到文件缓存
+            return self.legacy_cache.find_cached_fundamentals_data(symbol, data_source, max_age_hours)
+        else:
+            return self.legacy_cache.find_cached_fundamentals_data(symbol, data_source, max_age_hours)
+
+    def is_fundamentals_cache_valid(self, symbol: str, data_source: str = None,
+                                   max_age_hours: int = None) -> bool:
+        """
+        检查基本面缓存是否有效
+
+        Args:
+            symbol: 股票代码
+            data_source: 数据源
+            max_age_hours: 最大缓存时间（小时）
+
+        Returns:
+            bool: 缓存是否有效
+        """
+        cache_key = self.find_cached_fundamentals_data(symbol, data_source, max_age_hours)
+        return cache_key is not None
+
     def get_cache_stats(self) -> Dict[str, Any]:
         """获取缓存统计信息"""
         if self.use_adaptive:

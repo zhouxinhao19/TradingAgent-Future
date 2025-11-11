@@ -33,8 +33,9 @@ class DataSourceCode(str, Enum):
     BAOSTOCK = "baostock"    # BaoStock - 免费A股数据
     
     # ==================== 美股数据源 ====================
+    YFINANCE = "yfinance"         # yfinance - Yahoo Finance Python库
     FINNHUB = "finnhub"           # Finnhub - 美股实时数据
-    YAHOO_FINANCE = "yahoo_finance"  # Yahoo Finance - 全球股票数据
+    YAHOO_FINANCE = "yahoo_finance"  # Yahoo Finance - 全球股票数据（别名）
     ALPHA_VANTAGE = "alpha_vantage"  # Alpha Vantage - 美股技术分析
     IEX_CLOUD = "iex_cloud"       # IEX Cloud - 美股实时数据
     
@@ -131,6 +132,21 @@ DATA_SOURCE_REGISTRY: Dict[str, DataSourceInfo] = {
         features=["历史行情", "财务数据", "完全免费", "数据稳定"],
     ),
     
+    # yfinance
+    DataSourceCode.YFINANCE: DataSourceInfo(
+        code=DataSourceCode.YFINANCE,
+        name="yfinance",
+        display_name="yfinance (Yahoo Finance)",
+        provider="Yahoo Finance",
+        description="Yahoo Finance Python库，支持美股、港股等多个市场，完全免费",
+        supported_markets=["us_stocks", "hk_stocks"],
+        requires_api_key=False,
+        is_free=True,
+        official_website="https://finance.yahoo.com",
+        documentation_url="https://pypi.org/project/yfinance/",
+        features=["历史行情", "实时行情", "技术指标", "全球市场", "完全免费"],
+    ),
+
     # Finnhub
     DataSourceCode.FINNHUB: DataSourceInfo(
         code=DataSourceCode.FINNHUB,

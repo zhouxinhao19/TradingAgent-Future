@@ -119,8 +119,30 @@ class DatabaseService:
         return await _db_status.test_redis_connection()
 
     async def create_backup(self, name: str, collections: List[str] = None, user_id: str = None) -> Dict[str, Any]:
-        """创建数据库备份（委托子模块）"""
-        return await _db_backups.create_backup(name=name, backup_dir=self.backup_dir, collections=collections, user_id=user_id)
+        """
+        创建数据库备份（自动选择最佳方法）
+
+        - 如果 mongodump 可用，使用原生备份（快速）
+        - 否则使用 Python 实现（兼容性好但较慢）
+        """
+        # 检查 mongodump 是否可用
+        if _db_backups._check_mongodump_available():
+            logger.info("✅ 使用 mongodump 原生备份（推荐）")
+            return await _db_backups.create_backup_native(
+                name=name,
+                backup_dir=self.backup_dir,
+                collections=collections,
+                user_id=user_id
+            )
+        else:
+            logger.warning("⚠️ mongodump 不可用，使用 Python 备份（较慢）")
+            logger.warning("💡 建议安装 MongoDB Database Tools 以获得更快的备份速度")
+            return await _db_backups.create_backup(
+                name=name,
+                backup_dir=self.backup_dir,
+                collections=collections,
+                user_id=user_id
+            )
 
     async def list_backups(self) -> List[Dict[str, Any]]:
         """获取备份列表（委托子模块）"""

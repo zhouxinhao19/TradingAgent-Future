@@ -1,0 +1,10 @@
+{
+  "symbol": "TSLA",
+  "data_type": "fundamentals",
+  "data_source": "alpha_vantage",
+  "market_type": "us",
+  "file_path": "C:\\TradingAgentsCN\\tradingagents\\dataflows\\cache\\data_cache\\us_fundamentals\\TSLA_fundamentals_601731055345.txt",
+  "file_format": "txt",
+  "content_length": 1896,
+  "cached_at": "2025-11-11T18:38:35.011868"
+}

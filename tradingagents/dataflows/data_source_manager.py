@@ -38,6 +38,19 @@ class ChinaDataSource(Enum):
     BAOSTOCK = DataSourceCode.BAOSTOCK
 
 
+class USDataSource(Enum):
+    """
+    美股数据源枚举
+
+    注意：这个枚举与 tradingagents.constants.DataSourceCode 保持同步
+    值使用统一的数据源编码
+    """
+    MONGODB = DataSourceCode.MONGODB  # MongoDB数据库缓存（最高优先级）
+    YFINANCE = DataSourceCode.YFINANCE  # Yahoo Finance（免费，股票价格和技术指标）
+    ALPHA_VANTAGE = DataSourceCode.ALPHA_VANTAGE  # Alpha Vantage（基本面和新闻）
+    FINNHUB = DataSourceCode.FINNHUB  # Finnhub（备用数据源）
+
+
 
 
 
@@ -446,16 +459,21 @@ class DataSourceManager:
         elif self.use_mongodb_cache and 'mongodb' not in enabled_sources_in_db:
             logger.info("ℹ️ MongoDB数据源已在数据库中禁用")
 
+        # 从数据库读取数据源配置
+        datasource_configs = self._get_datasource_configs_from_db()
+
         # 检查Tushare
         if 'tushare' in enabled_sources_in_db:
             try:
                 import tushare as ts
-                token = os.getenv('TUSHARE_TOKEN')
+                # 优先从数据库配置读取 API Key，其次从环境变量读取
+                token = datasource_configs.get('tushare', {}).get('api_key') or os.getenv('TUSHARE_TOKEN')
                 if token:
                     available.append(ChinaDataSource.TUSHARE)
-                    logger.info("✅ Tushare数据源可用且已启用")
+                    source = "数据库配置" if datasource_configs.get('tushare', {}).get('api_key') else "环境变量"
+                    logger.info(f"✅ Tushare数据源可用且已启用 (API Key来源: {source})")
                 else:
-                    logger.warning("⚠️ Tushare数据源不可用: 未设置TUSHARE_TOKEN")
+                    logger.warning("⚠️ Tushare数据源不可用: API Key未配置（数据库和环境变量均未找到）")
             except ImportError:
                 logger.warning("⚠️ Tushare数据源不可用: 库未安装")
         else:
@@ -487,6 +505,35 @@ class DataSourceManager:
         # 不再检查和支持 TDX 数据源
 
         return available
+
+    def _get_datasource_configs_from_db(self) -> dict:
+        """从数据库读取数据源配置（包括 API Key）"""
+        try:
+            from app.core.database import get_mongo_db_sync
+            db = get_mongo_db_sync()
+
+            # 从 system_configs 集合读取激活的配置
+            config = db.system_configs.find_one({"is_active": True})
+            if not config:
+                return {}
+
+            # 提取数据源配置
+            datasource_configs = config.get('data_source_configs', [])
+
+            # 构建配置字典 {数据源名称: {api_key, api_secret, ...}}
+            result = {}
+            for ds_config in datasource_configs:
+                name = ds_config.get('name', '').lower()
+                result[name] = {
+                    'api_key': ds_config.get('api_key', ''),
+                    'api_secret': ds_config.get('api_secret', ''),
+                    'config_params': ds_config.get('config_params', {})
+                }
+
+            return result
+        except Exception as e:
+            logger.warning(f"⚠️ 从数据库读取数据源配置失败: {e}")
+            return {}
 
     def get_current_source(self) -> ChinaDataSource:
         """获取当前数据源"""
@@ -2163,3 +2210,265 @@ def get_stock_data_service() -> DataSourceManager:
     推荐直接使用 get_data_source_manager()
     """
     return get_data_source_manager()
+
+
+# ==================== 美股数据源管理器 ====================
+
+class USDataSourceManager:
+    """
+    美股数据源管理器
+
+    支持的数据源：
+    - yfinance: 股票价格和技术指标（免费）
+    - alpha_vantage: 基本面和新闻数据（需要API Key）
+    - finnhub: 备用数据源（需要API Key）
+    - mongodb: 缓存数据源（最高优先级）
+    """
+
+    def __init__(self):
+        """初始化美股数据源管理器"""
+        # 检查是否启用 MongoDB 缓存
+        self.use_mongodb_cache = self._check_mongodb_enabled()
+
+        # 检查可用的数据源
+        self.available_sources = self._check_available_sources()
+
+        # 设置默认数据源
+        self.default_source = self._get_default_source()
+        self.current_source = self.default_source
+
+        logger.info(f"📊 美股数据源管理器初始化完成")
+        logger.info(f"   MongoDB缓存: {'✅ 已启用' if self.use_mongodb_cache else '❌ 未启用'}")
+        logger.info(f"   默认数据源: {self.default_source.value}")
+        logger.info(f"   可用数据源: {[s.value for s in self.available_sources]}")
+
+    def _check_mongodb_enabled(self) -> bool:
+        """检查是否启用MongoDB缓存"""
+        from tradingagents.config.runtime_settings import use_app_cache_enabled
+        return use_app_cache_enabled()
+
+    def _get_data_source_priority_order(self, symbol: Optional[str] = None) -> List[USDataSource]:
+        """
+        从数据库获取美股数据源优先级顺序（用于降级）
+
+        Args:
+            symbol: 股票代码
+
+        Returns:
+            按优先级排序的数据源列表（不包含MongoDB）
+        """
+        try:
+            # 从数据库读取数据源配置
+            from app.core.database import get_mongo_db_sync
+            db = get_mongo_db_sync()
+
+            # 方法1: 从 datasource_groupings 集合读取（推荐）
+            groupings_collection = db.datasource_groupings
+            groupings = list(groupings_collection.find({
+                "market_category_id": "us_stocks",
+                "enabled": True
+            }).sort("priority", -1))  # 降序排序，优先级高的在前
+
+            if groupings:
+                # 转换为 USDataSource 枚举
+                # 🔥 数据源名称映射（数据库名称 → USDataSource 枚举）
+                source_mapping = {
+                    'yfinance': USDataSource.YFINANCE,
+                    'yahoo_finance': USDataSource.YFINANCE,  # 别名
+                    'alpha_vantage': USDataSource.ALPHA_VANTAGE,
+                    'finnhub': USDataSource.FINNHUB,
+                }
+
+                result = []
+                for grouping in groupings:
+                    ds_name = grouping.get('data_source_name', '').lower()
+                    if ds_name in source_mapping:
+                        source = source_mapping[ds_name]
+                        # 排除 MongoDB（MongoDB 是最高优先级，不参与降级）
+                        if source != USDataSource.MONGODB and source in self.available_sources:
+                            result.append(source)
+
+                if result:
+                    logger.info(f"✅ [美股数据源优先级] 从数据库读取: {[s.value for s in result]}")
+                    return result
+
+            logger.warning("⚠️ [美股数据源优先级] 数据库中没有配置，使用默认顺序")
+        except Exception as e:
+            logger.warning(f"⚠️ [美股数据源优先级] 从数据库读取失败: {e}，使用默认顺序")
+
+        # 回退到默认顺序
+        # 默认顺序：yfinance > Alpha Vantage > Finnhub
+        default_order = [
+            USDataSource.YFINANCE,
+            USDataSource.ALPHA_VANTAGE,
+            USDataSource.FINNHUB,
+        ]
+        # 只返回可用的数据源
+        return [s for s in default_order if s in self.available_sources]
+
+    def _get_default_source(self) -> USDataSource:
+        """获取默认数据源"""
+        # 如果启用MongoDB缓存，MongoDB作为最高优先级数据源
+        if self.use_mongodb_cache:
+            return USDataSource.MONGODB
+
+        # 从环境变量获取，默认使用 yfinance
+        env_source = os.getenv('DEFAULT_US_DATA_SOURCE', DataSourceCode.YFINANCE).lower()
+
+        # 映射到枚举
+        source_mapping = {
+            DataSourceCode.YFINANCE: USDataSource.YFINANCE,
+            DataSourceCode.ALPHA_VANTAGE: USDataSource.ALPHA_VANTAGE,
+            DataSourceCode.FINNHUB: USDataSource.FINNHUB,
+        }
+
+        return source_mapping.get(env_source, USDataSource.YFINANCE)
+
+    def _check_available_sources(self) -> List[USDataSource]:
+        """
+        检查可用的数据源
+
+        从数据库读取启用状态，并检查依赖是否满足
+        """
+        available = []
+
+        # MongoDB 缓存
+        if self.use_mongodb_cache:
+            available.append(USDataSource.MONGODB)
+            logger.info("✅ MongoDB缓存数据源可用")
+
+        # 从数据库读取启用的数据源列表和配置
+        enabled_sources_in_db = self._get_enabled_sources_from_db()
+        datasource_configs = self._get_datasource_configs_from_db()
+
+        # 检查 yfinance
+        if 'yfinance' in enabled_sources_in_db:
+            try:
+                import yfinance
+                available.append(USDataSource.YFINANCE)
+                logger.info("✅ yfinance数据源可用且已启用")
+            except ImportError:
+                logger.warning("⚠️ yfinance数据源不可用: 未安装 yfinance 库")
+        else:
+            logger.info("ℹ️ yfinance数据源已在数据库中禁用")
+
+        # 检查 Alpha Vantage
+        if 'alpha_vantage' in enabled_sources_in_db:
+            try:
+                # 优先从数据库配置读取 API Key，其次从环境变量读取
+                api_key = datasource_configs.get('alpha_vantage', {}).get('api_key') or os.getenv("ALPHA_VANTAGE_API_KEY")
+                if api_key:
+                    available.append(USDataSource.ALPHA_VANTAGE)
+                    source = "数据库配置" if datasource_configs.get('alpha_vantage', {}).get('api_key') else "环境变量"
+                    logger.info(f"✅ Alpha Vantage数据源可用且已启用 (API Key来源: {source})")
+                else:
+                    logger.warning("⚠️ Alpha Vantage数据源不可用: API Key未配置（数据库和环境变量均未找到）")
+            except Exception as e:
+                logger.warning(f"⚠️ Alpha Vantage数据源检查失败: {e}")
+        else:
+            logger.info("ℹ️ Alpha Vantage数据源已在数据库中禁用")
+
+        # 检查 Finnhub
+        if 'finnhub' in enabled_sources_in_db:
+            try:
+                # 优先从数据库配置读取 API Key，其次从环境变量读取
+                api_key = datasource_configs.get('finnhub', {}).get('api_key') or os.getenv("FINNHUB_API_KEY")
+                if api_key:
+                    available.append(USDataSource.FINNHUB)
+                    source = "数据库配置" if datasource_configs.get('finnhub', {}).get('api_key') else "环境变量"
+                    logger.info(f"✅ Finnhub数据源可用且已启用 (API Key来源: {source})")
+                else:
+                    logger.warning("⚠️ Finnhub数据源不可用: API Key未配置（数据库和环境变量均未找到）")
+            except Exception as e:
+                logger.warning(f"⚠️ Finnhub数据源检查失败: {e}")
+        else:
+            logger.info("ℹ️ Finnhub数据源已在数据库中禁用")
+
+        return available
+
+    def _get_enabled_sources_from_db(self) -> List[str]:
+        """从数据库读取启用的数据源列表"""
+        try:
+            from app.core.database import get_mongo_db_sync
+            db = get_mongo_db_sync()
+
+            # 从 datasource_groupings 集合读取
+            groupings = list(db.datasource_groupings.find({
+                "market_category_id": "us_stocks",
+                "enabled": True
+            }))
+
+            # 🔥 数据源名称映射（数据库名称 → 代码中使用的名称）
+            name_mapping = {
+                'alpha vantage': 'alpha_vantage',
+                'yahoo finance': 'yfinance',
+                'finnhub': 'finnhub',
+            }
+
+            result = []
+            for g in groupings:
+                db_name = g.get('data_source_name', '').lower()
+                # 使用映射表转换名称
+                code_name = name_mapping.get(db_name, db_name)
+                result.append(code_name)
+                logger.debug(f"🔄 数据源名称映射: '{db_name}' → '{code_name}'")
+
+            return result
+        except Exception as e:
+            logger.warning(f"⚠️ 从数据库读取启用的数据源失败: {e}")
+            # 默认全部启用
+            return ['yfinance', 'alpha_vantage', 'finnhub']
+
+    def _get_datasource_configs_from_db(self) -> dict:
+        """从数据库读取数据源配置（包括 API Key）"""
+        try:
+            from app.core.database import get_mongo_db_sync
+            db = get_mongo_db_sync()
+
+            # 从 system_configs 集合读取激活的配置
+            config = db.system_configs.find_one({"is_active": True})
+            if not config:
+                return {}
+
+            # 提取数据源配置
+            datasource_configs = config.get('data_source_configs', [])
+
+            # 构建配置字典 {数据源名称: {api_key, api_secret, ...}}
+            result = {}
+            for ds_config in datasource_configs:
+                name = ds_config.get('name', '').lower()
+                result[name] = {
+                    'api_key': ds_config.get('api_key', ''),
+                    'api_secret': ds_config.get('api_secret', ''),
+                    'config_params': ds_config.get('config_params', {})
+                }
+
+            return result
+        except Exception as e:
+            logger.warning(f"⚠️ 从数据库读取数据源配置失败: {e}")
+            return {}
+
+    def get_current_source(self) -> USDataSource:
+        """获取当前数据源"""
+        return self.current_source
+
+    def set_current_source(self, source: USDataSource) -> bool:
+        """设置当前数据源"""
+        if source in self.available_sources:
+            self.current_source = source
+            logger.info(f"✅ 美股数据源已切换到: {source.value}")
+            return True
+        else:
+            logger.error(f"❌ 美股数据源不可用: {source.value}")
+            return False
+
+
+# 全局美股数据源管理器实例
+_us_data_source_manager = None
+
+def get_us_data_source_manager() -> USDataSourceManager:
+    """获取全局美股数据源管理器实例"""
+    global _us_data_source_manager
+    if _us_data_source_manager is None:
+        _us_data_source_manager = USDataSourceManager()
+    return _us_data_source_manager

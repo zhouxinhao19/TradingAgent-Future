@@ -1,0 +1,65 @@
+# Company Overview: TSLA
+# Retrieved on: 2025-11-11 18:38:35
+
+## Basic Information
+**Name**: Tesla Inc
+**Symbol**: TSLA
+**Exchange**: NASDAQ
+**Currency**: USD
+**Country**: USA
+**Sector**: CONSUMER CYCLICAL
+**Industry**: AUTO MANUFACTURERS
+
+**Description**: Tesla, Inc. is a leading American electric vehicle and clean energy company headquartered in Palo Alto, California. With a diverse product portfolio that includes electric cars, battery energy storage solutions, and solar energy products, Tesla is at the forefront of sustainable transportation and energy innovation. In 2020, Tesla captured a significant share of the global market, achieving a 16% share in the plug-in vehicle segment and 23% in the battery-electric vehicle segment, solidifying it...
+
+## Valuation Metrics
+**Market Cap**: $1480754463000
+**PE Ratio**: 302.88
+**PEG Ratio**: 8.43
+**Price to Book**: 17.86
+**Price to Sales**: 15.48
+**EV to Revenue**: 14.65
+**EV to EBITDA**: 107.98
+
+## Financial Metrics
+**Revenue TTM**: $95632998000
+**Gross Profit TTM**: $16263999000
+**EBITDA**: $10768000000
+**Net Income TTM**: $N/A
+**EPS**: $1.47
+**Diluted EPS TTM**: $1.47
+
+## Profitability
+**Profit Margin**: 0.0531
+**Operating Margin TTM**: 0.0663
+**Return on Assets TTM**: 0.0235
+**Return on Equity TTM**: 0.0679
+
+## Dividend Information
+**Dividend Per Share**: $None
+**Dividend Yield**: None
+**Dividend Date**: None
+**Ex-Dividend Date**: None
+
+## Stock Information
+**52 Week High**: $488.54
+**52 Week Low**: $214.25
+**50 Day MA**: $423.19
+**200 Day MA**: $338.04
+**Shares Outstanding**: 3325819000
+**Beta**: 1.872
+
+## Financial Health
+**Book Value**: $24.06
+**Debt to Equity**: N/A
+**Current Ratio**: N/A
+**Quick Ratio**: N/A
+
+## Analyst Targets
+**Analyst Target Price**: $392.05
+**Analyst Rating Strong Buy**: 5
+**Analyst Rating Buy**: 15
+**Analyst Rating Hold**: 17
+**Analyst Rating Sell**: 7
+**Analyst Rating Strong Sell**: 3
+

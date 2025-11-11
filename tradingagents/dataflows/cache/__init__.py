@@ -74,8 +74,8 @@ except ImportError:
 # 全局缓存实例
 _cache_instance = None
 
-# 默认缓存策略
-DEFAULT_CACHE_STRATEGY = os.getenv("TA_CACHE_STRATEGY", "file")
+# 默认缓存策略（改为 integrated，优先使用 MongoDB/Redis 缓存）
+DEFAULT_CACHE_STRATEGY = os.getenv("TA_CACHE_STRATEGY", "integrated")
 
 def get_cache() -> Union[StockDataCache, IntegratedCacheManager]:
     """

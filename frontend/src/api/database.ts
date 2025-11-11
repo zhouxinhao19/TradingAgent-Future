@@ -124,11 +124,24 @@ export const databaseApi = {
   ): Promise<{ success: boolean; message: string; data: any }> {
     const formData = new FormData()
     formData.append('file', file)
-    formData.append('collection', options.collection)
-    formData.append('format', options.format || 'json')
-    formData.append('overwrite', String(options.overwrite || false))
 
-    return ApiClient.post('/api/system/database/import', formData, {
+    // 🔥 使用 URL 参数传递 collection, format, overwrite
+    // FastAPI 的 File 参数和其他参数混用时，其他参数需要通过 Query 传递
+    const params = new URLSearchParams({
+      collection: options.collection,
+      format: options.format || 'json',
+      overwrite: String(options.overwrite || false)
+    })
+
+    console.log('📤 导入数据请求:', {
+      filename: file.name,
+      size: file.size,
+      collection: options.collection,
+      format: options.format,
+      overwrite: options.overwrite
+    })
+
+    return ApiClient.post(`/api/system/database/import?${params.toString()}`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }

@@ -175,10 +175,14 @@ async def import_data(
     """导入数据"""
     try:
         logger.info(f"📥 用户 {current_user['username']} 导入数据到集合: {collection}")
-        
+        logger.info(f"   文件名: {file.filename}")
+        logger.info(f"   格式: {format}")
+        logger.info(f"   覆盖模式: {overwrite}")
+
         # 读取文件内容
         content = await file.read()
-        
+        logger.info(f"   文件大小: {len(content)} 字节")
+
         result = await database_service.import_data(
             content=content,
             collection=collection,
@@ -186,14 +190,18 @@ async def import_data(
             overwrite=overwrite,
             filename=file.filename
         )
-        
+
+        logger.info(f"✅ 导入成功: {result}")
+
         return {
             "success": True,
             "message": "数据导入成功",
             "data": result
         }
     except Exception as e:
-        logger.error(f"导入数据失败: {e}")
+        logger.error(f"❌ 导入数据失败: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"导入数据失败: {str(e)}"
