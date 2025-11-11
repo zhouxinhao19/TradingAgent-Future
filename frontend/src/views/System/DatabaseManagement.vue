@@ -114,9 +114,10 @@
         <h3>🛠️ 数据管理操作</h3>
       </template>
       
-      <el-row :gutter="24" justify="center">
+      <!-- 第一行：数据导入和导出 -->
+      <el-row :gutter="24">
         <!-- 数据导出 -->
-        <el-col :span="8">
+        <el-col :span="12">
           <div class="operation-section">
             <h4>📤 数据导出</h4>
             <p>导出数据库数据到文件</p>
@@ -147,7 +148,7 @@
         </el-col>
 
         <!-- 数据导入 -->
-        <el-col :span="8">
+        <el-col :span="12">
           <div class="operation-section">
             <h4>📥 数据导入</h4>
             <p>从导出文件导入数据</p>
@@ -194,16 +195,17 @@
             </el-button>
           </div>
         </el-col>
+      </el-row>
 
-        <!-- 数据备份说明 -->
-        <el-col :span="8">
+      <!-- 第二行：数据备份和还原说明 -->
+      <el-row :gutter="24" style="margin-top: 24px">
+        <el-col :span="24">
           <div class="operation-section">
             <h4>💾 数据备份与还原</h4>
             <el-alert
               title="请使用命令行工具进行备份和还原"
               type="info"
               :closable="false"
-              style="margin-bottom: 16px"
             >
               <template #default>
                 <div style="line-height: 1.8;">
