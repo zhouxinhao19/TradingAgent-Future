@@ -32,33 +32,111 @@ class AlphaVantageAPIError(Exception):
     pass
 
 
+def _get_api_key_from_database() -> Optional[str]:
+    """
+    从数据库读取 Alpha Vantage API Key
+
+    优先级：数据库配置 > 环境变量
+    这样用户在 Web 后台修改配置后可以立即生效
+
+    Returns:
+        Optional[str]: API Key，如果未找到返回 None
+    """
+    try:
+        logger.debug("🔍 [DB查询] 开始从数据库读取 Alpha Vantage API Key...")
+        from app.core.database import get_mongo_db_sync
+        db = get_mongo_db_sync()
+        config_collection = db.system_configs
+
+        # 获取最新的激活配置
+        logger.debug("🔍 [DB查询] 查询 is_active=True 的配置...")
+        config_data = config_collection.find_one(
+            {"is_active": True},
+            sort=[("version", -1)]
+        )
+
+        if config_data:
+            logger.debug(f"✅ [DB查询] 找到激活配置，版本: {config_data.get('version')}")
+            if config_data.get('data_source_configs'):
+                logger.debug(f"✅ [DB查询] 配置中有 {len(config_data['data_source_configs'])} 个数据源")
+                for ds_config in config_data['data_source_configs']:
+                    ds_type = ds_config.get('type')
+                    logger.debug(f"🔍 [DB查询] 检查数据源: {ds_type}")
+                    if ds_type == 'alpha_vantage':
+                        api_key = ds_config.get('api_key')
+                        logger.debug(f"✅ [DB查询] 找到 Alpha Vantage 配置，api_key 长度: {len(api_key) if api_key else 0}")
+                        if api_key and not api_key.startswith("your_"):
+                            logger.debug(f"✅ [DB查询] API Key 有效 (长度: {len(api_key)})")
+                            return api_key
+                        else:
+                            logger.debug(f"⚠️ [DB查询] API Key 无效或为占位符")
+            else:
+                logger.debug("⚠️ [DB查询] 配置中没有 data_source_configs")
+        else:
+            logger.debug("⚠️ [DB查询] 未找到激活的配置")
+
+        logger.debug("⚠️ [DB查询] 数据库中未找到有效的 Alpha Vantage API Key")
+    except Exception as e:
+        logger.debug(f"❌ [DB查询] 从数据库读取 API Key 失败: {e}")
+
+    return None
+
+
 def get_api_key() -> str:
     """
     获取 Alpha Vantage API Key
-    
+
     优先级：
-    1. 环境变量 ALPHA_VANTAGE_API_KEY
-    2. 配置文件
+    1. 数据库配置（system_configs 集合）
+    2. 环境变量 ALPHA_VANTAGE_API_KEY
+    3. 配置文件
+
+    Returns:
+        str: API Key
+
+    Raises:
+        ValueError: 如果未配置 API Key
     """
-    # 从环境变量获取
+    # 1. 从数据库获取（最高优先级）
+    logger.debug("🔍 [步骤1] 开始从数据库读取 Alpha Vantage API Key...")
+    db_api_key = _get_api_key_from_database()
+    if db_api_key:
+        logger.debug(f"✅ [步骤1] 数据库中找到 API Key (长度: {len(db_api_key)})")
+        return db_api_key
+    else:
+        logger.debug("⚠️ [步骤1] 数据库中未找到 API Key")
+
+    # 2. 从环境变量获取
+    logger.debug("🔍 [步骤2] 读取 .env 中的 API Key...")
     api_key = os.getenv("ALPHA_VANTAGE_API_KEY")
-    
-    if not api_key:
-        # 从配置文件获取
-        try:
-            from tradingagents.config.config_manager import ConfigManager
-            config_manager = ConfigManager()
-            api_key = config_manager.get("ALPHA_VANTAGE_API_KEY")
-        except Exception as e:
-            logger.debug(f"无法从配置文件获取 Alpha Vantage API Key: {e}")
-    
-    if not api_key:
-        raise ValueError(
-            "❌ Alpha Vantage API Key 未配置！\n"
-            "请设置环境变量 ALPHA_VANTAGE_API_KEY 或在配置文件中配置。\n"
-            "获取 API Key: https://www.alphavantage.co/support/#api-key"
-        )
-    
+    if api_key:
+        logger.debug(f"✅ [步骤2] .env 中找到 API Key (长度: {len(api_key)})")
+        return api_key
+    else:
+        logger.debug("⚠️ [步骤2] .env 中未找到 API Key")
+
+    # 3. 从配置文件获取
+    logger.debug("🔍 [步骤3] 读取配置文件中的 API Key...")
+    try:
+        from tradingagents.config.config_manager import ConfigManager
+        config_manager = ConfigManager()
+        api_key = config_manager.get("ALPHA_VANTAGE_API_KEY")
+        if api_key:
+            logger.debug(f"✅ [步骤3] 配置文件中找到 API Key (长度: {len(api_key)})")
+            return api_key
+    except Exception as e:
+        logger.debug(f"⚠️ [步骤3] 无法从配置文件获取 Alpha Vantage API Key: {e}")
+
+    # 所有方式都失败
+    raise ValueError(
+        "❌ Alpha Vantage API Key 未配置！\n"
+        "请通过以下任一方式配置：\n"
+        "1. Web 后台配置（推荐）: http://localhost:3000/api/config/datasource\n"
+        "2. 设置环境变量: ALPHA_VANTAGE_API_KEY\n"
+        "3. 在配置文件中配置\n"
+        "获取 API Key: https://www.alphavantage.co/support/#api-key"
+    )
+
     return api_key
 
 
