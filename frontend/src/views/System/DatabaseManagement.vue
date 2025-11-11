@@ -131,9 +131,8 @@
             
             <el-form-item label="数据集合">
               <el-select v-model="exportCollection" style="width: 100%">
-                <el-option label="全部集合" value="all" />
-                <el-option label="配置数据（用于演示系统）" value="config_only" />
-                <el-option label="配置和报告" value="config_and_reports" />
+                <el-option label="配置和报告（用于迁移）" value="config_and_reports" />
+                <el-option label="配置数据（用于演示系统，已脱敏）" value="config_only" />
                 <el-option label="分析结果" value="analysis_results" />
                 <el-option label="用户配置" value="user_configs" />
                 <el-option label="操作日志" value="operation_logs" />
@@ -257,7 +256,7 @@ const testing = ref(false)
 const cleaning = ref(false)
 
 const exportFormat = ref('json')
-const exportCollection = ref('all')
+const exportCollection = ref('config_and_reports')  // 默认选择"配置和报告"
 const cleanupDays = ref(30)
 const logCleanupDays = ref(90)
 
@@ -381,16 +380,13 @@ const exportData = async () => {
     let sanitize = false  // 是否启用脱敏
     let exportType = ''   // 导出类型（用于文件名）
 
-    if (exportCollection.value === 'all') {
-      collections = [] // 空数组表示导出所有集合
-      exportType = ''
-    } else if (exportCollection.value === 'config_only') {
+    if (exportCollection.value === 'config_only') {
       collections = configCollections // 仅导出配置数据
-      sanitize = true  // 配置数据导出时自动启用脱敏（清空 API key 等敏感字段）
+      sanitize = true  // 配置数据导出时自动启用脱敏（清空 API key 等敏感字段）- 用于演示系统
       exportType = '_config'
     } else if (exportCollection.value === 'config_and_reports') {
       collections = configAndReportsCollections // 导出配置和报告
-      sanitize = true  // 启用脱敏
+      sanitize = false  // 不脱敏 - 用于迁移，需要保留完整数据
       exportType = '_config_reports'
     } else {
       collections = [exportCollection.value] // 导出单个集合
@@ -415,7 +411,7 @@ const exportData = async () => {
     if (exportCollection.value === 'config_only') {
       ElMessage.success('配置数据导出成功（已脱敏：API key 等敏感字段已清空，用户数据仅保留结构）')
     } else if (exportCollection.value === 'config_and_reports') {
-      ElMessage.success('配置和报告数据导出成功（已脱敏：API key 等敏感字段已清空）')
+      ElMessage.success('配置和报告数据导出成功（包含完整数据，可用于迁移）')
     } else {
       ElMessage.success('数据导出成功')
     }
