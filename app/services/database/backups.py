@@ -234,8 +234,14 @@ async def delete_backup(backup_id: str) -> None:
 
 
 async def import_data(content: bytes, collection: str, *, format: str = "json", overwrite: bool = False, filename: str | None = None) -> Dict[str, Any]:
+    """
+    导入数据到数据库
+
+    支持两种导入模式：
+    1. 单集合模式：导入数据到指定集合
+    2. 多集合模式：导入包含多个集合的导出文件（自动检测）
+    """
     db = get_mongo_db()
-    collection_obj = db[collection]
 
     if format.lower() == "json":
         # 🔥 使用 asyncio.to_thread 将阻塞的 JSON 解析放到线程池执行
@@ -246,31 +252,83 @@ async def import_data(content: bytes, collection: str, *, format: str = "json", 
     else:
         raise Exception(f"不支持的格式: {format}")
 
-    if not isinstance(data, list):
-        data = [data]
+    # 检测是否为多集合导出格式（字典，key 为集合名）
+    if isinstance(data, dict) and all(isinstance(k, str) and isinstance(v, list) for k, v in data.items()):
+        # 多集合模式
+        logger.info(f"📦 检测到多集合导出文件，包含 {len(data)} 个集合")
 
-    if overwrite:
-        await collection_obj.delete_many({})
+        total_inserted = 0
+        imported_collections = []
 
-    for doc in data:
-        if "_id" in doc and isinstance(doc["_id"], str):
-            try:
-                doc["_id"] = ObjectId(doc["_id"])
-            except Exception:
-                del doc["_id"]
+        for coll_name, documents in data.items():
+            if not documents:  # 跳过空集合
+                logger.info(f"⏭️ 跳过空集合: {coll_name}")
+                continue
 
-    inserted_count = 0
-    if data:
-        res = await collection_obj.insert_many(data)
-        inserted_count = len(res.inserted_ids)
+            collection_obj = db[coll_name]
 
-    return {
-        "collection": collection,
-        "inserted_count": inserted_count,
-        "filename": filename,
-        "format": format,
-        "overwrite": overwrite,
-    }
+            if overwrite:
+                deleted_count = await collection_obj.delete_many({})
+                logger.info(f"🗑️ 清空集合 {coll_name}：删除 {deleted_count.deleted_count} 条文档")
+
+            # 处理 _id 字段
+            for doc in documents:
+                if "_id" in doc and isinstance(doc["_id"], str):
+                    try:
+                        doc["_id"] = ObjectId(doc["_id"])
+                    except Exception:
+                        del doc["_id"]
+
+            # 插入数据
+            if documents:
+                res = await collection_obj.insert_many(documents)
+                inserted_count = len(res.inserted_ids)
+                total_inserted += inserted_count
+                imported_collections.append(coll_name)
+                logger.info(f"✅ 导入集合 {coll_name}：{inserted_count} 条文档")
+
+        return {
+            "mode": "multi_collection",
+            "collections": imported_collections,
+            "total_collections": len(imported_collections),
+            "total_inserted": total_inserted,
+            "filename": filename,
+            "format": format,
+            "overwrite": overwrite,
+        }
+    else:
+        # 单集合模式（兼容旧版本）
+        logger.info(f"📄 单集合导入模式，目标集合: {collection}")
+
+        collection_obj = db[collection]
+
+        if not isinstance(data, list):
+            data = [data]
+
+        if overwrite:
+            deleted_count = await collection_obj.delete_many({})
+            logger.info(f"🗑️ 清空集合 {collection}：删除 {deleted_count.deleted_count} 条文档")
+
+        for doc in data:
+            if "_id" in doc and isinstance(doc["_id"], str):
+                try:
+                    doc["_id"] = ObjectId(doc["_id"])
+                except Exception:
+                    del doc["_id"]
+
+        inserted_count = 0
+        if data:
+            res = await collection_obj.insert_many(data)
+            inserted_count = len(res.inserted_ids)
+
+        return {
+            "mode": "single_collection",
+            "collection": collection,
+            "inserted_count": inserted_count,
+            "filename": filename,
+            "format": format,
+            "overwrite": overwrite,
+        }
 
 
 def _sanitize_document(doc: Any) -> Any:

@@ -116,11 +116,11 @@
       
       <el-row :gutter="24" justify="center">
         <!-- 数据导出 -->
-        <el-col :span="10">
+        <el-col :span="8">
           <div class="operation-section">
             <h4>📤 数据导出</h4>
             <p>导出数据库数据到文件</p>
-            
+
             <el-form-item label="导出格式">
               <el-select v-model="exportFormat" style="width: 100%">
                 <el-option label="JSON" value="json" />
@@ -128,7 +128,7 @@
                 <el-option label="Excel" value="xlsx" />
               </el-select>
             </el-form-item>
-            
+
             <el-form-item label="数据集合">
               <el-select v-model="exportCollection" style="width: 100%">
                 <el-option label="配置和报告（用于迁移）" value="config_and_reports" />
@@ -138,7 +138,7 @@
                 <el-option label="操作日志" value="operation_logs" />
               </el-select>
             </el-form-item>
-            
+
             <el-button @click="exportData" :loading="exporting">
               <el-icon><Download /></el-icon>
               导出数据
@@ -146,8 +146,57 @@
           </div>
         </el-col>
 
+        <!-- 数据导入 -->
+        <el-col :span="8">
+          <div class="operation-section">
+            <h4>📥 数据导入</h4>
+            <p>从导出文件导入数据</p>
+
+            <el-form-item label="选择文件">
+              <el-upload
+                ref="uploadRef"
+                :auto-upload="false"
+                :limit="1"
+                :on-change="handleFileChange"
+                :on-remove="handleFileRemove"
+                accept=".json"
+                drag
+              >
+                <el-icon class="el-icon--upload"><Upload /></el-icon>
+                <div class="el-upload__text">
+                  拖拽文件到此处或<em>点击上传</em>
+                </div>
+                <template #tip>
+                  <div class="el-upload__tip">
+                    仅支持 JSON 格式的导出文件
+                  </div>
+                </template>
+              </el-upload>
+            </el-form-item>
+
+            <el-form-item label="导入选项">
+              <el-checkbox v-model="importOverwrite">
+                覆盖现有数据
+              </el-checkbox>
+              <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+                ⚠️ 勾选后将删除现有数据再导入
+              </div>
+            </el-form-item>
+
+            <el-button
+              type="primary"
+              @click="importData"
+              :loading="importing"
+              :disabled="!importFile"
+            >
+              <el-icon><Upload /></el-icon>
+              导入数据
+            </el-button>
+          </div>
+        </el-col>
+
         <!-- 数据备份说明 -->
-        <el-col :span="10">
+        <el-col :span="8">
           <div class="operation-section">
             <h4>💾 数据备份与还原</h4>
             <el-alert
@@ -233,10 +282,11 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   DataBoard,
-  Download
+  Download,
+  Upload
 } from '@element-plus/icons-vue'
 
 import {
@@ -252,11 +302,15 @@ import {
 const loading = ref(false)
 
 const exporting = ref(false)
+const importing = ref(false)
 const testing = ref(false)
 const cleaning = ref(false)
 
 const exportFormat = ref('json')
 const exportCollection = ref('config_and_reports')  // 默认选择"配置和报告"
+const importFile = ref<File | null>(null)
+const importOverwrite = ref(false)
+const uploadRef = ref()
 const cleanupDays = ref(30)
 const logCleanupDays = ref(90)
 
@@ -424,7 +478,78 @@ const exportData = async () => {
   }
 }
 
+// 文件上传处理
+const handleFileChange = (file: any) => {
+  importFile.value = file.raw
+  console.log('📁 选择文件:', file.name)
+}
 
+const handleFileRemove = () => {
+  importFile.value = null
+  console.log('🗑️ 移除文件')
+}
+
+// 数据导入
+const importData = async () => {
+  if (!importFile.value) {
+    ElMessage.warning('请先选择要导入的文件')
+    return
+  }
+
+  try {
+    // 确认导入
+    const confirmMessage = importOverwrite.value
+      ? '确定要导入数据吗？这将覆盖现有数据！'
+      : '确定要导入数据吗？'
+
+    await ElMessageBox.confirm(
+      confirmMessage,
+      '确认导入',
+      {
+        type: 'warning',
+        confirmButtonText: '确定导入',
+        cancelButtonText: '取消'
+      }
+    )
+
+    importing.value = true
+
+    const result = await databaseApi.importData(importFile.value, {
+      collection: 'imported_data',  // 后端会自动检测多集合模式
+      format: 'json',
+      overwrite: importOverwrite.value
+    })
+
+    console.log('✅ 导入结果:', result)
+
+    // 根据导入模式显示不同的成功消息
+    if (result.data.mode === 'multi_collection') {
+      ElMessage.success(
+        `数据导入成功！共导入 ${result.data.total_collections} 个集合，` +
+        `${result.data.total_inserted} 条文档`
+      )
+    } else {
+      ElMessage.success(
+        `数据导入成功！导入 ${result.data.inserted_count} 条文档到集合 ${result.data.collection}`
+      )
+    }
+
+    // 清空文件选择
+    importFile.value = null
+    uploadRef.value?.clearFiles()
+
+    // 刷新数据库统计
+    await loadDatabaseStats()
+
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('❌ 数据导入失败:', error)
+      ElMessage.error(error.response?.data?.detail || '数据导入失败')
+    }
+  } finally {
+    importing.value = false
+  }
+}
 
 // 清理方法
 const cleanupAnalysisResults = async () => {
