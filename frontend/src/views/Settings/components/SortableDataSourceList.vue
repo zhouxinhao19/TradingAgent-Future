@@ -71,6 +71,14 @@
           </el-button>
           <el-button
             size="small"
+            type="info"
+            :loading="testingDataSources[item.name]"
+            @click="testDataSource(item)"
+          >
+            测试
+          </el-button>
+          <el-button
+            size="small"
             @click="$emit('manage-grouping', item.name)"
           >
             分组
@@ -128,6 +136,7 @@ const emit = defineEmits<{
 // Refs
 const sortableContainer = ref<HTMLElement>()
 const isDragging = ref(false)
+const testingDataSources = ref<Record<string, boolean>>({})
 let sortableInstance: Sortable | null = null
 
 // 初始化拖拽排序
@@ -205,12 +214,46 @@ const toggleDataSource = async (item: DataSourceConfig & { priority: number; ena
       props.categoryId,
       { enabled: newEnabled }
     )
-    
+
     item.enabled = newEnabled
     ElMessage.success(`数据源已${newEnabled ? '启用' : '禁用'}`)
   } catch (error) {
     console.error('切换数据源状态失败:', error)
     ElMessage.error('切换数据源状态失败')
+  }
+}
+
+// 测试数据源连接
+const testDataSource = async (item: DataSourceConfig) => {
+  try {
+    testingDataSources.value[item.name] = true
+
+    console.log('🧪 测试数据源:', item.name)
+
+    const result = await configApi.testConfig({
+      config_type: 'datasource',
+      config_data: item
+    })
+
+    if (result.success) {
+      ElMessage.success({
+        message: `✅ ${result.message}`,
+        duration: 3000
+      })
+    } else {
+      ElMessage.error({
+        message: `❌ ${result.message}`,
+        duration: 5000
+      })
+    }
+  } catch (error: any) {
+    console.error('测试数据源失败:', error)
+    ElMessage.error({
+      message: `❌ 测试失败: ${error.message || '未知错误'}`,
+      duration: 5000
+    })
+  } finally {
+    testingDataSources.value[item.name] = false
   }
 }
 
