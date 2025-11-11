@@ -85,30 +85,39 @@ class OptimizedUSDataProvider:
 
         # 检查缓存（除非强制刷新）
         if not force_refresh:
-            # 优先查找FINNHUB缓存
-            cache_key = self.cache.find_cached_stock_data(
-                symbol=symbol,
-                start_date=start_date,
-                end_date=end_date,
-                data_source="finnhub"
-            )
+            # 🔥 按照数据源优先级顺序查找缓存
+            from ...data_source_manager import get_us_data_source_manager, USDataSource
+            us_manager = get_us_data_source_manager()
 
-            # 如果没有FINNHUB缓存，查找Yahoo Finance缓存
-            if not cache_key:
-                cache_key = self.cache.find_cached_stock_data(
-                    symbol=symbol,
-                    start_date=start_date,
-                    end_date=end_date,
-                    data_source="yfinance"
-                )
+            # 获取数据源优先级顺序
+            priority_order = us_manager._get_data_source_priority_order(symbol)
 
-            if cache_key:
-                cached_data = self.cache.load_stock_data(cache_key)
-                if cached_data:
-                    # 识别缓存来源
-                    cache_source = "FINNHUB" if "finnhub" in cache_key.lower() else "Yahoo Finance"
-                    logger.info(f"⚡ [数据来源: 文件缓存-{cache_source}] 从缓存加载美股数据: {symbol}")
-                    return cached_data
+            # 数据源名称映射
+            source_name_mapping = {
+                USDataSource.ALPHA_VANTAGE: "alpha_vantage",
+                USDataSource.YFINANCE: "yfinance",
+                USDataSource.FINNHUB: "finnhub",
+            }
+
+            # 按优先级顺序查找缓存
+            for source in priority_order:
+                if source == USDataSource.MONGODB:
+                    continue  # MongoDB 缓存单独处理
+
+                source_name = source_name_mapping.get(source)
+                if source_name:
+                    cache_key = self.cache.find_cached_stock_data(
+                        symbol=symbol,
+                        start_date=start_date,
+                        end_date=end_date,
+                        data_source=source_name
+                    )
+
+                    if cache_key:
+                        cached_data = self.cache.load_stock_data(cache_key)
+                        if cached_data:
+                            logger.info(f"⚡ [数据来源: 缓存-{source_name}] 从缓存加载美股数据: {symbol}")
+                            return cached_data
 
         # 缓存未命中，从API获取 - 使用数据源管理器的优先级顺序
         formatted_data = None
