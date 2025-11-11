@@ -2271,10 +2271,12 @@ class USDataSourceManager:
 
             if groupings:
                 # 转换为 USDataSource 枚举
+                # 🔥 数据源名称映射（数据库名称 → USDataSource 枚举）
                 source_mapping = {
-                    DataSourceCode.YFINANCE: USDataSource.YFINANCE,
-                    DataSourceCode.ALPHA_VANTAGE: USDataSource.ALPHA_VANTAGE,
-                    DataSourceCode.FINNHUB: USDataSource.FINNHUB,
+                    'yfinance': USDataSource.YFINANCE,
+                    'yahoo_finance': USDataSource.YFINANCE,  # 别名
+                    'alpha_vantage': USDataSource.ALPHA_VANTAGE,
+                    'finnhub': USDataSource.FINNHUB,
                 }
 
                 result = []
