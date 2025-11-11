@@ -1437,21 +1437,99 @@ class ConfigService:
                     }
 
             elif ds_type == "alpha_vantage":
-                # 如果配置中没有 API Key 或被截断，尝试从环境变量获取
-                if not api_key or "..." in api_key:
-                    env_key = os.getenv('ALPHA_VANTAGE_API_KEY')
-                    if env_key:
-                        api_key = env_key.strip()
-                        used_env_credentials = True
-                        logger.info("🔑 使用环境变量中的 Alpha Vantage API Key")
-                    else:
-                        return {
-                            "success": False,
-                            "message": "API Key 无效或被截断，且环境变量中未配置 ALPHA_VANTAGE_API_KEY",
-                            "response_time": time.time() - start_time,
-                            "details": None
-                        }
+                # 🔥 如果配置中的 API Key 包含 "..."（截断标记），需要验证是否是未修改的原值
+                if api_key and "..." in api_key:
+                    logger.info(f"🔍 [TEST] API Key contains '...' (truncated), checking if it matches database value")
 
+                    # 从数据库中获取完整的 API Key
+                    system_config = await self.get_system_config()
+                    db_config = None
+                    if system_config:
+                        for ds in system_config.data_source_configs:
+                            if ds.name == ds_config.name:
+                                db_config = ds
+                                break
+
+                    if db_config and db_config.api_key:
+                        # 对数据库中的完整 API Key 进行相同的截断处理
+                        truncated_db_key = self._truncate_api_key(db_config.api_key)
+                        logger.info(f"🔍 [TEST] Database API Key truncated: {truncated_db_key}")
+                        logger.info(f"🔍 [TEST] Received API Key: {api_key}")
+
+                        # 比较截断后的值
+                        if api_key == truncated_db_key:
+                            # 相同，说明用户没有修改，使用数据库中的完整值
+                            api_key = db_config.api_key
+                            used_db_credentials = True
+                            logger.info(f"✅ [TEST] Truncated values match, using complete API Key from database (length: {len(api_key)})")
+                        else:
+                            # 不同，说明用户修改了但修改得不完整
+                            logger.error(f"❌ [TEST] Truncated API Key doesn't match database value")
+                            return {
+                                "success": False,
+                                "message": "API Key 格式错误：检测到截断标记但与数据库中的值不匹配，请输入完整的 API Key",
+                                "response_time": time.time() - start_time,
+                                "details": {
+                                    "error": "truncated_key_mismatch",
+                                    "received": api_key,
+                                    "expected": truncated_db_key
+                                }
+                            }
+                    else:
+                        # 数据库中没有有效的 API Key，尝试从环境变量获取
+                        logger.info(f"⚠️  [TEST] No valid API Key in database, trying environment variable")
+                        env_key = os.getenv('ALPHA_VANTAGE_API_KEY')
+                        if env_key:
+                            api_key = env_key.strip().strip('"').strip("'")
+                            used_env_credentials = True
+                            logger.info(f"🔑 [TEST] Using ALPHA_VANTAGE_API_KEY from environment (length: {len(api_key)})")
+                        else:
+                            logger.error(f"❌ [TEST] No valid API Key in database or environment")
+                            return {
+                                "success": False,
+                                "message": "API Key 无效：数据库和环境变量中均未配置有效的 API Key",
+                                "response_time": time.time() - start_time,
+                                "details": None
+                            }
+
+                # 如果 API Key 为空，尝试从数据库或环境变量获取
+                elif not api_key:
+                    logger.info(f"⚠️  [TEST] API Key is empty, trying to get from database")
+
+                    # 从数据库中获取完整的 API Key
+                    system_config = await self.get_system_config()
+                    db_config = None
+                    if system_config:
+                        for ds in system_config.data_source_configs:
+                            if ds.name == ds_config.name:
+                                db_config = ds
+                                break
+
+                    if db_config and db_config.api_key and "..." not in db_config.api_key:
+                        api_key = db_config.api_key
+                        used_db_credentials = True
+                        logger.info(f"🔑 [TEST] Using API Key from database (length: {len(api_key)})")
+                    else:
+                        # 如果数据库中也没有，尝试从环境变量获取
+                        logger.info(f"⚠️  [TEST] No valid API Key in database, trying environment variable")
+                        env_key = os.getenv('ALPHA_VANTAGE_API_KEY')
+                        if env_key:
+                            api_key = env_key.strip().strip('"').strip("'")
+                            used_env_credentials = True
+                            logger.info(f"🔑 [TEST] Using ALPHA_VANTAGE_API_KEY from environment (length: {len(api_key)})")
+                        else:
+                            logger.error(f"❌ [TEST] No valid API Key in config, database, or environment")
+                            return {
+                                "success": False,
+                                "message": "API Key 无效：配置、数据库和环境变量中均未配置有效的 API Key",
+                                "response_time": time.time() - start_time,
+                                "details": None
+                            }
+                else:
+                    # API Key 是完整的，直接使用
+                    logger.info(f"✅ [TEST] Using complete API Key from config (length: {len(api_key)})")
+
+                # 测试 Alpha Vantage API
                 endpoint = ds_config.endpoint or "https://www.alphavantage.co"
                 url = f"{endpoint}/query"
                 params = {
@@ -1462,20 +1540,32 @@ class ConfigService:
                 }
 
                 try:
+                    logger.info(f"🔌 [TEST] Calling Alpha Vantage API with key (length: {len(api_key)})")
                     response = requests.get(url, params=params, timeout=10)
 
                     if response.status_code == 200:
                         data = response.json()
                         if "Time Series (5min)" in data or "Meta Data" in data:
                             response_time = time.time() - start_time
+                            logger.info(f"✅ [TEST] Alpha Vantage API call successful (response time: {response_time:.2f}s)")
+
+                            # 构建消息，说明使用了哪个来源的凭证
+                            credential_source = "配置"
+                            if used_db_credentials:
+                                credential_source = "数据库"
+                            elif used_env_credentials:
+                                credential_source = "环境变量"
+
                             return {
                                 "success": True,
-                                "message": f"成功连接到 Alpha Vantage 数据源",
+                                "message": f"成功连接到 Alpha Vantage 数据源（使用{credential_source}中的凭证）",
                                 "response_time": response_time,
                                 "details": {
                                     "type": ds_type,
                                     "endpoint": endpoint,
                                     "test_result": "API 密钥有效",
+                                    "credential_source": credential_source,
+                                    "used_db_credentials": used_db_credentials,
                                     "used_env_credentials": used_env_credentials
                                 }
                             }
