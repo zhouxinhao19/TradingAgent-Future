@@ -459,16 +459,21 @@ class DataSourceManager:
         elif self.use_mongodb_cache and 'mongodb' not in enabled_sources_in_db:
             logger.info("ℹ️ MongoDB数据源已在数据库中禁用")
 
+        # 从数据库读取数据源配置
+        datasource_configs = self._get_datasource_configs_from_db()
+
         # 检查Tushare
         if 'tushare' in enabled_sources_in_db:
             try:
                 import tushare as ts
-                token = os.getenv('TUSHARE_TOKEN')
+                # 优先从数据库配置读取 API Key，其次从环境变量读取
+                token = datasource_configs.get('tushare', {}).get('api_key') or os.getenv('TUSHARE_TOKEN')
                 if token:
                     available.append(ChinaDataSource.TUSHARE)
-                    logger.info("✅ Tushare数据源可用且已启用")
+                    source = "数据库配置" if datasource_configs.get('tushare', {}).get('api_key') else "环境变量"
+                    logger.info(f"✅ Tushare数据源可用且已启用 (API Key来源: {source})")
                 else:
-                    logger.warning("⚠️ Tushare数据源不可用: 未设置TUSHARE_TOKEN")
+                    logger.warning("⚠️ Tushare数据源不可用: API Key未配置（数据库和环境变量均未找到）")
             except ImportError:
                 logger.warning("⚠️ Tushare数据源不可用: 库未安装")
         else:
@@ -500,6 +505,35 @@ class DataSourceManager:
         # 不再检查和支持 TDX 数据源
 
         return available
+
+    def _get_datasource_configs_from_db(self) -> dict:
+        """从数据库读取数据源配置（包括 API Key）"""
+        try:
+            from app.core.database import get_mongo_db_sync
+            db = get_mongo_db_sync()
+
+            # 从 system_config 集合读取配置
+            config = db.system_config.find_one({})
+            if not config:
+                return {}
+
+            # 提取数据源配置
+            datasource_configs = config.get('data_source_configs', [])
+
+            # 构建配置字典 {数据源名称: {api_key, api_secret, ...}}
+            result = {}
+            for ds_config in datasource_configs:
+                name = ds_config.get('name', '').lower()
+                result[name] = {
+                    'api_key': ds_config.get('api_key', ''),
+                    'api_secret': ds_config.get('api_secret', ''),
+                    'config_params': ds_config.get('config_params', {})
+                }
+
+            return result
+        except Exception as e:
+            logger.warning(f"⚠️ 从数据库读取数据源配置失败: {e}")
+            return {}
 
     def get_current_source(self) -> ChinaDataSource:
         """获取当前数据源"""
