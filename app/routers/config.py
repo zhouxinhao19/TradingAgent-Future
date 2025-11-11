@@ -748,6 +748,22 @@ async def add_data_source_config(
 
         success = await config_service.save_system_config(config)
         if success:
+            # 🆕 自动创建数据源分组关系
+            market_categories = _req.get('market_categories', [])
+            if market_categories:
+                for category_id in market_categories:
+                    try:
+                        grouping = DataSourceGrouping(
+                            data_source_name=ds_config.name,
+                            market_category_id=category_id,
+                            priority=ds_config.priority,
+                            enabled=ds_config.enabled
+                        )
+                        await config_service.add_datasource_to_category(grouping)
+                    except Exception as e:
+                        # 如果分组已存在或其他错误，记录但不影响主流程
+                        logger.warning(f"自动创建数据源分组失败: {str(e)}")
+
             # 审计日志（忽略异常）
             try:
                 await log_operation(
@@ -755,7 +771,7 @@ async def add_data_source_config(
                     username=getattr(current_user, "username", "unknown"),
                     action_type=ActionType.CONFIG_MANAGEMENT,
                     action="add_data_source_config",
-                    details={"name": ds_config.name},
+                    details={"name": ds_config.name, "market_categories": market_categories},
                     success=True,
                 )
             except Exception:
@@ -1199,6 +1215,39 @@ async def update_data_source_config(
 
                 success = await config_service.save_system_config(config)
                 if success:
+                    # 🆕 同步市场分类关系
+                    new_categories = set(_req.get('market_categories', []))
+
+                    # 获取当前的分组关系
+                    current_groupings = await config_service.get_datasource_groupings()
+                    current_categories = set(
+                        g.market_category_id
+                        for g in current_groupings
+                        if g.data_source_name == name
+                    )
+
+                    # 需要添加的分类
+                    to_add = new_categories - current_categories
+                    for category_id in to_add:
+                        try:
+                            grouping = DataSourceGrouping(
+                                data_source_name=name,
+                                market_category_id=category_id,
+                                priority=updated_config.priority,
+                                enabled=updated_config.enabled
+                            )
+                            await config_service.add_datasource_to_category(grouping)
+                        except Exception as e:
+                            logger.warning(f"添加数据源分组失败: {str(e)}")
+
+                    # 需要删除的分类
+                    to_remove = current_categories - new_categories
+                    for category_id in to_remove:
+                        try:
+                            await config_service.remove_datasource_from_category(name, category_id)
+                        except Exception as e:
+                            logger.warning(f"删除数据源分组失败: {str(e)}")
+
                     # 审计日志（忽略异常）
                     try:
                         await log_operation(
@@ -1206,7 +1255,7 @@ async def update_data_source_config(
                             username=getattr(current_user, "username", "unknown"),
                             action_type=ActionType.CONFIG_MANAGEMENT,
                             action="update_data_source_config",
-                            details={"name": name},
+                            details={"name": name, "market_categories": list(new_categories)},
                             success=True,
                         )
                     except Exception:

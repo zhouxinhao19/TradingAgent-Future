@@ -396,6 +396,7 @@
                 @manage-grouping="showDataSourceGroupingDialog"
                 @manage-category="showMarketCategoryManagement"
                 @add-datasource="showAddDataSourceDialog"
+                @delete-datasource="deleteDataSourceConfig"
               />
             </div>
 
@@ -431,6 +432,9 @@
                       </el-button>
                       <el-button size="small" type="primary" @click="testDataSource(dataSource)">
                         测试
+                      </el-button>
+                      <el-button size="small" type="danger" @click="deleteDataSourceConfig(dataSource)">
+                        删除
                       </el-button>
                     </div>
                   </div>
@@ -1935,6 +1939,31 @@ const testDataSource = async (config: DataSourceConfig) => {
     }
   } catch (error) {
     ElMessage.error('数据源连接测试失败')
+  }
+}
+
+// 删除数据源配置
+const deleteDataSourceConfig = async (config: DataSourceConfig) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除数据源 "${config.display_name || config.name}" 吗？此操作不可恢复。`,
+      '删除确认',
+      {
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+        confirmButtonClass: 'el-button--danger'
+      }
+    )
+
+    await configApi.deleteDataSourceConfig(config.name)
+    ElMessage.success('数据源删除成功')
+    await loadDataSourceConfigs()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('删除数据源失败:', error)
+      ElMessage.error(error.message || '删除数据源失败')
+    }
   }
 }
 

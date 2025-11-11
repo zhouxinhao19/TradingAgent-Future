@@ -2359,7 +2359,22 @@ class USDataSourceManager:
                 "enabled": True
             }))
 
-            return [g.get('data_source_name', '').lower() for g in groupings]
+            # 🔥 数据源名称映射（数据库名称 → 代码中使用的名称）
+            name_mapping = {
+                'alpha vantage': 'alpha_vantage',
+                'yahoo finance': 'yfinance',
+                'finnhub': 'finnhub',
+            }
+
+            result = []
+            for g in groupings:
+                db_name = g.get('data_source_name', '').lower()
+                # 使用映射表转换名称
+                code_name = name_mapping.get(db_name, db_name)
+                result.append(code_name)
+                logger.debug(f"🔄 数据源名称映射: '{db_name}' → '{code_name}'")
+
+            return result
         except Exception as e:
             logger.warning(f"⚠️ 从数据库读取启用的数据源失败: {e}")
             # 默认全部启用

@@ -14,26 +14,12 @@
       label-position="left"
     >
       <!-- 基本信息 -->
-      <el-form-item label="数据源名称" prop="name">
-        <el-input
-          v-model="formData.name"
-          placeholder="请输入数据源名称"
-          :disabled="isEdit"
-        />
-      </el-form-item>
-
-      <el-form-item label="显示名称" prop="display_name">
-        <el-input
-          v-model="formData.display_name"
-          placeholder="请输入显示名称"
-        />
-      </el-form-item>
-
       <el-form-item label="数据源类型" prop="type">
         <el-select
           v-model="formData.type"
           placeholder="请选择数据源类型"
           style="width: 100%"
+          :disabled="isEdit"
           @change="handleTypeChange"
         >
           <el-option
@@ -43,6 +29,30 @@
             :value="option.value"
           />
         </el-select>
+        <div class="form-tip">
+          ⚠️ 数据源类型一旦选择后不可修改，请谨慎选择
+        </div>
+      </el-form-item>
+
+      <el-form-item label="数据源名称" prop="name">
+        <el-input
+          v-model="formData.name"
+          placeholder="自动生成（基于数据源类型）"
+          disabled
+        />
+        <div class="form-tip">
+          📌 数据源名称由系统自动生成，用于后端识别，不可修改
+        </div>
+      </el-form-item>
+
+      <el-form-item label="显示名称" prop="display_name">
+        <el-input
+          v-model="formData.display_name"
+          placeholder="请输入显示名称（用于界面展示）"
+        />
+        <div class="form-tip">
+          💡 显示名称可以自定义，用于在界面上展示，例如："Alpha Vantage - 美股数据"
+        </div>
       </el-form-item>
 
       <!-- 🆕 注册引导提示 -->
@@ -303,8 +313,21 @@ const openRegisterUrl = () => {
 
 // 处理数据源类型变化
 const handleTypeChange = () => {
-  // 类型变化时可以做一些额外处理
-  console.log('数据源类型已变更:', formData.value.type)
+  const selectedType = formData.value.type
+  console.log('数据源类型已变更:', selectedType)
+
+  // 🔥 自动填充数据源名称（使用数据源类型的值）
+  if (selectedType) {
+    formData.value.name = selectedType
+
+    // 如果显示名称为空，也自动填充
+    if (!formData.value.display_name) {
+      const sourceInfo = dataSourceTypes.find(ds => ds.value === selectedType)
+      if (sourceInfo) {
+        formData.value.display_name = sourceInfo.label
+      }
+    }
+  }
 }
 
 // 表单数据
@@ -408,9 +431,9 @@ const dataSourceTypes = [
 
 // 表单验证规则
 const rules: FormRules = {
-  name: [{ required: true, message: '请输入数据源名称', trigger: 'blur' }],
-  display_name: [{ required: true, message: '请输入显示名称', trigger: 'blur' }],
   type: [{ required: true, message: '请选择数据源类型', trigger: 'change' }],
+  name: [{ required: true, message: '数据源名称不能为空（自动生成）', trigger: 'blur' }],
+  display_name: [{ required: true, message: '请输入显示名称', trigger: 'blur' }],
   timeout: [{ required: true, message: '请输入超时时间', trigger: 'blur' }],
   rate_limit: [{ required: true, message: '请输入速率限制', trigger: 'blur' }],
   priority: [{ required: true, message: '请输入优先级', trigger: 'blur' }],

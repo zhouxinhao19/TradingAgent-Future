@@ -90,6 +90,13 @@
           >
             {{ item.enabled ? '禁用' : '启用' }}
           </el-button>
+          <el-button
+            size="small"
+            type="danger"
+            @click="$emit('delete-datasource', item)"
+          >
+            删除
+          </el-button>
         </div>
       </div>
 
@@ -131,6 +138,7 @@ const emit = defineEmits<{
   'manage-grouping': [dataSourceName: string]
   'manage-category': [categoryId: string]
   'add-datasource': [categoryId: string]
+  'delete-datasource': [dataSource: DataSourceConfig]
 }>()
 
 // Refs
