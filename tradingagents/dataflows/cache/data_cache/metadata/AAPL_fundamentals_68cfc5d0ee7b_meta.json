@@ -1,0 +1,10 @@
+{
+  "symbol": "AAPL",
+  "data_type": "fundamentals",
+  "data_source": "finnhub",
+  "market_type": "us",
+  "file_path": "C:\\TradingAgentsCN\\tradingagents\\dataflows\\cache\\data_cache\\us_fundamentals\\AAPL_fundamentals_68cfc5d0ee7b.txt",
+  "file_format": "txt",
+  "content_length": 732,
+  "cached_at": "2025-11-11T17:36:02.558531"
+}

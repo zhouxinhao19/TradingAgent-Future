@@ -2301,8 +2301,9 @@ class USDataSourceManager:
             available.append(USDataSource.MONGODB)
             logger.info("✅ MongoDB缓存数据源可用")
 
-        # 从数据库读取启用的数据源列表
+        # 从数据库读取启用的数据源列表和配置
         enabled_sources_in_db = self._get_enabled_sources_from_db()
+        datasource_configs = self._get_datasource_configs_from_db()
 
         # 检查 yfinance
         if 'yfinance' in enabled_sources_in_db:
@@ -2318,13 +2319,14 @@ class USDataSourceManager:
         # 检查 Alpha Vantage
         if 'alpha_vantage' in enabled_sources_in_db:
             try:
-                # 检查 API Key 是否配置
-                api_key = os.getenv("ALPHA_VANTAGE_API_KEY")
+                # 优先从数据库配置读取 API Key，其次从环境变量读取
+                api_key = datasource_configs.get('alpha_vantage', {}).get('api_key') or os.getenv("ALPHA_VANTAGE_API_KEY")
                 if api_key:
                     available.append(USDataSource.ALPHA_VANTAGE)
-                    logger.info("✅ Alpha Vantage数据源可用且已启用")
+                    source = "数据库配置" if datasource_configs.get('alpha_vantage', {}).get('api_key') else "环境变量"
+                    logger.info(f"✅ Alpha Vantage数据源可用且已启用 (API Key来源: {source})")
                 else:
-                    logger.warning("⚠️ Alpha Vantage数据源不可用: API Key未配置")
+                    logger.warning("⚠️ Alpha Vantage数据源不可用: API Key未配置（数据库和环境变量均未找到）")
             except Exception as e:
                 logger.warning(f"⚠️ Alpha Vantage数据源检查失败: {e}")
         else:
@@ -2333,13 +2335,14 @@ class USDataSourceManager:
         # 检查 Finnhub
         if 'finnhub' in enabled_sources_in_db:
             try:
-                # 检查 API Key 是否配置
-                api_key = os.getenv("FINNHUB_API_KEY")
+                # 优先从数据库配置读取 API Key，其次从环境变量读取
+                api_key = datasource_configs.get('finnhub', {}).get('api_key') or os.getenv("FINNHUB_API_KEY")
                 if api_key:
                     available.append(USDataSource.FINNHUB)
-                    logger.info("✅ Finnhub数据源可用且已启用")
+                    source = "数据库配置" if datasource_configs.get('finnhub', {}).get('api_key') else "环境变量"
+                    logger.info(f"✅ Finnhub数据源可用且已启用 (API Key来源: {source})")
                 else:
-                    logger.warning("⚠️ Finnhub数据源不可用: API Key未配置")
+                    logger.warning("⚠️ Finnhub数据源不可用: API Key未配置（数据库和环境变量均未找到）")
             except Exception as e:
                 logger.warning(f"⚠️ Finnhub数据源检查失败: {e}")
         else:
@@ -2379,6 +2382,35 @@ class USDataSourceManager:
             logger.warning(f"⚠️ 从数据库读取启用的数据源失败: {e}")
             # 默认全部启用
             return ['yfinance', 'alpha_vantage', 'finnhub']
+
+    def _get_datasource_configs_from_db(self) -> dict:
+        """从数据库读取数据源配置（包括 API Key）"""
+        try:
+            from app.core.database import get_mongo_db_sync
+            db = get_mongo_db_sync()
+
+            # 从 system_config 集合读取配置
+            config = db.system_config.find_one({})
+            if not config:
+                return {}
+
+            # 提取数据源配置
+            datasource_configs = config.get('data_source_configs', [])
+
+            # 构建配置字典 {数据源名称: {api_key, api_secret, ...}}
+            result = {}
+            for ds_config in datasource_configs:
+                name = ds_config.get('name', '').lower()
+                result[name] = {
+                    'api_key': ds_config.get('api_key', ''),
+                    'api_secret': ds_config.get('api_secret', ''),
+                    'config_params': ds_config.get('config_params', {})
+                }
+
+            return result
+        except Exception as e:
+            logger.warning(f"⚠️ 从数据库读取数据源配置失败: {e}")
+            return {}
 
     def get_current_source(self) -> USDataSource:
         """获取当前数据源"""
