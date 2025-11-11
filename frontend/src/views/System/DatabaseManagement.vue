@@ -134,7 +134,7 @@
               <el-select v-model="exportCollection" style="width: 100%">
                 <el-option label="配置和报告（用于迁移）" value="config_and_reports" />
                 <el-option label="配置数据（用于演示系统，已脱敏）" value="config_only" />
-                <el-option label="分析结果" value="analysis_results" />
+                <el-option label="分析报告" value="analysis_reports" />
                 <el-option label="用户配置" value="user_configs" />
                 <el-option label="操作日志" value="operation_logs" />
               </el-select>
@@ -421,9 +421,9 @@ const exportData = async () => {
 
     // 分析报告集合列表
     const reportCollections = [
-      'analysis_results',    // 分析结果
-      'analysis_tasks',      // 分析任务
-      'debate_records'       // 辩论记录
+      'analysis_reports',    // 分析报告（修复：原来是 analysis_results，但数据库中实际是 analysis_reports）
+      'analysis_tasks'       // 分析任务
+      // 注意：debate_records 集合在数据库中不存在，已移除
     ]
 
     // 配置和报告集合列表

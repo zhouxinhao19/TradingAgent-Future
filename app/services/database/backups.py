@@ -233,6 +233,35 @@ async def delete_backup(backup_id: str) -> None:
     await db.database_backups.delete_one({"_id": ObjectId(backup_id)})
 
 
+def _convert_date_fields(doc: dict) -> dict:
+    """
+    转换文档中的日期字段（字符串 -> datetime）
+
+    常见的日期字段：
+    - created_at, updated_at, completed_at
+    - started_at, finished_at
+    - analysis_date (保持字符串格式，因为是日期而非时间戳)
+    """
+    from dateutil import parser
+
+    date_fields = [
+        "created_at", "updated_at", "completed_at",
+        "started_at", "finished_at", "deleted_at",
+        "last_login", "last_modified", "timestamp"
+    ]
+
+    for field in date_fields:
+        if field in doc and isinstance(doc[field], str):
+            try:
+                # 尝试解析日期字符串
+                doc[field] = parser.parse(doc[field])
+                logger.debug(f"✅ 转换日期字段 {field}: {doc[field]}")
+            except Exception as e:
+                logger.warning(f"⚠️ 无法解析日期字段 {field}: {doc[field]}, 错误: {e}")
+
+    return doc
+
+
 async def import_data(content: bytes, collection: str, *, format: str = "json", overwrite: bool = False, filename: str | None = None) -> Dict[str, Any]:
     """
     导入数据到数据库
@@ -252,10 +281,33 @@ async def import_data(content: bytes, collection: str, *, format: str = "json", 
     else:
         raise Exception(f"不支持的格式: {format}")
 
-    # 检测是否为多集合导出格式（字典，key 为集合名）
+    # 检测是否为多集合导出格式
+    logger.info(f"🔍 [导入检测] 数据类型: {type(data)}")
+
+    # 🔥 新格式：包含 export_info 和 data 的字典
+    if isinstance(data, dict) and "export_info" in data and "data" in data:
+        logger.info(f"📦 检测到新版多集合导出文件（包含 export_info）")
+        export_info = data.get("export_info", {})
+        logger.info(f"📋 导出信息: 创建时间={export_info.get('created_at')}, 集合数={len(export_info.get('collections', []))}")
+
+        # 提取实际数据
+        data = data["data"]
+        logger.info(f"📦 包含 {len(data)} 个集合: {list(data.keys())}")
+
+    # 🔥 旧格式：直接是集合名到文档列表的映射
+    if isinstance(data, dict):
+        logger.info(f"🔍 [导入检测] 字典包含 {len(data)} 个键")
+        logger.info(f"🔍 [导入检测] 键列表: {list(data.keys())[:10]}")  # 只显示前10个
+
+        # 检查每个键值对的类型
+        for k, v in list(data.items())[:5]:  # 只检查前5个
+            logger.info(f"🔍 [导入检测] 键 '{k}': 值类型={type(v)}, 是否为列表={isinstance(v, list)}")
+            if isinstance(v, list):
+                logger.info(f"🔍 [导入检测] 键 '{k}': 列表长度={len(v)}")
+
     if isinstance(data, dict) and all(isinstance(k, str) and isinstance(v, list) for k, v in data.items()):
         # 多集合模式
-        logger.info(f"📦 检测到多集合导出文件，包含 {len(data)} 个集合")
+        logger.info(f"📦 确认为多集合导入模式，包含 {len(data)} 个集合")
 
         total_inserted = 0
         imported_collections = []
@@ -271,13 +323,17 @@ async def import_data(content: bytes, collection: str, *, format: str = "json", 
                 deleted_count = await collection_obj.delete_many({})
                 logger.info(f"🗑️ 清空集合 {coll_name}：删除 {deleted_count.deleted_count} 条文档")
 
-            # 处理 _id 字段
+            # 处理 _id 字段和日期字段
             for doc in documents:
+                # 转换 _id
                 if "_id" in doc and isinstance(doc["_id"], str):
                     try:
                         doc["_id"] = ObjectId(doc["_id"])
                     except Exception:
                         del doc["_id"]
+
+                # 🔥 转换日期字段（字符串 -> datetime）
+                _convert_date_fields(doc)
 
             # 插入数据
             if documents:
@@ -299,22 +355,34 @@ async def import_data(content: bytes, collection: str, *, format: str = "json", 
     else:
         # 单集合模式（兼容旧版本）
         logger.info(f"📄 单集合导入模式，目标集合: {collection}")
+        logger.info(f"🔍 [单集合模式] 数据类型: {type(data)}")
+
+        if isinstance(data, dict):
+            logger.info(f"🔍 [单集合模式] 字典包含 {len(data)} 个键")
+            logger.info(f"🔍 [单集合模式] 键列表: {list(data.keys())[:10]}")
 
         collection_obj = db[collection]
 
         if not isinstance(data, list):
+            logger.info(f"🔍 [单集合模式] 数据不是列表，转换为列表")
             data = [data]
+
+        logger.info(f"🔍 [单集合模式] 准备插入 {len(data)} 条文档")
 
         if overwrite:
             deleted_count = await collection_obj.delete_many({})
             logger.info(f"🗑️ 清空集合 {collection}：删除 {deleted_count.deleted_count} 条文档")
 
         for doc in data:
+            # 转换 _id
             if "_id" in doc and isinstance(doc["_id"], str):
                 try:
                     doc["_id"] = ObjectId(doc["_id"])
                 except Exception:
                     del doc["_id"]
+
+            # 🔥 转换日期字段（字符串 -> datetime）
+            _convert_date_fields(doc)
 
         inserted_count = 0
         if data:
