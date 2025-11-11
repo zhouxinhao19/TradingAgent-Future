@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import gzip
+import asyncio
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -183,10 +184,12 @@ def _sanitize_document(doc: Any) -> Any:
 async def export_data(collections: Optional[List[str]] = None, *, export_dir: str, format: str = "json", sanitize: bool = False) -> str:
     import pandas as pd
 
+    # 🔥 使用异步数据库连接
     db = get_mongo_db()
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
 
     if not collections:
+        # 🔥 异步调用 list_collection_names()
         collections = await db.list_collection_names()
         collections = [c for c in collections if not c.startswith("system.")]
 
@@ -202,6 +205,7 @@ async def export_data(collections: Optional[List[str]] = None, *, export_dir: st
             all_data[collection_name] = []
             continue
 
+        # 🔥 异步迭代查询结果
         async for doc in collection.find():
             docs.append(serialize_document(doc))
         all_data[collection_name] = docs
@@ -213,7 +217,7 @@ async def export_data(collections: Optional[List[str]] = None, *, export_dir: st
     if format.lower() == "json":
         filename = f"export_{timestamp}.json"
         file_path = os.path.join(export_dir, filename)
-        export_data = {
+        export_data_dict = {
             "export_info": {
                 "created_at": datetime.utcnow().isoformat(),
                 "collections": collections,
@@ -221,8 +225,13 @@ async def export_data(collections: Optional[List[str]] = None, *, export_dir: st
             },
             "data": all_data,
         }
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(export_data, f, ensure_ascii=False, indent=2)
+
+        # 🔥 使用 asyncio.to_thread 将阻塞的文件 I/O 操作放到线程池执行
+        def _write_json():
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(export_data_dict, f, ensure_ascii=False, indent=2)
+
+        await asyncio.to_thread(_write_json)
         return file_path
 
     if format.lower() == "csv":
@@ -234,20 +243,30 @@ async def export_data(collections: Optional[List[str]] = None, *, export_dir: st
                 row = {**doc}
                 row["_collection"] = collection_name
                 rows.append(row)
-        if rows:
-            pd.DataFrame(rows).to_csv(file_path, index=False, encoding="utf-8-sig")
-        else:
-            pd.DataFrame().to_csv(file_path, index=False, encoding="utf-8-sig")
+
+        # 🔥 使用 asyncio.to_thread 将阻塞的文件 I/O 操作放到线程池执行
+        def _write_csv():
+            if rows:
+                pd.DataFrame(rows).to_csv(file_path, index=False, encoding="utf-8-sig")
+            else:
+                pd.DataFrame().to_csv(file_path, index=False, encoding="utf-8-sig")
+
+        await asyncio.to_thread(_write_csv)
         return file_path
 
     if format.lower() in ["xlsx", "excel"]:
         filename = f"export_{timestamp}.xlsx"
         file_path = os.path.join(export_dir, filename)
-        with pd.ExcelWriter(file_path, engine="openpyxl") as writer:
-            for collection_name, documents in all_data.items():
-                df = pd.DataFrame(documents) if documents else pd.DataFrame()
-                sheet = collection_name[:31]
-                df.to_excel(writer, sheet_name=sheet, index=False)
+
+        # 🔥 使用 asyncio.to_thread 将阻塞的文件 I/O 操作放到线程池执行
+        def _write_excel():
+            with pd.ExcelWriter(file_path, engine="openpyxl") as writer:
+                for collection_name, documents in all_data.items():
+                    df = pd.DataFrame(documents) if documents else pd.DataFrame()
+                    sheet = collection_name[:31]
+                    df.to_excel(writer, sheet_name=sheet, index=False)
+
+        await asyncio.to_thread(_write_excel)
         return file_path
 
     raise Exception(f"不支持的导出格式: {format}")
