@@ -512,8 +512,8 @@ class DataSourceManager:
             from app.core.database import get_mongo_db_sync
             db = get_mongo_db_sync()
 
-            # 从 system_config 集合读取配置
-            config = db.system_config.find_one({})
+            # 从 system_configs 集合读取激活的配置
+            config = db.system_configs.find_one({"is_active": True})
             if not config:
                 return {}
 
@@ -2423,8 +2423,8 @@ class USDataSourceManager:
             from app.core.database import get_mongo_db_sync
             db = get_mongo_db_sync()
 
-            # 从 system_config 集合读取配置
-            config = db.system_config.find_one({})
+            # 从 system_configs 集合读取激活的配置
+            config = db.system_configs.find_one({"is_active": True})
             if not config:
                 return {}
 
