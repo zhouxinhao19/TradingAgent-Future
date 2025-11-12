@@ -1135,6 +1135,73 @@ def get_stock_preparation_message(stock_code: str, market_type: str = "auto",
         return f"❌ 数据准备失败: {result.error_message}\n💡 建议: {result.suggestion}"
 
 
+async def prepare_stock_data_async(stock_code: str, market_type: str = "auto",
+                                   period_days: int = None, analysis_date: str = None) -> StockDataPreparationResult:
+    """
+    异步版本：预获取和验证股票数据
+
+    🔥 专门用于 FastAPI 异步上下文，避免事件循环冲突
+
+    Args:
+        stock_code: 股票代码
+        market_type: 市场类型 ("A股", "港股", "美股", "auto")
+        period_days: 历史数据时长（天），默认30天
+        analysis_date: 分析日期，默认为今天
+
+    Returns:
+        StockDataPreparationResult: 数据准备结果
+    """
+    preparer = get_stock_preparer()
+
+    # 使用异步版本的内部方法
+    if period_days is None:
+        period_days = preparer.default_period_days
+
+    if analysis_date is None:
+        from datetime import datetime
+        analysis_date = datetime.now().strftime('%Y-%m-%d')
+
+    logger.info(f"📊 [数据准备-异步] 开始准备股票数据: {stock_code} (市场: {market_type}, 时长: {period_days}天)")
+
+    # 1. 基本格式验证（同步操作）
+    format_result = preparer._validate_format(stock_code, market_type)
+    if not format_result.is_valid:
+        return format_result
+
+    # 2. 数据库数据检查（同步操作）
+    db_result = preparer._check_database_data(stock_code, format_result.market_type, period_days, analysis_date)
+
+    # 3. 如果需要同步数据，使用异步方法
+    if db_result.needs_sync:
+        logger.info(f"🔄 [数据准备-异步] 需要同步数据")
+
+        # 计算同步日期范围
+        from datetime import datetime, timedelta
+        end_date = datetime.strptime(analysis_date, '%Y-%m-%d')
+        start_date = end_date - timedelta(days=period_days)
+
+        # 🔥 直接调用异步方法，不创建新的事件循环
+        sync_result = await preparer._trigger_data_sync_async(
+            stock_code,
+            start_date.strftime('%Y-%m-%d'),
+            end_date.strftime('%Y-%m-%d')
+        )
+
+        if not sync_result.get("success", False):
+            return StockDataPreparationResult(
+                is_valid=False,
+                stock_code=stock_code,
+                market_type=format_result.market_type,
+                error_message=f"数据同步失败: {sync_result.get('message', '未知错误')}",
+                suggestion="请检查网络连接和数据源配置，或稍后重试"
+            )
+
+        # 同步成功后，重新检查数据库
+        db_result = preparer._check_database_data(stock_code, format_result.market_type, period_days, analysis_date)
+
+    return db_result
+
+
 # 保持向后兼容的别名
 StockValidator = StockDataPreparer
 get_stock_validator = get_stock_preparer
