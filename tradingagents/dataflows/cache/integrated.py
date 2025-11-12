@@ -266,9 +266,75 @@ class IntegratedCacheManager:
         """清理过期缓存"""
         if self.use_adaptive:
             self.adaptive_cache.clear_expired_cache()
-        
+
         # 总是清理传统缓存
         self.legacy_cache.clear_expired_cache()
+
+    def clear_old_cache(self, max_age_days: int = 7):
+        """
+        清理过期缓存（兼容旧接口）
+
+        Args:
+            max_age_days: 清理多少天前的缓存，0表示清理所有缓存
+
+        Returns:
+            清理的记录数
+        """
+        cleared_count = 0
+
+        # 1. 清理 Redis 缓存
+        if self.use_adaptive and self.db_manager.is_redis_available():
+            try:
+                redis_client = self.db_manager.get_redis_client()
+                if max_age_days == 0:
+                    # 清空所有缓存
+                    redis_client.flushdb()
+                    self.logger.info(f"🧹 Redis 缓存已全部清空")
+                else:
+                    # Redis 会自动过期，这里只记录日志
+                    self.logger.info(f"🧹 Redis 缓存会自动过期（TTL机制）")
+            except Exception as e:
+                self.logger.error(f"⚠️ Redis 缓存清理失败: {e}")
+
+        # 2. 清理 MongoDB 缓存
+        if self.use_adaptive and self.db_manager.is_mongodb_available():
+            try:
+                from datetime import datetime, timedelta
+                from zoneinfo import ZoneInfo
+                from tradingagents.config.runtime_settings import get_timezone_name
+
+                mongodb_db = self.db_manager.get_mongodb_db()
+
+                if max_age_days == 0:
+                    # 清空所有缓存集合
+                    for collection_name in ["stock_data", "news_data", "fundamentals_data"]:
+                        result = mongodb_db[collection_name].delete_many({})
+                        cleared_count += result.deleted_count
+                        self.logger.info(f"🧹 MongoDB {collection_name} 清空了 {result.deleted_count} 条记录")
+                else:
+                    # 清理过期数据
+                    cutoff_time = datetime.now(ZoneInfo(get_timezone_name())) - timedelta(days=max_age_days)
+                    for collection_name in ["stock_data", "news_data", "fundamentals_data"]:
+                        result = mongodb_db[collection_name].delete_many({"created_at": {"$lt": cutoff_time}})
+                        cleared_count += result.deleted_count
+                        self.logger.info(f"🧹 MongoDB {collection_name} 清理了 {result.deleted_count} 条记录")
+            except Exception as e:
+                self.logger.error(f"⚠️ MongoDB 缓存清理失败: {e}")
+
+        # 3. 清理文件缓存
+        try:
+            file_cleared = self.legacy_cache.clear_old_cache(max_age_days)
+            # 文件缓存可能返回 None，需要处理
+            if file_cleared is not None:
+                cleared_count += file_cleared
+                self.logger.info(f"🧹 文件缓存清理了 {file_cleared} 个文件")
+            else:
+                self.logger.info(f"🧹 文件缓存清理完成（返回值为None）")
+        except Exception as e:
+            self.logger.error(f"⚠️ 文件缓存清理失败: {e}")
+
+        self.logger.info(f"🧹 总共清理了 {cleared_count} 条缓存记录")
+        return cleared_count
     
     def get_cache_backend_info(self) -> Dict[str, Any]:
         """获取缓存后端信息"""

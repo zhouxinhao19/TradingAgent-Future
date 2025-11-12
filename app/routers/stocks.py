@@ -4,9 +4,10 @@
 - 所有端点均需鉴权 (Bearer Token)
 - 路径前缀在 main.py 中挂载为 /api，当前路由自身前缀为 /stocks
 """
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 import logging
+import re
 
 from app.routers.auth_db import get_current_user
 from app.core.database import get_mongo_db
@@ -27,18 +28,89 @@ def _zfill_code(code: str) -> str:
         return str(code)
 
 
+def _detect_market_and_code(code: str) -> Tuple[str, str]:
+    """
+    检测股票代码的市场类型并标准化代码
+
+    Args:
+        code: 股票代码
+
+    Returns:
+        (market, normalized_code): 市场类型和标准化后的代码
+            - CN: A股（6位数字）
+            - HK: 港股（4-5位数字或带.HK后缀）
+            - US: 美股（字母代码）
+    """
+    code = code.strip().upper()
+
+    # 港股：带.HK后缀
+    if code.endswith('.HK'):
+        return ('HK', code[:-3].zfill(5))  # 移除.HK，补齐到5位
+
+    # 美股：纯字母
+    if re.match(r'^[A-Z]+$', code):
+        return ('US', code)
+
+    # 港股：4-5位数字
+    if re.match(r'^\d{4,5}$', code):
+        return ('HK', code.zfill(5))  # 补齐到5位
+
+    # A股：6位数字
+    if re.match(r'^\d{6}$', code):
+        return ('CN', code)
+
+    # 默认当作A股处理
+    return ('CN', _zfill_code(code))
+
+
 @router.get("/{code}/quote", response_model=dict)
-async def get_quote(code: str, current_user: dict = Depends(get_current_user)):
-    """获取股票近实时快照（从入库的 market_quotes 集合 + 基础信息集合拼装）
-    返回字段（data内，蛇形命名，保持与现有风格一致）:
+async def get_quote(
+    code: str,
+    force_refresh: bool = Query(False, description="是否强制刷新（跳过缓存）"),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    获取股票实时行情（支持A股/港股/美股）
+
+    自动识别市场类型：
+    - 6位数字 → A股
+    - 4位数字或.HK → 港股
+    - 纯字母 → 美股
+
+    参数：
+    - code: 股票代码
+    - force_refresh: 是否强制刷新（跳过缓存）
+
+    返回字段（data内，蛇形命名）:
       - code, name, market
       - price(close), change_percent(pct_chg), amount, prev_close(估算)
       - turnover_rate, amplitude（振幅，替代量比）
       - trade_date, updated_at
-    若未命中行情，部分字段为 None
     """
+    # 检测市场类型
+    market, normalized_code = _detect_market_and_code(code)
+
+    # 港股和美股：使用新服务
+    if market in ['HK', 'US']:
+        from app.services.foreign_stock_service import ForeignStockService
+        from app.core.database import get_mongo_db
+
+        db = get_mongo_db()  # 不需要 await，直接返回数据库对象
+        service = ForeignStockService(db=db)
+
+        try:
+            quote = await service.get_quote(market, normalized_code, force_refresh)
+            return ok(data=quote)
+        except Exception as e:
+            logger.error(f"获取{market}股票{code}行情失败: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"获取行情失败: {str(e)}"
+            )
+
+    # A股：使用现有逻辑
     db = get_mongo_db()
-    code6 = _zfill_code(code)
+    code6 = normalized_code
 
     # 行情
     q = await db["market_quotes"].find_one({"code": code6}, {"_id": 0})
@@ -145,10 +217,11 @@ async def get_quote(code: str, current_user: dict = Depends(get_current_user)):
 async def get_fundamentals(
     code: str,
     source: Optional[str] = Query(None, description="数据源 (tushare/akshare/baostock/multi_source)"),
+    force_refresh: bool = Query(False, description="是否强制刷新（跳过缓存）"),
     current_user: dict = Depends(get_current_user)
 ):
     """
-    获取基础面快照（优先从 MongoDB 获取）
+    获取基础面快照（支持A股/港股/美股）
 
     数据来源优先级：
     1. stock_basic_info 集合（基础信息、估值指标）
@@ -157,9 +230,32 @@ async def get_fundamentals(
     参数：
     - code: 股票代码
     - source: 数据源（可选），默认按优先级：tushare > multi_source > akshare > baostock
+    - force_refresh: 是否强制刷新（跳过缓存）
     """
+    # 检测市场类型
+    market, normalized_code = _detect_market_and_code(code)
+
+    # 港股和美股：使用新服务
+    if market in ['HK', 'US']:
+        from app.services.foreign_stock_service import ForeignStockService
+        from app.core.database import get_mongo_db
+
+        db = get_mongo_db()  # 不需要 await，直接返回数据库对象
+        service = ForeignStockService(db=db)
+
+        try:
+            info = await service.get_basic_info(market, normalized_code, force_refresh)
+            return ok(data=info)
+        except Exception as e:
+            logger.error(f"获取{market}股票{code}基础信息失败: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"获取基础信息失败: {str(e)}"
+            )
+
+    # A股：使用现有逻辑
     db = get_mongo_db()
-    code6 = _zfill_code(code)
+    code6 = normalized_code
 
     # 1. 获取基础信息（支持数据源筛选）
     query = {"code": code6}
@@ -325,10 +421,20 @@ async def get_fundamentals(
 
 
 @router.get("/{code}/kline", response_model=dict)
-async def get_kline(code: str, period: str = "day", limit: int = 120, adj: str = "none", current_user: dict = Depends(get_current_user)):
-    """获取K线数据（MongoDB缓存优先，Tushare/AkShare兜底）
+async def get_kline(
+    code: str,
+    period: str = "day",
+    limit: int = 120,
+    adj: str = "none",
+    force_refresh: bool = Query(False, description="是否强制刷新（跳过缓存）"),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    获取K线数据（支持A股/港股/美股）
+
     period: day/week/month/5m/15m/30m/60m
     adj: none/qfq/hfq
+    force_refresh: 是否强制刷新（跳过缓存）
 
     🔥 新增功能：当天实时K线数据
     - 交易时间内（09:30-15:00）：从 market_quotes 获取实时数据
@@ -343,7 +449,34 @@ async def get_kline(code: str, period: str = "day", limit: int = 120, adj: str =
     if period not in valid_periods:
         raise HTTPException(status_code=400, detail=f"不支持的period: {period}")
 
-    code_padded = _zfill_code(code)
+    # 检测市场类型
+    market, normalized_code = _detect_market_and_code(code)
+
+    # 港股和美股：使用新服务
+    if market in ['HK', 'US']:
+        from app.services.foreign_stock_service import ForeignStockService
+        from app.core.database import get_mongo_db
+
+        db = get_mongo_db()  # 不需要 await，直接返回数据库对象
+        service = ForeignStockService(db=db)
+
+        try:
+            kline_data = await service.get_kline(market, normalized_code, period, limit, force_refresh)
+            return ok(data={
+                'code': normalized_code,
+                'period': period,
+                'items': kline_data,
+                'source': 'cache_or_api'
+            })
+        except Exception as e:
+            logger.error(f"获取{market}股票{code}K线数据失败: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"获取K线数据失败: {str(e)}"
+            )
+
+    # A股：使用现有逻辑
+    code_padded = normalized_code
     adj_norm = None if adj in (None, "none", "", "null") else adj
     items = None
     source = None
@@ -494,17 +627,39 @@ async def get_kline(code: str, period: str = "day", limit: int = 120, adj: str =
 
 @router.get("/{code}/news", response_model=dict)
 async def get_news(code: str, days: int = 2, limit: int = 50, include_announcements: bool = True, current_user: dict = Depends(get_current_user)):
-    """获取新闻与公告（Tushare 主，AkShare 兜底）"""
+    """获取新闻与公告（支持A股、港股、美股）"""
     from app.services.data_sources.manager import DataSourceManager
-    mgr = DataSourceManager()
-    items, source = mgr.get_news_with_fallback(code=_zfill_code(code), days=days, limit=limit, include_announcements=include_announcements)
-    data = {
-        "code": _zfill_code(code),
-        "days": days,
-        "limit": limit,
-        "include_announcements": include_announcements,
-        "source": source,
-        "items": items or []
-    }
-    return ok(data)
+    from app.services.foreign_stock_service import ForeignStockService
+
+    # 检测股票类型
+    market, normalized_code = _detect_market_and_code(code)
+
+    if market == 'US':
+        # 美股：使用 ForeignStockService
+        service = ForeignStockService()
+        result = await service.get_us_news(normalized_code, days=days, limit=limit)
+        return ok(result)
+    elif market == 'HK':
+        # 港股：暂时返回空数据（TODO: 实现港股新闻）
+        data = {
+            "code": normalized_code,
+            "days": days,
+            "limit": limit,
+            "source": "none",
+            "items": []
+        }
+        return ok(data)
+    else:
+        # A股：使用原有的 DataSourceManager
+        mgr = DataSourceManager()
+        items, source = mgr.get_news_with_fallback(code=normalized_code, days=days, limit=limit, include_announcements=include_announcements)
+        data = {
+            "code": normalized_code,
+            "days": days,
+            "limit": limit,
+            "include_announcements": include_announcements,
+            "source": source,
+            "items": items or []
+        }
+        return ok(data)
 
