@@ -2,12 +2,15 @@
 港股和美股数据服务
 🔥 复用统一数据源管理器（UnifiedStockService）
 🔥 按照数据库配置的数据源优先级调用API
+🔥 请求去重机制：防止并发请求重复调用API
 """
 from typing import Optional, Dict, List, Tuple
 from datetime import datetime, timedelta
 import logging
 import json
 import re
+import asyncio
+from collections import defaultdict
 
 # 复用现有缓存系统
 from tradingagents.dataflows.cache import get_cache
@@ -45,7 +48,13 @@ class ForeignStockService:
         # 保存数据库连接（用于查询数据源优先级）
         self.db = db
 
-        logger.info("✅ ForeignStockService 初始化完成")
+        # 🔥 请求去重：为每个 (market, code, data_type) 创建独立的锁
+        self._request_locks = defaultdict(asyncio.Lock)
+
+        # 🔥 正在进行的请求缓存（用于共享结果）
+        self._pending_requests = {}
+
+        logger.info("✅ ForeignStockService 初始化完成（已启用请求去重）")
     
     async def get_quote(self, market: str, code: str, force_refresh: bool = False) -> Dict:
         """
@@ -115,8 +124,9 @@ class ForeignStockService:
     
     async def _get_hk_quote(self, code: str, force_refresh: bool = False) -> Dict:
         """
-        获取港股实时行情
+        获取港股实时行情（带请求去重）
         🔥 按照数据库配置的数据源优先级调用API
+        🔥 防止并发请求重复调用API
         """
         # 1. 检查缓存（除非强制刷新）
         if not force_refresh:
@@ -131,67 +141,100 @@ class ForeignStockService:
                     logger.info(f"⚡ 从缓存获取港股行情: {code}")
                     return self._parse_cached_data(cached_data, 'HK', code)
 
-        # 2. 从数据库获取数据源优先级（使用统一方法）
-        source_priority = await self._get_source_priority('HK')
+        # 2. 🔥 请求去重：使用锁确保同一股票同时只有一个API调用
+        request_key = f"HK_quote_{code}_{force_refresh}"
+        lock = self._request_locks[request_key]
 
-        # 3. 按优先级尝试各个数据源
-        quote_data = None
-        data_source = None
+        async with lock:
+            # 🔥 再次检查缓存（可能在等待锁的过程中，其他请求已经完成并缓存了数据）
+            # 即使 force_refresh=True，也要检查是否有其他并发请求刚刚完成
+            cache_key = self.cache.find_cached_stock_data(
+                symbol=code,
+                data_source="hk_realtime_quote"
+            )
+            if cache_key:
+                cached_data = self.cache.load_stock_data(cache_key)
+                if cached_data:
+                    # 检查缓存时间，如果是最近1秒内的，说明是并发请求刚刚缓存的
+                    try:
+                        data_dict = json.loads(cached_data) if isinstance(cached_data, str) else cached_data
+                        updated_at = data_dict.get('updated_at', '')
+                        if updated_at:
+                            cache_time = datetime.fromisoformat(updated_at)
+                            time_diff = (datetime.now() - cache_time).total_seconds()
+                            if time_diff < 1:  # 1秒内的缓存，说明是并发请求刚刚完成的
+                                logger.info(f"⚡ [去重] 使用并发请求的结果: {code} (缓存时间: {time_diff:.2f}秒前)")
+                                return self._parse_cached_data(cached_data, 'HK', code)
+                    except Exception as e:
+                        logger.debug(f"检查缓存时间失败: {e}")
 
-        # 数据源名称映射（数据库名称 → 处理函数）
-        # 🔥 只有这些是有效的数据源名称
-        source_handlers = {
-            'yahoo_finance': ('yfinance', self._get_hk_quote_from_yfinance),
-            'akshare': ('akshare', self._get_hk_quote_from_akshare),
-        }
+                    # 如果不是强制刷新，使用缓存
+                    if not force_refresh:
+                        logger.info(f"⚡ [去重后] 从缓存获取港股行情: {code}")
+                        return self._parse_cached_data(cached_data, 'HK', code)
 
-        # 过滤有效数据源并去重
-        valid_priority = []
-        seen = set()
-        for source_name in source_priority:
-            source_key = source_name.lower()
-            # 只保留有效的数据源
-            if source_key in source_handlers and source_key not in seen:
-                seen.add(source_key)
-                valid_priority.append(source_name)
+            logger.info(f"🔄 开始获取港股行情: {code} (force_refresh={force_refresh})")
 
-        if not valid_priority:
-            logger.warning(f"⚠️ 数据库中没有配置有效的港股数据源，使用默认顺序")
-            valid_priority = ['yahoo_finance', 'akshare']
+            # 3. 从数据库获取数据源优先级（使用统一方法）
+            source_priority = await self._get_source_priority('HK')
 
-        logger.info(f"📊 [HK有效数据源] {valid_priority}")
+            # 4. 按优先级尝试各个数据源
+            quote_data = None
+            data_source = None
 
-        for source_name in valid_priority:
-            source_key = source_name.lower()
-            handler_name, handler_func = source_handlers[source_key]
-            try:
-                # 🔥 使用 asyncio.to_thread 避免阻塞事件循环
-                import asyncio
-                quote_data = await asyncio.to_thread(handler_func, code)
-                data_source = handler_name
+            # 数据源名称映射（数据库名称 → 处理函数）
+            # 🔥 只有这些是有效的数据源名称
+            source_handlers = {
+                'yahoo_finance': ('yfinance', self._get_hk_quote_from_yfinance),
+                'akshare': ('akshare', self._get_hk_quote_from_akshare),
+            }
 
-                if quote_data:
-                    logger.info(f"✅ {data_source}获取港股行情成功: {code}")
-                    break
-            except Exception as e:
-                logger.warning(f"⚠️ {source_name}获取失败: {e}")
-                continue
+            # 过滤有效数据源并去重
+            valid_priority = []
+            seen = set()
+            for source_name in source_priority:
+                source_key = source_name.lower()
+                # 只保留有效的数据源
+                if source_key in source_handlers and source_key not in seen:
+                    seen.add(source_key)
+                    valid_priority.append(source_name)
 
-        if not quote_data:
-            raise Exception(f"无法获取港股{code}的行情数据：所有数据源均失败")
+            if not valid_priority:
+                logger.warning(f"⚠️ 数据库中没有配置有效的港股数据源，使用默认顺序")
+                valid_priority = ['yahoo_finance', 'akshare']
 
-        # 4. 格式化数据
-        formatted_data = self._format_hk_quote(quote_data, code, data_source)
+            logger.info(f"📊 [HK有效数据源] {valid_priority} (股票: {code})")
 
-        # 5. 保存到缓存
-        self.cache.save_stock_data(
-            symbol=code,
-            data=json.dumps(formatted_data, ensure_ascii=False),
-            data_source="hk_realtime_quote"
-        )
-        logger.info(f"💾 港股行情已缓存: {code}")
+            for source_name in valid_priority:
+                source_key = source_name.lower()
+                handler_name, handler_func = source_handlers[source_key]
+                try:
+                    # 🔥 使用 asyncio.to_thread 避免阻塞事件循环
+                    quote_data = await asyncio.to_thread(handler_func, code)
+                    data_source = handler_name
 
-        return formatted_data
+                    if quote_data:
+                        logger.info(f"✅ {data_source}获取港股行情成功: {code}")
+                        break
+                except Exception as e:
+                    logger.warning(f"⚠️ {source_name}获取失败 ({code}): {e}")
+                    continue
+
+            if not quote_data:
+                raise Exception(f"无法获取港股{code}的行情数据：所有数据源均失败")
+
+            # 5. 格式化数据
+            formatted_data = self._format_hk_quote(quote_data, code, data_source)
+
+            # 6. 保存到缓存
+            self.cache.save_stock_data(
+                symbol=code,
+                data=json.dumps(formatted_data, ensure_ascii=False),
+                data_source="hk_realtime_quote"
+            )
+            logger.info(f"💾 港股行情已缓存: {code}")
+
+            return formatted_data
 
     async def _get_source_priority(self, market: str) -> List[str]:
         """
@@ -252,8 +295,9 @@ class ForeignStockService:
     
     async def _get_us_quote(self, code: str, force_refresh: bool = False) -> Dict:
         """
-        获取美股实时行情
+        获取美股实时行情（带请求去重）
         🔥 按照数据库配置的数据源优先级调用API
+        🔥 防止并发请求重复调用API
         """
         # 1. 检查缓存（除非强制刷新）
         if not force_refresh:
@@ -268,82 +312,114 @@ class ForeignStockService:
                     logger.info(f"⚡ 从缓存获取美股行情: {code}")
                     return self._parse_cached_data(cached_data, 'US', code)
 
-        # 2. 从数据库获取数据源优先级（使用统一方法）
-        source_priority = await self._get_source_priority('US')
+        # 2. 🔥 请求去重：使用锁确保同一股票同时只有一个API调用
+        request_key = f"US_quote_{code}_{force_refresh}"
+        lock = self._request_locks[request_key]
 
-        # 3. 按优先级尝试各个数据源
-        quote_data = None
-        data_source = None
+        async with lock:
+            # 🔥 再次检查缓存（可能在等待锁的过程中，其他请求已经完成并缓存了数据）
+            cache_key = self.cache.find_cached_stock_data(
+                symbol=code,
+                data_source="us_realtime_quote"
+            )
+            if cache_key:
+                cached_data = self.cache.load_stock_data(cache_key)
+                if cached_data:
+                    # 检查缓存时间，如果是最近1秒内的，说明是并发请求刚刚缓存的
+                    try:
+                        data_dict = json.loads(cached_data) if isinstance(cached_data, str) else cached_data
+                        updated_at = data_dict.get('updated_at', '')
+                        if updated_at:
+                            cache_time = datetime.fromisoformat(updated_at)
+                            time_diff = (datetime.now() - cache_time).total_seconds()
+                            if time_diff < 1:  # 1秒内的缓存，说明是并发请求刚刚完成的
+                                logger.info(f"⚡ [去重] 使用并发请求的结果: {code} (缓存时间: {time_diff:.2f}秒前)")
+                                return self._parse_cached_data(cached_data, 'US', code)
+                    except Exception as e:
+                        logger.debug(f"检查缓存时间失败: {e}")
 
-        # 数据源名称映射（数据库名称 → 处理函数）
-        # 🔥 只有这些是有效的数据源名称：alpha_vantage, yahoo_finance, finnhub
-        source_handlers = {
-            'alpha_vantage': ('alpha_vantage', self._get_us_quote_from_alpha_vantage),
-            'yahoo_finance': ('yfinance', self._get_us_quote_from_yfinance),
-            'finnhub': ('finnhub', self._get_us_quote_from_finnhub),
-        }
+                    # 如果不是强制刷新，使用缓存
+                    if not force_refresh:
+                        logger.info(f"⚡ [去重后] 从缓存获取美股行情: {code}")
+                        return self._parse_cached_data(cached_data, 'US', code)
 
-        # 过滤有效数据源并去重
-        valid_priority = []
-        seen = set()
-        for source_name in source_priority:
-            source_key = source_name.lower()
-            # 只保留有效的数据源
-            if source_key in source_handlers and source_key not in seen:
-                seen.add(source_key)
-                valid_priority.append(source_name)
+            logger.info(f"🔄 开始获取美股行情: {code} (force_refresh={force_refresh})")
 
-        if not valid_priority:
-            logger.warning("⚠️ 数据库中没有配置有效的美股数据源，使用默认顺序")
-            valid_priority = ['yahoo_finance', 'alpha_vantage', 'finnhub']
+            # 3. 从数据库获取数据源优先级（使用统一方法）
+            source_priority = await self._get_source_priority('US')
 
-        logger.info(f"📊 [US有效数据源] {valid_priority}")
+            # 4. 按优先级尝试各个数据源
+            quote_data = None
+            data_source = None
 
-        for source_name in valid_priority:
-            source_key = source_name.lower()
-            handler_name, handler_func = source_handlers[source_key]
-            try:
-                # 🔥 使用 asyncio.to_thread 避免阻塞事件循环
-                import asyncio
-                quote_data = await asyncio.to_thread(handler_func, code)
-                data_source = handler_name
+            # 数据源名称映射（数据库名称 → 处理函数）
+            # 🔥 只有这些是有效的数据源名称：alpha_vantage, yahoo_finance, finnhub
+            source_handlers = {
+                'alpha_vantage': ('alpha_vantage', self._get_us_quote_from_alpha_vantage),
+                'yahoo_finance': ('yfinance', self._get_us_quote_from_yfinance),
+                'finnhub': ('finnhub', self._get_us_quote_from_finnhub),
+            }
 
-                if quote_data:
-                    logger.info(f"✅ {data_source}获取美股行情成功: {code}")
-                    break
-            except Exception as e:
-                logger.warning(f"⚠️ {source_name}获取失败: {e}")
-                continue
+            # 过滤有效数据源并去重
+            valid_priority = []
+            seen = set()
+            for source_name in source_priority:
+                source_key = source_name.lower()
+                # 只保留有效的数据源
+                if source_key in source_handlers and source_key not in seen:
+                    seen.add(source_key)
+                    valid_priority.append(source_name)
 
-        if not quote_data:
-            raise Exception(f"无法获取美股{code}的行情数据：所有数据源均失败")
+            if not valid_priority:
+                logger.warning("⚠️ 数据库中没有配置有效的美股数据源，使用默认顺序")
+                valid_priority = ['yahoo_finance', 'alpha_vantage', 'finnhub']
 
-        # 4. 格式化数据
-        formatted_data = {
-            'code': code,
-            'name': quote_data.get('name', f'美股{code}'),
-            'market': 'US',
-            'price': quote_data.get('price'),
-            'open': quote_data.get('open'),
-            'high': quote_data.get('high'),
-            'low': quote_data.get('low'),
-            'volume': quote_data.get('volume'),
-            'change_percent': quote_data.get('change_percent'),
-            'trade_date': quote_data.get('trade_date'),
-            'currency': quote_data.get('currency', 'USD'),
-            'source': data_source,
-            'updated_at': datetime.now().isoformat()
-        }
+            logger.info(f"📊 [US有效数据源] {valid_priority} (股票: {code})")
 
-        # 5. 保存到缓存
-        self.cache.save_stock_data(
-            symbol=code,
-            data=json.dumps(formatted_data, ensure_ascii=False),
-            data_source="us_realtime_quote"
-        )
-        logger.info(f"💾 美股行情已缓存: {code}")
+            for source_name in valid_priority:
+                source_key = source_name.lower()
+                handler_name, handler_func = source_handlers[source_key]
+                try:
+                    # 🔥 使用 asyncio.to_thread 避免阻塞事件循环
+                    quote_data = await asyncio.to_thread(handler_func, code)
+                    data_source = handler_name
 
-        return formatted_data
+                    if quote_data:
+                        logger.info(f"✅ {data_source}获取美股行情成功: {code}")
+                        break
+                except Exception as e:
+                    logger.warning(f"⚠️ {source_name}获取失败 ({code}): {e}")
+                    continue
+
+            if not quote_data:
+                raise Exception(f"无法获取美股{code}的行情数据：所有数据源均失败")
+
+            # 5. 格式化数据
+            formatted_data = {
+                'code': code,
+                'name': quote_data.get('name', f'美股{code}'),
+                'market': 'US',
+                'price': quote_data.get('price'),
+                'open': quote_data.get('open'),
+                'high': quote_data.get('high'),
+                'low': quote_data.get('low'),
+                'volume': quote_data.get('volume'),
+                'change_percent': quote_data.get('change_percent'),
+                'trade_date': quote_data.get('trade_date'),
+                'currency': quote_data.get('currency', 'USD'),
+                'source': data_source,
+                'updated_at': datetime.now().isoformat()
+            }
+
+            # 6. 保存到缓存
+            self.cache.save_stock_data(
+                symbol=code,
+                data=json.dumps(formatted_data, ensure_ascii=False),
+                data_source="us_realtime_quote"
+            )
+            logger.info(f"💾 美股行情已缓存: {code}")
+
+            return formatted_data
 
     def _get_us_quote_from_yfinance(self, code: str) -> Dict:
         """从yfinance获取美股行情"""
