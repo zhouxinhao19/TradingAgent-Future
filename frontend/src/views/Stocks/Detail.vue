@@ -11,7 +11,13 @@
         <el-button @click="onToggleFavorite">
           <el-icon><Star /></el-icon> {{ isFav ? '已自选' : '加自选' }}
         </el-button>
-        <el-button type="primary" @click="showSyncDialog" :loading="syncLoading">
+        <!-- 🔥 港股和美股不显示"同步数据"按钮 -->
+        <el-button
+          v-if="market !== 'HK' && market !== 'US'"
+          type="primary"
+          @click="showSyncDialog"
+          :loading="syncLoading"
+        >
           <el-icon><Refresh /></el-icon> 同步数据
         </el-button>
         <el-button type="warning" @click="clearCache" :loading="clearCacheLoading">
