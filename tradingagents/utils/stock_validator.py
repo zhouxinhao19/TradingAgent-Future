@@ -548,26 +548,47 @@ class StockDataPreparer:
         """
         触发数据同步（同步包装器）
         在同步上下文中调用异步同步方法
+
+        🔥 兼容 asyncio.to_thread() 调用：
+        - 如果在 asyncio.to_thread() 创建的线程中运行，创建新的事件循环
+        - 避免 "attached to a different loop" 错误
         """
         import asyncio
 
         try:
-            # 获取或创建事件循环
+            # 🔥 检测是否有正在运行的事件循环
+            # 如果有，说明我们在 asyncio.to_thread() 创建的线程中，需要创建新的事件循环
             try:
-                loop = asyncio.get_event_loop()
-                if loop.is_closed():
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-            except RuntimeError:
+                running_loop = asyncio.get_running_loop()
+                # 有正在运行的循环，说明在异步上下文中，不能使用 run_until_complete
+                # 创建新的事件循环在新线程中运行
+                logger.info(f"🔍 [数据同步] 检测到正在运行的事件循环，创建新事件循环")
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
+                try:
+                    return loop.run_until_complete(
+                        self._trigger_data_sync_async(stock_code, start_date, end_date)
+                    )
+                finally:
+                    loop.close()
+                    asyncio.set_event_loop(None)
+            except RuntimeError:
+                # 没有正在运行的循环，可以安全地获取或创建事件循环
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_closed():
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
 
-            # 调用异步方法
-            return loop.run_until_complete(
-                self._trigger_data_sync_async(stock_code, start_date, end_date)
-            )
+                # 调用异步方法
+                return loop.run_until_complete(
+                    self._trigger_data_sync_async(stock_code, start_date, end_date)
+                )
         except Exception as e:
-            logger.error(f"❌ [数据同步] 同步包装器失败: {e}")
+            logger.error(f"❌ [数据同步] 同步包装器失败: {e}", exc_info=True)
             return {
                 "success": False,
                 "message": f"同步失败: {str(e)}",
