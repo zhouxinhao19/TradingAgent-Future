@@ -42,17 +42,47 @@
       <el-col :span="8">
         <el-card shadow="hover" class="account-card">
           <template #header><div class="card-hd">账户信息</div></template>
-          <el-descriptions :column="1" border v-if="account">
-            <el-descriptions-item label="现金">{{ fmtAmount(account.cash) }}</el-descriptions-item>
-            <el-descriptions-item label="持仓市值">{{ fmtAmount(account.positions_value) }}</el-descriptions-item>
-            <el-descriptions-item label="总权益">{{ fmtAmount(account.equity) }}</el-descriptions-item>
-            <el-descriptions-item label="已实现盈亏">
-              <span :style="{ color: account.realized_pnl >= 0 ? '#67C23A' : '#F56C6C' }">
-                {{ fmtAmount(account.realized_pnl) }}
-              </span>
-            </el-descriptions-item>
-            <el-descriptions-item label="更新时间">{{ formatDateTime(account.updated_at) }}</el-descriptions-item>
-          </el-descriptions>
+          <div v-if="account">
+            <!-- A股账户 -->
+            <el-descriptions :column="1" border title="🇨🇳 A股账户（人民币）" style="margin-bottom: 16px">
+              <el-descriptions-item label="可用资金">¥{{ fmtAmount(account.cash?.CNY || account.cash) }}</el-descriptions-item>
+              <el-descriptions-item label="持仓市值">¥{{ fmtAmount(account.positions_value?.CNY || account.positions_value) }}</el-descriptions-item>
+              <el-descriptions-item label="总资产">¥{{ fmtAmount(account.equity?.CNY || account.equity) }}</el-descriptions-item>
+              <el-descriptions-item label="已实现盈亏">
+                <span :style="{ color: (account.realized_pnl?.CNY || account.realized_pnl || 0) >= 0 ? '#67C23A' : '#F56C6C' }">
+                  ¥{{ fmtAmount(account.realized_pnl?.CNY || account.realized_pnl) }}
+                </span>
+              </el-descriptions-item>
+            </el-descriptions>
+
+            <!-- 港股账户 -->
+            <el-descriptions :column="1" border title="🇭🇰 港股账户（港币）" style="margin-bottom: 16px">
+              <el-descriptions-item label="可用资金">HK${{ fmtAmount(account.cash?.HKD || 0) }}</el-descriptions-item>
+              <el-descriptions-item label="持仓市值">HK${{ fmtAmount(account.positions_value?.HKD || 0) }}</el-descriptions-item>
+              <el-descriptions-item label="总资产">HK${{ fmtAmount(account.equity?.HKD || 0) }}</el-descriptions-item>
+              <el-descriptions-item label="已实现盈亏">
+                <span :style="{ color: (account.realized_pnl?.HKD || 0) >= 0 ? '#67C23A' : '#F56C6C' }">
+                  HK${{ fmtAmount(account.realized_pnl?.HKD || 0) }}
+                </span>
+              </el-descriptions-item>
+            </el-descriptions>
+
+            <!-- 美股账户 -->
+            <el-descriptions :column="1" border title="🇺🇸 美股账户（美元）">
+              <el-descriptions-item label="可用资金">${{ fmtAmount(account.cash?.USD || 0) }}</el-descriptions-item>
+              <el-descriptions-item label="持仓市值">${{ fmtAmount(account.positions_value?.USD || 0) }}</el-descriptions-item>
+              <el-descriptions-item label="总资产">${{ fmtAmount(account.equity?.USD || 0) }}</el-descriptions-item>
+              <el-descriptions-item label="已实现盈亏">
+                <span :style="{ color: (account.realized_pnl?.USD || 0) >= 0 ? '#67C23A' : '#F56C6C' }">
+                  ${{ fmtAmount(account.realized_pnl?.USD || 0) }}
+                </span>
+              </el-descriptions-item>
+            </el-descriptions>
+
+            <div style="margin-top: 12px; text-align: center; color: #909399; font-size: 12px">
+              更新时间: {{ formatDateTime(account.updated_at) }}
+            </div>
+          </div>
           <el-empty v-else description="暂无账户数据" />
         </el-card>
       </el-col>
@@ -69,17 +99,32 @@
             <el-table-column label="名称" width="100">
               <template #default="{ row }">{{ row.name || '-' }}</template>
             </el-table-column>
-            <el-table-column prop="quantity" label="数量" width="100" />
+            <el-table-column label="市场" width="70">
+              <template #default="{ row }">
+                <el-tag v-if="row.market === 'CN'" type="success" size="small">🇨🇳 A股</el-tag>
+                <el-tag v-else-if="row.market === 'HK'" type="warning" size="small">🇭🇰 港股</el-tag>
+                <el-tag v-else-if="row.market === 'US'" type="info" size="small">🇺🇸 美股</el-tag>
+                <el-tag v-else size="small">{{ row.market || 'CN' }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="数量" width="80">
+              <template #default="{ row }">
+                {{ row.quantity }}
+                <span v-if="row.available_qty !== undefined && row.available_qty < row.quantity" style="color: #909399; font-size: 11px">
+                  (可用{{ row.available_qty }})
+                </span>
+              </template>
+            </el-table-column>
             <el-table-column label="均价" width="100">
-              <template #default="{ row }">{{ fmtPrice(row.avg_cost) }}</template>
+              <template #default="{ row }">{{ getCurrencySymbol(row.currency) }}{{ fmtPrice(row.avg_cost) }}</template>
             </el-table-column>
             <el-table-column label="最新价" width="100">
-              <template #default="{ row }">{{ fmtPrice(row.last_price) }}</template>
+              <template #default="{ row }">{{ getCurrencySymbol(row.currency) }}{{ fmtPrice(row.last_price) }}</template>
             </el-table-column>
-            <el-table-column label="浮盈" width="100">
+            <el-table-column label="浮盈" width="120">
               <template #default="{ row }">
                 <span :style="{ color: (Number(row.last_price || 0) - Number(row.avg_cost || 0)) >= 0 ? '#67C23A' : '#F56C6C' }">
-                  {{ fmtAmount((Number(row.last_price || 0) - Number(row.avg_cost || 0)) * Number(row.quantity || 0)) }}
+                  {{ getCurrencySymbol(row.currency) }}{{ fmtAmount((Number(row.last_price || 0) - Number(row.avg_cost || 0)) * Number(row.quantity || 0)) }}
                 </span>
               </template>
             </el-table-column>
@@ -165,7 +210,17 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item label="代码">
-          <el-input v-model="order.code" placeholder="如 600519 或 000001" />
+          <el-input v-model="order.code" placeholder="A股: 600519 | 港股: 0700 | 美股: AAPL" @input="detectMarket" />
+        </el-form-item>
+        <el-form-item label="市场" v-if="detectedMarket">
+          <el-tag v-if="detectedMarket === 'CN'" type="success">🇨🇳 A股市场 (CNY)</el-tag>
+          <el-tag v-else-if="detectedMarket === 'HK'" type="warning">🇭🇰 港股市场 (HKD)</el-tag>
+          <el-tag v-else-if="detectedMarket === 'US'" type="info">🇺🇸 美股市场 (USD)</el-tag>
+          <div style="margin-top: 8px; font-size: 12px; color: #909399">
+            <span v-if="detectedMarket === 'CN'">💡 A股T+1，今天买入明天可卖</span>
+            <span v-else-if="detectedMarket === 'HK'">💡 港股T+0，买入后立即可卖</span>
+            <span v-else-if="detectedMarket === 'US'">💡 美股T+0，买入后立即可卖 | 零佣金</span>
+          </div>
         </el-form-item>
         <el-form-item label="数量">
           <el-input-number v-model="order.qty" :min="1" />
@@ -201,6 +256,7 @@ const loading = ref({ account: false, positions: false, orders: false })
 
 const orderDialog = ref(false)
 const order = ref({ side: 'buy', code: '', qty: 100 })
+const detectedMarket = ref<string>('')
 
 // 分析上下文
 const analysisContext = ref<any | null>(null)
@@ -214,6 +270,45 @@ function fmtPrice(n: number | null | undefined) {
 function fmtAmount(n: number | null | undefined) {
   if (n == null || Number.isNaN(n as any)) return '-'
   return Number(n).toFixed(2)
+}
+
+// 获取货币符号
+function getCurrencySymbol(currency: string | undefined) {
+  if (!currency) return '¥'
+  if (currency === 'CNY') return '¥'
+  if (currency === 'HKD') return 'HK$'
+  if (currency === 'USD') return '$'
+  return ''
+}
+
+// 检测市场类型
+function detectMarket() {
+  const code = order.value.code.trim().toUpperCase()
+  if (!code) {
+    detectedMarket.value = ''
+    return
+  }
+
+  // 美股：纯字母
+  if (/^[A-Z]+$/.test(code)) {
+    detectedMarket.value = 'US'
+    return
+  }
+
+  // 港股：4-5位数字或.HK后缀
+  if (/^\d{4,5}$/.test(code) || code.endsWith('.HK')) {
+    detectedMarket.value = 'HK'
+    return
+  }
+
+  // A股：6位数字
+  if (/^\d{6}$/.test(code)) {
+    detectedMarket.value = 'CN'
+    return
+  }
+
+  // 默认A股
+  detectedMarket.value = 'CN'
 }
 
 async function fetchAccount() {
