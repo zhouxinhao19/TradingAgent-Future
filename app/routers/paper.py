@@ -225,11 +225,12 @@ async def _get_last_price(code: str, market: str) -> Optional[float]:
 
             quote = await service.get_quote(market, code, force_refresh=False)
 
-            if quote and "current_price" in quote:
-                price = float(quote["current_price"])
-                if price > 0:
+            if quote:
+                # 尝试多个可能的价格字段
+                price = quote.get("price") or quote.get("current_price") or quote.get("close")
+                if price and float(price) > 0:
                     logger.debug(f"✅ 从 ForeignStockService 获取{market}价格: {code} = {price}")
-                    return price
+                    return float(price)
         except Exception as e:
             logger.error(f"❌ 获取{market}股价格失败 {code}: {e}")
             return None

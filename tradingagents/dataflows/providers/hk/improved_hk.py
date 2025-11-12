@@ -682,6 +682,12 @@ def get_hk_stock_info_akshare(symbol: str) -> Dict[str, Any]:
                     return {
                         'symbol': symbol,
                         'name': row['中文名称'],  # 新浪接口的列名
+                        'price': float(row['最新价']) if '最新价' in row and row['最新价'] else None,
+                        'open': float(row['今开']) if '今开' in row and row['今开'] else None,
+                        'high': float(row['最高']) if '最高' in row and row['最高'] else None,
+                        'low': float(row['最低']) if '最低' in row and row['最低'] else None,
+                        'volume': int(row['成交量']) if '成交量' in row and row['成交量'] else None,
+                        'change_percent': float(row['涨跌幅']) if '涨跌幅' in row and row['涨跌幅'] else None,
                         'currency': 'HKD',
                         'exchange': 'HKG',
                         'market': '港股',

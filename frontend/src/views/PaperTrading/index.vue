@@ -97,8 +97,15 @@
 
       <el-col :span="16">
         <el-card shadow="hover" class="positions-card">
-          <template #header><div class="card-hd">持仓</div></template>
-          <el-table :data="positions" size="small" v-loading="loading.positions">
+          <template #header>
+            <div class="card-hd">
+              持仓
+              <span style="margin-left: 8px; font-size: 12px; color: #909399; font-weight: normal">
+                ({{ filteredPositions.length }} 个)
+              </span>
+            </div>
+          </template>
+          <el-table :data="filteredPositions" size="small" v-loading="loading.positions">
             <el-table-column label="代码" width="100">
               <template #default="{ row }">
                 <el-link type="primary" @click="viewStockDetail(row.code)">{{ row.code }}</el-link>
@@ -147,8 +154,15 @@
         </el-card>
 
         <el-card shadow="hover" class="orders-card" style="margin-top:16px">
-          <template #header><div class="card-hd">订单记录</div></template>
-          <el-table :data="orders" size="small" v-loading="loading.orders">
+          <template #header>
+            <div class="card-hd">
+              订单记录
+              <span style="margin-left: 8px; font-size: 12px; color: #909399; font-weight: normal">
+                ({{ filteredOrders.length }} 条)
+              </span>
+            </div>
+          </template>
+          <el-table :data="filteredOrders" size="small" v-loading="loading.orders">
             <el-table-column label="时间" width="160">
               <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
             </el-table-column>
@@ -243,7 +257,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { CreditCard, Refresh, Plus, Delete } from '@element-plus/icons-vue'
@@ -266,6 +280,24 @@ const orderDialog = ref(false)
 const order = ref({ side: 'buy', code: '', qty: 100 })
 const detectedMarket = ref<string>('')
 const activeMarketTab = ref<string>('CN')
+
+// 计算属性：根据当前市场标签页过滤持仓
+const filteredPositions = computed(() => {
+  if (!positions.value || positions.value.length === 0) return []
+  return positions.value.filter(pos => {
+    const market = pos.market || 'CN'
+    return market === activeMarketTab.value
+  })
+})
+
+// 计算属性：根据当前市场标签页过滤订单
+const filteredOrders = computed(() => {
+  if (!orders.value || orders.value.length === 0) return []
+  return orders.value.filter(ord => {
+    const market = ord.market || 'CN'
+    return market === activeMarketTab.value
+  })
+})
 
 // 分析上下文
 const analysisContext = ref<any | null>(null)
