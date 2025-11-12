@@ -48,20 +48,25 @@ export const exchangeCodeToMarket = (exchangeCode: string): string => {
  * @returns 市场类型（"A股", "港股", "美股"）
  */
 export const getMarketByStockCode = (stockCode: string): string => {
-  const code = String(stockCode ?? '').trim()
+  const code = String(stockCode ?? '').trim().toUpperCase()
+
+  // 港股：明确带 .HK 后缀
+  if (code.endsWith('.HK')) {
+    return '港股'
+  }
 
   // A股：6位数字
   if (/^\d{6}$/.test(code)) {
     return 'A股'
   }
 
-  // 港股：数字+.HK 或 纯数字（4位）
-  if (code.endsWith('.HK') || /^\d{4,5}$/.test(code)) {
+  // 港股：4位数字（不包括5位，避免与A股混淆）
+  if (/^\d{4}$/.test(code)) {
     return '港股'
   }
 
-  // 美股：字母开头
-  if (/^[A-Z]+$/.test(code.toUpperCase())) {
+  // 美股：纯字母（至少1个字母）
+  if (/^[A-Z]+$/.test(code)) {
     return '美股'
   }
 
