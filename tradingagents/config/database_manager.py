@@ -251,7 +251,14 @@ class DatabaseManager:
         if self.mongodb_available and self.mongodb_client:
             return self.mongodb_client
         return None
-    
+
+    def get_mongodb_db(self):
+        """获取MongoDB数据库实例"""
+        if self.mongodb_available and self.mongodb_client:
+            db_name = self.mongodb_config.get("database", "tradingagents")
+            return self.mongodb_client[db_name]
+        return None
+
     def get_redis_client(self):
         """获取Redis客户端"""
         if self.redis_available and self.redis_client:

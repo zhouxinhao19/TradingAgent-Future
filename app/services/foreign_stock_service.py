@@ -165,7 +165,9 @@ class ForeignStockService:
             source_key = source_name.lower()
             handler_name, handler_func = source_handlers[source_key]
             try:
-                quote_data = handler_func(code)
+                # 🔥 使用 asyncio.to_thread 避免阻塞事件循环
+                import asyncio
+                quote_data = await asyncio.to_thread(handler_func, code)
                 data_source = handler_name
 
                 if quote_data:
@@ -301,7 +303,9 @@ class ForeignStockService:
             source_key = source_name.lower()
             handler_name, handler_func = source_handlers[source_key]
             try:
-                quote_data = handler_func(code)
+                # 🔥 使用 asyncio.to_thread 避免阻塞事件循环
+                import asyncio
+                quote_data = await asyncio.to_thread(handler_func, code)
                 data_source = handler_name
 
                 if quote_data:
@@ -497,7 +501,9 @@ class ForeignStockService:
             source_key = source_name.lower()
             handler_name, handler_func = source_handlers[source_key]
             try:
-                info_data = handler_func(code)
+                # 🔥 使用 asyncio.to_thread 避免阻塞事件循环
+                import asyncio
+                info_data = await asyncio.to_thread(handler_func, code)
                 data_source = handler_name
 
                 if info_data:
@@ -574,7 +580,9 @@ class ForeignStockService:
             source_key = source_name.lower()
             handler_name, handler_func = source_handlers[source_key]
             try:
-                info_data = handler_func(code)
+                # 🔥 使用 asyncio.to_thread 避免阻塞事件循环
+                import asyncio
+                info_data = await asyncio.to_thread(handler_func, code)
                 data_source = handler_name
 
                 if info_data:
@@ -676,7 +684,9 @@ class ForeignStockService:
             source_key = source_name.lower()
             handler_name, handler_func = source_handlers[source_key]
             try:
-                kline_data = handler_func(code, period, limit)
+                # 🔥 使用 asyncio.to_thread 避免阻塞事件循环
+                import asyncio
+                kline_data = await asyncio.to_thread(handler_func, code, period, limit)
                 data_source = handler_name
 
                 if kline_data:
@@ -751,7 +761,9 @@ class ForeignStockService:
             source_key = source_name.lower()
             handler_name, handler_func = source_handlers[source_key]
             try:
-                kline_data = handler_func(code, period, limit)
+                # 🔥 使用 asyncio.to_thread 避免阻塞事件循环
+                import asyncio
+                kline_data = await asyncio.to_thread(handler_func, code, period, limit)
                 data_source = handler_name
 
                 if kline_data:
@@ -1174,7 +1186,9 @@ class ForeignStockService:
             source_key = source_name.lower()
             handler_name, handler_func = source_handlers[source_key]
             try:
-                news_data = handler_func(code, days, limit)
+                # 🔥 使用 asyncio.to_thread 避免阻塞事件循环
+                import asyncio
+                news_data = await asyncio.to_thread(handler_func, code, days, limit)
                 data_source = handler_name
 
                 if news_data:
@@ -1268,7 +1282,9 @@ class ForeignStockService:
             source_key = source_name.lower()
             handler_name, handler_func = source_handlers[source_key]
             try:
-                news_data = handler_func(code, days, limit)
+                # 🔥 使用 asyncio.to_thread 避免阻塞事件循环
+                import asyncio
+                news_data = await asyncio.to_thread(handler_func, code, days, limit)
                 data_source = handler_name
 
                 if news_data:
