@@ -60,8 +60,9 @@ export const getMarketByStockCode = (stockCode: string): string => {
     return 'A股'
   }
 
-  // 港股：4位数字（不包括5位，避免与A股混淆）
-  if (/^\d{4}$/.test(code)) {
+  // 港股：1-5位数字（3位、4位、5位都是港股）
+  // 例如：700(腾讯)、1810(小米)、9988(阿里巴巴)
+  if (/^\d{1,5}$/.test(code)) {
     return '港股'
   }
 
