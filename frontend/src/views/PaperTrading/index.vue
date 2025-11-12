@@ -43,41 +43,49 @@
         <el-card shadow="hover" class="account-card">
           <template #header><div class="card-hd">账户信息</div></template>
           <div v-if="account">
-            <!-- A股账户 -->
-            <el-descriptions :column="1" border title="🇨🇳 A股账户（人民币）" style="margin-bottom: 16px">
-              <el-descriptions-item label="可用资金">¥{{ fmtAmount(account.cash?.CNY || account.cash) }}</el-descriptions-item>
-              <el-descriptions-item label="持仓市值">¥{{ fmtAmount(account.positions_value?.CNY || account.positions_value) }}</el-descriptions-item>
-              <el-descriptions-item label="总资产">¥{{ fmtAmount(account.equity?.CNY || account.equity) }}</el-descriptions-item>
-              <el-descriptions-item label="已实现盈亏">
-                <span :style="{ color: (account.realized_pnl?.CNY || account.realized_pnl || 0) >= 0 ? '#67C23A' : '#F56C6C' }">
-                  ¥{{ fmtAmount(account.realized_pnl?.CNY || account.realized_pnl) }}
-                </span>
-              </el-descriptions-item>
-            </el-descriptions>
+            <el-tabs v-model="activeMarketTab" type="border-card">
+              <!-- A股账户 -->
+              <el-tab-pane label="🇨🇳 A股" name="CN">
+                <el-descriptions :column="1" border>
+                  <el-descriptions-item label="可用资金">¥{{ fmtAmount(account.cash?.CNY || account.cash) }}</el-descriptions-item>
+                  <el-descriptions-item label="持仓市值">¥{{ fmtAmount(account.positions_value?.CNY || account.positions_value) }}</el-descriptions-item>
+                  <el-descriptions-item label="总资产">¥{{ fmtAmount(account.equity?.CNY || account.equity) }}</el-descriptions-item>
+                  <el-descriptions-item label="已实现盈亏">
+                    <span :style="{ color: (account.realized_pnl?.CNY !== undefined ? account.realized_pnl.CNY : (typeof account.realized_pnl === 'number' ? account.realized_pnl : 0)) >= 0 ? '#67C23A' : '#F56C6C' }">
+                      ¥{{ fmtAmount(account.realized_pnl?.CNY !== undefined ? account.realized_pnl.CNY : (typeof account.realized_pnl === 'number' ? account.realized_pnl : 0)) }}
+                    </span>
+                  </el-descriptions-item>
+                </el-descriptions>
+              </el-tab-pane>
 
-            <!-- 港股账户 -->
-            <el-descriptions :column="1" border title="🇭🇰 港股账户（港币）" style="margin-bottom: 16px">
-              <el-descriptions-item label="可用资金">HK${{ fmtAmount(account.cash?.HKD || 0) }}</el-descriptions-item>
-              <el-descriptions-item label="持仓市值">HK${{ fmtAmount(account.positions_value?.HKD || 0) }}</el-descriptions-item>
-              <el-descriptions-item label="总资产">HK${{ fmtAmount(account.equity?.HKD || 0) }}</el-descriptions-item>
-              <el-descriptions-item label="已实现盈亏">
-                <span :style="{ color: (account.realized_pnl?.HKD || 0) >= 0 ? '#67C23A' : '#F56C6C' }">
-                  HK${{ fmtAmount(account.realized_pnl?.HKD || 0) }}
-                </span>
-              </el-descriptions-item>
-            </el-descriptions>
+              <!-- 港股账户 -->
+              <el-tab-pane label="🇭🇰 港股" name="HK">
+                <el-descriptions :column="1" border>
+                  <el-descriptions-item label="可用资金">HK${{ fmtAmount(account.cash?.HKD || 0) }}</el-descriptions-item>
+                  <el-descriptions-item label="持仓市值">HK${{ fmtAmount(account.positions_value?.HKD || 0) }}</el-descriptions-item>
+                  <el-descriptions-item label="总资产">HK${{ fmtAmount(account.equity?.HKD || 0) }}</el-descriptions-item>
+                  <el-descriptions-item label="已实现盈亏">
+                    <span :style="{ color: (account.realized_pnl?.HKD || 0) >= 0 ? '#67C23A' : '#F56C6C' }">
+                      HK${{ fmtAmount(account.realized_pnl?.HKD || 0) }}
+                    </span>
+                  </el-descriptions-item>
+                </el-descriptions>
+              </el-tab-pane>
 
-            <!-- 美股账户 -->
-            <el-descriptions :column="1" border title="🇺🇸 美股账户（美元）">
-              <el-descriptions-item label="可用资金">${{ fmtAmount(account.cash?.USD || 0) }}</el-descriptions-item>
-              <el-descriptions-item label="持仓市值">${{ fmtAmount(account.positions_value?.USD || 0) }}</el-descriptions-item>
-              <el-descriptions-item label="总资产">${{ fmtAmount(account.equity?.USD || 0) }}</el-descriptions-item>
-              <el-descriptions-item label="已实现盈亏">
-                <span :style="{ color: (account.realized_pnl?.USD || 0) >= 0 ? '#67C23A' : '#F56C6C' }">
-                  ${{ fmtAmount(account.realized_pnl?.USD || 0) }}
-                </span>
-              </el-descriptions-item>
-            </el-descriptions>
+              <!-- 美股账户 -->
+              <el-tab-pane label="🇺🇸 美股" name="US">
+                <el-descriptions :column="1" border>
+                  <el-descriptions-item label="可用资金">${{ fmtAmount(account.cash?.USD || 0) }}</el-descriptions-item>
+                  <el-descriptions-item label="持仓市值">${{ fmtAmount(account.positions_value?.USD || 0) }}</el-descriptions-item>
+                  <el-descriptions-item label="总资产">${{ fmtAmount(account.equity?.USD || 0) }}</el-descriptions-item>
+                  <el-descriptions-item label="已实现盈亏">
+                    <span :style="{ color: (account.realized_pnl?.USD || 0) >= 0 ? '#67C23A' : '#F56C6C' }">
+                      ${{ fmtAmount(account.realized_pnl?.USD || 0) }}
+                    </span>
+                  </el-descriptions-item>
+                </el-descriptions>
+              </el-tab-pane>
+            </el-tabs>
 
             <div style="margin-top: 12px; text-align: center; color: #909399; font-size: 12px">
               更新时间: {{ formatDateTime(account.updated_at) }}
@@ -257,6 +265,7 @@ const loading = ref({ account: false, positions: false, orders: false })
 const orderDialog = ref(false)
 const order = ref({ side: 'buy', code: '', qty: 100 })
 const detectedMarket = ref<string>('')
+const activeMarketTab = ref<string>('CN')
 
 // 分析上下文
 const analysisContext = ref<any | null>(null)

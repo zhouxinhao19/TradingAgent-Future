@@ -220,12 +220,10 @@ async def _get_last_price(code: str, market: str) -> Optional[float]:
     elif market in ['HK', 'US']:
         try:
             from app.services.foreign_stock_service import ForeignStockService
-            service = ForeignStockService()
+            db = get_mongo_db()
+            service = ForeignStockService(db=db)
 
-            if market == 'HK':
-                quote = await service.get_hk_quote(code)
-            else:
-                quote = await service.get_us_quote(code)
+            quote = await service.get_quote(market, code, force_refresh=False)
 
             if quote and "current_price" in quote:
                 price = float(quote["current_price"])

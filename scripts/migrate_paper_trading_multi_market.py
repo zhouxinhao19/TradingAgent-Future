@@ -56,12 +56,19 @@ async def migrate_accounts(dry_run=False):
         print(f"   旧格式 - 现金: ¥{old_cash:,.2f}, 盈亏: ¥{old_pnl:,.2f}")
         
         # 新的多货币格式
+        # 每个市场的初始资金
+        INITIAL_CASH_BY_MARKET = {
+            "CNY": 1_000_000.0,   # A股：100万人民币
+            "HKD": 1_000_000.0,   # 港股：100万港币
+            "USD": 100_000.0      # 美股：10万美元
+        }
+
         new_cash = {
             "CNY": old_cash,
-            "HKD": 0.0,
-            "USD": 0.0
+            "HKD": INITIAL_CASH_BY_MARKET["HKD"],
+            "USD": INITIAL_CASH_BY_MARKET["USD"]
         }
-        
+
         new_pnl = {
             "CNY": old_pnl,
             "HKD": 0.0,
