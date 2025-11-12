@@ -895,12 +895,12 @@ class ForeignStockService:
             'pe': data.get('pe_ratio'),
             # 前端期望 pb
             'pb': data.get('pb_ratio'),
-            # 前端期望 ps（暂无数据）
-            'ps': None,
-            'ps_ttm': None,
-            # 前端期望 roe 和 debt_ratio（暂无数据）
-            'roe': None,
-            'debt_ratio': None,
+            # 前端期望 ps
+            'ps': data.get('ps_ratio'),
+            'ps_ttm': data.get('ps_ratio'),
+            # 🔥 从财务指标中获取 roe 和 debt_ratio
+            'roe': data.get('roe'),
+            'debt_ratio': data.get('debt_ratio'),
             'dividend_yield': data.get('dividend_yield'),
             'currency': data.get('currency', 'HKD'),
             'source': source,
@@ -1554,23 +1554,62 @@ class ForeignStockService:
         return news_list
 
     def _get_hk_info_from_akshare(self, code: str) -> Dict:
-        """从AKShare获取港股基础信息"""
-        from tradingagents.dataflows.providers.hk.improved_hk import get_hk_stock_info_akshare
+        """从AKShare获取港股基础信息和财务指标"""
+        from tradingagents.dataflows.providers.hk.improved_hk import (
+            get_hk_stock_info_akshare,
+            get_hk_financial_indicators
+        )
 
+        # 1. 获取基础信息（包含当前价格）
         info = get_hk_stock_info_akshare(code)
         if not info or 'error' in info:
             raise Exception("无数据")
 
-        # AKShare 返回的数据格式需要转换
+        # 2. 获取财务指标（EPS、BPS、ROE、负债率等）
+        financial_indicators = {}
+        try:
+            financial_indicators = get_hk_financial_indicators(code)
+            logger.info(f"✅ 获取港股{code}财务指标成功: {list(financial_indicators.keys())}")
+        except Exception as e:
+            logger.warning(f"⚠️ 获取港股{code}财务指标失败: {e}")
+
+        # 3. 计算 PE、PB、PS（参考分析模块的计算方式）
+        current_price = info.get('price')  # 当前价格
+        pe_ratio = None
+        pb_ratio = None
+        ps_ratio = None
+
+        if current_price and financial_indicators:
+            # 计算 PE = 当前价 / EPS_TTM
+            eps_ttm = financial_indicators.get('eps_ttm')
+            if eps_ttm and eps_ttm > 0:
+                pe_ratio = current_price / eps_ttm
+                logger.info(f"📊 计算 PE: {current_price} / {eps_ttm} = {pe_ratio:.2f}")
+
+            # 计算 PB = 当前价 / BPS
+            bps = financial_indicators.get('bps')
+            if bps and bps > 0:
+                pb_ratio = current_price / bps
+                logger.info(f"📊 计算 PB: {current_price} / {bps} = {pb_ratio:.2f}")
+
+            # 计算 PS = 市值 / 营业收入（需要市值数据，暂时无法计算）
+            # ps_ratio 暂时为 None
+
+        # 4. 合并数据
         return {
             'name': info.get('name', f'港股{code}'),
             'market_cap': None,  # AKShare 基础信息不包含市值
             'industry': None,
             'sector': None,
-            'pe_ratio': None,
-            'pb_ratio': None,
+            # 🔥 计算得到的估值指标
+            'pe_ratio': pe_ratio,
+            'pb_ratio': pb_ratio,
+            'ps_ratio': ps_ratio,
             'dividend_yield': None,
             'currency': 'HKD',
+            # 🔥 从财务指标中获取
+            'roe': financial_indicators.get('roe_avg'),  # 平均净资产收益率
+            'debt_ratio': financial_indicators.get('debt_asset_ratio'),  # 资产负债率
         }
 
     def _get_hk_info_from_yfinance(self, code: str) -> Dict:
