@@ -93,7 +93,6 @@ async def get_quote(
     # 港股和美股：使用新服务
     if market in ['HK', 'US']:
         from app.services.foreign_stock_service import ForeignStockService
-        from app.core.database import get_mongo_db
 
         db = get_mongo_db()  # 不需要 await，直接返回数据库对象
         service = ForeignStockService(db=db)
@@ -238,7 +237,6 @@ async def get_fundamentals(
     # 港股和美股：使用新服务
     if market in ['HK', 'US']:
         from app.services.foreign_stock_service import ForeignStockService
-        from app.core.database import get_mongo_db
 
         db = get_mongo_db()  # 不需要 await，直接返回数据库对象
         service = ForeignStockService(db=db)
@@ -455,7 +453,6 @@ async def get_kline(
     # 港股和美股：使用新服务
     if market in ['HK', 'US']:
         from app.services.foreign_stock_service import ForeignStockService
-        from app.core.database import get_mongo_db
 
         db = get_mongo_db()  # 不需要 await，直接返回数据库对象
         service = ForeignStockService(db=db)
@@ -579,7 +576,6 @@ async def get_kline(
             if should_fetch_realtime:
                 logger.info(f"🔥 尝试从 market_quotes 获取当天实时数据: {code_padded} (交易时间: {is_trading_time}, 已有当天数据: {has_today_data})")
 
-                from app.core.database import get_mongo_db
                 db = get_mongo_db()
                 market_quotes_coll = db["market_quotes"]
 
