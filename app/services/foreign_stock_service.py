@@ -442,7 +442,10 @@ class ForeignStockService:
             raise
     
     async def _get_hk_info(self, code: str, force_refresh: bool = False) -> Dict:
-        """获取港股基础信息"""
+        """
+        获取港股基础信息
+        🔥 按照数据库配置的数据源优先级调用API
+        """
         # 1. 检查缓存（除非强制刷新）
         if not force_refresh:
             cache_key = self.cache.find_cached_stock_data(
@@ -456,53 +459,64 @@ class ForeignStockService:
                     logger.info(f"⚡ 从缓存获取港股基础信息: {code}")
                     return self._parse_cached_data(cached_data, 'HK', code)
 
-        # 2. 从API获取
-        try:
-            import yfinance as yf
+        # 2. 从数据库获取数据源优先级
+        source_priority = await self._get_source_priority('HK')
 
-            ticker = yf.Ticker(f"{code}.HK")
-            info = ticker.info
+        # 3. 按优先级尝试各个数据源
+        info_data = None
+        data_source = None
 
-            # 格式化数据（匹配前端期望的字段名）
-            market_cap = info.get('marketCap')
-            formatted_data = {
-                'code': code,
-                'name': info.get('longName') or info.get('shortName') or f'港股{code}',
-                'market': 'HK',
-                'industry': info.get('industry'),
-                'sector': info.get('sector'),
-                # 前端期望 total_mv（单位：亿元）
-                'total_mv': market_cap / 1e8 if market_cap else None,
-                # 前端期望 pe_ttm 或 pe
-                'pe_ttm': info.get('trailingPE'),
-                'pe': info.get('trailingPE'),
-                # 前端期望 pb
-                'pb': info.get('priceToBook'),
-                # 前端期望 ps（暂无数据）
-                'ps': None,
-                'ps_ttm': None,
-                # 前端期望 roe 和 debt_ratio（暂无数据）
-                'roe': None,
-                'debt_ratio': None,
-                'dividend_yield': info.get('dividendYield'),
-                'currency': info.get('currency', 'HKD'),
-                'source': 'yfinance',
-                'updated_at': datetime.now().isoformat()
-            }
+        # 数据源名称映射
+        source_handlers = {
+            'akshare': ('akshare', self._get_hk_info_from_akshare),
+            'yahoo_finance': ('yfinance', self._get_hk_info_from_yfinance),
+            'finnhub': ('finnhub', self._get_hk_info_from_finnhub),
+        }
 
-            # 3. 保存到缓存
-            self.cache.save_stock_data(
-                symbol=code,
-                data=json.dumps(formatted_data, ensure_ascii=False),
-                data_source="hk_basic_info"
-            )
-            logger.info(f"💾 港股基础信息已缓存: {code}")
+        # 过滤有效数据源并去重
+        valid_priority = []
+        seen = set()
+        for source_name in source_priority:
+            source_key = source_name.lower()
+            if source_key in source_handlers and source_key not in seen:
+                seen.add(source_key)
+                valid_priority.append(source_name)
 
-            return formatted_data
+        if not valid_priority:
+            logger.warning("⚠️ 数据库中没有配置有效的港股基础信息数据源，使用默认顺序")
+            valid_priority = ['akshare', 'yahoo_finance', 'finnhub']
 
-        except Exception as e:
-            logger.error(f"❌ 获取港股基础信息失败: {e}")
-            raise Exception(f"无法获取港股{code}的基础信息: {str(e)}")
+        logger.info(f"📊 [HK基础信息有效数据源] {valid_priority}")
+
+        for source_name in valid_priority:
+            source_key = source_name.lower()
+            handler_name, handler_func = source_handlers[source_key]
+            try:
+                info_data = handler_func(code)
+                data_source = handler_name
+
+                if info_data:
+                    logger.info(f"✅ {data_source}获取港股基础信息成功: {code}")
+                    break
+            except Exception as e:
+                logger.warning(f"⚠️ {source_name}获取基础信息失败: {e}")
+                continue
+
+        if not info_data:
+            raise Exception(f"无法获取港股{code}的基础信息：所有数据源均失败")
+
+        # 4. 格式化数据
+        formatted_data = self._format_hk_info(info_data, code, data_source)
+
+        # 5. 保存到缓存
+        self.cache.save_stock_data(
+            symbol=code,
+            data=json.dumps(formatted_data, ensure_ascii=False),
+            data_source="hk_basic_info"
+        )
+        logger.info(f"💾 港股基础信息已缓存: {code}")
+
+        return formatted_data
 
     async def _get_us_info(self, code: str, force_refresh: bool = False) -> Dict:
         """
@@ -606,7 +620,10 @@ class ForeignStockService:
         return formatted_data
 
     async def _get_hk_kline(self, code: str, period: str, limit: int, force_refresh: bool = False) -> List[Dict]:
-        """获取港股K线数据"""
+        """
+        获取港股K线数据
+        🔥 按照数据库配置的数据源优先级调用API
+        """
         # 1. 检查缓存（除非强制刷新）
         cache_key_str = f"hk_kline_{period}_{limit}"
         if not force_refresh:
@@ -621,57 +638,61 @@ class ForeignStockService:
                     logger.info(f"⚡ 从缓存获取港股K线: {code}")
                     return self._parse_cached_kline(cached_data)
 
-        # 2. 从API获取
-        try:
-            import yfinance as yf
-            import pandas as pd
+        # 2. 从数据库获取数据源优先级
+        source_priority = await self._get_source_priority('HK')
 
-            ticker = yf.Ticker(f"{code}.HK")
+        # 3. 按优先级尝试各个数据源
+        kline_data = None
+        data_source = None
 
-            # 周期映射
-            period_map = {
-                'day': '1d',
-                'week': '1wk',
-                'month': '1mo',
-                '5m': '5m',
-                '15m': '15m',
-                '30m': '30m',
-                '60m': '60m'
-            }
+        # 数据源名称映射
+        source_handlers = {
+            'akshare': ('akshare', self._get_hk_kline_from_akshare),
+            'yahoo_finance': ('yfinance', self._get_hk_kline_from_yfinance),
+            'finnhub': ('finnhub', self._get_hk_kline_from_finnhub),
+        }
 
-            interval = period_map.get(period, '1d')
-            hist = ticker.history(period=f'{limit}d', interval=interval)
+        # 过滤有效数据源并去重
+        valid_priority = []
+        seen = set()
+        for source_name in source_priority:
+            source_key = source_name.lower()
+            if source_key in source_handlers and source_key not in seen:
+                seen.add(source_key)
+                valid_priority.append(source_name)
 
-            if hist.empty:
-                raise Exception(f"无法获取港股{code}的K线数据")
+        if not valid_priority:
+            logger.warning("⚠️ 数据库中没有配置有效的港股K线数据源，使用默认顺序")
+            valid_priority = ['akshare', 'yahoo_finance', 'finnhub']
 
-            # 格式化数据
-            kline_data = []
-            for date, row in hist.iterrows():
-                date_str = date.strftime('%Y-%m-%d')
-                kline_data.append({
-                    'date': date_str,
-                    'trade_date': date_str,  # 前端需要这个字段
-                    'open': float(row['Open']),
-                    'high': float(row['High']),
-                    'low': float(row['Low']),
-                    'close': float(row['Close']),
-                    'volume': int(row['Volume'])
-                })
+        logger.info(f"📊 [HK K线有效数据源] {valid_priority}")
 
-            # 3. 保存到缓存
-            self.cache.save_stock_data(
-                symbol=code,
-                data=json.dumps(kline_data, ensure_ascii=False),
-                data_source=cache_key_str
-            )
-            logger.info(f"💾 港股K线已缓存: {code}")
+        for source_name in valid_priority:
+            source_key = source_name.lower()
+            handler_name, handler_func = source_handlers[source_key]
+            try:
+                kline_data = handler_func(code, period, limit)
+                data_source = handler_name
 
-            return kline_data[-limit:]  # 返回最后limit条
+                if kline_data:
+                    logger.info(f"✅ {data_source}获取港股K线成功: {code}")
+                    break
+            except Exception as e:
+                logger.warning(f"⚠️ {source_name}获取K线失败: {e}")
+                continue
 
-        except Exception as e:
-            logger.error(f"❌ 获取港股K线失败: {e}")
-            raise Exception(f"无法获取港股{code}的K线数据: {str(e)}")
+        if not kline_data:
+            raise Exception(f"无法获取港股{code}的K线数据：所有数据源均失败")
+
+        # 4. 保存到缓存
+        self.cache.save_stock_data(
+            symbol=code,
+            data=json.dumps(kline_data, ensure_ascii=False),
+            data_source=cache_key_str
+        )
+        logger.info(f"💾 港股K线已缓存: {code}")
+
+        return kline_data
 
     async def _get_us_kline(self, code: str, period: str, limit: int, force_refresh: bool = False) -> List[Dict]:
         """
@@ -764,7 +785,35 @@ class ForeignStockService:
             'trade_date': data.get('timestamp', datetime.now().strftime('%Y-%m-%d')),
             'updated_at': datetime.now().isoformat()
         }
-    
+
+    def _format_hk_info(self, data: Dict, code: str, source: str) -> Dict:
+        """格式化港股基础信息"""
+        market_cap = data.get('market_cap')
+        return {
+            'code': code,
+            'name': data.get('name', f'港股{code}'),
+            'market': 'HK',
+            'industry': data.get('industry'),
+            'sector': data.get('sector'),
+            # 前端期望 total_mv（单位：亿元）
+            'total_mv': market_cap / 1e8 if market_cap else None,
+            # 前端期望 pe_ttm 或 pe
+            'pe_ttm': data.get('pe_ratio'),
+            'pe': data.get('pe_ratio'),
+            # 前端期望 pb
+            'pb': data.get('pb_ratio'),
+            # 前端期望 ps（暂无数据）
+            'ps': None,
+            'ps_ttm': None,
+            # 前端期望 roe 和 debt_ratio（暂无数据）
+            'roe': None,
+            'debt_ratio': None,
+            'dividend_yield': data.get('dividend_yield'),
+            'currency': data.get('currency', 'HKD'),
+            'source': source,
+            'updated_at': datetime.now().isoformat()
+        }
+
     def _parse_cached_data(self, cached_data: str, market: str, code: str) -> Dict:
         """解析缓存的数据"""
         try:
@@ -1059,6 +1108,100 @@ class ForeignStockService:
 
         return kline_data
 
+    async def get_hk_news(self, code: str, days: int = 2, limit: int = 50) -> Dict:
+        """
+        获取港股新闻
+
+        Args:
+            code: 股票代码
+            days: 回溯天数
+            limit: 返回数量限制
+
+        Returns:
+            包含新闻列表和数据源的字典
+        """
+        from datetime import datetime, timedelta
+
+        logger.info(f"📰 开始获取港股新闻: {code}, days={days}, limit={limit}")
+
+        # 1. 尝试从缓存获取
+        cache_key_str = f"hk_news_{days}_{limit}"
+        cache_key = self.cache.find_cached_stock_data(
+            symbol=code,
+            data_source=cache_key_str
+        )
+
+        if cache_key:
+            cached_data = self.cache.load_stock_data(cache_key)
+            if cached_data:
+                logger.info(f"⚡ 从缓存获取港股新闻: {code}")
+                return json.loads(cached_data)
+
+        # 2. 从数据库获取数据源优先级
+        source_priority = await self._get_source_priority('HK')
+
+        # 3. 按优先级尝试各个数据源
+        news_data = None
+        data_source = None
+
+        # 数据源名称映射
+        source_handlers = {
+            'akshare': ('akshare', self._get_hk_news_from_akshare),
+            'finnhub': ('finnhub', self._get_hk_news_from_finnhub),
+        }
+
+        # 过滤有效数据源并去重
+        valid_priority = []
+        seen = set()
+        for source_name in source_priority:
+            source_key = source_name.lower()
+            if source_key in source_handlers and source_key not in seen:
+                seen.add(source_key)
+                valid_priority.append(source_name)
+
+        if not valid_priority:
+            logger.warning("⚠️ 数据库中没有配置有效的港股新闻数据源，使用默认顺序")
+            valid_priority = ['akshare', 'finnhub']
+
+        logger.info(f"📊 [HK新闻有效数据源] {valid_priority}")
+
+        for source_name in valid_priority:
+            source_key = source_name.lower()
+            handler_name, handler_func = source_handlers[source_key]
+            try:
+                news_data = handler_func(code, days, limit)
+                data_source = handler_name
+
+                if news_data:
+                    logger.info(f"✅ {data_source}获取港股新闻成功: {code}, 返回 {len(news_data)} 条")
+                    break
+            except Exception as e:
+                logger.warning(f"⚠️ {source_name}获取新闻失败: {e}")
+                continue
+
+        if not news_data:
+            logger.warning(f"⚠️ 无法获取港股{code}的新闻数据：所有数据源均失败")
+            news_data = []
+            data_source = 'none'
+
+        # 4. 构建返回数据
+        result = {
+            'code': code,
+            'days': days,
+            'limit': limit,
+            'source': data_source,
+            'items': news_data
+        }
+
+        # 5. 缓存数据
+        self.cache.save_stock_data(
+            symbol=code,
+            data=json.dumps(result, ensure_ascii=False),
+            data_source=cache_key_str
+        )
+
+        return result
+
     async def get_us_news(self, code: str, days: int = 2, limit: int = 50) -> Dict:
         """
         获取美股新闻
@@ -1262,4 +1405,297 @@ class ForeignStockService:
             })
 
         return news_list
+
+    def _get_hk_news_from_finnhub(self, code: str, days: int, limit: int) -> List[Dict]:
+        """从Finnhub获取港股新闻"""
+        import finnhub
+        import os
+        from datetime import datetime, timedelta
+
+        # 获取 API Key
+        api_key = os.getenv('FINNHUB_API_KEY')
+        if not api_key:
+            raise Exception("Finnhub API Key 未配置")
+
+        # 创建客户端
+        client = finnhub.Client(api_key=api_key)
+
+        # 计算时间范围
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days)
+
+        # 港股代码需要添加 .HK 后缀
+        hk_symbol = f"{code}.HK" if not code.endswith('.HK') else code
+
+        # 获取公司新闻
+        news = client.company_news(
+            hk_symbol,
+            _from=start_date.strftime('%Y-%m-%d'),
+            to=end_date.strftime('%Y-%m-%d')
+        )
+
+        if not news:
+            raise Exception("无数据")
+
+        # 格式化新闻数据
+        news_list = []
+        for article in news[:limit]:
+            # 解析时间戳
+            timestamp = article.get('datetime', 0)
+            pub_time = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+
+            news_list.append({
+                'title': article.get('headline', ''),
+                'summary': article.get('summary', ''),
+                'url': article.get('url', ''),
+                'source': article.get('source', ''),
+                'publish_time': pub_time,
+                'sentiment': None,  # Finnhub 不提供情感分析
+                'sentiment_score': None,
+            })
+
+        return news_list
+
+    def _get_hk_info_from_akshare(self, code: str) -> Dict:
+        """从AKShare获取港股基础信息"""
+        from tradingagents.dataflows.providers.hk.improved_hk import get_hk_stock_info_akshare
+
+        info = get_hk_stock_info_akshare(code)
+        if not info or 'error' in info:
+            raise Exception("无数据")
+
+        # AKShare 返回的数据格式需要转换
+        return {
+            'name': info.get('name', f'港股{code}'),
+            'market_cap': None,  # AKShare 基础信息不包含市值
+            'industry': None,
+            'sector': None,
+            'pe_ratio': None,
+            'pb_ratio': None,
+            'dividend_yield': None,
+            'currency': 'HKD',
+        }
+
+    def _get_hk_info_from_yfinance(self, code: str) -> Dict:
+        """从Yahoo Finance获取港股基础信息"""
+        import yfinance as yf
+
+        ticker = yf.Ticker(f"{code}.HK")
+        info = ticker.info
+
+        return {
+            'name': info.get('longName') or info.get('shortName') or f'港股{code}',
+            'market_cap': info.get('marketCap'),
+            'industry': info.get('industry'),
+            'sector': info.get('sector'),
+            'pe_ratio': info.get('trailingPE'),
+            'pb_ratio': info.get('priceToBook'),
+            'dividend_yield': info.get('dividendYield'),
+            'currency': info.get('currency', 'HKD'),
+        }
+
+    def _get_hk_info_from_finnhub(self, code: str) -> Dict:
+        """从Finnhub获取港股基础信息"""
+        import finnhub
+        import os
+
+        # 获取 API Key
+        api_key = os.getenv('FINNHUB_API_KEY')
+        if not api_key:
+            raise Exception("Finnhub API Key 未配置")
+
+        # 创建客户端
+        client = finnhub.Client(api_key=api_key)
+
+        # 港股代码需要添加 .HK 后缀
+        hk_symbol = f"{code}.HK" if not code.endswith('.HK') else code
+
+        # 获取公司基本信息
+        profile = client.company_profile2(symbol=hk_symbol)
+
+        if not profile:
+            raise Exception("无数据")
+
+        return {
+            'name': profile.get('name', f'港股{code}'),
+            'market_cap': profile.get('marketCapitalization') * 1e6 if profile.get('marketCapitalization') else None,  # Finnhub返回的是百万单位
+            'industry': profile.get('finnhubIndustry'),
+            'sector': None,
+            'pe_ratio': None,
+            'pb_ratio': None,
+            'dividend_yield': None,
+            'currency': profile.get('currency', 'HKD'),
+        }
+
+    def _get_hk_kline_from_akshare(self, code: str, period: str, limit: int) -> List[Dict]:
+        """从AKShare获取港股K线数据"""
+        import akshare as ak
+        import pandas as pd
+        from datetime import datetime, timedelta
+        from tradingagents.dataflows.providers.hk.improved_hk import get_improved_hk_provider
+
+        # 标准化代码
+        provider = get_improved_hk_provider()
+        normalized_code = provider._normalize_hk_symbol(code)
+
+        # 直接使用 AKShare API
+        df = ak.stock_hk_daily(symbol=normalized_code, adjust="qfq")
+
+        if df is None or df.empty:
+            raise Exception("无数据")
+
+        # 过滤最近的数据
+        df = df.tail(limit)
+
+        # 格式化数据
+        kline_data = []
+        for _, row in df.iterrows():
+            # AKShare 返回的列名：date, open, close, high, low, volume
+            date_str = row['date'].strftime('%Y-%m-%d') if hasattr(row['date'], 'strftime') else str(row['date'])
+            kline_data.append({
+                'date': date_str,
+                'trade_date': date_str,
+                'open': float(row['open']),
+                'high': float(row['high']),
+                'low': float(row['low']),
+                'close': float(row['close']),
+                'volume': int(row['volume']) if 'volume' in row else 0
+            })
+
+        return kline_data
+
+    def _get_hk_kline_from_yfinance(self, code: str, period: str, limit: int) -> List[Dict]:
+        """从Yahoo Finance获取港股K线数据"""
+        import yfinance as yf
+        import pandas as pd
+
+        ticker = yf.Ticker(f"{code}.HK")
+
+        # 周期映射
+        period_map = {
+            'day': '1d',
+            'week': '1wk',
+            'month': '1mo',
+            '5m': '5m',
+            '15m': '15m',
+            '30m': '30m',
+            '60m': '60m'
+        }
+
+        interval = period_map.get(period, '1d')
+        hist = ticker.history(period=f'{limit}d', interval=interval)
+
+        if hist.empty:
+            raise Exception("无数据")
+
+        # 格式化数据
+        kline_data = []
+        for date, row in hist.iterrows():
+            date_str = date.strftime('%Y-%m-%d')
+            kline_data.append({
+                'date': date_str,
+                'trade_date': date_str,
+                'open': float(row['Open']),
+                'high': float(row['High']),
+                'low': float(row['Low']),
+                'close': float(row['Close']),
+                'volume': int(row['Volume'])
+            })
+
+        return kline_data[-limit:]  # 返回最后limit条
+
+    def _get_hk_kline_from_finnhub(self, code: str, period: str, limit: int) -> List[Dict]:
+        """从Finnhub获取港股K线数据"""
+        import finnhub
+        import os
+        from datetime import datetime, timedelta
+
+        # 获取 API Key
+        api_key = os.getenv('FINNHUB_API_KEY')
+        if not api_key:
+            raise Exception("Finnhub API Key 未配置")
+
+        # 创建客户端
+        client = finnhub.Client(api_key=api_key)
+
+        # 港股代码需要添加 .HK 后缀
+        hk_symbol = f"{code}.HK" if not code.endswith('.HK') else code
+
+        # 周期映射
+        resolution_map = {
+            'day': 'D',
+            'week': 'W',
+            'month': 'M',
+            '5m': '5',
+            '15m': '15',
+            '30m': '30',
+            '60m': '60'
+        }
+
+        resolution = resolution_map.get(period, 'D')
+
+        # 计算时间范围
+        end_time = int(datetime.now().timestamp())
+        start_time = int((datetime.now() - timedelta(days=limit * 2)).timestamp())
+
+        # 获取K线数据
+        candles = client.stock_candles(hk_symbol, resolution, start_time, end_time)
+
+        if not candles or candles.get('s') != 'ok':
+            raise Exception("无数据")
+
+        # 格式化数据
+        kline_data = []
+        for i in range(len(candles['t'])):
+            date_str = datetime.fromtimestamp(candles['t'][i]).strftime('%Y-%m-%d')
+            kline_data.append({
+                'date': date_str,
+                'trade_date': date_str,
+                'open': float(candles['o'][i]),
+                'high': float(candles['h'][i]),
+                'low': float(candles['l'][i]),
+                'close': float(candles['c'][i]),
+                'volume': int(candles['v'][i])
+            })
+
+        return kline_data[-limit:]  # 返回最后limit条
+
+    def _get_hk_news_from_akshare(self, code: str, days: int, limit: int) -> List[Dict]:
+        """从AKShare获取港股新闻"""
+        try:
+            import akshare as ak
+            from datetime import datetime, timedelta
+
+            # AKShare 的港股新闻接口
+            # 注意：AKShare 可能没有专门的港股新闻接口，这里使用通用新闻接口
+            # 如果没有合适的接口，抛出异常让系统尝试下一个数据源
+
+            # 尝试获取港股新闻（使用东方财富港股新闻）
+            try:
+                df = ak.stock_news_em(symbol=code)
+                if df is None or df.empty:
+                    raise Exception("无数据")
+
+                # 格式化新闻数据
+                news_list = []
+                for _, row in df.head(limit).iterrows():
+                    pub_time = row['发布时间'] if '发布时间' in row else datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    news_list.append({
+                        'title': row['新闻标题'] if '新闻标题' in row else '',
+                        'summary': row['新闻内容'] if '新闻内容' in row else '',
+                        'url': row['新闻链接'] if '新闻链接' in row else '',
+                        'source': 'AKShare-东方财富',
+                        'publish_time': pub_time,
+                        'sentiment': None,
+                        'sentiment_score': None,
+                    })
+
+                return news_list
+            except Exception as e:
+                logger.debug(f"AKShare 东方财富接口失败: {e}")
+                raise Exception("AKShare 暂不支持港股新闻")
+
+        except Exception as e:
+            logger.warning(f"⚠️ AKShare获取港股新闻失败: {e}")
+            raise
 
