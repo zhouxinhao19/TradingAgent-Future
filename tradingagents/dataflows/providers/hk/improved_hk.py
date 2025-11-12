@@ -679,15 +679,33 @@ def get_hk_stock_info_akshare(symbol: str) -> Dict[str, Any]:
                 matched = df[df['代码'] == normalized_symbol]
                 if not matched.empty:
                     row = matched.iloc[0]
+
+                    # 辅助函数：安全转换数值
+                    def safe_float(value):
+                        try:
+                            if value is None or value == '' or (isinstance(value, float) and value != value):  # NaN check
+                                return None
+                            return float(value)
+                        except:
+                            return None
+
+                    def safe_int(value):
+                        try:
+                            if value is None or value == '' or (isinstance(value, float) and value != value):  # NaN check
+                                return None
+                            return int(value)
+                        except:
+                            return None
+
                     return {
                         'symbol': symbol,
                         'name': row['中文名称'],  # 新浪接口的列名
-                        'price': float(row['最新价']) if '最新价' in row and row['最新价'] else None,
-                        'open': float(row['今开']) if '今开' in row and row['今开'] else None,
-                        'high': float(row['最高']) if '最高' in row and row['最高'] else None,
-                        'low': float(row['最低']) if '最低' in row and row['最低'] else None,
-                        'volume': int(row['成交量']) if '成交量' in row and row['成交量'] else None,
-                        'change_percent': float(row['涨跌幅']) if '涨跌幅' in row and row['涨跌幅'] else None,
+                        'price': safe_float(row.get('最新价')),
+                        'open': safe_float(row.get('今开')),
+                        'high': safe_float(row.get('最高')),
+                        'low': safe_float(row.get('最低')),
+                        'volume': safe_int(row.get('成交量')),
+                        'change_percent': safe_float(row.get('涨跌幅')),
                         'currency': 'HKD',
                         'exchange': 'HKG',
                         'market': '港股',

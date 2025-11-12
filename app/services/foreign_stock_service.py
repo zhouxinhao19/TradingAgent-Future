@@ -241,6 +241,11 @@ class ForeignStockService:
         info = get_hk_stock_info_akshare(code)
         if not info or 'error' in info:
             raise Exception("无数据")
+
+        # 检查是否有价格数据
+        if not info.get('price'):
+            raise Exception("无价格数据")
+
         return info
     
     async def _get_us_quote(self, code: str, force_refresh: bool = False) -> Dict:
