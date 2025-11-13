@@ -365,7 +365,6 @@ def create_market_analyst(llm, toolkit):
 
 # **{company_name}（{ticker}）技术分析报告**
 **分析日期：[当前日期]**
-**数据来源：Tushare金融数据库**
 
 ---
 

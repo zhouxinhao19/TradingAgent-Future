@@ -654,9 +654,22 @@ def get_hk_stock_data_akshare(symbol: str, start_date: str = None, end_date: str
         return f"❌ 港股{symbol}历史数据获取失败: {str(e)}"
 
 
+# 🔥 全局缓存：缓存 AKShare 的所有港股数据
+_akshare_hk_spot_cache = {
+    'data': None,
+    'timestamp': None,
+    'ttl': 600  # 缓存 10 分钟（参考美股实时行情缓存时长）
+}
+
+# 🔥 线程锁：防止多个线程同时调用 AKShare API
+import threading
+_akshare_hk_spot_lock = threading.Lock()
+
+
 def get_hk_stock_info_akshare(symbol: str) -> Dict[str, Any]:
     """
     兼容性函数：直接使用 akshare 获取港股信息（避免循环调用）
+    🔥 使用全局缓存 + 线程锁，避免重复调用 ak.stock_hk_spot()
 
     Args:
         symbol: 港股代码
@@ -666,6 +679,7 @@ def get_hk_stock_info_akshare(symbol: str) -> Dict[str, Any]:
     """
     try:
         import akshare as ak
+        from datetime import datetime
 
         # 标准化代码
         provider = get_improved_hk_provider()
@@ -673,15 +687,88 @@ def get_hk_stock_info_akshare(symbol: str) -> Dict[str, Any]:
 
         # 尝试从 akshare 获取实时行情
         try:
-            # 使用新浪财经接口（更稳定）
-            df = ak.stock_hk_spot()
+            # 🔥 使用互斥锁保护 AKShare API 调用（防止并发导致被封禁）
+            # 策略：
+            # 1. 尝试获取锁（最多等待 60 秒）
+            # 2. 获取锁后，先检查缓存是否已被其他线程更新
+            # 3. 如果缓存有效，直接使用；否则调用 API
+
+            thread_id = threading.current_thread().name
+            logger.info(f"🔒 [AKShare锁-{thread_id}] 尝试获取锁...")
+
+            # 尝试获取锁，最多等待 60 秒
+            lock_acquired = _akshare_hk_spot_lock.acquire(timeout=60)
+
+            if not lock_acquired:
+                # 超时，返回错误
+                logger.error(f"⏰ [AKShare锁-{thread_id}] 获取锁超时（60秒），放弃")
+                raise Exception("AKShare API 调用超时（其他线程占用）")
+
+            try:
+                logger.info(f"✅ [AKShare锁-{thread_id}] 已获取锁")
+
+                # 获取锁后，检查缓存是否已被其他线程更新
+                now = datetime.now()
+                cache = _akshare_hk_spot_cache
+
+                if cache['data'] is not None and cache['timestamp'] is not None:
+                    elapsed = (now - cache['timestamp']).total_seconds()
+                    if elapsed <= cache['ttl']:
+                        # 缓存有效（可能是其他线程刚更新的）
+                        logger.info(f"⚡ [AKShare缓存-{thread_id}] 使用缓存数据（{elapsed:.1f}秒前，可能由其他线程更新）")
+                        df = cache['data']
+                    else:
+                        # 缓存过期，需要调用 API
+                        logger.info(f"🔄 [AKShare缓存-{thread_id}] 缓存过期（{elapsed:.1f}秒前），调用 API 刷新")
+                        df = ak.stock_hk_spot()
+                        cache['data'] = df
+                        cache['timestamp'] = now
+                        logger.info(f"✅ [AKShare缓存-{thread_id}] 已缓存 {len(df)} 只港股数据")
+                else:
+                    # 缓存为空，首次调用
+                    logger.info(f"🔄 [AKShare缓存-{thread_id}] 首次获取港股数据")
+                    df = ak.stock_hk_spot()
+                    cache['data'] = df
+                    cache['timestamp'] = now
+                    logger.info(f"✅ [AKShare缓存-{thread_id}] 已缓存 {len(df)} 只港股数据")
+
+            finally:
+                # 释放锁
+                _akshare_hk_spot_lock.release()
+                logger.info(f"🔓 [AKShare锁-{thread_id}] 已释放锁")
+
+            # 从缓存的数据中查找目标股票
             if df is not None and not df.empty:
                 matched = df[df['代码'] == normalized_symbol]
                 if not matched.empty:
                     row = matched.iloc[0]
+
+                    # 辅助函数：安全转换数值
+                    def safe_float(value):
+                        try:
+                            if value is None or value == '' or (isinstance(value, float) and value != value):  # NaN check
+                                return None
+                            return float(value)
+                        except:
+                            return None
+
+                    def safe_int(value):
+                        try:
+                            if value is None or value == '' or (isinstance(value, float) and value != value):  # NaN check
+                                return None
+                            return int(value)
+                        except:
+                            return None
+
                     return {
                         'symbol': symbol,
                         'name': row['中文名称'],  # 新浪接口的列名
+                        'price': safe_float(row.get('最新价')),
+                        'open': safe_float(row.get('今开')),
+                        'high': safe_float(row.get('最高')),
+                        'low': safe_float(row.get('最低')),
+                        'volume': safe_int(row.get('成交量')),
+                        'change_percent': safe_float(row.get('涨跌幅')),
                         'currency': 'HKD',
                         'exchange': 'HKG',
                         'market': '港股',

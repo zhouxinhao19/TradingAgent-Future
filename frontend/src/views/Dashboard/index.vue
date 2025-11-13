@@ -203,22 +203,54 @@
           </template>
 
           <div v-if="paperAccount" class="paper-account-info">
-            <div class="account-item">
-              <div class="account-label">现金</div>
-              <div class="account-value">¥{{ formatMoney(paperAccount.cash) }}</div>
+            <!-- A股账户 -->
+            <div class="account-section">
+              <div class="account-section-title">🇨🇳 A股账户</div>
+              <div class="account-item">
+                <div class="account-label">现金</div>
+                <div class="account-value">¥{{ formatMoney(paperAccount.cash?.CNY || paperAccount.cash) }}</div>
+              </div>
+              <div class="account-item">
+                <div class="account-label">持仓市值</div>
+                <div class="account-value">¥{{ formatMoney(paperAccount.positions_value?.CNY || paperAccount.positions_value) }}</div>
+              </div>
+              <div class="account-item">
+                <div class="account-label">总资产</div>
+                <div class="account-value primary">¥{{ formatMoney(paperAccount.equity?.CNY || paperAccount.equity) }}</div>
+              </div>
             </div>
-            <div class="account-item">
-              <div class="account-label">持仓市值</div>
-              <div class="account-value">¥{{ formatMoney(paperAccount.positions_value) }}</div>
+
+            <!-- 港股账户 -->
+            <div class="account-section" v-if="paperAccount.cash?.HKD !== undefined">
+              <div class="account-section-title">🇭🇰 港股账户</div>
+              <div class="account-item">
+                <div class="account-label">现金</div>
+                <div class="account-value">HK${{ formatMoney(paperAccount.cash.HKD) }}</div>
+              </div>
+              <div class="account-item">
+                <div class="account-label">持仓市值</div>
+                <div class="account-value">HK${{ formatMoney(paperAccount.positions_value?.HKD || 0) }}</div>
+              </div>
+              <div class="account-item">
+                <div class="account-label">总资产</div>
+                <div class="account-value primary">HK${{ formatMoney(paperAccount.equity?.HKD || 0) }}</div>
+              </div>
             </div>
-            <div class="account-item">
-              <div class="account-label">总资产</div>
-              <div class="account-value primary">¥{{ formatMoney(paperAccount.equity) }}</div>
-            </div>
-            <div class="account-item">
-              <div class="account-label">已实现盈亏</div>
-              <div class="account-value" :class="getPnlClass(paperAccount.realized_pnl)">
-                {{ paperAccount.realized_pnl >= 0 ? '+' : '' }}¥{{ formatMoney(paperAccount.realized_pnl) }}
+
+            <!-- 美股账户 -->
+            <div class="account-section" v-if="paperAccount.cash?.USD !== undefined">
+              <div class="account-section-title">🇺🇸 美股账户</div>
+              <div class="account-item">
+                <div class="account-label">现金</div>
+                <div class="account-value">${{ formatMoney(paperAccount.cash.USD) }}</div>
+              </div>
+              <div class="account-item">
+                <div class="account-label">持仓市值</div>
+                <div class="account-value">${{ formatMoney(paperAccount.positions_value?.USD || 0) }}</div>
+              </div>
+              <div class="account-item">
+                <div class="account-label">总资产</div>
+                <div class="account-value primary">${{ formatMoney(paperAccount.equity?.USD || 0) }}</div>
               </div>
             </div>
           </div>
@@ -841,27 +873,41 @@ onMounted(async () => {
       flex-direction: column;
       gap: 16px;
 
+      .account-section {
+        border: 1px solid var(--el-border-color-lighter);
+        border-radius: 8px;
+        padding: 12px;
+        background-color: var(--el-fill-color-blank);
+
+        .account-section-title {
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--el-text-color-primary);
+          margin-bottom: 12px;
+          padding-bottom: 8px;
+          border-bottom: 1px solid var(--el-border-color-lighter);
+        }
+      }
+
       .account-item {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 12px;
-        background-color: var(--el-fill-color-lighter);
-        border-radius: 8px;
+        padding: 8px 0;
 
         .account-label {
-          font-size: 14px;
+          font-size: 13px;
           color: var(--el-text-color-regular);
         }
 
         .account-value {
-          font-size: 16px;
+          font-size: 15px;
           font-weight: 600;
           color: var(--el-text-color-primary);
 
           &.primary {
             color: var(--el-color-primary);
-            font-size: 18px;
+            font-size: 16px;
           }
 
           &.price-up {

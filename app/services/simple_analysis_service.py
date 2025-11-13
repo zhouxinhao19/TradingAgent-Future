@@ -831,7 +831,7 @@ class SimpleAnalysisService:
 
             # 🔍 验证股票代码是否存在
             logger.info(f"🔍 开始验证股票代码: {stock_code}")
-            from tradingagents.utils.stock_validator import prepare_stock_data
+            from tradingagents.utils.stock_validator import prepare_stock_data_async
             from datetime import datetime
 
             # 获取市场类型
@@ -854,9 +854,8 @@ class SimpleAnalysisService:
                         analysis_date = datetime.now().strftime('%Y-%m-%d')
                         logger.warning(f"⚠️ 分析日期格式不正确，使用今天: {analysis_date}")
 
-            # 验证股票代码并预获取数据
-            validation_result = await asyncio.to_thread(
-                prepare_stock_data,
+            # 🔥 使用异步版本，直接 await，避免事件循环冲突
+            validation_result = await prepare_stock_data_async(
                 stock_code=stock_code,
                 market_type=market_type,
                 period_days=30,
