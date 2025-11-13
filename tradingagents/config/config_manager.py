@@ -175,31 +175,47 @@ class ConfigManager:
     
     def _init_mongodb_storage(self):
         """初始化MongoDB存储"""
+        logger.info("🔧 [ConfigManager] 开始初始化 MongoDB 存储...")
+
         if not MONGODB_AVAILABLE:
+            logger.warning("⚠️ [ConfigManager] pymongo 未安装，无法使用 MongoDB 存储")
             return
-        
+
         # 检查是否启用MongoDB存储
-        use_mongodb = os.getenv("USE_MONGODB_STORAGE", "false").lower() == "true"
+        use_mongodb_env = os.getenv("USE_MONGODB_STORAGE", "false")
+        use_mongodb = use_mongodb_env.lower() == "true"
+
+        logger.info(f"🔍 [ConfigManager] USE_MONGODB_STORAGE={use_mongodb_env} (解析为: {use_mongodb})")
+
         if not use_mongodb:
+            logger.info("ℹ️ [ConfigManager] MongoDB 存储未启用，将使用 JSON 文件存储")
             return
-        
+
         try:
             connection_string = os.getenv("MONGODB_CONNECTION_STRING")
             database_name = os.getenv("MONGODB_DATABASE_NAME", "tradingagents")
-            
+
+            logger.info(f"🔍 [ConfigManager] MONGODB_CONNECTION_STRING={'已设置' if connection_string else '未设置'}")
+            logger.info(f"🔍 [ConfigManager] MONGODB_DATABASE_NAME={database_name}")
+
+            if not connection_string:
+                logger.error("❌ [ConfigManager] MONGODB_CONNECTION_STRING 未设置，无法初始化 MongoDB 存储")
+                return
+
+            logger.info(f"🔄 [ConfigManager] 正在创建 MongoDBStorage 实例...")
             self.mongodb_storage = MongoDBStorage(
                 connection_string=connection_string,
                 database_name=database_name
             )
-            
+
             if self.mongodb_storage.is_connected():
-                logger.info("✅ MongoDB存储已启用")
+                logger.info(f"✅ [ConfigManager] MongoDB存储已启用: {database_name}.token_usage")
             else:
                 self.mongodb_storage = None
-                logger.warning("⚠️ MongoDB连接失败，将使用JSON文件存储")
+                logger.warning("⚠️ [ConfigManager] MongoDB连接失败，将使用JSON文件存储")
 
         except Exception as e:
-            logger.error(f"❌ MongoDB初始化失败: {e}", exc_info=True)
+            logger.error(f"❌ [ConfigManager] MongoDB初始化失败: {e}", exc_info=True)
             self.mongodb_storage = None
 
     def _init_default_configs(self):
@@ -409,26 +425,41 @@ class ConfigManager:
             session_id=session_id,
             analysis_type=analysis_type
         )
-        
+
+        # 🔍 详细日志：记录保存位置
+        logger.info(f"💾 [Token记录] 准备保存: {provider}/{model_name}, 输入={input_tokens}, 输出={output_tokens}, 成本=¥{cost:.4f}, session={session_id}")
+
         # 优先使用MongoDB存储
         if self.mongodb_storage and self.mongodb_storage.is_connected():
+            logger.info(f"📊 [Token记录] 使用 MongoDB 存储 (数据库: {self.mongodb_storage.database_name}, 集合: {self.mongodb_storage.collection_name})")
             success = self.mongodb_storage.save_usage_record(record)
             if success:
+                logger.info(f"✅ [Token记录] MongoDB 保存成功: {provider}/{model_name}")
                 return record
             else:
-                logger.error(f"⚠️ MongoDB保存失败，回退到JSON文件存储")
-        
+                logger.error(f"⚠️ [Token记录] MongoDB保存失败，回退到JSON文件存储")
+        else:
+            # 🔍 详细日志：为什么没有使用MongoDB
+            if self.mongodb_storage is None:
+                logger.warning(f"⚠️ [Token记录] MongoDB存储未初始化 (mongodb_storage=None)")
+                logger.warning(f"   💡 请检查环境变量: USE_MONGODB_STORAGE={os.getenv('USE_MONGODB_STORAGE', '未设置')}")
+            elif not self.mongodb_storage.is_connected():
+                logger.warning(f"⚠️ [Token记录] MongoDB未连接 (is_connected=False)")
+
+            logger.info(f"📄 [Token记录] 使用 JSON 文件存储: {self.usage_file}")
+
         # 回退到JSON文件存储
         records = self.load_usage_records()
         records.append(record)
-        
+
         # 限制记录数量
         settings = self.load_settings()
         max_records = settings.get("max_usage_records", 10000)
         if len(records) > max_records:
             records = records[-max_records:]
-        
+
         self.save_usage_records(records)
+        logger.info(f"✅ [Token记录] JSON 文件保存成功: {self.usage_file}")
         return record
     
     def calculate_cost(self, provider: str, model_name: str, input_tokens: int, output_tokens: int) -> tuple[float, str]:
