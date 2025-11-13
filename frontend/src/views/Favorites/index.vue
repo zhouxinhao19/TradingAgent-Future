@@ -69,7 +69,9 @@
               <el-icon><Refresh /></el-icon>
               刷新
             </el-button>
+            <!-- 只有有A股自选股时才显示同步实时行情按钮 -->
             <el-button
+              v-if="hasAStocks"
               type="success"
               @click="syncAllRealtime"
               :loading="syncRealtimeLoading"
@@ -77,10 +79,11 @@
               <el-icon><Refresh /></el-icon>
               同步实时行情
             </el-button>
+            <!-- 只有选中的股票都是A股时才显示批量同步按钮 -->
             <el-button
+              v-if="selectedStocksAreAllAShares"
               type="primary"
               @click="showBatchSyncDialog"
-              :disabled="selectedStocks.length === 0"
             >
               <el-icon><Download /></el-icon>
               批量同步数据
@@ -180,7 +183,9 @@
             >
               编辑
             </el-button>
+            <!-- 只有A股显示同步按钮 -->
             <el-button
+              v-if="row.market === 'A股'"
               type="text"
               size="small"
               @click="showSingleSyncDialog(row)"
@@ -224,24 +229,30 @@
       width="500px"
     >
       <el-form :model="addForm" :rules="addRules" ref="addFormRef" label-width="100px">
+        <el-form-item label="市场类型" prop="market">
+          <el-select v-model="addForm.market" @change="handleMarketChange">
+            <el-option label="A股" value="A股" />
+            <el-option label="港股" value="港股" />
+            <el-option label="美股" value="美股" />
+          </el-select>
+        </el-form-item>
+
         <el-form-item label="股票代码" prop="stock_code">
           <el-input
             v-model="addForm.stock_code"
-            placeholder="请输入股票代码，如：000001"
+            :placeholder="getStockCodePlaceholder()"
             @blur="fetchStockInfo"
           />
+          <div style="font-size: 12px; color: #909399; margin-top: 4px;">
+            {{ getStockCodeHint() }}
+          </div>
         </el-form-item>
 
         <el-form-item label="股票名称" prop="stock_name">
           <el-input v-model="addForm.stock_name" placeholder="股票名称" />
-        </el-form-item>
-
-        <el-form-item label="市场类型">
-          <el-select v-model="addForm.market">
-            <el-option label="A股" value="A股" />
-            <el-option label="美股" value="美股" />
-            <el-option label="港股" value="港股" />
-          </el-select>
+          <div v-if="addForm.market !== 'A股'" style="font-size: 12px; color: #E6A23C; margin-top: 4px;">
+            {{ addForm.market }}不支持自动获取，请手动输入股票名称
+          </div>
         </el-form-item>
 
         <el-form-item label="标签">
@@ -568,9 +579,46 @@ const addForm = ref({
   notes: ''
 })
 
+// 股票代码验证器
+const validateStockCode = (rule: any, value: any, callback: any) => {
+  if (!value) {
+    callback(new Error('请输入股票代码'))
+    return
+  }
+
+  const code = value.trim()
+  const market = addForm.value.market
+
+  if (market === 'A股') {
+    // A股：6位数字
+    if (!/^\d{6}$/.test(code)) {
+      callback(new Error('A股代码必须是6位数字，如：000001'))
+      return
+    }
+  } else if (market === '港股') {
+    // 港股：4位数字 或 4-5位数字+.HK
+    if (!/^\d{4,5}$/.test(code) && !/^\d{4,5}\.HK$/i.test(code)) {
+      callback(new Error('港股代码格式：4位数字（如：0700）或带后缀（如：0700.HK）'))
+      return
+    }
+  } else if (market === '美股') {
+    // 美股：1-5个字母
+    if (!/^[A-Z]{1,5}$/i.test(code)) {
+      callback(new Error('美股代码必须是1-5个字母，如：AAPL'))
+      return
+    }
+  }
+
+  callback()
+}
+
 const addRules = {
+  market: [
+    { required: true, message: '请选择市场类型', trigger: 'change' }
+  ],
   stock_code: [
-    { required: true, message: '请输入股票代码', trigger: 'blur' }
+    { required: true, message: '请输入股票代码', trigger: 'blur' },
+    { validator: validateStockCode, trigger: 'blur' }
   ],
   stock_name: [
     { required: true, message: '请输入股票名称', trigger: 'blur' }
@@ -632,6 +680,17 @@ const filteredFavorites = computed<FavoriteItem[]>(() => {
   }
 
   return result
+})
+
+// 判断是否有A股自选股
+const hasAStocks = computed(() => {
+  return favorites.value.some(item => item.market === 'A股')
+})
+
+// 判断选中的股票是否都是A股
+const selectedStocksAreAllAShares = computed(() => {
+  if (selectedStocks.value.length === 0) return false
+  return selectedStocks.value.every(item => item.market === 'A股')
 })
 
 // 方法
@@ -808,24 +867,66 @@ const showAddDialog = () => {
   addDialogVisible.value = true
 }
 
+// 市场类型切换时清空股票代码和名称
+const handleMarketChange = () => {
+  addForm.value.stock_code = ''
+  addForm.value.stock_name = ''
+  // 清除验证错误
+  if (addFormRef.value) {
+    addFormRef.value.clearValidate(['stock_code', 'stock_name'])
+  }
+}
+
+// 获取股票代码输入提示
+const getStockCodePlaceholder = () => {
+  const market = addForm.value.market
+  if (market === 'A股') {
+    return '请输入6位数字代码，如：000001'
+  } else if (market === '港股') {
+    return '请输入4位数字代码，如：0700'
+  } else if (market === '美股') {
+    return '请输入股票代码，如：AAPL'
+  }
+  return '请输入股票代码'
+}
+
+// 获取股票代码输入提示文字
+const getStockCodeHint = () => {
+  const market = addForm.value.market
+  if (market === 'A股') {
+    return '输入代码后失焦，将自动填充股票名称'
+  } else if (market === '港股') {
+    return '港股不支持自动获取名称，请手动输入'
+  } else if (market === '美股') {
+    return '美股不支持自动获取名称，请手动输入'
+  }
+  return ''
+}
+
 const fetchStockInfo = async () => {
   if (!addForm.value.stock_code) return
 
   try {
-    // 🔥 从后台获取股票基础信息
     const symbol = addForm.value.stock_code.trim()
-    const res = await ApiClient.get(`/api/stock-data/basic-info/${symbol}`)
+    const market = addForm.value.market
 
-    if ((res as any)?.success && (res as any)?.data) {
-      const stockInfo = (res as any).data
-      // 自动填充股票名称
-      if (stockInfo.name) {
-        addForm.value.stock_name = stockInfo.name
-        ElMessage.success(`已自动填充股票名称: ${stockInfo.name}`)
+    // 🔥 只有A股支持自动获取股票名称
+    if (market === 'A股') {
+      // 从后台获取股票基础信息
+      const res = await ApiClient.get(`/api/stock-data/basic-info/${symbol}`)
+
+      if ((res as any)?.success && (res as any)?.data) {
+        const stockInfo = (res as any).data
+        // 自动填充股票名称
+        if (stockInfo.name) {
+          addForm.value.stock_name = stockInfo.name
+          ElMessage.success(`已自动填充股票名称: ${stockInfo.name}`)
+        }
+      } else {
+        ElMessage.warning('未找到该股票信息，请手动输入股票名称')
       }
-    } else {
-      ElMessage.warning('未找到该股票信息，请手动输入股票名称')
     }
+    // 港股和美股不调用API，用户需要手动输入
   } catch (error: any) {
     console.error('获取股票信息失败:', error)
     ElMessage.warning('获取股票信息失败，请手动输入股票名称')

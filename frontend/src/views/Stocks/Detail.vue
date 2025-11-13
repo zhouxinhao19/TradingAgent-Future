@@ -11,8 +11,17 @@
         <el-button @click="onToggleFavorite">
           <el-icon><Star /></el-icon> {{ isFav ? '已自选' : '加自选' }}
         </el-button>
-        <el-button type="primary" @click="showSyncDialog" :loading="syncLoading">
+        <!-- 🔥 港股和美股不显示"同步数据"按钮 -->
+        <el-button
+          v-if="market !== 'HK' && market !== 'US'"
+          type="primary"
+          @click="showSyncDialog"
+          :loading="syncLoading"
+        >
           <el-icon><Refresh /></el-icon> 同步数据
+        </el-button>
+        <el-button type="warning" @click="clearCache" :loading="clearCacheLoading">
+          <el-icon><Delete /></el-icon> 清除缓存
         </el-button>
         <el-button type="success" @click="goPaperTrading">
           <el-icon><CreditCard /></el-icon> 模拟交易
@@ -343,13 +352,14 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { TrendCharts, Star, Refresh, Link, Document, Clock, Reading, CreditCard } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { TrendCharts, Star, Refresh, Link, Document, Clock, Reading, CreditCard, Delete } from '@element-plus/icons-vue'
 import { marked } from 'marked'
 import { stocksApi } from '@/api/stocks'
 import { analysisApi } from '@/api/analysis'
 import { ApiClient } from '@/api/request'
 import { stockSyncApi } from '@/api/stockSync'
+import { clearAllCache } from '@/api/cache'
 import { use as echartsUse } from 'echarts/core'
 import { CandlestickChart } from 'echarts/charts'
 
@@ -493,6 +503,9 @@ const syncForm = reactive({
   days: 365
 })
 
+// 清除缓存
+const clearCacheLoading = ref(false)
+
 // 显示同步对话框
 function showSyncDialog() {
   syncDialogVisible.value = true
@@ -578,6 +591,42 @@ async function handleSync() {
 async function refreshMockQuote() {
   // 改为调用后端接口获取真实数据
   await fetchQuote()
+}
+
+// 清除缓存
+async function clearCache() {
+  try {
+    await ElMessageBox.confirm(
+      '确定要清除所有缓存吗？清除后需要重新从数据源获取数据。',
+      '清除缓存',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    clearCacheLoading.value = true
+    await clearAllCache()
+    ElMessage.success('缓存已清除，正在刷新数据...')
+
+    // 刷新当前页面数据
+    await Promise.all([
+      fetchQuote(),
+      fetchFundamentals(),
+      fetchKline(),
+      fetchNews()
+    ])
+
+    ElMessage.success('数据已刷新')
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('清除缓存失败:', error)
+      ElMessage.error(error.message || '清除缓存失败')
+    }
+  } finally {
+    clearCacheLoading.value = false
+  }
 }
 
 async function fetchQuote() {

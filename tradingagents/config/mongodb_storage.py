@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import Dict, List, Optional, Any
 from dataclasses import asdict
-from .config_manager import UsageRecord
+from .usage_models import UsageRecord
 
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
@@ -114,26 +114,34 @@ class MongoDBStorage:
     def save_usage_record(self, record: UsageRecord) -> bool:
         """保存单个使用记录到MongoDB"""
         if not self._connected:
+            logger.warning(f"⚠️ [MongoDB存储] 未连接，无法保存记录")
             return False
-        
+
         try:
             # 转换为字典格式
             record_dict = asdict(record)
-            
+
             # 添加MongoDB特有的字段
             record_dict['_created_at'] = datetime.now(ZoneInfo(get_timezone_name()))
-            
+
+            # 🔍 详细日志
+            logger.debug(f"📊 [MongoDB存储] 准备插入记录: {record.provider}/{record.model_name}, session={record.session_id}")
+            logger.debug(f"   数据库: {self.database_name}, 集合: {self.collection_name}")
+
             # 插入记录
             result = self.collection.insert_one(record_dict)
-            
+
             if result.inserted_id:
+                logger.info(f"✅ [MongoDB存储] 记录已保存: ID={result.inserted_id}, {record.provider}/{record.model_name}, ¥{record.cost:.4f}")
                 return True
             else:
-                logger.error(f"MongoDB插入失败：未返回插入ID")
+                logger.error(f"❌ [MongoDB存储] 插入失败：未返回插入ID")
                 return False
-                
+
         except Exception as e:
-            logger.error(f"保存记录到MongoDB失败: {e}")
+            logger.error(f"❌ [MongoDB存储] 保存记录失败: {e}")
+            import traceback
+            logger.error(f"   堆栈: {traceback.format_exc()}")
             return False
     
     def load_usage_records(self, limit: int = 10000, days: int = None) -> List[UsageRecord]:
