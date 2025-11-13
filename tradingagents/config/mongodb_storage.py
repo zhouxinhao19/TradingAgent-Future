@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import Dict, List, Optional, Any
 from dataclasses import asdict
-from .config_manager import UsageRecord
+from .usage_models import UsageRecord
 
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger
