@@ -412,6 +412,7 @@ const exportData = async () => {
       'llm_providers',       // LLM 提供商
       'market_categories',   // 市场分类
       'user_tags',           // 用户标签
+      'user_favorites',      // 自选股
       'datasource_groupings',// 数据源分组
       'platform_configs',    // 平台配置
       'user_configs',        // 用户配置
