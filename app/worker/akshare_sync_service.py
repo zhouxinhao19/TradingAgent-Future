@@ -1071,7 +1071,7 @@ class AKShareSyncService:
                     logger.debug(f"⚠️ {symbol} 未获取到新闻数据")
                     batch_stats["success_count"] += 1  # 没有新闻也算成功
 
-                # API限流
+                # 🔥 API限流：成功后休眠
                 await asyncio.sleep(0.2)
 
             except Exception as e:
@@ -1079,6 +1079,10 @@ class AKShareSyncService:
                 error_msg = f"{symbol}: {str(e)}"
                 batch_stats["errors"].append(error_msg)
                 logger.error(f"❌ {symbol} 新闻同步失败: {e}")
+
+                # 🔥 失败后也要休眠，避免"失败雪崩"
+                # 失败时休眠更长时间，给API服务器恢复的机会
+                await asyncio.sleep(1.0)
 
         return batch_stats
 
