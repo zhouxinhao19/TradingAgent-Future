@@ -76,7 +76,7 @@ const registry: Record<string, { title: string; loader: () => Promise<any>; cate
   'multi-agent-system': { title: '多智能体系统详解', loader: () => import('../../../../docs/learning/04-analysis-principles/multi-agent-system.md?raw'), category: 'AI分析原理', categoryType: 'info', readTime: '15分钟' },
   'risk-warnings': { title: 'AI股票分析的风险与局限性', loader: () => import('../../../../docs/learning/05-risks-limitations/risk-warnings.md?raw'), category: '风险与局限性', categoryType: 'danger', readTime: '12分钟' },
   'finrobot-intro': { title: 'TradingAgents项目介绍', loader: () => import('../../../../docs/learning/06-resources/finrobot-intro.md?raw'), category: '源项目与论文', categoryType: 'primary', readTime: '15分钟' },
-  'paper-guide': { title: 'FinRobot论文解读', loader: () => import('../../../../docs/learning/06-resources/paper-guide.md?raw'), category: '源项目与论文', categoryType: 'primary', readTime: '20分钟' },
+  'paper-guide': { title: 'TradingAgents论文解读', loader: () => import('../../../../docs/learning/06-resources/paper-guide.md?raw'), category: '源项目与论文', categoryType: 'primary', readTime: '20分钟' },
   'getting-started': { title: '快速入门教程', loader: () => import('../../../../docs/learning/07-tutorials/getting-started.md?raw'), category: '实战教程', categoryType: 'success', readTime: '10分钟' },
   'general-questions': { title: '常见问题解答', loader: () => import('../../../../docs/learning/08-faq/general-questions.md?raw'), category: '常见问题', categoryType: 'info', readTime: '15分钟' }
 }
