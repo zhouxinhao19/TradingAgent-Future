@@ -215,11 +215,12 @@ function rewriteImageSrc(html: string): string {
   div.innerHTML = html
 
   const assetMap: Record<string, string> = {
-    'assets/schema.png': new URL('../../../../assets/schema.png', import.meta.url).href,
-    'assets/analyst.png': new URL('../../../../assets/analyst.png', import.meta.url).href,
-    'assets/researcher.png': new URL('../../../../assets/researcher.png', import.meta.url).href,
-    'assets/trader.png': new URL('../../../../assets/trader.png', import.meta.url).href,
-    'assets/risk.png': new URL('../../../../assets/risk.png', import.meta.url).href
+    // 统一映射到前端 public 静态资源目录，避免 Vite 对跨根目录 new URL 的构建警告
+    'assets/schema.png': '/assets/schema.png',
+    'assets/analyst.png': '/assets/analyst.png',
+    'assets/researcher.png': '/assets/researcher.png',
+    'assets/trader.png': '/assets/trader.png',
+    'assets/risk.png': '/assets/risk.png'
   }
 
   const imgs = div.querySelectorAll('img')
