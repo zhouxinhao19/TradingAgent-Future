@@ -145,3 +145,34 @@ docs/learning/
 2. 发送邮件至项目维护者
 3. 在社区讨论区反馈
 
+---
+
+## ✅ 已完成文档
+
+### AI基础知识
+- ✅ [什么是大语言模型（LLM）](./01-ai-basics/what-is-llm.md)
+
+### 提示词工程
+- ✅ [提示词基础概念](./02-prompt-engineering/prompt-basics.md)
+- ✅ [提示词最佳实践](./02-prompt-engineering/best-practices.md)
+
+### 模型选择指南
+- ✅ [主流大模型对比](./03-model-selection/model-comparison.md)
+
+### AI分析股票原理
+- ✅ [多智能体系统详解](./04-analysis-principles/multi-agent-system.md)
+
+### 风险与局限性
+- ✅ [风险警示和免责声明](./05-risks-limitations/risk-warnings.md)
+
+### 源项目与论文
+- ✅ [FinRobot项目介绍](./06-resources/finrobot-intro.md)
+
+### 实战教程
+- ✅ [快速入门教程](./07-tutorials/getting-started.md)
+
+### 常见问题
+- ✅ [常见问题解答](./08-faq/general-questions.md)
+
+**进度统计**：已完成 8 篇核心文档，涵盖从入门到进阶的主要内容。
+

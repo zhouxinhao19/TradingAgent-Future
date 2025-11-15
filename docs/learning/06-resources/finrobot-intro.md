@@ -209,9 +209,10 @@ FinRobot论文提出了一个开源的AI智能体平台，用于金融应用。�
 
 ### 论文下载
 
-- 📄 [英文原版（arXiv）](https://arxiv.org/abs/2405.14767)
-- 📄 [中文翻译版](./paper-chinese.md)
-- 📄 [论文解读](./paper-analysis.md)
+- 📄 [英文原版PDF](../../paper/TradingAgents_paper.pdf)
+- 📄 [中文翻译版](../../paper/TradingAgents_论文中文版.md)
+- 📄 [arXiv在线版](https://arxiv.org/abs/2405.14767)
+- 📄 [论文解读](./paper-guide.md)
 
 ---
 
@@ -219,9 +220,9 @@ FinRobot论文提出了一个开源的AI智能体平台，用于金融应用。�
 
 ### 官方资源
 
-- 🌐 [FinRobot GitHub](https://github.com/AI4Finance-Foundation/FinRobot)
+- 🌐 [TradingAgents（源项目）](https://github.com/TauricResearch/TradingAgents)
+- 🌐 [FinRobot（基础框架）](https://github.com/AI4Finance-Foundation/FinRobot)
 - 📚 [FinRobot文档](https://finrobot.readthedocs.io/)
-- 💬 [Discord社区](https://discord.gg/finrobot)
 
 ### TradingAgents-CN资源
 
@@ -266,7 +267,7 @@ A: 欢迎贡献！请访问GitHub仓库，提交Pull Request或Issue。
 ---
 
 **下一步阅读**：
-- 📖 [论文中文版](./paper-chinese.md)
+- 📖 [论文中文版](../../paper/TradingAgents_论文中文版.md)
 - 📖 [多智能体系统](../04-analysis-principles/multi-agent-system.md)
-- 📖 [快速开始](../07-tutorials/quick-start.md)
+- 📖 [快速开始](../07-tutorials/getting-started.md)
 
