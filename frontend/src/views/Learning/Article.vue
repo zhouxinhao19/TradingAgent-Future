@@ -1,124 +1,145 @@
 <template>
-  <div class="learning-article">
+  <div class="learning-article-wrapper">
+    <!-- 页面头部 -->
     <el-page-header @back="goBack" :content="article.title">
       <template #extra>
         <el-button type="primary" :icon="Download" @click="downloadArticle">下载</el-button>
       </template>
     </el-page-header>
 
-    <div class="article-container">
-      <div class="article-meta">
-        <el-tag :type="article.categoryType" size="small">{{ article.category }}</el-tag>
-        <span class="read-time">
-          <el-icon><Clock /></el-icon>
-          {{ article.readTime }}
-        </span>
-        <span class="views">
-          <el-icon><View /></el-icon>
-          {{ article.views }}
-        </span>
-        <span class="update-time">更新于 {{ article.updateTime }}</span>
-      </div>
+    <!-- 主容器：文章 + 侧边栏 -->
+    <div class="learning-article">
+      <div class="article-container">
+        <div class="article-meta">
+          <el-tag :type="article.categoryType" size="small">{{ article.category }}</el-tag>
+          <span class="read-time">
+            <el-icon><Clock /></el-icon>
+            {{ article.readTime }}
+          </span>
+          <span class="views">
+            <el-icon><View /></el-icon>
+            {{ article.views }}
+          </span>
+          <span class="update-time">更新于 {{ article.updateTime }}</span>
+        </div>
 
-      <div class="article-content" v-html="article.content"></div>
+        <div class="article-content" v-html="article.content"></div>
 
-      <div class="article-footer">
-        <el-divider />
-        <div class="navigation">
-          <el-button v-if="prevArticle" @click="navigateToArticle(prevArticle.id)">
-            <el-icon><ArrowLeft /></el-icon>
-            上一篇：{{ prevArticle.title }}
-          </el-button>
-          <el-button v-if="nextArticle" @click="navigateToArticle(nextArticle.id)">
-            下一篇：{{ nextArticle.title }}
-            <el-icon><ArrowRight /></el-icon>
-          </el-button>
+        <div class="article-footer">
+          <el-divider />
+          <div class="navigation">
+            <el-button v-if="prevArticle" @click="navigateToArticle(prevArticle.id)">
+              <el-icon><ArrowLeft /></el-icon>
+              上一篇：{{ prevArticle.title }}
+            </el-button>
+            <el-button v-if="nextArticle" @click="navigateToArticle(nextArticle.id)">
+              下一篇：{{ nextArticle.title }}
+              <el-icon><ArrowRight /></el-icon>
+            </el-button>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- 侧边栏目录 -->
-    <div class="article-toc">
-      <div class="toc-title">目录</div>
-      <ul class="toc-list">
-        <li v-for="heading in tableOfContents" :key="heading.id" 
-            :class="['toc-item', `toc-level-${heading.level}`]"
-            @click="scrollToHeading(heading.id)">
-          {{ heading.text }}
-        </li>
-      </ul>
+      <!-- 侧边栏目录 -->
+      <div class="article-toc">
+        <div class="toc-title">目录</div>
+        <ul class="toc-list">
+          <li v-for="heading in tableOfContents" :key="heading.id"
+              :class="['toc-item', `toc-level-${heading.level}`]"
+              @click="scrollToHeading(heading.id)">
+            {{ heading.text }}
+          </li>
+        </ul>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Download, Clock, View, ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { marked } from 'marked'
 
 const route = useRoute()
 const router = useRouter()
 
 const articleId = computed(() => route.params.id as string)
 
-// 文章数据（示例，后续从API或Markdown文件加载）
+// 文章注册表：通过 Vite 的 ?raw 直接打包 Markdown
+const registry: Record<string, { title: string; loader: () => Promise<any>; category: string; categoryType: any; readTime: string }> = {
+  'what-is-llm': { title: '什么是大语言模型（LLM）？', loader: () => import('../../../../docs/learning/01-ai-basics/what-is-llm.md?raw'), category: 'AI基础知识', categoryType: 'primary', readTime: '10分钟' },
+  'prompt-basics': { title: '提示词基础', loader: () => import('../../../../docs/learning/02-prompt-engineering/prompt-basics.md?raw'), category: '提示词工程', categoryType: 'success', readTime: '10分钟' },
+  'best-practices': { title: '提示词工程最佳实践', loader: () => import('../../../../docs/learning/02-prompt-engineering/best-practices.md?raw'), category: '提示词工程', categoryType: 'success', readTime: '12分钟' },
+  'model-comparison': { title: '大语言模型对比与选择', loader: () => import('../../../../docs/learning/03-model-selection/model-comparison.md?raw'), category: '模型选择指南', categoryType: 'warning', readTime: '15分钟' },
+  'multi-agent-system': { title: '多智能体系统详解', loader: () => import('../../../../docs/learning/04-analysis-principles/multi-agent-system.md?raw'), category: 'AI分析原理', categoryType: 'info', readTime: '15分钟' },
+  'risk-warnings': { title: 'AI股票分析的风险与局限性', loader: () => import('../../../../docs/learning/05-risks-limitations/risk-warnings.md?raw'), category: '风险与局限性', categoryType: 'danger', readTime: '12分钟' },
+  'finrobot-intro': { title: 'TradingAgents项目介绍', loader: () => import('../../../../docs/learning/06-resources/finrobot-intro.md?raw'), category: '源项目与论文', categoryType: 'primary', readTime: '15分钟' },
+  'paper-guide': { title: 'FinRobot论文解读', loader: () => import('../../../../docs/learning/06-resources/paper-guide.md?raw'), category: '源项目与论文', categoryType: 'primary', readTime: '20分钟' },
+  'getting-started': { title: '快速入门教程', loader: () => import('../../../../docs/learning/07-tutorials/getting-started.md?raw'), category: '实战教程', categoryType: 'success', readTime: '10分钟' },
+  'general-questions': { title: '常见问题解答', loader: () => import('../../../../docs/learning/08-faq/general-questions.md?raw'), category: '常见问题', categoryType: 'info', readTime: '15分钟' }
+}
+
+// 文章顺序用于上一页/下一页
+const articleOrder = [
+  'what-is-llm',
+  'prompt-basics',
+  'best-practices',
+  'model-comparison',
+  'multi-agent-system',
+  'risk-warnings',
+  'finrobot-intro',
+  'paper-guide',
+  'getting-started',
+  'general-questions'
+]
+
+// 当前文章数据
 const article = ref({
-  id: 'what-is-llm',
-  title: '什么是大语言模型（LLM）？',
-  category: 'AI基础知识',
-  categoryType: 'primary',
-  readTime: '8分钟',
-  views: 2345,
-  updateTime: '2025-11-14',
-  content: `
-    <h2 id="introduction">引言</h2>
-    <p>大语言模型（Large Language Model，简称LLM）是近年来人工智能领域最重要的突破之一...</p>
-    
-    <h2 id="what-is-llm">什么是大语言模型？</h2>
-    <p>大语言模型是一种基于深度学习的自然语言处理模型...</p>
-    
-    <h3 id="key-features">核心特点</h3>
-    <ul>
-      <li><strong>大规模参数</strong>：通常包含数十亿甚至数千亿个参数</li>
-      <li><strong>预训练</strong>：在海量文本数据上进行预训练</li>
-      <li><strong>通用性</strong>：可以处理多种自然语言任务</li>
-    </ul>
-    
-    <h2 id="how-it-works">工作原理</h2>
-    <p>大语言模型基于Transformer架构...</p>
-    
-    <h2 id="applications">应用场景</h2>
-    <p>在股票分析领域，大语言模型可以...</p>
-  `
+  id: '',
+  title: '',
+  category: '',
+  categoryType: 'primary' as any,
+  readTime: '',
+  views: 0,
+  updateTime: '',
+  content: ''
 })
 
 // 目录
-const tableOfContents = ref([
-  { id: 'introduction', text: '引言', level: 2 },
-  { id: 'what-is-llm', text: '什么是大语言模型？', level: 2 },
-  { id: 'key-features', text: '核心特点', level: 3 },
-  { id: 'how-it-works', text: '工作原理', level: 2 },
-  { id: 'applications', text: '应用场景', level: 2 }
-])
+const tableOfContents = ref<{ id: string; text: string; level: number }[]>([])
 
-// 上一篇/下一篇
-const prevArticle = ref({
-  id: 'what-is-ai',
-  title: '什么是人工智能（AI）？'
-})
-
-const nextArticle = ref({
-  id: 'transformer-architecture',
-  title: 'Transformer架构详解'
-})
+const prevArticle = ref<{ id: string; title: string } | null>(null)
+const nextArticle = ref<{ id: string; title: string } | null>(null)
 
 const goBack = () => {
   router.back()
 }
 
-const downloadArticle = () => {
-  ElMessage.success('文章下载功能开发中...')
+const downloadArticle = async () => {
+  if (!article.value.id) return
+  const info = registry[article.value.id]
+  if (!info) {
+    ElMessage.warning('未找到文章资源')
+    return
+  }
+  try {
+    const mod = await info.loader()
+    const md: string = typeof mod === 'string' ? mod : (mod.default || '')
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${article.value.id}.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    console.error(e)
+    ElMessage.error('下载失败')
+  }
 }
 
 const navigateToArticle = (id: string) => {
@@ -131,19 +152,88 @@ const scrollToHeading = (id: string) => {
     element.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 }
+
+// 从 markdown 加载文章
+async function loadArticle(id: string) {
+  const info = registry[id]
+  if (!info) {
+    ElMessage.error('未找到文章')
+    return
+  }
+  article.value = {
+    id,
+    title: info.title,
+    category: info.category,
+    categoryType: info.categoryType,
+    readTime: info.readTime,
+    views: 0,
+    updateTime: new Date().toISOString().slice(0, 10),
+    content: ''
+  }
+
+  try {
+    const mod = await info.loader()
+    const md: string = typeof mod === 'string' ? mod : (mod.default || '')
+    // 解析 markdown -> html，并开启 heading id
+    marked.setOptions({ headerIds: true, mangle: false })
+    const html = marked.parse(md) as string
+    article.value.content = html
+    buildTOCFromHTML(html)
+    buildPrevNext(id)
+  } catch (e) {
+    console.error(e)
+    ElMessage.error('加载文章失败：无法访问文档资源')
+  }
+}
+
+function buildTOCFromHTML(html: string) {
+  const div = document.createElement('div')
+  div.innerHTML = html
+  const headings = Array.from(div.querySelectorAll('h2, h3, h4')) as HTMLHeadingElement[]
+  tableOfContents.value = headings.map(h => ({
+    id: h.id || h.textContent?.trim().toLowerCase().replace(/\s+/g, '-') || '',
+    text: h.textContent || '',
+    level: Number(h.tagName.substring(1))
+  }))
+}
+
+function buildPrevNext(id: string) {
+  const idx = articleOrder.indexOf(id)
+  prevArticle.value = idx > 0 ? { id: articleOrder[idx - 1], title: registry[articleOrder[idx - 1]].title } : null
+  nextArticle.value = idx >= 0 && idx < articleOrder.length - 1 ? { id: articleOrder[idx + 1], title: registry[articleOrder[idx + 1]].title } : null
+}
+
+onMounted(() => {
+  loadArticle(articleId.value)
+})
+
+watch(articleId, (id) => {
+  loadArticle(id)
+})
 </script>
 
 <style scoped lang="scss">
+.learning-article-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+
+  .el-page-header {
+    padding: 16px 24px;
+    background: white;
+    border-bottom: 1px solid #ebeef5;
+    flex-shrink: 0;
+  }
+}
+
 .learning-article {
   display: flex;
   padding: 24px;
   max-width: 1400px;
   margin: 0 auto;
   gap: 24px;
-
-  .el-page-header {
-    margin-bottom: 24px;
-  }
+  flex: 1;
+  width: 100%;
 
   .article-container {
     flex: 1;
@@ -231,11 +321,10 @@ const scrollToHeading = (id: string) => {
 
       :deep(blockquote) {
         border-left: 4px solid #409eff;
-        padding-left: 16px;
         margin: 16px 0;
+        padding: 12px 16px;
         color: #606266;
         background: #f5f7fa;
-        padding: 12px 16px;
         border-radius: 4px;
       }
     }

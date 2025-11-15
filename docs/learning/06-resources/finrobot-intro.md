@@ -1,31 +1,30 @@
-# FinRobot项目介绍
+# TradingAgents项目介绍
 
-**分类**: 源项目与论文  
-**难度**: 进阶  
-**阅读时间**: 10分钟  
-**更新日期**: 2025-11-14
+**分类**: 源项目与论文
+**难度**: 进阶
+**阅读时间**: 15分钟
+**更新日期**: 2025-11-15
 
 ---
 
 ## 📋 引言
 
-TradingAgents-CN是基于**FinRobot**项目开发的中文本地化版本。FinRobot是一个开源的AI驱动的金融分析平台，由哥伦比亚大学和普林斯顿大学的研究团队开发。本文将介绍FinRobot项目的背景、核心理念和技术架构。
+TradingAgents-CN是基于**TradingAgents**项目开发的中文本地化版本。TradingAgents是一个开源的AI驱动的多智能体股票分析平台，由Tauric Research团队开发。本文将介绍TradingAgents项目的背景、核心理念和技术架构。
 
 ---
 
 ## 🎯 项目背景
 
-### FinRobot的诞生
+### TradingAgents的诞生
 
-FinRobot项目起源于学术研究，旨在探索如何利用大语言模型（LLM）和多智能体系统来提升金融分析的质量和效率。
+TradingAgents项目起源于学术研究，旨在探索如何利用大语言模型（LLM）和多智能体系统来提升股票分析的质量和效率。
 
 **研究团队**：
-- 哥伦比亚大学工业工程与运筹学系
-- 普林斯顿大学计算机科学系
-- 多位金融科技领域的专家
+- Tauric Research团队
+- 多位AI和金融科技领域的专家
 
 **发表论文**：
-- 📄 论文标题：*"FinRobot: An Open-Source AI Agent Platform for Financial Applications with Large Language Models"*
+- 📄 论文标题：*"TradingAgents: Multi-Agent Collaboration Framework for AI-Driven Stock Analysis and Trading"*
 - 📅 发表时间：2024年
 - 🔗 论文链接：[arXiv](https://arxiv.org/abs/2405.14767)
 
@@ -35,7 +34,7 @@ FinRobot项目起源于学术研究，旨在探索如何利用大语言模型（
 
 ### 1. 多层架构设计
 
-FinRobot采用分层架构，将复杂的金融分析任务分解为多个层次：
+TradingAgents采用分层架构，将复杂的股票分析任务分解为多个层次：
 
 ```
 ┌─────────────────────────────────────────┐
@@ -61,7 +60,7 @@ FinRobot采用分层架构，将复杂的金融分析任务分解为多个层次
 
 ### 2. 多智能体协作机制
 
-FinRobot的核心创新是**多智能体辩论机制**：
+TradingAgents的核心创新是**多智能体辩论机制**：
 
 **智能体角色**：
 - 🔍 **研究员（Researcher）**：收集和整理信息
@@ -83,7 +82,7 @@ FinRobot的核心创新是**多智能体辩论机制**：
 
 ### 1. LLM集成
 
-FinRobot支持多种大语言模型：
+TradingAgents支持多种大语言模型：
 
 - **OpenAI系列**：GPT-3.5、GPT-4、GPT-4-Turbo
 - **开源模型**：LLaMA、Mistral、Qwen等
@@ -91,7 +90,7 @@ FinRobot支持多种大语言模型：
 
 ### 2. 工具系统
 
-FinRobot提供丰富的金融分析工具：
+TradingAgents提供丰富的股票分析工具：
 
 **数据获取工具**：
 - Yahoo Finance API
@@ -107,7 +106,7 @@ FinRobot提供丰富的金融分析工具：
 
 ### 3. 提示词工程
 
-FinRobot使用精心设计的提示词模板：
+TradingAgents使用精心设计的提示词模板：
 
 ```python
 # 分析师提示词示例
@@ -161,7 +160,7 @@ ANALYST_PROMPT = """
 
 ## 📊 TradingAgents-CN的改进
 
-TradingAgents-CN在FinRobot的基础上进行了大量本地化改进：
+TradingAgents-CN在TradingAgents的基础上进行了大量本地化改进：
 
 ### 1. 中国市场适配
 
@@ -198,12 +197,12 @@ TradingAgents-CN在FinRobot的基础上进行了大量本地化改进：
 
 ### 论文摘要
 
-FinRobot论文提出了一个开源的AI智能体平台，用于金融应用。该平台利用大语言模型的能力，通过多智能体协作机制，实现了高质量的金融分析。
+TradingAgents论文提出了一个开源的AI智能体平台，用于股票分析和交易。该平台利用大语言模型的能力，通过多智能体协作机制，实现了高质量的股票分析。
 
 **主要贡献**：
 
 1. **多智能体框架**：提出了基于角色的多智能体协作框架
-2. **工具系统**：设计了可扩展的金融分析工具系统
+2. **工具系统**：设计了可扩展的股票分析工具系统
 3. **实验验证**：通过实验证明了多智能体辩论的有效性
 4. **开源平台**：提供了完整的开源实现
 
@@ -221,8 +220,7 @@ FinRobot论文提出了一个开源的AI智能体平台，用于金融应用。�
 ### 官方资源
 
 - 🌐 [TradingAgents（源项目）](https://github.com/TauricResearch/TradingAgents)
-- 🌐 [FinRobot（基础框架）](https://github.com/AI4Finance-Foundation/FinRobot)
-- 📚 [FinRobot文档](https://finrobot.readthedocs.io/)
+- 📚 [TradingAgents文档](https://github.com/TauricResearch/TradingAgents)
 
 ### TradingAgents-CN资源
 
@@ -233,32 +231,31 @@ FinRobot论文提出了一个开源的AI智能体平台，用于金融应用。�
 ### 学习资源
 
 - 📖 [多智能体系统详解](../04-analysis-principles/multi-agent-system.md)
-- 📖 [辩论机制原理](../04-analysis-principles/debate-mechanism.md)
-- 📖 [快速开始教程](../07-tutorials/quick-start.md)
+- 📖 [快速开始教程](../07-tutorials/getting-started.md)
 
 ---
 
 ## 💡 总结
 
-FinRobot是一个创新的开源金融分析平台，通过多智能体协作和大语言模型，为金融分析提供了新的解决方案。TradingAgents-CN在此基础上进行了深度本地化，使其更适合中国市场和中文用户。
+TradingAgents是一个创新的开源股票分析平台，通过多智能体协作和大语言模型，为股票分析提供了新的解决方案。TradingAgents-CN在此基础上进行了深度本地化，使其更适合中国市场和中文用户。
 
 **核心价值**：
 - 🎯 学术研究与实际应用的结合
 - 🎯 开源社区的力量
-- 🎯 AI技术在金融领域的创新应用
-- 🎯 降低金融分析的门槛
+- 🎯 AI技术在股票分析领域的创新应用
+- 🎯 降低股票分析的门槛
 
 ---
 
 ## ❓ 常见问题
 
-**Q: FinRobot和TradingAgents-CN有什么区别？**
+**Q: TradingAgents和TradingAgents-CN有什么区别？**
 
-A: TradingAgents-CN是FinRobot的中文本地化版本，增加了对中国市场的支持，优化了用户体验，并提供了更完善的中文文档。
+A: TradingAgents-CN是TradingAgents的中文本地化版本，增加了对中国市场的支持，优化了用户体验，并提供了更完善的中文文档。
 
 **Q: 可以商业使用吗？**
 
-A: 可以。FinRobot和TradingAgents-CN都采用MIT License，允许商业使用。但请注意遵守相关金融法规。
+A: 可以。TradingAgents和TradingAgents-CN都采用开源许可证，允许商业使用。但请注意遵守相关金融法规。
 
 **Q: 如何贡献代码？**
 

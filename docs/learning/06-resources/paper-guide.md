@@ -1,17 +1,17 @@
-# FinRobot论文解读
+# TradingAgents论文解读
 
-**分类**: 源项目与论文  
-**难度**: 进阶  
-**阅读时间**: 20分钟  
-**更新日期**: 2025-11-14
+**分类**: 源项目与论文
+**难度**: 进阶
+**阅读时间**: 20分钟
+**更新日期**: 2025-11-15
 
 ---
 
 ## 📋 论文信息
 
-**标题**: FinRobot: An Open-Source AI Agent Platform for Financial Applications with Large Language Models
+**标题**: TradingAgents: Multi-Agent Collaboration Framework for AI-Driven Stock Analysis and Trading
 
-**作者**: Hongyang Yang, Boyu Zhang, et al.
+**作者**: Tauric Research Team
 
 **发表**: arXiv:2405.14767
 

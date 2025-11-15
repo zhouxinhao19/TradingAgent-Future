@@ -76,7 +76,7 @@ const categoryMap: Record<string, any> = {
   'resources': {
     title: '源项目与论文',
     icon: '📖',
-    description: 'FinRobot项目介绍和学术论文资源'
+    description: 'TradingAgents项目介绍和学术论文资源'
   },
   'tutorials': {
     title: '实战教程',
@@ -167,8 +167,8 @@ const articlesDatabase: Record<string, any[]> = {
   'resources': [
     {
       id: 'finrobot-intro',
-      title: 'FinRobot项目介绍',
-      description: '了解TradingAgents-CN的源项目FinRobot的架构和特性',
+      title: 'TradingAgents项目介绍',
+      description: '了解TradingAgents-CN的源项目TradingAgents的架构和特性',
       readTime: '15分钟',
       views: 1432,
       difficulty: 'warning',
@@ -176,8 +176,8 @@ const articlesDatabase: Record<string, any[]> = {
     },
     {
       id: 'paper-guide',
-      title: 'FinRobot论文解读',
-      description: '深度解读FinRobot学术论文的核心内容和创新点',
+      title: 'TradingAgents论文解读',
+      description: '深度解读TradingAgents学术论文的核心内容和创新点',
       readTime: '20分钟',
       views: 987,
       difficulty: 'danger',
