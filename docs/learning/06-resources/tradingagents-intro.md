@@ -24,9 +24,10 @@ TradingAgents项目起源于学术研究，旨在探索如何利用大语言模�
 - 多位AI和金融科技领域的专家
 
 **发表论文**：
-- 📄 论文标题：*"TradingAgents: Multi-Agent Collaboration Framework for AI-Driven Stock Analysis and Trading"*
+- 📄 论文标题：*"TradingAgents: TradingAgents: Multi-Agents LLM Financial Trading
+Framework"*
 - 📅 发表时间：2024年
-- 🔗 论文链接：[arXiv](https://arxiv.org/abs/2405.14767)
+- 🔗 论文链接：[arXiv](https://arxiv.org/pdf/2412.20138)
 
 ---
 
@@ -137,7 +138,8 @@ ANALYST_PROMPT = """
 
 ### 1. 开源与可扩展
 
-- ✅ 完全开源（MIT License）
+- ✅ 开源核心组件（Apache License 2.0）
+- 🔒 专有组件遵循项目根目录许可证说明（见 LICENSE 与 LICENSING.md）
 - ✅ 模块化设计，易于扩展
 - ✅ 支持自定义智能体和工具
 - ✅ 活跃的社区支持
@@ -147,7 +149,6 @@ ANALYST_PROMPT = """
 - 🇺🇸 美股市场
 - 🇨🇳 A股市场（TradingAgents-CN增强）
 - 🇭🇰 港股市场
-- 🌍 其他国际市场
 
 ### 3. 灵活的部署方式
 
@@ -210,7 +211,7 @@ TradingAgents论文提出了一个开源的AI智能体平台，用于股票分�
 
 - 📄 [英文原版PDF](../../paper/TradingAgents_paper.pdf)
 - 📄 [中文翻译版](../../paper/TradingAgents_论文中文版.md)
-- 📄 [arXiv在线版](https://arxiv.org/abs/2405.14767)
+- 📄 [arXiv在线版](https://arxiv.org/pdf/2412.20138)
 - 📄 [论文解读](./paper-guide.md)
 
 ---
@@ -231,7 +232,6 @@ TradingAgents论文提出了一个开源的AI智能体平台，用于股票分�
 ### 学习资源
 
 - 📖 [多智能体系统详解](../04-analysis-principles/multi-agent-system.md)
-- 📖 [快速开始教程](../07-tutorials/getting-started.md)
 
 ---
 

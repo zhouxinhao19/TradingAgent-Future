@@ -416,7 +416,5 @@
 ## 🔗 相关资源
 
 - 📖 [提示词基础](./prompt-basics.md)
-- 📖 [Few-shot学习](./few-shot-learning.md)
-- 📖 [思维链提示](./chain-of-thought.md)
-- 📖 [自定义提示词教程](../07-tutorials/custom-prompts.md)
+
 

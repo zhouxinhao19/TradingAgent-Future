@@ -193,6 +193,15 @@ const articlesDatabase: Record<string, any[]> = {
       views: 3456,
       difficulty: 'success',
       difficultyText: '入门'
+    },
+    {
+      id: 'usage-guide-preview',
+      title: '使用指南（试用版）',
+      description: 'TradingAgents-CN v1.0.0-preview 使用指南与试用说明',
+      readTime: '15分钟',
+      views: 1288,
+      difficulty: 'success',
+      difficultyText: '入门'
     }
   ],
   'faq': [
@@ -218,6 +227,16 @@ const goBack = () => {
 }
 
 const openArticle = (articleId: string) => {
+  // 外链文章在列表点击时直接新标签页打开，不进入详情页
+  const externalMap: Record<string, string> = {
+    'getting-started': 'https://mp.weixin.qq.com/s/uAk4RevdJHMuMvlqpdGUEw',
+    'usage-guide-preview': 'https://mp.weixin.qq.com/s/ppsYiBncynxlsfKFG8uEbw'
+  }
+  const external = externalMap[articleId]
+  if (external) {
+    window.open(external, '_blank')
+    return
+  }
   router.push(`/learning/article/${articleId}`)
 }
 </script>
@@ -228,8 +247,10 @@ const openArticle = (articleId: string) => {
   max-width: 1400px;
   margin: 0 auto;
 
-  .el-page-header {
+  :deep(.el-page-header) {
     margin-bottom: 32px;
+    border-bottom: 1px solid var(--el-border-color);
+    background: var(--el-fill-color-blank);
 
     .category-icon {
       font-size: 24px;
@@ -241,12 +262,12 @@ const openArticle = (articleId: string) => {
     .category-description {
       margin-bottom: 32px;
       padding: 20px;
-      background: #f5f7fa;
+      background: var(--el-fill-color-light);
       border-radius: 8px;
 
       p {
         font-size: 16px;
-        color: #606266;
+        color: var(--el-text-color-regular);
         line-height: 1.6;
         margin: 0;
       }
@@ -256,11 +277,21 @@ const openArticle = (articleId: string) => {
       cursor: pointer;
       transition: all 0.3s ease;
       margin-bottom: 20px;
-      height: 200px;
+      min-height: 200px;
+      background: var(--el-fill-color-blank);
+      border: 1px solid var(--el-border-color);
 
       &:hover {
         transform: translateY(-4px);
         box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+      }
+
+      // 让卡片内容垂直排布并撑满高度，避免底部信息被裁剪
+      :deep(.el-card__body) {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        box-sizing: border-box;
       }
 
       .article-header {
@@ -271,7 +302,7 @@ const openArticle = (articleId: string) => {
 
         h3 {
           font-size: 16px;
-          color: #303133;
+          color: var(--el-text-color-primary);
           font-weight: 600;
           flex: 1;
           margin-right: 12px;
@@ -280,7 +311,7 @@ const openArticle = (articleId: string) => {
 
       .article-desc {
         font-size: 14px;
-        color: #606266;
+        color: var(--el-text-color-regular);
         line-height: 1.6;
         margin-bottom: 16px;
         min-height: 60px;
@@ -291,19 +322,48 @@ const openArticle = (articleId: string) => {
         justify-content: space-between;
         align-items: center;
         padding-top: 12px;
-        border-top: 1px solid #ebeef5;
+        border-top: 1px solid var(--el-border-color);
+        margin-top: auto;
 
         span {
           display: flex;
           align-items: center;
           font-size: 13px;
-          color: #909399;
+          color: var(--el-text-color-secondary);
 
           .el-icon {
             margin-right: 4px;
           }
         }
       }
+    }
+  }
+}
+
+// 暗黑模式覆盖
+:global(html.dark) {
+  .learning-category {
+    background: #000000 !important;
+
+    :deep(.el-page-header) {
+      background: #000000 !important;
+      border-bottom-color: var(--el-border-color);
+    }
+
+    .category-content {
+      .category-description {
+        background: #000000 !important;
+        border: 1px solid var(--el-border-color);
+      }
+
+      .article-card {
+        background: #000000 !important;
+        border-color: var(--el-border-color) !important;
+      }
+    }
+
+    .article-footer {
+      border-top-color: var(--el-border-color);
     }
   }
 }

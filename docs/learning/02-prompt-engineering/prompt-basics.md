@@ -327,9 +327,8 @@
 
 ### 下一步学习
 
-- 📖 [提示词工程进阶](./prompt-patterns.md)
-- 📖 [Few-shot学习技巧](./few-shot-learning.md)
-- 📖 [思维链提示](./chain-of-thought.md)
+- 📖 [提示词工程最佳实践](./best-practices.md)
+
 
 ---
 
@@ -351,8 +350,4 @@
 
 ---
 
-**相关资源**：
-- [OpenAI提示词指南](https://platform.openai.com/docs/guides/prompt-engineering)
-- [提示词工程最佳实践](./best-practices.md)
-- [实战案例](../07-tutorials/custom-prompts.md)
 

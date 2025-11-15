@@ -61,7 +61,7 @@
         <el-card class="category-card" shadow="hover" @click="navigateTo('resources')">
           <div class="card-icon">📖</div>
           <h3>源项目与论文</h3>
-          <p>FinRobot项目介绍和学术论文资源</p>
+          <p>TradingAgents项目介绍和学术论文资源</p>
           <el-tag type="primary" size="small">2篇文章</el-tag>
         </el-card>
       </el-col>
@@ -72,7 +72,7 @@
           <div class="card-icon">🎓</div>
           <h3>实战教程</h3>
           <p>通过实际案例学习如何使用本工具</p>
-          <el-tag type="success" size="small">1篇文章</el-tag>
+          <el-tag type="success" size="small">2篇文章</el-tag>
         </el-card>
       </el-col>
 
@@ -112,8 +112,20 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
+// 为 Element Plus Tag 的 type 属性定义允许的联合类型，避免模板类型不匹配
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
+
+interface RecommendedArticle {
+  id: string
+  category: string
+  tagType: TagType
+  title: string
+  description: string
+  readTime: string
+}
+
 // 推荐文章
-const recommendedArticles = ref([
+const recommendedArticles = ref<RecommendedArticle[]>([
   {
     id: 'what-is-llm',
     category: 'AI基础',
@@ -145,6 +157,16 @@ const navigateTo = (category: string) => {
 }
 
 const openArticle = (articleId: string) => {
+  // 外链文章直接在新标签打开
+  const externalMap: Record<string, string> = {
+    'getting-started': 'https://mp.weixin.qq.com/s/uAk4RevdJHMuMvlqpdGUEw',
+    'usage-guide-preview': 'https://mp.weixin.qq.com/s/ppsYiBncynxlsfKFG8uEbw'
+  }
+  const external = externalMap[articleId]
+  if (external) {
+    window.open(external, '_blank')
+    return
+  }
   router.push(`/learning/article/${articleId}`)
 }
 </script>
@@ -183,6 +205,8 @@ const openArticle = (articleId: string) => {
       transition: all 0.3s ease;
       height: 220px;
       margin-bottom: 20px;
+      background: var(--el-fill-color-blank);
+      border-color: var(--el-border-color);
 
       &:hover {
         transform: translateY(-8px);
@@ -198,12 +222,12 @@ const openArticle = (articleId: string) => {
       h3 {
         font-size: 18px;
         margin-bottom: 12px;
-        color: #303133;
+        color: var(--el-text-color-primary);
       }
 
       p {
         font-size: 14px;
-        color: #606266;
+        color: var(--el-text-color-regular);
         margin-bottom: 16px;
         line-height: 1.6;
         min-height: 60px;
@@ -221,7 +245,7 @@ const openArticle = (articleId: string) => {
     h2 {
       font-size: 24px;
       margin-bottom: 24px;
-      color: #303133;
+      color: var(--el-text-color-primary);
     }
 
     .article-card {
@@ -229,6 +253,8 @@ const openArticle = (articleId: string) => {
       transition: all 0.3s ease;
       margin-bottom: 20px;
       height: 180px;
+      background: var(--el-fill-color-blank);
+      border-color: var(--el-border-color);
 
       &:hover {
         transform: translateY(-4px);
@@ -243,22 +269,57 @@ const openArticle = (articleId: string) => {
 
         .read-time {
           font-size: 12px;
-          color: #909399;
+          color: var(--el-text-color-secondary);
         }
       }
 
       h4 {
         font-size: 16px;
         margin-bottom: 8px;
-        color: #303133;
+        color: var(--el-text-color-primary);
         font-weight: 600;
       }
 
       p {
         font-size: 14px;
-        color: #606266;
+        color: var(--el-text-color-regular);
         line-height: 1.6;
       }
+    }
+  }
+}
+
+// 暗黑模式样式
+:global(html.dark) {
+  .learning-center {
+    background: #000000 !important;
+
+    .learning-header {
+      background: #000000 !important;
+      border: 1px solid var(--el-border-color-light);
+      color: var(--el-text-color-primary);
+      h1 { color: var(--el-text-color-primary); }
+      .subtitle { color: var(--el-text-color-regular); }
+    }
+
+    .learning-categories .category-card,
+    .recommended-section .article-card {
+      background: #000000 !important;
+      border-color: var(--el-border-color) !important;
+    }
+
+    .learning-categories .category-card h3,
+    .recommended-section h2,
+    .recommended-section .article-card h4,
+    .recommended-section .article-card p,
+    .recommended-section .article-card .read-time {
+      color: var(--el-text-color-primary) !important;
+    }
+
+    .recommended-section .article-card p,
+    .learning-categories .category-card p,
+    .recommended-section .article-card .read-time {
+      color: var(--el-text-color-regular) !important;
     }
   }
 }

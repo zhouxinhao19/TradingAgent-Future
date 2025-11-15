@@ -21,6 +21,13 @@ const routes: RouteRecordRaw[] = [
     path: '/',
     redirect: '/dashboard'
   },
+  // 兼容文档链接：将 /paper/<name>.md 重定向到学习中心文章路由
+  {
+    path: '/paper/:name.md',
+    name: 'PaperMdRedirect',
+    redirect: (to) => `/learning/article/${to.params.name as string}`,
+    meta: { title: '文档跳转', hideInMenu: true, requiresAuth: false }
+  },
   {
     path: '/dashboard',
     name: 'Dashboard',
