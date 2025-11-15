@@ -161,7 +161,7 @@
 → 样样通，样样松
 ```
 
-**FinRobot方式**：
+**TradingAgents方式**：
 ```
 每个AI专注特定角色
 → 术业有专攻
@@ -236,7 +236,7 @@
 
 ### vs 传统量化策略
 
-| 维度 | 传统量化 | FinRobot |
+| 维度 | 传统量化 | TradingAgents |
 |------|---------|----------|
 | 灵活性 | ❌ 固定规则 | ✅ 自适应 |
 | 可解释性 | ⚠️ 黑盒 | ✅ 可解释 |
@@ -245,7 +245,7 @@
 
 ### vs 单一LLM
 
-| 维度 | 单一LLM | FinRobot |
+| 维度 | 单一LLM | TradingAgents |
 |------|---------|----------|
 | 分析深度 | ⚠️ 有限 | ✅ 深入 |
 | 多角度 | ❌ 单一视角 | ✅ 多角度 |
@@ -315,7 +315,7 @@
 
 - 📖 [多智能体系统详解](../04-analysis-principles/multi-agent-system.md)
 - 📖 [辩论机制原理](../04-analysis-principles/debate-mechanism.md)
-- 📖 [FinRobot项目介绍](./finrobot-intro.md)
+- 📖 [TradingAgents项目介绍](./finrobot-intro.md)
 
 ---
 
@@ -362,7 +362,7 @@
 
 > "一个人可以走得很快，但一群人可以走得更远"
 
-这句话完美诠释了FinRobot的理念：
+这句话完美诠释了TradingAgents的理念：
 - 不是追求单个AI的极致
 - 而是通过协作达到更好的效果
 

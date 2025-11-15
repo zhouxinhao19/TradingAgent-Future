@@ -429,6 +429,6 @@ class MultiAgentSystem:
 
 - 📖 [辩论机制详解](./debate-mechanism.md)
 - 📖 [分析流程详解](./analysis-workflow.md)
-- 📖 [FinRobot项目介绍](../06-resources/finrobot-intro.md)
+- 📖 [TradingAgents项目介绍](../06-resources/finrobot-intro.md)
 - 📖 [实战教程](../07-tutorials/single-analysis.md)
 
