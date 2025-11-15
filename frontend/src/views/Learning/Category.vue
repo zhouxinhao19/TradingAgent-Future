@@ -37,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Clock, View } from '@element-plus/icons-vue'
 
@@ -98,36 +98,120 @@ const categoryInfo = computed(() => {
   }
 })
 
-// 文章列表（示例数据，后续从API获取）
-const articles = ref([
-  {
-    id: 'what-is-ai',
-    title: '什么是人工智能（AI）？',
-    description: '了解人工智能的定义、发展历史和应用领域',
-    readTime: '5分钟',
-    views: 1234,
-    difficulty: 'success',
-    difficultyText: '入门'
-  },
-  {
-    id: 'what-is-llm',
-    title: '什么是大语言模型（LLM）？',
-    description: '深入了解大语言模型的工作原理和技术架构',
-    readTime: '8分钟',
-    views: 2345,
-    difficulty: 'warning',
-    difficultyText: '进阶'
-  },
-  {
-    id: 'transformer-architecture',
-    title: 'Transformer架构详解',
-    description: '学习大模型背后的核心技术：Transformer架构',
-    readTime: '12分钟',
-    views: 987,
-    difficulty: 'danger',
-    difficultyText: '高级'
-  }
-])
+// 文章数据库
+const articlesDatabase: Record<string, any[]> = {
+  'ai-basics': [
+    {
+      id: 'what-is-llm',
+      title: '什么是大语言模型（LLM）？',
+      description: '深入了解大语言模型的定义、工作原理和在股票分析中的应用',
+      readTime: '10分钟',
+      views: 2345,
+      difficulty: 'success',
+      difficultyText: '入门'
+    }
+  ],
+  'prompt-engineering': [
+    {
+      id: 'prompt-basics',
+      title: '提示词基础',
+      description: '学习提示词的基本概念、结构和编写技巧',
+      readTime: '10分钟',
+      views: 1876,
+      difficulty: 'success',
+      difficultyText: '入门'
+    },
+    {
+      id: 'best-practices',
+      title: '提示词工程最佳实践',
+      description: '掌握提示词编写的核心原则和实用技巧',
+      readTime: '12分钟',
+      views: 1543,
+      difficulty: 'warning',
+      difficultyText: '进阶'
+    }
+  ],
+  'model-selection': [
+    {
+      id: 'model-comparison',
+      title: '大语言模型对比与选择',
+      description: '对比主流大语言模型的特点，学会选择最适合的模型',
+      readTime: '15分钟',
+      views: 1987,
+      difficulty: 'warning',
+      difficultyText: '进阶'
+    }
+  ],
+  'analysis-principles': [
+    {
+      id: 'multi-agent-system',
+      title: '多智能体系统详解',
+      description: '深入理解TradingAgents-CN的多智能体协作机制',
+      readTime: '15分钟',
+      views: 1654,
+      difficulty: 'warning',
+      difficultyText: '进阶'
+    }
+  ],
+  'risks-limitations': [
+    {
+      id: 'risk-warnings',
+      title: 'AI股票分析的风险与局限性',
+      description: '了解AI的主要局限性、使用风险和正确的使用方式',
+      readTime: '12分钟',
+      views: 2134,
+      difficulty: 'success',
+      difficultyText: '入门'
+    }
+  ],
+  'resources': [
+    {
+      id: 'finrobot-intro',
+      title: 'FinRobot项目介绍',
+      description: '了解TradingAgents-CN的源项目FinRobot的架构和特性',
+      readTime: '15分钟',
+      views: 1432,
+      difficulty: 'warning',
+      difficultyText: '进阶'
+    },
+    {
+      id: 'paper-guide',
+      title: 'FinRobot论文解读',
+      description: '深度解读FinRobot学术论文的核心内容和创新点',
+      readTime: '20分钟',
+      views: 987,
+      difficulty: 'danger',
+      difficultyText: '高级'
+    }
+  ],
+  'tutorials': [
+    {
+      id: 'getting-started',
+      title: '快速入门教程',
+      description: '从零开始学习如何使用TradingAgents-CN进行股票分析',
+      readTime: '10分钟',
+      views: 3456,
+      difficulty: 'success',
+      difficultyText: '入门'
+    }
+  ],
+  'faq': [
+    {
+      id: 'general-questions',
+      title: '常见问题解答',
+      description: '快速找到关于功能、模型选择、使用技巧等常见问题的答案',
+      readTime: '15分钟',
+      views: 2876,
+      difficulty: 'success',
+      difficultyText: '入门'
+    }
+  ]
+}
+
+// 根据当前分类获取文章列表
+const articles = computed(() => {
+  return articlesDatabase[category.value] || []
+})
 
 const goBack = () => {
   router.push('/learning')

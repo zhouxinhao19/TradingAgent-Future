@@ -12,7 +12,7 @@
           <div class="card-icon">🤖</div>
           <h3>AI基础知识</h3>
           <p>什么是AI？什么是大模型？了解人工智能的基本概念</p>
-          <el-tag type="primary" size="small">5篇文章</el-tag>
+          <el-tag type="primary" size="small">1篇文章</el-tag>
         </el-card>
       </el-col>
 
@@ -22,7 +22,7 @@
           <div class="card-icon">✍️</div>
           <h3>提示词工程</h3>
           <p>学习如何编写有效的提示词，让AI更好地理解你的需求</p>
-          <el-tag type="success" size="small">6篇文章</el-tag>
+          <el-tag type="success" size="small">2篇文章</el-tag>
         </el-card>
       </el-col>
 
@@ -32,7 +32,7 @@
           <div class="card-icon">🎯</div>
           <h3>模型选择指南</h3>
           <p>了解不同大模型的特点，选择最适合你的模型</p>
-          <el-tag type="warning" size="small">4篇文章</el-tag>
+          <el-tag type="warning" size="small">1篇文章</el-tag>
         </el-card>
       </el-col>
 
@@ -42,7 +42,7 @@
           <div class="card-icon">📊</div>
           <h3>AI分析股票原理</h3>
           <p>深入了解多智能体如何协作分析股票</p>
-          <el-tag type="info" size="small">7篇文章</el-tag>
+          <el-tag type="info" size="small">1篇文章</el-tag>
         </el-card>
       </el-col>
 
@@ -52,7 +52,7 @@
           <div class="card-icon">⚠️</div>
           <h3>风险与局限性</h3>
           <p>了解AI的潜在问题和正确使用方式</p>
-          <el-tag type="danger" size="small">5篇文章</el-tag>
+          <el-tag type="danger" size="small">1篇文章</el-tag>
         </el-card>
       </el-col>
 
@@ -62,7 +62,7 @@
           <div class="card-icon">📖</div>
           <h3>源项目与论文</h3>
           <p>FinRobot项目介绍和学术论文资源</p>
-          <el-tag type="primary" size="small">3篇文章</el-tag>
+          <el-tag type="primary" size="small">2篇文章</el-tag>
         </el-card>
       </el-col>
 
@@ -72,7 +72,7 @@
           <div class="card-icon">🎓</div>
           <h3>实战教程</h3>
           <p>通过实际案例学习如何使用本工具</p>
-          <el-tag type="success" size="small">8篇文章</el-tag>
+          <el-tag type="success" size="small">1篇文章</el-tag>
         </el-card>
       </el-col>
 
@@ -82,7 +82,7 @@
           <div class="card-icon">❓</div>
           <h3>常见问题</h3>
           <p>快速找到常见问题的答案</p>
-          <el-tag type="info" size="small">12篇文章</el-tag>
+          <el-tag type="info" size="small">1篇文章</el-tag>
         </el-card>
       </el-col>
     </el-row>
@@ -120,23 +120,23 @@ const recommendedArticles = ref([
     tagType: 'primary',
     title: '什么是大语言模型（LLM）？',
     description: '从零开始了解大语言模型的基本概念和工作原理',
-    readTime: '5分钟'
+    readTime: '10分钟'
   },
   {
-    id: 'multi-agent-debate',
+    id: 'multi-agent-system',
     category: 'AI分析',
     tagType: 'info',
-    title: '多智能体辩论机制详解',
+    title: '多智能体系统详解',
     description: '了解本工具如何通过多个AI智能体协作分析股票',
-    readTime: '8分钟'
+    readTime: '15分钟'
   },
   {
-    id: 'prompt-best-practices',
+    id: 'best-practices',
     category: '提示词',
     tagType: 'success',
-    title: '提示词编写最佳实践',
+    title: '提示词工程最佳实践',
     description: '学习如何编写高质量的提示词，提升AI分析效果',
-    readTime: '6分钟'
+    readTime: '12分钟'
   }
 ])
 
