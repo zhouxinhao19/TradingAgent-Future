@@ -56,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Download, Clock, View, ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
@@ -75,7 +75,7 @@ const registry: Record<string, { title: string; loader: () => Promise<any>; cate
   'model-comparison': { title: '大语言模型对比与选择', loader: () => import('../../../../docs/learning/03-model-selection/model-comparison.md?raw'), category: '模型选择指南', categoryType: 'warning', readTime: '15分钟' },
   'multi-agent-system': { title: '多智能体系统详解', loader: () => import('../../../../docs/learning/04-analysis-principles/multi-agent-system.md?raw'), category: 'AI分析原理', categoryType: 'info', readTime: '15分钟' },
   'risk-warnings': { title: 'AI股票分析的风险与局限性', loader: () => import('../../../../docs/learning/05-risks-limitations/risk-warnings.md?raw'), category: '风险与局限性', categoryType: 'danger', readTime: '12分钟' },
-  'finrobot-intro': { title: 'TradingAgents项目介绍', loader: () => import('../../../../docs/learning/06-resources/finrobot-intro.md?raw'), category: '源项目与论文', categoryType: 'primary', readTime: '15分钟' },
+  'tradingagents-intro': { title: 'TradingAgents项目介绍', loader: () => import('../../../../docs/learning/06-resources/tradingagents-intro.md?raw'), category: '源项目与论文', categoryType: 'primary', readTime: '15分钟' },
   'paper-guide': { title: 'TradingAgents论文解读', loader: () => import('../../../../docs/learning/06-resources/paper-guide.md?raw'), category: '源项目与论文', categoryType: 'primary', readTime: '20分钟' },
   'getting-started': { title: '快速入门教程', loader: () => import('../../../../docs/learning/07-tutorials/getting-started.md?raw'), category: '实战教程', categoryType: 'success', readTime: '10分钟' },
   'general-questions': { title: '常见问题解答', loader: () => import('../../../../docs/learning/08-faq/general-questions.md?raw'), category: '常见问题', categoryType: 'info', readTime: '15分钟' }
@@ -89,7 +89,7 @@ const articleOrder = [
   'model-comparison',
   'multi-agent-system',
   'risk-warnings',
-  'finrobot-intro',
+  'tradingagents-intro',
   'paper-guide',
   'getting-started',
   'general-questions'
@@ -153,6 +153,29 @@ const scrollToHeading = (id: string) => {
   }
 }
 
+// 将 markdown 中的本地链接转换为应用内路由链接
+function convertLocalLinks(html: string): string {
+  const div = document.createElement('div')
+  div.innerHTML = html
+
+  // 处理所有链接
+  const links = div.querySelectorAll('a')
+  for (const link of links) {
+    const href = link.getAttribute('href')
+    if (href && href.endsWith('.md')) {
+      // 提取文件名（不含扩展名）
+      const fileName = href.split('/').pop()?.replace('.md', '')
+      if (fileName && registry[fileName]) {
+        // 转换为应用内路由链接
+        link.setAttribute('href', `/learning/article/${fileName}`)
+        link.setAttribute('data-internal', 'true')
+      }
+    }
+  }
+
+  return div.innerHTML
+}
+
 // 从 markdown 加载文章
 async function loadArticle(id: string) {
   const info = registry[id]
@@ -176,10 +199,14 @@ async function loadArticle(id: string) {
     const md: string = typeof mod === 'string' ? mod : (mod.default || '')
     // 解析 markdown -> html，并开启 heading id
     marked.setOptions({ headerIds: true, mangle: false })
-    const html = marked.parse(md) as string
+    let html = marked.parse(md) as string
+    // 转换本地链接
+    html = convertLocalLinks(html)
     article.value.content = html
     buildTOCFromHTML(html)
     buildPrevNext(id)
+    // 在 DOM 更新后设置内部链接处理
+    setupInternalLinks()
   } catch (e) {
     console.error(e)
     ElMessage.error('加载文章失败：无法访问文档资源')
@@ -195,6 +222,25 @@ function buildTOCFromHTML(html: string) {
     text: h.textContent || '',
     level: Number(h.tagName.substring(1))
   }))
+}
+
+// 在 DOM 更新后处理内部链接
+function setupInternalLinks() {
+  nextTick(() => {
+    const container = document.querySelector('.article-content')
+    if (!container) return
+
+    const links = container.querySelectorAll('a[data-internal="true"]')
+    for (const link of links) {
+      link.addEventListener('click', (e) => {
+        e.preventDefault()
+        const href = link.getAttribute('href')
+        if (href) {
+          router.push(href)
+        }
+      })
+    }
+  })
 }
 
 function buildPrevNext(id: string) {

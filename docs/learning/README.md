@@ -44,7 +44,7 @@ docs/learning/
 │   └── proper-usage.md        # 正确使用方式
 │
 ├── 06-resources/              # 源项目与论文
-│   ├── finrobot-intro.md      # TradingAgents项目介绍
+│   ├── tradingagents-intro.md # TradingAgents项目介绍
 │   ├── paper-chinese.md       # 论文中文版
 │   ├── paper-english.md       # 论文英文版
 │   └── related-resources.md   # 相关资源
@@ -166,7 +166,7 @@ docs/learning/
 - ✅ [风险警示和免责声明](./05-risks-limitations/risk-warnings.md)
 
 ### 源项目与论文
-- ✅ [TradingAgents项目介绍](./06-resources/finrobot-intro.md)
+- ✅ [TradingAgents项目介绍](./06-resources/tradingagents-intro.md)
 
 ### 实战教程
 - ✅ [快速入门教程](./07-tutorials/getting-started.md)

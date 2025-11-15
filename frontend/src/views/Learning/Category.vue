@@ -166,7 +166,7 @@ const articlesDatabase: Record<string, any[]> = {
   ],
   'resources': [
     {
-      id: 'finrobot-intro',
+      id: 'tradingagents-intro',
       title: 'TradingAgents项目介绍',
       description: '了解TradingAgents-CN的源项目TradingAgents的架构和特性',
       readTime: '15分钟',

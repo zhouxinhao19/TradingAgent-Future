@@ -315,7 +315,7 @@
 
 - 📖 [多智能体系统详解](../04-analysis-principles/multi-agent-system.md)
 - 📖 [辩论机制原理](../04-analysis-principles/debate-mechanism.md)
-- 📖 [TradingAgents项目介绍](./finrobot-intro.md)
+- 📖 [TradingAgents项目介绍](./tradingagents-intro.md)
 
 ---
 
