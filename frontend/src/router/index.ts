@@ -108,6 +108,46 @@ const routes: RouteRecordRaw[] = [
     ]
   },
   {
+    path: '/learning',
+    name: 'Learning',
+    component: () => import('@/layouts/BasicLayout.vue'),
+    meta: {
+      title: '学习中心',
+      icon: 'Reading',
+      requiresAuth: false,
+      transition: 'fade'
+    },
+    children: [
+      {
+        path: '',
+        name: 'LearningHome',
+        component: () => import('@/views/Learning/index.vue'),
+        meta: {
+          title: '学习中心',
+          requiresAuth: false
+        }
+      },
+      {
+        path: ':category',
+        name: 'LearningCategory',
+        component: () => import('@/views/Learning/Category.vue'),
+        meta: {
+          title: '学习分类',
+          requiresAuth: false
+        }
+      },
+      {
+        path: 'article/:id',
+        name: 'LearningArticle',
+        component: () => import('@/views/Learning/Article.vue'),
+        meta: {
+          title: '文章详情',
+          requiresAuth: false
+        }
+      }
+    ]
+  },
+  {
     path: '/stocks',
     name: 'Stocks',
     component: () => import('@/layouts/BasicLayout.vue'),
