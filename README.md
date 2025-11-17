@@ -87,6 +87,7 @@
 #### 📚 使用指南
 
 在使用前，建议先阅读详细的使用指南：
+- **[0、📘 TradingAgents-CN v1.0.0-preview 快速入门视频](https://www.bilibili.com/video/BV1i2CeBwEP7/?vd_source=5d790a5b8d2f46d2c10fd4e770be1594)**
 
 - **[1、📘 TradingAgents-CN v1.0.0-preview 使用指南](https://mp.weixin.qq.com/s/ppsYiBncynxlsfKFG8uEbw)**
 - **[2、📘 使用 Docker Compose 部署TradingAgents-CN v1.0.0-preview（完全版）](https://mp.weixin.qq.com/s/JkA0cOu8xJnoY_3LC5oXNw)**
@@ -238,7 +239,7 @@
 
 - **GitHub Issues**: [提交问题和建议](https://github.com/hsliuping/TradingAgents-CN/issues)
 - **邮箱**: hsliup@163.com
-- 项目ＱＱ群：187537480
+- 项目ＱＱ群：1009816091
 - 项目微信公众号：TradingAgents-CN
 
   <img src="assets/wexin.png" alt="微信公众号" width="200"/>
