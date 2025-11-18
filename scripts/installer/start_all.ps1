@@ -9,6 +9,27 @@ param(
 $ErrorActionPreference = "Continue"
 $root = $PSScriptRoot
 
+function Load-Env($path) {
+    $map = @{}
+    if (Test-Path -LiteralPath $path) {
+        foreach ($line in Get-Content -LiteralPath $path) {
+            if ($line -match '^\s*#') { continue }
+            if ($line -match '^\s*$') { continue }
+            $idx = $line.IndexOf('=')
+            if ($idx -gt 0) {
+                $key = $line.Substring(0, $idx).Trim()
+                $val = $line.Substring($idx + 1).Trim()
+                $map[$key] = $val
+            }
+        }
+    }
+    return $map
+}
+
+$envMap = Load-Env (Join-Path $root '.env')
+$backendPort = if ($envMap.ContainsKey('PORT')) { [int]$envMap['PORT'] } else { 8000 }
+$nginxPort = if ($envMap.ContainsKey('NGINX_PORT')) { [int]$envMap['NGINX_PORT'] } else { 80 }
+
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "TradingAgents-CN Portable - Start All" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
@@ -126,15 +147,14 @@ if ($needsImport) {
 }
 
 # Step 3: Start Backend
-Write-Host ""
+Write-Host "" 
 Write-Host "[3/4] Starting Backend..." -ForegroundColor Yellow
 
-# Check if port 8000 is already in use
-Write-Host "  Checking port 8000..." -ForegroundColor Gray
-$port8000InUse = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
-if ($port8000InUse) {
+Write-Host "  Checking port $backendPort..." -ForegroundColor Gray
+$portInUse = Get-NetTCPConnection -LocalPort $backendPort -State Listen -ErrorAction SilentlyContinue
+if ($portInUse) {
     Write-Host "  WARNING: Port 8000 is already in use!" -ForegroundColor Yellow
-    foreach ($conn in $port8000InUse) {
+    foreach ($conn in $portInUse) {
         $process = Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue
         if ($process) {
             Write-Host "    Process: $($process.ProcessName) (PID: $($process.Id))" -ForegroundColor Gray
@@ -293,7 +313,7 @@ while ($retryCount -lt $maxRetries) {
     }
 
     try {
-        $response = Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/health" -TimeoutSec 2 -UseBasicParsing -ErrorAction SilentlyContinue
+        $response = Invoke-WebRequest -Uri "http://127.0.0.1:$backendPort/api/health" -TimeoutSec 2 -UseBasicParsing -ErrorAction SilentlyContinue
         if ($response.StatusCode -eq 200) {
             $backendReady = $true
             break
@@ -345,10 +365,10 @@ if (-not (Test-Path $nginxConf)) {
     exit 1
 }
 
-# Check if port 80 is already in use
-$port80InUse = Get-NetTCPConnection -LocalPort 80 -ErrorAction SilentlyContinue
+# Check if nginx port is already in use
+$port80InUse = Get-NetTCPConnection -LocalPort $nginxPort -ErrorAction SilentlyContinue
 if ($port80InUse) {
-    Write-Host "  WARNING: Port 80 is already in use!" -ForegroundColor Yellow
+    Write-Host "  WARNING: Port $nginxPort is already in use!" -ForegroundColor Yellow
     foreach ($conn in $port80InUse) {
         $process = Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue
         if ($process) {
@@ -386,6 +406,16 @@ $logsDir = Join-Path $root 'logs'
 if (-not (Test-Path $logsDir)) {
     New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
 }
+
+try {
+    $confText = Get-Content -LiteralPath $nginxConf -Raw -ErrorAction Stop
+    $newText = $confText
+    $newText = [regex]::Replace($newText, 'listen\s+\d+;', "listen $nginxPort;")
+    $newText = [regex]::Replace($newText, 'proxy_pass\s+http://127\.0\.0\.1:\d+;', "proxy_pass http://127.0.0.1:$backendPort;")
+    if ($newText -ne $confText) {
+        Set-Content -LiteralPath $nginxConf -Value $newText -Encoding UTF8
+    }
+} catch {}
 
 # Start Nginx with absolute paths
 try {
@@ -432,8 +462,8 @@ Write-Host ""
 Write-Host "Service Status:" -ForegroundColor White
 Write-Host "  MongoDB:  127.0.0.1:27017" -ForegroundColor Green
 Write-Host "  Redis:    127.0.0.1:6379" -ForegroundColor Green
-Write-Host "  Backend:  http://127.0.0.1:8000" -ForegroundColor Green
-Write-Host "  Frontend: http://127.0.0.1:80" -ForegroundColor Green
+Write-Host "  Backend:  http://127.0.0.1:$backendPort" -ForegroundColor Green
+Write-Host "  Frontend: http://127.0.0.1:$nginxPort" -ForegroundColor Green
 Write-Host ""
 Write-Host "Access the application:" -ForegroundColor White
 Write-Host "  Web UI:   http://localhost" -ForegroundColor Cyan
