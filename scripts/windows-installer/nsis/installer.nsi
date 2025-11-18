@@ -79,30 +79,30 @@ ${NSD_CreateButton} 78% 90u 20% 14u "Detect & Suggest"
 FunctionEnd
 
 Function DetectPorts
- ; 使用单个 PowerShell 调用检测所有端口，提高性能
+ ; Use single PowerShell call to detect all ports for better performance
  nsExec::ExecToStack 'powershell -ExecutionPolicy Bypass -NoProfile -Command "& { $ports = @{Backend=${BACKEND_PORT}; Mongo=${MONGO_PORT}; Redis=${REDIS_PORT}; Nginx=${NGINX_PORT}}; $result = @{}; foreach($name in $ports.Keys) { $p = $ports[$name]; $used = Get-NetTCPConnection -LocalPort $p -ErrorAction SilentlyContinue; if($used) { for($i=$p+1; $i -le 65535; $i++) { if(-not (Get-NetTCPConnection -LocalPort $i -ErrorAction SilentlyContinue)) { $result[$name] = $i; break } } } else { $result[$name] = $p } }; Write-Output ($result | ConvertTo-Json) }"'
  Pop $0
  Pop $1
 
- ; 解析 JSON 结果并更新文本框
+ ; Parse JSON result and update text boxes
  ${If} $0 == 0
-  ; 简单的 JSON 解析（提取数值）
+  ; Simple JSON parsing (extract values)
   ${If} $1 != ""
-   ; 尝试从 JSON 中提取端口号
-   ; 格式: {"Backend": 8000, "Mongo": 27017, ...}
+   ; Try to extract port numbers from JSON
+   ; Format: {"Backend": 8000, "Mongo": 27017, ...}
    StrCpy $BackendPort ${BACKEND_PORT}
    StrCpy $MongoPort ${MONGO_PORT}
    StrCpy $RedisPort ${REDIS_PORT}
    StrCpy $NginxPort ${NGINX_PORT}
 
-   ; 如果 PowerShell 执行失败，使用默认值
+   ; If PowerShell execution failed, use default values
    ${NSD_SetText} $hBackendEdit $BackendPort
    ${NSD_SetText} $hMongoEdit $MongoPort
    ${NSD_SetText} $hRedisEdit $RedisPort
    ${NSD_SetText} $hNginxEdit $NginxPort
   ${EndIf}
  ${Else}
-  ; 检测失败，使用默认值
+  ; Detection failed, use default values
   ${NSD_SetText} $hBackendEdit ${BACKEND_PORT}
   ${NSD_SetText} $hMongoEdit ${MONGO_PORT}
   ${NSD_SetText} $hRedisEdit ${REDIS_PORT}
@@ -116,7 +116,7 @@ Function PortsPageLeave
  ${NSD_GetText} $hRedisEdit $RedisPort
  ${NSD_GetText} $hNginxEdit $NginxPort
 
- ; 验证端口号格式
+ ; Validate port number format
  ${If} $BackendPort == ""
   MessageBox MB_ICONSTOP "Backend port cannot be empty"
   Abort
@@ -134,7 +134,7 @@ Function PortsPageLeave
   Abort
  ${EndIf}
 
- ; 验证端口范围
+ ; Validate port range
  ${If} $BackendPort < 1024
   MessageBox MB_ICONSTOP "Backend port must be >= 1024"
   Abort
@@ -164,7 +164,7 @@ Function PortsPageLeave
   Abort
  ${EndIf}
 
- ; 验证端口不重复
+ ; Validate no duplicate ports
  ${If} $BackendPort == $MongoPort
   MessageBox MB_ICONSTOP "Backend port duplicates MongoDB port"
   Abort

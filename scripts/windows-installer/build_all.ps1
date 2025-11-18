@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Version = "1.0.0",
     [int]$BackendPort = 8000,
     [int]$MongoPort = 27017,
@@ -12,7 +12,6 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# 日志函数
 function Write-Log {
     param([string]$Message, [string]$Level = "INFO")
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
@@ -20,55 +19,53 @@ function Write-Log {
 }
 
 Write-Log "=========================================="
-Write-Log "TradingAgentsCN Windows 安装程序构建"
+Write-Log "TradingAgentsCN Windows Installer Build"
 Write-Log "=========================================="
-Write-Log "版本: $Version"
-Write-Log "后端端口: $BackendPort"
-Write-Log "MongoDB 端口: $MongoPort"
-Write-Log "Redis 端口: $RedisPort"
-Write-Log "Nginx 端口: $NginxPort"
-Write-Log "输出目录: $OutputDir"
+Write-Log "Version: $Version"
+Write-Log "Backend Port: $BackendPort"
+Write-Log "MongoDB Port: $MongoPort"
+Write-Log "Redis Port: $RedisPort"
+Write-Log "Nginx Port: $NginxPort"
+Write-Log "Output Dir: $OutputDir"
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
-Write-Log "项目根目录: $root"
+Write-Log "Project Root: $root"
 
-# 第一步：构建便携版本
 if (-not $SkipPortable) {
     Write-Log ""
-    Write-Log "========== 步骤 1: 构建便携版本 =========="
+    Write-Log "========== Step 1: Build Portable Version =========="
     $portableScript = Join-Path $PSScriptRoot "prepare\build_portable.ps1"
     
     if (-not (Test-Path $portableScript)) {
-        Write-Log "build_portable.ps1 未找到: $portableScript" "ERROR"
+        Write-Log "build_portable.ps1 not found: $portableScript" "ERROR"
         exit 1
     }
     
     try {
-        Write-Log "执行 build_portable.ps1..."
+        Write-Log "Executing build_portable.ps1..."
         $portableDir = & $portableScript -OutputDir $OutputDir
-        Write-Log "便携版本构建完成: $portableDir"
+        Write-Log "Portable version build completed: $portableDir"
     } catch {
-        Write-Log "便携版本构建失败: $_" "ERROR"
+        Write-Log "Portable version build failed: $_" "ERROR"
         exit 1
     }
 } else {
-    Write-Log "跳过便携版本构建"
+    Write-Log "Skipping portable version build"
     $portableDir = Join-Path $root $OutputDir
 }
 
-# 第二步：构建安装程序
 if (-not $SkipInstaller) {
     Write-Log ""
-    Write-Log "========== 步骤 2: 构建安装程序 =========="
+    Write-Log "========== Step 2: Build Installer =========="
     $installerScript = Join-Path $PSScriptRoot "build\build_installer.ps1"
     
     if (-not (Test-Path $installerScript)) {
-        Write-Log "build_installer.ps1 未找到: $installerScript" "ERROR"
+        Write-Log "build_installer.ps1 not found: $installerScript" "ERROR"
         exit 1
     }
     
     try {
-        Write-Log "执行 build_installer.ps1..."
+        Write-Log "Executing build_installer.ps1..."
         $args = @(
             "-Version", $Version,
             "-BackendPort", $BackendPort,
@@ -82,19 +79,18 @@ if (-not $SkipInstaller) {
         }
         
         & $installerScript @args
-        Write-Log "安装程序构建完成"
+        Write-Log "Installer build completed"
     } catch {
-        Write-Log "安装程序构建失败: $_" "ERROR"
+        Write-Log "Installer build failed: $_" "ERROR"
         exit 1
     }
 } else {
-    Write-Log "跳过安装程序构建"
+    Write-Log "Skipping installer build"
 }
 
 Write-Log ""
 Write-Log "=========================================="
-Write-Log "构建完成！"
+Write-Log "Build Completed!"
 Write-Log "=========================================="
-Write-Log "便携版本位置: $portableDir"
-Write-Log "安装程序位置: $(Join-Path $PSScriptRoot "nsis\TradingAgentsCNSetup-$Version.exe")"
-
+Write-Log "Portable Version: $portableDir"
+Write-Log "Installer: $(Join-Path $PSScriptRoot "nsis\TradingAgentsCNSetup-$Version.exe")"

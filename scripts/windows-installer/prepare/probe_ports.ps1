@@ -1,53 +1,49 @@
-param(
+﻿param(
     [int]$BackendPort = 8000,
     [int]$MongoPort = 27017,
     [int]$RedisPort = 6379,
     [int]$NginxPort = 80,
-    [int]$TimeoutSeconds = 10
+    [int]$TimeoutSeconds = 10,
+    [int]$MaxAttempts = 100
 )
 
-$ErrorActionPreference = "SilentlyContinue"
+$ErrorActionPreference = "Stop"
+
+function Write-Log {
+    param([string]$Message, [string]$Level = "INFO")
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    Write-Host "[$timestamp] [$Level] $Message"
+}
 
 function Probe-Port {
-    param(
-        [int]$Port,
-        [int]$MaxAttempts = 100,
-        [int]$TimeoutMs = 500
-    )
-
+    param([int]$Port)
     try {
-        # 快速检查端口是否被占用
         $connection = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue
-        if ($connection) {
-            # 端口被占用，寻找可用端口
-            for ($i = $Port + 1; $i -le ($Port + $MaxAttempts); $i++) {
-                $available = Get-NetTCPConnection -LocalPort $i -ErrorAction SilentlyContinue
-                if (-not $available) {
-                    return $i
-                }
-            }
-            # 如果找不到可用端口，返回原端口
-            return $Port
-        }
-        return $Port
-    }
-    catch {
-        # 如果出错，返回原端口
-        return $Port
+        return $connection -ne $null
+    } catch {
+        return $false
     }
 }
 
-# 并行探测所有端口以提高性能
-$result = [ordered]@{}
+Write-Log "Starting port detection..."
+Write-Log "Backend Port: $BackendPort"
+Write-Log "MongoDB Port: $MongoPort"
+Write-Log "Redis Port: $RedisPort"
+Write-Log "Nginx Port: $NginxPort"
 
-# 使用后台作业并行探测
+$result = @{
+    Backend = $BackendPort
+    Mongo = $MongoPort
+    Redis = $RedisPort
+    Nginx = $NginxPort
+}
+
 $jobs = @()
-$jobs += Start-Job -ScriptBlock { param($p) Probe-Port $p } -ArgumentList $BackendPort
-$jobs += Start-Job -ScriptBlock { param($p) Probe-Port $p } -ArgumentList $MongoPort
-$jobs += Start-Job -ScriptBlock { param($p) Probe-Port $p } -ArgumentList $RedisPort
-$jobs += Start-Job -ScriptBlock { param($p) Probe-Port $p } -ArgumentList $NginxPort
+$jobs += Start-Job -ScriptBlock { param($p) Get-NetTCPConnection -LocalPort $p -ErrorAction SilentlyContinue } -ArgumentList $BackendPort
+$jobs += Start-Job -ScriptBlock { param($p) Get-NetTCPConnection -LocalPort $p -ErrorAction SilentlyContinue } -ArgumentList $MongoPort
+$jobs += Start-Job -ScriptBlock { param($p) Get-NetTCPConnection -LocalPort $p -ErrorAction SilentlyContinue } -ArgumentList $RedisPort
+$jobs += Start-Job -ScriptBlock { param($p) Get-NetTCPConnection -LocalPort $p -ErrorAction SilentlyContinue } -ArgumentList $NginxPort
 
-# 等待所有作业完成（带超时）
 $timeout = (Get-Date).AddSeconds($TimeoutSeconds)
 $completed = 0
 while ((Get-Date) -lt $timeout -and $completed -lt 4) {
@@ -55,19 +51,33 @@ while ((Get-Date) -lt $timeout -and $completed -lt 4) {
     Start-Sleep -Milliseconds 100
 }
 
-# 收集结果
-$result.BackendPort = (Receive-Job -Job $jobs[0] -ErrorAction SilentlyContinue) -as [int]
-$result.MongoPort = (Receive-Job -Job $jobs[1] -ErrorAction SilentlyContinue) -as [int]
-$result.RedisPort = (Receive-Job -Job $jobs[2] -ErrorAction SilentlyContinue) -as [int]
-$result.NginxPort = (Receive-Job -Job $jobs[3] -ErrorAction SilentlyContinue) -as [int]
+$portMap = @{ 0 = "Backend"; 1 = "Mongo"; 2 = "Redis"; 3 = "Nginx" }
+$portValues = @($BackendPort, $MongoPort, $RedisPort, $NginxPort)
 
-# 清理作业
-$jobs | Remove-Job -Force -ErrorAction SilentlyContinue
+for ($i = 0; $i -lt 4; $i++) {
+    $job = $jobs[$i]
+    $portName = $portMap[$i]
+    $port = $portValues[$i]
+    
+    if ($job.State -eq "Completed") {
+        $output = Receive-Job -Job $job
+        if ($output) {
+            Write-Log "Port $port ($portName) is in use, finding alternative..."
+            for ($newPort = $port + 1; $newPort -le 65535; $newPort++) {
+                if (-not (Probe-Port $newPort)) {
+                    $result[$portName] = $newPort
+                    Write-Log "Found available port: $newPort for $portName"
+                    break
+                }
+            }
+        } else {
+            Write-Log "Port $port ($portName) is available"
+        }
+    } else {
+        Write-Log "Port detection timeout for $portName, using default: $port" "WARNING"
+    }
+    
+    Remove-Job -Job $job -Force
+}
 
-# 如果结果为空，使用默认值
-if (-not $result.BackendPort) { $result.BackendPort = $BackendPort }
-if (-not $result.MongoPort) { $result.MongoPort = $MongoPort }
-if (-not $result.RedisPort) { $result.RedisPort = $RedisPort }
-if (-not $result.NginxPort) { $result.NginxPort = $NginxPort }
-
-Write-Output (ConvertTo-Json $result)
+$result | ConvertTo-Json

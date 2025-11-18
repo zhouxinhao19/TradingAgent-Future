@@ -169,7 +169,5 @@ windows-installer/
 2. 在 `probe_ports.ps1` 中添加端口检测逻辑
 3. 在 `build_portable.ps1` 中添加相应的配置文件
 
-## 许可证
 
-MIT License
 
