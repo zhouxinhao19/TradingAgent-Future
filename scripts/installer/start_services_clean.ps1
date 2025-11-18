@@ -77,7 +77,7 @@ function Check-Port($Port, $ServiceName) {
     return $true
 }
 
-function Start-Proc($FilePath, $Arguments, $Name, $WaitSeconds = 3) {
+function Start-Proc($FilePath, $Arguments, $Name, $WaitSeconds = 3, $WorkingDirectory = $null) {
     Write-Host "Starting $Name..."
     Write-Host "  Command: $FilePath $Arguments"
     try {
@@ -88,6 +88,12 @@ function Start-Proc($FilePath, $Arguments, $Name, $WaitSeconds = 3) {
         $psi.CreateNoWindow = $true
         $psi.RedirectStandardOutput = $true
         $psi.RedirectStandardError = $true
+
+        # Set working directory if provided
+        if ($WorkingDirectory) {
+            $psi.WorkingDirectory = $WorkingDirectory
+            Write-Host "  Working Directory: $WorkingDirectory"
+        }
 
         $process = [System.Diagnostics.Process]::Start($psi)
         Write-Host "  Process started, waiting $WaitSeconds seconds..."
@@ -239,9 +245,9 @@ if (-not $SkipRedis -and (Test-Path -LiteralPath $redisExe)) {
     [System.IO.File]::WriteAllText($redisConf, ($conf -join "`n"), $utf8NoBom)
 
     # Redis needs more time to initialize, wait 5 seconds
-    # Use relative path to avoid Cygwin path conversion issues
+    # Use relative path with WorkingDirectory to avoid Cygwin path issues
     $redisConfRelative = "runtime\redis.conf"
-    $redisProc = Start-Proc -FilePath $redisExe -Arguments "`"$redisConfRelative`"" -Name 'Redis' -WaitSeconds 5
+    $redisProc = Start-Proc -FilePath $redisExe -Arguments "`"$redisConfRelative`"" -Name 'Redis' -WaitSeconds 5 -WorkingDirectory $root
 } else {
     Write-Host "Redis skipped or binary not found"
 }

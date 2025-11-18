@@ -24,7 +24,7 @@
 
 Name "${PRODUCT_NAME}"
 OutFile "TradingAgentsCNSetup-${PRODUCT_VERSION}.exe"
-InstallDir "$PROGRAMFILES\TradingAgentsCN"
+InstallDir "C:\TradingAgentsCN"
 RequestExecutionLevel admin
 SetDatablockOptimize on
 SetCompressor lzma
@@ -38,12 +38,15 @@ Var hMongoEdit
 Var hRedisEdit
 Var hNginxEdit
 Var hDetectBtn
+Var LaunchCheckbox
+Var LaunchCheckboxState
 
 Function .onInit
  StrCpy $BackendPort "${BACKEND_PORT}"
  StrCpy $MongoPort "${MONGO_PORT}"
  StrCpy $RedisPort "${REDIS_PORT}"
  StrCpy $NginxPort "${NGINX_PORT}"
+ StrCpy $LaunchCheckboxState ${BST_CHECKED}
 FunctionEnd
 
 Function PortsPage
@@ -164,12 +167,22 @@ Function PortsPageLeave
  ${EndIf}
 FunctionEnd
 
+!define MUI_FINISHPAGE_RUN
+!define MUI_FINISHPAGE_RUN_TEXT "Launch TradingAgentsCN"
+!define MUI_FINISHPAGE_RUN_FUNCTION "LaunchApplication"
+
 Page custom PortsPage PortsPageLeave
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
-!insertmacro MUI_LANGUAGE "SimpChinese"
+!insertmacro MUI_LANGUAGE "English"
+
+Function LaunchApplication
+ ; Launch with admin privileges
+ ExecShell "runas" "powershell" '-ExecutionPolicy Bypass -NoExit -File "$INSTDIR\start_all.ps1"'
+FunctionEnd
 
 Section
 SetOutPath "$INSTDIR"
@@ -193,21 +206,32 @@ Delete "$INSTDIR\TradingAgentsCN-Portable-latest.zip"
 
 ; Update configuration files with user-selected ports
 DetailPrint "Updating configuration..."
-nsExec::ExecToLog 'powershell -ExecutionPolicy Bypass -Command "$envFile = \"$INSTDIR\.env\"; if (Test-Path $envFile) { $content = Get-Content $envFile -Raw -Encoding UTF8; $content = $content -replace \"BACKEND_PORT=.*\", \"BACKEND_PORT=$BackendPort\"; $content = $content -replace \"MONGO_PORT=.*\", \"MONGO_PORT=$MongoPort\"; $content = $content -replace \"REDIS_PORT=.*\", \"REDIS_PORT=$RedisPort\"; $content = $content -replace \"NGINX_PORT=.*\", \"NGINX_PORT=$NginxPort\"; $content | Set-Content $envFile -Encoding UTF8 -NoNewline }"'
 
-; Create shortcuts
+; Update .env file (use PORT for backend, not BACKEND_PORT)
+nsExec::ExecToLog 'powershell -ExecutionPolicy Bypass -Command "$$envFile = \"$INSTDIR\.env\"; if (Test-Path $$envFile) { $$content = Get-Content $$envFile -Raw -Encoding UTF8; $$content = $$content -replace \"PORT=.*\", \"PORT=$BackendPort\"; $$content = $$content -replace \"API_PORT=.*\", \"API_PORT=$BackendPort\"; $$content = $$content -replace \"MONGODB_PORT=.*\", \"MONGODB_PORT=$MongoPort\"; $$content = $$content -replace \"REDIS_PORT=.*\", \"REDIS_PORT=$RedisPort\"; $$content = $$content -replace \"NGINX_PORT=.*\", \"NGINX_PORT=$NginxPort\"; $$utf8 = New-Object System.Text.UTF8Encoding $$false; [System.IO.File]::WriteAllText($$envFile, $$content, $$utf8) }"'
+
+; Update Redis configuration
+DetailPrint "Updating Redis configuration..."
+nsExec::ExecToLog 'powershell -ExecutionPolicy Bypass -Command "$$redisConf = \"$INSTDIR\runtime\redis.conf\"; if (Test-Path $$redisConf) { $$content = Get-Content $$redisConf -Raw -Encoding UTF8; $$content = $$content -replace \"^port\\s+\\d+\", \"port $RedisPort\"; $$utf8 = New-Object System.Text.UTF8Encoding $$false; [System.IO.File]::WriteAllText($$redisConf, $$content, $$utf8) }"'
+
+; Update MongoDB configuration
+DetailPrint "Updating MongoDB configuration..."
+nsExec::ExecToLog 'powershell -ExecutionPolicy Bypass -Command "$$mongoConf = \"$INSTDIR\runtime\mongodb.conf\"; if (Test-Path $$mongoConf) { $$content = Get-Content $$mongoConf -Raw -Encoding UTF8; $$content = $$content -replace \"port:\\s*\\d+\", \"port: $MongoPort\"; $$utf8 = New-Object System.Text.UTF8Encoding $$false; [System.IO.File]::WriteAllText($$mongoConf, $$content, $$utf8) }"'
+
+; Update Nginx configuration
+DetailPrint "Updating Nginx configuration..."
+nsExec::ExecToLog 'powershell -ExecutionPolicy Bypass -Command "$$nginxConf = \"$INSTDIR\runtime\nginx.conf\"; if (Test-Path $$nginxConf) { $$content = Get-Content $$nginxConf -Raw -Encoding UTF8; $$content = $$content -replace \"listen\\s+\\d+;\", \"listen       $NginxPort;\"; $$utf8 = New-Object System.Text.UTF8Encoding $$false; [System.IO.File]::WriteAllText($$nginxConf, $$content, $$utf8) }"'
+
+; Create shortcuts with admin privileges
 DetailPrint "Creating shortcuts..."
 CreateDirectory "$SMPROGRAMS\TradingAgentsCN"
 
-; Start shortcut with working directory
-SetOutPath "$INSTDIR"
-CreateShortcut "$SMPROGRAMS\TradingAgentsCN\Start TradingAgentsCN.lnk" "powershell.exe" '-ExecutionPolicy Bypass -NoExit -File "$INSTDIR\start_all.ps1"'
+; Create shortcuts using PowerShell to set RunAsAdministrator flag
+nsExec::ExecToLog 'powershell -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut(\"$SMPROGRAMS\TradingAgentsCN\Start TradingAgentsCN.lnk\"); $s.TargetPath = \"powershell.exe\"; $s.Arguments = \"-ExecutionPolicy Bypass -NoExit -File `\"$INSTDIR\start_all.ps1`\"\"; $s.WorkingDirectory = \"$INSTDIR\"; $s.Save(); $bytes = [System.IO.File]::ReadAllBytes($s.FullName); $bytes[0x15] = $bytes[0x15] -bor 0x20; [System.IO.File]::WriteAllBytes($s.FullName, $bytes)"'
 
-; Stop shortcut
-CreateShortcut "$SMPROGRAMS\TradingAgentsCN\Stop TradingAgentsCN.lnk" "powershell.exe" '-ExecutionPolicy Bypass -NoExit -File "$INSTDIR\stop_all.ps1"'
+nsExec::ExecToLog 'powershell -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut(\"$SMPROGRAMS\TradingAgentsCN\Stop TradingAgentsCN.lnk\"); $s.TargetPath = \"powershell.exe\"; $s.Arguments = \"-ExecutionPolicy Bypass -NoExit -File `\"$INSTDIR\stop_all.ps1`\"\"; $s.WorkingDirectory = \"$INSTDIR\"; $s.Save(); $bytes = [System.IO.File]::ReadAllBytes($s.FullName); $bytes[0x15] = $bytes[0x15] -bor 0x20; [System.IO.File]::WriteAllBytes($s.FullName, $bytes)"'
 
-; Desktop shortcut
-CreateShortcut "$DESKTOP\TradingAgentsCN.lnk" "powershell.exe" '-ExecutionPolicy Bypass -NoExit -File "$INSTDIR\start_all.ps1"'
+nsExec::ExecToLog 'powershell -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut(\"$DESKTOP\TradingAgentsCN.lnk\"); $s.TargetPath = \"powershell.exe\"; $s.Arguments = \"-ExecutionPolicy Bypass -NoExit -File `\"$INSTDIR\start_all.ps1`\"\"; $s.WorkingDirectory = \"$INSTDIR\"; $s.Save(); $bytes = [System.IO.File]::ReadAllBytes($s.FullName); $bytes[0x15] = $bytes[0x15] -bor 0x20; [System.IO.File]::WriteAllBytes($s.FullName, $bytes)"'
 
 ; Write uninstaller
 WriteUninstaller "$INSTDIR\Uninstall.exe"
