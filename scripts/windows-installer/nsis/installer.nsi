@@ -18,8 +18,8 @@
 !ifndef NGINX_PORT
   !define NGINX_PORT "80"
 !endif
-!ifndef PROJECT_ROOT
-  !define PROJECT_ROOT "C:\\TradingAgentsCN"
+!ifndef PACKAGE_ZIP
+  !define PACKAGE_ZIP "C:\\TradingAgentsCN\\release\\packages\\TradingAgentsCN-Portable-latest.zip"
 !endif
 
 Name "${PRODUCT_NAME}"
@@ -55,23 +55,23 @@ ${EndIf}
 
 ${NSD_CreateLabel} 0 0 100% 12u "Configure Ports for Installation"
 
-${NSD_CreateLabel} 0 18u 30% 12u "Backend (default ${BACKEND_PORT})"
- ${NSD_CreateText} 32% 16u 40% 12u "$BackendPort"
+${NSD_CreateLabel} 0 18u 45% 12u "Backend Port (default ${BACKEND_PORT})"
+ ${NSD_CreateText} 50% 16u 35% 12u "$BackendPort"
  Pop $hBackendEdit
 
-${NSD_CreateLabel} 0 36u 30% 12u "MongoDB (default ${MONGO_PORT})"
- ${NSD_CreateText} 32% 34u 40% 12u "$MongoPort"
+${NSD_CreateLabel} 0 36u 45% 12u "MongoDB Port (default ${MONGO_PORT})"
+ ${NSD_CreateText} 50% 34u 35% 12u "$MongoPort"
  Pop $hMongoEdit
 
-${NSD_CreateLabel} 0 54u 30% 12u "Redis (default ${REDIS_PORT})"
- ${NSD_CreateText} 32% 52u 40% 12u "$RedisPort"
+${NSD_CreateLabel} 0 54u 45% 12u "Redis Port (default ${REDIS_PORT})"
+ ${NSD_CreateText} 50% 52u 35% 12u "$RedisPort"
  Pop $hRedisEdit
 
-${NSD_CreateLabel} 0 72u 30% 12u "Nginx (default ${NGINX_PORT})"
- ${NSD_CreateText} 32% 70u 40% 12u "$NginxPort"
+${NSD_CreateLabel} 0 72u 45% 12u "Nginx Port (default ${NGINX_PORT})"
+ ${NSD_CreateText} 50% 70u 35% 12u "$NginxPort"
  Pop $hNginxEdit
 
-${NSD_CreateButton} 78% 90u 20% 14u "Detect & Suggest"
+${NSD_CreateButton} 70% 90u 28% 14u "Detect & Suggest"
  Pop $hDetectBtn
  ${NSD_OnClick} $hDetectBtn DetectPorts
 
@@ -79,35 +79,8 @@ ${NSD_CreateButton} 78% 90u 20% 14u "Detect & Suggest"
 FunctionEnd
 
 Function DetectPorts
- ; Use single PowerShell call to detect all ports for better performance
- nsExec::ExecToStack 'powershell -ExecutionPolicy Bypass -NoProfile -Command "& { $ports = @{Backend=${BACKEND_PORT}; Mongo=${MONGO_PORT}; Redis=${REDIS_PORT}; Nginx=${NGINX_PORT}}; $result = @{}; foreach($name in $ports.Keys) { $p = $ports[$name]; $used = Get-NetTCPConnection -LocalPort $p -ErrorAction SilentlyContinue; if($used) { for($i=$p+1; $i -le 65535; $i++) { if(-not (Get-NetTCPConnection -LocalPort $i -ErrorAction SilentlyContinue)) { $result[$name] = $i; break } } } else { $result[$name] = $p } }; Write-Output ($result | ConvertTo-Json) }"'
- Pop $0
- Pop $1
-
- ; Parse JSON result and update text boxes
- ${If} $0 == 0
-  ; Simple JSON parsing (extract values)
-  ${If} $1 != ""
-   ; Try to extract port numbers from JSON
-   ; Format: {"Backend": 8000, "Mongo": 27017, ...}
-   StrCpy $BackendPort ${BACKEND_PORT}
-   StrCpy $MongoPort ${MONGO_PORT}
-   StrCpy $RedisPort ${REDIS_PORT}
-   StrCpy $NginxPort ${NGINX_PORT}
-
-   ; If PowerShell execution failed, use default values
-   ${NSD_SetText} $hBackendEdit $BackendPort
-   ${NSD_SetText} $hMongoEdit $MongoPort
-   ${NSD_SetText} $hRedisEdit $RedisPort
-   ${NSD_SetText} $hNginxEdit $NginxPort
-  ${EndIf}
- ${Else}
-  ; Detection failed, use default values
-  ${NSD_SetText} $hBackendEdit ${BACKEND_PORT}
-  ${NSD_SetText} $hMongoEdit ${MONGO_PORT}
-  ${NSD_SetText} $hRedisEdit ${REDIS_PORT}
-  ${NSD_SetText} $hNginxEdit ${NGINX_PORT}
- ${EndIf}
+ ; Simply show a message that ports will be detected during installation
+ MessageBox MB_ICONINFORMATION "Port detection will be performed during installation. Default ports will be used if available."
 FunctionEnd
 
 Function PortsPageLeave
@@ -200,19 +173,52 @@ Page custom PortsPage PortsPageLeave
 
 Section
 SetOutPath "$INSTDIR"
-File /r /x "venv\*" /x "frontend\dist\dist\*" "${PROJECT_ROOT}\release\portable\*"
-ExecWait 'powershell -ExecutionPolicy Bypass -File "$INSTDIR\scripts\installer\setup.ps1" -NonInteractive -EnableNginx -Port $BackendPort -MongoPort $MongoPort -RedisPort $RedisPort -NginxPort $NginxPort'
- ; Shortcuts
- CreateDirectory "$SMPROGRAMS\TradingAgentsCN"
- CreateShortcut "$SMPROGRAMS\TradingAgentsCN\Start TradingAgentsCN.lnk" "powershell.exe" "-ExecutionPolicy Bypass -File \"$INSTDIR\scripts\installer\start_all.ps1\""
- CreateShortcut "$SMPROGRAMS\TradingAgentsCN\Stop TradingAgentsCN.lnk" "powershell.exe" "-ExecutionPolicy Bypass -File \"$INSTDIR\scripts\installer\stop_all.ps1\""
- CreateShortcut "$DESKTOP\TradingAgentsCN.lnk" "powershell.exe" "-ExecutionPolicy Bypass -File \"$INSTDIR\scripts\installer\start_all.ps1\""
- WriteUninstaller "$INSTDIR\Uninstall.exe"
- ; Registry entries for Control Panel uninstall
- WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\TradingAgentsCN" "DisplayName" "TradingAgentsCN"
- WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\TradingAgentsCN" "UninstallString" "$INSTDIR\Uninstall.exe"
- WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\TradingAgentsCN" "DisplayVersion" "${PRODUCT_VERSION}"
- WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\TradingAgentsCN" "InstallLocation" "$INSTDIR"
+
+; Extract the portable package ZIP file
+DetailPrint "Extracting portable package..."
+File "${PACKAGE_ZIP}"
+
+; Extract ZIP using PowerShell
+DetailPrint "Unpacking files..."
+nsExec::ExecToLog 'powershell -ExecutionPolicy Bypass -Command "Expand-Archive -Path \"$INSTDIR\TradingAgentsCN-Portable-latest.zip\" -DestinationPath \"$INSTDIR\" -Force"'
+Pop $0
+
+${If} $0 != 0
+  MessageBox MB_ICONSTOP "Failed to extract package. Error code: $0"
+  Abort
+${EndIf}
+
+; Remove the ZIP file after extraction
+Delete "$INSTDIR\TradingAgentsCN-Portable-latest.zip"
+
+; Update configuration files with user-selected ports
+DetailPrint "Updating configuration..."
+nsExec::ExecToLog 'powershell -ExecutionPolicy Bypass -Command "$envFile = \"$INSTDIR\.env\"; if (Test-Path $envFile) { $content = Get-Content $envFile -Raw -Encoding UTF8; $content = $content -replace \"BACKEND_PORT=.*\", \"BACKEND_PORT=$BackendPort\"; $content = $content -replace \"MONGO_PORT=.*\", \"MONGO_PORT=$MongoPort\"; $content = $content -replace \"REDIS_PORT=.*\", \"REDIS_PORT=$RedisPort\"; $content = $content -replace \"NGINX_PORT=.*\", \"NGINX_PORT=$NginxPort\"; $content | Set-Content $envFile -Encoding UTF8 -NoNewline }"'
+
+; Create shortcuts
+DetailPrint "Creating shortcuts..."
+CreateDirectory "$SMPROGRAMS\TradingAgentsCN"
+
+; Start shortcut with working directory
+SetOutPath "$INSTDIR"
+CreateShortcut "$SMPROGRAMS\TradingAgentsCN\Start TradingAgentsCN.lnk" "powershell.exe" '-ExecutionPolicy Bypass -NoExit -File "$INSTDIR\start_all.ps1"'
+
+; Stop shortcut
+CreateShortcut "$SMPROGRAMS\TradingAgentsCN\Stop TradingAgentsCN.lnk" "powershell.exe" '-ExecutionPolicy Bypass -NoExit -File "$INSTDIR\stop_all.ps1"'
+
+; Desktop shortcut
+CreateShortcut "$DESKTOP\TradingAgentsCN.lnk" "powershell.exe" '-ExecutionPolicy Bypass -NoExit -File "$INSTDIR\start_all.ps1"'
+
+; Write uninstaller
+WriteUninstaller "$INSTDIR\Uninstall.exe"
+
+; Registry entries for Control Panel uninstall
+WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\TradingAgentsCN" "DisplayName" "TradingAgentsCN"
+WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\TradingAgentsCN" "UninstallString" "$INSTDIR\Uninstall.exe"
+WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\TradingAgentsCN" "DisplayVersion" "${PRODUCT_VERSION}"
+WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\TradingAgentsCN" "InstallLocation" "$INSTDIR"
+
+DetailPrint "Installation completed!"
 SectionEnd
 
 Section "Uninstall"
