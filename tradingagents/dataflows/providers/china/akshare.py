@@ -1066,8 +1066,10 @@ class AKShareProvider(BaseStockDataProvider):
                     except KeyError as e:
                         # 东方财富网接口变更或反爬虫拦截，返回的字段结构改变
                         if str(e) == "'cmsArticleWebOld'":
-                            self.logger.warning(f"⚠️ {symbol} AKShare新闻接口被拦截（可能是反爬虫），已自动添加浏览器请求头和延迟")
-                            # 不再重试，因为已经添加了浏览器请求头，如果还失败说明接口真的变了
+                            self.logger.error(f"❌ {symbol} AKShare新闻接口返回数据结构异常: 缺少 'cmsArticleWebOld' 字段")
+                            self.logger.error(f"   这通常是因为：1) 反爬虫拦截 2) 接口变更 3) 网络问题")
+                            self.logger.error(f"   建议：检查 AKShare 版本是否为最新 (当前要求 >=1.17.86)")
+                            # 返回空列表，避免程序崩溃
                             return []
                         else:
                             if attempt < max_retries - 1:

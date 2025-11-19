@@ -10,7 +10,7 @@ from typing import Dict, Any, List, Optional
 from app.core.database import get_mongo_db
 from app.services.historical_data_service import get_historical_data_service
 from app.services.news_data_service import get_news_data_service
-from tradingagents.dataflows.providers.china.akshare import AKShareProvider
+from tradingagents.dataflows.providers.china.akshare import get_akshare_provider
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +46,8 @@ class AKShareSyncService:
             # 初始化新闻数据服务
             self.news_service = await get_news_data_service()
 
-            # 初始化AKShare提供器
-            self.provider = AKShareProvider()
+            # 初始化AKShare提供器（使用全局单例，确保monkey patch生效）
+            self.provider = get_akshare_provider()
 
             # 测试连接
             if not await self.provider.test_connection():
