@@ -38,35 +38,55 @@ class AKShareProvider(BaseStockDataProvider):
         try:
             import akshare as ak
             import requests
+            import time
 
-            # 修复AKShare的bug：设置requests的默认headers
+            # 修复AKShare的bug：设置requests的默认headers，并添加请求延迟
             # AKShare的stock_news_em()函数没有设置必要的headers，导致API返回空响应
             if not hasattr(requests, '_akshare_headers_patched'):
                 original_get = requests.get
+                last_request_time = {'time': 0}  # 使用字典以便在闭包中修改
 
                 def patched_get(url, **kwargs):
                     """
-                    包装requests.get方法，自动添加必要的headers
+                    包装requests.get方法，自动添加必要的headers和请求延迟
                     修复AKShare stock_news_em()函数缺少headers的问题
                     """
+                    # 添加请求延迟，避免被反爬虫封禁
+                    # 只对东方财富网的请求添加延迟
+                    if 'eastmoney.com' in url:
+                        current_time = time.time()
+                        time_since_last_request = current_time - last_request_time['time']
+                        if time_since_last_request < 0.5:  # 至少间隔0.5秒
+                            time.sleep(0.5 - time_since_last_request)
+                        last_request_time['time'] = time.time()
+
+                    # 设置浏览器请求头
                     if 'headers' not in kwargs or kwargs['headers'] is None:
                         kwargs['headers'] = {
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                            'Referer': 'http://quote.eastmoney.com/'
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+                            'Accept-Encoding': 'gzip, deflate, br',
+                            'Referer': 'https://www.eastmoney.com/',
+                            'Connection': 'keep-alive',
                         }
                     elif isinstance(kwargs['headers'], dict):
                         # 如果已有headers，确保包含必要的字段
                         if 'User-Agent' not in kwargs['headers']:
-                            kwargs['headers']['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                            kwargs['headers']['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
                         if 'Referer' not in kwargs['headers']:
-                            kwargs['headers']['Referer'] = 'http://quote.eastmoney.com/'
+                            kwargs['headers']['Referer'] = 'https://www.eastmoney.com/'
+                        if 'Accept' not in kwargs['headers']:
+                            kwargs['headers']['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+                        if 'Accept-Language' not in kwargs['headers']:
+                            kwargs['headers']['Accept-Language'] = 'zh-CN,zh;q=0.9,en;q=0.8'
 
                     return original_get(url, **kwargs)
 
                 # 应用patch
                 requests.get = patched_get
                 requests._akshare_headers_patched = True
-                logger.debug("🔧 已修复AKShare的headers问题")
+                logger.info("🔧 已修复AKShare的headers问题，并添加请求延迟（0.5秒）")
 
             self.ak = ak
             self.connected = True
@@ -1043,6 +1063,20 @@ class AKShareProvider(BaseStockDataProvider):
                         else:
                             self.logger.error(f"❌ {symbol} 获取新闻失败(JSON解析错误): {e}")
                             return []
+                    except KeyError as e:
+                        # 东方财富网接口变更或反爬虫拦截，返回的字段结构改变
+                        if str(e) == "'cmsArticleWebOld'":
+                            self.logger.warning(f"⚠️ {symbol} AKShare新闻接口被拦截（可能是反爬虫），已自动添加浏览器请求头和延迟")
+                            # 不再重试，因为已经添加了浏览器请求头，如果还失败说明接口真的变了
+                            return []
+                        else:
+                            if attempt < max_retries - 1:
+                                self.logger.warning(f"⚠️ {symbol} 第{attempt+1}次获取新闻失败(字段错误): {e}，{retry_delay}秒后重试...")
+                                await asyncio.sleep(retry_delay)
+                                retry_delay *= 2
+                            else:
+                                self.logger.error(f"❌ {symbol} 获取新闻失败(字段错误): {e}")
+                                return []
                     except Exception as e:
                         if attempt < max_retries - 1:
                             self.logger.warning(f"⚠️ {symbol} 第{attempt+1}次获取新闻失败: {e}，{retry_delay}秒后重试...")
