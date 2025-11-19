@@ -16,7 +16,7 @@ langgraph
 chromadb
 setuptools
 backtrader
-akshare
+akshare>=1.17.86
 tushare
 baostock
 finnhub-python

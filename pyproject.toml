@@ -37,7 +37,7 @@ dependencies = [
     "concurrent-log-handler>=0.9.24",  # Windows 友好的日志轮转处理器
 
     # 数据源和金融数据
-    "akshare>=1.16.98",
+    "akshare>=1.17.86",
     "backtrader>=1.9.78.123",
     "baostock>=0.8.8",
     "eodhd>=1.0.32",
