@@ -21,9 +21,12 @@
 !ifndef PACKAGE_ZIP
   !define PACKAGE_ZIP "C:\\TradingAgentsCN\\release\\packages\\TradingAgentsCN-Portable-latest.zip"
 !endif
+!ifndef OUTPUT_DIR
+  !define OUTPUT_DIR "C:\\TradingAgentsCN\\release\\packages"
+!endif
 
 Name "${PRODUCT_NAME}"
-OutFile "TradingAgentsCNSetup-${PRODUCT_VERSION}.exe"
+OutFile "${OUTPUT_DIR}\TradingAgentsCNSetup-${PRODUCT_VERSION}.exe"
 InstallDir "C:\TradingAgentsCN"
 RequestExecutionLevel admin
 SetDatablockOptimize on
@@ -74,17 +77,9 @@ ${NSD_CreateLabel} 0 72u 45% 12u "Nginx Port (default ${NGINX_PORT})"
  ${NSD_CreateText} 50% 70u 35% 12u "$NginxPort"
  Pop $hNginxEdit
 
-${NSD_CreateButton} 70% 90u 28% 14u "Detect & Suggest"
- Pop $hDetectBtn
- ${NSD_OnClick} $hDetectBtn DetectPorts
-
  nsDialogs::Show
 FunctionEnd
 
-Function DetectPorts
- ; Simply show a message that ports will be detected during installation
- MessageBox MB_ICONINFORMATION "Port detection will be performed during installation. Default ports will be used if available."
-FunctionEnd
 
 Function PortsPageLeave
  ${NSD_GetText} $hBackendEdit $BackendPort
@@ -165,7 +160,9 @@ Function PortsPageLeave
   MessageBox MB_ICONSTOP "Redis port duplicates Nginx port"
   Abort
  ${EndIf}
-FunctionEnd
+
+ 
+ FunctionEnd
 
 !define MUI_FINISHPAGE_RUN
 !define MUI_FINISHPAGE_RUN_TEXT "Launch TradingAgentsCN"
@@ -227,11 +224,12 @@ DetailPrint "Creating shortcuts..."
 CreateDirectory "$SMPROGRAMS\TradingAgentsCN"
 
 ; Create shortcuts using PowerShell to set RunAsAdministrator flag
-nsExec::ExecToLog 'powershell -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut(\"$SMPROGRAMS\TradingAgentsCN\Start TradingAgentsCN.lnk\"); $s.TargetPath = \"powershell.exe\"; $s.Arguments = \"-ExecutionPolicy Bypass -NoExit -File `\"$INSTDIR\start_all.ps1`\"\"; $s.WorkingDirectory = \"$INSTDIR\"; $s.Save(); $bytes = [System.IO.File]::ReadAllBytes($s.FullName); $bytes[0x15] = $bytes[0x15] -bor 0x20; [System.IO.File]::WriteAllBytes($s.FullName, $bytes)"'
+; Fix: Change directory first, then execute script (simulate manual startup)
+nsExec::ExecToLog 'powershell -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut(\"$SMPROGRAMS\TradingAgentsCN\Start TradingAgentsCN.lnk\"); $s.TargetPath = \"powershell.exe\"; $s.Arguments = \"-ExecutionPolicy Bypass -NoExit -Command `\"Set-Location -Path ''$INSTDIR''; & ''$INSTDIR\start_all.ps1''`\"\"; $s.WorkingDirectory = \"$INSTDIR\"; $s.Save(); $bytes = [System.IO.File]::ReadAllBytes($s.FullName); $bytes[0x15] = $bytes[0x15] -bor 0x20; [System.IO.File]::WriteAllBytes($s.FullName, $bytes)"'
 
-nsExec::ExecToLog 'powershell -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut(\"$SMPROGRAMS\TradingAgentsCN\Stop TradingAgentsCN.lnk\"); $s.TargetPath = \"powershell.exe\"; $s.Arguments = \"-ExecutionPolicy Bypass -NoExit -File `\"$INSTDIR\stop_all.ps1`\"\"; $s.WorkingDirectory = \"$INSTDIR\"; $s.Save(); $bytes = [System.IO.File]::ReadAllBytes($s.FullName); $bytes[0x15] = $bytes[0x15] -bor 0x20; [System.IO.File]::WriteAllBytes($s.FullName, $bytes)"'
+nsExec::ExecToLog 'powershell -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut(\"$SMPROGRAMS\TradingAgentsCN\Stop TradingAgentsCN.lnk\"); $s.TargetPath = \"powershell.exe\"; $s.Arguments = \"-ExecutionPolicy Bypass -NoExit -Command `\"Set-Location -Path ''$INSTDIR''; & ''$INSTDIR\stop_all.ps1''`\"\"; $s.WorkingDirectory = \"$INSTDIR\"; $s.Save(); $bytes = [System.IO.File]::ReadAllBytes($s.FullName); $bytes[0x15] = $bytes[0x15] -bor 0x20; [System.IO.File]::WriteAllBytes($s.FullName, $bytes)"'
 
-nsExec::ExecToLog 'powershell -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut(\"$DESKTOP\TradingAgentsCN.lnk\"); $s.TargetPath = \"powershell.exe\"; $s.Arguments = \"-ExecutionPolicy Bypass -NoExit -File `\"$INSTDIR\start_all.ps1`\"\"; $s.WorkingDirectory = \"$INSTDIR\"; $s.Save(); $bytes = [System.IO.File]::ReadAllBytes($s.FullName); $bytes[0x15] = $bytes[0x15] -bor 0x20; [System.IO.File]::WriteAllBytes($s.FullName, $bytes)"'
+nsExec::ExecToLog 'powershell -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut(\"$DESKTOP\TradingAgentsCN.lnk\"); $s.TargetPath = \"powershell.exe\"; $s.Arguments = \"-ExecutionPolicy Bypass -NoExit -Command `\"Set-Location -Path ''$INSTDIR''; & ''$INSTDIR\start_all.ps1''`\"\"; $s.WorkingDirectory = \"$INSTDIR\"; $s.Save(); $bytes = [System.IO.File]::ReadAllBytes($s.FullName); $bytes[0x15] = $bytes[0x15] -bor 0x20; [System.IO.File]::WriteAllBytes($s.FullName, $bytes)"'
 
 ; Write uninstaller
 WriteUninstaller "$INSTDIR\Uninstall.exe"
