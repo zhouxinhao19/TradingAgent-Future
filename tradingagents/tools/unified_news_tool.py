@@ -217,8 +217,8 @@ class UnifiedNewsAnalyzer:
                     # 定义异步获取新闻任务
                     async def get_news_task():
                         try:
-                            # 动态导入 AKShare provider
-                            from tradingagents.dataflows.providers.akshare_provider import AKShareProvider
+                            # 动态导入 AKShare provider（正确的导入路径）
+                            from tradingagents.dataflows.providers.china.akshare import AKShareProvider
 
                             # 创建 provider 实例
                             provider = AKShareProvider()
