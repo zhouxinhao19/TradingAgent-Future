@@ -197,6 +197,7 @@ class UnifiedNewsAnalyzer:
         """
         try:
             import asyncio
+            import concurrent.futures
 
             # 标准化股票代码（去除后缀）
             clean_code = stock_code.replace('.SH', '').replace('.SZ', '').replace('.SS', '')\
@@ -204,72 +205,66 @@ class UnifiedNewsAnalyzer:
 
             logger.info(f"[统一新闻工具] 🔄 开始同步 {clean_code} 的新闻...")
 
-            # 定义异步同步任务
-            async def sync_task():
+            # 🔥 始终在新线程中运行，避免事件循环冲突
+            def run_sync_in_new_thread():
+                """在新线程中创建新的事件循环并运行同步任务"""
+                # 创建新的事件循环
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+
                 try:
-                    # 动态导入，避免循环依赖
-                    from app.worker.akshare_sync_service import get_akshare_sync_service
-                    from app.services.news_data_service import get_news_data_service
+                    # 定义异步同步任务
+                    async def sync_task():
+                        try:
+                            # 动态导入，避免循环依赖
+                            from app.worker.akshare_sync_service import get_akshare_sync_service
+                            from app.services.news_data_service import get_news_data_service
 
-                    sync_service = await get_akshare_sync_service()
-                    news_service = await get_news_data_service()
+                            sync_service = await get_akshare_sync_service()
+                            news_service = await get_news_data_service()
 
-                    # 调用 provider 直接获取新闻
-                    news_data = await sync_service.provider.get_stock_news(
-                        symbol=clean_code,
-                        limit=max_news
-                    )
+                            # 调用 provider 直接获取新闻
+                            news_data = await sync_service.provider.get_stock_news(
+                                symbol=clean_code,
+                                limit=max_news
+                            )
 
-                    if news_data:
-                        # 保存到数据库
-                        saved_count = await news_service.save_news_data(
-                            news_data=news_data,
-                            data_source="akshare",
-                            market="CN"
-                        )
-                        logger.info(f"[统一新闻工具] ✅ 同步成功: {saved_count} 条新闻")
-                        return saved_count > 0
-                    else:
-                        logger.warning(f"[统一新闻工具] ⚠️ 未获取到新闻数据")
-                        return False
+                            if news_data:
+                                # 保存到数据库
+                                saved_count = await news_service.save_news_data(
+                                    news_data=news_data,
+                                    data_source="akshare",
+                                    market="CN"
+                                )
+                                logger.info(f"[统一新闻工具] ✅ 同步成功: {saved_count} 条新闻")
+                                return saved_count > 0
+                            else:
+                                logger.warning(f"[统一新闻工具] ⚠️ 未获取到新闻数据")
+                                return False
 
-                except Exception as e:
-                    logger.error(f"[统一新闻工具] ❌ 同步任务执行失败: {e}")
-                    import traceback
-                    logger.error(traceback.format_exc())
-                    return False
+                        except Exception as e:
+                            logger.error(f"[统一新闻工具] ❌ 同步任务执行失败: {e}")
+                            import traceback
+                            logger.error(traceback.format_exc())
+                            return False
 
-            # 🔥 检查是否在事件循环中
-            try:
-                loop = asyncio.get_running_loop()
-                # 如果在事件循环中，不能使用 asyncio.run()
-                # 需要使用同步方式等待异步任务
-                logger.info(f"[统一新闻工具] 检测到运行中的事件循环，使用同步等待")
+                    # 在新的事件循环中运行任务
+                    return new_loop.run_until_complete(sync_task())
 
-                # 使用 asyncio.ensure_future 创建任务并等待
-                import concurrent.futures
-                import threading
+                finally:
+                    # 清理事件循环
+                    new_loop.close()
 
-                # 在新线程中运行事件循环
-                def run_in_thread():
-                    new_loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(new_loop)
-                    try:
-                        return new_loop.run_until_complete(sync_task())
-                    finally:
-                        new_loop.close()
-
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(run_in_thread)
-                    result = future.result(timeout=30)  # 30秒超时
-                    return result
-
-            except RuntimeError:
-                # 如果没有运行中的事件循环，直接使用 asyncio.run()
-                logger.info(f"[统一新闻工具] 没有运行中的事件循环，创建新的事件循环")
-                result = asyncio.run(sync_task())
+            # 在线程池中执行
+            logger.info(f"[统一新闻工具] 在新线程中运行同步任务，避免事件循环冲突")
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(run_sync_in_new_thread)
+                result = future.result(timeout=30)  # 30秒超时
                 return result
 
+        except concurrent.futures.TimeoutError:
+            logger.error(f"[统一新闻工具] ❌ 同步新闻超时（30秒）")
+            return False
         except Exception as e:
             logger.error(f"[统一新闻工具] ❌ 同步新闻失败: {e}")
             import traceback
