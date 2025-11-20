@@ -187,6 +187,7 @@ class UnifiedNewsAnalyzer:
     def _sync_news_from_akshare(self, stock_code: str, max_news: int = 10) -> bool:
         """
         从AKShare同步新闻到数据库（同步方法）
+        使用同步的数据库客户端和新线程中的事件循环，避免事件循环冲突
 
         Args:
             stock_code: 股票代码
@@ -205,7 +206,7 @@ class UnifiedNewsAnalyzer:
 
             logger.info(f"[统一新闻工具] 🔄 开始同步 {clean_code} 的新闻...")
 
-            # 🔥 始终在新线程中运行，避免事件循环冲突
+            # 🔥 在新线程中运行，使用同步数据库客户端
             def run_sync_in_new_thread():
                 """在新线程中创建新的事件循环并运行同步任务"""
                 # 创建新的事件循环
@@ -213,43 +214,50 @@ class UnifiedNewsAnalyzer:
                 asyncio.set_event_loop(new_loop)
 
                 try:
-                    # 定义异步同步任务
-                    async def sync_task():
+                    # 定义异步获取新闻任务
+                    async def get_news_task():
                         try:
-                            # 动态导入，避免循环依赖
-                            from app.worker.akshare_sync_service import get_akshare_sync_service
-                            from app.services.news_data_service import get_news_data_service
+                            # 动态导入 AKShare provider
+                            from tradingagents.dataflows.providers.akshare_provider import AKShareProvider
 
-                            sync_service = await get_akshare_sync_service()
-                            news_service = await get_news_data_service()
+                            # 创建 provider 实例
+                            provider = AKShareProvider()
 
-                            # 调用 provider 直接获取新闻
-                            news_data = await sync_service.provider.get_stock_news(
+                            # 调用 provider 获取新闻
+                            news_data = await provider.get_stock_news(
                                 symbol=clean_code,
                                 limit=max_news
                             )
 
-                            if news_data:
-                                # 保存到数据库
-                                saved_count = await news_service.save_news_data(
-                                    news_data=news_data,
-                                    data_source="akshare",
-                                    market="CN"
-                                )
-                                logger.info(f"[统一新闻工具] ✅ 同步成功: {saved_count} 条新闻")
-                                return saved_count > 0
-                            else:
-                                logger.warning(f"[统一新闻工具] ⚠️ 未获取到新闻数据")
-                                return False
+                            return news_data
 
                         except Exception as e:
-                            logger.error(f"[统一新闻工具] ❌ 同步任务执行失败: {e}")
+                            logger.error(f"[统一新闻工具] ❌ 获取新闻失败: {e}")
                             import traceback
                             logger.error(traceback.format_exc())
-                            return False
+                            return None
 
-                    # 在新的事件循环中运行任务
-                    return new_loop.run_until_complete(sync_task())
+                    # 在新的事件循环中获取新闻
+                    news_data = new_loop.run_until_complete(get_news_task())
+
+                    if not news_data:
+                        logger.warning(f"[统一新闻工具] ⚠️ 未获取到新闻数据")
+                        return False
+
+                    logger.info(f"[统一新闻工具] 📥 获取到 {len(news_data)} 条新闻")
+
+                    # 🔥 使用同步方法保存到数据库（不依赖事件循环）
+                    from app.services.news_data_service import NewsDataService
+
+                    news_service = NewsDataService()
+                    saved_count = news_service.save_news_data_sync(
+                        news_data=news_data,
+                        data_source="akshare",
+                        market="CN"
+                    )
+
+                    logger.info(f"[统一新闻工具] ✅ 同步成功: {saved_count} 条新闻")
+                    return saved_count > 0
 
                 finally:
                     # 清理事件循环
