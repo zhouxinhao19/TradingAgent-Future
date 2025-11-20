@@ -22,6 +22,7 @@ baostock
 finnhub-python
 parsel
 requests
+curl-cffi>=0.6.0  # 模拟真实浏览器TLS指纹，绕过反爬虫检测
 tqdm
 pytz
 redis
