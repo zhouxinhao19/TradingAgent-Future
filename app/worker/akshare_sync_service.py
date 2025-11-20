@@ -952,18 +952,20 @@ class AKShareSyncService:
     async def _get_favorite_stocks(self) -> List[str]:
         """
         获取所有用户的自选股列表（去重）
+        注意：只获取最新的文档，避免获取历史旧数据
 
         Returns:
             自选股代码列表
         """
         try:
+            favorite_codes = set()
+
             # 方法1：从 users 集合的 favorite_stocks 字段获取
             users_cursor = self.db.users.find(
                 {"favorite_stocks": {"$exists": True, "$ne": []}},
                 {"favorite_stocks.stock_code": 1, "_id": 0}
             )
 
-            favorite_codes = set()
             async for user in users_cursor:
                 for fav in user.get("favorite_stocks", []):
                     code = fav.get("stock_code")
@@ -971,13 +973,16 @@ class AKShareSyncService:
                         favorite_codes.add(code)
 
             # 方法2：从 user_favorites 集合获取（兼容旧数据结构）
-            favorites_cursor = self.db.user_favorites.find(
+            # 🔥 只获取最新的一个文档（按 updated_at 降序排序）
+            latest_doc = await self.db.user_favorites.find_one(
                 {"favorites": {"$exists": True, "$ne": []}},
-                {"favorites.stock_code": 1, "_id": 0}
+                {"favorites.stock_code": 1, "_id": 0},
+                sort=[("updated_at", -1)]  # 按更新时间降序，获取最新的
             )
 
-            async for doc in favorites_cursor:
-                for fav in doc.get("favorites", []):
+            if latest_doc:
+                logger.info(f"📌 从 user_favorites 获取最新文档的自选股")
+                for fav in latest_doc.get("favorites", []):
                     code = fav.get("stock_code")
                     if code:
                         favorite_codes.add(code)
