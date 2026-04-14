@@ -12,7 +12,7 @@ from tradingagents.tools.unified_news_tool import create_unified_news_tool
 from tradingagents.utils.stock_utils import StockUtils
 # 导入Google工具调用处理器
 from tradingagents.agents.utils.google_tool_handler import GoogleToolCallHandler
-from tradingagents.agents.utils.agent_utils import build_instrument_context
+from tradingagents.agents.utils.instrument_utils import build_instrument_context
 
 logger = get_logger("analysts.news")
 

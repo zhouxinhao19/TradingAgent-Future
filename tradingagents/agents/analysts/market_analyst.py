@@ -12,7 +12,7 @@ logger = get_logger("default")
 
 # 导入Google工具调用处理器
 from tradingagents.agents.utils.google_tool_handler import GoogleToolCallHandler
-from tradingagents.agents.utils.agent_utils import build_instrument_context
+from tradingagents.agents.utils.instrument_utils import build_instrument_context
 
 
 def _get_company_name(ticker: str, market_info: dict) -> str:

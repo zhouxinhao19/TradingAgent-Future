@@ -72,6 +72,8 @@ def create_llm_by_provider(provider: str, model: str, backend_url: str, temperat
             model=model,
             base_url=backend_url,
             api_key=api_key,
+            temperature=temperature,
+            max_tokens=max_tokens,
             timeout=timeout,
         )
         return client.get_llm()
@@ -182,6 +184,8 @@ def create_llm_by_provider(provider: str, model: str, backend_url: str, temperat
 
         if not custom_api_key:
             logger.warning(f"⚠️ 未找到自定义厂家 {provider} 的 API Key，尝试使用默认配置")
+
+        from langchain_openai import ChatOpenAI
 
         return ChatOpenAI(
             model=model,
