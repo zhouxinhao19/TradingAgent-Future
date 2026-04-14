@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     MONGODB_DATABASE: str = Field(default="tradingagentscn")
     MONGODB_DATABASE_SCOPE: str = Field(default="auto")
     MONGODB_DATABASE_INSTANCE: str = Field(default="")
+    ALLOW_SHARED_DB_IN_DEBUG: bool = Field(default=False)
     MONGODB_AUTH_SOURCE: str = Field(default="admin")
     MONGO_MAX_CONNECTIONS: int = Field(default=100)
     MONGO_MIN_CONNECTIONS: int = Field(default=10)

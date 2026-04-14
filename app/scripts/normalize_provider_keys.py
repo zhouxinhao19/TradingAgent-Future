@@ -1,6 +1,6 @@
 import argparse
 from datetime import datetime
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from pymongo import MongoClient
 
@@ -35,7 +35,21 @@ def _pick_value(primary: Dict[str, Any], secondary: Dict[str, Any], key: str):
     return secondary.get(key)
 
 
-def normalize_llm_providers(db, dry_run: bool = False) -> Dict[str, Any]:
+def _split_csv(value: Optional[str]) -> List[str]:
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _should_run(section: str, include: Optional[Sequence[str]], exclude: Sequence[str]) -> bool:
+    if include and section not in include:
+        return False
+    if section in exclude:
+        return False
+    return True
+
+
+def normalize_llm_providers(db, dry_run: bool = False, fix_indexes: bool = False) -> Dict[str, Any]:
     coll = db.llm_providers
     docs = list(coll.find())
     grouped: Dict[str, List[Dict[str, Any]]] = {}
@@ -85,7 +99,7 @@ def normalize_llm_providers(db, dry_run: bool = False) -> Dict[str, Any]:
             if duplicate_ids:
                 coll.delete_many({"_id": {"$in": duplicate_ids}})
 
-    if not dry_run:
+    if not dry_run and fix_indexes:
         try:
             coll.create_index("name", unique=True, name="uniq_provider_name")
         except Exception:
@@ -122,7 +136,7 @@ def normalize_system_configs(db, dry_run: bool = False) -> Dict[str, Any]:
     return {"system_configs_changed": changed_docs, "llm_config_entries_changed": changed_entries}
 
 
-def normalize_model_catalog(db, dry_run: bool = False) -> Dict[str, Any]:
+def normalize_model_catalog(db, dry_run: bool = False, fix_indexes: bool = False) -> Dict[str, Any]:
     coll = db.model_catalog
     docs = list(coll.find())
     grouped: Dict[str, List[Dict[str, Any]]] = {}
@@ -155,7 +169,7 @@ def normalize_model_catalog(db, dry_run: bool = False) -> Dict[str, Any]:
 
         merged_catalogs += max(0, len(items) - 1)
 
-    if not dry_run:
+    if not dry_run and fix_indexes:
         try:
             coll.create_index("provider", unique=True, name="uniq_model_catalog_provider")
         except Exception:
@@ -169,18 +183,30 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     parser.add_argument("--mongo-uri", default=settings.MONGO_URI)
     parser.add_argument("--database", default=settings.MONGO_DB)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--include", default="", help="Comma-separated sections: providers,system_configs,model_catalog")
+    parser.add_argument("--exclude", default="", help="Comma-separated sections to skip")
+    parser.add_argument("--fix-indexes", action="store_true", help="Recreate unique indexes for normalized keys")
     args = parser.parse_args(list(argv) if argv is not None else None)
+
+    include = _split_csv(args.include) or None
+    exclude = _split_csv(args.exclude)
 
     client = MongoClient(args.mongo_uri)
     try:
         db = client[args.database]
-        summary = {
+        summary: Dict[str, Any] = {
             "database": args.database,
             "dry_run": args.dry_run,
-            **normalize_llm_providers(db, dry_run=args.dry_run),
-            **normalize_system_configs(db, dry_run=args.dry_run),
-            **normalize_model_catalog(db, dry_run=args.dry_run),
+            "include": include or ["providers", "system_configs", "model_catalog"],
+            "exclude": exclude,
+            "fix_indexes": args.fix_indexes,
         }
+        if _should_run("providers", include, exclude):
+            summary.update(normalize_llm_providers(db, dry_run=args.dry_run, fix_indexes=args.fix_indexes))
+        if _should_run("system_configs", include, exclude):
+            summary.update(normalize_system_configs(db, dry_run=args.dry_run))
+        if _should_run("model_catalog", include, exclude):
+            summary.update(normalize_model_catalog(db, dry_run=args.dry_run, fix_indexes=args.fix_indexes))
         print(summary)
         return 0
     finally:
