@@ -7,10 +7,7 @@ from datetime import date
 from typing import Dict, Any, Tuple, List, Optional
 import time
 
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
-from langchain_google_genai import ChatGoogleGenerativeAI
-from tradingagents.llm_adapters import ChatDashScopeOpenAI, ChatGoogleOpenAI
+from tradingagents.llm_clients import create_llm_client
 
 from langgraph.prebuilt import ToolNode
 
@@ -60,7 +57,28 @@ def create_llm_by_provider(provider: str, model: str, backend_url: str, temperat
     logger.info(f"🔧 [创建LLM] provider={provider}, model={model}, url={backend_url}")
     logger.info(f"🔑 [API Key] 来源: {'数据库配置' if api_key else '环境变量'}")
 
+    if provider.lower() in ["openai", "siliconflow", "openrouter", "ollama"]:
+        if not api_key:
+            if provider.lower() == "siliconflow":
+                api_key = os.getenv('SILICONFLOW_API_KEY')
+            elif provider.lower() == "openrouter":
+                api_key = os.getenv('OPENROUTER_API_KEY') or os.getenv('OPENAI_API_KEY')
+            elif provider.lower() == "openai":
+                api_key = os.getenv('OPENAI_API_KEY')
+
+        factory_provider = "openai" if provider.lower() == "siliconflow" else provider.lower()
+        client = create_llm_client(
+            provider=factory_provider,
+            model=model,
+            base_url=backend_url,
+            api_key=api_key,
+            timeout=timeout,
+        )
+        return client.get_llm()
+
     if provider.lower() == "google":
+        from tradingagents.llm_adapters import ChatGoogleOpenAI
+
         # 优先使用传入的 API Key，否则从环境变量读取
         google_api_key = api_key or os.getenv('GOOGLE_API_KEY')
         if not google_api_key:
@@ -77,6 +95,8 @@ def create_llm_by_provider(provider: str, model: str, backend_url: str, temperat
         )
 
     elif provider.lower() == "dashscope":
+        from tradingagents.llm_adapters import ChatDashScopeOpenAI
+
         # 优先使用传入的 API Key，否则从环境变量读取
         dashscope_api_key = api_key or os.getenv('DASHSCOPE_API_KEY')
 
@@ -121,26 +141,9 @@ def create_llm_by_provider(provider: str, model: str, backend_url: str, temperat
             timeout=timeout
         )
 
-    elif provider.lower() in ["openai", "siliconflow", "openrouter", "ollama"]:
-        # 优先使用传入的 API Key，否则从环境变量读取
-        if not api_key:
-            if provider.lower() == "siliconflow":
-                api_key = os.getenv('SILICONFLOW_API_KEY')
-            elif provider.lower() == "openrouter":
-                api_key = os.getenv('OPENROUTER_API_KEY') or os.getenv('OPENAI_API_KEY')
-            elif provider.lower() == "openai":
-                api_key = os.getenv('OPENAI_API_KEY')
-
-        return ChatOpenAI(
-            model=model,
-            base_url=backend_url,
-            api_key=api_key,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            timeout=timeout
-        )
-
     elif provider.lower() == "anthropic":
+        from langchain_anthropic import ChatAnthropic
+
         return ChatAnthropic(
             model=model,
             base_url=backend_url,
@@ -268,95 +271,42 @@ class TradingAgentsGraph:
 
             logger.info(f"✅ [混合模式] LLM 实例创建成功")
 
-        elif self.config["llm_provider"].lower() == "openai":
-            logger.info(f"🔧 [OpenAI-快速模型] max_tokens={quick_max_tokens}, temperature={quick_temperature}, timeout={quick_timeout}s")
-            logger.info(f"🔧 [OpenAI-深度模型] max_tokens={deep_max_tokens}, temperature={deep_temperature}, timeout={deep_timeout}s")
+        elif self.config["llm_provider"].lower() in {"openai", "siliconflow", "openrouter", "ollama"}:
+            provider = self.config["llm_provider"].lower()
+            logger.info(f"🔧 [{provider}-快速模型] max_tokens={quick_max_tokens}, temperature={quick_temperature}, timeout={quick_timeout}s")
+            logger.info(f"🔧 [{provider}-深度模型] max_tokens={deep_max_tokens}, temperature={deep_temperature}, timeout={deep_timeout}s")
 
-            self.deep_thinking_llm = ChatOpenAI(
+            api_key = None
+            if provider == "siliconflow":
+                api_key = os.getenv('SILICONFLOW_API_KEY')
+                if not api_key:
+                    raise ValueError("使用SiliconFlow需要设置SILICONFLOW_API_KEY环境变量")
+            elif provider == "openrouter":
+                api_key = os.getenv('OPENROUTER_API_KEY') or os.getenv('OPENAI_API_KEY')
+                if not api_key:
+                    raise ValueError("使用OpenRouter需要设置OPENROUTER_API_KEY或OPENAI_API_KEY环境变量")
+
+            self.deep_thinking_llm = create_llm_by_provider(
+                provider=provider,
                 model=self.config["deep_think_llm"],
-                base_url=self.config["backend_url"],
+                backend_url=self.config["backend_url"],
                 temperature=deep_temperature,
                 max_tokens=deep_max_tokens,
-                timeout=deep_timeout
+                timeout=deep_timeout,
+                api_key=api_key,
             )
-            self.quick_thinking_llm = ChatOpenAI(
+            self.quick_thinking_llm = create_llm_by_provider(
+                provider=provider,
                 model=self.config["quick_think_llm"],
-                base_url=self.config["backend_url"],
+                backend_url=self.config["backend_url"],
                 temperature=quick_temperature,
                 max_tokens=quick_max_tokens,
-                timeout=quick_timeout
-            )
-        elif self.config["llm_provider"] == "siliconflow":
-            # SiliconFlow支持：使用OpenAI兼容API
-            siliconflow_api_key = os.getenv('SILICONFLOW_API_KEY')
-            if not siliconflow_api_key:
-                raise ValueError("使用SiliconFlow需要设置SILICONFLOW_API_KEY环境变量")
-
-            logger.info(f"🌐 [SiliconFlow] 使用API密钥: {siliconflow_api_key[:20]}...")
-            logger.info(f"🔧 [SiliconFlow-快速模型] max_tokens={quick_max_tokens}, temperature={quick_temperature}, timeout={quick_timeout}s")
-            logger.info(f"🔧 [SiliconFlow-深度模型] max_tokens={deep_max_tokens}, temperature={deep_temperature}, timeout={deep_timeout}s")
-
-            self.deep_thinking_llm = ChatOpenAI(
-                model=self.config["deep_think_llm"],
-                base_url=self.config["backend_url"],
-                api_key=siliconflow_api_key,
-                temperature=deep_temperature,
-                max_tokens=deep_max_tokens,
-                timeout=deep_timeout
-            )
-            self.quick_thinking_llm = ChatOpenAI(
-                model=self.config["quick_think_llm"],
-                base_url=self.config["backend_url"],
-                api_key=siliconflow_api_key,
-                temperature=quick_temperature,
-                max_tokens=quick_max_tokens,
-                timeout=quick_timeout
-            )
-        elif self.config["llm_provider"] == "openrouter":
-            # OpenRouter支持：优先使用OPENROUTER_API_KEY，否则使用OPENAI_API_KEY
-            openrouter_api_key = os.getenv('OPENROUTER_API_KEY') or os.getenv('OPENAI_API_KEY')
-            if not openrouter_api_key:
-                raise ValueError("使用OpenRouter需要设置OPENROUTER_API_KEY或OPENAI_API_KEY环境变量")
-
-            logger.info(f"🌐 [OpenRouter] 使用API密钥: {openrouter_api_key[:20]}...")
-            logger.info(f"🔧 [OpenRouter-快速模型] max_tokens={quick_max_tokens}, temperature={quick_temperature}, timeout={quick_timeout}s")
-            logger.info(f"🔧 [OpenRouter-深度模型] max_tokens={deep_max_tokens}, temperature={deep_temperature}, timeout={deep_timeout}s")
-
-            self.deep_thinking_llm = ChatOpenAI(
-                model=self.config["deep_think_llm"],
-                base_url=self.config["backend_url"],
-                api_key=openrouter_api_key,
-                temperature=deep_temperature,
-                max_tokens=deep_max_tokens,
-                timeout=deep_timeout
-            )
-            self.quick_thinking_llm = ChatOpenAI(
-                model=self.config["quick_think_llm"],
-                base_url=self.config["backend_url"],
-                api_key=openrouter_api_key,
-                temperature=quick_temperature,
-                max_tokens=quick_max_tokens,
-                timeout=quick_timeout
-            )
-        elif self.config["llm_provider"] == "ollama":
-            logger.info(f"🔧 [Ollama-快速模型] max_tokens={quick_max_tokens}, temperature={quick_temperature}, timeout={quick_timeout}s")
-            logger.info(f"🔧 [Ollama-深度模型] max_tokens={deep_max_tokens}, temperature={deep_temperature}, timeout={deep_timeout}s")
-
-            self.deep_thinking_llm = ChatOpenAI(
-                model=self.config["deep_think_llm"],
-                base_url=self.config["backend_url"],
-                temperature=deep_temperature,
-                max_tokens=deep_max_tokens,
-                timeout=deep_timeout
-            )
-            self.quick_thinking_llm = ChatOpenAI(
-                model=self.config["quick_think_llm"],
-                base_url=self.config["backend_url"],
-                temperature=quick_temperature,
-                max_tokens=quick_max_tokens,
-                timeout=quick_timeout
+                timeout=quick_timeout,
+                api_key=api_key,
             )
         elif self.config["llm_provider"].lower() == "anthropic":
+            from langchain_anthropic import ChatAnthropic
+
             logger.info(f"🔧 [Anthropic-快速模型] max_tokens={quick_max_tokens}, temperature={quick_temperature}, timeout={quick_timeout}s")
             logger.info(f"🔧 [Anthropic-深度模型] max_tokens={deep_max_tokens}, temperature={deep_temperature}, timeout={deep_timeout}s")
 
@@ -375,6 +325,8 @@ class TradingAgentsGraph:
                 timeout=quick_timeout
             )
         elif self.config["llm_provider"].lower() == "google":
+            from tradingagents.llm_adapters import ChatGoogleOpenAI
+
             # 使用 Google OpenAI 兼容适配器，解决工具调用格式不匹配问题
             logger.info(f"🔧 使用Google AI OpenAI 兼容适配器 (解决工具调用问题)")
 
@@ -430,6 +382,8 @@ class TradingAgentsGraph:
               self.config["llm_provider"].lower() == "alibaba" or
               "dashscope" in self.config["llm_provider"].lower() or
               "阿里百炼" in self.config["llm_provider"]):
+            from tradingagents.llm_adapters import ChatDashScopeOpenAI
+
             # 使用 OpenAI 兼容适配器，支持原生 Function Calling
             logger.info(f"🔧 使用阿里百炼 OpenAI 兼容适配器 (支持原生工具调用)")
 

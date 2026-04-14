@@ -15,6 +15,7 @@ logger = get_logger("default")
 
 # 导入Google工具调用处理器
 from tradingagents.agents.utils.google_tool_handler import GoogleToolCallHandler
+from tradingagents.agents.utils.agent_utils import build_instrument_context
 
 
 def _get_company_name_for_fundamentals(ticker: str, market_info: dict) -> str:
@@ -155,6 +156,7 @@ def create_fundamentals_analyst(llm, toolkit):
 
         # 获取公司名称
         company_name = _get_company_name_for_fundamentals(ticker, market_info)
+        instrument_context = build_instrument_context(ticker)
         logger.debug(f"📊 [DEBUG] 公司名称: {ticker} -> {company_name}")
 
         # 统一使用 get_stock_fundamentals_unified 工具
@@ -180,6 +182,7 @@ def create_fundamentals_analyst(llm, toolkit):
             f"你是一位专业的股票基本面分析师。"
             f"⚠️ 绝对强制要求：你必须调用工具获取真实数据！不允许任何假设或编造！"
             f"任务：分析{company_name}（股票代码：{ticker}，{market_info['market_name']}）"
+            f"{instrument_context}"
             f"🔴 立即调用 get_stock_fundamentals_unified 工具"
             f"参数：ticker='{ticker}', start_date='{start_date}', end_date='{current_date}', curr_date='{current_date}'"
             "📊 分析要求："
@@ -218,6 +221,7 @@ def create_fundamentals_analyst(llm, toolkit):
             "1. 【第一次调用】如果消息历史中没有工具结果（ToolMessage），立即调用 get_stock_fundamentals_unified 工具"
             "2. 【收到数据后】如果消息历史中已经有工具结果（ToolMessage），🚨 绝对禁止再次调用工具！🚨"
             "3. 【生成报告】收到工具数据后，必须立即生成完整的基本面分析报告，包含："
+            f"4. 【股票代码约束】{instrument_context}"
             "   - 公司基本信息和财务数据分析"
             "   - PE、PB、PEG等估值指标分析"
             "   - 当前股价是否被低估或高估的判断"

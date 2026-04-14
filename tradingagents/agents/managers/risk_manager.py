@@ -3,6 +3,7 @@ import json
 
 # 导入统一日志系统
 from tradingagents.utils.logging_init import get_logger
+from tradingagents.agents.utils.agent_utils import build_instrument_context
 logger = get_logger("default")
 
 
@@ -10,6 +11,7 @@ def create_risk_manager(llm, memory):
     def risk_manager_node(state) -> dict:
 
         company_name = state["company_of_interest"]
+        instrument_context = build_instrument_context(company_name)
 
         history = state["risk_debate_state"]["history"]
         risk_debate_state = state["risk_debate_state"]
@@ -43,6 +45,9 @@ def create_risk_manager(llm, memory):
 交付成果：
 - 明确且可操作的建议：买入、卖出或持有。
 - 基于辩论和过去反思的详细推理。
+
+标的约束：
+{instrument_context}
 
 ---
 
