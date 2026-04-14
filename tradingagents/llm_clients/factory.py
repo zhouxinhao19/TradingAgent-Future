@@ -1,6 +1,7 @@
 from typing import Optional
 
 from .base_client import BaseLLMClient
+from .provider_keys import normalize_provider_key
 
 
 _PROVIDER_ALIASES = {
@@ -27,7 +28,7 @@ def create_llm_client(
     base_url: Optional[str] = None,
     **kwargs,
 ) -> BaseLLMClient:
-    provider_lower = provider.lower()
+    provider_lower = normalize_provider_key(provider)
     provider_lower = _PROVIDER_ALIASES.get(provider_lower, provider_lower)
 
     if provider_lower in _OPENAI_COMPATIBLE:

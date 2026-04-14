@@ -281,19 +281,12 @@ def _get_env_api_key_for_provider(provider: str) -> str:
     """
     import os
 
-    env_key_map = {
-        "google": "GOOGLE_API_KEY",
-        "dashscope": "DASHSCOPE_API_KEY",
-        "openai": "OPENAI_API_KEY",
-        "deepseek": "DEEPSEEK_API_KEY",
-        "anthropic": "ANTHROPIC_API_KEY",
-        "openrouter": "OPENROUTER_API_KEY",
-        "siliconflow": "SILICONFLOW_API_KEY",
-        "qianfan": "QIANFAN_API_KEY",
-        "302ai": "AI302_API_KEY",
-    }
+    from tradingagents.llm_clients.provider_keys import env_key_for_provider, normalize_provider_key
 
-    env_key_name = env_key_map.get(provider.lower())
+    provider_key = normalize_provider_key(provider)
+    env_key_name = env_key_for_provider(provider_key)
+    if not env_key_name and provider_key == "302ai":
+        env_key_name = "AI302_API_KEY"
     if env_key_name:
         api_key = os.getenv(env_key_name)
         if api_key and api_key.strip() and api_key != "your-api-key":
@@ -312,18 +305,14 @@ def _get_default_backend_url(provider: str) -> str:
     Returns:
         str: 默认的 backend_url
     """
-    default_urls = {
-        "google": "https://generativelanguage.googleapis.com/v1beta",
-        "dashscope": "https://dashscope.aliyuncs.com/api/v1",
-        "openai": "https://api.openai.com/v1",
-        "deepseek": "https://api.deepseek.com",
-        "anthropic": "https://api.anthropic.com",
-        "openrouter": "https://openrouter.ai/api/v1",
-        "qianfan": "https://qianfan.baidubce.com/v2",
-        "302ai": "https://api.302.ai/v1",
-    }
+    from tradingagents.llm_clients.provider_keys import default_backend_url, normalize_provider_key
 
-    url = default_urls.get(provider, "https://dashscope.aliyuncs.com/compatible-mode/v1")
+    provider_key = normalize_provider_key(provider)
+    if provider_key == "302ai":
+        url = "https://api.302.ai/v1"
+    else:
+        url = default_backend_url(provider_key)
+
     logger.info(f"🔧 [默认URL] {provider} -> {url}")
     return url
 
@@ -336,11 +325,11 @@ def _get_default_provider_by_model(model_name: str) -> str:
     # 模型名称到供应商的默认映射
     model_provider_map = {
         # 阿里百炼 (DashScope)
-        'qwen-turbo': 'dashscope',
-        'qwen-plus': 'dashscope',
-        'qwen-max': 'dashscope',
-        'qwen-plus-latest': 'dashscope',
-        'qwen-max-longcontext': 'dashscope',
+        'qwen-turbo': 'qwen',
+        'qwen-plus': 'qwen',
+        'qwen-max': 'qwen',
+        'qwen-plus-latest': 'qwen',
+        'qwen-max-longcontext': 'qwen',
 
         # OpenAI
         'gpt-3.5-turbo': 'openai',
@@ -359,12 +348,12 @@ def _get_default_provider_by_model(model_name: str) -> str:
         'deepseek-coder': 'deepseek',
 
         # 智谱AI
-        'glm-4': 'zhipu',
-        'glm-3-turbo': 'zhipu',
-        'chatglm3-6b': 'zhipu'
+        'glm-4': 'glm',
+        'glm-3-turbo': 'glm',
+        'chatglm3-6b': 'glm'
     }
 
-    provider = model_provider_map.get(model_name, 'dashscope')  # 默认使用阿里百炼
+    provider = model_provider_map.get(model_name, 'qwen')  # 默认使用阿里百炼
     logger.info(f"🔧 使用默认映射: {model_name} -> {provider}")
     return provider
 
