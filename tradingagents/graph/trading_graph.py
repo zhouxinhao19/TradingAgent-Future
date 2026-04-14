@@ -96,7 +96,7 @@ def create_llm_by_provider(provider: str, model: str, backend_url: str, temperat
             timeout=timeout
         )
 
-    elif provider.lower() == "dashscope":
+    elif provider.lower() in ["dashscope", "qwen"]:
         from tradingagents.llm_adapters import ChatDashScopeOpenAI
 
         # 优先使用传入的 API Key，否则从环境变量读取
@@ -127,7 +127,7 @@ def create_llm_by_provider(provider: str, model: str, backend_url: str, temperat
             timeout=timeout
         )
 
-    elif provider.lower() == "zhipu":
+    elif provider.lower() in ["zhipu", "glm"]:
         # 智谱AI处理
         zhipu_api_key = api_key or os.getenv('ZHIPU_API_KEY')
         if not zhipu_api_key:
@@ -384,6 +384,7 @@ class TradingAgentsGraph:
             logger.info(f"✅ [Google AI] 已启用优化的工具调用和内容格式处理并应用用户配置的模型参数")
         elif (self.config["llm_provider"].lower() == "dashscope" or
               self.config["llm_provider"].lower() == "alibaba" or
+              self.config["llm_provider"].lower() == "qwen" or
               "dashscope" in self.config["llm_provider"].lower() or
               "阿里百炼" in self.config["llm_provider"]):
             from tradingagents.llm_adapters import ChatDashScopeOpenAI
@@ -583,7 +584,7 @@ class TradingAgentsGraph:
                 timeout=quick_timeout
             )
             logger.info("✅ [千帆] 文心一言适配器已配置成功并应用用户配置的模型参数")
-        elif self.config["llm_provider"].lower() == "zhipu":
+        elif self.config["llm_provider"].lower() in ["zhipu", "glm"]:
             # 智谱AI GLM配置 - 使用专门的ChatZhipuOpenAI适配器
             from tradingagents.llm_adapters.openai_compatible_base import ChatZhipuOpenAI
             

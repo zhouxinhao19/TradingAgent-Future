@@ -1066,15 +1066,8 @@ def run_analysis():
     config["quick_think_llm"] = selections["shallow_thinker"]
     config["deep_think_llm"] = selections["deep_thinker"]
     config["backend_url"] = selections["backend_url"]
-    # 处理LLM提供商名称，确保正确识别
-    provider_mapping = {
-        "qwen": "dashscope",
-        "glm": "zhipu",
-    }
     selected_llm_provider_name = selections["llm_provider"]
-    config["llm_provider"] = provider_mapping.get(
-        selected_llm_provider_name, selected_llm_provider_name
-    )
+    config["llm_provider"] = selected_llm_provider_name
 
     if selected_llm_provider_name == "custom_openai":
         custom_url = os.getenv("CUSTOM_OPENAI_BASE_URL", selections["backend_url"])
