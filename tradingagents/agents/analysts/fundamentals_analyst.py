@@ -16,6 +16,7 @@ logger = get_logger("default")
 # 导入Google工具调用处理器
 from tradingagents.agents.utils.google_tool_handler import GoogleToolCallHandler
 from tradingagents.agents.utils.instrument_utils import build_instrument_context
+from tradingagents.llm_clients import create_llm_client
 
 
 def _get_company_name_for_fundamentals(ticker: str, market_info: dict) -> str:
@@ -257,22 +258,27 @@ def create_fundamentals_analyst(llm, toolkit):
         prompt = prompt.partial(ticker=ticker)
         prompt = prompt.partial(company_name=company_name)
 
-        # 检测阿里百炼模型并创建新实例
-        if hasattr(llm, '__class__') and 'DashScope' in llm.__class__.__name__:
+        # 检测阿里百炼/通义千问模型并创建新实例，避免工具缓存影响后续调用
+        llm_class_name = getattr(getattr(llm, "__class__", None), "__name__", "")
+        model_name = getattr(llm, "model_name", "") or ""
+        original_base_url = getattr(llm, 'openai_api_base', None)
+        original_api_key = getattr(llm, 'openai_api_key', None)
+        is_qwen_like = (
+            "DashScope" in llm_class_name
+            or "qwen" in str(model_name).lower()
+            or "dashscope" in str(original_base_url or "").lower()
+        )
+
+        if is_qwen_like:
             logger.debug(f"📊 [DEBUG] 检测到阿里百炼模型，创建新实例以避免工具缓存")
-            from tradingagents.llm_adapters import ChatDashScopeOpenAI
-
-            # 获取原始 LLM 的 base_url 和 api_key
-            original_base_url = getattr(llm, 'openai_api_base', None)
-            original_api_key = getattr(llm, 'openai_api_key', None)
-
-            fresh_llm = ChatDashScopeOpenAI(
-                model=llm.model_name,
-                api_key=original_api_key,  # 🔥 传递原始 LLM 的 API Key
-                base_url=original_base_url if original_base_url else None,  # 传递 base_url
+            fresh_llm = create_llm_client(
+                provider="qwen",
+                model=model_name,
+                base_url=original_base_url if original_base_url else None,
+                api_key=original_api_key,
                 temperature=llm.temperature,
-                max_tokens=getattr(llm, 'max_tokens', 2000)
-            )
+                max_tokens=getattr(llm, 'max_tokens', 2000),
+            ).get_llm()
 
             if original_base_url:
                 logger.debug(f"📊 [DEBUG] 新实例使用原始 base_url: {original_base_url}")

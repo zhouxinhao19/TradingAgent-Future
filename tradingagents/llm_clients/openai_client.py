@@ -28,6 +28,7 @@ _PROVIDER_CONFIG = {
     "deepseek": ("https://api.deepseek.com", "DEEPSEEK_API_KEY"),
     "qwen": ("https://dashscope.aliyuncs.com/compatible-mode/v1", "DASHSCOPE_API_KEY"),
     "glm": ("https://open.bigmodel.cn/api/paas/v4/", "ZHIPU_API_KEY"),
+    "qianfan": ("https://qianfan.baidubce.com/v2", "QIANFAN_API_KEY"),
     "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY"),
     "ollama": ("http://localhost:11434/v1", None),
     "custom_openai": (None, "CUSTOM_OPENAI_API_KEY"),

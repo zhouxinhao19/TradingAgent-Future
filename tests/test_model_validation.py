@@ -1,7 +1,10 @@
 import unittest
 import warnings
+from types import ModuleType
+from unittest.mock import patch
 
 from tradingagents.llm_clients.base_client import BaseLLMClient
+from tradingagents.llm_clients.factory import create_llm_client
 from tradingagents.llm_clients.model_catalog import get_known_models
 from tradingagents.llm_clients.validators import validate_model
 
@@ -50,6 +53,34 @@ class ModelValidationTests(unittest.TestCase):
                     client.get_llm()
 
                 self.assertEqual(caught, [])
+
+    def test_factory_supports_qianfan_as_openai_compatible(self):
+        fake_langchain_openai = ModuleType("langchain_openai")
+
+        class _FakeChatOpenAI:
+            def __init__(self, **kwargs):
+                self.kwargs = kwargs
+
+        fake_langchain_openai.ChatOpenAI = _FakeChatOpenAI
+
+        with patch.dict("sys.modules", {"langchain_openai": fake_langchain_openai}):
+            client = create_llm_client("qianfan", "ernie-4.0-8k")
+
+        self.assertEqual(client.provider, "qianfan")
+
+    def test_factory_supports_google_via_compatible_adapter(self):
+        fake_google_adapter = ModuleType("tradingagents.llm_adapters.google_openai_adapter")
+
+        class _FakeChatGoogleOpenAI:
+            def __init__(self, **kwargs):
+                self.kwargs = kwargs
+
+        fake_google_adapter.ChatGoogleOpenAI = _FakeChatGoogleOpenAI
+
+        with patch.dict("sys.modules", {"tradingagents.llm_adapters.google_openai_adapter": fake_google_adapter}):
+            client = create_llm_client("google", "gemini-2.5-pro")
+
+        self.assertEqual(client.__class__.__name__, "GoogleClient")
 
 
 if __name__ == "__main__":

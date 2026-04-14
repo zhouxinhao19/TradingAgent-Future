@@ -1,6 +1,8 @@
 import argparse
+import json
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Set
 
 from pymongo import MongoClient
@@ -77,23 +79,27 @@ def _copy_collection(
     dry_run: bool,
     batch_size: int,
     since: Optional[datetime],
+    limit: int,
 ) -> dict:
     src = source_db[name]
     tgt = target_db[name]
     query = _build_since_query(since)
 
     src_count = src.count_documents(query)
+    source_count_used = min(src_count, limit) if limit > 0 else src_count
     tgt_count_before = tgt.estimated_document_count() if name in target_db.list_collection_names() else 0
 
     if dry_run:
         return {
             "collection": name,
             "source_count": src_count,
+            "source_count_used": source_count_used,
             "target_count_before": tgt_count_before,
             "target_count_after": tgt_count_before,
             "dropped": False,
             "upserted": 0,
             "since": since.isoformat() if since else None,
+            "limit": limit if limit > 0 else None,
         }
 
     dropped = False
@@ -103,6 +109,8 @@ def _copy_collection(
 
     upserted = 0
     cursor = src.find(query, no_cursor_timeout=True).batch_size(batch_size)
+    if limit > 0:
+        cursor = cursor.limit(limit)
     try:
         ops = []
         for doc in cursor:
@@ -126,12 +134,23 @@ def _copy_collection(
     return {
         "collection": name,
         "source_count": src_count,
+        "source_count_used": source_count_used,
         "target_count_before": tgt_count_before,
         "target_count_after": tgt_count_after,
         "dropped": dropped,
         "upserted": upserted,
         "since": since.isoformat() if since else None,
+        "limit": limit if limit > 0 else None,
     }
+
+
+def _write_summary_json(path: str, summary: Dict[str, object]) -> None:
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2, default=str),
+        encoding="utf-8",
+    )
 
 
 def main(argv: Optional[Iterable[str]] = None) -> int:
@@ -146,6 +165,8 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     parser.add_argument("--drop-target", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--batch-size", type=int, default=500)
+    parser.add_argument("--limit", type=int, default=0, help="Per-collection document limit for small-sample validation")
+    parser.add_argument("--summary-json", default="", help="Write migration summary JSON to file")
     args = parser.parse_args(list(argv) if argv is not None else None)
 
     if args.show_default_excludes:
@@ -175,6 +196,7 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
                     dry_run=args.dry_run,
                     batch_size=args.batch_size,
                     since=since,
+                    limit=args.limit,
                 )
             )
 
@@ -184,8 +206,11 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
             "include": sorted(include) if include else None,
             "exclude": sorted(exclude),
             "since": since.isoformat() if since else None,
+            "limit": args.limit if args.limit > 0 else None,
             "collections": results,
         }
+        if args.summary_json:
+            _write_summary_json(args.summary_json, total)
         print(total)
         return 0
     finally:

@@ -1,10 +1,13 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from app.scripts.migrate_mongo_db import (
     DEFAULT_EXCLUDED_COLLECTIONS,
     _build_since_query,
     _iter_collections,
     _parse_since,
+    _write_summary_json,
     main,
 )
 
@@ -40,6 +43,13 @@ class MigrateMongoDbScriptTests(unittest.TestCase):
 
     def test_show_default_excludes_returns_success(self):
         self.assertEqual(main(["--show-default-excludes"]), 0)
+
+    def test_write_summary_json(self):
+        with TemporaryDirectory() as tmpdir:
+            output = Path(tmpdir) / "summary.json"
+            _write_summary_json(str(output), {"ok": True, "count": 2})
+            self.assertTrue(output.exists())
+            self.assertIn('"ok": true', output.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@ _OPENAI_COMPATIBLE = {
     "deepseek",
     "qwen",
     "glm",
+    "qianfan",
     "openrouter",
     "ollama",
     "custom_openai",

@@ -142,6 +142,29 @@ python -m app.scripts.migrate_mongo_db \
   --since 2026-01-01T00:00:00
 ```
 
+### 小样本验证
+
+先对每个集合只迁移少量文档，验证命令和目标库是否符合预期：
+
+```bash
+python -m app.scripts.migrate_mongo_db \
+  --source-db tradingagents \
+  --target-db tradingagentscn_v1_devx \
+  --include llm_providers,system_configs,model_catalog \
+  --limit 20 \
+  --dry-run
+```
+
+### 输出迁移结果到 JSON
+
+```bash
+python -m app.scripts.migrate_mongo_db \
+  --source-db tradingagents \
+  --target-db tradingagentscn_v1_devx \
+  --include llm_providers,system_configs,model_catalog \
+  --summary-json ./tmp/migrate_summary.json
+```
+
 ### 覆盖目标集合
 
 ```bash
