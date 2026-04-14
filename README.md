@@ -300,6 +300,12 @@
 - **持续改进**: 不断完善中文增强版本，提供更好的用户体验
 - **开放合作**: 欢迎与源项目团队和全球开发者进行技术交流与合作
 
+## [感谢AIHubmix赞助，推荐llm模型使用AIHubmix](https://aihubmix.com/?aff=2rIi)
+
+<a href="https://aihubmix.com/?aff=2rIi" target="_blank" rel="noopener noreferrer">
+  <img src="assets/AIHubmixlogo.png" alt="AIHubMix" width="220"/>
+</a>
+
 ## 📈 版本历史
 
 - **v1.0.1** (2026-04-14): 🔧 配置管理优化、AiHubMix 聚合厂家、单股同步增强与上游能力吸收 ✨ **当前版本**
