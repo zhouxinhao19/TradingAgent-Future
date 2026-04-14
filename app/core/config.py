@@ -80,6 +80,28 @@ class Settings(BaseSettings):
 
         return _sanitize_mongo_db_name(base)
 
+    @property
+    def MONGO_DB_IDENTITY(self) -> dict:
+        scope = (self.MONGODB_DATABASE_SCOPE or "").strip().lower() or "auto"
+        if scope == "auto":
+            resolved_scope = "major_instance" if self.DEBUG else "explicit"
+        else:
+            resolved_scope = scope
+
+        major = _read_major_version()
+        instance = (self.MONGODB_DATABASE_INSTANCE or "").strip()
+        if resolved_scope == "major_instance" and not instance:
+            instance = _default_instance_tag()
+
+        return {
+            "base_database": self.MONGODB_DATABASE,
+            "scope_configured": scope,
+            "scope_effective": resolved_scope,
+            "major_version": major,
+            "instance": instance,
+            "database": self.MONGO_DB,
+        }
+
     # Redis配置
     REDIS_HOST: str = Field(default="localhost")
     REDIS_PORT: int = Field(default=6379)

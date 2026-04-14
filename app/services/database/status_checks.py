@@ -21,6 +21,7 @@ async def get_mongodb_status() -> Dict[str, Any]:
             "host": settings.MONGODB_HOST,
             "port": settings.MONGODB_PORT,
             "database": settings.MONGO_DB,
+            "database_identity": settings.MONGO_DB_IDENTITY,
             "version": server_info.get("version", "Unknown"),
             "uptime": server_status.get("uptime", 0),
             "connections": server_status.get("connections", {}),
@@ -34,6 +35,7 @@ async def get_mongodb_status() -> Dict[str, Any]:
             "host": settings.MONGODB_HOST,
             "port": settings.MONGODB_PORT,
             "database": settings.MONGO_DB,
+            "database_identity": settings.MONGO_DB_IDENTITY,
         }
 
 
