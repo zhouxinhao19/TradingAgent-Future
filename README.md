@@ -151,6 +151,11 @@
 - 数据库版本隔离、共享库保护、迁移脚本与 provider 规范化说明：
   - [数据库版本隔离与 Provider 规范化](./docs/deployment/database/DB_VERSION_ISOLATION_AND_PROVIDER_NORMALIZATION.md)
 
+### 上游吸收补充
+
+- 当前项目采用人工选择性吸收上游更新：
+  - [人工上游吸收清单](./docs/maintenance/manual-upstream-absorption-checklist.md)
+
 #### 关注公众号
 
 1. **关注公众号**: 微信搜索 **"TradingAgents-CN"** 并关注
