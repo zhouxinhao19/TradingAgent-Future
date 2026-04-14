@@ -85,6 +85,26 @@ ALLOW_SHARED_DB_IN_DEBUG=true
 
 - `app/scripts/migrate_mongo_db.py`
 
+### 默认行为
+
+如果不传 `--include`，脚本会默认排除缓存/大表集合，例如：
+
+- `historical_data`
+- `market_quotes`
+- `stock_basic_info`
+- `stock_financial_data`
+- `analysis_tasks`
+- `analysis_reports`
+- `usage_records`
+
+这样默认更适合做“配置类集合迁移”，避免误把大体量运行数据整库搬过去。
+
+### 查看默认排除集合
+
+```bash
+python -m app.scripts.migrate_mongo_db --show-default-excludes
+```
+
 ### 推荐先 dry-run
 
 ```bash
@@ -108,6 +128,18 @@ python -m app.scripts.migrate_mongo_db \
   --source-db tradingagents \
   --target-db tradingagentscn_v1_devx \
   --include llm_providers,system_configs,model_catalog
+```
+
+### 增量迁移
+
+按 `created_at/updated_at` 做增量迁移：
+
+```bash
+python -m app.scripts.migrate_mongo_db \
+  --source-db tradingagents \
+  --target-db tradingagentscn_v1_devx \
+  --include llm_providers,system_configs,model_catalog \
+  --since 2026-01-01T00:00:00
 ```
 
 ### 覆盖目标集合
@@ -175,7 +207,7 @@ python -m app.scripts.normalize_provider_keys --fix-indexes
 
 1. 检查当前实际数据库名与作用域
 2. 对目标数据库执行 `migrate_mongo_db.py --dry-run`
-3. 执行配置类集合迁移
+3. 优先只迁移配置类集合，必要时再显式 `--include` 大表
 4. 对目标数据库执行 `normalize_provider_keys.py --dry-run`
 5. 确认输出无异常后执行真实规范化
 6. 最后视情况执行 `--fix-indexes`
@@ -183,6 +215,7 @@ python -m app.scripts.normalize_provider_keys --fix-indexes
 ## 7. 风险提示
 
 - 不要在不了解当前 `database_identity` 的情况下直接运行迁移脚本
+- 不传 `--include` 时，脚本默认不会迁移缓存/大表集合，这是有意设计
 - 不要在生产环境直接对整库执行 `--drop-target`
 - 不要在存在重复脏数据时直接运行 `--fix-indexes`
 - 本地开发尽量保持 `ALLOW_SHARED_DB_IN_DEBUG=false`

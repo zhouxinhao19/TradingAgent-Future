@@ -146,6 +146,11 @@
 - ✅ 常见问题解答和故障排除
 - ✅ 实际使用案例和效果展示
 
+### 数据库运维补充
+
+- 数据库版本隔离、共享库保护、迁移脚本与 provider 规范化说明：
+  - [数据库版本隔离与 Provider 规范化](./docs/deployment/database/DB_VERSION_ISOLATION_AND_PROVIDER_NORMALIZATION.md)
+
 #### 关注公众号
 
 1. **关注公众号**: 微信搜索 **"TradingAgents-CN"** 并关注

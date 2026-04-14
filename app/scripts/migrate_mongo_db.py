@@ -1,16 +1,55 @@
 import argparse
 import os
-from typing import Iterable, List, Optional, Set
+from datetime import datetime
+from typing import Dict, Iterable, List, Optional, Set
 
 from pymongo import MongoClient
 
 from app.core.config import settings
+
+DEFAULT_EXCLUDED_COLLECTIONS = {
+    "analysis_tasks",
+    "analysis_reports",
+    "historical_data",
+    "market_quotes",
+    "market_quotes_hk",
+    "market_quotes_us",
+    "news_data",
+    "social_media_data",
+    "stock_basic_info",
+    "stock_basic_info_hk",
+    "stock_basic_info_us",
+    "stock_financial_data",
+    "usage_records",
+}
 
 
 def _split_csv(value: Optional[str]) -> List[str]:
     if not value:
         return []
     return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _parse_since(value: Optional[str]) -> Optional[datetime]:
+    if not value:
+        return None
+    normalized = value.strip().replace("Z", "+00:00")
+    return datetime.fromisoformat(normalized)
+
+
+def _build_since_query(since: Optional[datetime]) -> Dict[str, object]:
+    if since is None:
+        return {}
+
+    since_iso = since.isoformat()
+    return {
+        "$or": [
+            {"updated_at": {"$gte": since}},
+            {"created_at": {"$gte": since}},
+            {"updated_at": {"$gte": since_iso}},
+            {"created_at": {"$gte": since_iso}},
+        ]
+    }
 
 
 def _get_collection_names(db) -> List[str]:
@@ -37,11 +76,13 @@ def _copy_collection(
     drop_target: bool,
     dry_run: bool,
     batch_size: int,
+    since: Optional[datetime],
 ) -> dict:
     src = source_db[name]
     tgt = target_db[name]
+    query = _build_since_query(since)
 
-    src_count = src.estimated_document_count()
+    src_count = src.count_documents(query)
     tgt_count_before = tgt.estimated_document_count() if name in target_db.list_collection_names() else 0
 
     if dry_run:
@@ -52,6 +93,7 @@ def _copy_collection(
             "target_count_after": tgt_count_before,
             "dropped": False,
             "upserted": 0,
+            "since": since.isoformat() if since else None,
         }
 
     dropped = False
@@ -60,7 +102,7 @@ def _copy_collection(
         dropped = True
 
     upserted = 0
-    cursor = src.find({}, no_cursor_timeout=True).batch_size(batch_size)
+    cursor = src.find(query, no_cursor_timeout=True).batch_size(batch_size)
     try:
         ops = []
         for doc in cursor:
@@ -88,6 +130,7 @@ def _copy_collection(
         "target_count_after": tgt_count_after,
         "dropped": dropped,
         "upserted": upserted,
+        "since": since.isoformat() if since else None,
     }
 
 
@@ -98,13 +141,22 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     parser.add_argument("--target-db", default=os.getenv("MONGO_TARGET_DB") or settings.MONGO_DB)
     parser.add_argument("--include", default="", help="Comma-separated collection names to include")
     parser.add_argument("--exclude", default="", help="Comma-separated collection names to exclude")
+    parser.add_argument("--since", default="", help="Incremental migration lower bound, ISO-8601 format")
+    parser.add_argument("--show-default-excludes", action="store_true", help="Print default excluded large/cache collections and exit")
     parser.add_argument("--drop-target", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--batch-size", type=int, default=500)
     args = parser.parse_args(list(argv) if argv is not None else None)
 
+    if args.show_default_excludes:
+        print(sorted(DEFAULT_EXCLUDED_COLLECTIONS))
+        return 0
+
     include = set(_split_csv(args.include)) or None
     exclude = set(_split_csv(args.exclude))
+    since = _parse_since(args.since)
+    if include is None:
+        exclude |= DEFAULT_EXCLUDED_COLLECTIONS
 
     client = MongoClient(args.mongo_uri)
     try:
@@ -122,12 +174,16 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
                     drop_target=args.drop_target,
                     dry_run=args.dry_run,
                     batch_size=args.batch_size,
+                    since=since,
                 )
             )
 
         total = {
             "source_db": args.source_db,
             "target_db": args.target_db,
+            "include": sorted(include) if include else None,
+            "exclude": sorted(exclude),
+            "since": since.isoformat() if since else None,
             "collections": results,
         }
         print(total)
