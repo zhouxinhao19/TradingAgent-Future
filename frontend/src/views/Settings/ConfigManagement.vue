@@ -1228,7 +1228,7 @@ const availableModelsForProvider = (providerId: string) => {
     return config.provider === providerId && config.enabled
   })
   console.log(`✅ 找到 ${models.length} 个可用模型:`, models)
-  return models
+  return sortLLMConfigsByNewest(models)
 }
 
 // 加载厂家列表
@@ -1258,13 +1258,23 @@ const sortProvidersByNewest = (providerList: LLMProvider[]) => {
   return [...providerList].sort((a, b) => getTimestamp(b) - getTimestamp(a))
 }
 
+const sortLLMConfigsByNewest = (configs: LLMConfig[]) => {
+  const getTimestamp = (config: LLMConfig) => {
+    const timeValue = config.created_at || config.updated_at
+    const timestamp = timeValue ? new Date(timeValue).getTime() : 0
+    return Number.isNaN(timestamp) ? 0 : timestamp
+  }
+
+  return [...configs].sort((a, b) => getTimestamp(b) - getTimestamp(a))
+}
+
 const loadLLMConfigs = async () => {
   llmLoading.value = true
   try {
     console.log('🔄 开始加载大模型配置...')
     const configs = await configApi.getLLMConfigs()
     console.log('📊 大模型配置响应:', configs)
-    llmConfigs.value = configs
+    llmConfigs.value = sortLLMConfigsByNewest(configs)
     console.log('✅ 大模型配置加载成功，数量:', configs.length)
 
     // 获取默认LLM
@@ -1312,15 +1322,19 @@ const buildLLMConfigGroups = () => {
       display_name: providerInfo.display_name,
       description: providerInfo.description,
       is_active: providerInfo.is_active,
-      models: models.sort((a, b) => {
+      models: sortLLMConfigsByNewest(models).sort((a, b) => {
         // 默认模型排在前面
         if (a.model_name === defaultLLM.value) return -1
         if (b.model_name === defaultLLM.value) return 1
         // 启用的模型排在前面
         if (a.enabled && !b.enabled) return -1
         if (!a.enabled && b.enabled) return 1
-        // 按名称排序
-        return a.model_name.localeCompare(b.model_name)
+        // 其它模型按最新添加时间倒序
+        const aTime = a.created_at || a.updated_at
+        const bTime = b.created_at || b.updated_at
+        const aTimestamp = aTime ? new Date(aTime).getTime() : 0
+        const bTimestamp = bTime ? new Date(bTime).getTime() : 0
+        return (Number.isNaN(bTimestamp) ? 0 : bTimestamp) - (Number.isNaN(aTimestamp) ? 0 : aTimestamp)
       })
     }
 

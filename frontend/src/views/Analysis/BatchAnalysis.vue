@@ -372,6 +372,16 @@ const clearStocks = () => {
 // 初始化模型设置
 const initializeModelSettings = async () => {
   try {
+    const sortModelsByNewest = (configs: any[]) => {
+      const getTimestamp = (config: any) => {
+        const timeValue = config.created_at || config.updated_at
+        const timestamp = timeValue ? new Date(timeValue).getTime() : 0
+        return Number.isNaN(timestamp) ? 0 : timestamp
+      }
+
+      return [...configs].sort((a, b) => getTimestamp(b) - getTimestamp(a))
+    }
+
     // 获取默认模型
     const defaultModels = await configApi.getDefaultModels()
     modelSettings.value.quickAnalysisModel = defaultModels.quick_analysis_model
@@ -379,7 +389,9 @@ const initializeModelSettings = async () => {
 
     // 获取所有可用的模型列表
     const llmConfigs = await configApi.getLLMConfigs()
-    availableModels.value = llmConfigs.filter((config: any) => config.enabled)
+    availableModels.value = sortModelsByNewest(
+      llmConfigs.filter((config: any) => config.enabled)
+    )
 
     console.log('✅ 加载模型配置成功:', {
       quick: modelSettings.value.quickAnalysisModel,

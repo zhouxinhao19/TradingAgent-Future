@@ -62,6 +62,8 @@ export interface LLMConfig {
     cost?: number  // 成本(1-5)
     quality?: number  // 质量(1-5)
   }
+  created_at?: string
+  updated_at?: string
 }
 
 export interface FetchProviderModelsRequest {

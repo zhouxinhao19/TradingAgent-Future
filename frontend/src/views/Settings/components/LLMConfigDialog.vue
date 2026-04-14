@@ -442,9 +442,21 @@ interface ModelInfo {
   is_deprecated?: boolean
   release_date?: string
   capabilities?: string[]
+  created_at?: string
+  updated_at?: string
 }
 
 const modelCatalog = ref<Record<string, Array<ModelInfo>>>({})
+
+const sortModelsByNewest = (models: ModelInfo[]) => {
+  const getTimestamp = (model: ModelInfo) => {
+    const timeValue = model.created_at || model.updated_at
+    const timestamp = timeValue ? new Date(timeValue).getTime() : 0
+    return Number.isNaN(timestamp) ? 0 : timestamp
+  }
+
+  return [...models].sort((a, b) => getTimestamp(b) - getTimestamp(a))
+}
 
 // 加载模型目录
 const loadModelCatalog = async () => {
@@ -453,7 +465,7 @@ const loadModelCatalog = async () => {
     // 转换为 provider -> models 的映射
     const catalogMap: Record<string, Array<ModelInfo>> = {}
     catalog.forEach(item => {
-      catalogMap[item.provider] = item.models
+      catalogMap[item.provider] = sortModelsByNewest(item.models || [])
     })
     modelCatalog.value = catalogMap
     console.log('✅ 模型目录加载成功:', Object.keys(catalogMap))
@@ -470,7 +482,7 @@ const getModelOptions = (provider: string) => {
   // 优先从后端获取的目录中查找
   const models = modelCatalog.value[provider]
   if (models && models.length > 0) {
-    return models.map(m => ({
+    return sortModelsByNewest(models).map(m => ({
       label: m.display_name,
       value: m.name
     }))
