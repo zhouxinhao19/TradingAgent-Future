@@ -102,7 +102,7 @@
       <el-alert
         title="🔒 安全提示"
         type="info"
-        description="敏感密钥通过环境变量/运维配置注入，出于安全考虑，此处不存储或展示真实密钥。"
+        description="敏感密钥保存后不会在列表中明文展示；你也可以留空并改用 .env 环境变量注入。"
         show-icon
         :closable="false"
         class="mb-2"

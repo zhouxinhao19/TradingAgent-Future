@@ -65,6 +65,7 @@ def test_format_aihubmix_models_maps_fields():
         {
             "id": "gpt-5-mini",
             "name": "gpt-5-mini",
+            "provider_vendor": "openai",
             "description": "fast and cheap",
             "context_length": 400000,
             "max_tokens": 128000,
@@ -74,3 +75,35 @@ def test_format_aihubmix_models_maps_fields():
             "capabilities": ["thinking", "tools", "function_calling"],
         }
     ]
+
+
+def test_filter_aihubmix_models_by_provider_names():
+    service = ConfigService()
+    models = [
+        {
+            "model_id": "gpt-5-mini",
+            "types": "llm",
+            "features": "tools,function_calling",
+            "input_modalities": "text",
+            "context_length": 400000,
+        },
+        {
+            "model_id": "deepseek-v3.2",
+            "types": "llm",
+            "features": "tools,function_calling",
+            "input_modalities": "text",
+            "context_length": 128000,
+        },
+    ]
+
+    filtered = service._filter_aihubmix_models(
+        models,
+        {
+            "type": "llm",
+            "modalities": "text",
+            "provider_names": ["deepseek"],
+            "limit": 40,
+        },
+    )
+
+    assert [item["model_id"] for item in filtered] == ["deepseek-v3.2"]

@@ -1238,7 +1238,7 @@ const loadProviders = async () => {
     console.log('🔄 开始加载厂家列表...')
     const providerList = await configApi.getLLMProviders()
     console.log('📊 厂家列表响应:', providerList)
-    providers.value = providerList
+    providers.value = sortProvidersByNewest(providerList)
     console.log('✅ 厂家列表加载成功，数量:', providerList.length)
   } catch (error) {
     console.error('❌ 加载厂家列表失败:', error)
@@ -1246,6 +1246,16 @@ const loadProviders = async () => {
   } finally {
     providersLoading.value = false
   }
+}
+
+const sortProvidersByNewest = (providerList: LLMProvider[]) => {
+  const getTimestamp = (provider: LLMProvider) => {
+    const timeValue = provider.created_at || provider.updated_at
+    const timestamp = timeValue ? new Date(timeValue).getTime() : 0
+    return Number.isNaN(timestamp) ? 0 : timestamp
+  }
+
+  return [...providerList].sort((a, b) => getTimestamp(b) - getTimestamp(a))
 }
 
 const loadLLMConfigs = async () => {
@@ -1999,7 +2009,7 @@ const testDatabase = async (config: DatabaseConfig) => {
     const result = await configApi.testDatabaseConfig(config.name)
 
     if (result.success) {
-      ElMessage.success(`数据库连接测试成功 (${result.response_time?.toFixed(2)}s)`)
+      ElMessage.success(`数据库连接测试成功`)
     } else {
       ElMessage.error(`数据库连接测试失败: ${result.message}`)
     }

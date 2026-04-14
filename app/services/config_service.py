@@ -6,6 +6,7 @@ import time
 import asyncio
 import logging
 import re
+from collections import defaultdict
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from app.utils.timezone import now_tz
@@ -18,7 +19,7 @@ from app.models.config import (
     ModelProvider, DataSourceType, DatabaseType, LLMProvider,
     MarketCategory, DataSourceGrouping, ModelCatalog, ModelInfo
 )
-from tradingagents.llm_clients.provider_keys import canonical_aliases
+from tradingagents.llm_clients.provider_keys import canonical_aliases, normalize_provider_key
 
 logger = logging.getLogger(__name__)
 
@@ -3921,7 +3922,7 @@ class ConfigService:
     async def fetch_provider_models(self, provider_id: str, filters: Optional[dict] = None) -> dict:
         """从厂家 API 获取模型列表"""
         try:
-            print(f"🔍 获取厂家模型列表 - provider_id: {provider_id}")
+            logger.info(f"🔍 [fetch_provider_models] provider_id={provider_id}")
 
             db = await self._get_db()
             providers_collection = db.llm_providers
@@ -3947,6 +3948,15 @@ class ConfigService:
             api_key = provider_data.get("api_key")
             base_url = provider_data.get("default_base_url")
             display_name = provider_data.get("display_name", provider_name)
+            normalized_provider_name = normalize_provider_key(provider_name)
+            filters = filters or {}
+
+            logger.info(
+                "🔍 [fetch_provider_models] provider loaded: "
+                f"name={provider_name}, normalized={normalized_provider_name}, "
+                f"display_name={display_name}, base_url={base_url}, "
+                f"filters={filters}"
+            )
 
             # 🔥 判断数据库中的 API Key 是否有效
             if not self._is_valid_api_key(api_key):
@@ -3954,12 +3964,12 @@ class ConfigService:
                 env_api_key = self._get_env_api_key(provider_name)
                 if env_api_key:
                     api_key = env_api_key
-                    print(f"✅ 数据库配置无效，从环境变量读取到 {display_name} 的 API Key")
+                    logger.info(f"✅ [fetch_provider_models] 数据库配置无效，从环境变量读取到 {display_name} 的 API Key")
                 else:
                     # 某些聚合平台（如 OpenRouter）的 /models 端点不需要 API Key
-                    print(f"⚠️ {display_name} 未配置有效的API密钥，尝试无认证访问")
+                    logger.warning(f"⚠️ [fetch_provider_models] {display_name} 未配置有效的API密钥，尝试无认证访问")
             else:
-                print(f"✅ 使用数据库配置的 {display_name} API密钥")
+                logger.info(f"✅ [fetch_provider_models] 使用数据库配置的 {display_name} API密钥")
 
             if not base_url:
                 return {
@@ -3967,28 +3977,42 @@ class ConfigService:
                     "message": f"{display_name} 未配置 API 基础地址 (default_base_url)"
                 }
 
-            filters = filters or {}
-
-            if provider_name == "aihubmix":
+            if self._is_aihubmix_provider(provider_name, base_url):
+                logger.info("🧭 [fetch_provider_models] branch=aihubmix")
                 result = await asyncio.get_event_loop().run_in_executor(
                     None, self._fetch_aihubmix_models, api_key, base_url, display_name, filters
                 )
             else:
+                logger.warning(
+                    "🧭 [fetch_provider_models] branch=generic_openai_compatible "
+                    f"(provider_name={provider_name}, normalized={normalized_provider_name}, base_url={base_url})"
+                )
                 # 调用 OpenAI 兼容的 /v1/models 端点
                 result = await asyncio.get_event_loop().run_in_executor(
                     None, self._fetch_models_from_api, api_key, base_url, display_name
                 )
 
+            logger.info(
+                "📦 [fetch_provider_models] result "
+                f"success={result.get('success')} "
+                f"models={len(result.get('models') or [])} "
+                f"message={result.get('message')}"
+            )
             return result
 
         except Exception as e:
-            print(f"获取模型列表失败: {e}")
+            logger.exception(f"❌ [fetch_provider_models] 获取模型列表失败: {e}")
             import traceback
             traceback.print_exc()
             return {
                 "success": False,
                 "message": f"获取模型列表失败: {str(e)}"
             }
+
+    def _is_aihubmix_provider(self, provider_name: str | None, base_url: str | None) -> bool:
+        normalized_name = normalize_provider_key(provider_name)
+        base_url_lower = str(base_url or "").lower()
+        return normalized_name == "aihubmix" or "aihubmix.com" in base_url_lower or "api.aihubmix.com" in base_url_lower
 
     def _fetch_models_from_api(self, api_key: str, base_url: str, display_name: str) -> dict:
         """从 API 获取模型列表"""
@@ -4128,8 +4152,12 @@ class ConfigService:
             if api_key:
                 headers["Authorization"] = f"Bearer {api_key}"
 
-            logger.info(f"🔍 [AiHubMix] 请求模型列表: {url} params={params}")
+            logger.info(
+                f"🔍 [AiHubMix] 请求模型列表: url={url} params={params} "
+                f"provider_names={filters.get('provider_names')} limit={filters.get('limit')}"
+            )
             response = requests.get(url, headers=headers, params=params, timeout=20)
+            logger.info(f"📡 [AiHubMix] HTTP {response.status_code}")
 
             if response.status_code != 200:
                 try:
@@ -4150,7 +4178,17 @@ class ConfigService:
                 }
 
             all_models = result["data"]
+            logger.info(
+                "📊 [AiHubMix] 原始模型数量=%s, 前10个=%s",
+                len(all_models),
+                [str(item.get("model_id") or item.get("id") or "") for item in all_models[:10]],
+            )
             filtered_models = self._filter_aihubmix_models(all_models, filters)
+            logger.info(
+                "📊 [AiHubMix] 过滤后模型数量=%s, 前10个=%s",
+                len(filtered_models),
+                [str(item.get("model_id") or item.get("id") or "") for item in filtered_models[:10]],
+            )
             formatted_models = self._format_aihubmix_models(filtered_models)
 
             return {
@@ -4172,6 +4210,11 @@ class ConfigService:
         tools_only = bool(filters.get("tools_only", False))
         exclude_preview = bool(filters.get("exclude_preview", True))
         keyword = str(filters.get("model_keyword") or "").strip().lower()
+        provider_names = {
+            str(item).strip().lower()
+            for item in (filters.get("provider_names") or [])
+            if str(item).strip()
+        }
 
         requested_modalities = {
             item.strip().lower()
@@ -4204,12 +4247,15 @@ class ConfigService:
         excluded_keywords = ("preview", "experimental", "exp", "alpha", "beta", "test", "free")
 
         filtered = []
+        drop_reasons = defaultdict(int)
         for model in models:
             model_id = str(model.get("model_id") or model.get("id") or "").strip()
             if not model_id:
+                drop_reasons["empty_model_id"] += 1
                 continue
 
             model_id_lower = model_id.lower()
+            provider_vendor = self._infer_aihubmix_model_provider(model_id_lower)
             model_type = str(model.get("types") or "").strip().lower()
             features = {
                 item.strip().lower()
@@ -4223,23 +4269,40 @@ class ConfigService:
             }
 
             if model_type and model_type != "llm":
+                drop_reasons["non_llm"] += 1
                 continue
             if requested_modalities and not requested_modalities.issubset(modalities):
+                drop_reasons["modalities_mismatch"] += 1
                 continue
             if requested_features and not requested_features.issubset(features):
+                drop_reasons["features_mismatch"] += 1
                 continue
             if tools_only and not ({"tools", "function_calling"} & features):
+                drop_reasons["tools_only_mismatch"] += 1
                 continue
             if keyword and keyword not in model_id_lower:
+                drop_reasons["keyword_mismatch"] += 1
                 continue
             if exclude_preview and any(word in model_id_lower for word in excluded_keywords):
+                drop_reasons["preview_excluded"] += 1
                 continue
             if recommended_only and not model_id_lower.startswith(preferred_prefixes):
+                drop_reasons["not_recommended"] += 1
+                continue
+            if provider_names and provider_vendor not in provider_names:
+                drop_reasons[f"provider_mismatch:{provider_vendor}"] += 1
                 continue
 
             filtered.append(model)
 
         filtered.sort(key=self._aihubmix_model_sort_key)
+        logger.info(
+            "🧪 [AiHubMix] filter summary: total=%s kept=%s provider_names=%s drop_reasons=%s",
+            len(models),
+            len(filtered),
+            sorted(provider_names),
+            dict(sorted(drop_reasons.items(), key=lambda item: (-item[1], item[0]))),
+        )
         return filtered[:limit]
 
     def _aihubmix_model_sort_key(self, model: dict) -> tuple:
@@ -4264,6 +4327,7 @@ class ConfigService:
             formatted.append({
                 "id": model_id,
                 "name": model_id,
+                "provider_vendor": self._infer_aihubmix_model_provider(model_id),
                 "description": model.get("desc"),
                 "context_length": self._safe_int(model.get("context_length")),
                 "max_tokens": self._safe_int(model.get("max_output")),
@@ -4277,6 +4341,27 @@ class ConfigService:
                 ],
             })
         return formatted
+
+    def _infer_aihubmix_model_provider(self, model_id: str) -> str:
+        model_id = str(model_id or "").lower()
+        provider_prefix_map = [
+            (("gpt-", "o1", "o3", "o4", "chatgpt-"), "openai"),
+            (("claude-",), "anthropic"),
+            (("gemini",), "google"),
+            (("deepseek-", "deepseek"), "deepseek"),
+            (("qwen-", "qwen"), "qwen"),
+            (("glm-", "glm", "chatglm", "zhipu"), "glm"),
+            (("kimi-", "kimi", "moonshot"), "kimi"),
+            (("doubao-", "doubao"), "doubao"),
+            (("minimax-", "minimax", "abab", "mimo-"), "minimax"),
+            (("mistral-", "mistral"), "mistral"),
+            (("llama-", "meta/", "meta-"), "meta"),
+            (("jina-", "jina/"), "jina"),
+        ]
+        for prefixes, provider in provider_prefix_map:
+            if model_id.startswith(prefixes):
+                return provider
+        return "other"
 
     def _safe_int(self, value: Any, default: Optional[int] = None) -> Optional[int]:
         try:

@@ -68,6 +68,7 @@ export interface FetchProviderModelsRequest {
   type?: string
   modalities?: string
   features?: string[]
+  provider_names?: string[]
   model_keyword?: string
   sort_by?: string
   sort_order?: string

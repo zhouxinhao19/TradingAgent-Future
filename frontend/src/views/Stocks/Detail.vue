@@ -723,8 +723,8 @@ async function checkFavorite() {
     console.warn('检查自选失败', e)
   }
 }
-onMounted(async () => {
-  // 首次加载：打通后端（并行）
+
+async function loadPageData() {
   await Promise.all([
     fetchQuote(),
     fetchFundamentals(),
@@ -734,10 +734,39 @@ onMounted(async () => {
     fetchLatestAnalysis(),  // 获取最新的历史分析报告
     fetchSyncStatus()  // 获取同步状态
   ])
+}
+
+function resetPageState() {
+  stockName.value = ''
+  market.value = ''
+  isFav.value = false
+  syncStatus.value = null
+  newsItems.value = []
+  newsSource.value = undefined
+  lastAnalysis.value = null
+  lastTaskInfo.value = null
+  analysisStatus.value = 'idle'
+  analysisProgress.value = 0
+  analysisMessage.value = ''
+  currentTaskId.value = null
+}
+
+onMounted(async () => {
+  // 首次加载：打通后端（并行）
+  await loadPageData()
   // 每30秒刷新一次报价
   timer = setInterval(fetchQuote, 30000)
 })
 onUnmounted(() => { if (timer) clearInterval(timer) })
+
+watch(() => route.params.code, async (newCode, oldCode) => {
+  if (!newCode || newCode === oldCode) {
+    return
+  }
+
+  resetPageState()
+  await loadPageData()
+})
 
 
 

@@ -173,6 +173,7 @@ class FetchProviderModelsRequest(BaseModel):
     type: str | None = None
     modalities: str | None = None
     features: List[str] | None = None
+    provider_names: List[str] | None = None
     model_keyword: str | None = None
     sort_by: str | None = None
     sort_order: str | None = None
@@ -294,12 +295,24 @@ async def add_llm_provider(
     request: LLMProviderRequest,
     current_user: User = Depends(get_current_user)
 ):
-    """添加大模型厂家（方案A：REST不接受密钥，强制清洗）"""
+    """添加大模型厂家"""
     try:
-        sanitized = request.model_dump()
-        if 'api_key' in sanitized:
-            sanitized['api_key'] = ""
-        provider = LLMProvider(**sanitized)
+        from app.utils.api_key_utils import should_skip_api_key_update
+
+        provider_data = request.model_dump()
+
+        # 新增时也允许保存完整密钥；占位符/截断值则跳过该字段
+        if 'api_key' in provider_data:
+            api_key = provider_data.get('api_key', '')
+            if should_skip_api_key_update(api_key):
+                del provider_data['api_key']
+
+        if 'api_secret' in provider_data:
+            api_secret = provider_data.get('api_secret', '')
+            if should_skip_api_key_update(api_secret):
+                del provider_data['api_secret']
+
+        provider = LLMProvider(**provider_data)
         provider_id = await config_service.add_llm_provider(provider)
 
         # 审计日志（忽略异常）
@@ -483,7 +496,20 @@ async def fetch_provider_models(
     """从厂家 API 获取模型列表"""
     try:
         filters = request.model_dump(exclude_none=True) if request else None
+        logger.info(
+            "🔍 [API] POST /api/config/llm/providers/%s/fetch-models user=%s filters=%s",
+            provider_id,
+            getattr(current_user, "username", None),
+            filters,
+        )
         result = await config_service.fetch_provider_models(provider_id, filters)
+        logger.info(
+            "📦 [API] fetch-models result provider_id=%s success=%s models=%s message=%s",
+            provider_id,
+            result.get("success"),
+            len(result.get("models") or []),
+            result.get("message"),
+        )
         return result
     except HTTPException:
         raise

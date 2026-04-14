@@ -259,7 +259,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, h, reactive } from 'vue'
+import { ref, computed, h, reactive, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox, ElInput, ElInputNumber, ElForm, ElFormItem } from 'element-plus'
 import { paperApi } from '@/api/paper'
@@ -907,11 +907,16 @@ const getRiskDescription = (riskLevel: string) => {
   return descMap[riskLevel] || '请根据自身风险承受能力决策'
 }
 
-// 生命周期
-onMounted(() => {
-  fetchLLMConfigs() // 先加载模型配置
-  fetchReportDetail() // 再加载报告详情
-})
+watch(
+  () => route.params.id,
+  async () => {
+    report.value = null
+    activeModule.value = ''
+    await fetchLLMConfigs()
+    await fetchReportDetail()
+  },
+  { immediate: true }
+)
 </script>
 
 <style lang="scss" scoped>
