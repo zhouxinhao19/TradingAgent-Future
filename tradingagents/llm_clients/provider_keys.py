@@ -18,6 +18,11 @@ _ALIASES = {
     "siliconflow": "siliconflow",
 }
 
+_CANONICAL_ALIASES = {
+    "qwen": ["dashscope", "alibaba", "阿里百炼", "百炼"],
+    "glm": ["zhipu", "智谱", "智谱ai"],
+}
+
 
 def normalize_provider_key(provider: str) -> str:
     if provider is None:
@@ -67,3 +72,8 @@ def default_backend_url(provider: str) -> str:
         "glm": "https://open.bigmodel.cn/api/paas/v4/",
     }
     return default_urls.get(key, "https://dashscope.aliyuncs.com/compatible-mode/v1")
+
+
+def canonical_aliases(provider: str) -> list[str]:
+    key = normalize_provider_key(provider)
+    return list(_CANONICAL_ALIASES.get(key, []))

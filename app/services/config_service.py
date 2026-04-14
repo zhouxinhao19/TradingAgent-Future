@@ -17,6 +17,7 @@ from app.models.config import (
     ModelProvider, DataSourceType, DatabaseType, LLMProvider,
     MarketCategory, DataSourceGrouping, ModelCatalog, ModelInfo
 )
+from tradingagents.llm_clients.provider_keys import canonical_aliases
 
 logger = logging.getLogger(__name__)
 
@@ -2372,7 +2373,7 @@ class ConfigService:
         """获取默认模型目录数据"""
         return [
             {
-                "provider": "dashscope",
+                "provider": "qwen",
                 "provider_name": "通义千问",
                 "models": [
                     {
@@ -2633,7 +2634,7 @@ class ConfigService:
                 ]
             },
             {
-                "provider": "zhipu",
+                "provider": "glm",
                 "provider_name": "智谱AI",
                 "models": [
                     {
@@ -3158,12 +3159,13 @@ class ConfigService:
                     "supported_features": ["chat", "completion", "function_calling", "streaming"]
                 },
                 {
-                    "name": "dashscope",
+                    "name": "qwen",
                     "display_name": "阿里云百炼",
                     "description": "阿里云百炼大模型服务平台，提供通义千问等模型",
                     "website": "https://bailian.console.aliyun.com",
                     "api_doc_url": "https://help.aliyun.com/zh/dashscope/",
                     "default_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+                    "aliases": canonical_aliases("qwen"),
                     "supported_features": ["chat", "completion", "embedding", "function_calling", "streaming"]
                 },
                 {

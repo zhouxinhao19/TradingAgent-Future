@@ -1,6 +1,7 @@
 import unittest
 
 from tradingagents.llm_clients.provider_keys import (
+    canonical_aliases,
     default_backend_url,
     env_key_for_provider,
     normalize_provider_key,
@@ -24,6 +25,10 @@ class ProviderKeysTests(unittest.TestCase):
     def test_default_backend_url_mapping(self):
         self.assertIn("dashscope.aliyuncs.com", default_backend_url("qwen"))
         self.assertIn("open.bigmodel.cn", default_backend_url("glm"))
+
+    def test_canonical_aliases(self):
+        self.assertIn("dashscope", canonical_aliases("qwen"))
+        self.assertIn("zhipu", canonical_aliases("glm"))
 
 
 if __name__ == "__main__":
