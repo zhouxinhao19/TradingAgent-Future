@@ -58,6 +58,11 @@ PROVIDER_OPTIONS: List[Dict[str, str]] = [
         "base_url": "https://openrouter.ai/api/v1",
     },
     {
+        "label": "AiHubMix",
+        "key": "aihubmix",
+        "base_url": "https://aihubmix.com/v1",
+    },
+    {
         "label": "Ollama",
         "key": "ollama",
         "base_url": "http://localhost:11434/v1",

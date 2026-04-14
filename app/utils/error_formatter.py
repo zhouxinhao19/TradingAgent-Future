@@ -40,6 +40,7 @@ class ErrorFormatter:
         "deepseek": "DeepSeek",
         "openai": "OpenAI",
         "openrouter": "OpenRouter",
+        "aihubmix": "AiHubMix",
         "anthropic": "Anthropic Claude",
         "glm": "智谱AI",
         "zhipu": "智谱AI",

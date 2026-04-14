@@ -272,7 +272,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Refresh, Document } from '@element-plus/icons-vue'
-import { configApi, type LLMProvider } from '@/api/config'
+import { configApi, type FetchProviderModelsRequest, type LLMProvider } from '@/api/config'
 import axios from 'axios'
 
 // 数据
@@ -287,7 +287,7 @@ const providersLoading = ref(false)
 const fetchingModels = ref(false)
 
 // 聚合平台列表
-const aggregatorProviders = ['302ai', 'oneapi', 'newapi', 'openrouter', 'custom_aggregator']
+const aggregatorProviders = ['302ai', 'oneapi', 'newapi', 'openrouter', 'aihubmix', 'custom_aggregator']
 
 // 计算属性：判断当前选择的是否为聚合平台
 const isAggregatorProvider = computed(() => {
@@ -446,8 +446,14 @@ const handleFetchModelsFromAPI = async () => {
       console.log('⚠️ 该厂家未配置 API Key，尝试无认证访问')
     }
 
+    const fetchOptions = buildFetchModelFilters(provider.name)
+
+    const confirmMessage = provider.name === 'aihubmix'
+      ? `此操作将按推荐条件从 AiHubMix 获取模型列表并覆盖当前模型列表。\n\n筛选条件：仅 LLM、仅文本输入、优先工具调用/函数调用、排除 preview/测试模型、最多 ${fetchOptions.limit || 40} 个。\n\n是否继续？`
+      : '此操作将从 API 获取模型列表并覆盖当前的模型列表，是否继续？'
+
     await ElMessageBox.confirm(
-      '此操作将从 API 获取模型列表并覆盖当前的模型列表，是否继续？',
+      confirmMessage,
       '确认操作',
       { type: 'warning' }
     )
@@ -466,7 +472,7 @@ const handleFetchModelsFromAPI = async () => {
 
     // 调用后端 API 来获取模型列表（避免 CORS 问题）
     // 注意：需要传递厂家的 ID，而不是 name
-    const response = await configApi.fetchProviderModels(provider.id)
+    const response = await configApi.fetchProviderModels(provider.id, fetchOptions)
 
     console.log('📊 API 响应:', response)
 
@@ -479,8 +485,11 @@ const handleFetchModelsFromAPI = async () => {
         input_price_per_1k: model.input_price_per_1k || null,
         output_price_per_1k: model.output_price_per_1k || null,
         context_length: model.context_length || null,
+        max_tokens: model.max_tokens || null,
+        description: model.description || '',
+        capabilities: model.capabilities || [],
         // OpenRouter 的价格是 USD
-        currency: 'USD'
+        currency: model.currency || 'USD'
       }))
 
       // 统计有价格信息的模型数量
@@ -502,6 +511,24 @@ const handleFetchModelsFromAPI = async () => {
   } finally {
     fetchingModels.value = false
   }
+}
+
+const buildFetchModelFilters = (providerName: string): FetchProviderModelsRequest => {
+  if (providerName === 'aihubmix') {
+    return {
+      type: 'llm',
+      modalities: 'text',
+      features: ['tools', 'function_calling'],
+      sort_by: 'order',
+      sort_order: 'asc',
+      limit: 40,
+      recommended_only: true,
+      tools_only: true,
+      exclude_preview: true
+    }
+  }
+
+  return {}
 }
 
 // 使用预设模板

@@ -168,6 +168,20 @@ class SetDefaultRequest(BaseModel):
     name: str
 
 
+class FetchProviderModelsRequest(BaseModel):
+    """从厂家 API 获取模型列表时的过滤参数"""
+    type: str | None = None
+    modalities: str | None = None
+    features: List[str] | None = None
+    model_keyword: str | None = None
+    sort_by: str | None = None
+    sort_order: str | None = None
+    limit: int | None = None
+    recommended_only: bool = False
+    tools_only: bool = False
+    exclude_preview: bool = True
+
+
 @router.get("/system", response_model=SystemConfigResponse)
 async def get_system_config(
     current_user: User = Depends(get_current_user)
@@ -463,11 +477,13 @@ async def toggle_llm_provider(
 @router.post("/llm/providers/{provider_id}/fetch-models", response_model=dict)
 async def fetch_provider_models(
     provider_id: str,
+    request: FetchProviderModelsRequest | None = None,
     current_user: User = Depends(get_current_user)
 ):
     """从厂家 API 获取模型列表"""
     try:
-        result = await config_service.fetch_provider_models(provider_id)
+        filters = request.model_dump(exclude_none=True) if request else None
+        result = await config_service.fetch_provider_models(provider_id, filters)
         return result
     except HTTPException:
         raise

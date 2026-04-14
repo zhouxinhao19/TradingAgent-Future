@@ -12,7 +12,7 @@ from tradingagents.llm_clients.provider_keys import env_key_for_provider, normal
 
 from langgraph.prebuilt import ToolNode
 
-from tradingagents.agents import *
+from tradingagents.agents import Toolkit
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.agents.utils.memory import FinancialSituationMemory
 
@@ -57,7 +57,7 @@ def create_llm_by_provider(provider: str, model: str, backend_url: str, temperat
 
     normalized_provider = normalize_provider_key(provider)
 
-    if normalized_provider in {"openai", "siliconflow", "openrouter", "ollama", "deepseek", "qwen", "glm", "custom_openai", "qianfan"}:
+    if normalized_provider in {"openai", "siliconflow", "openrouter", "aihubmix", "ollama", "deepseek", "qwen", "glm", "custom_openai", "qianfan"}:
         if not api_key:
             if normalized_provider == "siliconflow":
                 api_key = os.getenv('SILICONFLOW_API_KEY')
@@ -269,7 +269,7 @@ class TradingAgentsGraph:
 
             logger.info(f"✅ [混合模式] LLM 实例创建成功")
 
-        elif normalized_provider in {"openai", "siliconflow", "openrouter", "ollama"}:
+        elif normalized_provider in {"openai", "siliconflow", "openrouter", "aihubmix", "ollama"}:
             provider = normalized_provider
             logger.info(f"🔧 [{provider}-快速模型] max_tokens={quick_max_tokens}, temperature={quick_temperature}, timeout={quick_timeout}s")
             logger.info(f"🔧 [{provider}-深度模型] max_tokens={deep_max_tokens}, temperature={deep_temperature}, timeout={deep_timeout}s")
@@ -283,6 +283,10 @@ class TradingAgentsGraph:
                 api_key = os.getenv('OPENROUTER_API_KEY') or os.getenv('OPENAI_API_KEY')
                 if not api_key:
                     raise ValueError("使用OpenRouter需要设置OPENROUTER_API_KEY或OPENAI_API_KEY环境变量")
+            elif provider == "aihubmix":
+                api_key = os.getenv('AIHUBMIX_API_KEY')
+                if not api_key:
+                    raise ValueError("使用AiHubMix需要设置AIHUBMIX_API_KEY环境变量")
 
             self.deep_thinking_llm, self.quick_thinking_llm = _create_provider_pair(
                 provider=provider,

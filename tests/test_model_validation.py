@@ -25,7 +25,7 @@ class DummyLLMClient(BaseLLMClient):
 class ModelValidationTests(unittest.TestCase):
     def test_catalog_models_are_validator_approved(self):
         for provider, models in get_known_models().items():
-            if provider in ("ollama", "openrouter", "custom_openai"):
+            if provider in ("ollama", "openrouter", "aihubmix", "custom_openai"):
                 continue
 
             for model in models:
@@ -43,8 +43,8 @@ class ModelValidationTests(unittest.TestCase):
         self.assertIn("not-a-real-openai-model", str(caught[0].message))
         self.assertIn("openai", str(caught[0].message))
 
-    def test_openrouter_ollama_and_custom_openai_allow_custom_models(self):
-        for provider in ("openrouter", "ollama", "custom_openai"):
+    def test_openrouter_aihubmix_ollama_and_custom_openai_allow_custom_models(self):
+        for provider in ("openrouter", "aihubmix", "ollama", "custom_openai"):
             client = DummyLLMClient(provider, "custom-model-name")
 
             with self.subTest(provider=provider):

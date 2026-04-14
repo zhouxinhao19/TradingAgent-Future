@@ -83,6 +83,16 @@ MODEL_OPTIONS: ProviderModeOptions = {
             ("Custom model ID", "custom"),
         ],
     },
+    "aihubmix": {
+        "quick": [
+            ("GPT-4o Mini", "gpt-4o-mini"),
+            ("Custom model ID", "custom"),
+        ],
+        "deep": [
+            ("GPT-4o", "gpt-4o"),
+            ("Custom model ID", "custom"),
+        ],
+    },
     "ollama": {
         "quick": [
             ("llama3.1", "llama3.1"),

@@ -107,6 +107,16 @@ async def init_providers():
             "default_base_url": "https://api.302.ai/v1",
             "is_active": True,
             "supported_features": ["chat", "completion", "embedding", "image", "vision", "function_calling", "streaming"]
+        },
+        {
+            "name": "aihubmix",
+            "display_name": "AiHubMix",
+            "description": "AiHubMix 是 OpenAI 兼容的聚合渠道，提供统一模型接入入口",
+            "website": "https://aihubmix.com/?aff=2rIi",
+            "api_doc_url": "https://docs.aihubmix.com/cn/quick-start",
+            "default_base_url": "https://aihubmix.com/v1",
+            "is_active": True,
+            "supported_features": ["chat", "completion", "embedding", "vision", "function_calling", "streaming"]
         }
     ]
     

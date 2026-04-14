@@ -18,6 +18,7 @@ _OPENAI_COMPATIBLE = {
     "glm",
     "qianfan",
     "openrouter",
+    "aihubmix",
     "ollama",
     "custom_openai",
 }

@@ -302,6 +302,8 @@ def _get_env_api_key_for_provider(provider: str) -> str:
     env_key_name = env_key_for_provider(provider_key)
     if not env_key_name and provider_key == "302ai":
         env_key_name = "AI302_API_KEY"
+    if not env_key_name and provider_key == "aihubmix":
+        env_key_name = "AIHUBMIX_API_KEY"
     if env_key_name:
         api_key = os.getenv(env_key_name)
         if api_key and api_key.strip() and api_key != "your-api-key":
@@ -325,6 +327,8 @@ def _get_default_backend_url(provider: str) -> str:
     provider_key = normalize_provider_key(provider)
     if provider_key == "302ai":
         url = "https://api.302.ai/v1"
+    elif provider_key == "aihubmix":
+        url = "https://aihubmix.com/v1"
     else:
         url = default_backend_url(provider_key)
 
