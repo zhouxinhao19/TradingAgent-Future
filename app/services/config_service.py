@@ -2842,6 +2842,7 @@ class ConfigService:
     def _get_env_api_key(self, provider_name: str) -> Optional[str]:
         """从环境变量获取API密钥"""
         import os
+        from tradingagents.llm_clients.provider_keys import env_key_for_provider, normalize_provider_key
 
         # 环境变量映射表
         env_key_mapping = {
@@ -2849,8 +2850,10 @@ class ConfigService:
             "anthropic": "ANTHROPIC_API_KEY",
             "google": "GOOGLE_API_KEY",
             "zhipu": "ZHIPU_API_KEY",
+            "glm": "ZHIPU_API_KEY",
             "deepseek": "DEEPSEEK_API_KEY",
             "dashscope": "DASHSCOPE_API_KEY",
+            "qwen": "DASHSCOPE_API_KEY",
             "qianfan": "QIANFAN_API_KEY",
             "azure": "AZURE_OPENAI_API_KEY",
             "siliconflow": "SILICONFLOW_API_KEY",
@@ -2862,7 +2865,8 @@ class ConfigService:
             "custom_aggregator": "CUSTOM_AGGREGATOR_API_KEY"
         }
 
-        env_var = env_key_mapping.get(provider_name)
+        provider_key = normalize_provider_key(provider_name)
+        env_var = env_key_for_provider(provider_key) or env_key_mapping.get(provider_key) or env_key_mapping.get(provider_name)
         if env_var:
             api_key = os.getenv(env_var)
             # 使用统一的验证方法

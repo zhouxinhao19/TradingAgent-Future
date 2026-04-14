@@ -164,9 +164,15 @@ def get_provider_and_url_by_model_sync(model_name: str) -> dict:
                         backend_url = _get_default_backend_url(provider)
                         logger.warning(f"⚠️ [同步查询] 厂家 {provider} 没有配置 default_base_url，使用硬编码默认值")
 
+                    from tradingagents.llm_clients.provider_keys import normalize_provider_key, default_backend_url
+
+                    provider_key = normalize_provider_key(provider)
+                    if provider_key == "qwen" and backend_url == "https://dashscope.aliyuncs.com/api/v1":
+                        backend_url = default_backend_url(provider_key)
+
                     client.close()
                     return {
-                        "provider": provider,
+                        "provider": provider_key,
                         "backend_url": backend_url,
                         "api_key": api_key
                     }
@@ -204,9 +210,15 @@ def get_provider_and_url_by_model_sync(model_name: str) -> dict:
                 if api_key:
                     logger.info(f"✅ [同步查询] 使用环境变量的 API Key")
 
+            from tradingagents.llm_clients.provider_keys import normalize_provider_key, default_backend_url
+
+            provider_key = normalize_provider_key(provider)
+            if provider_key == "qwen" and backend_url == "https://dashscope.aliyuncs.com/api/v1":
+                backend_url = default_backend_url(provider_key)
+
             client.close()
             return {
-                "provider": provider,
+                "provider": provider_key,
                 "backend_url": backend_url,
                 "api_key": api_key
             }
@@ -214,10 +226,13 @@ def get_provider_and_url_by_model_sync(model_name: str) -> dict:
             logger.warning(f"⚠️ [同步查询] 无法查询厂家配置: {e}")
 
         # 最后回退到硬编码的默认 URL 和环境变量 API Key
+        from tradingagents.llm_clients.provider_keys import normalize_provider_key
+
+        provider_key = normalize_provider_key(provider)
         return {
-            "provider": provider,
-            "backend_url": _get_default_backend_url(provider),
-            "api_key": _get_env_api_key_for_provider(provider)
+            "provider": provider_key,
+            "backend_url": _get_default_backend_url(provider_key),
+            "api_key": _get_env_api_key_for_provider(provider_key)
         }
 
     except Exception as e:
@@ -503,41 +518,7 @@ def create_analysis_config(
         logger.info(f"🔑 深度模型 API Key: {'已配置' if config['deep_api_key'] else '未配置（将使用环境变量）'}")
     except Exception as e:
         logger.warning(f"⚠️  无法从数据库获取 backend_url 和 API Key: {e}")
-        # 2️⃣ 回退到硬编码的默认 URL，API Key 将从环境变量读取
-        if llm_provider == "dashscope":
-            config["backend_url"] = "https://dashscope.aliyuncs.com/api/v1"
-        elif llm_provider == "deepseek":
-            config["backend_url"] = "https://api.deepseek.com"
-        elif llm_provider == "openai":
-            config["backend_url"] = "https://api.openai.com/v1"
-        elif llm_provider == "google":
-            config["backend_url"] = "https://generativelanguage.googleapis.com/v1beta"
-        elif llm_provider == "qianfan":
-            config["backend_url"] = "https://aip.baidubce.com"
-        else:
-            # 🔧 未知厂家，尝试从数据库获取厂家的 default_base_url
-            logger.warning(f"⚠️  未知厂家 {llm_provider}，尝试从数据库获取配置")
-            try:
-                from pymongo import MongoClient
-                from app.core.config import settings
-
-                client = MongoClient(settings.MONGO_URI)
-                db = client[settings.MONGO_DB]
-                providers_collection = db.llm_providers
-                provider_doc = providers_collection.find_one({"name": llm_provider})
-
-                if provider_doc and provider_doc.get("default_base_url"):
-                    config["backend_url"] = provider_doc["default_base_url"]
-                    logger.info(f"✅ 从数据库获取自定义厂家 {llm_provider} 的 backend_url: {config['backend_url']}")
-                else:
-                    # 如果数据库中也没有，使用 OpenAI 兼容格式作为最后的回退
-                    config["backend_url"] = "https://api.openai.com/v1"
-                    logger.warning(f"⚠️  数据库中未找到厂家 {llm_provider} 的配置，使用默认 OpenAI 端点")
-
-                client.close()
-            except Exception as e2:
-                logger.error(f"❌ 查询数据库失败: {e2}，使用默认 OpenAI 端点")
-                config["backend_url"] = "https://api.openai.com/v1"
+        config["backend_url"] = _get_default_backend_url(llm_provider)
 
         logger.info(f"⚠️  使用回退的 backend_url: {config['backend_url']}")
 
