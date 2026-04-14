@@ -539,46 +539,70 @@ async function handleSync() {
 
     if (res.success) {
       const data = res.data
-      let message = `股票 ${code.value} 数据同步完成\n`
+      const lines: string[] = [`股票 ${code.value} 数据同步结果`]
 
       if (data.realtime_sync) {
         if (data.realtime_sync.success) {
           // 🔥 如果切换了数据源，显示提示信息
           if (data.realtime_sync.data_source_used && data.realtime_sync.data_source_used !== syncForm.dataSource) {
-            message += `✅ 实时行情同步成功（已自动切换到 ${data.realtime_sync.data_source_used.toUpperCase()} 数据源）\n`
+            lines.push(`✅ 实时行情同步成功（已自动切换到 ${data.realtime_sync.data_source_used.toUpperCase()} 数据源）`)
           } else {
-            message += `✅ 实时行情同步成功\n`
+            lines.push('✅ 实时行情同步成功')
           }
         } else {
-          message += `❌ 实时行情同步失败: ${data.realtime_sync.error || '未知错误'}\n`
+          lines.push(`❌ 实时行情同步失败: ${data.realtime_sync.error || data.realtime_sync.message || '未知错误'}`)
+        }
+
+        if (data.realtime_sync.attempted_sources?.length) {
+          lines.push(`尝试数据源: ${data.realtime_sync.attempted_sources.join(' -> ')}`)
+        }
+
+        if (data.realtime_sync.primary_error?.error) {
+          lines.push(`主链路错误: ${data.realtime_sync.primary_error.error}`)
+        }
+
+        if (data.realtime_sync.fallback_error?.error) {
+          lines.push(`回退错误: ${data.realtime_sync.fallback_error.error}`)
+        }
+
+        if (data.realtime_sync.market_quote_available) {
+          const snapshot = data.realtime_sync.market_quote_snapshot
+          lines.push(`行情已写入 market_quotes${snapshot?.trade_date ? `（交易日: ${snapshot.trade_date}）` : ''}`)
+        } else if (syncForm.syncTypes.includes('realtime')) {
+          lines.push('行情未写入 market_quotes')
         }
       }
 
       if (data.historical_sync) {
         if (data.historical_sync.success) {
-          message += `✅ 历史数据: ${data.historical_sync.records || 0} 条记录\n`
+          lines.push(`✅ 历史数据: ${data.historical_sync.records || 0} 条记录`)
         } else {
-          message += `❌ 历史数据同步失败: ${data.historical_sync.error || '未知错误'}\n`
+          lines.push(`❌ 历史数据同步失败: ${data.historical_sync.error || '未知错误'}`)
         }
       }
 
       if (data.financial_sync) {
         if (data.financial_sync.success) {
-          message += `✅ 财务数据同步成功\n`
+          lines.push('✅ 财务数据同步成功')
         } else {
-          message += `❌ 财务数据同步失败: ${data.financial_sync.error || '未知错误'}\n`
+          lines.push(`❌ 财务数据同步失败: ${data.financial_sync.error || '未知错误'}`)
         }
       }
 
       if (data.basic_sync) {
         if (data.basic_sync.success) {
-          message += `✅ 基础数据同步成功\n`
+          lines.push('✅ 基础数据同步成功')
         } else {
-          message += `❌ 基础数据同步失败: ${data.basic_sync.error || '未知错误'}\n`
+          lines.push(`❌ 基础数据同步失败: ${data.basic_sync.error || '未知错误'}`)
         }
       }
 
-      ElMessage.success(message)
+      const messageHtml = lines.map(line => line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')).join('<br/>')
+      await ElMessageBox.alert(messageHtml, data.overall_success ? '同步成功' : '同步部分失败', {
+        dangerouslyUseHTMLString: true,
+        confirmButtonText: '知道了',
+        type: data.overall_success ? 'success' : 'warning'
+      })
       syncDialogVisible.value = false
 
       // 刷新页面数据

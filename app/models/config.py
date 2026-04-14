@@ -236,6 +236,8 @@ class LLMConfig(BaseModel):
         default=None,
         description="性能指标: speed(速度1-5), cost(成本1-5), quality(质量1-5)"
     )
+    created_at: Optional[datetime] = Field(default=None, description="创建时间")
+    updated_at: Optional[datetime] = Field(default=None, description="更新时间")
 
 
 class DataSourceConfig(BaseModel):

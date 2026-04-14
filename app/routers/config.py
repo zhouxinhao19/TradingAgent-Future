@@ -86,6 +86,23 @@ def _sanitize_llm_configs(items):
     except Exception:
         return items
 
+
+def _sort_llm_configs_by_newest(items):
+    indexed_items = list(enumerate(items))
+
+    def get_sort_key(indexed_item):
+        index, item = indexed_item
+        time_value = getattr(item, "created_at", None) or getattr(item, "updated_at", None)
+        if not time_value:
+            return (0, index)
+
+        try:
+            return (1, time_value.timestamp())
+        except Exception:
+            return (0, index)
+
+    return [item for _, item in sorted(indexed_items, key=get_sort_key, reverse=True)]
+
 def _sanitize_datasource_configs(items):
     """
     脱敏数据源配置，返回缩略的 API Key
@@ -997,9 +1014,11 @@ async def get_llm_configs(
             if llm_config.enabled and llm_config.provider in active_provider_names
         ]
 
-        logger.info(f"✅ 过滤后的大模型配置数量: {len(filtered_configs)} (原始: {len(config.llm_configs)})")
+        sorted_configs = _sort_llm_configs_by_newest(filtered_configs)
 
-        return _sanitize_llm_configs(filtered_configs)
+        logger.info(f"✅ 过滤后的大模型配置数量: {len(sorted_configs)} (原始: {len(config.llm_configs)})")
+
+        return _sanitize_llm_configs(sorted_configs)
     except Exception as e:
         logger.error(f"❌ 获取大模型配置失败: {e}")
         raise HTTPException(

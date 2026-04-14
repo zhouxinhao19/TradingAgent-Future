@@ -854,19 +854,36 @@ class ConfigService:
     async def update_llm_config(self, llm_config: LLMConfig) -> bool:
         """更新大模型配置"""
         try:
+            config = await self.get_system_config()
+            if not config:
+                return False
+
+            now = now_tz()
+
+            # 更新时保留原创建时间；新增时补齐创建时间和更新时间
+            for existing_config in config.llm_configs:
+                if (
+                    str(existing_config.provider).lower() == str(llm_config.provider).lower()
+                    and existing_config.model_name == llm_config.model_name
+                ):
+                    llm_config.created_at = existing_config.created_at or now
+                    break
+            else:
+                llm_config.created_at = llm_config.created_at or now
+
+            llm_config.updated_at = now
+
             # 直接保存到统一配置管理器
             success = unified_config.save_llm_config(llm_config)
             if not success:
                 return False
 
-            # 同时更新数据库配置
-            config = await self.get_system_config()
-            if not config:
-                return False
-
             # 查找并更新对应的LLM配置
             for i, existing_config in enumerate(config.llm_configs):
-                if existing_config.model_name == llm_config.model_name:
+                if (
+                    str(existing_config.provider).lower() == str(llm_config.provider).lower()
+                    and existing_config.model_name == llm_config.model_name
+                ):
                     config.llm_configs[i] = llm_config
                     break
             else:
