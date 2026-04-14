@@ -461,7 +461,7 @@ class ConfigService:
                     type=DatabaseType.MONGODB,
                     host="localhost",
                     port=27017,
-                    database="tradingagents",
+                    database="tradingagentscn",
                     enabled=True,
                     description="MongoDB主数据库"
                 ),
