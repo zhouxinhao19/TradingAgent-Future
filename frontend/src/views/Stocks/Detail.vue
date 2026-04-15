@@ -185,14 +185,14 @@
               <!-- 报告列表预览 -->
               <div class="reports-preview">
                 <el-tag
-                  v-for="(content, key) in lastAnalysis.reports"
-                  :key="key"
+                  v-for="reportKey in reportKeys"
+                  :key="reportKey"
                   size="small"
                   effect="plain"
                   class="report-tag"
-                  @click="openReport(key)"
+                  @click="openReport(reportKey)"
                 >
-                  {{ formatReportName(key) }}
+                  {{ formatReportName(reportKey) }}
                 </el-tag>
               </div>
             </div>
@@ -291,14 +291,14 @@
     >
       <el-tabs v-model="activeReportTab" type="border-card">
         <el-tab-pane
-          v-for="(content, key) in lastAnalysis?.reports"
-          :key="key"
-          :label="formatReportName(key)"
-          :name="key"
+          v-for="reportKey in reportKeys"
+          :key="reportKey"
+          :label="formatReportName(reportKey)"
+          :name="reportKey"
         >
           <div class="report-content">
             <el-scrollbar height="500px">
-              <div class="markdown-body" v-html="renderMarkdown(content)"></div>
+              <div class="markdown-body" v-html="renderMarkdown(lastAnalysis?.reports?.[reportKey] || '')"></div>
             </el-scrollbar>
           </div>
         </el-tab-pane>
@@ -374,7 +374,6 @@ import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
 import type { EChartsOption } from 'echarts'
 import { favoritesApi } from '@/api/favorites'
-import { useNotificationStore } from '@/stores/notifications'
 
 
 echartsUse([CandlestickChart, GridComponent, TooltipComponent, DataZoomComponent, LegendComponent, TitleComponent, CanvasRenderer])
@@ -394,16 +393,6 @@ const lastTaskInfo = ref<any | null>(null) // 保存任务信息（包含 end_ti
 // 报告对话框
 const showReportsDialog = ref(false)
 const activeReportTab = ref('')
-
-const notifStore = useNotificationStore()
-
-const lastAnalysisTagType = computed(() => {
-  const reco = String(lastAnalysis.value?.recommendation || '').toLowerCase()
-  if (reco.includes('买') || reco.includes('buy') || reco.includes('增持') || reco.includes('强')) return 'success'
-  if (reco.includes('卖') || reco.includes('sell')) return 'danger'
-  if (reco.includes('减持') || reco.includes('谨慎')) return 'warning'
-  return 'info'
-})
 
 // 股票代码（从路由参数获取）
 const code = computed(() => {
@@ -944,11 +933,6 @@ function goPaperTrading() {
   router.push({ name: 'PaperTradingHome', query: { code: code.value } })
 }
 
-function scrollToDetail() {
-  const el = document.getElementById('analysis-detail')
-  if (el) el.scrollIntoView({ behavior: 'smooth' })
-}
-
 // 获取最新的历史分析报告
 async function fetchLatestAnalysis() {
   try {
@@ -1169,12 +1153,17 @@ function formatReportName(key: string): string {
 function renderMarkdown(content: string): string {
   if (!content) return '<p>暂无内容</p>'
   try {
-    return marked(content)
+    return String(marked.parse(content))
   } catch (e) {
     console.error('Markdown渲染失败:', e)
     return `<pre>${content}</pre>`
   }
 }
+
+const reportKeys = computed<string[]>(() => {
+  const reports = lastAnalysis.value?.reports
+  return reports ? Object.keys(reports) : []
+})
 
 // 打开指定报告
 function openReport(reportKey: string) {

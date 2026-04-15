@@ -714,8 +714,8 @@ import { configApi } from '@/api/config'
 import DeepModelSelector from '@/components/DeepModelSelector.vue'
 import { ANALYSTS, convertAnalystNamesToIds } from '@/constants/analysts'
 import { marked } from 'marked'
-import { recommendModels, validateModels, type ModelRecommendationResponse } from '@/api/modelCapabilities'
-import { validateStockCode, getStockCodeFormatHelp, getStockCodeExamples } from '@/utils/stockValidator'
+import { recommendModels } from '@/api/modelCapabilities'
+import { validateStockCode, getStockCodeFormatHelp } from '@/utils/stockValidator'
 import { normalizeMarketForAnalysis, getMarketByStockCode } from '@/utils/market'
 
 // 配置marked选项
@@ -741,7 +741,6 @@ interface AnalysisForm {
 }
 
 // 使用store
-const appStore = useAppStore()
 const authStore = useAuthStore()
 const router = useRouter()
 const route = useRoute()
@@ -1698,7 +1697,7 @@ const goSimOrder = async () => {
       confirmButtonText: '确认下单',
       cancelButtonText: '取消',
       type: 'warning',
-      beforeClose: (action, instance, done) => {
+      beforeClose: (action, _instance, done) => {
         if (action === 'confirm') {
           // 验证输入
           if (tradeForm.quantity < 100 || tradeForm.quantity % 100 !== 0) {
@@ -2077,11 +2076,6 @@ const isQuickAnalysisRole = (roles: string[] | undefined): boolean => {
 /**
  * 判断是否适合深度分析
  */
-const isDeepAnalysisRole = (roles: string[] | undefined): boolean => {
-  if (!roles || !Array.isArray(roles)) return false
-  return roles.includes('deep_analysis') || roles.includes('both')
-}
-
 /**
  * 显示分析深度的模型推荐说明
  */

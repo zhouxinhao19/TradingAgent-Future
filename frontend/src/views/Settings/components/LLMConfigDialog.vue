@@ -410,7 +410,24 @@ const defaultFormData = {
   }
 }
 
-const formData = ref({ ...defaultFormData })
+type PerformanceMetrics = {
+  speed: number
+  cost: number
+  quality: number
+}
+
+const normalizePerformanceMetrics = (
+  metrics?: Partial<PerformanceMetrics> | null
+): PerformanceMetrics => ({
+  speed: metrics?.speed ?? defaultFormData.performance_metrics.speed,
+  cost: metrics?.cost ?? defaultFormData.performance_metrics.cost,
+  quality: metrics?.quality ?? defaultFormData.performance_metrics.quality
+})
+
+const formData = ref({
+  ...defaultFormData,
+  performance_metrics: normalizePerformanceMetrics(defaultFormData.performance_metrics)
+})
 
 // 用于跟踪当前选择的模型（用于下拉列表）
 const selectedModelKey = ref<string>('')
@@ -589,7 +606,7 @@ watch(
         suitable_roles: config.suitable_roles || defaultFormData.suitable_roles,
         features: config.features || defaultFormData.features,
         recommended_depths: config.recommended_depths || defaultFormData.recommended_depths,
-        performance_metrics: config.performance_metrics || defaultFormData.performance_metrics
+        performance_metrics: normalizePerformanceMetrics(config.performance_metrics)
       }
       modelOptions.value = getModelOptions(config.provider)
 
@@ -635,7 +652,7 @@ watch(
           suitable_roles: props.config.suitable_roles || defaultFormData.suitable_roles,
           features: props.config.features || defaultFormData.features,
           recommended_depths: props.config.recommended_depths || defaultFormData.recommended_depths,
-          performance_metrics: props.config.performance_metrics || defaultFormData.performance_metrics
+          performance_metrics: normalizePerformanceMetrics(props.config.performance_metrics)
         }
         modelOptions.value = getModelOptions(props.config.provider)
 

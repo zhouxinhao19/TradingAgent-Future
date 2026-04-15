@@ -1088,9 +1088,7 @@ import {
   Key,
   OfficeBuilding,
   CircleCheck,
-  Collection,
-  Star,
-  Money
+  Collection
 } from '@element-plus/icons-vue'
 
 import {
@@ -1112,11 +1110,27 @@ import MarketCategoryManagement from './components/MarketCategoryManagement.vue'
 import DataSourceGroupingDialog from './components/DataSourceGroupingDialog.vue'
 import SortableDataSourceList from './components/SortableDataSourceList.vue'
 
+type ProviderInfoSummary = {
+  display_name: string
+  description: string
+  is_active: boolean
+}
+
+type LLMConfigGroup = {
+  provider: string
+  display_name: string
+  description: string
+  is_active: boolean
+  models: LLMConfig[]
+}
+
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
+
 // 响应式数据
 const activeTab = ref('validation')
 const providers = ref<LLMProvider[]>([])
 const llmConfigs = ref<LLMConfig[]>([])
-const llmConfigGroups = ref<any[]>([])
+const llmConfigGroups = ref<LLMConfigGroup[]>([])
 const dataSourceConfigs = ref<DataSourceConfig[]>([])
 const databaseConfigs = ref<DatabaseConfig[]>([])
 const systemSettings = ref<Record<string, any>>({})
@@ -1124,7 +1138,7 @@ const systemSettingsMeta = ref<Record<string, SettingMeta>>({})
 const defaultLLM = ref<string>('')
 
 // 厂家信息映射
-const providerInfoMap = ref<Record<string, any>>({})
+const providerInfoMap = ref<Record<string, ProviderInfoSummary>>({})
 const defaultDataSource = ref<string>('')
 
 // 新增：数据源分组相关
@@ -1306,7 +1320,7 @@ const buildLLMConfigGroups = () => {
   })
 
   // 构建分组数据
-  const groups: any[] = []
+  const groups: LLMConfigGroup[] = []
 
   Object.entries(providerGroups).forEach(([provider, models]) => {
     // 获取厂家信息
@@ -1413,7 +1427,7 @@ const buildDataSourceGroups = () => {
           return null
         })
         .filter(Boolean)
-        .sort((a, b) => b.priority - a.priority) // 按优先级降序排列
+        .sort((a, b) => (b?.priority ?? 0) - (a?.priority ?? 0)) // 按优先级降序排列
 
       groups.push({
         categoryId: category.id,
@@ -1555,12 +1569,12 @@ const handleProviderSuccess = () => {
 const loadProviderInfoMap = async () => {
   try {
     const providerList = await configApi.getLLMProviders()
-    const map: Record<string, any> = {}
+    const map: Record<string, ProviderInfoSummary> = {}
 
     providerList.forEach(provider => {
       map[provider.name] = {
         display_name: provider.display_name,
-        description: provider.description,
+        description: provider.description || '',
         is_active: provider.is_active
       }
     })
@@ -1571,14 +1585,9 @@ const loadProviderInfoMap = async () => {
   }
 }
 
-// 刷新大模型配置数据
-const refreshLLMConfigs = () => {
-  buildLLMConfigGroups()
-}
-
 // 获取厂家标签类型
-const getProviderTagType = (provider: string) => {
-  const typeMap: Record<string, string> = {
+const getProviderTagType = (provider: string): TagType => {
+  const typeMap: Record<string, TagType> = {
     'openai': 'primary',
     'google': 'success',
     'anthropic': 'warning',
@@ -1604,15 +1613,14 @@ const getCapabilityLevelText = (level: number) => {
 }
 
 // 🆕 获取能力等级标签类型
-const getCapabilityLevelType = (level: number) => {
-  const typeMap: Record<number, string> = {
+const getCapabilityLevelType = (level: number): TagType | undefined => {
+  const typeMap: Partial<Record<number, TagType>> = {
     1: 'info',
-    2: '',
     3: 'success',
     4: 'warning',
     5: 'danger'
   }
-  return typeMap[level] || ''
+  return typeMap[level]
 }
 
 // 🆕 获取角色文本
@@ -1640,7 +1648,7 @@ const addModelToProvider = (providerRow: any) => {
   currentLLMConfig.value = {
     provider: providerRow.provider,
     model_name: '',
-    display_name: '',
+    model_display_name: '',
     description: '',
     enabled: true,
     max_tokens: 4000,
@@ -1659,7 +1667,7 @@ const addModelToProvider = (providerRow: any) => {
 }
 
 // 切换厂家状态
-const toggleProviderStatus = async (providerRow: any) => {
+const toggleProviderStatus = async (providerRow: LLMConfigGroup) => {
   try {
     const newStatus = !providerRow.is_active
     const action = newStatus ? '启用' : '禁用'
@@ -1803,18 +1811,6 @@ const handleLLMConfigSuccess = () => {
   loadLLMConfigs()
 }
 
-// 设置默认LLM
-const setDefaultLLM = async (modelName: string) => {
-  try {
-    await configApi.setDefaultLLM(modelName)
-    defaultLLM.value = modelName
-    buildLLMConfigGroups() // 重新构建分组以更新排序
-    ElMessage.success('默认大模型设置成功')
-  } catch (error) {
-    ElMessage.error('设置默认大模型失败')
-  }
-}
-
 // 测试LLM配置
 const testLLMConfig = async (config: LLMConfig) => {
   try {
@@ -1937,16 +1933,6 @@ const handleMarketCategorySuccess = () => {
 const handleDataSourceGroupingSuccess = () => {
   loadDataSourceGroupings()
   buildDataSourceGroups()
-}
-
-const setDefaultDataSource = async (name: string) => {
-  try {
-    await configApi.setDefaultDataSource(name)
-    defaultDataSource.value = name
-    ElMessage.success('默认数据源设置成功')
-  } catch (error) {
-    ElMessage.error('设置默认数据源失败')
-  }
 }
 
 const testDataSource = async (config: DataSourceConfig) => {
