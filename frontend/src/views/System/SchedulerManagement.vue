@@ -998,16 +998,6 @@ const formatTrigger = (trigger: string) => {
   return trigger
 }
 
-const formatAction = (action: string) => {
-  const actionMap: Record<string, string> = {
-    pause: '暂停',
-    resume: '恢复',
-    trigger: '手动触发',
-    execute: '执行'
-  }
-  return actionMap[action] || action
-}
-
 const handleSearch = () => {
   // 搜索和筛选会自动通过 computed 属性生效
 }
