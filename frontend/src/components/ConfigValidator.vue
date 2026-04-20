@@ -406,6 +406,7 @@ const updateConfigItems = () => {
 
   // 更新推荐配置
   const recommendedKeys = [
+    { key: 'AIHUBMIX_API_KEY', name: 'AIHubMix API', description: 'AIHubMix API 密钥', help: '用于 AI 分析功能' },
     { key: 'DEEPSEEK_API_KEY', name: 'DeepSeek API', description: 'DeepSeek 大模型 API 密钥', help: '用于 AI 分析功能' },
     { key: 'DASHSCOPE_API_KEY', name: '通义千问 API', description: '阿里云通义千问 API 密钥', help: '用于 AI 分析功能' },
     { key: 'TUSHARE_TOKEN', name: 'Tushare Token', description: 'Tushare 数据源 Token', help: '用于获取专业A股数据' }
