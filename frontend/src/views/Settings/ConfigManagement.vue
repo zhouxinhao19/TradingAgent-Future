@@ -93,8 +93,13 @@
           </template>
 
           <div v-loading="providersLoading">
-            <el-table :data="providers" style="width: 100%">
-              <el-table-column label="厂家信息" width="200">
+            <el-table
+              :data="providers"
+              style="width: 100%"
+              class="provider-table"
+              table-layout="auto"
+            >
+              <el-table-column label="厂家信息" min-width="180">
                 <template #default="{ row }">
                   <div class="provider-info">
                     <div class="provider-name">{{ row.display_name }}</div>
@@ -102,7 +107,7 @@
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column label="API密钥" width="120">
+              <el-table-column label="API密钥" width="108" align="center">
                 <template #default="{ row }">
                   <div class="api-key-status">
                     <el-tag
@@ -114,8 +119,14 @@
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column prop="description" label="描述" />
-              <el-table-column label="状态" width="120">
+              <el-table-column label="描述" min-width="420" class-name="provider-description-column">
+                <template #default="{ row }">
+                  <div class="provider-description">
+                    {{ row.description || '暂无描述' }}
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column label="状态" width="108">
                 <template #default="{ row }">
                   <div class="status-column">
                     <el-tag :type="row.is_active ? 'success' : 'danger'" size="small">
@@ -132,7 +143,7 @@
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column label="支持功能" width="200">
+              <el-table-column label="支持功能" min-width="180">
                 <template #default="{ row }">
                   <div class="features">
                     <el-tag
@@ -146,37 +157,39 @@
                   </div>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="280" fixed="right">
+              <el-table-column label="操作" min-width="220" fixed="right">
                 <template #default="{ row }">
-                  <el-button
-                    size="small"
-                    @click.stop="editProvider(row)"
-                  >
-                    编辑
-                  </el-button>
-                  <el-button
-                    v-if="row.extra_config?.has_api_key"
-                    size="small"
-                    type="info"
-                    @click.stop="testProviderAPI(row)"
-                    :loading="testingProviders[row.id]"
-                  >
-                    测试
-                  </el-button>
-                  <el-button
-                    size="small"
-                    :type="row.is_active ? 'warning' : 'success'"
-                    @click.stop="toggleProvider(row)"
-                  >
-                    {{ row.is_active ? '禁用' : '启用' }}
-                  </el-button>
-                  <el-button
-                    size="small"
-                    type="danger"
-                    @click.stop="deleteProvider(row)"
-                  >
-                    删除
-                  </el-button>
+                  <div class="provider-row-actions">
+                    <el-button
+                      size="small"
+                      @click.stop="editProvider(row)"
+                    >
+                      编辑
+                    </el-button>
+                    <el-button
+                      v-if="row.extra_config?.has_api_key"
+                      size="small"
+                      type="info"
+                      @click.stop="testProviderAPI(row)"
+                      :loading="testingProviders[row.id]"
+                    >
+                      测试
+                    </el-button>
+                    <el-button
+                      size="small"
+                      :type="row.is_active ? 'warning' : 'success'"
+                      @click.stop="toggleProvider(row)"
+                    >
+                      {{ row.is_active ? '禁用' : '启用' }}
+                    </el-button>
+                    <el-button
+                      size="small"
+                      type="danger"
+                      @click.stop="deleteProvider(row)"
+                    >
+                      删除
+                    </el-button>
+                  </div>
                 </template>
               </el-table-column>
             </el-table>
@@ -2454,6 +2467,16 @@ onMounted(async () => {
   }
 
   // 厂家管理样式
+  .provider-table {
+    :deep(.el-table__cell) {
+      vertical-align: top;
+    }
+
+    :deep(.provider-description-column .cell) {
+      white-space: normal;
+    }
+  }
+
   .provider-info {
     .provider-name {
       font-weight: 500;
@@ -2467,7 +2490,18 @@ onMounted(async () => {
     }
   }
 
+  .provider-description {
+    color: var(--el-text-color-regular);
+    line-height: 1.7;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
   .features {
+    display: flex;
+    flex-wrap: wrap;
+
     .feature-tag {
       margin-right: 4px;
       margin-bottom: 4px;
@@ -2491,6 +2525,12 @@ onMounted(async () => {
       margin-top: 2px;
       font-family: monospace;
     }
+  }
+
+  .provider-row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   // 卡片式布局样式

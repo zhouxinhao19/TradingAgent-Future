@@ -42,6 +42,31 @@ class ConfigService:
                 self.db = get_mongo_db()
         return self.db
 
+    @staticmethod
+    def _provider_to_string(provider: Any) -> str:
+        """统一提取 provider 字符串，兼容历史枚举对象和普通字符串。"""
+        if provider is None:
+            return ""
+
+        if hasattr(provider, "value"):
+            provider = provider.value
+
+        return str(provider).strip()
+
+    @classmethod
+    def _providers_match(cls, left: Any, right: Any) -> bool:
+        """兼容历史数据形态比较 provider。"""
+        left_provider = cls._provider_to_string(left).lower()
+        right_provider = cls._provider_to_string(right).lower()
+
+        if left_provider == right_provider:
+            return True
+
+        if not left_provider or not right_provider:
+            return False
+
+        return normalize_provider_key(left_provider) == normalize_provider_key(right_provider)
+
     # ==================== 市场分类管理 ====================
 
     async def get_market_categories(self) -> List[MarketCategory]:
@@ -589,7 +614,8 @@ class ConfigService:
 
             # 打印所有现有配置
             for i, llm in enumerate(config.llm_configs):
-                print(f"   {i+1}. provider: {llm.provider.value}, model_name: {llm.model_name}")
+                provider_str = self._provider_to_string(getattr(llm, "provider", ""))
+                print(f"   {i+1}. provider: {provider_str}, model_name: {llm.model_name}")
 
             # 查找并删除指定的LLM配置
             original_count = len(config.llm_configs)
@@ -597,7 +623,10 @@ class ConfigService:
             # 使用更宽松的匹配条件
             config.llm_configs = [
                 llm for llm in config.llm_configs
-                if not (str(llm.provider.value).lower() == provider.lower() and llm.model_name == model_name)
+                if not (
+                    self._providers_match(getattr(llm, "provider", ""), provider)
+                    and llm.model_name == model_name
+                )
             ]
 
             new_count = len(config.llm_configs)
@@ -863,7 +892,7 @@ class ConfigService:
             # 更新时保留原创建时间；新增时补齐创建时间和更新时间
             for existing_config in config.llm_configs:
                 if (
-                    str(existing_config.provider).lower() == str(llm_config.provider).lower()
+                    self._providers_match(existing_config.provider, llm_config.provider)
                     and existing_config.model_name == llm_config.model_name
                 ):
                     llm_config.created_at = existing_config.created_at or now
@@ -881,7 +910,7 @@ class ConfigService:
             # 查找并更新对应的LLM配置
             for i, existing_config in enumerate(config.llm_configs):
                 if (
-                    str(existing_config.provider).lower() == str(llm_config.provider).lower()
+                    self._providers_match(existing_config.provider, llm_config.provider)
                     and existing_config.model_name == llm_config.model_name
                 ):
                     config.llm_configs[i] = llm_config
@@ -902,7 +931,7 @@ class ConfigService:
             import requests
 
             # 获取 provider 字符串值（兼容枚举和字符串）
-            provider_str = llm_config.provider.value if hasattr(llm_config.provider, 'value') else str(llm_config.provider)
+            provider_str = self._provider_to_string(llm_config.provider)
 
             logger.info(f"🧪 测试大模型配置: {provider_str} - {llm_config.model_name}")
             logger.info(f"📍 API基础URL (模型配置): {llm_config.api_base}")
