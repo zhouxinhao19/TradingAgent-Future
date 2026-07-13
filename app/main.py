@@ -70,6 +70,9 @@ from apscheduler.triggers.interval import IntervalTrigger
 from app.services.quotes_ingestion_service import QuotesIngestionService
 from app.routers import paper as paper_router
 
+# 模块级 logger(供商品模块条件 include_router 的 else 分支等场景使用)
+logger = logging.getLogger("app.main")
+
 
 def get_version() -> str:
     """从 VERSION 文件读取版本号"""

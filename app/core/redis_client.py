@@ -34,8 +34,8 @@ async def init_redis():
             health_check_interval=30,  # 每30秒检查一次连接健康状态
         )
 
-        # 创建Redis客户端
-        redis_client = redis.Redis(connection_pool=redis_pool)
+        # 创建Redis客户端(强制 RESP2 协议,兼容 Redis <6,避免 HELLO 3 握手)
+        redis_client = redis.Redis(connection_pool=redis_pool, protocol=2)
 
         # 测试连接
         await redis_client.ping()

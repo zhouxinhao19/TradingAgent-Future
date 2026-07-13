@@ -84,10 +84,11 @@ class DatabaseManager:
                 decode_responses=True,
                 socket_connect_timeout=5,  # 5秒连接超时
                 socket_timeout=10,  # 10秒套接字超时
+                protocol=2,  # 强制 RESP2,兼容 Redis <6,避免 HELLO 3 握手失败
             )
 
-            # 创建Redis客户端
-            self.redis_client = Redis(connection_pool=self.redis_pool)
+            # 创建Redis客户端(强制 RESP2 协议,兼容 Redis <6,避免 HELLO 3 握手)
+            self.redis_client = Redis(connection_pool=self.redis_pool, protocol=2)
 
             # 测试连接
             await self.redis_client.ping()

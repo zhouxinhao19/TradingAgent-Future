@@ -12,7 +12,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, Union
 import json
-import toml
+
+# Python 3.11+ 内置 tomllib; <3.11 需要第三方 toml 包
+try:
+    import tomllib as toml  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover - py<3.11 fallback
+    import toml  # type: ignore[import-untyped]
 
 # 注意：这里不能导入自己，会造成循环导入
 # 在日志系统初始化前，使用标准库自举日志器，避免未定义引用
@@ -148,8 +153,12 @@ class TradingAgentsLogger:
         for config_path in config_paths:
             if config_path and Path(config_path).exists():
                 try:
-                    with open(config_path, 'r', encoding='utf-8') as f:
-                        config_data = toml.load(f)
+                    # Python 3.11+ 的 tomllib 只接受 bytes/二进制;老 toml 接受文本流
+                    if toml.__name__ == "tomllib":
+                        config_data = toml.loads(Path(config_path).read_bytes().decode("utf-8"))
+                    else:
+                        with open(config_path, 'r', encoding='utf-8') as f:
+                            config_data = toml.load(f)
 
                     # 转换配置格式
                     return self._convert_toml_config(config_data)
