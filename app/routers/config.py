@@ -2358,3 +2358,36 @@ async def delete_database_config(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"删除数据库配置失败: {str(e)}"
         )
+
+
+# ========== Feature Flags(Phase 0 引入,大宗商品渐进开关) ==========
+
+@router.get("/features", response_model=dict, summary="获取当前功能开关状态")
+async def get_feature_flags():
+    """
+    返回当前生效的 feature flag 状态
+
+    - 前端通过此端点读取 `commodity_*` 开关,控制菜单显示
+    - 不需要鉴权(所有前端都能读)
+    - 对应字段详见 app/core/config.py 的 FEATURE_COMMODITY_* 与 FEATURE_FLAGS property
+
+    返回示例:
+    {
+      "success": true,
+      "data": {
+        "commodity_enabled": false,
+        "commodity_data": false,
+        "commodity_analysis": false,
+        "commodity_paper": false
+      }
+    }
+    """
+    try:
+        from app.core.config import settings
+        return ok(data=settings.FEATURE_FLAGS, message="获取功能开关成功")
+    except Exception as e:
+        logger.error(f"获取功能开关失败: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取功能开关失败: {str(e)}"
+        )
