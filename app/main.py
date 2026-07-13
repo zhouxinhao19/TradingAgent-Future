@@ -730,6 +730,29 @@ app.include_router(social_media.router, tags=["social-media"])
 app.include_router(internal_messages.router, tags=["internal-messages"])
 
 
+# ===== 大宗商品路由(Feature Flag 渐进开启,Phase 0 引入) =====
+# 总开关关闭时,所有 /api/commodity/* 路由不注册
+# 子开关按需细粒度控制:Phase 1=数据,Phase 2=分析,Phase 4=模拟交易
+if settings.FEATURE_COMMODITY_ENABLED:
+    from app.routers.commodity import quotes_router
+
+    if settings.FEATURE_COMMODITY_DATA:
+        # Phase 1:商品基础信息/行情/历史/品类/交易所
+        app.include_router(quotes_router, prefix="/api")
+        logger.info("✅ 大宗商品数据路由已注册(/api/commodity/*)")
+    else:
+        logger.info("⏸️  大宗商品数据路由未启用(FEATURE_COMMODITY_DATA=false)")
+
+    # Phase 2 启用:from app.routers.commodity import analysis_router
+    # if settings.FEATURE_COMMODITY_ANALYSIS:
+    #     app.include_router(analysis_router, prefix="/api")
+    # Phase 4 启用:from app.routers.commodity import paper_rules_router
+    # if settings.FEATURE_COMMODITY_PAPER:
+    #     app.include_router(paper_rules_router, prefix="/api")
+else:
+    logger.info("⏸️  大宗商品模块未启用(FEATURE_COMMODITY_ENABLED=false)")
+
+
 @app.get("/")
 async def root():
     """根路径，返回API信息"""
