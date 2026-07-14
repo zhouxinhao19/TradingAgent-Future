@@ -1,6 +1,6 @@
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import List
+from typing import List, Dict
 import os
 import warnings
 import re
@@ -149,6 +149,27 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = Field(default="INFO")
     LOG_FORMAT: str = Field(default="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     LOG_FILE: str = Field(default="logs/tradingagents.log")
+
+    # ===== 大宗商品功能开关(Phase 0 引入,严格渐进开启) =====
+    # 总开关:关闭时 /api/commodity/* 路由不注册,前端菜单不显示
+    # 详见 docs/plans/stock-to-commodity.md §1.5
+    FEATURE_COMMODITY_ENABLED: bool = Field(default=False)
+    # Phase 1+: 商品数据可拉取/查询(/api/commodity/{symbol}/info/quotes/historical)
+    FEATURE_COMMODITY_DATA: bool = Field(default=False)
+    # Phase 2+: 商品技术分析任务可提交(/api/commodity/analysis/*)
+    FEATURE_COMMODITY_ANALYSIS: bool = Field(default=False)
+    # Phase 4+: 商品模拟交易(/api/commodity/paper/*)
+    FEATURE_COMMODITY_PAPER: bool = Field(default=False)
+
+    @property
+    def FEATURE_FLAGS(self) -> Dict[str, bool]:
+        """前端通过 /api/config/features 读取,控制菜单显示"""
+        return {
+            "commodity_enabled": self.FEATURE_COMMODITY_ENABLED,
+            "commodity_data": self.FEATURE_COMMODITY_DATA,
+            "commodity_analysis": self.FEATURE_COMMODITY_ANALYSIS,
+            "commodity_paper": self.FEATURE_COMMODITY_PAPER,
+        }
 
     # 代理配置
     # 用于配置需要绕过代理的域名（国内数据源）

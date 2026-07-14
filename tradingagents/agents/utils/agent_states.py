@@ -83,3 +83,21 @@ class AgentState(MessagesState):
         RiskDebateState, "Current state of the debate on evaluating risk"
     ]
     final_trade_decision: Annotated[str, "Final decision made by the Risk Analysts"]
+
+    # ===== 大宗商品 commodity 字段(Phase 3b-ii-D 引入,3b-ii-E 端到端实测通过) =====
+    # asset_type 决定决策链节点是否走 commodity prompt 分支
+    # CIO 节点统一读取 final_decision(而非 stock 的 final_trade_decision)
+    asset_type: Annotated[str, "资产类型: 'stock'(默认) 或 'commodity'(大宗商品期货)"]
+    full_symbol: Annotated[str, "完整合约代码(如 RB2501.SHF / CU2504.SHF)"]
+    variety_name: Annotated[str, "品种中文名(如 螺纹钢 / 铜)"]
+    exchange: Annotated[str, "交易所代码(SHF/DCE/CZCE/INE/GFEX/CFFEX)"]
+    category: Annotated[str, "行业分类"]
+    quote_unit: Annotated[str, "报价单位(元/吨 等)"]
+    commodity_features: Annotated[dict, "Features 层 6 模块输出(technical/basis/inventory/positioning/term_structure/news_sentiment)"]
+    latest_news: Annotated[list, "最新新闻列表 List[Dict],来自 provider.get_futures_news()"]
+    final_decision: Annotated[str, "CIO 最终决策(Markdown 文本)"]
+    cio_decision_timestamp: Annotated[str, "CIO 决策 ISO 时间戳"]
+
+
+# Researcher team state
+class InvestDebateState(TypedDict):

@@ -336,6 +336,8 @@ class CommodityTradingAgentsGraph(TradingAgentsGraph):
         quote_unit: str = "",
         progress_callback: Optional[Callable] = None,
         task_id: Optional[str] = None,
+        auto_features: bool = False,
+        provider: Optional[Any] = None,
     ):
         """运行 commodity 分析图。
 
@@ -350,12 +352,40 @@ class CommodityTradingAgentsGraph(TradingAgentsGraph):
             quote_unit: 报价单位(元/吨 等)
             progress_callback: 进度回调
             task_id: 任务 ID
+            auto_features: True 时从 provider 自动拉数据并填充 features/news。
+                          仅补缺(用户已显式传入的参数不会被覆盖)。
+            provider: 已 connect() 的 BaseCommodityDataProvider,
+                      auto_features=True 时必传。
 
         Returns:
             (final_state, decision)
         """
         self.full_symbol = full_symbol
         logger.info(f"🌾 [CommodityTradingAgentsGraph] propagate: {full_symbol} @ {trade_date}")
+
+        # ---- auto_features:从 provider 自动补 features/news ----
+        if auto_features and provider is not None:
+            try:
+                from tradingagents.features import compute_all_features_from_provider
+
+                aggregated = compute_all_features_from_provider(
+                    provider, full_symbol, trade_date
+                )
+                # 仅补缺,保留显式传入
+                if commodity_features is None:
+                    commodity_features = aggregated.get("features", {}) or {}
+                if latest_news is None:
+                    try:
+                        latest_news = provider.get_futures_news("all", 100) or []
+                    except Exception as e:  # noqa: BLE001
+                        logger.warning(f"⚠️ provider.get_futures_news 失败: {e}")
+                        latest_news = []
+                logger.info(
+                    f"✅ auto_features 加载完成 (success={aggregated.get('success')}, "
+                    f"modules={list((aggregated.get('features') or {}).keys())})"
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.error(f"❌ auto_features 拉取失败: {e}", exc_info=True)
 
         init_state = self.propagator.create_initial_state(
             full_symbol=full_symbol,
