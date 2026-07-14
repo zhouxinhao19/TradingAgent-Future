@@ -12,12 +12,14 @@ tradingagents.paper — 大宗商品模拟交易(撮合 / 持仓 / PnL / 风控)
 - pnl.py         浮动 / 已实现 PnL 计算
 - account.py     账户聚合:余额 / 可用 / 占用 / 净值 / 风险度 + 持仓更新
 - matcher.py     撮合引擎预检 + 滑点 + 当前价撮合(纯逻辑,MongoDB 编排待补)
-- risk.py        风控:止损止盈触发 / 保证金追缴 / 强平 — 待第三刀
-- repo.py        MongoDB 读写封装(4 集合)— 待第三刀
+- risk.py        风控:止损止盈触发 / 保证金追缴 / 强平 — 第四刀
+- repo.py        MongoDB 读写封装(5 集合):Account / Order / Position / Fill / Snapshot
+- service.py     业务编排(create_account / submit_order / cancel_order / from_decision)
 
-Phase 4 现状(spec + 第二刀已交):
-- spec.py / types.py / pnl.py / account.py / matcher.py 全部纯逻辑层
-- 测试覆盖 96 个,全部 0 失败
+Phase 4 现状(第三刀已交):
+- spec + 第二刀:127 单测全过(spec/pnl/account/matcher)
+- 第三刀:ODM 5 类(repo + service),本文件 re-export
+- 第四刀:HTTP 路由 + 前端 PaperTrading.vue
 """
 from .types import (
     Direction,
@@ -73,6 +75,45 @@ from .matcher import (
     is_stop_triggered,
     is_take_profit_triggered,
 )
+from .repo import (
+    COLL_ACCOUNTS,
+    COLL_ORDERS,
+    COLL_POSITIONS,
+    COLL_FILLS,
+    COLL_SNAPSHOTS,
+    PaperAccountRepo,
+    PaperOrderRepo,
+    PaperPositionRepo,
+    PaperFillRepo,
+    PaperDailySnapshotRepo,
+    ensure_indexes,
+    get_account_repo,
+    get_order_repo,
+    get_position_repo,
+    get_fill_repo,
+    get_snapshot_repo,
+)
+from .service import (
+    PaperTradingError,
+    OrderRejected,
+    InsufficientMargin,
+    AccountNotFound,
+    PaperServiceContext,
+    DecisionSnapshot,
+    create_account,
+    reset_account,
+    list_accounts_by_user,
+    get_account,
+    get_account_metrics,
+    get_account_snapshot,
+    submit_order,
+    cancel_order,
+    list_orders,
+    get_orders_by_account,
+    list_positions,
+    list_fills,
+    from_decision,
+)
 
 __all__ = [
     # types
@@ -95,4 +136,18 @@ __all__ = [
     "get_slippage_config",
     "apply_slippage", "pre_check_order", "match_current_price",
     "is_stop_triggered", "is_take_profit_triggered",
+    # repo (Phase 4 第三刀)
+    "COLL_ACCOUNTS", "COLL_ORDERS", "COLL_POSITIONS", "COLL_FILLS", "COLL_SNAPSHOTS",
+    "PaperAccountRepo", "PaperOrderRepo", "PaperPositionRepo",
+    "PaperFillRepo", "PaperDailySnapshotRepo",
+    "ensure_indexes",
+    "get_account_repo", "get_order_repo", "get_position_repo",
+    "get_fill_repo", "get_snapshot_repo",
+    # service (Phase 4 第三刀)
+    "PaperTradingError", "OrderRejected", "InsufficientMargin", "AccountNotFound",
+    "PaperServiceContext", "DecisionSnapshot",
+    "create_account", "reset_account", "list_accounts_by_user",
+    "get_account", "get_account_metrics", "get_account_snapshot",
+    "submit_order", "cancel_order", "list_orders", "get_orders_by_account",
+    "list_positions", "list_fills", "from_decision",
 ]
