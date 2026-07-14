@@ -353,3 +353,114 @@ LLM 失败时,`messages=[]` 防止半成品 AIMessage 污染消息历史。
 2. **3b-ii-C 子图接线**(1.5 天)— `CommodityTradingAgentsGraph` + Propagator + GraphSetup asset_type 切换
 3. **3b-ii-D 路由 + 前端**(1.5 天)— `analysis.py` 路由 + `Analysis.vue` 页面
 4. **3b-ii-E 端到端实测 + 文档**(1 天)— 翻 `FEATURE_COMMODITY_ANALYSIS` + curl/浏览器验证
+
+---
+
+## 九、3b-ii-B 进度(2026-07-14 完成)
+
+### 9.1 ✅ 8 个决策链节点全部 commodity 化
+
+采用**最小侵入方案** — 在原 stock 节点顶部加 `COMMODITY_*_PROMPT` 常量 + `if asset_type == "commodity"` 分支。stock 路径零影响,commodity 路径用期货特定 prompt。
+
+| 节点 | 文件 | stock 路径 | commodity 路径 |
+|---|---|---|---|
+| 看涨研究员 | `researchers/bull_researcher.py` | 原 prompt 不变 | `COMMODITY_BULL_PROMPT` — 关注基差/库存/期限结构/持仓/杠杆/合约换月 |
+| 看跌研究员 | `researchers/bear_researcher.py` | 原 prompt 不变 | `COMMODITY_BEAR_PROMPT` — 关注 Contango + 库存累积 + 穿仓风险 |
+| 研究经理 | `managers/research_manager.py` | 原 prompt 不变 | `COMMODITY_RESEARCH_MANAGER_PROMPT` — 加合约选择/杠杆/手数/持有周期 |
+| 交易员 | `trader/trader.py` | messages 列表不变 | `COMMODITY_TRADER_SYSTEM_PROMPT` — 做多/做空/平仓 + 手数/保证金 |
+| 激进风控 | `risk_mgmt/aggresive_debator.py` | 原 prompt 不变 | `COMMODITY_AGGRESSIVE_PROMPT` — 趋势放大 + 正 carry + 库存周期 |
+| 保守风控 | `risk_mgmt/conservative_debator.py` | 原 prompt 不变 | `COMMODITY_CONSERVATIVE_PROMPT` — 杠杆反向放大 + 穿仓 + Contango 损耗 |
+| 中性风控 | `risk_mgmt/neutral_debator.py` | 原 prompt 不变 | `COMMODITY_NEUTRAL_PROMPT` — 跨期对冲 + 跨品种对冲 + 波动率对冲 |
+| 风控经理 | `managers/risk_manager.py` | 原 prompt + 持有默认值 | `COMMODITY_RISK_MANAGER_PROMPT` + 平仓默认值(LLM 失败 fallback) |
+
+### 9.2 新增 CIO (ExecutiveDecisionMaker)
+
+**新文件** `tradingagents/agents/managers/executive_decision_maker.py` — 整合三层决策输出最终可执行指令:
+
+```
+inputs:
+  - investment_plan (研究经理辩论结果)
+  - trader_investment_plan (交易员计划)
+  - final_trade_decision (风控评估)
+
+outputs:
+  - state['final_decision'] = Markdown 决策报告
+  - 包含:方向/合约/入场/止损/目标/手数/持有周期/置信度/风险敞口
+  - 失败 fallback:COMMODITY_DEFAULT_DECISION(平仓)
+```
+
+### 9.3 关键设计决策
+
+| 决策 | 原因 | 落地 |
+|---|---|---|
+| **最小侵入**:在 stock 节点加 commodity 分支 | 不创建新文件,避免双倍维护 | 8 个 stock 决策链节点顶部加 `COMMODITY_*_PROMPT` 常量 + if/else 分支 |
+| **stock 路径零修改**:保持原 f-string 原样 | commodity 化必须**不能破坏**现有 stock 业务 | if/else 包装,stock 路径 prompt 字符级不变 |
+| **`asset_type` 字段约定**:state.get("asset_type", "stock") | 默认 stock,commodity 路径由 Propagator 注入 | 全 8 节点 + CIO 共 9 处用此约定 |
+| **full_symbol 优先于 company_of_interest**:commodity 路径下 | commodity 用 `<SYMBOL><YYMM>.<EXCHANGE>` 格式 | `full_symbol = state.get("full_symbol") or company_name` |
+| **CIO 仅 commodity 路径**:stock 路径返回 None | Phase 3b-ii 不实现 stock CIO,避免重复维护 | `if asset_type == "commodity": ... else: return {"final_decision": None}` |
+| **LLM 失败 fallback**:每个 commodity 节点都有 fallback | commodity LLM 调用易因网络/限流失败 | Risk Manager + CIO 用 `COMMODITY_DEFAULT_DECISION` |
+| **复用 LangChain ChatPromptTemplate**:统一消息格式 | 跟 3b-ii-A 一致 | CIO 用 `prompt.partial(...).format_messages(messages=...)` |
+
+### 9.4 测试结果
+
+**新增测试 32 个,全部通过**:
+
+- `tests/test_commodity_decision_chain.py` — **26 个测试**
+  - `TestBull` (3): commodity prompt / stock prompt / 默认 asset_type
+  - `TestBear` (2): commodity prompt / stock prompt
+  - `TestResearchManager` (2): commodity prompt / stock prompt
+  - `TestTrader` (2): commodity prompt / stock prompt
+  - `TestAggresiveDebator` (2): commodity prompt / stock prompt
+  - `TestConservativeDebator` (2): commodity prompt / stock prompt
+  - `TestNeutralDebator` (2): commodity prompt / stock prompt
+  - `TestRiskManager` (4): commodity / stock / commodity fallback / stock fallback
+  - `TestPromptCompleteness` (5): 5 个 commodity prompt 的 placeholder 校验
+  - `TestFieldConsistency` (2): 字段返回值一致性
+- `tests/test_commodity_cio.py` — **6 个测试**
+  - happy path / LLM 失败 fallback / stock 路径返回 None / 默认 asset_type / prompt 包含三层 / placeholder 校验
+
+**合并测试结果**:
+- `test_commodity_analyst.py`: 45
+- `test_commodity_features.py`: 97
+- `test_commodity_decision_chain.py`: 26
+- `test_commodity_cio.py`: 6
+- **合计 174 测试,0 失败**
+
+### 9.5 输出字段映射(决策链 零改动 → 验证通过)
+
+| 节点 | 输出字段 | 写入字段 |
+|---|---|---|
+| bull_researcher | `investment_debate_state` | ✅ |
+| bear_researcher | `investment_debate_state` | ✅ |
+| research_manager | `investment_debate_state` + `investment_plan` | ✅ |
+| trader | `messages` + `trader_investment_plan` + `sender` | ✅ |
+| aggresive/conservative/neutral debator | `risk_debate_state` | ✅ |
+| risk_manager | `risk_debate_state` + `final_trade_decision` | ✅ |
+| CIO (新) | `final_decision` + `messages` + `cio_decision_timestamp` | ✅ |
+
+### 9.6 已知约束与未交付项
+
+#### ✅ 已交付
+- 8 个决策链节点 commodity 化(代码 + 单元测试)
+- CIO (ExecutiveDecisionMaker) 新节点(代码 + 单元测试)
+- 32 个新单元测试全过(26 + 6)
+- 字段映射验证通过,stock 路径零影响
+- LLM 失败 fallback(Risk Manager + CIO)
+
+#### 🟡 未交付(后续 3b-ii-C/D/E)
+- `CommodityTradingAgentsGraph` 子类 + Propagator 接线(3b-ii-C)
+- `app/routers/commodity/analysis.py` 路由(3b-ii-D)
+- `frontend/src/views/Commodity/Analysis.vue` 页面(3b-ii-D)
+- 端到端实测(LLM 真实调用 + 报告渲染)(3b-ii-E)
+
+#### ⚠️ 待验证项(代码完成 ≠ 用户可演示)
+- 决策链节点未在 LangGraph 中实际注册(仅单元测试覆盖)
+- 真实 LLM 调用未做(测试用 MagicMock)
+- 端到端流程未跑(需等 3b-ii-C 子图接线)
+
+### 9.7 下一步计划
+
+按 3b-ii-C/D/E 顺序:
+1. **3b-ii-C 子图接线**(1.5 天)— `CommodityTradingAgentsGraph` + Propagator + GraphSetup asset_type 切换
+2. **3b-ii-D 路由 + 前端**(1.5 天)— `analysis.py` 路由 + `Analysis.vue` 页面
+3. **3b-ii-E 端到端实测 + 文档**(1 天)— 翻 `FEATURE_COMMODITY_ANALYSIS` + curl/浏览器验证

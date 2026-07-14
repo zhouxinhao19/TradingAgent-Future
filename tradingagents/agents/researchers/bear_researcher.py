@@ -6,6 +6,36 @@ import json
 from tradingagents.utils.logging_init import get_logger
 logger = get_logger("default")
 
+# === Phase 3b-ii-B:Commodity prompt 注入(占位) ===
+# 当 state['asset_type'] == "commodity" 时,使用此 prompt 替代 stock 默认 prompt
+COMMODITY_BEAR_PROMPT = """你是一位看跌期货研究员,负责论证放弃做多或做空标的 {full_symbol} 的理由。
+
+⚠️ 重要:这是大宗商品期货分析(非股票),关注以下期货特定风险:
+- **基差与期限结构**:Contango + 现货贴水 + 库存累积是最强看空信号
+- **库存与持仓**:库存累积 + 仓单增加 + 净空头集中
+- **杠杆风险**:期货保证金率 8-15%,亏损可能超过本金
+- **合约换月风险**:主力合约换月跳空、展期成本(contango 时为负 carry)
+- **涨跌停与流动性**:单日涨跌停无法平仓、小品种流动性差
+- **产业周期**:产能投放/季节性累库/限产解除/替代品冲击
+
+请用中文构建看跌论证,重点关注:
+- **基本面恶化**:库存累积 + 现货贴水 + Contango + 净空头集中共振
+- **技术面破位**:跌破关键支撑 + OI 减少 + 波动率放大
+- **资金面撤离**:前 20 名净多头大幅减少、主力翻空
+- **宏观与产业**:美联储紧缩 + OPEC+ 增产 + 库存高企 + 需求疲软
+- **反驳看涨观点**:用具体数据(库存/基差/持仓)批判看涨的过度乐观
+
+可用资源:
+- 技术面报告: {market_research_report}
+- 持仓/情绪报告: {sentiment_report}
+- 新闻/产业事件: {news_report}
+- 基本面报告(基差+库存+期限结构): {fundamentals_report}
+- 辩论对话历史: {history}
+- 最后的看涨论点: {current_response}
+- 经验教训: {past_memory_str}
+
+请构建有说服力的看跌论点,聚焦期货特定风险证据(基差/库存/期限结构/持仓/保证金),反驳看涨担忧。"""
+
 
 def create_bear_researcher(llm, memory):
     def bear_node(state) -> dict:
@@ -24,6 +54,9 @@ def create_bear_researcher(llm, memory):
         from tradingagents.utils.stock_utils import StockUtils
         market_info = StockUtils.get_market_info(ticker)
         is_china = market_info['is_china']
+
+        # === Phase 3b-ii-B:检测 asset_type ===
+        asset_type = state.get("asset_type", "stock")
 
         # 获取公司名称
         def _get_company_name(ticker_code: str, market_info_dict: dict) -> str:
@@ -86,7 +119,19 @@ def create_bear_researcher(llm, memory):
         for i, rec in enumerate(past_memories, 1):
             past_memory_str += rec["recommendation"] + "\n\n"
 
-        prompt = f"""你是一位看跌分析师，负责论证不投资股票 {company_name}（股票代码：{ticker}）的理由。
+        if asset_type == "commodity":
+            prompt = COMMODITY_BEAR_PROMPT.format(
+                full_symbol=state.get("full_symbol") or ticker,
+                market_research_report=market_research_report,
+                sentiment_report=sentiment_report,
+                news_report=news_report,
+                fundamentals_report=fundamentals_report,
+                history=history,
+                current_response=current_response,
+                past_memory_str=past_memory_str,
+            )
+        else:
+            prompt = f"""你是一位看跌分析师，负责论证不投资股票 {company_name}（股票代码：{ticker}）的理由。
 
 ⚠️ 重要提醒：当前分析的是 {market_info['market_name']}，所有价格和估值请使用 {currency}（{currency_symbol}）作为单位。
 ⚠️ 在你的分析中，请始终使用公司名称"{company_name}"而不是股票代码"{ticker}"来称呼这家公司。
