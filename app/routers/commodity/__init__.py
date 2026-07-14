@@ -1,13 +1,19 @@
 """
 大宗商品路由包入口
-- 统一导出 quotes router(Phase 1 最小)
-- 主入口在 main.py 中按 feature flag 条件 include
+- Phase 1/3a: quotes + extended + news
+- Phase 3b-ii: analysis
+- Phase 4:    paper_rules (模拟交易)
 """
 from .quotes import router as quotes_router
+from .extended import router as extended_router
+from .news import router as news_router
+from .analysis import router as analysis_router
+from .paper_rules import router as paper_rules_router
 
-# Phase 1:只导出 quotes router(包含 info / quotes / historical / categories / exchanges)
-# 后续 Phase 增加:
-# - from .analysis import router as analysis_router   # Phase 2
-# - from .paper_rules import router as paper_rules_router  # Phase 4
+__all__ = [
+    "quotes_router", "extended_router", "news_router",
+    "analysis_router", "paper_rules_router",
+]
 
-__all__ = ["quotes_router"]
+# 防止未使用警告
+_ = (quotes_router, extended_router, news_router, analysis_router, paper_rules_router)

@@ -39,7 +39,6 @@ class UnifiedCommodityService:
     async def get_basic_info(self, full_symbol: str) -> Optional[Dict[str, Any]]:
         """获取商品基础信息"""
         await self.initialize()
-        # Phase 1:只试 akshare
         provider = self._providers.get("akshare_futures")
         if not provider:
             return None
