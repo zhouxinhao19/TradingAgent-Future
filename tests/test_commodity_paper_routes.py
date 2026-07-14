@@ -222,8 +222,8 @@ class TestListOrders:
 
     def test_empty(self, client):
         resp = client.get(f"{_BASE}/orders", params={"account_id": "nonexistent"})
-        body = _assert_ok(resp)
-        assert body["data"]["total"] == 0
+        # 不存在的账户应返回 404(所有权校验拦截)
+        assert resp.status_code == 404
 
 
 class TestCancelOrder:

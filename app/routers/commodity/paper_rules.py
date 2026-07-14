@@ -54,6 +54,24 @@ def _user_id(user: dict) -> str:
     return user.get("username") or user.get("sub") or user.get("user_id", "")
 
 
+async def _verify_account_owner(account_id: str, uid: str) -> dict:
+    """验证 account_id 归属当前用户,返回账户 dict(含 user_id)或抛 403/404。"""
+    if not uid:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="未登录")
+    try:
+        account = await service.get_account(account_id)
+        if account.get("user_id") != uid:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="无权访问该账户",
+            )
+        return account
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+
+
 # =============================================================================
 # 账户端点
 # =============================================================================
@@ -92,6 +110,8 @@ async def get_account(
     user: dict = Depends(get_current_user),
 ):
     """获取指定模拟账户基础信息。"""
+    uid = _user_id(user)
+    await _verify_account_owner(account_id, uid)
     data = await service.get_account(account_id)
     return ok(data=data, message="获取账户成功")
 
@@ -102,6 +122,8 @@ async def get_account_snapshot(
     user: dict = Depends(get_current_user),
 ):
     """获取账户完整快照:账户信息 + 当前持仓 + 最新订单。"""
+    uid = _user_id(user)
+    await _verify_account_owner(account_id, uid)
     data = await service.get_account_snapshot(account_id)
     # 额外补充最新订单
     try:
@@ -118,6 +140,8 @@ async def get_account_metrics(
     user: dict = Depends(get_current_user),
 ):
     """获取账户详细指标(含保证金/风险度/盈亏分解)。"""
+    uid = _user_id(user)
+    await _verify_account_owner(account_id, uid)
     data = await service.get_account_metrics(account_id)
     return ok(data=data, message="获取指标成功")
 
@@ -128,6 +152,8 @@ async def reset_account(
     user: dict = Depends(get_current_user),
 ):
     """重置模拟账户到初始资金,清空持仓/订单/成交记录。"""
+    uid = _user_id(user)
+    await _verify_account_owner(account_id, uid)
     data = await service.reset_account(account_id)
     return ok(data=data, message="账户已重置")
 
@@ -158,6 +184,8 @@ async def submit_order(
     - stop: 止损单,触发价条件单
     - stop_limit: 止损限价单
     """
+    uid = _user_id(user)
+    await _verify_account_owner(account_id, uid)
     data = await service.submit_order(
         account_id=account_id,
         full_symbol=full_symbol,
@@ -183,6 +211,8 @@ async def list_orders(
     user: dict = Depends(get_current_user),
 ):
     """获取模拟账户的订单列表(支持状态/合约过滤)。"""
+    uid = _user_id(user)
+    await _verify_account_owner(account_id, uid)
     data = await service.list_orders(
         account_id, status=status, full_symbol=full_symbol, limit=limit, skip=skip,
     )
@@ -196,6 +226,8 @@ async def get_order(
     user: dict = Depends(get_current_user),
 ):
     """获取单笔订单的完整详情(含成交明细)。"""
+    uid = _user_id(user)
+    await _verify_account_owner(account_id, uid)
     data = await service.list_orders(account_id, limit=1)
     orders = data.get("orders", [])
     target = [o for o in orders if o.get("id") == order_id]
@@ -213,6 +245,14 @@ async def cancel_order(
     user: dict = Depends(get_current_user),
 ):
     """撤销指定订单(仅 pending 状态可撤)。"""
+    # 先查订单拿到 account_id,再校验归属
+    uid = _user_id(user)
+    from tradingagents.paper.repo import get_order_repo
+    repo = get_order_repo()
+    order = await repo.get(order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"订单不存在: {order_id}")
+    await _verify_account_owner(order.account_id, uid)
     data = await service.cancel_order(order_id)
     return ok(data=data, message="撤单成功")
 
@@ -228,6 +268,8 @@ async def list_positions(
     user: dict = Depends(get_current_user),
 ):
     """获取模拟账户当前持仓列表(净持仓模型，同品种同方向合并)。"""
+    uid = _user_id(user)
+    await _verify_account_owner(account_id, uid)
     data = await service.list_positions(account_id, open_only=open_only)
     return ok(data=data, message="获取持仓成功")
 
@@ -245,6 +287,8 @@ async def list_fills(
     user: dict = Depends(get_current_user),
 ):
     """获取模拟账户历史成交记录(append-only)。"""
+    uid = _user_id(user)
+    await _verify_account_owner(account_id, uid)
     data = await service.list_fills(
         account_id, full_symbol=full_symbol, limit=limit, skip=skip,
     )
@@ -269,6 +313,8 @@ async def from_decision(
     - long/short → 按决策入场区间取中点限价,计算手数,提交订单
     - 失败返回具体原因
     """
+    uid = _user_id(user)
+    await _verify_account_owner(account_id, uid)
     data = await service.from_decision(account_id, decision_id, override_lots=lots)
     return ok(data=data, message="决策已处理")
 
@@ -284,6 +330,8 @@ async def list_snapshots(
     user: dict = Depends(get_current_user),
 ):
     """获取模拟账户日终净值快照列表(用于 PnL 折线图)。"""
+    uid = _user_id(user)
+    await _verify_account_owner(account_id, uid)
     try:
         from tradingagents.paper.repo import get_snapshot_repo
         repo = get_snapshot_repo()
