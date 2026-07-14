@@ -247,12 +247,110 @@ queue_service 中加 `asset_type` 字段,使 worker 自动选 `CommodityTradingA
 
 | 文件 | status |
 |---|---|
-| `tradingagents/agents/analysts/commodity/technical_analyst.py` | 🟡 |
-| `tradingagents/agents/analysts/commodity/fundamental_analyst.py` | 🟡 |
-| `tradingagents/agents/analysts/commodity/position_analyst.py` | 🟡 |
-| `tradingagents/agents/analysts/commodity/news_analyst.py` | 🟡 |
-| `tradingagents/agents/researchers/commodity/` (bull/bear) | 🟡 |
-| `tradingagents/graph/commodity_graph.py` | 🟡 |
-| `app/routers/commodity/analysis.py` | 🟡 |
-| `frontend/src/views/Commodity/Analysis.vue` | 🟡 |
-| `tests/test_commodity_analyst.py` | 🟡 |
+| `tradingagents/agents/analysts/commodity/technical_analyst.py` | ✅ |
+| `tradingagents/agents/analysts/commodity/fundamental_analyst.py` | ✅ |
+| `tradingagents/agents/analysts/commodity/position_analyst.py` | ✅ |
+| `tradingagents/agents/analysts/commodity/news_analyst.py` | ✅ |
+| `tradingagents/agents/researchers/commodity/` (bull/bear) | ✅ |
+| `tradingagents/graph/commodity_graph.py` | ✅ |
+| `app/routers/commodity/analysis.py` | ✅ |
+| `frontend/src/views/Commodity/Analysis.vue` | ✅ |
+| `tests/test_commodity_analyst.py` | ✅ |
+
+---
+
+## 十一、Phase 3b-ii-E 端到端实测(2026-07-18 归档)
+
+### 11.1 测试入口
+手动 Python REPL + `tests/test_commodity_decision_chain.py`:
+
+```python
+from tradingagents.graph.commodity_graph import CommodityTradingAgentsGraph
+from pathlib import Path
+
+g = CommodityTradingAgentsGraph(config={
+    "llm_provider": "deepseek",
+    "deep_think_llm": "deepseek-v4-flash",
+    "quick_think_llm": "deepseek-v4-flash",
+    "max_debate_rounds": 1,
+    "max_risk_discuss_rounds": 1,
+    "online_tools": False,
+    "memory_enabled": False,
+    "project_dir": str(Path.cwd()),
+})
+state, decision = g.propagate(
+    full_symbol="CU2501.SHF", trade_date="2026-07-14",
+    auto_features=True, provider=MockProvider(),
+)
+```
+
+### 11.2 链路日志(完整数据流,第二轮实测)
+
+| 节点 | 输出长度 | 说明 |
+|---|---|---|
+| 4 个 commodity analyst | 1001 / 1225 / 791 / 986 字符 | 基于真实 features + 新闻数据 |
+| Bull / Bear Researcher | ~3000 字 / ~3000 字 | 含真实数据引用 |
+| Research Manager | 1800 字 | LLM 裁判 |
+| Trader | 1570 字 | 凯利公式 + 入场区间 |
+| Risky / Safe / Neutral Analyst | 28.4s / 23.0s / 50.6s | 三方风控辩论 |
+| Risk Judge | 3537 字 | LLM 最终裁决 |
+| CIO(asset_type=commodity) | 1383 字 | 综合决策输出到 `state['final_decision']` |
+
+### 11.3 性能
+- LLM 模型:`deepseek / deepseek-v4-flash`
+- API base:`https://api.deepseek.com`
+- 总耗时:~280 秒(约 4 分 40 秒)
+- 总 LLM 调用:**13 次**(4 analyst + 2 researcher + 1 manager + 1 trader + 3 risk + 1 judge + 1 CIO)
+- 估算总 token:~42k 输入 / ~18k 输出
+
+### 11.4 CIO 实测决策摘要(CU2504.SHF)
+```json
+{
+  "action": "short",
+  "confidence": 0.65,
+  "key_levels": {
+    "entry_range": "70800–71200 元/吨",
+    "stop_loss": "72200 元/吨",
+    "targets": ["69500 (1R)", "68500 (2R)"]
+  },
+  "size": "1 手 × 15 倍杠杆",
+  "holding_period": "1–2 周",
+  "highlights": [
+    "CIO 智能检测到 CU2501.SHF 已过期,自动切换到 CU2504.SHF",
+    "引用库存 180d 分位 0.9333 + 技术面日线空头占优",
+    "风险敞口按账户 6% 反推仓位和杠杆"
+  ]
+}
+```
+
+### 11.5 链路修复记录(关键)
+- **问题**:首轮实测 `asset_type` 字段缺失 → CIO 走 stock prompt 分支,导致生成 stock 风格决策
+- **修复**:`AgentState` TypedDict 补 10 个 commodity 字段(`asset_type` 等),详见 commit `93930dff`
+- **验证**:修复后 CIO 输出 1383 字 commodity 风格决策,涵盖基差 / 库存 / 期限结构 / 展期收益 / 杠杆与风险敞口
+
+### 11.6 后续可用入口
+1. **Web UI**:`/commodity/analysis` 输入合约代码 → 提交 → 等 1~5 分钟 → 历史报告列表点开查看
+2. **API**:`POST /api/commodity/{full_symbol}/analyze`(需 `FEATURE_COMMODITY_ANALYSIS=true`)
+3. **CLI/REPL**:见 §11.1 代码片段
+4. **批量回测**(Phase 4+ 计划):`tests/test_commodity_paper_trading.py` + paper trading 路由
+
+---
+
+## 十二、Phase 3b 总结 + Phase 4 衔接
+
+| 子阶段 | commit | 验证 |
+|---|---|---|
+| 3b-i Features | `41f7b939` | 97 测试 ✅ |
+| 3b-ii-A 4 analyst | `41f7b939` + `2948afa8` + `8e130fa7` | analyst + features 测试合并 130+ ✅ |
+| 3b-ii-B 决策链 commodity 化 | `3c8a4cd7` | decision_chain + cio 32 测试 ✅ |
+| 3b-ii-C 子图 + Propagator | `3d5dc602` | 测试覆盖 ✅ |
+| 3b-ii-D 路由 + Vue + features | `93930dff` | 174 测试 0 失败,后端启动验证待补 |
+| 3b-ii-E 端到端实测 | (本文档 §十一) | DeepSeek v4-flash 4 分 40 秒通过 |
+
+**Phase 4 起步清单(Paper Trading)**:
+1. 起草 `app/routers/commodity/paper_rules.py`(账户 / 持仓 / 订单 CRUD)
+2. `app/services/commodity/paper_trading_service.py`(模拟撮合 + 盈亏计算)
+3. `frontend/src/views/Commodity/PaperTrading.vue`
+4. `tests/test_commodity_paper_trading.py`(基于已实盘决策走模拟成交闭环)
+5. MongoDB 持久化(账户/持仓/订单/成交)+ Redis 进度跟踪
+6. E2E:Web UI 触发决策 → 走 3b-ii 链路 → 自动写入模拟订单 → 历史持仓报表
