@@ -215,6 +215,15 @@ const routes: RouteRecordRaw[] = [
           // 商品详情通过点击进入,不显示在菜单
           hideInMenu: true,
         }
+      },
+      {
+        path: 'paper',
+        name: 'CommodityPaperTrading',
+        component: () => import('@/views/Commodity/PaperTrading.vue'),
+        meta: {
+          title: '期货模拟交易',
+          requiresAuth: true,
+        }
       }
     ]
   },
