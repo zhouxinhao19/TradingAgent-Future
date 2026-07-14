@@ -38,6 +38,9 @@ from tradingagents.agents.analysts.commodity import (
     NewsReport,
     PositionReport,
     TechnicalReport,
+    create_fundamental_analyst,
+    create_news_analyst,
+    create_position_analyst,
     create_technical_analyst,
 )
 from tradingagents.agents.analysts.commodity._base import (
@@ -48,6 +51,11 @@ from tradingagents.agents.analysts.commodity._base import (
     truncate_snapshot,
 )
 from tradingagents.features.commodity.technical import compute_technical_metrics
+from tradingagents.features.commodity.basis import compute_basis_metrics
+from tradingagents.features.commodity.inventory import compute_inventory_metrics
+from tradingagents.features.commodity.term_structure import compute_term_structure_metrics
+from tradingagents.features.commodity.positioning import compute_positioning_metrics
+from tradingagents.features.commodity.news_sentiment import compute_news_sentiment_metrics
 
 
 # =============================================================================
@@ -97,6 +105,125 @@ def sample_ohlcv() -> pd.DataFrame:
 def sample_features_tech(sample_ohlcv) -> dict:
     """3b-i features 层输出:compute_technical_metrics(sample_ohlcv)。"""
     return {"technical": compute_technical_metrics(sample_ohlcv)}
+
+
+@pytest.fixture
+def sample_basis_df() -> pd.DataFrame:
+    """构造基差测试数据(现货+期货+基差)。"""
+    n = 60
+    return pd.DataFrame(
+        {
+            "日期": pd.date_range("2025-01-01", periods=n),
+            "现货价": 72000 + np.cumsum(np.random.randn(n) * 50),
+            "期货价": 71800 + np.cumsum(np.random.randn(n) * 50),
+            "基差": 200 + np.cumsum(np.random.randn(n) * 10),
+        }
+    )
+
+
+@pytest.fixture
+def sample_inventory_df() -> pd.DataFrame:
+    """构造库存测试数据。"""
+    n = 60
+    return pd.DataFrame(
+        {
+            "日期": pd.date_range("2025-01-01", periods=n),
+            "库存": 50000 + np.cumsum(np.random.randn(n) * 100),
+        }
+    )
+
+
+@pytest.fixture
+def sample_term_structure_df() -> pd.DataFrame:
+    """构造期限结构测试数据。"""
+    n = 60
+    return pd.DataFrame(
+        {
+            "日期": pd.date_range("2025-01-01", periods=n),
+            "近月": 72000 + np.cumsum(np.random.randn(n) * 50),
+            "远月": 72200 + np.cumsum(np.random.randn(n) * 50),
+        }
+    )
+
+
+@pytest.fixture
+def sample_positioning_df() -> pd.DataFrame:
+    """构造持仓测试数据。"""
+    n = 60
+    return pd.DataFrame(
+        {
+            "日期": pd.date_range("2025-01-01", periods=n),
+            "前20名净多头": 5000 + np.cumsum(np.random.randn(n) * 100),
+        }
+    )
+
+
+@pytest.fixture
+def sample_news_items() -> list:
+    """构造新闻测试数据(list 形式,给 news_analyst 直接用)。"""
+    return [
+        {
+            "published_at": "2025-03-01 09:30",
+            "title": "美联储鸽派转向",
+            "content": "美联储暗示将放缓加息节奏",
+            "source": "global_macro",
+            "sentiment": "positive",
+        },
+        {
+            "published_at": "2025-03-01 10:15",
+            "title": "库存数据超预期下降",
+            "content": "上周库存环比下降 5%",
+            "source": "metal",
+            "sentiment": "positive",
+        },
+        {
+            "published_at": "2025-03-01 14:20",
+            "title": "下游需求疲软",
+            "content": "加工厂反映订单减少",
+            "source": "chemical",
+            "sentiment": "negative",
+        },
+    ]
+
+
+@pytest.fixture
+def sample_news_df() -> pd.DataFrame:
+    """构造新闻 DataFrame(给 compute_news_sentiment_metrics 用)。"""
+    return pd.DataFrame(
+        {
+            "date": pd.to_datetime(
+                ["2025-03-01 09:30", "2025-03-01 10:15", "2025-03-01 14:20"]
+            ),
+            "title": ["美联储鸽派转向", "库存数据超预期下降", "下游需求疲软"],
+            "content": [
+                "美联储暗示将放缓加息节奏",
+                "上周库存环比下降 5%",
+                "加工厂反映订单减少",
+            ],
+            "source": ["global_macro", "metal", "chemical"],
+            "sentiment": ["positive", "positive", "negative"],
+        }
+    )
+
+
+@pytest.fixture
+def sample_features_all(
+    sample_ohlcv,
+    sample_basis_df,
+    sample_inventory_df,
+    sample_term_structure_df,
+    sample_positioning_df,
+    sample_news_df,
+) -> dict:
+    """所有 6 个 features 模块的输出。"""
+    return {
+        "technical": compute_technical_metrics(sample_ohlcv),
+        "basis": compute_basis_metrics(sample_basis_df),
+        "inventory": compute_inventory_metrics(sample_inventory_df),
+        "term_structure": compute_term_structure_metrics(sample_term_structure_df),
+        "positioning": compute_positioning_metrics(sample_positioning_df),
+        "news_sentiment": compute_news_sentiment_metrics(sample_news_df),
+    }
 
 
 def _state(**overrides) -> dict:
@@ -426,3 +553,171 @@ class TestSchemaConsistency:
             assert isinstance(d, dict)
             assert d["direction"] == "bullish"
             assert d["summary"] == "test"
+
+
+# =============================================================================
+# 测试 5:fundamental_analyst 节点
+# =============================================================================
+
+class TestFundamentalAnalystNode:
+    def test_no_features_returns_neutral(self, mock_llm):
+        node = create_fundamental_analyst(mock_llm)
+        result = node(_state())
+        assert "fundamentals_report" in result
+        assert "数据缺失" in result["fundamentals_report"]
+        mock_llm.invoke.assert_not_called()
+
+    def test_with_features_calls_llm(self, mock_llm, sample_features_all):
+        node = create_fundamental_analyst(mock_llm)
+        result = node(_state(commodity_features=sample_features_all))
+        assert "fundamentals_report" in result
+        assert result["fundamentals_tool_call_count"] == 0
+        mock_llm.invoke.assert_called_once()
+
+    def test_partial_features(self, mock_llm, sample_basis_df):
+        """只有 basis,缺 inventory/term_structure 时仍能跑。"""
+        feats = {"basis": compute_basis_metrics(sample_basis_df)}
+        node = create_fundamental_analyst(mock_llm)
+        result = node(_state(commodity_features=feats))
+        assert "fundamentals_report" in result
+
+    def test_llm_failure_falls_back(self, sample_features_all):
+        mock = MagicMock()
+        mock.invoke.side_effect = RuntimeError("LLM down")
+        node = create_fundamental_analyst(mock)
+        result = node(_state(commodity_features=sample_features_all))
+        assert "降级版本" in result["fundamentals_report"]
+
+
+# =============================================================================
+# 测试 6:position_analyst 节点
+# =============================================================================
+
+class TestPositionAnalystNode:
+    def test_no_features_returns_neutral(self, mock_llm):
+        node = create_position_analyst(mock_llm)
+        result = node(_state())
+        assert "sentiment_report" in result
+        assert "数据缺失" in result["sentiment_report"]
+        mock_llm.invoke.assert_not_called()
+
+    def test_with_features_calls_llm(self, mock_llm, sample_features_all):
+        node = create_position_analyst(mock_llm)
+        result = node(_state(commodity_features=sample_features_all))
+        assert "sentiment_report" in result
+        mock_llm.invoke.assert_called_once()
+
+    def test_llm_failure_falls_back(self, sample_features_all):
+        mock = MagicMock()
+        mock.invoke.side_effect = RuntimeError("LLM down")
+        node = create_position_analyst(mock)
+        result = node(_state(commodity_features=sample_features_all))
+        assert "降级版本" in result["sentiment_report"]
+
+    def test_extreme_crowding_signals(self, mock_llm):
+        """拥挤度 180d 分位 > 0.9 时应触发反向风险提示。"""
+        feats = {
+            "positioning": {
+                "latest": {
+                    "net_long_change_5d": 0.10,
+                    "crowding_pctl_180d": 0.95,
+                    "concentration": 0.7,
+                },
+                "signals": ["主力净多头加仓", "持仓集中度 0.70"],
+                "quality": {"rows": 60, "coverage": 1.0},
+            }
+        }
+        node = create_position_analyst(mock_llm)
+        result = node(_state(commodity_features=feats))
+        assert "sentiment_report" in result
+
+
+# =============================================================================
+# 测试 7:news_analyst 节点(必调 LLM)
+# =============================================================================
+
+class TestNewsAnalystNode:
+    def test_no_features_no_events_returns_neutral(self, mock_llm):
+        node = create_news_analyst(mock_llm)
+        result = node(_state())
+        assert "news_report" in result
+        assert "数据缺失" in result["news_report"]
+        mock_llm.invoke.assert_not_called()
+
+    def test_with_features_calls_llm(self, mock_llm, sample_features_all, sample_news_items):
+        node = create_news_analyst(mock_llm)
+        result = node(
+            _state(
+                commodity_features=sample_features_all,
+                latest_news=sample_news_items,
+            )
+        )
+        assert "news_report" in result
+        mock_llm.invoke.assert_called_once()
+
+    def test_with_only_events(self, mock_llm, sample_news_items):
+        """features 缺失但有 latest_news 时仍能跑。"""
+        node = create_news_analyst(mock_llm)
+        result = node(_state(latest_news=sample_news_items))
+        assert "news_report" in result
+        mock_llm.invoke.assert_called_once()
+
+    def test_llm_failure_returns_sentiment_only(self, sample_features_all, sample_news_items):
+        """LLM 失败时返回情感统计(无叙事)。"""
+        mock = MagicMock()
+        mock.invoke.side_effect = RuntimeError("LLM down")
+        node = create_news_analyst(mock)
+        result = node(
+            _state(
+                commodity_features=sample_features_all,
+                latest_news=sample_news_items,
+            )
+        )
+        assert "news_report" in result
+        assert "降级版本" in result["news_report"]
+        assert "情感统计" in result["news_report"]
+
+
+# =============================================================================
+# 测试 8:4 个 analyst 输出字段映射(决策链零改动前提)
+# =============================================================================
+
+class TestOutputFieldMapping:
+    """验证每个 analyst 写入正确的 AgentState 字段。"""
+
+    def test_technical_writes_market_report(self, mock_llm, sample_features_tech):
+        node = create_technical_analyst(mock_llm)
+        result = node(_state(commodity_features=sample_features_tech))
+        assert "market_report" in result
+        assert "fundamentals_report" not in result
+        assert "news_report" not in result
+        assert "sentiment_report" not in result
+
+    def test_fundamental_writes_fundamentals_report(self, mock_llm, sample_features_all):
+        node = create_fundamental_analyst(mock_llm)
+        result = node(_state(commodity_features=sample_features_all))
+        assert "fundamentals_report" in result
+        assert "market_report" not in result
+        assert "news_report" not in result
+        assert "sentiment_report" not in result
+
+    def test_position_writes_sentiment_report(self, mock_llm, sample_features_all):
+        node = create_position_analyst(mock_llm)
+        result = node(_state(commodity_features=sample_features_all))
+        assert "sentiment_report" in result
+        assert "market_report" not in result
+        assert "fundamentals_report" not in result
+        assert "news_report" not in result
+
+    def test_news_writes_news_report(self, mock_llm, sample_features_all, sample_news_items):
+        node = create_news_analyst(mock_llm)
+        result = node(
+            _state(
+                commodity_features=sample_features_all,
+                latest_news=sample_news_items,
+            )
+        )
+        assert "news_report" in result
+        assert "market_report" not in result
+        assert "fundamentals_report" not in result
+        assert "sentiment_report" not in result
