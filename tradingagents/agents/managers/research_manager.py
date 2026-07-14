@@ -6,6 +6,40 @@ from tradingagents.utils.logging_init import get_logger
 from tradingagents.agents.utils.instrument_utils import build_instrument_context
 logger = get_logger("default")
 
+# === Phase 3b-ii-B:Commodity prompt 注入(占位) ===
+COMMODITY_RESEARCH_MANAGER_PROMPT = """作为期货研究经理和辩论主持人,您需要批判性地评估这轮多空辩论,并为标的 {full_symbol} 做出明确决策:做多、做空或持有。
+
+⚠️ 这是大宗商品期货分析(非股票),必须包含以下期货特定内容:
+- **目标价格**:具体入场价位、止损、止盈、目标位(以合约报价单位)
+- **合约选择**:主力合约代码、换月计划、展期成本估算
+- **杠杆与保证金**:建议持仓手数、保证金占用、风险敞口
+- **基差与期限结构**:对进场时机的指示(Contango 时谨慎,Backwardation 时积极)
+- **时间维度**:日内/短线/波段/趋势,建议持有周期
+
+简洁地总结双方关键观点,重点关注最有说服力的证据或推理。您的建议——做多、做空或持有——必须明确且可操作。避免仅仅因为双方都有有效观点就默认选择持有;要基于辩论中最强有力的论点做出承诺。
+
+请用中文撰写所有内容。
+
+以下是您对错误的过去反思:
+\"{past_memory_str}\"
+
+标的约束:
+{instrument_context}
+
+以下是综合分析报告:
+市场研究: {market_research_report}
+
+情绪分析: {sentiment_report}
+
+新闻分析: {news_report}
+
+基本面分析: {fundamentals_report}
+
+以下是辩论:
+辩论历史: {history}
+
+请做出明确决策:做多/做空/持有 + 目标价/止损/止盈 + 合约选择 + 持有周期。"""
+
 
 def create_research_manager(llm, memory):
     def research_manager_node(state) -> dict:
@@ -18,6 +52,9 @@ def create_research_manager(llm, memory):
         fundamentals_report = state["fundamentals_report"]
 
         investment_debate_state = state["investment_debate_state"]
+
+        # === Phase 3b-ii-B:检测 asset_type ===
+        asset_type = state.get("asset_type", "stock")
 
         curr_situation = f"{market_research_report}\n\n{sentiment_report}\n\n{news_report}\n\n{fundamentals_report}"
 
@@ -32,7 +69,19 @@ def create_research_manager(llm, memory):
         for i, rec in enumerate(past_memories, 1):
             past_memory_str += rec["recommendation"] + "\n\n"
 
-        prompt = f"""作为投资组合经理和辩论主持人，您的职责是批判性地评估这轮辩论并做出明确决策：支持看跌分析师、看涨分析师，或者仅在基于所提出论点有强有力理由时选择持有。
+        if asset_type == "commodity":
+            prompt = COMMODITY_RESEARCH_MANAGER_PROMPT.format(
+                full_symbol=state.get("full_symbol") or ticker,
+                market_research_report=market_research_report,
+                sentiment_report=sentiment_report,
+                news_report=news_report,
+                fundamentals_report=fundamentals_report,
+                history=history,
+                past_memory_str=past_memory_str,
+                instrument_context=instrument_context,
+            )
+        else:
+            prompt = f"""作为投资组合经理和辩论主持人，您的职责是批判性地评估这轮辩论并做出明确决策：支持看跌分析师、看涨分析师，或者仅在基于所提出论点有强有力理由时选择持有。
 
 简洁地总结双方的关键观点，重点关注最有说服力的证据或推理。您的建议——买入、卖出或持有——必须明确且可操作。避免仅仅因为双方都有有效观点就默认选择持有；要基于辩论中最强有力的论点做出承诺。
 

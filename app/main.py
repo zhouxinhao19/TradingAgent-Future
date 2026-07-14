@@ -737,21 +737,35 @@ app.include_router(internal_messages.router, tags=["internal-messages"])
 # 总开关关闭时,所有 /api/commodity/* 路由不注册
 # 子开关按需细粒度控制:Phase 1=数据,Phase 2=分析,Phase 4=模拟交易
 if settings.FEATURE_COMMODITY_ENABLED:
-    from app.routers.commodity import quotes_router
+    from app.routers.commodity import quotes_router, extended_router, news_router
 
     if settings.FEATURE_COMMODITY_DATA:
-        # Phase 1:商品基础信息/行情/历史/品类/交易所
+        # Phase 1:商品基础信息/行情/历史/品类/交易所(5 端点)
         app.include_router(quotes_router, prefix="/api")
-        logger.info("✅ 大宗商品数据路由已注册(/api/commodity/*)")
+        # Phase 3a:13 扩展接口 + 静态品种字典(15 端点)
+        app.include_router(extended_router, prefix="/api")
+        # Phase 3a:6 类新闻聚合(2 端点)
+        app.include_router(news_router, prefix="/api")
+        total = len(quotes_router.routes) + len(extended_router.routes) + len(news_router.routes)
+        logger.info(f"✅ 大宗商品数据路由已注册(/api/commodity/* 共 {total} 端点)")
     else:
         logger.info("⏸️  大宗商品数据路由未启用(FEATURE_COMMODITY_DATA=false)")
 
-    # Phase 2 启用:from app.routers.commodity import analysis_router
-    # if settings.FEATURE_COMMODITY_ANALYSIS:
-    #     app.include_router(analysis_router, prefix="/api")
-    # Phase 4 启用:from app.routers.commodity import paper_rules_router
-    # if settings.FEATURE_COMMODITY_PAPER:
-    #     app.include_router(paper_rules_router, prefix="/api")
+    # Phase 3b-ii-D 启用:商品分析任务(异步跑决策链)
+    if settings.FEATURE_COMMODITY_ANALYSIS:
+        from app.routers.commodity import analysis_router
+        app.include_router(analysis_router, prefix="/api")
+        logger.info("✅ 大宗商品分析路由已注册(/api/commodity/{symbol}/analyze + reports)")
+    else:
+        logger.info("⏸️  大宗商品分析路由未启用(FEATURE_COMMODITY_ANALYSIS=false)")
+
+    # Phase 4 启用:大宗商品模拟交易
+    if settings.FEATURE_COMMODITY_PAPER:
+        from app.routers.commodity import paper_rules_router
+        app.include_router(paper_rules_router, prefix="/api")
+        logger.info(f"✅ 大宗商品模拟交易路由已注册(/api/commodity/paper/*, 共 {len(paper_rules_router.routes)} 端点)")
+    else:
+        logger.info("⏸️  大宗商品模拟交易路由未启用(FEATURE_COMMODITY_PAPER=false)")
 else:
     logger.info("⏸️  大宗商品模块未启用(FEATURE_COMMODITY_ENABLED=false)")
 

@@ -6,6 +6,32 @@ import json
 from tradingagents.utils.logging_init import get_logger
 logger = get_logger("default")
 
+# === Phase 3b-ii-B:Commodity prompt 注入(占位) ===
+COMMODITY_CONSERVATIVE_PROMPT = """作为保守期货风险分析师,您认为期货高杠杆会放大亏损,必须严格控制风险敞口。重点强调:
+
+⚠️ 这是大宗商品期货(非股票):
+- **杠杆反向放大**:期货 8-15 倍杠杆,做错方向时亏损放大同样倍数
+- **穿仓风险**:极端行情下,保证金不足会被强平甚至穿仓(倒欠交易所)
+- **涨跌停无法平仓**:单日反向停板,无法止损出场,次日跳空继续亏损
+- **Contango 损耗**:做多远月合约在 Contango 结构下,每次展期都亏损(carry 为负)
+- **流动性与滑点**:小品种或主力换月时流动性差,实际成交价远差于预期
+- **库存与基差突变**:现货升水突然转贴水,基差反转会瞬间抹去浮盈
+- **品种波动差异**:农产品季节性单日 3-5%,能源单日可达 5-10%,金属 2-4%
+
+以下是交易员的决策:
+{trader_decision}
+
+积极反驳激进和中性分析师,强调保守策略的稳健性:
+- 市场研究(趋势确认 + 突破有效性): {market_research_report}
+- 持仓/情绪报告(拥挤度 + 主力翻空): {sentiment_report}
+- 新闻/产业事件(供给过剩 + 需求疲软): {news_report}
+- 基本面报告(基差走弱 + 库存累积 + Contango): {fundamentals_report}
+- 当前对话历史: {history}
+- 激进分析师的最后论点: {current_risky_response}
+- 中性分析师的最后论点: {current_neutral_response}
+
+保守策略应包括:严格止损位(单笔不超过 1-2% 账户)、低杠杆(保证金占用 ≤ 20%)、主力合约而非远月、流动性充足的品种。请用中文以对话方式输出。"""
+
 
 def create_safe_debator(llm):
     def safe_node(state) -> dict:
@@ -23,6 +49,9 @@ def create_safe_debator(llm):
 
         trader_decision = state["trader_investment_plan"]
 
+        # === Phase 3b-ii-B:检测 asset_type ===
+        asset_type = state.get("asset_type", "stock")
+
         # 📊 记录输入数据长度
         logger.info(f"📊 [Safe Analyst] 输入数据长度统计:")
         logger.info(f"  - market_report: {len(market_research_report):,} 字符")
@@ -37,7 +66,19 @@ def create_safe_debator(llm):
                        len(current_risky_response) + len(current_neutral_response))
         logger.info(f"  - 总Prompt长度: {total_length:,} 字符 (~{total_length//4:,} tokens)")
 
-        prompt = f"""作为安全/保守风险分析师，您的主要目标是保护资产、最小化波动性，并确保稳定、可靠的增长。您优先考虑稳定性、安全性和风险缓解，仔细评估潜在损失、经济衰退和市场波动。在评估交易员的决策或计划时，请批判性地审查高风险要素，指出决策可能使公司面临不当风险的地方，以及更谨慎的替代方案如何能够确保长期收益。以下是交易员的决策：
+        if asset_type == "commodity":
+            prompt = COMMODITY_CONSERVATIVE_PROMPT.format(
+                trader_decision=trader_decision,
+                market_research_report=market_research_report,
+                sentiment_report=sentiment_report,
+                news_report=news_report,
+                fundamentals_report=fundamentals_report,
+                history=history,
+                current_risky_response=current_risky_response,
+                current_neutral_response=current_neutral_response,
+            )
+        else:
+            prompt = f"""作为安全/保守风险分析师，您的主要目标是保护资产、最小化波动性，并确保稳定、可靠的增长。您优先考虑稳定性、安全性和风险缓解，仔细评估潜在损失、经济衰退和市场波动。在评估交易员的决策或计划时，请批判性地审查高风险要素，指出决策可能使公司面临不当风险的地方，以及更谨慎的替代方案如何能够确保长期收益。以下是交易员的决策：
 
 {trader_decision}
 

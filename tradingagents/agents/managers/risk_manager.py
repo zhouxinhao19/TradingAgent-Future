@@ -6,12 +6,66 @@ from tradingagents.utils.logging_init import get_logger
 from tradingagents.agents.utils.instrument_utils import build_instrument_context
 logger = get_logger("default")
 
+# === Phase 3b-ii-B:Commodity prompt 注入(占位) ===
+COMMODITY_RISK_MANAGER_PROMPT = """作为期货风险管理委员会主席,您需要评估三位风险分析师(激进/中性/保守)的辩论,并确定交易员在标的 {full_symbol} 上的最佳行动方案。决策必须明确:做多、做空或平仓。
+
+⚠️ 这是大宗商品期货(非股票),必须包含以下期货特定内容:
+- **目标价格**:具体入场价位、止损、止盈(以合约报价单位)
+- **合约选择**:主力合约代码、换月计划
+- **杠杆与保证金**:建议持仓手数、保证金占用、风险敞口百分比
+- **基差与期限结构**:对进场时机的指示(Contango 时谨慎,Backwardation 时积极)
+- **时间维度**:日内/短线/波段/趋势,建议持有周期
+- **风险量化**:最大单笔亏损(账户百分比)、最大回撤容忍度
+
+决策指导原则:
+1. **总结关键论点**:提取每位分析师的最强观点,重点关注与背景的相关性。
+2. **提供理由**:用辩论中的直接引用和反驳论点支持您的建议。
+3. **完善交易员计划**:从交易员的原始计划 **{trader_plan}** 开始,根据分析师的见解进行调整。
+4. **从过去的错误中学习**:使用 **{past_memory_str}** 中的经验教训改进决策,避免在期货上重复错误。
+
+交付成果:
+- 明确且可操作的建议:做多、做空或平仓。
+- 基于辩论和过去反思的详细推理。
+
+标的约束:
+{instrument_context}
+
+---
+
+**分析师辩论历史:**
+{history}
+
+---
+
+请用中文撰写所有分析内容,聚焦期货特定风险(基差/库存/期限结构/持仓/杠杆/合约选择)。"""
+
+# === Phase 3b-ii-B:Commodity 默认决策(LLM 失败 fallback) ===
+COMMODITY_DEFAULT_DECISION = """**默认建议:平仓**
+
+由于技术原因无法生成详细分析,基于当前市场状况和风险控制原则,建议对{full_symbol}采取平仓策略。
+
+**理由:**
+1. 期货高杠杆特性,信息不足时优先控制风险
+2. 保持现有仓位退出,等待更明确的市场信号
+3. 控制保证金占用,避免在不确定性高的情况下做出激进决策
+
+**建议:**
+- 密切关注基差/库存/期限结构变化
+- 设置合理的止损和止盈位
+- 等待更好的入场或出场时机
+
+注意:此为系统默认建议,建议结合人工分析做出最终决策。"""
+
 
 def create_risk_manager(llm, memory):
     def risk_manager_node(state) -> dict:
 
         company_name = state["company_of_interest"]
         instrument_context = build_instrument_context(company_name)
+
+        # === Phase 3b-ii-B:检测 asset_type ===
+        asset_type = state.get("asset_type", "stock")
+        full_symbol = state.get("full_symbol") or company_name
 
         history = state["risk_debate_state"]["history"]
         risk_debate_state = state["risk_debate_state"]
@@ -34,7 +88,16 @@ def create_risk_manager(llm, memory):
         for i, rec in enumerate(past_memories, 1):
             past_memory_str += rec["recommendation"] + "\n\n"
 
-        prompt = f"""作为风险管理委员会主席和辩论主持人，您的目标是评估三位风险分析师——激进、中性和安全/保守——之间的辩论，并确定交易员的最佳行动方案。您的决策必须产生明确的建议：买入、卖出或持有。只有在有具体论据强烈支持时才选择持有，而不是在所有方面都似乎有效时作为后备选择。力求清晰和果断。
+        if asset_type == "commodity":
+            prompt = COMMODITY_RISK_MANAGER_PROMPT.format(
+                full_symbol=full_symbol,
+                trader_plan=trader_plan,
+                past_memory_str=past_memory_str,
+                instrument_context=instrument_context,
+                history=history,
+            )
+        else:
+            prompt = f"""作为风险管理委员会主席和辩论主持人，您的目标是评估三位风险分析师——激进、中性和安全/保守——之间的辩论，并确定交易员的最佳行动方案。您的决策必须产生明确的建议：买入、卖出或持有。只有在有具体论据强烈支持时才选择持有，而不是在所有方面都似乎有效时作为后备选择。力求清晰和果断。
 
 决策指导原则：
 1. **总结关键论点**：提取每位分析师的最强观点，重点关注与背景的相关性。
@@ -129,7 +192,7 @@ def create_risk_manager(llm, memory):
         # 如果所有重试都失败，生成默认决策
         if not response_content:
             logger.error(f"❌ [Risk Manager] 所有LLM调用尝试失败，使用默认决策")
-            response_content = f"""**默认建议：持有**
+            response_content = (COMMODITY_DEFAULT_DECISION.format(full_symbol=full_symbol) if asset_type == "commodity" else f"""**默认建议：持有**
 
 由于技术原因无法生成详细分析，基于当前市场状况和风险控制原则，建议对{company_name}采取持有策略。
 
@@ -143,7 +206,7 @@ def create_risk_manager(llm, memory):
 - 设置合理的止损和止盈位
 - 等待更好的入场或出场时机
 
-注意：此为系统默认建议，建议结合人工分析做出最终决策。"""
+注意：此为系统默认建议，建议结合人工分析做出最终决策。""")
 
         new_risk_debate_state = {
             "judge_decision": response_content,

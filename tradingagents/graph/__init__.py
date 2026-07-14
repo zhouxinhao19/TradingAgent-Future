@@ -6,6 +6,7 @@ from .setup import GraphSetup
 from .propagation import Propagator
 from .reflection import Reflector
 from .signal_processing import SignalProcessor
+from .commodity_graph import CommodityTradingAgentsGraph, CommodityPropagator, CommodityGraphSetup
 
 # 导入统一日志系统
 from tradingagents.utils.logging_init import get_logger
@@ -18,4 +19,7 @@ __all__ = [
     "Propagator",
     "Reflector",
     "SignalProcessor",
+    "CommodityTradingAgentsGraph",
+    "CommodityPropagator",
+    "CommodityGraphSetup",
 ]

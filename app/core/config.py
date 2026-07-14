@@ -161,6 +161,47 @@ class Settings(BaseSettings):
     # Phase 4+: 商品模拟交易(/api/commodity/paper/*)
     FEATURE_COMMODITY_PAPER: bool = Field(default=False)
 
+    # ===== 大宗商品模拟交易参数(Phase 4 第三刀起生效) =====
+    # 撮合模式:current_price(默认,立即按当前市价成交) / next_bar_open / vwap
+    PAPER_MATCHING_MODE: str = Field(
+        default="current_price",
+        description="模拟撮合模式,默认 current_price(演示友好)"
+    )
+    # 单笔滑点(basis points,1bp = 0.01%)。长买向上滑 / 短卖向下滑
+    PAPER_SLIPPAGE_BPS: float = Field(
+        default=1.0, ge=0.0,
+        description="单笔滑点(基础点),0 表示无滑点"
+    )
+    # 单笔最大委托手数(防止误操作 / 风控)
+    PAPER_MAX_LOTS_PER_ORDER: int = Field(
+        default=10, ge=1,
+        description="单笔订单最大手数,超出按 invalid_lots 拒单"
+    )
+    # 单品种最大持仓手数(防止模型失控)
+    PAPER_MAX_POSITION_PER_SYMBOL: int = Field(
+        default=50, ge=1,
+        description="单品种最大净持仓手数,超出按 exceeds_max_position 拒单"
+    )
+    # 默认初始资金(开户未指定时)
+    PAPER_DEFAULT_INITIAL_CAPITAL: float = Field(
+        default=1_000_000.0, gt=0,
+        description="默认初始资金(元)"
+    )
+    # 日终快照 cron(每日 15:35 收盘后落库)
+    PAPER_SNAPSHOT_CRON: str = Field(
+        default="35 15 * * 1-5",
+        description="日终快照 cron 表达式(仅工作日)"
+    )
+    # 日终快照功能开关
+    PAPER_DAILY_SNAPSHOT_ENABLED: bool = Field(
+        default=True,
+        description="是否启用每日 15:35 自动日终快照"
+    )
+    # 风控触发强平阈值(risk_ratio > 此值触发)
+    PAPER_FORCE_CLOSE_RISK_RATIO: float = Field(
+        default=1.0, ge=0.0,
+        description="风险度超过此值触发强平,默认 1.0 = 100%"
+    )
     @property
     def FEATURE_FLAGS(self) -> Dict[str, bool]:
         """前端通过 /api/config/features 读取,控制菜单显示"""

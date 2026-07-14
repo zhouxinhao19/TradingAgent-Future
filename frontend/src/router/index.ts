@@ -180,6 +180,54 @@ const routes: RouteRecordRaw[] = [
     ]
   },
 
+  // 大宗商品(Phase 3a / 3b-ii)
+  {
+    path: '/commodity',
+    name: 'Commodity',
+    component: () => import('@/layouts/BasicLayout.vue'),
+    redirect: '/commodity/list',
+    meta: {
+      title: '大宗商品',
+      icon: 'Box',
+      requiresAuth: true,
+      transition: 'fade'
+    },
+    children: [
+      {
+        path: 'list',
+        name: 'CommodityList',
+        component: () => import('@/views/Commodity/List.vue'),
+        meta: { title: '商品列表', requiresAuth: true }
+      },
+      {
+        path: 'analysis',
+        name: 'CommodityAnalysis',
+        component: () => import('@/views/Commodity/Analysis.vue'),
+        meta: { title: '商品分析', requiresAuth: true }
+      },
+      {
+        path: ':fullSymbol',
+        name: 'CommodityDetail',
+        component: () => import('@/views/Commodity/Detail.vue'),
+        meta: {
+          title: '商品详情',
+          requiresAuth: true,
+          // 商品详情通过点击进入,不显示在菜单
+          hideInMenu: true,
+        }
+      },
+      {
+        path: 'paper',
+        name: 'CommodityPaperTrading',
+        component: () => import('@/views/Commodity/PaperTrading.vue'),
+        meta: {
+          title: '期货模拟交易',
+          requiresAuth: true,
+        }
+      }
+    ]
+  },
+
 
   {
     path: '/tasks',

@@ -6,6 +6,36 @@ import json
 from tradingagents.utils.logging_init import get_logger
 logger = get_logger("default")
 
+# === Phase 3b-ii-B:Commodity prompt 注入(占位) ===
+# 当 state['asset_type'] == "commodity" 时,使用此 prompt 替代 stock 默认 prompt
+# 期货特定关注:基差/库存/期限结构/持仓/展期收益率/保证金率/涨跌停/合约到期/手数
+COMMODITY_BULL_PROMPT = """你是一位看涨期货研究员,负责为标的 {full_symbol} 的做多机会建立强有力的论证。
+
+⚠️ 重要:这是大宗商品期货分析(非股票),关注以下期货特定维度:
+- **基差与期限结构**:现货升贴水、Contango/Backwardation、展期收益率(carry)
+- **库存与持仓**:库存去化速率、前 20 名净多头变化、拥挤度
+- **波动率与杠杆**:ATR 百分位、保证金率(通常 8-15%)、涨跌停板
+- **合约生命周期**:主力合约换月、最后交易日、限仓规则
+- **季节性**:农产品有强季节性,能源/金属有需求淡旺季
+
+请用中文构建看涨论证,重点关注:
+- **基本面驱动**:库存去化 + 现货升水 + Backwardation 三角共振是最强看多信号
+- **技术面配合**:日/周双周期同向 + OI 背离支持 + 突破关键位
+- **资金面与持仓**:前 20 名净多头增加 + 主力加多
+- **宏观与产业**:全球宏观(美联储/OPEC+/地缘) + 产业事件(产能/限产/天气)
+- **反驳看跌观点**:用具体数据(库存/基差/持仓)批判性分析
+
+可用资源:
+- 技术面报告: {market_research_report}
+- 持仓/情绪报告: {sentiment_report}
+- 新闻/产业事件: {news_report}
+- 基本面报告(基差+库存+期限结构): {fundamentals_report}
+- 辩论对话历史: {history}
+- 最后的看跌论点: {current_response}
+- 经验教训: {past_memory_str}
+
+请构建有说服力的看涨论点,聚焦期货特定证据(基差/库存/期限结构/持仓),反驳看跌担忧。"""
+
 
 def create_bull_researcher(llm, memory):
     def bull_node(state) -> dict:
@@ -21,7 +51,10 @@ def create_bull_researcher(llm, memory):
         news_report = state["news_report"]
         fundamentals_report = state["fundamentals_report"]
 
-        # 使用统一的股票类型检测
+        # === Phase 3b-ii-B:检测 asset_type ===
+        asset_type = state.get("asset_type", "stock")
+
+        # 使用统一的股票类型检测(仅 stock 路径需要)
         ticker = state.get('company_of_interest', 'Unknown')
         from tradingagents.utils.stock_utils import StockUtils
         market_info = StockUtils.get_market_info(ticker)
@@ -97,7 +130,19 @@ def create_bull_researcher(llm, memory):
         for i, rec in enumerate(past_memories, 1):
             past_memory_str += rec["recommendation"] + "\n\n"
 
-        prompt = f"""你是一位看涨分析师，负责为股票 {company_name}（股票代码：{ticker}）的投资建立强有力的论证。
+        if asset_type == "commodity":
+            prompt = COMMODITY_BULL_PROMPT.format(
+                full_symbol=state.get("full_symbol") or ticker,
+                market_research_report=market_research_report,
+                sentiment_report=sentiment_report,
+                news_report=news_report,
+                fundamentals_report=fundamentals_report,
+                history=history,
+                current_response=current_response,
+                past_memory_str=past_memory_str,
+            )
+        else:
+            prompt = f"""你是一位看涨分析师，负责为股票 {company_name}（股票代码：{ticker}）的投资建立强有力的论证。
 
 ⚠️ 重要提醒：当前分析的是 {'中国A股' if is_china else '海外股票'}，所有价格和估值请使用 {currency}（{currency_symbol}）作为单位。
 ⚠️ 在你的分析中，请始终使用公司名称"{company_name}"而不是股票代码"{ticker}"来称呼这家公司。
