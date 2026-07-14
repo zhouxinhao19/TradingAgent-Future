@@ -759,9 +759,13 @@ if settings.FEATURE_COMMODITY_ENABLED:
     else:
         logger.info("⏸️  大宗商品分析路由未启用(FEATURE_COMMODITY_ANALYSIS=false)")
 
-    # Phase 4 启用:from app.routers.commodity import paper_rules_router
-    # if settings.FEATURE_COMMODITY_PAPER:
-    #     app.include_router(paper_rules_router, prefix="/api")
+    # Phase 4 启用:大宗商品模拟交易
+    if settings.FEATURE_COMMODITY_PAPER:
+        from app.routers.commodity import paper_rules_router
+        app.include_router(paper_rules_router, prefix="/api")
+        logger.info(f"✅ 大宗商品模拟交易路由已注册(/api/commodity/paper/*, 共 {len(paper_rules_router.routes)} 端点)")
+    else:
+        logger.info("⏸️  大宗商品模拟交易路由未启用(FEATURE_COMMODITY_PAPER=false)")
 else:
     logger.info("⏸️  大宗商品模块未启用(FEATURE_COMMODITY_ENABLED=false)")
 

@@ -380,4 +380,168 @@ export const commodityApi = {
   },
 }
 
+// ============================================================
+// 模拟交易 API (Phase 4)
+// ============================================================
+
+export interface PaperAccountItem {
+  account_id: string
+  user_id: string
+  name: string
+  initial_capital: number
+  balance: number
+  available: number
+  margin_used: number
+  frozen: number
+  equity: number
+  realized_pnl: number
+  unrealized_pnl: number
+  risk_ratio: number
+  status: string
+  updated_at?: string
+}
+
+export interface PaperPositionItem {
+  id: string
+  account_id: string
+  full_symbol: string
+  direction: 'long' | 'short'
+  lots: number
+  avg_cost: number
+  current_price: number
+  floating_pnl: number
+  margin_used: number
+  stop_loss?: number | null
+  take_profit?: number | null
+  opened_at?: string
+  updated_at?: string
+}
+
+export interface PaperOrderItem {
+  id: string
+  account_id: string
+  full_symbol: string
+  direction: 'long' | 'short'
+  offset: string
+  order_type: 'market' | 'limit' | 'stop' | 'stop_limit'
+  lots: number
+  price?: number | null
+  stop_price?: number | null
+  status: string
+  filled_lots: number
+  filled_avg_price: number
+  commission: number
+  source: string
+  decision_id?: string | null
+  created_at?: string
+  filled_at?: string
+  cancelled_at?: string
+}
+
+export interface PaperFillItem {
+  id: string
+  order_id: string
+  account_id: string
+  full_symbol: string
+  direction: string
+  offset: string
+  lots: number
+  price: number
+  commission: number
+  slippage: number
+  matched_at?: string
+}
+
+export const commodityPaperApi = {
+  // ---- 账户 ----
+  async createAccount(name = '默认账户', initialCapital?: number) {
+    const params: Record<string, any> = { name }
+    if (initialCapital !== undefined) params.initial_capital = initialCapital
+    return ApiClient.post<ApiEnvelope<PaperAccountItem>>(`/api/commodity/paper/accounts`, params)
+  },
+
+  async listAccounts() {
+    return ApiClient.get<ApiEnvelope<{ accounts: PaperAccountItem[] }>>(`/api/commodity/paper/accounts`)
+  },
+
+  async getAccount(accountId: string) {
+    return ApiClient.get<ApiEnvelope<PaperAccountItem>>(`/api/commodity/paper/accounts/${accountId}`)
+  },
+
+  async getAccountSnapshot(accountId: string) {
+    return ApiClient.get<ApiEnvelope<PaperAccountItem & { positions: PaperPositionItem[]; recent_orders: PaperOrderItem[] }>>(
+      `/api/commodity/paper/accounts/${accountId}/snapshot`,
+    )
+  },
+
+  async getAccountMetrics(accountId: string) {
+    return ApiClient.get<ApiEnvelope<Record<string, number>>>(`/api/commodity/paper/accounts/${accountId}/metrics`)
+  },
+
+  async resetAccount(accountId: string) {
+    return ApiClient.post<ApiEnvelope<PaperAccountItem>>(`/api/commodity/paper/accounts/${accountId}/reset`)
+  },
+
+  // ---- 订单 ----
+  async submitOrder(params: {
+    account_id: string
+    full_symbol: string
+    direction: 'long' | 'short'
+    offset?: string
+    order_type?: string
+    lots: number
+    price?: number
+    stop_price?: number
+    stop_loss?: number
+    take_profit?: number
+  }) {
+    return ApiClient.post<ApiEnvelope<{ status: string; fill?: PaperFillItem; reject_reason?: string }>>(
+      `/api/commodity/paper/orders`, params,
+    )
+  },
+
+  async listOrders(accountId: string, params?: { status?: string; full_symbol?: string; limit?: number; skip?: number }) {
+    return ApiClient.get<ApiEnvelope<{ orders: PaperOrderItem[]; total: number }>>(
+      `/api/commodity/paper/orders`, { account_id: accountId, ...params },
+    )
+  },
+
+  async getOrder(orderId: string, accountId: string) {
+    return ApiClient.get<ApiEnvelope<PaperOrderItem>>(`/api/commodity/paper/orders/${orderId}`, { account_id: accountId })
+  },
+
+  async cancelOrder(orderId: string) {
+    return ApiClient.post<ApiEnvelope<{ order_id: string; status: string }>>(`/api/commodity/paper/orders/${orderId}/cancel`)
+  },
+
+  // ---- 持仓 ----
+  async listPositions(accountId: string, openOnly = true) {
+    return ApiClient.get<ApiEnvelope<{ positions: PaperPositionItem[] }>>(
+      `/api/commodity/paper/positions`, { account_id: accountId, open_only: openOnly },
+    )
+  },
+
+  // ---- 成交 ----
+  async listFills(accountId: string, params?: { full_symbol?: string; limit?: number; skip?: number }) {
+    return ApiClient.get<ApiEnvelope<{ fills: PaperFillItem[]; total: number }>>(
+      `/api/commodity/paper/fills`, { account_id: accountId, ...params },
+    )
+  },
+
+  // ---- 决策下单 ----
+  async fromDecision(accountId: string, decisionId: string, lots?: number) {
+    return ApiClient.post<ApiEnvelope<{ status: string; lots?: number; reason?: string }>>(
+      `/api/commodity/paper/from-decision`,
+      { account_id: accountId, decision_id: decisionId, lots },
+    )
+  },
+
+  // ---- 快照 ----
+  async listSnapshots(accountId: string, limit = 30) {
+    return ApiClient.get<ApiEnvelope<{ snapshots: Array<{ date: string; equity: number; balance: number }> }>>(
+      `/api/commodity/paper/snapshots`, { account_id: accountId, limit },
+    )
+  },
+}
+
 export default commodityApi
