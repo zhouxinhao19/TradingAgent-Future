@@ -13,9 +13,12 @@ services:
       # 开发模式自动重载
       DEBUG: "true"
       UVICORN_RELOAD: "true"
-      # Phase 0 引入的 4 个 feature flag(本地默认全部关闭)
-      FEATURE_COMMODITY_ENABLED: "false"
-      FEATURE_COMMODITY_DATA: "false"
+      # Phase 0 引入的 4 个 feature flag
+      # Phase 3a 完成 → ENABLE + DATA = true(本地开发默认开启商品数据/列表/详情页)
+      # Phase 3b 后 ANALYSI = true(分析师任务)
+      # Phase 4 后  PAPER = true(模拟交易)
+      FEATURE_COMMODITY_ENABLED: "true"
+      FEATURE_COMMODITY_DATA: "true"
       FEATURE_COMMODITY_ANALYSIS: "false"
       FEATURE_COMMODITY_PAPER: "false"
 
