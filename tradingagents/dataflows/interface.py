@@ -1,33 +1,15 @@
-from typing import Annotated, Dict
-import time
-import os
-from datetime import datetime
+"""
+数据流接口层 (Phase 5: 已移除股票数据流, 仅保留通用接口)
+"""
+import logging
 
-# 导入新闻模块（支持新旧路径）
-try:
-    from .news import fetch_top_from_category
-except ImportError:
-    from .news.reddit import fetch_top_from_category
+logger = logging.getLogger("dataflows.interface")
 
-from .news.google_news import *
+def set_config(**kwargs):
+    """兼容性占位 — 原用于股票数据源配置"""
+    pass
 
-
-from .news.chinese_finance import get_chinese_social_sentiment
-
-# 导入 Finnhub 工具（支持新旧路径）
-
-from .providers.us import get_data_in_range
-
-
-# 导入统一日志系统
-from tradingagents.utils.logging_init import setup_dataflow_logging
-
-# 导入日志模块
-from tradingagents.utils.logging_manager import get_logger
-logger = get_logger('agents')
-logger = setup_dataflow_logging()
-
-# 导入港股工具
+__all__ = ["set_config"]
 try:
     from .providers.hk.hk_stock import get_hk_stock_data, get_hk_stock_info
     HK_STOCK_AVAILABLE = True

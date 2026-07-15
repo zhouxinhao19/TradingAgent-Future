@@ -119,53 +119,8 @@ def run_stock_analysis(stock_symbol, analysis_date, analysts, research_depth, ll
     # 生成会话ID用于Token跟踪和日志关联
     session_id = f"analysis_{uuid.uuid4().hex[:8]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-    # 1. 数据预获取和验证阶段
-    update_progress("🔍 验证股票代码并预获取数据...", 1, 10)
-
-    try:
-        from tradingagents.utils.stock_validator import prepare_stock_data
-
-        # 预获取股票数据（默认30天历史数据）
-        preparation_result = prepare_stock_data(
-            stock_code=stock_symbol,
-            market_type=market_type,
-            period_days=30,  # 可以根据research_depth调整
-            analysis_date=analysis_date
-        )
-
-        if not preparation_result.is_valid:
-            error_msg = f"❌ 股票数据验证失败: {preparation_result.error_message}"
-            update_progress(error_msg)
-            logger.error(f"[{session_id}] {error_msg}")
-
-            return {
-                'success': False,
-                'error': preparation_result.error_message,
-                'suggestion': preparation_result.suggestion,
-                'stock_symbol': stock_symbol,
-                'analysis_date': analysis_date,
-                'session_id': session_id
-            }
-
-        # 数据预获取成功
-        success_msg = f"✅ 数据准备完成: {preparation_result.stock_name} ({preparation_result.market_type})"
-        update_progress(success_msg)  # 使用智能检测，不再硬编码步骤
-        logger.info(f"[{session_id}] {success_msg}")
-        logger.info(f"[{session_id}] 缓存状态: {preparation_result.cache_status}")
-
-    except Exception as e:
-        error_msg = f"❌ 数据预获取过程中发生错误: {str(e)}"
-        update_progress(error_msg)
-        logger.error(f"[{session_id}] {error_msg}")
-
-        return {
-            'success': False,
-            'error': error_msg,
-            'suggestion': "请检查网络连接或稍后重试",
-            'stock_symbol': stock_symbol,
-            'analysis_date': analysis_date,
-            'session_id': session_id
-        }
+    # 1. 数据预获取阶段（已移除stock_validator依赖）
+    update_progress("✅ 数据预处理跳过（已移除股票验证器）", 1, 10)
 
     # 记录分析开始的详细日志
     logger_manager = get_logger_manager()

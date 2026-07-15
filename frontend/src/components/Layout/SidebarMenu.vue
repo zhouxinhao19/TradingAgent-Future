@@ -16,35 +16,15 @@
       <template #title>学习中心</template>
     </el-menu-item>
 
-    <el-sub-menu index="/analysis">
-      <template #title>
-        <el-icon><TrendCharts /></el-icon>
-        <span>股票分析</span>
-      </template>
-      <el-menu-item index="/analysis/single">单股分析</el-menu-item>
-      <el-menu-item index="/analysis/batch">批量分析</el-menu-item>
-      <!-- 新增：将分析报告作为股票分析的子菜单 -->
-      <el-menu-item index="/reports">分析报告</el-menu-item>
-    </el-sub-menu>
+    <!-- 分析报告 -->
+    <el-menu-item index="/reports">
+      <el-icon><Document /></el-icon>
+      <template #title>分析报告</template>
+    </el-menu-item>
 
     <el-menu-item index="/tasks">
       <el-icon><List /></el-icon>
       <template #title>任务中心</template>
-    </el-menu-item>
-
-    <el-menu-item index="/screening">
-      <el-icon><Search /></el-icon>
-      <template #title>股票筛选</template>
-    </el-menu-item>
-
-    <el-menu-item index="/favorites">
-      <el-icon><Star /></el-icon>
-      <template #title>我的自选股</template>
-    </el-menu-item>
-
-    <el-menu-item index="/paper">
-      <el-icon><CreditCard /></el-icon>
-      <template #title>股票模拟交易</template>
     </el-menu-item>
 
     <!-- 大宗商品(Phase 3a · Feature Flag 控制) -->
@@ -57,15 +37,6 @@
       <el-menu-item v-if="featureStore.commodityAnalysis" index="/commodity/analysis">商品分析</el-menu-item>
       <el-menu-item v-if="featureStore.commodityPaper" index="/commodity/paper">期货模拟交易</el-menu-item>
     </el-sub-menu>
-
-
-    <!-- 分析报告已移至“股票分析”子菜单，保留注释便于追踪 -->
-    <!--
-    <el-menu-item index="/reports">
-      <el-icon><Document /></el-icon>
-      <template #title>分析报告</template>
-    </el-menu-item>
-    -->
 
     <el-sub-menu index="/settings">
       <template #title>
@@ -117,14 +88,10 @@ import { useFeatureStore } from '@/stores/feature'
 import {
   Odometer,
   Reading,
-  TrendCharts,
-  Search,
-  Star,
   List,
-  /* Document 移除：不再使用顶级分析报告菜单图标 */
+  Document,
   Setting,
   InfoFilled,
-  CreditCard,
   Box
 } from '@element-plus/icons-vue'
 

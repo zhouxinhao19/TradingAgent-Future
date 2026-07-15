@@ -1,32 +1,5 @@
 """
 数据模型模块
+Phase 5: 已移除股票数据模型，保留 commodity 模型
 """
-
-# 导入股票数据模型
-from .stock_models import (
-    StockBasicInfoExtended,
-    MarketQuotesExtended,
-    MarketInfo,
-    TechnicalIndicators,
-    StockBasicInfoResponse,
-    MarketQuotesResponse,
-    StockListResponse,
-    MarketType,
-    ExchangeType,
-    CurrencyType,
-    StockStatus
-)
-
-__all__ = [
-    "StockBasicInfoExtended",
-    "MarketQuotesExtended",
-    "MarketInfo",
-    "TechnicalIndicators",
-    "StockBasicInfoResponse",
-    "MarketQuotesResponse",
-    "StockListResponse",
-    "MarketType",
-    "ExchangeType",
-    "CurrencyType",
-    "StockStatus"
-]
+__all__ = []

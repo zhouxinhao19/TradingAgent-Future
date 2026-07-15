@@ -51,70 +51,6 @@ const routes: RouteRecordRaw[] = [
     ]
   },
   {
-    path: '/analysis',
-    name: 'Analysis',
-    component: () => import('@/layouts/BasicLayout.vue'),
-    redirect: '/analysis/single',
-    children: [
-      {
-        path: 'single',
-        name: 'SingleAnalysis',
-        component: () => import('@/views/Analysis/SingleAnalysis.vue')
-      },
-      {
-        path: 'batch',
-        name: 'BatchAnalysis',
-        component: () => import('@/views/Analysis/BatchAnalysis.vue')
-      },
-
-    ]
-  },
-  {
-    path: '/screening',
-    name: 'StockScreening',
-    component: () => import('@/layouts/BasicLayout.vue'),
-    meta: {
-      title: '股票筛选',
-      icon: 'Search',
-      requiresAuth: true,
-      transition: 'slide-up'
-    },
-    children: [
-      {
-        path: '',
-        name: 'StockScreeningHome',
-        component: () => import('@/views/Screening/index.vue'),
-        meta: {
-          title: '股票筛选',
-          requiresAuth: true
-        }
-      }
-    ]
-  },
-
-  {
-    path: '/favorites',
-    name: 'Favorites',
-    component: () => import('@/layouts/BasicLayout.vue'),
-    meta: {
-      title: '我的自选股',
-      icon: 'Star',
-      requiresAuth: true,
-      transition: 'slide-up'
-    },
-    children: [
-      {
-        path: '',
-        name: 'FavoritesHome',
-        component: () => import('@/views/Favorites/index.vue'),
-        meta: {
-          title: '我的自选股',
-          requiresAuth: true
-        }
-      }
-    ]
-  },
-  {
     path: '/learning',
     name: 'Learning',
     component: () => import('@/layouts/BasicLayout.vue'),
@@ -150,31 +86,6 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '文章详情',
           requiresAuth: false
-        }
-      }
-    ]
-  },
-  {
-    path: '/stocks',
-    name: 'Stocks',
-    component: () => import('@/layouts/BasicLayout.vue'),
-    meta: {
-      title: '股票详情',
-      icon: 'TrendCharts',
-      requiresAuth: true,
-      hideInMenu: true,
-      transition: 'fade'
-    },
-    children: [
-      {
-        path: ':code',
-        name: 'StockDetail',
-        component: () => import('@/views/Stocks/Detail.vue'),
-        meta: {
-          title: '股票详情',
-          requiresAuth: true,
-          hideInMenu: true,
-          transition: 'fade'
         }
       }
     ]
@@ -249,7 +160,6 @@ const routes: RouteRecordRaw[] = [
     ]
   },
   { path: '/queue', redirect: '/tasks' },
-  { path: '/analysis/history', redirect: '/tasks?tab=completed' },
   {
     path: '/reports',
     name: 'Reports',
@@ -407,29 +317,6 @@ const routes: RouteRecordRaw[] = [
       transition: 'fade'
     }
   },
-  {
-    path: '/paper',
-    name: 'PaperTrading',
-    component: () => import('@/layouts/BasicLayout.vue'),
-    meta: {
-      title: '模拟交易',
-      icon: 'CreditCard',
-      requiresAuth: true,
-      transition: 'slide-up'
-    },
-    children: [
-      {
-        path: '',
-        name: 'PaperTradingHome',
-        component: () => import('@/views/PaperTrading/index.vue'),
-        meta: {
-          title: '模拟交易',
-          requiresAuth: true
-        }
-      }
-    ]
-  },
-
   {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
