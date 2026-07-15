@@ -31,7 +31,10 @@ logger = get_logger("default")
 
 
 # 国内期货交易所后缀映射(AKShare 接口不识别后缀)
-_CHINA_FUTURES_EXCHANGES = ("SHF", "DCE", "CZC", "INE", "GFEX")
+# 同时接受 metadata 的完整交易所代码，兼容用户手动输入的完整标的。
+_CHINA_FUTURES_EXCHANGES = (
+    "SHF", "SHFE", "DCE", "CZC", "CZCE", "INE", "GFEX", "CFFEX",
+)
 
 # 交易所中文名
 _EXCHANGE_NAMES = {
