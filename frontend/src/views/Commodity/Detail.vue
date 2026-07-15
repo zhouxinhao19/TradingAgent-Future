@@ -243,32 +243,71 @@
         <el-row :gutter="12">
           <el-col :span="12">
             <el-card shadow="never">
-              <template #header><b>手续费 / 保证金(全交易所 769 行)</b></template>
-              <el-button type="primary" plain @click="loadFees" :loading="feesLoading">拉取数据</el-button>
-              <el-table
-                v-if="feesRows.length"
-                :data="feesRows.slice(0, 50)"
-                stripe border size="small" :max-height="280" style="margin-top:12px"
-              >
-                <el-table-column v-for="col in feesCols" :key="col" :prop="col" :label="col" :min-width="80" />
-              </el-table>
+              <template #header>
+                <b>手续费 / 保证金</b>
+                <el-tag size="small" type="info" style="margin-left: 8px">
+                  交易所维度 · {{ exchangeInfo }}
+                </el-tag>
+              </template>
+              <el-button type="primary" plain @click="loadFees" :loading="feesLoading">
+                拉取数据
+              </el-button>
+              <el-tabs v-if="feesAllLoaded" v-model="feesTab" style="margin-top: 12px">
+                <el-tab-pane
+                  :label="`当前品种 (${currentFeesRows.length})`"
+                  name="current"
+                >
+                  <el-table
+                    v-if="currentFeesRows.length"
+                    :data="currentFeesRows"
+                    stripe border size="small" :max-height="280"
+                  >
+                    <el-table-column
+                      v-for="col in feesCols" :key="col" :prop="col"
+                      :label="col" :min-width="80"
+                    />
+                  </el-table>
+                  <el-empty
+                    v-else
+                    :description="`当前品种 ${currentUnderlying} 在 ${exchangeInfo} 暂无费率数据,可在'交易所全部'中对比`"
+                  />
+                </el-tab-pane>
+                <el-tab-pane
+                  :label="`交易所全部 (${allFeesRows.length} 行)`"
+                  name="all"
+                >
+                  <el-table
+                    :data="allFeesRows"
+                    stripe border size="small" :max-height="280"
+                  >
+                    <el-table-column
+                      v-for="col in feesCols" :key="col" :prop="col"
+                      :label="col" :min-width="80"
+                    />
+                  </el-table>
+                </el-tab-pane>
+              </el-tabs>
               <el-empty v-else-if="!feesLoading" description="未拉取" />
             </el-card>
           </el-col>
 
           <el-col :span="12">
             <el-card shadow="never">
-              <template #header><b>合约信息({{ exchangeInfo }})</b></template>
+              <template #header><b>合约信息 ({{ exchangeInfo }})</b></template>
               <el-button type="primary" plain @click="loadContractInfo" :loading="contractLoading">
                 拉取 {{ exchangeInfo }} 合约
               </el-button>
-              <el-table
-                v-if="contractRows.length"
-                :data="contractRows.slice(0, 50)"
-                stripe border size="small" :max-height="280" style="margin-top:12px"
-              >
-                <el-table-column v-for="col in contractCols" :key="col" :prop="col" :label="col" :min-width="80" />
-              </el-table>
+              <div v-if="contractRows.length" style="margin-top: 12px">
+                <el-tag size="small" type="info" style="margin-bottom: 8px">
+                  共 {{ contractRows.length }} 行
+                </el-tag>
+                <el-table
+                  :data="contractRows"
+                  stripe border size="small" :max-height="320"
+                >
+                  <el-table-column v-for="col in contractCols" :key="col" :prop="col" :label="col" :min-width="80" />
+                </el-table>
+              </div>
               <el-empty v-else-if="!contractLoading" description="未拉取" />
             </el-card>
           </el-col>
@@ -329,8 +368,27 @@ let basisChart: echarts.ECharts | null = null
 
 // ---- 扩展数据(费用 / 合约信息) ----
 const feesLoading = ref(false)
-const feesRows = ref<Record<string, unknown>[]>([])
+// 手续费/保证金是交易所维度数据(AKShare 接口一次性吐整张交易所表),
+// 这里把它切成两份:当前品种行 + 全表,UI 上分别用两个 tab 展示
+const currentFeesRows = ref<Record<string, unknown>[]>([])
+const allFeesRows = ref<Record<string, unknown>[]>([])
 const feesCols = ref<string[]>([])
+const feesTab = ref<'current' | 'all'>('current')
+const feesAllLoaded = ref(false)
+const currentUnderlying = ref('')
+
+// 上游 AKShare 费率表里"品种代码"这一列的列名在不同日期/接口下不稳定,
+// 列名白名单保证过滤逻辑对这种差异有韧性
+const FEE_SYMBOL_COLUMN_CANDIDATES = [
+  '品种代码', 'symbol', 'code', 'symbol_code', '品种', '品种简称', '品种名', '品种名称',
+] as const
+
+function pickSymbolColumn(row: Record<string, unknown>): string | null {
+  for (const key of FEE_SYMBOL_COLUMN_CANDIDATES) {
+    if (key in row) return key
+  }
+  return null
+}
 
 const contractLoading = ref(false)
 const contractRows = ref<Record<string, unknown>[]>([])
@@ -383,17 +441,47 @@ async function loadFees() {
   try {
     const r = await commodityApi.getFees(fullSymbol.value)
     const items = (r as any)?.data?.items
-    if (Array.isArray(items) && items.length) {
-      // 按当前品种过滤(全交易所 769 行 → 仅当前品种 N 行)
-      const underlying = extractUnderlying(fullSymbol.value)
-      const filtered = items.filter((it: any) => it?.品种代码 === underlying)
-      feesRows.value = filtered.length ? filtered : items  // 没匹配时回退展示全量
-      feesCols.value = Object.keys((filtered.length ? filtered[0] : items[0]) as Record<string, unknown>)
-      const label = filtered.length ? `当前品种 ${underlying} ${filtered.length} 行` : `全交易所 ${items.length} 行(无 ${underlying} 数据)`
-      ElMessage.success(`拉取费用/保证金成功(${label})`)
-    } else {
-      feesRows.value = []
+    // 1. 上游接口返回的不是数组 → 视为空表,绝不回退展示全量
+    if (!Array.isArray(items) || items.length === 0) {
+      currentFeesRows.value = []
+      allFeesRows.value = []
+      feesCols.value = []
+      feesAllLoaded.value = true
+      currentUnderlying.value = extractUnderlying(fullSymbol.value)
+      ElMessage.warning(`未拉到 ${exchangeInfo.value} 手续费/保证金数据`)
+      return
     }
+
+    // 2. 全表先落地(交易所全部 tab 用)
+    allFeesRows.value = items
+    feesCols.value = Object.keys(items[0] as Record<string, unknown>)
+
+    // 3. 按白名单列名匹配,定位"品种代码"列;再按当前 underlying 过滤出"当前品种"行
+    const underlying = extractUnderlying(fullSymbol.value)
+    currentUnderlying.value = underlying
+    // 用第一行确定白名单列名(避免不同行 schema 不一致)
+    const symCol = pickSymbolColumn(items[0] as Record<string, unknown>)
+    if (symCol) {
+      const target = underlying.toUpperCase()
+      currentFeesRows.value = items.filter(
+        (it: any) => String(it?.[symCol] ?? '').toUpperCase() === target,
+      )
+    } else {
+      // 找不到品种代码列 → 当前品种 tab 显示空,不由前端猜测/回退
+      currentFeesRows.value = []
+    }
+
+    // 4. toast 区分命中 / 未命中,文案不再混淆"全表"和"当前品种"
+    const exh = exchangeInfo.value
+    if (symCol && currentFeesRows.value.length > 0) {
+      ElMessage.success(`拉取 ${exh} 费用/保证金:当前品种 ${underlying} 共 ${currentFeesRows.value.length} 行(全表 ${items.length} 行可在隔壁 tab 对比)`)
+    } else if (symCol) {
+      ElMessage.warning(`拉取 ${exh} 费用/保证金成功,但 ${underlying} 在该表无匹配(全表 ${items.length} 行,可在隔壁 tab 查找)`)
+    } else {
+      ElMessage.warning(`拉取 ${exh} 费用/保证金成功(全表 ${items.length} 行),但未识别出"品种代码"列,无法按品种过滤`)
+    }
+
+    feesAllLoaded.value = true
   } catch (e) {
     ElMessage.error('拉取失败: ' + String(e))
   } finally {
