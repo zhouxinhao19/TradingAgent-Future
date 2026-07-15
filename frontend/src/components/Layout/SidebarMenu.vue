@@ -27,16 +27,19 @@
       <template #title>任务中心</template>
     </el-menu-item>
 
-    <!-- 大宗商品(Phase 3a · Feature Flag 控制) -->
-    <el-sub-menu v-if="featureStore.commodityEnabled" index="/commodity">
-      <template #title>
-        <el-icon><Box /></el-icon>
-        <span>大宗商品</span>
-      </template>
-      <el-menu-item index="/commodity/list">商品列表</el-menu-item>
-      <el-menu-item v-if="featureStore.commodityAnalysis" index="/commodity/analysis">商品分析</el-menu-item>
-      <el-menu-item v-if="featureStore.commodityPaper" index="/commodity/paper">期货模拟交易</el-menu-item>
-    </el-sub-menu>
+    <!-- 大宗商品(Phase 3a · Feature Flag 控制) — 提升到一级目录 -->
+    <el-menu-item v-if="featureStore.commodityEnabled" index="/commodity/list">
+      <el-icon><Box /></el-icon>
+      <template #title>商品列表</template>
+    </el-menu-item>
+    <el-menu-item v-if="featureStore.commodityAnalysis" index="/commodity/analysis">
+      <el-icon><Box /></el-icon>
+      <template #title>商品分析</template>
+    </el-menu-item>
+    <el-menu-item v-if="featureStore.commodityPaper" index="/commodity/paper">
+      <el-icon><Box /></el-icon>
+      <template #title>期货模拟交易</template>
+    </el-menu-item>
 
     <el-sub-menu index="/settings">
       <template #title>

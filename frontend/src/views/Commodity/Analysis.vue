@@ -14,8 +14,51 @@
           </template>
 
           <el-form :model="form" label-position="top" size="large">
-            <el-form-item label="合约代码" required>
-              <el-input v-model="form.full_symbol" placeholder="如 CU2501.SHF / RB2510.SHF" />
+            <el-form-item label="交易所" required>
+              <el-select v-model="form.exchange" placeholder="选择交易所" style="width: 100%" @change="onExchangeChange">
+                <el-option label="上期所" value="SHFE" />
+                <el-option label="大商所" value="DCE" />
+                <el-option label="郑商所" value="CZCE" />
+                <el-option label="能源中心" value="INE" />
+                <el-option label="广期所" value="GFEX" />
+                <el-option label="中金所" value="CFFEX" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="品种代码" required>
+              <el-select
+                v-model="form.variety_symbol"
+                placeholder="先选交易所"
+                style="width: 100%"
+                :loading="loadingVarieties"
+                :disabled="!form.exchange"
+                filterable
+                @change="onVarietyChange"
+              >
+                <el-option
+                  v-for="v in varietyOptions"
+                  :key="v.symbol"
+                  :label="`${v.symbol} - ${v.name_cn}`"
+                  :value="v.symbol"
+                />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="合约选择" required>
+              <el-select
+                v-model="form.contract"
+                placeholder="先选品种"
+                style="width: 100%"
+                :loading="loadingContracts"
+                :disabled="!form.variety_symbol"
+              >
+                <el-option
+                  v-for="c in contractOptions"
+                  :key="c.value"
+                  :label="c.label"
+                  :value="c.value"
+                />
+              </el-select>
             </el-form-item>
 
             <el-form-item label="交易日期">
@@ -27,42 +70,6 @@
                 value-format="YYYY-MM-DD"
               />
             </el-form-item>
-
-            <el-form-item label="品种名称(可选)">
-              <el-input v-model="form.variety_name" placeholder="如 螺纹钢 / 铜" />
-            </el-form-item>
-
-            <el-row :gutter="12">
-              <el-col :span="8">
-                <el-form-item label="交易所">
-                  <el-select v-model="form.exchange" placeholder="自动" clearable style="width: 100%">
-                    <el-option label="上期所" value="SHF" />
-                    <el-option label="大商所" value="DCE" />
-                    <el-option label="郑商所" value="CZCE" />
-                    <el-option label="能源中心" value="INE" />
-                    <el-option label="广期所" value="GFEX" />
-                    <el-option label="中金所" value="CFFEX" />
-                  </el-select>
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="品类">
-                  <el-select v-model="form.category" placeholder="自动" clearable style="width: 100%">
-                    <el-option label="有色金属" value="有色金属" />
-                    <el-option label="贵金属" value="贵金属" />
-                    <el-option label="能源" value="能源" />
-                    <el-option label="化工" value="化工" />
-                    <el-option label="农产品" value="农产品" />
-                    <el-option label="金融" value="金融" />
-                  </el-select>
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="报价单位">
-                  <el-input v-model="form.quote_unit" placeholder="如 元/吨" />
-                </el-form-item>
-              </el-col>
-            </el-row>
 
             <el-divider />
 
@@ -85,7 +92,7 @@
               type="primary"
               size="large"
               :loading="submitting"
-              :disabled="!form.full_symbol.trim()"
+              :disabled="!form.contract"
               style="width: 100%"
               @click="submitAnalysis"
             >
@@ -178,15 +185,23 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { commodityApi } from '@/api/commodity'
+import { commodityApi, type VarietyItem } from '@/api/commodity'
+
+// 交易所 → 后缀映射
+const EXCHANGE_SUFFIX: Record<string, string> = {
+  SHFE: '.SHF',
+  DCE: '.DCE',
+  CZCE: '.ZCE',
+  INE: '.INE',
+  GFEX: '.GFEX',
+  CFFEX: '.CFX',
+}
 
 const form = ref({
-  full_symbol: '',
-  trade_date: '',
-  variety_name: '',
   exchange: '',
-  category: '',
-  quote_unit: '',
+  variety_symbol: '',
+  contract: '',
+  trade_date: '',
   max_debate_rounds: 1,
   max_risk_discuss_rounds: 1,
 })
@@ -195,6 +210,18 @@ const latestResult = ref<Record<string, any> | null>(null)
 const reports = ref<Array<Record<string, any>>>([])
 const detailVisible = ref(false)
 const detailData = ref<Record<string, any> | null>(null)
+
+// 品种和合约级联
+const loadingVarieties = ref(false)
+const loadingContracts = ref(false)
+const varietyOptions = ref<VarietyItem[]>([])
+const contractOptions = ref<Array<{ value: string; label: string }>>([])
+
+// 选中品种的中文名(给 submit 用)
+const selectedVarietyName = ref('')
+
+// 已加载的合约列表(存 underlying 给 submit 用)
+const currentUnderlying = ref('')
 
 function directionLabel(action?: string): string {
   const map: Record<string, string> = { long: '📈 做多', short: '📉 做空', hold: '⏸️ 持有', flat: '🔒 平仓' }
@@ -214,22 +241,76 @@ function sectionTitle(key: string): string {
   return map[key] || key
 }
 
-async function submitAnalysis() {
-  if (!form.value.full_symbol.trim()) { ElMessage.warning('请输入合约代码'); return }
-  submitting.value = true; latestResult.value = null
+async function onExchangeChange() {
+  form.value.variety_symbol = ''
+  form.value.contract = ''
+  varietyOptions.value = []
+  contractOptions.value = []
+  selectedVarietyName.value = ''
+  currentUnderlying.value = ''
+  if (!form.value.exchange) return
+  loadingVarieties.value = true
   try {
-    const res = await commodityApi.submitAnalysis(form.value.full_symbol.trim(), {
+    const res = await commodityApi.getVarieties({ exchange: form.value.exchange })
+    if (res?.success && res?.data?.items) {
+      varietyOptions.value = res.data.items
+    }
+  } catch { /* ignore */ }
+  loadingVarieties.value = false
+}
+
+async function onVarietyChange() {
+  form.value.contract = ''
+  contractOptions.value = []
+  selectedVarietyName.value = ''
+  currentUnderlying.value = ''
+  if (!form.value.variety_symbol) return
+
+  // 找到品种中文名
+  const found = varietyOptions.value.find(v => v.symbol === form.value.variety_symbol)
+  selectedVarietyName.value = found?.name_cn || form.value.variety_symbol
+
+  loadingContracts.value = true
+  try {
+    // 用品种代码+主力连续后缀获取合约列表
+    const suffix = EXCHANGE_SUFFIX[form.value.exchange] || `.${form.value.exchange}`
+    const fullSymbol = `${form.value.variety_symbol}0${suffix}`
+    const res = await commodityApi.getContractsList(fullSymbol)
+    if (res?.success && res?.data) {
+      currentUnderlying.value = res.data.underlying
+      const continuous = res.data.continuous
+      const current = res.data.current
+      const contracts = res.data.contracts || []
+
+      contractOptions.value = contracts.map((c: string) => {
+        const isContinuous = continuous && c === continuous
+        const isCurrent = current && c === current
+        let label = c
+        if (isContinuous) label += ' (主力连续)'
+        if (isCurrent) label += ' (当前主力)'
+        return { value: c, label }
+      })
+    }
+  } catch { /* ignore */ }
+  loadingContracts.value = false
+}
+
+async function submitAnalysis() {
+  if (!form.value.contract) { ElMessage.warning('请选择合约'); return }
+  submitting.value = true; latestResult.value = null
+  const fullSymbol = form.value.contract
+  try {
+    const res = await commodityApi.submitAnalysis(fullSymbol, {
       trade_date: form.value.trade_date || undefined,
-      variety_name: form.value.variety_name || undefined,
+      variety_name: selectedVarietyName.value || undefined,
       exchange: form.value.exchange || undefined,
-      category: form.value.category || undefined,
-      quote_unit: form.value.quote_unit || undefined,
       max_debate_rounds: form.value.max_debate_rounds,
       max_risk_discuss_rounds: form.value.max_risk_discuss_rounds,
     })
     if (res?.success) {
       ElMessage.success(`分析任务已提交: ${res.data?.task_id}`)
-      pollForResult(form.value.full_symbol.trim())
+      submitting.value = false // 立即释放按钮,后台继续轮询
+      pollForResult(fullSymbol)
     } else { ElMessage.error(res?.message || '提交失败'); submitting.value = false }
   } catch (e: any) { ElMessage.error(e?.message || '提交异常'); submitting.value = false }
 }
@@ -264,7 +345,7 @@ async function fetchLatestReport(fullSymbol: string): Promise<Record<string, any
 }
 
 async function loadReports(fullSymbol?: string) {
-  const sym = fullSymbol || form.value.full_symbol.trim()
+  const sym = fullSymbol || form.value.contract
   if (!sym) return
   try { const res = await commodityApi.getReports(sym, 20); reports.value = res?.data?.reports || [] }
   catch { reports.value = [] }
@@ -280,7 +361,22 @@ async function viewReport(row: Record<string, any>) {
 onMounted(() => {
   const params = new URLSearchParams(window.location.search)
   const symbol = params.get('symbol')
-  if (symbol) { form.value.full_symbol = symbol; loadReports(symbol) }
+  if (symbol) {
+    // 从 URL 参数解析交易所和品种
+    const parts = symbol.split('.')
+    if (parts.length === 2) {
+      // 通过后缀反查交易所代码
+      const suffix = '.' + parts[1]
+      for (const [ex, sfx] of Object.entries(EXCHANGE_SUFFIX)) {
+        if (sfx === suffix) {
+          form.value.exchange = ex
+          break
+        }
+      }
+      form.value.contract = symbol
+      loadReports(symbol)
+    }
+  }
 })
 </script>
 
