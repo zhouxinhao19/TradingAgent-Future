@@ -94,21 +94,55 @@
         </el-row>
       </el-tab-pane>
 
-      <!-- ② 日 K 线 -->
+      <!-- ② 日 K 线 / 现货价 -->
       <el-tab-pane label="日 K 线" name="kline">
-        <el-card shadow="never" v-loading="store.loading(`historical:${fullSymbol}`)">
+        <el-card shadow="never" v-loading="klineLoading">
           <el-alert
-            v-if="store.errorMsg(`historical:${fullSymbol}`)"
+            v-if="klineError"
             type="warning"
-            :title="store.errorMsg(`historical:${fullSymbol}`)"
+            :title="klineError"
             :closable="false"
             show-icon
             style="margin-bottom: 12px"
           />
           <template #header>
-            <div style="display:flex; align-items:center; justify-content:space-between">
-              <b>日 K 线(最近 {{ klineDays }} 天)</b>
-              <div>
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <b v-if="klineMode === 'kline'">日 K 线</b>
+                <b v-else>现货价走势</b>
+                <span v-if="klineSymbol !== fullSymbol" style="font-size:12px; color:var(--el-text-color-secondary);">
+                  {{ klineSymbol }}
+                </span>
+                <el-radio-group v-model="klineMode" size="small" @change="switchKlineMode">
+                  <el-radio-button value="kline">K 线</el-radio-button>
+                  <el-radio-button value="spot">现货价</el-radio-button>
+                </el-radio-group>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <!-- 合约选择器(K线模式下) -->
+                <el-select
+                  v-if="klineMode === 'kline' && contractsList.contracts.length"
+                  v-model="klineSymbol"
+                  size="small"
+                  @change="onContractChange"
+                  style="width:160px"
+                >
+                  <el-option-group label="主力连续">
+                    <el-option
+                      v-if="contractsList.continuous"
+                      :value="contractsList.continuous"
+                      label="主力连续"
+                    />
+                  </el-option-group>
+                  <el-option-group label="到期合约">
+                    <el-option
+                      v-for="c in contractsList.contracts"
+                      :key="c"
+                      :value="c"
+                      :label="c.split('.')[0]"
+                    />
+                  </el-option-group>
+                </el-select>
                 <el-radio-group v-model="klineDays" size="small" @change="reloadKline">
                   <el-radio-button :value="30">30 天</el-radio-button>
                   <el-radio-button :value="90">90 天</el-radio-button>
@@ -119,7 +153,7 @@
             </div>
           </template>
           <div ref="klineRef" class="kline-chart"></div>
-          <el-empty v-if="!store.historical?.rows?.length" description="暂无 K 线数据" />
+          <el-empty v-if="!hasKlineData" :description="klineMode === 'kline' ? '暂无 K 线数据' : '暂无现货价数据'" />
         </el-card>
       </el-tab-pane>
 
@@ -333,8 +367,23 @@ const store = useCommodityStore()
 const fullSymbol = computed<string>(() => String(route.params.fullSymbol || ''))
 const activeTab = ref<string>((route.query.tab as string) || 'quotes')
 const klineDays = ref<number>(180)
+const klineMode = ref<'kline' | 'spot'>('kline')
+const klineSymbol = ref<string>('')
+const contractsList = ref<{ continuous: string | null; contracts: string[] }>({ continuous: null, contracts: [] })
 const holdingIndicator = ref<'成交量' | '多单持仓' | '空单持仓'>('成交量')
 const newsCategory = ref<string>('all')
+
+// K 线卡片的 loading/error 状态：根据当前模式动态取不同 key
+const klineLoadingKey = computed(() =>
+  klineMode.value === 'kline' ? `historical:${klineSymbol.value}` : 'basis',
+)
+const klineLoading = computed(() => store.loading(klineLoadingKey.value))
+const klineError = computed(() => store.errorMsg(klineLoadingKey.value))
+const hasKlineData = computed(() =>
+  klineMode.value === 'kline'
+    ? !!store.historical?.rows?.length
+    : !!store.basis?.rows?.length && (store.basis.rows as any[]).some((r: any) => r.spot_price !== undefined),
+)
 
 // 后端 /contract-info 接收 SHFE/DCE/CZCE 等长码;前端从 fullSymbol 提取的
 // 是短码(SHF/CZC),需要映射成长码才能成功调用
@@ -407,12 +456,15 @@ async function reload() {
   startDate.setDate(startDate.getDate() - 30)
   const startStr = startDate.toISOString().slice(0, 10)
   const underlying = extractUnderlying(fullSymbol.value)
+
+  // 并行加载:基础数据 + 合约列表
   await Promise.all([
     store.loadSymbolDetail(fullSymbol.value, klineDays.value),
     store.loadInventory(fullSymbol.value),
     store.loadBasisForVars([underlying], startStr, endDate),
     store.loadHoldingPosition(fullSymbol.value, holdingIndicator.value),
     store.loadNewsCategories(),
+    loadContractsList(),
   ])
   await nextTick()
   renderKline()
@@ -422,9 +474,49 @@ async function reload() {
 
 function reloadKline() {
   if (!fullSymbol.value) return
+  const symbol = klineSymbol.value || fullSymbol.value
   const startDate = new Date()
   startDate.setDate(startDate.getDate() - klineDays.value)
-  store.loadHistorical(fullSymbol.value, startDate.toISOString().slice(0, 10))
+  store.loadHistorical(symbol, startDate.toISOString().slice(0, 10))
+}
+
+async function loadContractsList() {
+  if (!fullSymbol.value) return
+  try {
+    const r = await commodityApi.getContractsList(fullSymbol.value)
+    const data = (r as any)?.data
+    if (data?.contracts) {
+      contractsList.value = { continuous: data.continuous, contracts: data.contracts }
+    }
+    // 初始化 klineSymbol 为当前 fullSymbol
+    klineSymbol.value = fullSymbol.value
+  } catch (e) {
+    console.error('[commodity] loadContractsList failed', e)
+    klineSymbol.value = fullSymbol.value
+  }
+}
+
+function switchKlineMode(mode: 'kline' | 'spot') {
+  klineMode.value = mode
+  if (mode === 'kline') {
+    reloadKline()
+  } else {
+    loadSpotPrice()
+  }
+}
+
+function onContractChange(newSymbol: string) {
+  klineSymbol.value = newSymbol
+  reloadKline()
+}
+
+async function loadSpotPrice() {
+  const underlying = extractUnderlying(fullSymbol.value)
+  const endDate = new Date().toISOString().slice(0, 10)
+  const startDate = new Date()
+  startDate.setDate(startDate.getDate() - klineDays.value)
+  await store.loadBasisForVars([underlying], startDate.toISOString().slice(0, 10), endDate)
+  nextTick(renderSpotPriceLine)
 }
 
 function reloadHolding() {
@@ -635,6 +727,75 @@ function renderBasis() {
   basisChart.resize()
 }
 
+// 现货价走势图(在日K线卡片内渲染,利用基差接口的 spot_price 字段)
+function renderSpotPriceLine() {
+  if (!klineRef.value) return
+  if (!klineChart) klineChart = echarts.init(klineRef.value)
+  const rows = (store.basis?.rows || []) as Record<string, unknown>[]
+  if (!rows.length) {
+    klineChart.clear()
+    return
+  }
+  // 按日期排序
+  const sorted = [...rows].sort(
+    (a, b) => String(a['date'] || '').localeCompare(String(b['date'] || '')),
+  )
+  const dates = sorted.map((r) => String(r['date'] || r['日期'] || ''))
+  const spotPrices = sorted.map((r) => Number(r['spot_price'] ?? 0))
+  const futuresPrices = sorted.map((r) => Number(r['dominant_contract_price'] ?? 0))
+
+  klineChart.setOption({
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'cross' },
+      formatter: (params: any) => {
+        const idx = params[0]?.dataIndex ?? 0
+        const row = sorted[idx]
+        const spot = row['spot_price'] ?? '-'
+        const fut = row['dominant_contract_price'] ?? '-'
+        const basis = row['dom_basis'] ?? '-'
+        const rate = row['dom_basis_rate'] ?? '-'
+        return [
+          `<b>${dates[idx] || ''}</b>`,
+          `现货价: ${spot}`,
+          `主力期货: ${fut}`,
+          `基差: ${basis}`,
+          `基差率: ${rate}`,
+        ].join('<br/>')
+      },
+    },
+    legend: { data: ['现货价', '主力期货'], top: 0 },
+    grid: { left: 60, right: 30, top: 40, bottom: 60 },
+    xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 10, rotate: 30 } },
+    yAxis: { type: 'value', name: '价格', scale: true },
+    dataZoom: [
+      { type: 'inside', start: 0, end: 100 },
+      { type: 'slider', height: 18, bottom: 5 },
+    ],
+    series: [
+      {
+        name: '现货价',
+        type: 'line',
+        data: spotPrices,
+        smooth: true,
+        symbol: 'none',
+        itemStyle: { color: '#409eff' },
+        areaStyle: { color: 'rgba(64,158,255,0.1)' },
+      },
+      {
+        name: '主力期货',
+        type: 'line',
+        data: futuresPrices,
+        smooth: true,
+        symbol: 'none',
+        lineStyle: { type: 'dashed', width: 1 },
+        itemStyle: { color: '#ee6666' },
+      },
+    ],
+  }, true)
+  klineChart.resize()
+}
+
 async function reloadBasis() {
   const endDate = new Date().toISOString().slice(0, 10)
   const startDate = new Date()
@@ -664,21 +825,34 @@ onUnmounted(() => {
 
 watch(activeTab, () => {
   nextTick(() => {
-    if (activeTab.value === 'kline') renderKline()
+    if (activeTab.value === 'kline') {
+      if (klineMode.value === 'kline') renderKline()
+      else renderSpotPriceLine()
+    }
     if (activeTab.value === 'inventory') renderInventory()
     if (activeTab.value === 'basis') renderBasis()
   })
 })
 
 watch(() => store.historical, () => {
-  if (activeTab.value === 'kline') nextTick(renderKline)
+  if (activeTab.value === 'kline' && klineMode.value === 'kline') nextTick(renderKline)
 })
 watch(() => store.inventory, () => {
   if (activeTab.value === 'inventory') nextTick(renderInventory)
 })
 watch(() => store.basis, () => {
   if (activeTab.value === 'basis') nextTick(renderBasis)
+  // 现货价模式也依赖 basis 数据
+  if (activeTab.value === 'kline' && klineMode.value === 'spot') nextTick(renderSpotPriceLine)
 }, { deep: true })
+watch(klineMode, () => {
+  if (activeTab.value === 'kline') {
+    nextTick(() => {
+      if (klineMode.value === 'kline') renderKline()
+      else renderSpotPriceLine()
+    })
+  }
+})
 
 // ---- 格式化 ----
 function formatPrice(v: number | undefined | null): string {

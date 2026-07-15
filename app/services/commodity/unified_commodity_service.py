@@ -334,6 +334,84 @@ class UnifiedCommodityService:
             return None
         return {"exchange": exchange, "date": date or "", "rows": records, "count": len(records)}
 
+    async def get_contracts_list(self, full_symbol: str) -> Optional[Dict[str, Any]]:
+        """
+        列出某品种下的所有到期合约代码 + 主力连续代码。
+
+        从 full_symbol (如 CU2501.SHF) 提取 underlying (CU) 和 exchange (SHF)，
+        调用 get_contract_info 并过滤出该品种的所有合约。
+        """
+        await self.initialize()
+        provider = self._providers.get("akshare_futures")
+        if not provider:
+            return None
+
+        from tradingagents.dataflows.providers.commodity.commodity_metadata import (
+            get_main_continuous_symbol, get_variety,
+        )
+        from tradingagents.utils.commodity_utils import CommodityUtils
+
+        info = CommodityUtils.get_market_info(full_symbol)
+        underlying = info.get("underlying", "")
+        code = full_symbol.split(".")[0] if "." in full_symbol else full_symbol
+        exchange = full_symbol.split(".")[-1].upper() if "." in full_symbol else ""
+
+        if not underlying or not exchange:
+            return None
+
+        # 主力连续合约代码
+        continuous = get_main_continuous_symbol(underlying)
+        continuous_full = f"{continuous}.{exchange}" if continuous else None
+
+        # 品种中文名
+        variety_meta = get_variety(underlying) or {}
+        chinese_name = variety_meta.get("name_cn", underlying)
+
+        # 获取该交易所的所有合约，过滤出该品种的
+        ex_long = {"SHF": "SHFE", "CZC": "CZCE"}.get(exchange, exchange)
+        contract_data = await self.get_contract_info(ex_long)
+        if not contract_data or not contract_data.get("rows"):
+            return {
+                "underlying": underlying,
+                "chinese_name": chinese_name,
+                "exchange": exchange,
+                "continuous": continuous_full,
+                "current": full_symbol,
+                "contracts": [],
+                "count": 0,
+            }
+
+        rows = contract_data["rows"]
+        # 找包含合约代码的列名
+        code_key = None
+        candidates = ["合约代码", "contract_code", "code", "symbol", "品种代码"]
+        for c in candidates:
+            if rows and c in rows[0]:
+                code_key = c
+                break
+        if not code_key:
+            code_key = list(rows[0].keys())[0] if rows else "合约代码"
+
+        # 过滤:合约代码以 underlying 开头
+        contracts = []
+        seen = set()
+        for r in rows:
+            raw = str(r.get(code_key, "")).strip()
+            if raw.upper().startswith(underlying.upper()) and raw not in seen:
+                seen.add(raw)
+                contracts.append(f"{raw}.{exchange}")
+
+        contracts.sort()
+        return {
+            "underlying": underlying,
+            "chinese_name": chinese_name,
+            "exchange": exchange,
+            "continuous": continuous_full,
+            "current": full_symbol,
+            "contracts": contracts,
+            "count": len(contracts),
+        }
+
     async def get_trading_calendar(
         self,
         date: str,

@@ -1919,10 +1919,10 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         if len(year_month) == 4 and year_month.isdigit():
             yymm_str = f"20{year_month[:2]}年{int(year_month[2:]):02d}月"
 
-        name = f"{underlying}期货{yymm_str}合约" if yymm_str else f"{underlying}期货"
-
-        # 优先使用 commodity_metadata 静态元数据
+        # 优先使用 commodity_metadata 静态元数据中的中文名
         variety_meta = get_variety(underlying) or {}
+        chinese_name = variety_meta.get("name_cn", underlying)
+        name = f"{chinese_name}期货{yymm_str}合约" if yymm_str else f"{chinese_name}期货"
         ex_norm = normalize_exchange_code(exchange) or ""
 
         return {
