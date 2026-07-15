@@ -421,22 +421,39 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
 
         - 如果 full_symbol 含 YYMM(如 CU2501.SHF):用 futures_hist_em 取具体合约最新日线
         - 如果 full_symbol 不含 YYMM(CU0.SHF):用 futures_main_sina 取主力连续最新日线
+        - Fallback:具体合约无数据(已到期/退市)时,自动回退到主力连续(<underlying>0.<exch>)
+          并在响应里标记 ``used_continuous_fallback=True`` 与 ``data_source`` 改为
+          ``akshare_futures+continuous_fallback``,便于上游识别与排查。
         """
         if not await self._ensure_ak():
             return None
 
         symbol = self._strip_exchange(full_symbol)
+        data_source = "akshare_futures"
+        used_continuous_fallback = False
 
         if self._has_yyymm(full_symbol):
             # 具体合约:使用东财个人合约历史接口,取最新 bar
             today = date.today().strftime("%Y%m%d")
-            df = await self._call("futures_hist_em", symbol=symbol.lower(), period="daily", start_date="20200101", end_date=today)
+            df = await self._call(
+                "futures_hist_em",
+                symbol=symbol.lower(),
+                period="daily",
+                start_date="20200101",
+                end_date=today,
+            )
+            date_col = "日期"
+            if df is None or df.empty:
+                # Fallback:具体合约无行情(已到期/退市),回退到主力连续
+                df = await self._try_continuous_fallback(full_symbol)
+                if df is not None and not df.empty:
+                    used_continuous_fallback = True
+                    data_source = "akshare_futures+continuous_fallback"
             if df is None or df.empty:
                 return None
             df = self._normalize_hist_em_df(df)
             last = df.iloc[-1]
             prev = df.iloc[-2] if len(df) > 1 else last
-            date_col = "日期"
         else:
             # 主力连续:使用新浪主力连续接口(原逻辑)
             df = await self._call("futures_main_sina", symbol=symbol)
@@ -474,7 +491,8 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
             "volume": int(last.get("成交量", 0) or 0),
             "open_interest": int(last.get("持仓量", 0) or 0),
             "trade_date": str(last.get(date_col, "")),
-            "data_source": "akshare_futures",
+            "data_source": data_source,
+            "used_continuous_fallback": used_continuous_fallback,
             "updated_at": _now_iso(),
         }
 
@@ -489,6 +507,9 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
 
         - 如果 full_symbol 含 YYMM(如 CU2501.SHF):用 futures_hist_em 取具体合约数据
         - 如果 full_symbol 不含 YYMM(CU0.SHF / CU.SHF):用 futures_main_sina 取主力连续
+        - Fallback:具体合约无数据(已到期/退市)时,自动回退到主力连续。
+          返回的 DataFrame 会带 ``data_source_note = "continuous_fallback"`` 元数据
+          (存放在 ``df.attrs["data_source_note"]``)。
 
         Args:
             adjustment_mode: 复权模式
@@ -500,6 +521,7 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
             return None
 
         symbol = self._strip_exchange(full_symbol)
+        used_continuous_fallback = False
 
         if self._has_yyymm(full_symbol):
             # 具体合约:使用东财个人合约历史接口
@@ -509,10 +531,23 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
                 ed = end_date.replace("-", "") if end_date else "20500101"
             df = await self._call("futures_hist_em", symbol=symbol.lower(), period="daily", start_date=sd, end_date=ed)
             if df is None or df.empty:
+                # Fallback:具体合约无数据,回退到主力连续
+                df = await self._try_continuous_fallback(full_symbol)
+                if df is not None and not df.empty:
+                    used_continuous_fallback = True
+            if df is None or df.empty:
                 return None
-            df = self._normalize_hist_em_df(df)
-            # 具体合约无换月问题,rollover_date 全 false
-            df["rollover_date"] = False
+            if not used_continuous_fallback:
+                df = self._normalize_hist_em_df(df)
+                # 具体合约无换月问题,rollover_date 全 false
+                df["rollover_date"] = False
+            else:
+                # 主力连续路径:保留换月点/复权处理(与 else 分支一致)
+                df["日期"] = pd.to_datetime(df["日期"]).dt.date
+                df = df.sort_values("日期").reset_index(drop=True)
+                df = self._mark_rollover_dates(df)
+                if adjustment_mode in ("back", "forward") and df["rollover_date"].any():
+                    df = self._apply_adjustment(df, mode=adjustment_mode)
             start = pd.to_datetime(start_date).date() if isinstance(start_date, str) else start_date
             if end_date is None:
                 end = df["日期"].max() if "日期" in df.columns else date.today()
@@ -522,6 +557,8 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
                 end = end_date
             df = df[(df["日期"] >= start) & (df["日期"] <= end)]
             df = df.sort_values("日期").reset_index(drop=True)
+            if used_continuous_fallback:
+                df.attrs["data_source_note"] = "continuous_fallback"
             return df
         else:
             # 主力连续:使用新浪主力连续接口
@@ -1710,6 +1747,26 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         suffix = code[len(underlying):]
         # 具体合约:后缀是 3-4 位纯数字(CZCE 部分品种 3 位如 AP410→10,标准 4 位如 CU2501→2501)
         return bool(suffix) and suffix.isdigit() and len(suffix) in (3, 4)
+
+    async def _try_continuous_fallback(self, full_symbol: str):
+        """
+        尝试用主力连续(<underlying>0.<exch>)作为回退,适用于具体合约无行情的场景。
+
+        Returns:
+            pandas.DataFrame 或 None
+        """
+        underlying = CommodityUtils.get_underlying_symbol(full_symbol)
+        if not underlying:
+            return None
+        fallback_symbol = f"{underlying}0"
+        df = await self._call("futures_main_sina", symbol=fallback_symbol)
+        if df is None or df.empty:
+            return None
+        self.logger.warning(
+            "⚠️ 具体合约 %s 无行情,回退到主力连续 %s 成功",
+            full_symbol, fallback_symbol,
+        )
+        return df
 
     @staticmethod
     def _normalize_hist_em_df(df: pd.DataFrame) -> pd.DataFrame:
