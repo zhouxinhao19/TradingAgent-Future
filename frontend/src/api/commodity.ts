@@ -392,6 +392,26 @@ export const commodityApi = {
   async getReportDetail(reportId: string) {
     return ApiClient.get<ApiEnvelope<Record<string, unknown>>>(`/api/commodity/reports/${reportId}`)
   },
+
+  /** 全局最近商品分析报告(所有品种混合) */
+  async getRecentReports(limit: number = 10) {
+    return ApiClient.get<ApiEnvelope<{
+      total: number
+      reports: Array<RecentReportItem>
+    }>>(`/api/commodity/reports/recent`, { limit })
+  },
+}
+
+/**
+ * 最近报告摘要类型 — 供全局列表复用
+ */
+export interface RecentReportItem {
+  report_id: string
+  full_symbol: string
+  trade_date: string
+  direction: string
+  confidence: number
+  created_at: string
 }
 
 // ============================================================

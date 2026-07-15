@@ -319,6 +319,7 @@ import { favoritesApi } from '@/api/favorites'
 import { analysisApi } from '@/api/analysis'
 import { newsApi } from '@/api/news'
 import { paperApi, type PaperAccountSummary } from '@/api/paper'
+import { commodityApi, type RecentReportItem } from '@/api/commodity'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -333,6 +334,9 @@ const userStats = ref({
 })
 
 const recentAnalyses = ref<AnalysisTask[]>([])
+
+/** 商品分析最近记录(用于"最近分析"卡片) */
+const recentCommodityRecords = ref<RecentReportItem[]>([])
 
 // 自选股数据
 const favoriteStocks = ref<any[]>([])
@@ -381,6 +385,42 @@ const goToHistory = () => {
 
 const goToLearning = () => {
   router.push('/learning')
+}
+
+// ---------- 商品分析相关 ----------
+
+/** 商品方向中文标签 */
+function commodityDirectionLabel(direction: string): string {
+  const map: Record<string, string> = { long: '做多', short: '做空', hold: '持有', flat: '平仓' }
+  return map[direction] || direction
+}
+
+/** 商品方向 Tag 类型 */
+function commodityDirectionTagType(direction: string): string {
+  const map: Record<string, string> = { long: 'success', short: 'danger', hold: 'info', flat: 'warning' }
+  return map[direction] || 'info'
+}
+
+/** 查看商品分析报告详情 */
+function viewCommodityReport(row: RecentReportItem) {
+  router.push(`/commodity/analysis?symbol=${row.full_symbol}`)
+}
+
+/** 前往商品分析页 */
+function goToCommodityAnalysis() {
+  router.push('/commodity/analysis')
+}
+
+/** 加载最近商品分析记录 */
+async function loadRecentCommodityRecords() {
+  try {
+    const res = await commodityApi.getRecentReports(10)
+    const body = (res as any)?.data
+    recentCommodityRecords.value = body?.reports || []
+  } catch (error) {
+    console.error('加载最近商品分析记录失败:', error)
+    recentCommodityRecords.value = []
+  }
 }
 
 const viewAnalysis = (analysis: AnalysisTask) => {
@@ -573,8 +613,10 @@ const formatMoney = (value: number) => {
 onMounted(async () => {
   // 加载自选股数据
   await loadFavoriteStocks()
-  // 加载最近分析
+  // 加载最近分析(股票)
   await loadRecentAnalyses()
+  // 加载最近商品分析记录
+  await loadRecentCommodityRecords()
   // 加载市场快讯
   await loadMarketNews()
   // 加载模拟交易账户

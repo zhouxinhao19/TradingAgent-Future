@@ -205,6 +205,40 @@ def _list_reports(full_symbol: str, limit: int = 20) -> List[Dict[str, Any]]:
     return reports[:limit]
 
 
+def _list_recent_reports(limit: int = 10) -> List[Dict[str, Any]]:
+    """列出所有品种中最近的分析报告(全局按 mtime 排序)。"""
+    all_reports: List[tuple[float, Dict[str, Any]]] = []
+
+    for symbol_dir in _REPORTS_BASE.iterdir():
+        if not symbol_dir.is_dir():
+            continue
+        safe_sym = symbol_dir.name
+        for date_dir in symbol_dir.iterdir():
+            if not date_dir.is_dir():
+                continue
+            for f_path in date_dir.glob("*.json"):
+                try:
+                    mtime = f_path.stat().st_mtime
+                    data = json.loads(f_path.read_text(encoding="utf-8"))
+                    decision = data.get("decision", {})
+                    all_reports.append((
+                        mtime,
+                        {
+                            "report_id": f_path.stem,
+                            "full_symbol": safe_sym,
+                            "trade_date": date_dir.name,
+                            "direction": decision.get("action", "hold"),
+                            "confidence": decision.get("confidence", 0.0),
+                            "created_at": datetime.fromtimestamp(mtime).isoformat(),
+                        },
+                    ))
+                except Exception:
+                    continue
+
+    all_reports.sort(key=lambda x: x[0], reverse=True)
+    return [r for _, r in all_reports[:limit]]
+
+
 # ==================== 端点 ====================
 
 @router.post("/{full_symbol}/analyze", response_model=dict, summary="提交商品分析任务")
@@ -328,6 +362,23 @@ async def get_commodity_reports(
             "reports": reports,
         },
         "message": "获取报告列表成功" if reports else "暂无历史报告",
+    }
+
+
+@router.get("/reports/recent", response_model=dict, summary="全局最近报告")
+async def get_recent_commodity_reports(
+    limit: int = Query(10, ge=1, le=50, description="返回条数"),
+    user: dict = Depends(get_current_user),
+):
+    """获取所有商品品种中最近的分析报告(全局)。"""
+    reports = _list_recent_reports(limit=limit)
+    return {
+        "success": True,
+        "data": {
+            "total": len(reports),
+            "reports": reports,
+        },
+        "message": "获取最近报告成功" if reports else "暂无历史报告",
     }
 
 
