@@ -35,11 +35,6 @@
           <div class="content-section">
             <DataSourceStatus ref="dataSourceStatusRef" />
           </div>
-          
-          <!-- 使用建议 -->
-          <div class="content-section">
-            <SyncRecommendations />
-          </div>
         </el-col>
 
         <!-- 右侧列 -->
@@ -130,7 +125,6 @@ import {
 import { testDataSources, type DataSourceTestResult } from '@/api/sync'
 import DataSourceStatus from '@/components/Sync/DataSourceStatus.vue'
 import SyncControl from '@/components/Sync/SyncControl.vue'
-import SyncRecommendations from '@/components/Sync/SyncRecommendations.vue'
 import SyncHistory from '@/components/Sync/SyncHistory.vue'
 
 // 响应式数据
