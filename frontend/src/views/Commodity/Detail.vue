@@ -150,24 +150,33 @@
         </el-card>
       </el-tab-pane>
 
-      <!-- ④ 基差(全市场汇总) -->
+      <!-- ④ 基差(按品种) -->
       <el-tab-pane label="基差" name="basis">
         <el-card shadow="never" v-loading="store.loading('basis')">
-          <template #header><b>当日现货 + 基差(全品种 51 行)</b></template>
-          <el-empty v-if="!store.basis?.rows?.length" description="暂无基差数据" />
+          <template #header>
+            <div style="display:flex; align-items:center; justify-content:space-between">
+              <b>基差({{ extractUnderlying(fullSymbol) }} 近 30 日)</b>
+              <el-button size="small" @click="reloadBasis">刷新</el-button>
+            </div>
+          </template>
+          <div ref="basisChartRef" class="kline-chart" style="height: 360px;"></div>
+          <el-empty v-if="!store.basis?.rows?.length" description="暂无基差数据(部分品种无基差接口)" />
           <el-table
             v-if="store.basis?.rows?.length"
             :data="store.basis.rows"
             stripe
             border
             size="small"
-            :max-height="420"
+            :max-height="280"
+            style="margin-top: 12px"
           >
-            <el-table-column prop="品种" label="品种" width="80" />
-            <el-table-column prop="现货价格" label="现货" />
-            <el-table-column prop="主力合约代码" label="主力合约" />
-            <el-table-column prop="基差" label="基差" />
-            <el-table-column prop="基差率" label="基差率" />
+            <el-table-column prop="date" label="日期" width="120" />
+            <el-table-column prop="symbol" label="品种" width="80" />
+            <el-table-column prop="dominant_contract" label="主力合约" width="100" />
+            <el-table-column prop="spot_price" label="现货" />
+            <el-table-column prop="dominant_contract_price" label="期货" />
+            <el-table-column prop="dom_basis" label="基差" />
+            <el-table-column prop="dom_basis_rate" label="基差率" />
           </el-table>
         </el-card>
       </el-tab-pane>
@@ -288,13 +297,35 @@ const klineDays = ref<number>(180)
 const holdingIndicator = ref<'成交量' | '多单持仓' | '空单持仓'>('成交量')
 const newsCategory = ref<string>('all')
 
-const exchangeInfo = computed(() => fullSymbol.value.split('.').pop() || 'SHFE')
+// 后端 /contract-info 接收 SHFE/DCE/CZCE 等长码;前端从 fullSymbol 提取的
+// 是短码(SHF/CZC),需要映射成长码才能成功调用
+const EXCHANGE_SUFFIX: Record<string, string> = {
+  SHF: 'SHFE',
+  DCE: 'DCE',
+  CZC: 'CZCE',
+  INE: 'INE',
+  GFEX: 'GFEX',
+  CFFEX: 'CFFEX',
+  SHFE: 'SHFE',
+  CZCE: 'CZCE',
+}
+const exchangeInfo = computed(() => {
+  const raw = fullSymbol.value.split('.').pop() || 'SHFE'
+  return EXCHANGE_SUFFIX[raw] || raw
+})
+
+// 从 full_symbol 提取品种代码(CU2501.SHF → CU / CU0.SHF → CU / RB2510.DCE → RB)
+function extractUnderlying(fs: string): string {
+  return fs.replace(/\..*/, '').replace(/\d+$/, '').toUpperCase()
+}
 
 // ---- ECharts 实例 ----
 const klineRef = ref<HTMLDivElement | null>(null)
 const inventoryChartRef = ref<HTMLDivElement | null>(null)
+const basisChartRef = ref<HTMLDivElement | null>(null)
 let klineChart: echarts.ECharts | null = null
 let inventoryChart: echarts.ECharts | null = null
+let basisChart: echarts.ECharts | null = null
 
 // ---- 扩展数据(费用 / 合约信息) ----
 const feesLoading = ref(false)
@@ -313,16 +344,22 @@ async function reload() {
     ElMessage.warning('缺少标的代码')
     return
   }
+  const endDate = new Date().toISOString().slice(0, 10)
+  const startDate = new Date()
+  startDate.setDate(startDate.getDate() - 30)
+  const startStr = startDate.toISOString().slice(0, 10)
+  const underlying = extractUnderlying(fullSymbol.value)
   await Promise.all([
     store.loadSymbolDetail(fullSymbol.value, klineDays.value),
     store.loadInventory(fullSymbol.value),
-    store.loadBasis(30),
+    store.loadBasisForVars([underlying], startStr, endDate),
     store.loadHoldingPosition(fullSymbol.value, holdingIndicator.value),
     store.loadNewsCategories(),
   ])
   await nextTick()
   renderKline()
   renderInventory()
+  renderBasis()
 }
 
 function reloadKline() {
@@ -347,9 +384,13 @@ async function loadFees() {
     const r = await commodityApi.getFees(fullSymbol.value)
     const items = (r as any)?.data?.items
     if (Array.isArray(items) && items.length) {
-      feesRows.value = items
-      feesCols.value = Object.keys(items[0] as Record<string, unknown>)
-      ElMessage.success(`拉取费用/保证金成功(共 ${items.length} 行)`)
+      // 按当前品种过滤(全交易所 769 行 → 仅当前品种 N 行)
+      const underlying = extractUnderlying(fullSymbol.value)
+      const filtered = items.filter((it: any) => it?.品种代码 === underlying)
+      feesRows.value = filtered.length ? filtered : items  // 没匹配时回退展示全量
+      feesCols.value = Object.keys((filtered.length ? filtered[0] : items[0]) as Record<string, unknown>)
+      const label = filtered.length ? `当前品种 ${underlying} ${filtered.length} 行` : `全交易所 ${items.length} 行(无 ${underlying} 数据)`
+      ElMessage.success(`拉取费用/保证金成功(${label})`)
     } else {
       feesRows.value = []
     }
@@ -432,6 +473,8 @@ function renderKline() {
       },
     ],
   }, true)
+  // 自适应铺面:容器宽度变化时重画
+  klineChart.resize()
 }
 
 function renderInventory() {
@@ -462,6 +505,58 @@ function renderInventory() {
   }, true)
 }
 
+// 基差图:柱状=基差,线=基差率(双轴)
+// 后端字段为英文:date / symbol / spot_price / near_contract / dominant_contract /
+//                 dominant_contract_price / dom_basis / dom_basis_rate
+function renderBasis() {
+  if (!basisChartRef.value) return
+  if (!basisChart) basisChart = echarts.init(basisChartRef.value)
+  const rows = (store.basis?.rows || []) as Record<string, unknown>[]
+  if (!rows.length) {
+    basisChart.clear()
+    return
+  }
+  const dates = rows.map((r) => String(r['date'] || r['日期'] || ''))
+  const basisValues = rows.map((r) => Number(r['dom_basis'] ?? r['基差'] ?? 0))
+  const basisRateValues = rows.map((r) => Number(r['dom_basis_rate'] ?? r['基差率'] ?? 0))
+
+  basisChart.setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+    legend: { data: ['基差', '基差率'], top: 0 },
+    grid: { left: 60, right: 60, top: 40, bottom: 60 },
+    xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 10, rotate: 30 } },
+    yAxis: [
+      { type: 'value', name: '基差(元/吨)', position: 'left' },
+      { type: 'value', name: '基差率(%)', position: 'right' },
+    ],
+    dataZoom: [
+      { type: 'inside', start: 0, end: 100 },
+      { type: 'slider', height: 18, bottom: 5 },
+    ],
+    series: [
+      {
+        name: '基差', type: 'bar', data: basisValues,
+        itemStyle: { color: '#5470c6' },
+      },
+      {
+        name: '基差率', type: 'line', yAxisIndex: 1, data: basisRateValues,
+        itemStyle: { color: '#ee6666' }, smooth: true,
+      },
+    ],
+  }, true)
+  basisChart.resize()
+}
+
+async function reloadBasis() {
+  const endDate = new Date().toISOString().slice(0, 10)
+  const startDate = new Date()
+  startDate.setDate(startDate.getDate() - 30)
+  const startStr = startDate.toISOString().slice(0, 10)
+  const underlying = extractUnderlying(fullSymbol.value)
+  await store.loadBasisForVars([underlying], startStr, endDate)
+  nextTick(renderBasis)
+}
+
 // ---- 路由/生命周期 ----
 function goBack() {
   if (window.history.length > 1) router.back()
@@ -476,12 +571,14 @@ onMounted(async () => {
 onUnmounted(() => {
   klineChart?.dispose()
   inventoryChart?.dispose()
+  basisChart?.dispose()
 })
 
 watch(activeTab, () => {
   nextTick(() => {
     if (activeTab.value === 'kline') renderKline()
     if (activeTab.value === 'inventory') renderInventory()
+    if (activeTab.value === 'basis') renderBasis()
   })
 })
 
@@ -491,6 +588,9 @@ watch(() => store.historical, () => {
 watch(() => store.inventory, () => {
   if (activeTab.value === 'inventory') nextTick(renderInventory)
 })
+watch(() => store.basis, () => {
+  if (activeTab.value === 'basis') nextTick(renderBasis)
+}, { deep: true })
 
 // ---- 格式化 ----
 function formatPrice(v: number | undefined | null): string {
@@ -548,7 +648,7 @@ function sentimentType(sent: string): 'success' | 'danger' | 'info' {
 .quote-area .pct { font-size: 12px; margin-left: 4px; }
 .actions { display: flex; gap: 8px; }
 .detail-tabs { background: #fff; border-radius: 4px; padding: 12px; }
-.kline-chart { width: 100%; height: 420px; }
+.kline-chart { width: 100%; min-width: 900px; height: 460px; }
 .news-list { padding: 0; margin: 0; list-style: none; }
 .news-item { padding: 12px 0; border-bottom: 1px solid var(--el-border-color-lighter); }
 .news-meta { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; font-size: 12px; color: var(--el-text-color-secondary); }
