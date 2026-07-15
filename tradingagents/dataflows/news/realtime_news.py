@@ -712,25 +712,7 @@ def get_realtime_stock_news(ticker: str, curr_date: str, hours_back: int = 6) ->
         else:
             logger.info(f"[新闻分析] 未匹配到已知后缀")
     else:
-        logger.info(f"[新闻分析] ticker不包含点号，尝试使用StockUtils判断")
-        # 尝试使用StockUtils判断股票类型
-        try:
-            from tradingagents.utils.stock_utils import StockUtils
-            logger.info(f"[新闻分析] 成功导入StockUtils，开始判断股票类型")
-            market_info = StockUtils.get_market_info(ticker)
-            logger.info(f"[新闻分析] StockUtils返回市场信息: {market_info}")
-            if market_info['is_china']:
-                stock_type = "A股"
-                is_china_stock = True
-                logger.info(f"[新闻分析] StockUtils判断为A股")
-            elif market_info['is_hk']:
-                stock_type = "港股"
-                logger.info(f"[新闻分析] StockUtils判断为港股")
-            elif market_info['is_us']:
-                stock_type = "美股"
-                logger.info(f"[新闻分析] StockUtils判断为美股")
-        except Exception as e:
-            logger.warning(f"[新闻分析] 使用StockUtils判断股票类型失败: {e}")
+        logger.info(f"[新闻分析] ticker不包含点号，无法判断股票类型（已移除StockUtils依赖）")
 
     logger.info(f"[新闻分析] 最终判断结果 - 股票 {ticker} 类型: {stock_type}, 是否A股: {is_china_stock}")
 

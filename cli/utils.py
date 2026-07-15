@@ -9,8 +9,6 @@ from rich.console import Console
 from cli.models import AnalystType
 from tradingagents.llm_clients.model_catalog import get_model_options
 from tradingagents.utils.logging_manager import get_logger
-from tradingagents.utils.stock_utils import StockUtils
-
 logger = get_logger("cli")
 console = Console()
 
@@ -135,13 +133,8 @@ def select_analysts(ticker: str = None) -> List[AnalystType]:
     """Select analysts using an interactive checkbox."""
     available_analysts = ANALYST_ORDER.copy()
 
-    if ticker and StockUtils.is_china_stock(ticker):
-        available_analysts = [
-            (display, value)
-            for display, value in ANALYST_ORDER
-            if value != AnalystType.SOCIAL
-        ]
-        console.print(f"[yellow]💡 检测到A股代码 {ticker}，社交媒体分析师不可用（国内数据源限制）[/yellow]")
+    # A股社交媒体过滤已移除（stock_utils依赖已删除）
+    # 所有分析师类型均可用
 
     choices = questionary.checkbox(
         "选择您的分析师团队 | Select Your [Analysts Team]:",

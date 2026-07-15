@@ -1,11 +1,10 @@
 """
 标的抽象(Instrument)
-为股票和大宗商品提供统一的代码识别与元数据抽象
-开发期间共存,Phase 5 清理后只保留商品路径
+为大宗商品提供统一的代码识别与元数据抽象
+Phase 5 已清理,仅保留商品路径
 
 设计原则:
 - 工厂方法 `Instrument.of(code)` 自动识别标的类型
-- 优先尝试股票(快路径),再 commodity,二者互不依赖
 - 失败时抛 ValueError,避免 silent failure
 - 提供 to_dict() 供 AgentState 注入
 """
@@ -14,24 +13,22 @@ from dataclasses import dataclass, field, asdict
 from typing import Any, Dict, Optional
 
 from tradingagents.utils.logging_init import get_logger
-from tradingagents.utils.stock_utils import StockMarket, StockUtils
 from tradingagents.utils.commodity_utils import CommodityMarket, CommodityUtils
 
 logger = get_logger("default")
 
 
 # 资产类型常量
-ASSET_TYPE_STOCK = "stock"
 ASSET_TYPE_COMMODITY = "commodity"
 ASSET_TYPE_UNKNOWN = "unknown"
 
 
 @dataclass
 class Instrument:
-    """统一标的抽象(股票 / 大宗商品)"""
+    """统一标的抽象(大宗商品)"""
 
     code: str
-    asset_type: str                          # stock | commodity
+    asset_type: str                          # commodity
     market: str                              # 枚举值字符串(便于 JSON 序列化)
     market_name: str = ""
     category: str = ""                       # 股票:industry / 商品:metal/energy/...
@@ -49,11 +46,10 @@ class Instrument:
     @staticmethod
     def of(code: str) -> "Instrument":
         """
-        工厂方法:自动识别标的类型
+        工厂方法:自动识别标的类型(仅商品)
 
         Args:
-            code: 股票代码 (000001 / 600519.SH / AAPL) 或
-                  商品代码 (CU2501.SHF / CL=F / AU9999.SGE)
+            code: 商品代码 (CU2501.SHF / CL=F / AU9999.SGE)
 
         Returns:
             Instrument 实例
@@ -68,28 +64,7 @@ class Instrument:
         if not code:
             raise ValueError("Instrument.of: 标的代码不能为空")
 
-        # 快路径:先尝试股票识别(命中率高)
-        stock_market = StockUtils.identify_stock_market(code)
-        if stock_market != StockMarket.UNKNOWN:
-            info = StockUtils.get_market_info(code)
-            return Instrument(
-                code=code.upper(),
-                asset_type=ASSET_TYPE_STOCK,
-                market=info["market"],
-                market_name=info["market_name"],
-                category="",                # 股票品类在 basic_info 集合动态读
-                currency="CNY" if info["is_china"] else ("HKD" if info["is_hk"] else "USD"),
-                unit="股",
-                contract_size=1.0,
-                data_source=info["data_source"],
-                extra={
-                    "is_china": info["is_china"],
-                    "is_hk": info["is_hk"],
-                    "is_us": info["is_us"],
-                },
-            )
-
-        # 再尝试商品识别
+        # 尝试商品识别
         commodity_market = CommodityUtils.identify_market(code)
         if commodity_market != CommodityMarket.UNKNOWN:
             info = CommodityUtils.get_market_info(code)
@@ -123,10 +98,6 @@ class Instrument:
             return Instrument.of(code)
         except ValueError:
             return None
-
-    @property
-    def is_stock(self) -> bool:
-        return self.asset_type == ASSET_TYPE_STOCK
 
     @property
     def is_commodity(self) -> bool:

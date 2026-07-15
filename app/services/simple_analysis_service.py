@@ -803,9 +803,8 @@ class SimpleAnalysisService:
         try:
             logger.info(f"🚀 开始后台执行分析任务: {task_id}")
 
-            # 🔍 验证股票代码是否存在
+            # 🔍 验证股票代码（已移除stock_validator依赖）
             logger.info(f"🔍 开始验证股票代码: {stock_code}")
-            from tradingagents.utils.stock_validator import prepare_stock_data_async
             from datetime import datetime
 
             # 获取市场类型
@@ -827,49 +826,6 @@ class SimpleAnalysisService:
                         # 如果格式不对，使用今天
                         analysis_date = datetime.now().strftime('%Y-%m-%d')
                         logger.warning(f"⚠️ 分析日期格式不正确，使用今天: {analysis_date}")
-
-            # 🔥 使用异步版本，直接 await，避免事件循环冲突
-            validation_result = await prepare_stock_data_async(
-                stock_code=stock_code,
-                market_type=market_type,
-                period_days=30,
-                analysis_date=analysis_date
-            )
-
-            if not validation_result.is_valid:
-                error_msg = f"❌ 股票代码验证失败: {validation_result.error_message}"
-                logger.error(error_msg)
-                logger.error(f"💡 建议: {validation_result.suggestion}")
-
-                # 构建用户友好的错误消息
-                user_friendly_error = (
-                    f"❌ 股票代码无效\n\n"
-                    f"{validation_result.error_message}\n\n"
-                    f"💡 {validation_result.suggestion}"
-                )
-
-                # 更新任务状态为失败
-                await self.memory_manager.update_task_status(
-                    task_id=task_id,
-                    status=AnalysisStatus.FAILED,
-                    progress=0,
-                    error_message=user_friendly_error
-                )
-
-                # 更新MongoDB状态
-                await self._update_task_status(
-                    task_id,
-                    AnalysisStatus.FAILED,
-                    0,
-                    error_message=user_friendly_error
-                )
-
-                return
-
-            logger.info(f"✅ 股票代码验证通过: {stock_code} - {validation_result.stock_name}")
-            logger.info(f"📊 市场类型: {validation_result.market_type}")
-            logger.info(f"📈 历史数据: {'有' if validation_result.has_historical_data else '无'}")
-            logger.info(f"📋 基本信息: {'有' if validation_result.has_basic_info else '无'}")
 
             # 在线程池中创建Redis进度跟踪器（避免阻塞事件循环）
             def create_progress_tracker():
@@ -2497,63 +2453,10 @@ class SimpleAnalysisService:
                         except Exception as fallback_error:
                             logger.warning(f"⚠️ 降级提取也失败: {fallback_error}")
 
-            # 🔥 根据股票代码推断市场类型
-            from tradingagents.utils.stock_utils import StockUtils
-            market_info = StockUtils.get_market_info(stock_symbol)
-            market_type_map = {
-                "china_a": "A股",
-                "hong_kong": "港股",
-                "us": "美股",
-                "unknown": "A股"  # 默认为A股
-            }
-            market_type = market_type_map.get(market_info.get("market", "unknown"), "A股")
-            logger.info(f"📊 推断市场类型: {stock_symbol} -> {market_type}")
-
-            # 🔥 获取股票名称
-            stock_name = stock_symbol  # 默认使用股票代码
-            try:
-                if market_info.get("market") == "china_a":
-                    # A股：使用统一接口获取股票信息
-                    from tradingagents.dataflows.interface import get_china_stock_info_unified
-                    stock_info = get_china_stock_info_unified(stock_symbol)
-                    logger.debug(f"📊 获取股票信息返回: {stock_info[:200] if stock_info else 'None'}...")
-
-                    if stock_info and "股票名称:" in stock_info:
-                        stock_name = stock_info.split("股票名称:")[1].split("\n")[0].strip()
-                        logger.info(f"✅ 获取A股名称: {stock_symbol} -> {stock_name}")
-                    else:
-                        # 降级方案：尝试直接从数据源管理器获取
-                        logger.warning(f"⚠️ 无法从统一接口解析股票名称: {stock_symbol}，尝试降级方案")
-                        try:
-                            from tradingagents.dataflows.data_source_manager import get_china_stock_info_unified as get_info_dict
-                            info_dict = get_info_dict(stock_symbol)
-                            if info_dict and info_dict.get('name'):
-                                stock_name = info_dict['name']
-                                logger.info(f"✅ 降级方案成功获取股票名称: {stock_symbol} -> {stock_name}")
-                        except Exception as fallback_e:
-                            logger.error(f"❌ 降级方案也失败: {fallback_e}")
-
-                elif market_info.get("market") == "hong_kong":
-                    # 港股：使用改进的港股工具
-                    try:
-                        from tradingagents.dataflows.providers.hk.improved_hk import get_hk_company_name_improved
-                        stock_name = get_hk_company_name_improved(stock_symbol)
-                        logger.info(f"📊 获取港股名称: {stock_symbol} -> {stock_name}")
-                    except Exception:
-                        clean_ticker = stock_symbol.replace('.HK', '').replace('.hk', '')
-                        stock_name = f"港股{clean_ticker}"
-                elif market_info.get("market") == "us":
-                    # 美股：使用简单映射
-                    us_stock_names = {
-                        'AAPL': '苹果公司', 'TSLA': '特斯拉', 'NVDA': '英伟达',
-                        'MSFT': '微软', 'GOOGL': '谷歌', 'AMZN': '亚马逊',
-                        'META': 'Meta', 'NFLX': '奈飞'
-                    }
-                    stock_name = us_stock_names.get(stock_symbol.upper(), f"美股{stock_symbol}")
-                    logger.info(f"📊 获取美股名称: {stock_symbol} -> {stock_name}")
-            except Exception as e:
-                logger.warning(f"⚠️ 获取股票名称失败: {stock_symbol} - {e}")
-                stock_name = stock_symbol
+            # 🔥 设置默认市场类型和股票名称（已移除StockUtils依赖）
+            market_type = "A股"
+            stock_name = stock_symbol
+            logger.info(f"📊 使用默认市场类型: {stock_symbol} -> {market_type}")
 
             # 构建文档（与web目录的MongoDBReportManager保持一致）
             document = {

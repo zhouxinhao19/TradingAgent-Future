@@ -179,18 +179,8 @@ async def get_reports_list(
             if not stock_name:
                 stock_name = get_stock_name(stock_code)
 
-            # 🔥 获取市场类型，如果没有则根据股票代码推断
-            market_type = doc.get("market_type")
-            if not market_type:
-                from tradingagents.utils.stock_utils import StockUtils
-                market_info = StockUtils.get_market_info(stock_code)
-                market_type_map = {
-                    "china_a": "A股",
-                    "hong_kong": "港股",
-                    "us": "美股",
-                    "unknown": "A股"
-                }
-                market_type = market_type_map.get(market_info.get("market", "unknown"), "A股")
+            # 🔥 获取市场类型（已移除StockUtils依赖，默认A股）
+            market_type = doc.get("market_type", "A股")
 
             # 获取创建时间（数据库中是 UTC 时间，需要转换为 UTC+8）
             created_at = doc.get("created_at", datetime.utcnow())
