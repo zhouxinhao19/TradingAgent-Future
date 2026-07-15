@@ -275,6 +275,24 @@ async def get_contract_info(
     return ok(data=data, message="获取合约信息成功")
 
 
+@router.get("/{full_symbol}/contracts-list", response_model=dict, summary="品种合约列表(含主力连续)")
+async def get_contracts_list(full_symbol: str):
+    """
+    列出某品种下的所有到期合约代码 + 主力连续代码。
+
+    用于前端 K 线卡片切换合约。
+
+    Path: GET /api/commodity/CU2501.SHF/contracts-list
+    """
+    data = await service.get_contracts_list(full_symbol)
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"无法获取合约列表: {full_symbol}",
+        )
+    return ok(data=data, message="获取合约列表成功")
+
+
 @router.get("/trading-calendar", response_model=dict, summary="交易日历 + 合约参数")
 async def get_trading_calendar(
     date: Optional[str] = Query(None, description="交易日 YYYY-MM-DD,默认今天"),

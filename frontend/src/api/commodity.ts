@@ -303,6 +303,18 @@ export const commodityApi = {
     )
   },
 
+  async getContractsList(fullSymbol: string) {
+    return ApiClient.get<ApiEnvelope<{
+      underlying: string
+      chinese_name: string
+      exchange: string
+      continuous: string | null
+      current: string
+      contracts: string[]
+      count: number
+    }>>(`/api/commodity/${encodeURIComponent(fullSymbol)}/contracts-list`)
+  },
+
   async getTradingCalendar(date?: string) {
     return ApiClient.get<ApiEnvelope<TradingCalendarResponse>>(
       `/api/commodity/trading-calendar`,
