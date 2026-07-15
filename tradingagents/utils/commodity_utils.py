@@ -22,7 +22,10 @@ class CommodityMarket(Enum):
 
 
 # 国内期货交易所后缀(包含中金所期货:股指/国债)
-_CHINA_FUTURES_EXCHANGES = ("SHF", "DCE", "CZC", "INE", "GFEX", "CFFEX")
+# 兼容 metadata 使用的完整代码(SHFE/CZCE)和行情接口常用短码(SHF/CZC)
+_CHINA_FUTURES_EXCHANGES = (
+    "SHF", "SHFE", "DCE", "CZC", "CZCE", "INE", "GFEX", "CFFEX",
+)
 
 # 国际期货:Yahoo Finance 主力连续合约代码(常见品种)
 _INTERNATIONAL_FUTURES_PREFIX = {
@@ -122,11 +125,11 @@ class CommodityUtils:
 
         code = str(code).strip().upper()
 
-        # 国内期货: <SYMBOL><YYMM>.<EXCHANGE>
+        # 国内期货: <SYMBOL><YYMM>.<EXCHANGE> 或主力连续 <SYMBOL>0.<EXCHANGE>
         # 大部分合约是 4 位数字(YEAR2+MONTH2),CZCE 部分品种采用 3 位(YEAR1+MONTH2)
         for exch in _CHINA_FUTURES_EXCHANGES:
-            # 标准 4 位数字
-            if re.match(rf'^[A-Z]{{1,3}}\d{{4}}\.{exch}$', code):
+            # 具体月份(4位)或主力连续(末尾 0)
+            if re.match(rf'^[A-Z]{{1,3}}(?:\d{{4}}|0)\.{exch}$', code):
                 return CommodityMarket.CHINA_FUTURES
         # CZCE 兼容 3 位数字(YYM):如 AP410 / CF401 / SR409
         if re.match(r'^[A-Z]{1,3}\d{3}\.(CZC|CZCE)$', code):

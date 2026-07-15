@@ -18,7 +18,7 @@
           <div class="price" :class="changeClass">{{ formatPrice(store.quotes.current_price) }}</div>
           <div class="change" :class="changeClass">
             <span>{{ formatChange(store.quotes.change) }}</span>
-            <span class="pct">({{ store.quotes.pct_chg.toFixed(2) }}%)</span>
+            <span class="pct">({{ formatPercent(store.quotes.pct_chg) }}%)</span>
           </div>
         </div>
 
@@ -40,6 +40,14 @@
         <el-row :gutter="12">
           <el-col :xs="24" :md="12">
             <el-card shadow="hover" v-loading="store.loading(`quotes:${fullSymbol}`)">
+              <el-alert
+                v-if="store.errorMsg(`quotes:${fullSymbol}`)"
+                type="warning"
+                :title="store.errorMsg(`quotes:${fullSymbol}`)"
+                :closable="false"
+                show-icon
+                style="margin-bottom: 12px"
+              />
               <template #header>
                 <b>实时报价</b>
                 <el-tag size="small" type="info" style="margin-left: 8px">{{ store.quotes?.trade_date }}</el-tag>
@@ -60,6 +68,14 @@
 
           <el-col :xs="24" :md="12">
             <el-card shadow="hover" v-loading="store.loading(`info:${fullSymbol}`)">
+              <el-alert
+                v-if="store.errorMsg(`info:${fullSymbol}`)"
+                type="warning"
+                :title="store.errorMsg(`info:${fullSymbol}`)"
+                :closable="false"
+                show-icon
+                style="margin-bottom: 12px"
+              />
               <template #header><b>基础信息</b></template>
               <el-descriptions :column="1" border size="small" v-if="store.info">
                 <el-descriptions-item label="品种代码">{{ store.info.code }}</el-descriptions-item>
@@ -81,6 +97,14 @@
       <!-- ② 日 K 线 -->
       <el-tab-pane label="日 K 线" name="kline">
         <el-card shadow="never" v-loading="store.loading(`historical:${fullSymbol}`)">
+          <el-alert
+            v-if="store.errorMsg(`historical:${fullSymbol}`)"
+            type="warning"
+            :title="store.errorMsg(`historical:${fullSymbol}`)"
+            :closable="false"
+            show-icon
+            style="margin-bottom: 12px"
+          />
           <template #header>
             <div style="display:flex; align-items:center; justify-content:space-between">
               <b>日 K 线(最近 {{ klineDays }} 天)</b>
@@ -477,6 +501,10 @@ function formatChange(v: number | undefined | null): string {
   if (v === undefined || v === null) return '-'
   const n = Number(v)
   return (n > 0 ? '+' : '') + n.toFixed(2)
+}
+function formatPercent(v: number | undefined | null): string {
+  const n = Number(v)
+  return Number.isFinite(n) ? n.toFixed(2) : '-'
 }
 function formatNumber(v: number | undefined | null): string {
   if (v === undefined || v === null) return '-'

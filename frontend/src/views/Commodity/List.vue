@@ -93,8 +93,7 @@
       </el-table>
 
       <p class="footer-tip">
-        💡 点击行或"详情"按钮进入 {{ '{品种代码}' }}.{{ '{交易所}' }} 详情页 ·
-        示例: CU2501.SHF / AU2506.SHF / RB2501.SHF / SC2508.INE
+        💡 点击行或"详情"按钮进入主力连续合约详情页 · 默认使用最新主力连续代码(如 CU0.SHF / AU0.SHF / RB0.SHF / SC0.INE)
       </p>
     </el-card>
   </div>
@@ -137,10 +136,26 @@ async function reload() {
   await store.loadVarieties(params, true)
 }
 
+const EXCHANGE_SUFFIX: Record<string, string> = {
+  SHFE: 'SHF',
+  CZCE: 'CZC',
+  DCE: 'DCE',
+  INE: 'INE',
+  GFEX: 'GFEX',
+  CFFEX: 'CFFEX',
+}
+
+function buildContinuousSymbol(row: VarietyItem): string {
+  const symbol = row.symbol.trim().toUpperCase()
+  const exchange = row.exchange.trim().toUpperCase()
+  const suffix = EXCHANGE_SUFFIX[exchange] || exchange
+  return `${symbol}0.${suffix}`
+}
+
 function goDetail(row: VarietyItem) {
   router.push({
     name: 'CommodityDetail',
-    params: { fullSymbol: `${row.symbol}2501.${row.exchange}` },
+    params: { fullSymbol: buildContinuousSymbol(row) },
     query: { variety: row.symbol },
   })
 }
@@ -152,7 +167,7 @@ function onRowClick(row: VarietyItem) {
 async function quickQuote(row: VarietyItem) {
   router.push({
     name: 'CommodityDetail',
-    params: { fullSymbol: `${row.symbol}2501.${row.exchange}` },
+    params: { fullSymbol: buildContinuousSymbol(row) },
     query: { variety: row.symbol, tab: 'quotes' },
   })
 }
