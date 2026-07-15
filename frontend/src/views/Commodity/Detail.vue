@@ -439,6 +439,20 @@ function pickSymbolColumn(row: Record<string, unknown>): string | null {
   return null
 }
 
+// 合约信息表格中"品种代码"列名白名单(不同交易所/接口返回的列名可能不同)
+const CONTRACT_SYMBOL_COLUMN_CANDIDATES = [
+  '品种代码', 'symbol_code', '品种简称', '品种',
+] as const
+
+function pickContractSymbolColumn(row: Record<string, unknown>): string | null {
+  for (const key of CONTRACT_SYMBOL_COLUMN_CANDIDATES) {
+    if (key in row) return key
+  }
+  // 无白名单列时,尝试取第一列(部分接口列名不稳定,用第一列作为品种代码列)
+  const keys = Object.keys(row)
+  return keys.length > 0 ? keys[0] : null
+}
+
 const contractLoading = ref(false)
 const contractRows = ref<Record<string, unknown>[]>([])
 const contractCols = ref<string[]>([])
@@ -587,9 +601,35 @@ async function loadContractInfo() {
     const r = await commodityApi.getContractInfo(exchangeInfo.value)
     const items = (r as any)?.data?.rows
     if (Array.isArray(items) && items.length) {
-      contractRows.value = items
+      const underlying = extractUnderlying(fullSymbol.value)
+      currentUnderlying.value = underlying
+
+      // 找品种代码列,按当前 underlying 过滤
+      const symCol = pickContractSymbolColumn(items[0] as Record<string, unknown>)
+      let filtered: Record<string, unknown>[]
+      if (symCol && underlying) {
+        const target = underlying.toUpperCase()
+        filtered = items.filter(
+          (it: any) => String(it?.[symCol] ?? '').toUpperCase() === target,
+        )
+        // 若品种代码列匹配不到,降级为按合约代码前缀匹配
+        if (filtered.length === 0) {
+          const codeCandidates = ['合约代码', 'contract_code', 'code', 'symbol', '品种代码']
+          const codeKey = codeCandidates.find(c => c in items[0]) || Object.keys(items[0] as Record<string, unknown>)[0]
+          filtered = items.filter(
+            (it: any) => String(it?.[codeKey] ?? '').toUpperCase().startsWith(target),
+          )
+        }
+      } else {
+        filtered = items
+      }
+
+      contractRows.value = filtered
       contractCols.value = Object.keys(items[0] as Record<string, unknown>)
-      ElMessage.success(`拉取 ${exchangeInfo.value} 合约信息成功(共 ${items.length} 行)`)
+      ElMessage.success(
+        `拉取 ${exchangeInfo.value} 合约信息: 当前品种 ${underlying} 共 ${filtered.length} 行` +
+        (filtered.length !== items.length ? `(全交易所 ${items.length} 行, 已按品种过滤)` : ''),
+      )
     } else {
       contractRows.value = []
     }
