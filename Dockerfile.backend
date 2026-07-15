@@ -77,6 +77,9 @@ COPY docs ./docs
 COPY install ./install
 
 # 复制Docker环境配置文件
+# ⚠️ 注意:此 COPY 的 .env 仅作 build 期默认值
+# docker-compose 启动时,compose 文件的 `environment:` 段优先于镜像内 .env
+# 所以 docker-compose.override.yml 里翻 FEATURE_COMMODITY_* 会覆盖这里的默认值
 COPY .env.docker ./.env
 
 # 暴露后端端口（与docker-compose.v1.0.0.yml一致）

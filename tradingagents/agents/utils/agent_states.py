@@ -97,7 +97,3 @@ class AgentState(MessagesState):
     latest_news: Annotated[list, "最新新闻列表 List[Dict],来自 provider.get_futures_news()"]
     final_decision: Annotated[str, "CIO 最终决策(Markdown 文本)"]
     cio_decision_timestamp: Annotated[str, "CIO 决策 ISO 时间戳"]
-
-
-# Researcher team state
-class InvestDebateState(TypedDict):

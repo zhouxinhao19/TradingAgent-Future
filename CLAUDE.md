@@ -5,13 +5,41 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 回复约定
 
 - 始终使用中文回复（见 `~/.claude/CLAUDE.md` 用户全局指令）。
-- 当前日期：2026-07-13。
+- 当前日期：2026-07-14。
+
+---
+
+## 兄弟项目对照（工作区布局）
+
+工作区根目录 `D:\改造\` 下同时存在**两个项目**，后者是**已改造完成的期货版**，作为本次改造的**参考蓝本**：
+
+| 目录 | 性质 | 当前状态 | 主要差异 |
+|---|---|---|---|
+| `TradingAgent-CN/` | 正在改造的目标项目 | 股票 + 大宗商品并存（Phase 3a 已完成） | FastAPI + Vue 3 多智能体框架，商品能力通过 feature flag 渐进开启 |
+| `TradingAgents_for_Futures-main/` | 参考蓝本 | 已完工、Streamlit 单体 | 完整 6 模块期货分析 + 多空辩论 + CIO 决策链 |
+
+### 参考项目的可借鉴模式
+
+参考项目采用的两条平行结构与本项目思路一致，可直接对照：
+
+- **顶层单体脚本** vs **`qihuo/` 模块化包** — 本项目对应 `tradingagents/`（核心引擎，Apache 2.0）+ `app/` + `frontend/`（专有）。
+- **决策链结构**（研究员辩论 → 研究经理 → 交易员 → 风控 → CIO）— 对应 `tradingagents/agents/{researchers,managers,trader,risk_mgmt}/`。可借鉴其**多空辩论 prompt 风格**（参考 `期货TradingAgents系统_看涨研究员.py` / `看跌研究员.py`）。
+- **6 大分析模块**：技术 / 基差 / 库存 / 持仓 / 期限结构 / 新闻 — 本项目当前已实现的 commodity data layer 与之 1:1 对齐，可参考其 `qihuo/features/`（纯函数特征工程）+ `qihuo/analysis/`（聚合器）的分层。
+- **DeepSeek 单一接入点**模式 — 本项目已升级为更通用的 `tradingagents/llm_clients/` 抽象层（factory + provider_keys + 多 backend 兼容）。
+- **数据更新器独立子目录**（`modules/`）— 对应本项目 `tradingagents/dataflows/providers/commodity/akshare_futures.py` 的"按子目录组织 provider"。
+
+### 参考项目的关键约束（避免照搬踩坑）
+
+- **路径全部相对**（参考 `CRITICAL_PATH_FIX.md`）。本项目已通过 `tradingagents/dataflows/providers/commodity/commodity_metadata.py` 的 `normalize_exchange_code()` 与 `Path(__file__).parent` 模式规避绝对路径硬编码。
+- **TA-Lib 缺失自动降级 stockstats**（参考项目 README 提示）。本项目通过 `pyproject.toml` 可选依赖管理 + 运行时 try/except 包装。
+- **JSON 严格输出契约**（参考项目 LLM 提示词：`direction(仅 long|short|neutral) / conviction(0~1) / bullets[]`）— 本项目通过 LangChain 的 `with_structured_output` + Pydantic schema 等价实现。
+- **参考项目遗留 `NotImplementedError` 占位**（部分 `qihuo/agents/analysts/` 方法尚未接入），本项目应**避免遗留占位**：`AkshareFuturesProvider` 的 13 扩展接口已全部实现，新功能若暂未实现需在进度文档 `docs/progress/phase-N.md` 明确标注 "未交付"。
 
 ---
 
 ## 项目概览
 
-**TradingAgents-CN** 是面向中文用户的多智能体股票分析学习平台，基于 [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents) 多智能体交易框架改造，采用 Apache 2.0 + 专有组件的混合许可证。当前版本 `v1.0.1`（见根目录 `VERSION`）。
+**TradingAgents-CN** 是面向中文用户的多智能体股票分析学习平台，基于 [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents) 多智能体交易框架改造，采用 Apache 2.0 + 专有组件的混合许可证。当前版本 `v1.0.1`（见根目录 `VERSION`）。**当前正在改造方向：股票 → 大宗商品期货**（详见后文"股票→大宗商品改造"）。
 
 **注意**：
 - `app/`（FastAPI 后端）和 `frontend/`（Vue 前端）属于**专有组件**，商业使用需单独授权（`app/LICENSE`、`frontend/LICENSE`）。
@@ -59,7 +87,12 @@ tradingagents/
 │   ├── data_source_manager.py # 中国市场主调度（AKShare/Tushare/BaoStock 多级降级链）
 │   ├── optimized_china_data.py
 │   ├── realtime_metrics.py
-│   ├── providers/{china,hk,us,examples}/  # 按市场分目录的 provider
+│   ├── providers/{china,hk,us,examples}/        # 股票侧 providers(Phase 5 待删除)
+│   ├── providers/commodity/                      # ⭐ Phase 2 商品 providers(akshare_futures / yfinance_futures)
+│   │   ├── base_commodity_provider.py            # ABC:3 @abstractmethod + 13 扩展接口(默认 NotImplementedError)
+│   │   ├── commodity_metadata.py                 # 6 交易所 + 80 品种 + 主力连续 + 交易时间 + 归一化
+│   │   ├── commodity_utils.py                    # CommodityMarket 枚举 + 标的识别
+│   │   └── akshare_futures.py                    # 主 provider(13 扩展接口 + 6 类新闻)
 │   ├── cache/{file_cache,db_cache,mongodb_cache_adapter,integrated,adaptive,app_adapter}.py
 │   └── news/, technical/
 ├── tools/                     # 数据工具（YFinance/Tushare/AKShare 等 wrapper）
@@ -252,6 +285,22 @@ python tests/debug_docker.py
 - 对应的同步 worker 放在 `app/worker/` 和 CLI 初始化脚本 `cli/{akshare,tushare,baostock}_init.py`。
 - 单股实时行情降级链：`stock_bid_ask_em → stock_zh_a_spot → stock_zh_a_spot_em → stock_zh_a_hist`。
 
+### 数据源（Commodity / 大宗商品 — Phase 2 主轴）
+
+`tradingagents/dataflows/providers/commodity/` 是股票 → 商品改造的核心路径，独立成子目录且与 `stock_*` 互不污染：
+
+- **基类强约束**：`BaseCommodityDataProvider` 规定 3 个 `@abstractmethod`（`connect` / `get_commodity_basic_info` / `get_commodity_quotes` / `get_historical_data`），未实现则无法实例化。
+- **13 个扩展接口可选**：`get_fees_and_margin / get_inventory / get_warehouse_receipt / get_position_rank / get_registered_receipt / get_spot_price / get_basis_history / get_basis_spot_previous / get_roll_yield / get_contract_info / get_trading_calendar / get_realtime_quote / get_minute_kline / get_delivery_info / get_holding_position`。默认 `NotImplementedError`，子类（`AkshareFuturesProvider` / 未来的 `YFinanceFuturesProvider`）按需重写。
+- **静态元数据**：`commodity_metadata.py` 维护 6 大交易所 + 80+ 品种 + 主力连续代码 + 交易时间 + `normalize_exchange_code()` 归一化（接受 `SHF / CZC / shfe` 等任意输入）。零依赖、可单测。
+- **标的格式**：`<SYMBOL><YYMM>.<EXCHANGE>`（国内期货）、`=F` 后缀（国际期货，Phase 2+ 接）、`SGE` 后缀（上海黄金现货，Phase 2+ 接）。
+- **新闻管道（6 类别）**：`get_futures_news(category, limit)` 聚合多源。
+  - shmet 文本快讯（金属/财经/要闻/VIP，15 个细分类）
+  - 4 个合成器：chemical / energy / agricultural / financial — 从宏观 + 产业数据接口合成"基本面事件卡片"
+  - global_macro 聚合：6 个 `stock_info_*` 资讯源 + 时间归一化（`_parse_global_macro_time` 6 种格式）
+  - 情感评分：期货专用关键词词典 + QVIX 阈值（30/25/22/18 → -0.5 ~ +0.5）
+- **测试约定**：`tests/test_commodity_data_layer.py` 85 个测试全过，无需 pytest-asyncio plugin（用 `asyncio.run()` 同步包装）。`mock_ak` fixture 注入 35+ AKShare 函数 mock，断言 `assert_called_with(...)` / `assert_not_called()`。所有 `_call()` 路径在 akshare 不可用时优雅返回 `None`。
+- **接入新 provider**：在 `tradingagents/dataflows/providers/commodity/<name>.py` 继承 ABC，至少实现 4 个 abstractmethod；在 `app/services/commodity/unified_commodity_service.py` 注册 provider key 与优先级。
+
 ### 后端路由/服务
 
 - 新增业务模块：在 `app/routers/` 加路由文件 → `app/main.py` 中 `include_router`。
@@ -289,11 +338,48 @@ python tests/debug_docker.py
 
 按 [`docs/plans/stock-to-commodity.md`](docs/plans/stock-to-commodity.md) 推进 **"股票 → 大宗商品"改造**。
 
-- **当前阶段**：Phase 0 - 抽象统一（未开始）
-- **关键约束**：
-  - 开发期间**股票/商品并存**，每个 Phase 都能 `docker compose up` 跑通
-  - **Feature Flag 渐进开启**：4 个 `FEATURE_COMMODITY_*` 默认全 `false`，完成后翻 `true` 即可演示
-  - 进度产出：`docs/progress/phase-N.md` + 截图
-  - 新建模块统一用 `commodity_*` 前缀，与 `stock_*` 隔离
-- **下次启动第一句话**：直接说"继续 Phase 0"即可
-- **迁移说明**：plan 原文已从 `~/.claude/plans/encapsulated-forging-hoare.md` 移到本仓库 `docs/plans/stock-to-commodity.md`，跨机器可用
+### 实际状态(2026-07-14 实测审计)
+
+| Phase | 范围 | 实际交付 | 未交付 |
+|---|---|---|---|
+| **Phase 0** | 抽象统一 | ✅ 完成 | - |
+| **Phase 1** | 数据闭环(行情) | ✅ 后端 5 端点 + flag gating + 前端 commodity UI | - |
+| **Phase 2** | 数据层完备 + 6 类新闻 | ✅ Provider 实现 + 85 单测全过 + 17 HTTP 端点 + 前端 4 文件 | - |
+| **Phase 3a** | 路由 + 前端补全 | ✅ 后端 22 端点 200 + 前端 axios/store/views/router 全部交付 | ❌ 前端 TS 编译 / 浏览器实测未做(无 node_modules) |
+| **Phase 3b** | Features 层(纯规则) + 4 分析师 + 四阶段决策链 | 🟡 **待启动(P0 已修,开工 3b-i → 3b-ii)** | 全部 |
+
+### 关键约束
+- 开发期间**股票/商品并存**,每个 Phase 都能 `docker compose up` 跑通
+- **Feature Flag 渐进开启**:4 个 `FEATURE_COMMODITY_*` 渐进开启
+  - `FEATURE_COMMODITY_ENABLED` / `FEATURE_COMMODITY_DATA`: Phase 3a 已翻 `true`
+  - `FEATURE_COMMODITY_ANALYSIS`: Phase 3b 翻 true
+  - `FEATURE_COMMODITY_PAPER`: Phase 4 翻 true
+- 进度产出:`docs/progress/phase-N.md` + 截图(必须如实标注未交付项)
+- 新建模块统一用 `commodity_*` 前缀,与 `stock_*` 隔离
+
+### 当前数据层实测状态(2026-07-14)
+- 85 个商品数据层单元测试全过(`pytest tests/test_commodity_data_layer.py`)
+- 13 扩展接口(provider 层实现 + 后端包装)
+- 82 品种(6 交易所 / 6 品类)
+- 6 类新闻 `metal/chemical/energy/agricultural/financial/global_macro`
+- HTTP 端点共 **22 个**(5 Phase 1 + 15 Phase 3a 扩展 + 2 Phase 3a 新闻)
+- curl 实测:`tests/test_phase3a_curl.py` — 24 个调用 100% 200 OK
+- 前端:`api/commodity.ts` (22 async 方法) + `stores/commodity.ts` (12 actions) + `views/Commodity/{List,Detail}.vue` + 路由 `/commodity/list` `/commodity/:fullSymbol`
+
+### 下次启动第一句话
+
+推荐 **3b-i → 3b-ii 顺序**:
+
+- **"开工 3b-i: 先做 Features 层 technical.py"**(纯规则计算,零 LLM,3-4 天)
+- **"开工 3b-ii: 做 technical_analyst 节点"**(Features 完成后,1 周)
+- **"继续修 P0-x"**(若 P0 还有未完成项)
+
+### 关键教训(2026-07-13 → 2026-07-14)
+- **代码完成 ≠ 用户可演示**:Phase 1/2 后端能力齐备,但用户无法在浏览器看到任何商品页面 → Phase 3a 已纠正(后端 22 端点 + 前端 4 文件齐备,curl 全 200)
+- **文档必须反映实测**:phase-1.md 原始版本夸大了前端交付,现已纠正;未来进度文档以"实测验证"为标准
+- **合约生命周期是结构性盲点**:Phase 3a 审计发现 `get_historical_data` 忽略 YYMM,用户传具体合约被静默替换为主连 — 这是 P0 缺陷,必须在 Phase 3b 前修复
+- **Phase 3b 前置条件**:复用 `期货TradingAgents系统_*` 决策链模式,避免直接照搬占位实现;必须先修 P0 三项合约生命周期问题
+
+### 迁移说明
+- plan 原文已从 `~/.claude/plans/encapsulated-forging-hoare.md` 移到本仓库 `docs/plans/stock-to-commodity.md`,跨机器可用
+- plan v3 已更新,反映 Phase 0/1/2/3a 完成 + Phase 3b 待启动(前置:先修 §八 P0)

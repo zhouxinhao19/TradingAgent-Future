@@ -19,7 +19,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 
 from app.routers.auth_db import get_current_user
@@ -211,7 +211,7 @@ def _list_reports(full_symbol: str, limit: int = 20) -> List[Dict[str, Any]]:
 async def submit_commodity_analysis(
     full_symbol: str,
     background_tasks: BackgroundTasks,
-    request: Optional[AnalysisRequest] = None,
+    raw_request: Request,
     user: dict = Depends(get_current_user),
 ):
     """提交大宗商品期货分析任务。
@@ -220,9 +220,27 @@ async def submit_commodity_analysis(
       4 分析师 → 多空辩论 → 交易员 → 风控 → CIO 最终决策
     耗时约 1-5 分钟(取决于 LLM 速度)。
     完成后报告自动保存,可通过 GET /reports 查看。
+
+    body 兼容性:full_symbol 在路径参数和 body 都接受;
+    - 完全没 body / body={} → 用路径参数填充
+    - body 含 full_symbol → 用 body 的(优先级更高)
+    - body 含其它字段(trade_date/variety_name/...) → 正常解析
     """
-    if request is None:
-        request = AnalysisRequest(full_symbol=full_symbol)
+    # 容错:body 缺失或为空时用路径参数填充 full_symbol
+    try:
+        body_bytes = await raw_request.body()
+        body_data: Dict[str, Any] = json.loads(body_bytes) if body_bytes else {}
+    except (json.JSONDecodeError, ValueError):
+        body_data = {}
+    if not body_data.get("full_symbol"):
+        body_data["full_symbol"] = full_symbol
+    try:
+        request = AnalysisRequest(**body_data)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"请求体校验失败: {exc}",
+        )
 
     task_id = f"commodity_{uuid.uuid4().hex[:12]}"
     trade_date = request.trade_date or _today()

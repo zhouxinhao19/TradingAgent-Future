@@ -539,7 +539,19 @@ export const configApi = {
   // 配置重载
   reloadConfig(): Promise<{ success: boolean; message: string; data?: any }> {
     return unwrapResponse(ApiClient.post<{ success: boolean; message: string; data?: any }>('/api/config/reload'))
-  }
+  },
+
+  // ========== Feature Flags(Phase 3a 接入) ==========
+
+  /**
+   * 获取当前生效的 feature flag 状态(后端 /api/config/features)
+   * 前端用以条件渲染菜单与详情页守卫
+   * 不需要鉴权
+   */
+  async getFeatureFlags(): Promise<FeatureFlags> {
+    const res = await ApiClient.get<{ success: boolean; data: FeatureFlags }>('/api/config/features')
+    return (res as unknown as { success: boolean; data: FeatureFlags }).data
+  },
 }
 
 // 配置相关的常量
@@ -550,6 +562,20 @@ export const CONFIG_PROVIDERS = {
   GEMINI: 'gemini',
   CLAUDE: 'claude'
 } as const
+
+// ========== Feature Flags 类型(Phase 3a) ==========
+
+/**
+ * 后端 /api/config/features 返回结构(对齐 app/core/config.py:FEATURE_FLAGS)
+ * commodity_enabled 是顶级开关,数据/分析/交易逐级精细控制
+ */
+export interface FeatureFlags {
+  commodity_enabled: boolean
+  commodity_data: boolean
+  commodity_analysis: boolean
+  commodity_paper: boolean
+  [key: string]: boolean
+}
 
 /**
  * 数据源类型常量

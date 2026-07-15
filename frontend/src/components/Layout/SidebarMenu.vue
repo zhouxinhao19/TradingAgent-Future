@@ -44,8 +44,19 @@
 
     <el-menu-item index="/paper">
       <el-icon><CreditCard /></el-icon>
-      <template #title>模拟交易</template>
+      <template #title>股票模拟交易</template>
     </el-menu-item>
+
+    <!-- 大宗商品(Phase 3a · Feature Flag 控制) -->
+    <el-sub-menu v-if="featureStore.commodityEnabled" index="/commodity">
+      <template #title>
+        <el-icon><Box /></el-icon>
+        <span>大宗商品</span>
+      </template>
+      <el-menu-item index="/commodity/list">商品列表</el-menu-item>
+      <el-menu-item v-if="featureStore.commodityAnalysis" index="/commodity/analysis">商品分析</el-menu-item>
+      <el-menu-item v-if="featureStore.commodityPaper" index="/commodity/paper">期货模拟交易</el-menu-item>
+    </el-sub-menu>
 
 
     <!-- 分析报告已移至“股票分析”子菜单，保留注释便于追踪 -->
@@ -99,9 +110,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
+import { useFeatureStore } from '@/stores/feature'
 import {
   Odometer,
   Reading,
@@ -112,13 +124,20 @@ import {
   /* Document 移除：不再使用顶级分析报告菜单图标 */
   Setting,
   InfoFilled,
-  CreditCard
+  CreditCard,
+  Box
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const appStore = useAppStore()
+const featureStore = useFeatureStore()
 
 const activeMenu = computed(() => route.path)
+
+// 应用启动拉一次,后续守卫/菜单直接读 store
+onMounted(() => {
+  featureStore.load()
+})
 </script>
 
 <style lang="scss" scoped>

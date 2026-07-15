@@ -352,12 +352,14 @@ export const commodityApi = {
     max_debate_rounds?: number
     max_risk_discuss_rounds?: number
   }) {
+    // 后端 AnalysisRequest 必填 full_symbol(虽然也在 URL 里,但 Pydantic 仍校验 body)
+    const body = { full_symbol: fullSymbol, ...(params || {}) }
     return ApiClient.post<ApiEnvelope<{
       task_id: string
       full_symbol: string
       trade_date: string
       status: string
-    }>>(`/api/commodity/${encodeURIComponent(fullSymbol)}/analyze`, params || {})
+    }>>(`/api/commodity/${encodeURIComponent(fullSymbol)}/analyze`, body)
   },
 
   async getReports(fullSymbol: string, limit: number = 20) {
