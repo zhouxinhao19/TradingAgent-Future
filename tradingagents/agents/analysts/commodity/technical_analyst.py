@@ -45,12 +45,42 @@ TECHNICAL_SYSTEM_PROMPT = """你是一位资深的期货技术分析师,与基�
 - 交易所:{exchange}
 - 分析日期:{trade_date}
 
+## 合约分析策略
+
+你是基于品种级技术分析的期货分析师。技术分析遵循以下合约层级:
+
+1. **主力连续合约(Primary)**: 持仓量最大的合约的拼接序列。
+   所有技术指标(均线、MACD、RSI、BOLL)基于此计算。这是技术分析的主战场。
+
+2. **指数合约(Auxiliary)**: 所有合约持仓量加权平均的连续序列。
+   用于验证长期趋势(MA60/MA120)、过滤主力合约换月噪音。
+
+3. **近月合约(Avoid)**: 距到期不足 30 天的合约。
+   价格向现货回归、持仓限制导致技术图形失真,不用于纯技术分析。
+
+4. **移仓换月预警**: 当新主力 OI 连续超过旧主力时发出预警,确保分析标的已更新。
+
 ## 特征层(已计算,直接消费)
 
 ### 综合判断
 - 综合方向:{combined_direction}(强度 {combined_strength:.2f})
 - 日线方向:{daily_direction}(强度 {daily_strength:.2f})
 - 周线方向:{weekly_direction}(强度 {weekly_strength:.2f})
+
+### 主力-指数一致性
+- 状态:{main_index_alignment}
+  - aligned = 主力与指数同向,趋势共识强
+  - divergent = 主力与指数反向,短期噪音或换月干扰
+  - partial = 一方信号不足
+
+### 指数合约长期趋势
+- 指数合约代码:{index_symbol}
+- 长期均线:MA60={index_ma60}, MA120={index_ma120}
+- 长期趋势:{index_long_term_trend}
+- 主力相对指数强弱(z-score):{relative_strength}
+
+### 移仓换月状态
+{rollover_status}
 
 ### 持仓量(OI)与价格背离
 {oi_divergence}
@@ -68,8 +98,8 @@ TECHNICAL_SYSTEM_PROMPT = """你是一位资深的期货技术分析师,与基�
 
 ## 数据质量
 - 数据条数:{quality_rows}
-- 覆盖率:{quality_coverage}
-- 数据时效:{quality_freshness_days} 天
+- 主力连续合约:{main_available}
+- 指数合约:{index_available}
 
 ---
 
@@ -77,9 +107,13 @@ TECHNICAL_SYSTEM_PROMPT = """你是一位资深的期货技术分析师,与基�
 
 1. **技术形态解读**:基于日/周双周期综合判断趋势方向与强度,说明两周期是否同向
 2. **关键位识别**:从价格区间、均线、布林带提炼 2-3 个支撑位与阻力位
-3. **OI 背离分析**:持仓量与价格背离的方向含义(看多/看空/中性)
-4. **波动率评估**:当前波动率历史分位,适合突破策略还是震荡策略
-5. **风险提示**:数据稀疏、信号冲突时降低 confidence,在结论中明确标注
+3. **主力指数交叉验证**:当主力信号冲突时,以指数长期趋势过滤噪音
+   - 主力看多 + 指数 MA120 上方 → 高置信度顺势
+   - 主力看多 + 指数 MA120 下方 → 警惕逆大趋势的假突破
+4. **OI 背离分析**:持仓量与价格背离的方向含义(看多/看空/中性)
+5. **波动率评估**:当前波动率历史分位,适合突破策略还是震荡策略
+6. **移仓检测**:报告含 rollover 预警时,判断历史信号是否因换月而失真
+7. **风险提示**:数据稀疏、信号冲突、指数不可用时降低 confidence,在结论中明确标注
 
 ## 输出格式
 
@@ -88,6 +122,7 @@ TECHNICAL_SYSTEM_PROMPT = """你是一位资深的期货技术分析师,与基�
 - ## 关键位(支撑/阻力表格)
 - ## OI 背离解读
 - ## 波动率与策略适配
+- ## 移仓换月(如有预警)
 - ## 风险提示
 
 不要使用 emoji;所有数值保留 2 位小数。
@@ -120,6 +155,8 @@ def _build_fallback_report(
     daily: Dict[str, Any],
     weekly: Dict[str, Any],
     quality: Dict[str, Any],
+    index_contract: Optional[Dict[str, Any]] = None,
+    rollover: Optional[Dict[str, Any]] = None,
 ) -> str:
     """LLM 调用失败时,直接用 features snapshot 拼 Markdown 报告。
 
@@ -137,14 +174,34 @@ def _build_fallback_report(
         f"- 方向:{direction_cn}\n"
         f"- 强度:{strength:.2f}\n"
         f"- OI 背离:{combined.get('oi_divergence', 'neutral')}\n"
-        f"- 波动率:{vol.get('regime', 'low')} (ATR={_fmt(vol.get('atr'))})\n\n"
-        f"## 触发信号\n"
+        f"- 波动率:{vol.get('regime', 'low')} (ATR={_fmt(vol.get('atr'))})\n"
     )
+
+    # 指数合约摘要
+    if index_contract:
+        lt = index_contract.get("long_term_trend", "neutral")
+        lt_cn = {"bullish": "看多", "bearish": "看空", "neutral": "中性"}.get(lt, lt)
+        md += f"- 指数合约趋势:{lt_cn} (MA60={_fmt(index_contract.get('ma60'))}, MA120={_fmt(index_contract.get('ma120'))})\n"
+        rs = index_contract.get("relative_strength")
+        if rs is not None:
+            md += f"- 主力相对指数强弱:z-score={rs:.3f}\n"
+    alignment = combined.get("main_index_alignment", "N/A")
+    md += f"- 主力-指数一致性:{alignment}\n\n"
+
+    # 移仓换月
+    if rollover and rollover.get("detected"):
+        md += f"## 移仓换月预警\n"
+        md += f"- {rollover.get('description', '检测到换月')}\n"
+        if rollover.get("recent_rollover"):
+            md += "- ⚠ 近期发生换月,历史信号可能失真\n"
+        md += "\n"
+
+    md += f"## 触发信号\n"
     md += "\n".join(f"- {s}" for s in signals) or "- (无触发信号)"
     md += "\n\n## 数据质量\n"
     md += f"- 数据条数:{quality.get('rows', 0)}\n"
-    md += f"- 覆盖率:{_fmt(quality.get('coverage'))}\n"
-    md += f"- 数据时效:{_fmt(quality.get('data_freshness_days'))} 天\n"
+    md += f"- 主力连续合约:{quality.get('main_continuous_available', 'N/A')}\n"
+    md += f"- 指数合约:{quality.get('index_contract_available', 'N/A')}\n"
     md += (
         f"\n---\n"
         f"_本报告由 features 层直接生成,未经过 LLM 文字总结;"
@@ -201,14 +258,32 @@ def create_technical_analyst(llm):
 
         # --- 主路径:features 可信,准备 LLM prompt ---
         combined = tech.get("combined", {}) or {}
-        daily = tech.get("daily", {}) or {}
-        weekly = tech.get("weekly") or {}
+        main_cont = tech.get("main_continuous", {}) or {}
+        daily = main_cont.get("daily", {}) or {}
+        weekly = main_cont.get("weekly") or {}
         quality = tech.get("quality", {}) or {}
+        index_contract = tech.get("index_contract", {}) or {}
+        rollover = tech.get("rollover", {}) or {}
 
         snapshot_excerpt = _format_snapshot_excerpt(truncate_snapshot(daily.get("snapshot", {}), max_keys=15))
         trigger_signals = "\n".join(
             f"- {s}" for s in (combined.get("signals", []) or [])[:10]
         ) or "- (无触发信号)"
+
+        # 指数合约字段
+        index_symbol = index_contract.get("symbol") or "N/A"
+        index_ma60 = _fmt(index_contract.get("ma60"))
+        index_ma120 = _fmt(index_contract.get("ma120"))
+        index_long_term_trend = index_contract.get("long_term_trend", "neutral")
+        rel_strength = _fmt(index_contract.get("relative_strength"))
+
+        # 移仓换月字段
+        if rollover and rollover.get("detected"):
+            rollover_status = f"- 检测到换月: {rollover.get('description', '')}"
+            if rollover.get("recent_rollover"):
+                rollover_status += "\n- ⚠ 近期发生换月,注意历史信号失真"
+        else:
+            rollover_status = "- 未检测到换月"
 
         variety_name = state.get("variety_name", full_symbol)
         exchange = state.get("exchange", "")
@@ -227,6 +302,13 @@ def create_technical_analyst(llm):
             daily_strength=float(daily_trend.get("strength", 0.0) or 0.0),
             weekly_direction=(weekly_trend.get("direction", "neutral") if weekly else "N/A"),
             weekly_strength=(float(weekly_trend.get("strength", 0.0) or 0.0) if weekly else 0.0),
+            main_index_alignment=combined.get("main_index_alignment", "partial"),
+            index_symbol=index_symbol,
+            index_ma60=index_ma60,
+            index_ma120=index_ma120,
+            index_long_term_trend=index_long_term_trend,
+            relative_strength=rel_strength,
+            rollover_status=rollover_status,
             oi_divergence=combined.get("oi_divergence", "neutral") or "neutral",
             vol_regime=vol.get("regime", "low") or "low",
             atr=_fmt(vol.get("atr")),
@@ -234,8 +316,8 @@ def create_technical_analyst(llm):
             snapshot_excerpt=snapshot_excerpt,
             trigger_signals=trigger_signals,
             quality_rows=quality.get("rows", 0),
-            quality_coverage=_fmt(quality.get("coverage")),
-            quality_freshness_days=_fmt(quality.get("data_freshness_days")),
+            main_available=str(quality.get("main_continuous_available", "N/A")),
+            index_available=str(quality.get("index_contract_available", "N/A")),
         )
 
         try:
@@ -285,7 +367,11 @@ def create_technical_analyst(llm):
             # --- 降级路径 3:LLM 调用抛错(网络/超时/限流) ---
             logger.error(f"❌ [技术分析师] LLM 调用失败,降级为 features 直拼: {e}")
             try:
-                fallback_md = _build_fallback_report(full_symbol, combined, daily, weekly, quality)
+                fallback_md = _build_fallback_report(
+                    full_symbol, combined, daily, weekly, quality,
+                    index_contract=index_contract,
+                    rollover=rollover,
+                )
             except Exception as inner_e:
                 logger.error(f"❌ [技术分析师] fallback 也失败: {inner_e}")
                 fallback_md = empty_report("neutral", f"features 与 LLM 均不可用: {e}; fallback 异常: {inner_e}")

@@ -285,3 +285,123 @@ def empty_result(reason: str = "无数据") -> Dict[str, Any]:
         "snapshot": {},
         "quality": {"rows": 0, "coverage": 0.0, "data_freshness_days": None, "reason": reason},
     }
+
+
+# =============================================================================
+# 6. 合约选择工具
+# =============================================================================
+
+# 期货合约月份编号(YYMM 格式的后两位 MM 对应月份)
+_MONTH_MAP = {
+    "01": 1, "02": 2, "03": 3, "04": 4, "05": 5, "06": 6,
+    "07": 7, "08": 8, "09": 9, "10": 10, "11": 11, "12": 12,
+}
+
+
+def extract_yyymm(symbol: str) -> Optional[int]:
+    """从完整合约代码提取 YYMM 数字。
+
+    Args:
+        symbol: 合约代码, 如 ``RB2501.SHF`` 或 ``CU2501.SHF``
+
+    Returns:
+        YYMM 整数, 如 2501; 无 YYMM 时返回 None(如 ``CU0.SHF`` 主力连续)
+    """
+    import re
+    if not symbol:
+        return None
+    # 匹配 SYMBOLYYMM 模式: 品种代码后跟 4 位数字
+    m = re.search(r'[A-Za-z]+(\d{4})(?:\.|[A-Z]|$)', symbol)
+    if m:
+        try:
+            return int(m.group(1))
+        except ValueError:
+            return None
+    return None
+
+
+def is_near_delivery(
+    symbol: str,
+    trade_date: str,
+    days_threshold: int = 30,
+) -> bool:
+    """判断合约是否临近交割(距到期 < 阈值)。
+
+    Args:
+        symbol: 合约代码, 如 ``RB2501.SHF``
+        trade_date: 当前交易日, YYYY-MM-DD
+        days_threshold: 临近交割阈值天数, 默认 30 天
+
+    Returns:
+        True 表示合约距交割不足阈值; 无法判断时返回 False
+    """
+    from datetime import datetime, timedelta
+
+    yymm = extract_yyymm(symbol)
+    if yymm is None:
+        return False  # 主力连续代码,无到期概念
+
+    try:
+        date_obj = datetime.strptime(trade_date, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return False
+
+    # 从 YYMM 推断到期日: 合约年份 = 2000 + YY, 合约月份 = MM
+    yy = yymm // 100  # 前两位: 年份
+    mm = yymm % 100   # 后两位: 月份
+    if mm < 1 or mm > 12:
+        return False
+
+    # 年份: YY 以当前年份为基准, 若 YY < 当前年份后两位, 则加 10 年
+    current_year = date_obj.year
+    current_yy = current_year % 100
+    if yy < current_yy:
+        yy += 100  # 下个世纪
+    year = 2000 + yy
+
+    # 期货合约通常在该月第 15 个自然日附近到期(简化)
+    from datetime import date as date_type
+    try:
+        delivery_date = date_type(year, mm, 15)
+    except ValueError:
+        return False
+
+    remaining = (delivery_date - date_obj).days
+    return 0 <= remaining < days_threshold
+
+
+def normalize_multi_contract_input(
+    main_df: Optional[pd.DataFrame],
+    index_df: Optional[pd.DataFrame] = None,
+    contracts_dict: Optional[Dict[str, pd.DataFrame]] = None,
+) -> Dict[str, Any]:
+    """统一多合约输入格式, 补充缺失字段。
+
+    Args:
+        main_df: 主力连续合约 OHLCV DataFrame
+        index_df: 指数合约 OHLCV DataFrame(可选)
+        contracts_dict: 品种下各合约的 OHLCV DataFrame 字典(可选),
+                        key=合约代码, value=DataFrame
+
+    Returns:
+        {
+            "main_df": pd.DataFrame,        # 空 DataFrame 不抛错
+            "index_df": pd.DataFrame,       # 空 DataFrame 表示不可用
+            "contracts_dict": Dict,          # 空 dict 表示无合约明细
+            "has_main": bool,               # 主力连续是否可用
+            "has_index": bool,              # 指数合约是否可用
+            "has_contracts": bool,          # 合约明细是否可用
+        }
+    """
+    main_df_safe = main_df if main_df is not None else pd.DataFrame()
+    index_df_safe = index_df if index_df is not None else pd.DataFrame()
+    contracts_safe = contracts_dict if contracts_dict is not None else {}
+
+    return {
+        "main_df": main_df_safe,
+        "index_df": index_df_safe,
+        "contracts_dict": contracts_safe,
+        "has_main": not main_df_safe.empty,
+        "has_index": not index_df_safe.empty,
+        "has_contracts": bool(contracts_safe),
+    }
