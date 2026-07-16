@@ -442,7 +442,7 @@ const loadMarketNews = async () => {
       marketNews.value = body.items
         .map((item: any) => ({
           id: item.title,
-          title: item.content || item.title,
+          title: (item.title || "") + " " + (item.content || ""),
           time: item.published_at || item.date,
           url: item.url,
           source: item.source
