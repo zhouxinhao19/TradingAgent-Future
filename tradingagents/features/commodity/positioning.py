@@ -12,7 +12,7 @@ positioning.py — 商品期货持仓/拥挤度特征模块 (Phase 3b-i)
 
       也接受 Dict[symbol, DataFrame] 形式(provider 原始返回),此时传入 `symbol` 选择品种。
 
-输出: 标准 schema Dict
+输出: 标准 schema Dict(含多空双边/多空比/连续变化/价格对齐)
 """
 from __future__ import annotations
 
@@ -104,6 +104,11 @@ def _signals(
     pctl: Optional[float],
     net_chg_5d: Optional[float],
     concentration: Optional[float],
+    long_change_5d: Optional[float] = None,
+    short_change_5d: Optional[float] = None,
+    lsr_change_5d: Optional[float] = None,
+    consecutive_days: Optional[int] = None,
+    price_pos_alignment: Optional[str] = None,
 ) -> List[str]:
     sigs: List[str] = []
     if pctl is not None and not (isinstance(pctl, float) and np.isnan(pctl)):
@@ -121,18 +126,40 @@ def _signals(
             sigs.append(f"前20集中度偏高({concentration:.1%})")
         elif concentration <= 0.2:
             sigs.append(f"前20集中度偏低({concentration:.1%})")
+    # 多空双边信号
+    if long_change_5d is not None:
+        if long_change_5d > 0:
+            sigs.append(f"多头前20主动加仓({long_change_5d:+.0f})")
+        elif long_change_5d < 0:
+            sigs.append(f"多头前20减仓({long_change_5d:+.0f})")
+    if short_change_5d is not None:
+        if short_change_5d > 0:
+            sigs.append(f"空头前20加仓({short_change_5d:+.0f})")
+        elif short_change_5d < 0:
+            sigs.append(f"空头前20减仓({short_change_5d:+.0f})")
+    if lsr_change_5d is not None and abs(lsr_change_5d) > 0.2:
+        sigs.append(f"多空比急剧变化({lsr_change_5d:+.2f})")
+    if consecutive_days is not None and abs(consecutive_days) >= 2:
+        if consecutive_days > 0:
+            sigs.append(f"连续{consecutive_days}日净多增加(主力稳步建仓)")
+        else:
+            sigs.append(f"连续{abs(consecutive_days)}日净多减少(主力持续撤退)")
+    if price_pos_alignment is not None and "背离" in price_pos_alignment:
+        sigs.append(f"价格-持仓背离({price_pos_alignment})")
     return sigs
 
 
 def compute_positioning_metrics(
     df_or_dict: Union[pd.DataFrame, Dict[str, pd.DataFrame], None],
     symbol: Optional[str] = None,
+    price_direction: Optional[str] = None,
 ) -> Dict[str, Any]:
     """席位与拥挤度指标。
 
     Args:
         df_or_dict: 单品种 DataFrame 或多品种 Dict[str, DataFrame]
         symbol: 品种过滤(Dict 模式下用于选 key)
+        price_direction: 日线价格方向(bullish/bearish/neutral),用于价格-持仓交叉验证
     """
     if df_or_dict is None:
         return h.empty_result("无席位缓存")
@@ -157,22 +184,105 @@ def compute_positioning_metrics(
         "short_top20": h.safe_float(last.get("short_top20")),
         "total_oi": h.safe_float(last.get("total_oi")),
         "net_long_top20": h.safe_float(last.get("net_long_top20")),
+        # 多空比
+        "long_short_ratio": (
+            float(last["long_top20"] / last["short_top20"])
+            if pd.notna(last.get("long_top20")) and pd.notna(last.get("short_top20"))
+            and last.get("short_top20") not in (None, 0)
+            else None
+        ),
     }
     concentration = h.safe_float(last.get("conc_metric"))
     pctl = h.percentile_rank(data["conc_metric"].dropna() if data["conc_metric"].notna().any() else pd.Series(dtype=float), 180)
-    net_chg_5d = None
-    if "net_long_top20" in data.columns and len(data) >= 6:
-        v_last = data["net_long_top20"].iloc[-1]
-        v_prev = data["net_long_top20"].iloc[-6]
-        if pd.notna(v_last) and pd.notna(v_prev):
-            net_chg_5d = float(v_last - v_prev)
 
-    signals = _signals(pctl, net_chg_5d, concentration)
+    # 净多单边变化
+    net_chg_5d = None
+    long_chg_5d = None
+    short_chg_5d = None
+    if len(data) >= 6:
+        if "net_long_top20" in data.columns:
+            v_last = data["net_long_top20"].iloc[-1]
+            v_prev = data["net_long_top20"].iloc[-6]
+            if pd.notna(v_last) and pd.notna(v_prev):
+                net_chg_5d = float(v_last - v_prev)
+        if "long_top20" in data.columns:
+            v_last = data["long_top20"].iloc[-1]
+            v_prev = data["long_top20"].iloc[-6]
+            if pd.notna(v_last) and pd.notna(v_prev):
+                long_chg_5d = float(v_last - v_prev)
+        if "short_top20" in data.columns:
+            v_last = data["short_top20"].iloc[-1]
+            v_prev = data["short_top20"].iloc[-6]
+            if pd.notna(v_last) and pd.notna(v_prev):
+                short_chg_5d = float(v_last - v_prev)
+
+    # 多空比 5 日变化
+    lsr_change_5d = None
+    if len(data) >= 6:
+        lsr_cur = latest.get("long_short_ratio") or (
+            float(data["long_top20"].iloc[-1] / data["short_top20"].iloc[-1])
+            if "long_top20" in data.columns and "short_top20" in data.columns
+            and pd.notna(data["short_top20"].iloc[-1]) and data["short_top20"].iloc[-1] != 0
+            else None
+        )
+        lsr_prev = (
+            float(data["long_top20"].iloc[-6] / data["short_top20"].iloc[-6])
+            if "long_top20" in data.columns and "short_top20" in data.columns
+            and pd.notna(data["short_top20"].iloc[-6]) and data["short_top20"].iloc[-6] != 0
+            else None
+        )
+        if lsr_cur is not None and lsr_prev is not None:
+            lsr_change_5d = float(lsr_cur - lsr_prev)
+
+    # 连续净多变化天数
+    consecutive_net_long_days = 0
+    if "net_long_top20" in data.columns:
+        nl = data["net_long_top20"]
+        sign_series = nl.diff().apply(lambda x: 1 if (pd.notna(x) and x > 0) else (-1 if (pd.notna(x) and x < 0) else 0))
+        # 从最新一天向前累加同符号天数
+        cnt = 0
+        for i in range(len(sign_series) - 1, -1, -1):
+            s = sign_series.iloc[i]
+            if s == 0:
+                continue
+            if cnt == 0 or s == (1 if cnt > 0 else -1):
+                cnt += s
+            else:
+                break
+        consecutive_net_long_days = cnt
+
+    # 价格-持仓对齐
+    price_pos_alignment = None
+    if price_direction:
+        if price_direction == "bullish" and (net_chg_5d is not None and net_chg_5d > 0):
+            price_pos_alignment = "同向看多(价涨仓增)"
+        elif price_direction == "bearish" and (net_chg_5d is not None and net_chg_5d < 0):
+            price_pos_alignment = "同向看空(价跌仓减)"
+        elif price_direction == "bullish" and (net_chg_5d is not None and net_chg_5d < 0):
+            price_pos_alignment = "背离(价涨仓减)"
+        elif price_direction == "bearish" and (net_chg_5d is not None and net_chg_5d > 0):
+            price_pos_alignment = "背离(价跌仓增)"
+
+    signals = _signals(
+        pctl, net_chg_5d, concentration,
+        long_change_5d=long_chg_5d,
+        short_change_5d=short_chg_5d,
+        lsr_change_5d=lsr_change_5d,
+        consecutive_days=consecutive_net_long_days,
+        price_pos_alignment=price_pos_alignment,
+    )
     snapshot = {
         **latest,
         "concentration": concentration,
         "crowding_pctl_180d": pctl,
         "net_long_change_5d": net_chg_5d,
+        # 新字段
+        "long_top20_change_5d": long_chg_5d,
+        "short_top20_change_5d": short_chg_5d,
+        "long_short_ratio_change_5d": lsr_change_5d,
+        "consecutive_net_long_days": consecutive_net_long_days,
+        "price_direction": price_direction or "N/A",
+        "price_position_alignment": price_pos_alignment or "N/A",
         # 衍生指标
         "net_long_slope_20d": h.slope(data["net_long_top20"], 20) if "net_long_top20" in data.columns else None,
         "long_share": (
