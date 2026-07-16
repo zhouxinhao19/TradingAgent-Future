@@ -18,6 +18,7 @@ test_commodity_analyst.py — Phase 3b-ii commodity analyst 节点测试
 """
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -74,6 +75,39 @@ def mock_llm() -> MagicMock:
         "- 关键位:支撑 72000 / 阻力 73500\n\n"
         "## OI 背离解读\n中性\n\n"
         "## 风险提示\n数据完整,无特殊风险。\n"
+    )
+    mock.invoke.return_value = response
+    return mock
+
+
+@pytest.fixture
+def mock_llm_json() -> MagicMock:
+    """Mock LLM,invoke() 返回合法 JSON。"""
+    mock = MagicMock()
+    response = MagicMock()
+    response.content = json.dumps(
+        {
+            "valuation": {
+                "level": "低估",
+                "safety_margin": "充足",
+                "reasoning": "近月基差率-2.5%,主力贴水处低分位,Backwardation 结构,估值偏低",
+            },
+            "drive": {
+                "direction": "向上",
+                "strength": "中",
+                "dominant_factor": "库存持续去化",
+                "reasoning": "库存周环比下降,180d 分位处低位,Carry Score 为正,驱动向上",
+            },
+            "consistency": {
+                "alignment": "同向",
+                "confidence": "高",
+                "analysis": "低估+驱动向上,估值与驱动同向,做多安全边际充足",
+                "key_uncertainty": "宏观情绪变化可能导致短期波动",
+            },
+            "summary": "估值偏低且驱动向上,做多安全边际充足,建议逢低做多",
+            "risk_flags": ["宏观情绪变化", "持仓集中度偏高"],
+            "data_quality": "数据覆盖近60个交易日,基差/库存/期限结构数据完整",
+        }
     )
     mock.invoke.return_value = response
     return mock
@@ -564,6 +598,8 @@ class TestFundamentalAnalystNode:
         node = create_fundamental_analyst(mock_llm)
         result = node(_state())
         assert "fundamentals_report" in result
+        assert "fundamentals_structured" in result
+        assert result["fundamentals_structured"] == {}
         assert "数据缺失" in result["fundamentals_report"]
         mock_llm.invoke.assert_not_called()
 
@@ -571,8 +607,28 @@ class TestFundamentalAnalystNode:
         node = create_fundamental_analyst(mock_llm)
         result = node(_state(commodity_features=sample_features_all))
         assert "fundamentals_report" in result
+        assert "fundamentals_structured" in result
+        assert isinstance(result["fundamentals_structured"], dict)
         assert result["fundamentals_tool_call_count"] == 0
         mock_llm.invoke.assert_called_once()
+
+    def test_structured_output_json(self, mock_llm_json, sample_features_all):
+        """LLM 返回合法 JSON 时,fundamentals_structured 包含预期 key。"""
+        node = create_fundamental_analyst(mock_llm_json)
+        result = node(_state(commodity_features=sample_features_all))
+        structured = result.get("fundamentals_structured", {})
+        assert isinstance(structured, dict)
+        # 顶层 key
+        for key in ("valuation", "drive", "consistency", "summary", "risk_flags", "data_quality"):
+            assert key in structured, f"缺少结构化字段: {key}"
+        # 嵌套 key
+        assert "level" in structured["valuation"]
+        assert "direction" in structured["drive"]
+        assert "alignment" in structured["consistency"]
+        # Markdown 兼容输出
+        assert "fundamentals_report" in result
+        assert isinstance(result["fundamentals_report"], str)
+        assert len(result["fundamentals_report"]) > 50
 
     def test_partial_features(self, mock_llm, sample_basis_df):
         """只有 basis,缺 inventory/term_structure 时仍能跑。"""
@@ -587,6 +643,12 @@ class TestFundamentalAnalystNode:
         node = create_fundamental_analyst(mock)
         result = node(_state(commodity_features=sample_features_all))
         assert "降级版本" in result["fundamentals_report"]
+        assert "fundamentals_structured" in result
+        assert isinstance(result["fundamentals_structured"], dict)
+        # 降级路径也应该包含估值/驱动字段
+        structured = result["fundamentals_structured"]
+        assert "valuation" in structured or "raw" in structured
+        assert "summary" in structured
 
 
 # =============================================================================

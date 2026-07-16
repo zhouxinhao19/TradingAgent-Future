@@ -92,7 +92,7 @@
               type="primary"
               size="large"
               :loading="submitting"
-              :disabled="!form.contract"
+              :disabled="submitting || !form.contract"
               style="width: 100%"
               @click="submitAnalysis"
             >
@@ -183,7 +183,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { commodityApi, type VarietyItem } from '@/api/commodity'
 
@@ -299,6 +299,12 @@ async function submitAnalysis() {
   if (!form.value.contract) { ElMessage.warning('请选择合约'); return }
   submitting.value = true; latestResult.value = null
   const fullSymbol = form.value.contract
+
+  // 安全兜底:15秒后强制释放按钮,避免 API 卡死导致按钮永远转圈
+  const fallbackTimer = setTimeout(() => {
+    submitting.value = false
+  }, 15000)
+
   try {
     const res = await commodityApi.submitAnalysis(fullSymbol, {
       trade_date: form.value.trade_date || undefined,
@@ -309,13 +315,25 @@ async function submitAnalysis() {
     })
     if (res?.success) {
       ElMessage.success(`分析任务已提交: ${res.data?.task_id}`)
-      submitting.value = false // 立即释放按钮,后台继续轮询
-      pollForResult(fullSymbol)
-    } else { ElMessage.error(res?.message || '提交失败'); submitting.value = false }
-  } catch (e: any) { ElMessage.error(e?.message || '提交异常'); submitting.value = false }
+      // 立即释放按钮，不再耦合轮询逻辑
+      await loadReports(fullSymbol)
+      // 后台启动轮询，但按钮状态已恢复
+      startPolling(fullSymbol)
+    } else {
+      ElMessage.error(res?.message || '提交失败')
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '提交异常')
+  } finally {
+    clearTimeout(fallbackTimer)
+    submitting.value = false
+  }
 }
 
-async function pollForResult(fullSymbol: string) {
+// 分离轮询逻辑，不触碰 submitting 状态
+let pollingTimer: ReturnType<typeof setTimeout> | null = null
+
+function startPolling(fullSymbol: string) {
   let attempts = 0; const maxAttempts = 60
   const poll = async () => {
     attempts++
@@ -323,14 +341,18 @@ async function pollForResult(fullSymbol: string) {
       const res = await commodityApi.getReports(fullSymbol, 1)
       if (res?.data?.reports?.length) {
         latestResult.value = await fetchLatestReport(fullSymbol)
-        await loadReports(fullSymbol); submitting.value = false; ElMessage.success('✅ 分析完成!')
+        await loadReports(fullSymbol)
+        ElMessage.success('✅ 分析完成!')
         return
       }
     } catch { /* continue polling */ }
-    if (attempts < maxAttempts) { setTimeout(poll, 5000) }
-    else { submitting.value = false; ElMessage.warning('分析超时,请稍后查看报告列表') }
+    if (attempts < maxAttempts) {
+      pollingTimer = setTimeout(poll, 5000)
+    } else {
+      ElMessage.warning('分析超时,请稍后查看报告列表')
+    }
   }
-  setTimeout(poll, 5000)
+  pollingTimer = setTimeout(poll, 5000)
 }
 
 async function fetchLatestReport(fullSymbol: string): Promise<Record<string, any> | null> {
@@ -376,6 +398,13 @@ onMounted(() => {
       form.value.contract = symbol
       loadReports(symbol)
     }
+  }
+})
+
+onUnmounted(() => {
+  if (pollingTimer !== null) {
+    clearTimeout(pollingTimer)
+    pollingTimer = null
   }
 })
 </script>

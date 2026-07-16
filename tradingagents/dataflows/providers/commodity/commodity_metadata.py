@@ -313,6 +313,42 @@ def get_variety_by_exchange(exchange: str, symbol: str) -> Optional[Dict]:
     return _VARIETY_INDEX_BY_EXCHANGE_SYMBOL.get((exchange.upper(), symbol.upper()))
 
 
+def resolve_variety_to_symbol(variety: str) -> Optional[Dict[str, str]]:
+    """品种代码 → 合约代码 + 元信息。
+
+    Args:
+        variety: 品种代码,如 "RB" / "CU" / "SC"
+
+    Returns:
+        {
+            "full_symbol": "RB.SHF",        # 不带 YYMM,触发 provider 主力连续路径
+            "variety_name": "螺纹钢",
+            "exchange": "SHFE",
+            "category": "metal",
+            "quote_unit": "元/吨",
+        }
+        或 None(品种未找到)
+    """
+    if not variety:
+        return None
+    variety_info = get_variety(variety.upper())
+    if not variety_info:
+        return None
+    exchange_code = variety_info["exchange"]
+    exch_info = EXCHANGES.get(exchange_code)
+    if not exch_info:
+        return None
+    suffix = exch_info.get("suffix", f".{exchange_code}")
+    unit = variety_info.get("unit", "吨")
+    return {
+        "full_symbol": f"{variety.upper()}{suffix}",
+        "variety_name": variety_info.get("name_cn", variety.upper()),
+        "exchange": exchange_code,
+        "category": variety_info.get("category", ""),
+        "quote_unit": f"{unit}/手",
+    }
+
+
 # =============================================================================
 # 主力连续合约代码(新浪),与 AKShare 一致
 # =============================================================================

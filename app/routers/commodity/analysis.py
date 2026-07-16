@@ -14,8 +14,9 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -39,7 +40,6 @@ def _safe_symbol(raw: str) -> str:
     - 移除所有路径分隔符(`/` `\`)和 `..` 序列
     - 同时返回净化后的字符串和其相对于 _REPORTS_BASE 的解析路径
     """
-    import re
     cleaned = re.sub(r'[^a-zA-Z0-9.\-_]', '', raw)
     # 额外防御:不允许以点开头(隐藏文件)或连续点(..)
     cleaned = cleaned.lstrip('.')
@@ -56,7 +56,7 @@ def _safe_symbol(raw: str) -> str:
 
 class AnalysisRequest(BaseModel):
     """商品分析请求参数"""
-    full_symbol: str = Field(..., description="完整合约代码,如 CU2501.SHF")
+    full_symbol: str = Field(..., description="合约代码或品种代码,如 CU2501.SHF 或 CU(自动解析为主力连续)")
     trade_date: Optional[str] = Field(None, description="交易日期 YYYY-MM-DD(默认当天)")
     variety_name: str = Field("", description="品种中文名,如 螺纹钢")
     exchange: str = Field("", description="交易所代码,如 SHF")
@@ -88,6 +88,29 @@ class ReportSummary(BaseModel):
 
 def _today() -> str:
     return datetime.now().strftime("%Y-%m-%d")
+
+
+def _resolve_input_symbol(raw: str) -> Optional[Dict[str, str]]:
+    """智能解析输入代码:品种代码 → 全量合约元信息。
+
+    支持:
+      - 完整合约: "RB2501.SHF" → 返回 None(已有 YYMM,走具体合约)
+      - 带交易所: "RB.SHF"     → 返回 None(无 YYMM,provider 自动走主力连续)
+      - 裸品种:   "RB" / "CU"  → 查 metadata,解析为 "RB.SHF"
+    不支持或找不到 → 返回 None(保持兼容,让下游自行报错)
+    """
+    raw = raw.strip().upper()
+    # 已经是完整合约格式(如 RB2501.SHF) → 不动
+    if re.search(r'\d{3,4}\.[A-Z]', raw):
+        return None
+    # 带交易所后缀(如 RB.SHF) → 不动,provider 自动走主力连续
+    if re.match(r'^[A-Z]{1,3}\.[A-Z]{2,}$', raw):
+        return None
+    # 纯品种代码 → 查 metadata 解析
+    from tradingagents.dataflows.providers.commodity.commodity_metadata import (
+        resolve_variety_to_symbol,
+    )
+    return resolve_variety_to_symbol(raw)
 
 
 # ==================== 任务元数据 MongoDB 层 ====================
@@ -147,7 +170,7 @@ async def _backfill_completed_tasks() -> int:
                 continue
             full_sym = data.get("full_symbol", "")
             trade_date = data.get("trade_date", "")
-            mtime = datetime.fromtimestamp(report_file.stat().st_mtime)
+            mtime = datetime.fromtimestamp(report_file.stat().st_mtime, tz=timezone.utc)
             await coll.update_one(
                 {"task_id": tid},
                 {"$set": {
@@ -251,6 +274,7 @@ def _run_commodity_analysis(
         "decision": decision,
         "market_report": final_state.get("market_report", ""),
         "fundamentals_report": final_state.get("fundamentals_report", ""),
+        "fundamentals_structured": final_state.get("fundamentals_structured", {}),
         "sentiment_report": final_state.get("sentiment_report", ""),
         "news_report": final_state.get("news_report", ""),
         "investment_plan": final_state.get("investment_plan", ""),
@@ -295,7 +319,7 @@ def _list_reports(full_symbol: str, limit: int = 20) -> List[Dict[str, Any]]:
                     "direction": decision.get("action", "hold"),
                     "confidence": decision.get("confidence", 0.0),
                     "created_at": datetime.fromtimestamp(
-                        f_path.stat().st_mtime
+                        f_path.stat().st_mtime, tz=timezone.utc
                     ).isoformat(),
                 })
             except Exception:
@@ -328,7 +352,7 @@ def _list_recent_reports(limit: int = 10) -> List[Dict[str, Any]]:
                             "trade_date": date_dir.name,
                             "direction": decision.get("action", "hold"),
                             "confidence": decision.get("confidence", 0.0),
-                            "created_at": datetime.fromtimestamp(mtime).isoformat(),
+                            "created_at": datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat(),
                         },
                     ))
                 except Exception:
@@ -375,17 +399,34 @@ async def submit_commodity_analysis(
             detail=f"请求体校验失败: {exc}",
         )
 
+    # ---- 品种代码自动解析(如 "RB" → "RB.SHF") ----
+    resolved = _resolve_input_symbol(request.full_symbol)
+    if resolved:
+        logger.info(
+            f"🌾 [CommodityAnalysis] 品种解析: {request.full_symbol} → "
+            f"{resolved['full_symbol']} ({resolved['variety_name']})"
+        )
+        request.full_symbol = resolved["full_symbol"]
+        if not request.variety_name:
+            request.variety_name = resolved["variety_name"]
+        if not request.exchange:
+            request.exchange = resolved["exchange"]
+        if not request.category:
+            request.category = resolved["category"]
+        if not request.quote_unit:
+            request.quote_unit = resolved.get("quote_unit", "")
+
     task_id = f"commodity_{uuid.uuid4().hex[:12]}"
     trade_date = request.trade_date or _today()
 
     logger.info(
-        f"🌾 [CommodityAnalysis] 提交分析: {full_symbol} @ {trade_date}, "
+        f"🌾 [CommodityAnalysis] 提交分析: {request.full_symbol} @ {trade_date}, "
         f"task_id={task_id}"
     )
 
     background_tasks.add_task(
         _run_and_save_analysis,
-        full_symbol=full_symbol,
+        full_symbol=request.full_symbol,
         trade_date=trade_date,
         variety_name=request.variety_name,
         exchange=request.exchange,
@@ -401,7 +442,7 @@ async def submit_commodity_analysis(
         "success": True,
         "data": {
             "task_id": task_id,
-            "full_symbol": full_symbol,
+            "full_symbol": request.full_symbol,
             "trade_date": trade_date,
             "status": "submitted",
         },
@@ -433,7 +474,7 @@ async def _run_and_save_analysis(
         "exchange": exchange,
         "user_id": user_id,
         "status": "processing",
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
     })
 
     try:
@@ -456,7 +497,7 @@ async def _run_and_save_analysis(
         await _task_set(task_id, {
             "status": "completed",
             "report_id": report_id,
-            "completed_at": datetime.utcnow(),
+            "completed_at": datetime.now(timezone.utc),
         })
         logger.info(f"✅ [BackgroundTask] 分析完成: {full_symbol}, report_id={report_id}")
     except Exception as e:
@@ -465,7 +506,7 @@ async def _run_and_save_analysis(
         await _task_set(task_id, {
             "status": "failed",
             "error_message": err_msg,
-            "completed_at": datetime.utcnow(),
+            "completed_at": datetime.now(timezone.utc),
         })
         logger.error(
             f"❌ [BackgroundTask] 分析失败: {full_symbol}, error={err_msg}", exc_info=True

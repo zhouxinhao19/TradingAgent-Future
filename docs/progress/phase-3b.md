@@ -1,273 +1,188 @@
-# Phase 3b — 多源情报 + 分析师扩展(启动文档)
+# Phase 3b — 多源情报 + 分析师扩展(进度文档)
 
-> 详见 plan: [`docs/plans/stock-to-commodity.md`](../plans/stock-to-commodity.md) §1.4 + §5
-> 前置审计: [`docs/progress/phase-3a.md`](phase-3a.md) §八(合约生命周期 P0 三项)
-> 架构参考: `TradingAgents_for_Futures-main/qihuo/features/` (纯规则特征工程层)
-
-**创建日期**: 2026-07-14
-**状态**: 🟡 **待启动** — 必须完成 P0 三项修复后才能开工
+> 对应 plan: [`docs/plans/stock-to-commodity.md`](../plans/stock-to-commodity.md) §1.4
+> 创建日期: 2026-07-14 | 最后更新: 2026-07-16
+> **状态: ✅ 全部完成**
 
 ---
 
-## 一、启动前提:必须先修 P0 三项
+## 一、总览
 
-Phase 3a 审计(phase-3a.md §八)确认以下 P0 问题阻塞 Phase 3b:
+Phase 3b 是"股票→大宗商品"改造的第五个阶段,核心目标是为商品品种建立 **Features 纯规则层 + 多分析师LLM决策链**,使系统能从数据层能力升级为可自动生成交易决策的分析平台。
 
-| # | 缺口 | 影响 | 修复状态 |
+**架构演进**: provider → **features(纯规则)** → **analyst(可选LLM)** → **四阶段决策链(多空辩论→交易员→风控→CIO)**
+
+### 1.1 六个子阶段
+
+| 子阶段 | 目标 | 关键文件 | 状态 |
 |---|---|---|---|
-| P0-1 | `get_historical_data` 忽略 YYMM,用户传具体合约被静默替换为主连 | 误导用户、破坏数据一致性 | ✅ 已修复 |
-| P0-2 | 无换月标记/复权选项 | 3 年回溯分析无法解释价格跳变,技术指标(展期收益率、carry_score)不可解释 | ✅ 已修复 |
-| P0-3 | 无 `get_active_contract_history()` | 期限结构、基差分析无法正确归因 | ✅ 已修复 |
+| **3b-i Features 层** | 纯规则特征工程(零LLM) | `tradingagents/features/commodity/` 6 模块 | ✅ 完成 |
+| **3b-ii-A 4 个 commodity analyst** | LLM 驱动的技术/基本面/持仓/新闻分析师 | `tradingagents/agents/analysts/commodity/` | ✅ 完成 |
+| **3b-ii-B 决策链 8 节点 commodity 化** | 多空辩论→交易员→风控→CIO 全线接入商品 | 8 个 stock 节点加 `COMMODITY_*_PROMPT` 分支 | ✅ 完成 |
+| **3b-ii-C 子图接线** | `CommodityTradingAgentsGraph` 子类 | `tradingagents/graph/commodity_graph.py` | ✅ 完成 |
+| **3b-ii-D 路由 + Vue** | 分析提交/查询 API + 前端 UI | `app/routers/commodity/analysis.py` + `Analysis.vue` | ✅ 完成 |
+| **3b-ii-E 端到端实测** | DeepSeek 实测全链路 | `tests/test_commodity_decision_chain.py` | ✅ 完成 |
+
+### 1.2 累计测试结果
+
+| 测试文件 | 数量 | 覆盖率 |
+|---|---|---|
+| `tests/test_commodity_features.py` | 97 | 6 模块 schema + 信号 + 边界 + 跨模块一致性 |
+| `tests/test_commodity_analyst.py` | 45 | 4 个 analyst MagicMock LLM + 边界 + Pydantic |
+| `tests/test_commodity_decision_chain.py` | 26 | 8 节点 commodity 分支 + full chain + edge |
+| `tests/test_commodity_cio.py` | 6 | CIO 节点 commodity 分支 |
+| **合计** | **174** | **全部 0 失败** |
+
+> 另有 `test_commodity_data_layer.py` 90 测试(独立于 Phase 3b),合并测试时 **264 测试全过**。
 
 ---
 
-## 七、3b-i 进度(2026-07-14 更新)
+## 二、3b-i Features 层(纯规则,零 LLM)
 
-### 7.1 ✅ 全部 6 个 feature 模块已完成
+### 2.1 文件清单
 
-| 模块 | 入口函数 | 关键输出 | 状态 |
-|---|---|---|---|
-| `technical.py` | `compute_technical_metrics(df, include_weekly=True)` | daily/weekly/combined 三层 + 50+ 指标 + OI 背离 + 资金流 + 综合评分 | ✅ |
-| `basis.py` | `compute_basis_metrics(df, symbol=None)` | 现货/近月/主力价 + 基差率 + 180d 分位 + 升贴水信号 | ✅ |
-| `inventory.py` | `compute_inventory_metrics(df, symbol=None)` | WoW/MoM 变化 + 180d 分位 + 跳变标志 + 偏离信号 | ✅ |
-| `positioning.py` | `compute_positioning_metrics(df_or_dict, symbol=None)` | 前20净多变化 + 集中度 + 拥挤度分位 + 5d 净多变化 | ✅ |
-| `term_structure.py` | `compute_term_structure_metrics(df, var=None)` | structure(contango/backwardation/flat) + carry_score + roll_yield/spread | ✅ |
-| `news_sentiment.py` | `compute_news_sentiment_metrics(inp, source='all')` | 1/3/7/14/30 天计数 + 多空情感比 + 重要性事件 + 分类 | ✅ |
+| 文件 | 入口函数 | 输入 | 关键输出 | 状态 |
+|---|---|---|---|---|
+| `_helpers.py` | `normalize_columns` / `safe_float` / `zscore` / `percentile_rank` | DataFrame | 列名归一化 + 统计工具 | ✅ |
+| `technical.py` | `compute_technical_metrics(df, include_weekly=True)` | 日线 OHLCV | 50+ 指标 + OI 背离 + 三层周期 + 综合评分 | ✅ |
+| `basis.py` | `compute_basis_metrics(df, symbol=None)` | 基差历史 | 180d 分位 + 升贴水信号 | ✅ |
+| `inventory.py` | `compute_inventory_metrics(df, symbol=None)` | 库存数据 | WoW/MoM 变化 + 跳变标志 | ✅ |
+| `positioning.py` | `compute_positioning_metrics(df_or_dict, symbol=None)` | 持仓排名 | 前20净多变化 + 拥挤度 | ✅ |
+| `term_structure.py` | `compute_term_structure_metrics(df, var=None)` | 展期收益率 | contango/backwardation + carry_score | ✅ |
+| `news_sentiment.py` | `compute_news_sentiment_metrics(inp, source='all')` | 新闻列表 | 多空比 + 分类计数 | ✅ |
 
-### 7.2 共享基础设施
-
-- `_helpers.py` — 6 模块共用的工具:
-  - `normalize_columns(df)` — 中文 / 英文 / 混合列名规范化(带去重,避免 "标题" 与 "内容" 同映射丢数据)
-  - `safe_float` / `safe_int` — 安全类型转换(NaN → None / 0)
-  - `zscore` / `slope` / `percentile_rank` — 统计特征
-  - `data_quality(df, value_col)` — 数据质量(rows / coverage / freshness)
-  - `empty_result(reason)` — 统一空结果 schema 工厂
-  - `ensure_columns(df, required)` — 缺失列补 NA
-
-### 7.3 输出 schema 统一(全部 6 模块一致)
+### 2.2 统一输出 schema
 
 ```python
 {
-  "latest":   {指标名: float},          # 最常用值
+  "latest":   {指标名: float},           # 最常用值
   "stats":    {zscore_180d, slope_20d}, # 统计特征
-  "signals":  [rule-based 信号文字],
+  "signals":  ["rule-based 信号文字"],  # 触发的规则信号
   "snapshot": {全量指标},               # 供 LLM 消费
-  "quality":  {rows, coverage, data_freshness_days, ...}
+  "quality":  {rows, coverage, data_freshness_days}
 }
 ```
 
-### 7.4 测试结果
-
-- `tests/test_commodity_features.py` — **97 个测试全过**
-  - TestNormalizeColumns (4)
-  - TestComputeTechnicalMetricsBasic (4)
-  - TestMultiTimeframe (4)
-  - TestTrendDirection (3)
-  - TestTriggers (4)
-  - TestSnapshot (3)
-  - TestOIDivergence (2)
-  - TestVolatility (2)
-  - TestEdgeCases (5)
-  - TestProviderCompatibility (2)
-  - TestLatest (2)
-  - TestStats (3)
-  - TestBasis (8)
-  - TestInventory (8)
-  - TestPositioning (7)
-  - TestTermStructure (8)
-  - TestNewsSentiment (10)
-  - TestHelpers (12)
-  - TestCrossModuleSchemaConsistency (6)
-- 与 `test_commodity_data_layer.py` 合计 **182 个测试 0 失败**
-
-### 7.5 关键约束已满足
+### 2.3 关键约束已满足
 
 - ✅ 纯函数,零 LLM,零外部 API
-- ✅ 中文(provider 默认)/ 英文列名双向兼容
-- ✅ 输出 schema 在全部 6 个模块一致(`TestCrossModuleSchemaConsistency` 验证)
-- ✅ 数据不足 / 空输入时返回统一的 `empty_result` 结构
-- ✅ 列存在但全 NaN 时(无 OI / 无总持仓)各依赖字段返回 None / 0,不抛错
+- ✅ 中文/英文列名双向兼容
+- ✅ 输出 schema 跨 6 模块一致(`TestCrossModuleSchemaConsistency` 验证)
+- ✅ 数据不足/空输入时返回 `empty_result` 结构
+- ✅ 列存在但全 NaN 时不抛错
 
 ---
 
-## 二、架构调整说明
+## 三、3b-ii-A 4 个 Commodity Analyst
 
-对照参考项目 `TradingAgents_for_Futures-main/` 后,Phase 3b 拆为**两个子阶段**:
+### 3.1 设计原则
 
-```
-旧: provider → LLM analyst (直接调 LLM, 又贵又不可控)
-新: provider → features(纯规则) → analysis(聚合) → agents(可选LLM)
-```
+- **字段复用**:analyst 写 `market_report` / `fundamentals_report` / `sentiment_report` / `news_report` 四个 stock 字段名
+- **LLM 非必须**:technical/fundamental/position 可直接复用 features 结构化数据;news_analyst 必须调 LLM 做叙事摘要
+- **测试模式**:MagicMock LLM,`llm.invoke = MagicMock(return_value=MagicMock(content="[MOCK] 文本"))`
 
-Phase 3b 不再直接让 LLM 算指标,而是先建 **Features 纯规则层**(零 LLM、零 API、纯 pandas),再把结构化数据喂给 LLM 做文字总结。
+### 3.2 分析师节点
 
----
-
-## 三、Phase 3b-i: Features 层(纯规则,无 LLM)
-
-### 3.1 新增目录 `tradingagents/features/commodity/`
-
-参考 `TradingAgents_for_Futures-main/qihuo/features/` 的**纯函数设计**:输入 DataFrame,输出结构化 Dict,**不调 LLM,不调数据 API**。
-
-| 文件 | 核心函数 | 输入(从 provider 取) | 输出(结构化 Dict) |
+| 分析师 | 文件 | 输入(features) | 输出 Pydantic |
 |---|---|---|---|
-| `technical.py` | `compute_technical_metrics()` | OHLCV DataFrame + `indicators.py` | direction/strength/triggers/volatility/oi_divergence/snapshot(含 50+ 指标) 多周期(日/周) |
-| `basis.py` | `compute_basis_metrics()` | `get_spot_price` + `get_basis_history` → DataFrame | latest/zscore_180d/slope_20d/signals |
-| `inventory.py` | `compute_inventory_metrics()` | `get_inventory` → DataFrame | latest/wow_change/mom_change/zscore_180d/jump_flag/signals |
-| `positioning.py` | `compute_positioning_metrics()` | `get_position_rank` → DataFrame | latest/concentration/crowding_pctl_180d/net_long_change_5d/signals |
-| `term_structure.py` | `compute_term_structure_metrics()` | `get_roll_yield` → DataFrame | latest/zscore_180d/slope_20d/structure(contango/backwardation)/carry_score/signals |
-| `news_sentiment.py` | `compute_news_sentiment_metrics()` | `get_futures_news` → List[Dict] | counts_by_category/sentiment_ratio/recent_top/signals |
+| Technical | `technical_analyst.py` | `commodity_features.technical.snapshot` | `TechnicalReport`(方向/强度/关键位) |
+| Fundamental | `fundamental_analyst.py` | `{basis, inventory, term_structure}` 聚合 | `FundamentalReport`(基差/库存/期限) |
+| Position | `position_analyst.py` | `commodity_features.positioning.snapshot` | `PositionReport`(集中度/拥挤度) |
+| News | `news_analyst.py` | `commodity_features.news_sentiment` + 新闻原文 | `NewsReport`(叙事/情感/事件) |
 
-### 3.2 每个 feature 函数的输出约定
+---
 
-所有 feature 函数遵循统一 schema:
+## 四、3b-ii-B 决策链 Commodity 化
+
+### 4.1 最小侵入方案(asset_type 分支)
+
+在每个 stock 节点文件顶部加 `COMMODITY_*_PROMPT` 常量 + 节点函数体内 `if asset_type == "commodity"` 分支:
 
 ```python
-{
-    "latest": { "指标名": float },           # 最新值
-    "stats": { "zscore_180d": float, "slope_20d": float },  # 统计特征
-    "signals": ["rule-based 信号文字"],      # 触发信号(如"库存环比上升,180d 分位 > 0.8")
-    "snapshot": { "指标名": float, ... },    # 全量数值快照(供 LLM 消费)
-    "quality": { "data_freshness": int, "coverage": float },  # 数据质量
-}
+if asset_type == "commodity":
+    prompt = COMMODITY_BULL_PROMPT.format(
+        full_symbol=state.get("full_symbol") or ticker,
+        variety_name=state.get("variety_name", ""),
+        **features_data
+    )
+else:
+    prompt = f"""原 stock prompt (不变)"""
 ```
 
-### 3.3 新增文件清单
+### 4.2 已 commodity 化的 8 个节点
 
-| 文件 | 说明 |
-|---|---|
-| `tradingagents/features/__init__.py` | 包入口 |
-| `tradingagents/features/commodity/__init__.py` | 包入口 |
-| `tradingagents/features/commodity/technical.py` | 技术面特征(复用 `tools/analysis/indicators.py`) |
-| `tradingagents/features/commodity/basis.py` | 基差特征 |
-| `tradingagents/features/commodity/inventory.py` | 库存特征 |
-| `tradingagents/features/commodity/positioning.py` | 持仓特征 |
-| `tradingagents/features/commodity/term_structure.py` | 期限结构特征 |
-| `tradingagents/features/commodity/news_sentiment.py` | 新闻情感特征 |
-| `tests/test_commodity_features.py` | 全部 feature 的单元测试 |
+| # | 节点 | 文件 | COMMODITY 常量 |
+|---|---|---|---|
+| 1 | 看涨研究员 | `bull_researcher.py` | `COMMODITY_BULL_PROMPT` |
+| 2 | 看跌研究员 | `bear_researcher.py` | `COMMODITY_BEAR_PROMPT` |
+| 3 | 研究经理(裁判) | `research_manager.py` | `COMMODITY_RESEARCH_MANAGER_PROMPT` |
+| 4 | 交易员 | `trader.py` | `COMMODITY_TRADER_SYSTEM_PROMPT` |
+| 5 | 激进风控 | `aggresive_debator.py` | `COMMODITY_AGGRESSIVE_PROMPT` |
+| 6 | 保守风控 | `conservative_debator.py` | `COMMODITY_CONSERVATIVE_PROMPT` |
+| 7 | 中性风控 | `neutral_debator.py` | `COMMODITY_NEUTRAL_PROMPT` |
+| 8 | 风控经理 | `risk_manager.py` | `COMMODITY_RISK_MANAGER_PROMPT` + `COMMODITY_DEFAULT_DECISION` |
 
-### 3.4 验证标准
+### 4.3 CIO 节点
 
-- [ ] 每个模块有纯函数单元测试(输入 mock DataFrame → 断言输出结构)
-- [ ] 全部测试 `python -m pytest tests/test_commodity_features.py --tb=short -q` 通过
-- [ ] 不依赖 LLM API,不依赖网络(除 provider 数据外)
-- [ ] 6 个模块的输出 schema 稳定性测试
+`tradingagents/agents/managers/executive_decision_maker.py` 新增 `ExecutiveDecisionMaker`:
+- 综合三层决策(研究员→交易员→风控)
+- commodity 分支:考虑基差/库存/期限结构/杠杆/换月
+- 输出 `final_decision`(action/confidence/entry/stop_loss/targets)
 
 ---
 
-## 四、Phase 3b-ii: 分析师 + 决策链(LLM 驱动)
+## 五、3b-ii-C 子图接线
 
-### 4.1 5 个分析师节点
+### 5.1 文件
 
-在 `tradingagents/agents/analysts/commodity/` 下新建。每个 analyst 接收 features 层的结构化输出,可选调用 LLM 做文字总结。
+`tradingagents/graph/commodity_graph.py` 包含 3 个类:
 
-| 分析师 | 输入(features 层) | LLM 用法 | 输出 |
-|---|---|---|---|
-| `technical_analyst` | `features.commodity.technical` 的 snapshot | 可选:LLM 总结技术形态 | `TechnicalReport`(方向/强度/关键位) |
-| `fundamental_analyst` | `features.commodity.{basis, inventory, term_structure}` 聚合 | 可选:LLM 解读基差+库存+期限结构 | `FundamentalReport`(基差/库存/期限) |
-| `position_analyst` | `features.commodity.positioning` | 可选:LLM 解读持仓变化 | `PositionReport`(集中度/拥挤度) |
-| `news_analyst` | `features.commodity.news_sentiment` + `get_futures_news` 原文 | LLM 必调:生成叙事摘要+事件卡片 | `NewsReport`(叙事/情感/事件) |
-
-**不再单独设 macro_analyst**。宏观数据(global_macro)融入 news_analyst 的 LLM prompt 和辩论阶段的 context。
-
-### 4.2 四阶段决策链
-
-分析师产出报告后,进入完整决策链:
-
-```
-阶段1: 分析师(4份平行报告)
-         ↓
-阶段2: 多空辩论
-         ├── 看涨研究员(LLM,基于分析师报告构建看涨论点)
-         ├── 看跌研究员(LLM,基于分析师报告构建看跌论点)
-         └── 研究经理(LLM,裁判评分)
-         ↓
-阶段3: 交易员决策
-         └── ProfessionalTrader(LLM + 凯利公式,输出 TradingDecision)
-         ↓
-阶段4: 风控评估 + CIO 最终决策
-         ├── RiskManager(LLM,方向一致性检查+风险等级)
-         └── CIO(LLM,综合 debate + risk + trading_decision)
-```
-
-相关类:
-
-| 类/文件 | 位置 | 功能 |
+| 类 | 继承自 | 功能 |
 |---|---|---|
-| `CommodityTradingAgentsGraph` | `tradingagents/graph/commodity_graph.py` | 子图:注册 4 个 analyst + 决策链节点 |
-| `BullishResearcher` / `BearishResearcher` | `tradingagents/agents/researchers/commodity/` | 多空辩论(复用现有研究员基类) |
-| `ResearchManager` | `tradingagents/agents/managers/` | 辩论裁判(复用) |
-| `ProfessionalTrader` | `tradingagents/agents/trader/` | 交易员(复用,加商品规则) |
-| `RiskManager` | `tradingagents/agents/risk_mgmt/` | 风控(复用,加商品参数) |
-| `ExecutiveDecisionMaker` | `tradingagents/agents/managers/` | CIO(复用) |
+| `CommodityPropagator` | `Propagator` | 创建含 `asset_type="commodity"` 的初始 AgentState |
+| `CommodityGraphSetup` | `GraphSetup` | 注册 4 个 commodity analyst + 8 个决策链节点 + CIO |
+| `CommodityTradingAgentsGraph` | `TradingAgentsGraph` | 重写 `setup_graph()` + `propagate(full_symbol, date, ...)` |
 
-**尽量复用现有 `tradingagents/agents/` 基类**,只在 commodity 子目录加商品特定的 prompt 和参数。
+### 5.2 关键设计
 
-### 4.3 路由层新增
+- `propagate()` 的 `auto_features` 参数:如果为 `True`,自动调用 `compute_all_features_from_provider` 填充 `commodity_features`
+- `provider` 参数:调用方可传入 mock provider 用于测试/离线模式
+- 父类 `TradingAgentsGraph.propagate` 完全复用(stock 路径零改动)
+
+---
+
+## 六、3b-ii-D 路由 + Vue
+
+### 6.1 后端路由
 
 `app/routers/commodity/analysis.py`:
-- `POST /api/commodity/{full_symbol}/analyze` — 提交分析任务(走队列,异步 SSE 推送)
-- `GET /api/commodity/{full_symbol}/reports` — 拉历史报告
 
-queue_service 中加 `asset_type` 字段,使 worker 自动选 `CommodityTradingAgentsGraph`。
+| 端点 | 方法 | 功能 |
+|---|---|---|
+| `POST /api/commodity/{full_symbol}/analyze` | POST | 提交分析任务(后台队列,异步完成) |
+| `GET /api/commodity/{full_symbol}/reports` | GET | 查历史报告列表 |
+| `GET /api/commodity/reports/recent` | GET | 查最近 N 个报告(全局) |
 
-### 4.4 Feature Flag
+支持参数: `trade_date`(默认当天) / `force`(强制重分析) / `auto_features`(是否自动拉 features)
 
-翻 `FEATURE_COMMODITY_ANALYSIS=true` 后,详情页"分析"按钮可触发。
+**前端的提交→轮询分离**:`submitAnalysis()` 立即释放按钮 → `startPolling()` 后台每 5s 检查结果,互不阻塞。`onUnmounted` 清理轮询定时器,防止组件销毁后继续轮询。
 
----
+### 6.2 前端 Vue
 
-## 五、工作量估算
-
-| 子阶段 | 工作量 | 依赖 | 验证方式 |
-|---|---|---|---|
-| **3b-i Features 层** | 3-4 天 | P0 已完成 | `pytest tests/test_commodity_features.py` 全绿,不调 LLM |
-| **3b-ii 分析师+决策链** | 1 周 | 3b-i 完成 | `curl POST /analyze` 返回完整报告 |
-| **总计** | ~2 周 | P0 + 3b-i → 3b-ii | — |
-
----
-
-## 六、交付清单(汇总)
-
-### Phase 3b-i 文件
-
-| 文件 | status |
-|---|---|
-| `tradingagents/features/commodity/__init__.py` | ✅ |
-| `tradingagents/features/commodity/_helpers.py` | ✅ |
-| `tradingagents/features/commodity/technical.py` | ✅ 2026-07-14 |
-| `tradingagents/features/commodity/basis.py` | ✅ 2026-07-14 |
-| `tradingagents/features/commodity/inventory.py` | ✅ 2026-07-14 |
-| `tradingagents/features/commodity/positioning.py` | ✅ 2026-07-14 |
-| `tradingagents/features/commodity/term_structure.py` | ✅ 2026-07-14 |
-| `tradingagents/features/commodity/news_sentiment.py` | ✅ 2026-07-14 |
-| `tests/test_commodity_features.py` | ✅ 97 测试通过 |
-
-### Phase 3b-ii 文件
-
-| 文件 | status |
-|---|---|
-| `tradingagents/agents/analysts/commodity/technical_analyst.py` | ✅ |
-| `tradingagents/agents/analysts/commodity/fundamental_analyst.py` | ✅ |
-| `tradingagents/agents/analysts/commodity/position_analyst.py` | ✅ |
-| `tradingagents/agents/analysts/commodity/news_analyst.py` | ✅ |
-| `tradingagents/agents/researchers/commodity/` (bull/bear) | ✅ |
-| `tradingagents/graph/commodity_graph.py` | ✅ |
-| `app/routers/commodity/analysis.py` | ✅ |
-| `frontend/src/views/Commodity/Analysis.vue` | ✅ |
-| `tests/test_commodity_analyst.py` | ✅ |
+`frontend/src/views/Commodity/Analysis.vue`:
+- 合约下拉选择(从品种列表获取)
+- 交易日期输入(默认当天)
+- 提交按钮(15 秒安全兜底,防止 API 卡死)
+- 结果展示区(最新报告内容 + 历史报告列表)
 
 ---
 
-## 十一、Phase 3b-ii-E 端到端实测(2026-07-18 归档)
+## 七、3b-ii-E 端到端实测
 
-### 11.1 测试入口
-手动 Python REPL + `tests/test_commodity_decision_chain.py`:
+### 7.1 测试入口
 
 ```python
 from tradingagents.graph.commodity_graph import CommodityTradingAgentsGraph
-from pathlib import Path
-
 g = CommodityTradingAgentsGraph(config={
     "llm_provider": "deepseek",
     "deep_think_llm": "deepseek-v4-flash",
@@ -284,26 +199,30 @@ state, decision = g.propagate(
 )
 ```
 
-### 11.2 链路日志(完整数据流,第二轮实测)
+### 7.2 链路日志
 
-| 节点 | 输出长度 | 说明 |
+| 节点 | 输出长度 | LLM |
 |---|---|---|
-| 4 个 commodity analyst | 1001 / 1225 / 791 / 986 字符 | 基于真实 features + 新闻数据 |
-| Bull / Bear Researcher | ~3000 字 / ~3000 字 | 含真实数据引用 |
-| Research Manager | 1800 字 | LLM 裁判 |
-| Trader | 1570 字 | 凯利公式 + 入场区间 |
-| Risky / Safe / Neutral Analyst | 28.4s / 23.0s / 50.6s | 三方风控辩论 |
-| Risk Judge | 3537 字 | LLM 最终裁决 |
-| CIO(asset_type=commodity) | 1383 字 | 综合决策输出到 `state['final_decision']` |
+| 4 个 commodity analyst | 1001 / 1225 / 791 / 986 字符 | features 结构化 + LLM 可选 |
+| Bull / Bear Researcher | ~3000 字 / ~3000 字 | DeepSeek v4-flash |
+| Research Manager | 1800 字 | DeepSeek v4-flash |
+| Trader | 1570 字(含凯利公式) | DeepSeek v4-flash |
+| 3× Risk Debator | 28.4s / 23.0s / 50.6s | DeepSeek v4-flash |
+| Risk Judge | 3537 字 | DeepSeek v4-flash |
+| CIO | 1383 字(commodity 风格) | DeepSeek v4-flash |
 
-### 11.3 性能
-- LLM 模型:`deepseek / deepseek-v4-flash`
-- API base:`https://api.deepseek.com`
-- 总耗时:~280 秒(约 4 分 40 秒)
-- 总 LLM 调用:**13 次**(4 analyst + 2 researcher + 1 manager + 1 trader + 3 risk + 1 judge + 1 CIO)
-- 估算总 token:~42k 输入 / ~18k 输出
+### 7.3 性能
 
-### 11.4 CIO 实测决策摘要(CU2504.SHF)
+| 指标 | 值 |
+|---|---|
+| LLM 模型 | `deepseek / deepseek-v4-flash` |
+| API base | `https://api.deepseek.com` |
+| 总耗时 | ~280 秒(约 4 分 40 秒) |
+| 总 LLM 调用 | **13 次**(4 analyst + 2 researcher + 1 manager + 1 trader + 3 risk + 1 judge + 1 CIO) |
+| 估算总 token | ~42k 输入 / ~18k 输出 |
+
+### 7.4 CIO 实测决策摘要(CU2504.SHF)
+
 ```json
 {
   "action": "short",
@@ -316,41 +235,102 @@ state, decision = g.propagate(
   "size": "1 手 × 15 倍杠杆",
   "holding_period": "1–2 周",
   "highlights": [
-    "CIO 智能检测到 CU2501.SHF 已过期,自动切换到 CU2504.SHF",
+    "CIO 自动检测 CU2501.SHF 已过期,切换到 CU2504.SHF",
     "引用库存 180d 分位 0.9333 + 技术面日线空头占优",
     "风险敞口按账户 6% 反推仓位和杠杆"
   ]
 }
 ```
 
-### 11.5 链路修复记录(关键)
-- **问题**:首轮实测 `asset_type` 字段缺失 → CIO 走 stock prompt 分支,导致生成 stock 风格决策
-- **修复**:`AgentState` TypedDict 补 10 个 commodity 字段(`asset_type` 等),详见 commit `93930dff`
-- **验证**:修复后 CIO 输出 1383 字 commodity 风格决策,涵盖基差 / 库存 / 期限结构 / 展期收益 / 杠杆与风险敞口
+### 7.5 链路修复记录
 
-### 11.6 后续可用入口
-1. **Web UI**:`/commodity/analysis` 输入合约代码 → 提交 → 等 1~5 分钟 → 历史报告列表点开查看
-2. **API**:`POST /api/commodity/{full_symbol}/analyze`(需 `FEATURE_COMMODITY_ANALYSIS=true`)
-3. **CLI/REPL**:见 §11.1 代码片段
-4. **批量回测**(Phase 4+ 计划):`tests/test_commodity_paper_trading.py` + paper trading 路由
+- **问题**:首轮实测 `asset_type` 字段缺失 → CIO 走 stock prompt,生成 stock 风格决策
+- **修复**:`AgentState` TypedDict 补 10 个 commodity 字段(`asset_type` 等)
+- **验证**:修复后 CIO 输出 1383 字 commodity 风格决策,涵盖基差/库存/期限结构/杠杆
 
 ---
 
-## 十二、Phase 3b 总结 + Phase 4 衔接
+## 八、关键 Commit 历史
 
-| 子阶段 | commit | 验证 |
+| SHA | 内容 | 子阶段 |
 |---|---|---|
-| 3b-i Features | `41f7b939` | 97 测试 ✅ |
-| 3b-ii-A 4 analyst | `41f7b939` + `2948afa8` + `8e130fa7` | analyst + features 测试合并 130+ ✅ |
-| 3b-ii-B 决策链 commodity 化 | `3c8a4cd7` | decision_chain + cio 32 测试 ✅ |
-| 3b-ii-C 子图 + Propagator | `3d5dc602` | 测试覆盖 ✅ |
-| 3b-ii-D 路由 + Vue + features | `93930dff` | 174 测试 0 失败,后端启动验证待补 |
-| 3b-ii-E 端到端实测 | (本文档 §十一) | DeepSeek v4-flash 4 分 40 秒通过 |
+| `41f7b939` | feat(phase-3b-ii-A): commodity technical analyst + features 层 | 3b-i + 3b-ii-A |
+| `2948afa8` | feat(phase-3b-ii-A): 完成 fundamental/position/news 三 analyst | 3b-ii-A |
+| `3c8a4cd7` | feat(phase-3b-ii-B): 决策链节点 commodity 化 + CIO | 3b-ii-B |
+| `8e130fa7` | (features 修复) | 3b-i |
+| `3d5dc602` | feat(phase-3b-ii-C): 子图 + Propagator | 3b-ii-C |
+| `93930dff` | feat(phase-3b-ii-D/E): 路由 + Vue + E2E | 3b-ii-D/E |
+| `bb34fbb9` | fix: 主力连续 fallback(280 测试) | P0 修复 |
+| `792a9083` | fix: 详情页 5 UX bug | 详情页修复 |
+| `8b8a7f0c` | fix(features): 修复 6 个 feature 模块的数据兼容性问题 | 3b-i 后修 |
 
-**Phase 4 起步清单(Paper Trading)**:
-1. 起草 `app/routers/commodity/paper_rules.py`(账户 / 持仓 / 订单 CRUD)
-2. `app/services/commodity/paper_trading_service.py`(模拟撮合 + 盈亏计算)
-3. `frontend/src/views/Commodity/PaperTrading.vue`
-4. `tests/test_commodity_paper_trading.py`(基于已实盘决策走模拟成交闭环)
-5. MongoDB 持久化(账户/持仓/订单/成交)+ Redis 进度跟踪
-6. E2E:Web UI 触发决策 → 走 3b-ii 链路 → 自动写入模拟订单 → 历史持仓报表
+---
+
+## 九、Phase 3b 交付清单(全部 ✅)
+
+### Phase 3b-i 文件
+
+| 文件 | 状态 |
+|---|---|
+| `tradingagents/features/commodity/__init__.py` | ✅ |
+| `tradingagents/features/commodity/_helpers.py` | ✅ |
+| `tradingagents/features/commodity/technical.py` | ✅ |
+| `tradingagents/features/commodity/basis.py` | ✅ |
+| `tradingagents/features/commodity/inventory.py` | ✅ |
+| `tradingagents/features/commodity/positioning.py` | ✅ |
+| `tradingagents/features/commodity/term_structure.py` | ✅ |
+| `tradingagents/features/commodity/news_sentiment.py` | ✅ |
+| `tests/test_commodity_features.py` | ✅ 97 测试 |
+
+### Phase 3b-ii 文件
+
+| 文件 | 状态 |
+|---|---|
+| `tradingagents/agents/analysts/commodity/technical_analyst.py` | ✅ |
+| `tradingagents/agents/analysts/commodity/fundamental_analyst.py` | ✅ |
+| `tradingagents/agents/analysts/commodity/position_analyst.py` | ✅ |
+| `tradingagents/agents/analysts/commodity/news_analyst.py` | ✅ |
+| `tradingagents/agents/analysts/commodity/_base.py` | ✅ |
+| `tradingagents/agents/analysts/commodity/reports.py` | ✅ |
+| `tradingagents/graph/commodity_graph.py` | ✅ |
+| `app/routers/commodity/analysis.py` | ✅ |
+| `frontend/src/views/Commodity/Analysis.vue` | ✅ |
+| `tests/test_commodity_analyst.py` | ✅ 45 测试 |
+| `tests/test_commodity_decision_chain.py` | ✅ 26 测试 |
+| `tests/test_commodity_cio.py` | ✅ 6 测试 |
+
+---
+
+## 十、关键教训
+
+- **最小侵入 commodity 化成功**:8 个决策链节点只需文件顶 `COMMODITY_*_PROMPT` + `if/else` 分支,stock 路径零改动
+- **MagicMock 不兼容 `prompt \| llm` 链式调用**:必须用 `llm.invoke(messages_payload)` 而非 `chain.invoke`
+- **asset_type 传递至关重要**:`AgentState` 必须默认 `"stock"`,commodity 路径在 Propagator 中注入 `"commodity"`
+- **CIO 换月检测**:实际 E2E 测试发现 `CU2501.SHF` 已过期,CIO 自动切换到 `CU2504.SHF` — 证明决策链能正确使用合约字段
+- **全链路 13 次 LLM 调用**:~280 秒,用户需有耐心等待,可考虑未来加 SSE 进度推送
+
+---
+
+## 十一、Phase 4 衔接
+
+### 启动前置条件
+
+在 `commodity_metadata.py` 补齐每个品种的合约规格字段:
+- `margin_rate`(保证金率,如 0.08=8%)
+- `commission_rate`(手续费率,如 0.0001=万分之一)
+- `limit_up_down_pct`(涨跌停幅度,如 0.07=±7%)
+
+### 实施步骤
+
+| 步骤 | 模块 | 时间 |
+|---|---|---|
+| Phase 4-1 | 合约规格补齐(`commodity_metadata.py` 新增字段) | 0.5 天 |
+| Phase 4-2 | 纯规则引擎(`tradingagents/paper/{spec,matcher,pnl,account,risk,repo}.py`) | 3-4 天 |
+| Phase 4-3 | HTTP 路由 + Vue 下单页(`paper_rules.py` + `PaperTrading.vue`) | 2 天 |
+| Phase 4-4 | CIO→Paper 联动(`POST /api/commodity/paper/from-decision`) | 1 天 |
+| Phase 4-5 | E2E 实测(下单→持仓→隔日盯市) | 1 天 |
+
+### 参考
+
+- 细节设计: `docs/plans/stock-to-commodity.md` §6.1
+- 模拟交易路由设计: `docs/progress/phase-4.md`(启动后创建)

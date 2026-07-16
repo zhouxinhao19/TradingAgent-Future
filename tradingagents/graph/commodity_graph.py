@@ -106,6 +106,7 @@ class CommodityPropagator(Propagator):
             ),
             "market_report": "",
             "fundamentals_report": "",
+            "fundamentals_structured": {},
             "sentiment_report": "",
             "news_report": "",
             "commodity_features": commodity_features or {},
@@ -292,7 +293,7 @@ class CommodityTradingAgentsGraph(TradingAgentsGraph):
     # === 进度映射(覆盖父类,适配 commodity 节点名) ===
     _COMMODITY_NODE_MAPPING = {
         "Technical Analyst": "📈 技术分析师",
-        "Fundamentals Analyst": "💼 基本面分析师",
+        "Fundamentals Analyst": "💼 产业分析师",
         "Sentiment Analyst": "🧠 持仓情绪分析师",
         "News Analyst": "📰 新闻分析师",
         "Bull Researcher": "🐂 看涨研究员",
