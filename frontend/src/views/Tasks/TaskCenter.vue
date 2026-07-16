@@ -242,7 +242,7 @@ function computeStats() {
 async function loadList() {
   loading.value = true
   try {
-    const res = await commodityApi.getRecentReports(500)
+    const res = await commodityApi.getRecentReports(50)
     const body = (res as any)?.data
     const reports: RecentReportItem[] = body?.reports || []
     list.value = reports.sort(

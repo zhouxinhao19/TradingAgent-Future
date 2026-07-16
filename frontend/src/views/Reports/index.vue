@@ -250,7 +250,7 @@ const pagedReports = computed(() => {
 const fetchReports = async () => {
   loading.value = true
   try {
-    const res = await commodityApi.getRecentReports(500)
+    const res = await commodityApi.getRecentReports(50)
     const body = (res as any)?.data
     const items: RecentReportItem[] = body?.reports || []
     reports.value = items.sort(
