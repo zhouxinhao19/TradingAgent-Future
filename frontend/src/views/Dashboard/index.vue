@@ -316,10 +316,9 @@ import { ElMessage } from 'element-plus'
 import type { AnalysisTask, AnalysisStatus } from '@/types/analysis'
 import MultiSourceSyncCard from '@/components/Dashboard/MultiSourceSyncCard.vue'
 import { favoritesApi } from '@/api/favorites'
-import { analysisApi } from '@/api/analysis'
 import { newsApi } from '@/api/news'
 import { paperApi, type PaperAccountSummary } from '@/api/paper'
-import { commodityApi, type RecentReportItem } from '@/api/commodity'
+import { commodityApi, type RecentReportItem, type CommodityTaskItem } from '@/api/commodity'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -538,21 +537,15 @@ const loadFavoriteStocks = async () => {
 
 const loadRecentAnalyses = async () => {
   try {
-    // 使用任务中心的用户任务接口，获取最近10条
-    const res = await analysisApi.getTaskList({
-      limit: 10,
-      offset: 0,
-      // 不限定状态，展示最近任务；如需仅展示已完成可设为 'completed'
-      status: undefined
-    })
+    // 使用商品分析任务中心接口，获取最近10条
+    const res = await commodityApi.getTaskList({ limit: 10, offset: 0 })
 
-    // 兼容不同返回结构（ApiResponse 或直接 data）
-    const body: any = (res as any)?.data?.data || (res as any)?.data || res || {}
-    const tasks = body.tasks || []
+    const body: any = (res as any)?.data || {}
+    const tasks: CommodityTaskItem[] = body.tasks || []
 
-    recentAnalyses.value = tasks
+    recentAnalyses.value = tasks as any
     userStats.value.totalAnalyses = body.total ?? tasks.length
-    userStats.value.successfulAnalyses = tasks.filter((item: any) => item.status === 'completed').length
+    userStats.value.successfulAnalyses = tasks.filter((item) => item.status === 'completed').length
   } catch (error) {
     console.error('加载最近分析失败:', error)
     recentAnalyses.value = []
