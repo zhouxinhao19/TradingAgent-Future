@@ -92,43 +92,46 @@
           </div>
         </el-card>
 
-        <!-- 最近分析 -->
+        <!-- 最近分析（任务中心联动） -->
         <el-card class="recent-analyses-card" header="最近分析" style="margin-top: 24px;">
           <el-table :data="recentAnalyses" style="width: 100%">
-            <el-table-column prop="stock_code" label="股票代码" width="120" />
-            <el-table-column prop="stock_name" label="股票名称" width="150" />
-            <el-table-column prop="status" label="状态" width="100">
+            <el-table-column label="合约代码" width="160">
               <template #default="{ row }">
-                <el-tag :type="getStatusType(row.status)">
+                <span class="symbol-link" @click="viewCommodityReport(row)">{{ row.full_symbol }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="trade_date" label="交易日期" width="110" />
+            <el-table-column label="状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="getStatusType(row.status)" size="small">
                   {{ getStatusText(row.status) }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="start_time" label="创建时间" width="180">
+            <el-table-column label="提交时间" width="170">
               <template #default="{ row }">
-                {{ formatTime(row.start_time) }}
+                {{ formatTime(row.created_at) }}
               </template>
             </el-table-column>
             <el-table-column label="操作">
               <template #default="{ row }">
-                <el-button type="text" size="small" @click="viewAnalysis(row)">
-                  查看
+                <el-button type="text" size="small" @click="viewCommodityReport(row)">
+                  查看报告
                 </el-button>
-                <el-button
-                  v-if="row.status === 'completed'"
-                  type="text"
-                  size="small"
-                  @click="downloadReport(row)"
+                <el-tooltip
+                  v-if="row.status === 'failed' && row.error_message"
+                  :content="row.error_message"
+                  placement="top"
                 >
-                  下载
-                </el-button>
+                  <el-tag type="danger" size="small" effect="plain">失败原因</el-tag>
+                </el-tooltip>
               </template>
             </el-table-column>
           </el-table>
 
           <div class="table-footer">
-            <el-button type="text" @click="goToHistory">
-              查看全部历史 <el-icon><ArrowRight /></el-icon>
+            <el-button type="text" @click="goToQueue">
+              查看全部任务 <el-icon><ArrowRight /></el-icon>
             </el-button>
           </div>
         </el-card>
@@ -258,7 +261,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
 import {
   TrendCharts,
   Box,
@@ -268,24 +270,15 @@ import {
   Reading
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import type { AnalysisTask, AnalysisStatus } from '@/types/analysis'
+import type { AnalysisStatus } from '@/types/analysis'
 import DataSourceLlmStatusCard from '@/components/Dashboard/DataSourceLlmStatusCard.vue'
 import { favoritesApi } from '@/api/favorites'
-import { commodityApi, type RecentReportItem, type CommodityTaskItem } from '@/api/commodity'
+import { commodityApi, commodityPaperApi, type CommodityTaskItem } from '@/api/commodity'
 
 const router = useRouter()
-const authStore = useAuthStore()
 
 // 响应式数据
-const userStats = ref({
-  totalAnalyses: 0,
-  successfulAnalyses: 0,
-  dailyQuota: 1000,
-  dailyUsed: 0,
-  concurrentLimit: 3
-})
-
-const recentAnalyses = ref<AnalysisTask[]>([])
+const recentAnalyses = ref<CommodityTaskItem[]>([])
 
 /** 商品分析最近记录(用于"最近分析"卡片) */
 const recentCommodityRecords = ref<RecentReportItem[]>([])
@@ -297,26 +290,11 @@ const favoriteStocks = ref<any[]>([])
 const marketNews = ref<any[]>([])
 
 // 模拟交易账户数据
-const paperAccount = ref<{ name: string; equity: number; balance: number; pnl: number } | null>(null)
-
-const getCurrencyAmount = (
-  amount: number | { CNY: number; HKD: number; USD: number } | undefined,
-  currency: 'CNY' | 'HKD' | 'USD',
-  fallback = 0
-): number => {
-  if (typeof amount === 'number') return amount
-  return amount?.[currency] ?? fallback
-}
-
-
+const paperAccount = ref<{ name: string; equity: number; balance: number; realized_pnl: number } | null>(null)
 
 // 方法
 const goToQueue = () => {
   router.push('/queue')
-}
-
-const goToHistory = () => {
-  router.push('/tasks?tab=completed')
 }
 
 const goToLearning = () => {
@@ -325,26 +303,23 @@ const goToLearning = () => {
 
 // ---------- 商品分析相关 ----------
 
-/** 商品方向中文标签 */
-function commodityDirectionLabel(direction: string): string {
-  const map: Record<string, string> = { long: '做多', short: '做空', hold: '持有', flat: '平仓' }
-  return map[direction] || direction
-}
-
-/** 商品方向 Tag 类型 */
-function commodityDirectionTagType(direction: string): string {
-  const map: Record<string, string> = { long: 'success', short: 'danger', hold: 'info', flat: 'warning' }
-  return map[direction] || 'info'
-}
-
 /** 查看商品分析报告详情 */
-function viewCommodityReport(row: RecentReportItem) {
-  router.push(`/commodity/analysis?symbol=${row.full_symbol}`)
+function viewCommodityReport(row: CommodityTaskItem) {
+  if (row.status === 'completed') {
+    router.push(`/commodity/analysis?symbol=${row.full_symbol}`)
+  } else {
+    router.push('/queue')
+  }
 }
 
 /** 前往商品分析页 */
 function goToCommodityAnalysis() {
   router.push('/commodity/analysis')
+}
+
+/** 前往期货模拟 */
+function goToCommodityPaper() {
+  router.push('/commodity/paper')
 }
 
 /** 加载最近商品分析记录 */
@@ -359,49 +334,7 @@ async function loadRecentCommodityRecords() {
   }
 }
 
-const viewAnalysis = (analysis: AnalysisTask) => {
-  const status = (analysis as any)?.status
-  if (status === 'completed') {
-    // 报告详情已合并到商品分析页面
-    router.push('/commodity/analysis')
-  } else {
-    // 未完成任务跳转到任务中心的“进行中”标签页
-    router.push('/tasks?tab=running')
-  }
-}
 
-const downloadReport = async (analysis: AnalysisTask) => {
-  try {
-    const reportId = analysis.task_id
-    const res = await fetch(`/api/reports/${reportId}/download?format=markdown`, {
-      headers: {
-        'Authorization': `Bearer ${authStore.token}`
-      }
-    })
-    if (!res.ok) {
-      const msg = `下载失败：HTTP ${res.status}`
-      console.error(msg)
-      ElMessage.error('下载失败，报告可能尚未生成')
-      return
-    }
-    const blob = await res.blob()
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    const code = (analysis as any).stock_code || (analysis as any).stock_symbol || 'stock'
-    const dateStr = (analysis as any).analysis_date || (analysis as any).start_time || ''
-    // 🔥 统一文件名格式：{code}_分析报告_{date}.md
-    a.download = `${code}_分析报告_${String(dateStr).slice(0,10)}.md`
-    document.body.appendChild(a)
-    a.click()
-    window.URL.revokeObjectURL(url)
-    document.body.removeChild(a)
-    ElMessage.success('报告已开始下载')
-  } catch (err) {
-    console.error('下载报告出错:', err)
-    ElMessage.error('下载失败，请稍后重试')
-  }
-}
 
 const openNewsUrl = (url?: string) => {
   if (url) {
@@ -482,8 +415,6 @@ const loadRecentAnalyses = async () => {
     const tasks: CommodityTaskItem[] = body.tasks || []
 
     recentAnalyses.value = tasks as any
-    userStats.value.totalAnalyses = body.total ?? tasks.length
-    userStats.value.successfulAnalyses = tasks.filter((item) => item.status === 'completed').length
   } catch (error) {
     console.error('加载最近分析失败:', error)
     recentAnalyses.value = []
@@ -514,11 +445,11 @@ const loadMarketNews = async () => {
 const loadPaperAccount = async () => {
   try {
     // 取第一个期货模拟账户的快照
-    const listRes = await commodityApi.listAccounts()
+    const listRes = await commodityPaperApi.listAccounts()
     const accounts = (listRes as any)?.data?.accounts
     if (accounts?.length) {
       const acc = accounts[0]
-      const snap = await commodityApi.getAccountSnapshot(acc.account_id)
+      const snap = await commodityPaperApi.getAccountSnapshot(acc.account_id)
       const snapData = (snap as any)?.data
       paperAccount.value = {
         name: acc.name,
@@ -547,13 +478,13 @@ const formatMoney = (value: number) => {
 onMounted(async () => {
   // 加载自选股数据
   await loadFavoriteStocks()
-  // 加载最近分析(股票)
+  // 加载最近分析(商品任务中心)
   await loadRecentAnalyses()
   // 加载最近商品分析记录
   await loadRecentCommodityRecords()
   // 加载市场快讯
   await loadMarketNews()
-  // 加载模拟交易账户
+  // 加载期货模拟交易账户
   await loadPaperAccount()
 })
 </script>
@@ -725,6 +656,12 @@ onMounted(async () => {
   }
 
   .recent-analyses-card {
+    .symbol-link {
+      color: var(--el-color-primary);
+      cursor: pointer;
+      font-weight: 500;
+      &:hover { text-decoration: underline; }
+    }
     .table-footer {
       text-align: center;
       margin-top: 16px;
