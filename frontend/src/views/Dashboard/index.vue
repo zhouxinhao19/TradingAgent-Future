@@ -12,13 +12,13 @@
         </p>
       </div>
       <div class="welcome-actions">
-        <el-button type="primary" size="large" @click="quickAnalysis">
+        <el-button type="primary" size="large" @click="goToCommodityAnalysis">
           <el-icon><TrendCharts /></el-icon>
-          快速分析
+          商品分析
         </el-button>
-        <el-button size="large" @click="goToScreening">
-          <el-icon><Search /></el-icon>
-          股票筛选
+        <el-button size="large" @click="goToCommodityPaper">
+          <el-icon><Box /></el-icon>
+          期货模拟
         </el-button>
       </div>
     </div>
@@ -57,35 +57,24 @@
       <el-col :span="16">
         <el-card class="quick-actions-card" header="快速操作">
           <div class="quick-actions">
-            <div class="action-item" @click="goToSingleAnalysis">
+            <div class="action-item" @click="goToCommodityAnalysis">
               <div class="action-icon">
-                <el-icon><Document /></el-icon>
+                <el-icon><Box /></el-icon>
               </div>
               <div class="action-content">
-                <h3>单股分析</h3>
-                <p>深度分析单只股票的投资价值</p>
+                <h3>商品分析</h3>
+                <p>多智能体决策链分析大宗商品期货</p>
               </div>
               <el-icon class="action-arrow"><ArrowRight /></el-icon>
             </div>
 
-            <div class="action-item" @click="goToBatchAnalysis">
+            <div class="action-item" @click="goToCommodityPaper">
               <div class="action-icon">
-                <el-icon><Files /></el-icon>
+                <el-icon><TrendCharts /></el-icon>
               </div>
               <div class="action-content">
-                <h3>批量分析</h3>
-                <p>同时分析多只股票，提高效率</p>
-              </div>
-              <el-icon class="action-arrow"><ArrowRight /></el-icon>
-            </div>
-
-            <div class="action-item" @click="goToScreening">
-              <div class="action-icon">
-                <el-icon><Search /></el-icon>
-              </div>
-              <div class="action-content">
-                <h3>股票筛选</h3>
-                <p>通过多维度条件筛选优质股票</p>
+                <h3>期货模拟</h3>
+                <p>基于分析决策进行模拟期货交易</p>
               </div>
               <el-icon class="action-arrow"><ArrowRight /></el-icon>
             </div>
@@ -96,7 +85,7 @@
               </div>
               <div class="action-content">
                 <h3>任务中心</h3>
-                <p>查看和管理分析任务列表</p>
+                <p>查看和管理商品分析任务列表</p>
               </div>
               <el-icon class="action-arrow"><ArrowRight /></el-icon>
             </div>
@@ -230,54 +219,22 @@
           </template>
 
           <div v-if="paperAccount" class="paper-account-info">
-            <!-- A股账户 -->
+            <!-- 期货模拟账户 -->
             <div class="account-section">
-              <div class="account-section-title">🇨🇳 A股账户</div>
+              <div class="account-section-title">📦 {{ paperAccount.name }}</div>
               <div class="account-item">
-                <div class="account-label">现金</div>
-                <div class="account-value">¥{{ formatMoney(getCurrencyAmount(paperAccount.cash, 'CNY')) }}</div>
+                <div class="account-label">账户权益</div>
+                <div class="account-value primary">¥{{ formatMoney(paperAccount.equity) }}</div>
               </div>
               <div class="account-item">
-                <div class="account-label">持仓市值</div>
-                <div class="account-value">¥{{ formatMoney(getCurrencyAmount(paperAccount.positions_value, 'CNY')) }}</div>
+                <div class="account-label">可用资金</div>
+                <div class="account-value">¥{{ formatMoney(paperAccount.balance) }}</div>
               </div>
               <div class="account-item">
-                <div class="account-label">总资产</div>
-                <div class="account-value primary">¥{{ formatMoney(getCurrencyAmount(paperAccount.equity, 'CNY')) }}</div>
-              </div>
-            </div>
-
-            <!-- 港股账户 -->
-            <div class="account-section" v-if="typeof paperAccount.cash !== 'number' && paperAccount.cash?.HKD !== undefined">
-              <div class="account-section-title">🇭🇰 港股账户</div>
-              <div class="account-item">
-                <div class="account-label">现金</div>
-                <div class="account-value">HK${{ formatMoney(getCurrencyAmount(paperAccount.cash, 'HKD')) }}</div>
-              </div>
-              <div class="account-item">
-                <div class="account-label">持仓市值</div>
-                <div class="account-value">HK${{ formatMoney(getCurrencyAmount(paperAccount.positions_value, 'HKD')) }}</div>
-              </div>
-              <div class="account-item">
-                <div class="account-label">总资产</div>
-                <div class="account-value primary">HK${{ formatMoney(getCurrencyAmount(paperAccount.equity, 'HKD')) }}</div>
-              </div>
-            </div>
-
-            <!-- 美股账户 -->
-            <div class="account-section" v-if="typeof paperAccount.cash !== 'number' && paperAccount.cash?.USD !== undefined">
-              <div class="account-section-title">🇺🇸 美股账户</div>
-              <div class="account-item">
-                <div class="account-label">现金</div>
-                <div class="account-value">${{ formatMoney(getCurrencyAmount(paperAccount.cash, 'USD')) }}</div>
-              </div>
-              <div class="account-item">
-                <div class="account-label">持仓市值</div>
-                <div class="account-value">${{ formatMoney(getCurrencyAmount(paperAccount.positions_value, 'USD')) }}</div>
-              </div>
-              <div class="account-item">
-                <div class="account-label">总资产</div>
-                <div class="account-value primary">${{ formatMoney(getCurrencyAmount(paperAccount.equity, 'USD')) }}</div>
+                <div class="account-label">累计盈亏</div>
+                <div class="account-value" :class="paperAccount.pnl >= 0 ? 'price-up' : 'price-down'">
+                  {{ paperAccount.pnl >= 0 ? '+' : '' }}¥{{ formatMoney(Math.abs(paperAccount.pnl)) }}
+                </div>
               </div>
             </div>
           </div>
@@ -304,9 +261,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import {
   TrendCharts,
-  Search,
-  Document,
-  Files,
+  Box,
   List,
   ArrowRight,
   InfoFilled,
@@ -316,8 +271,6 @@ import { ElMessage } from 'element-plus'
 import type { AnalysisTask, AnalysisStatus } from '@/types/analysis'
 import DataSourceLlmStatusCard from '@/components/Dashboard/DataSourceLlmStatusCard.vue'
 import { favoritesApi } from '@/api/favorites'
-import { newsApi } from '@/api/news'
-import { paperApi, type PaperAccountSummary } from '@/api/paper'
 import { commodityApi, type RecentReportItem, type CommodityTaskItem } from '@/api/commodity'
 
 const router = useRouter()
@@ -344,7 +297,7 @@ const favoriteStocks = ref<any[]>([])
 const marketNews = ref<any[]>([])
 
 // 模拟交易账户数据
-const paperAccount = ref<PaperAccountSummary | null>(null)
+const paperAccount = ref<{ name: string; equity: number; balance: number; pnl: number } | null>(null)
 
 const getCurrencyAmount = (
   amount: number | { CNY: number; HKD: number; USD: number } | undefined,
@@ -358,22 +311,6 @@ const getCurrencyAmount = (
 
 
 // 方法
-const quickAnalysis = () => {
-  router.push('/analysis/single')
-}
-
-const goToSingleAnalysis = () => {
-  router.push('/analysis/single')
-}
-
-const goToBatchAnalysis = () => {
-  router.push('/analysis/batch')
-}
-
-const goToScreening = () => {
-  router.push('/screening')
-}
-
 const goToQueue = () => {
   router.push('/queue')
 }
@@ -555,47 +492,61 @@ const loadRecentAnalyses = async () => {
 
 const loadMarketNews = async () => {
   try {
-    // 先尝试获取最近 24 小时的新闻
-    let response = await newsApi.getLatestNews(undefined, 10, 24)
-
-    // 如果最近 24 小时没有新闻，则获取最新的 10 条（不限时间）
-    if (response.success && response.data && response.data.news.length === 0) {
-      console.log('最近 24 小时没有新闻，获取最新的 10 条新闻（不限时间）')
-      response = await newsApi.getLatestNews(undefined, 10, 24 * 365) // 回溯 1 年
-    }
-
-    if (response.success && response.data) {
-      marketNews.value = response.data.news.map((item: any) => ({
-        id: item.id || item.title,
+    // 使用期货新闻接口获取市场快讯
+    const res = await commodityApi.getNews('global_macro', 10)
+    const body = (res as any)?.data
+    if (body?.items?.length) {
+      marketNews.value = body.items.map((item: any) => ({
+        id: item.title,
         title: item.title,
-        time: item.publish_time,
+        time: item.published_at || item.date,
         url: item.url,
         source: item.source
       }))
+    } else {
+      // 降级:获取 all 分类
+      const res2 = await commodityApi.getNews('all', 10)
+      const body2 = (res2 as any)?.data
+      marketNews.value = body2?.items?.map((item: any) => ({
+        id: item.title,
+        title: item.title,
+        time: item.published_at || item.date,
+        url: item.url,
+        source: item.source
+      })) || []
     }
   } catch (error) {
     console.error('加载市场快讯失败:', error)
-    // 如果加载失败，显示提示信息
     marketNews.value = []
   }
 }
 
-// 加载模拟交易账户信息
+// 加载期货模拟交易账户信息
 const loadPaperAccount = async () => {
   try {
-    const response = await paperApi.getAccount()
-    if (response.success && response.data) {
-      paperAccount.value = response.data.account
+    // 取第一个期货模拟账户的快照
+    const listRes = await commodityApi.listAccounts()
+    const accounts = (listRes as any)?.data?.accounts
+    if (accounts?.length) {
+      const acc = accounts[0]
+      const snap = await commodityApi.getAccountSnapshot(acc.account_id)
+      const snapData = (snap as any)?.data
+      paperAccount.value = {
+        name: acc.name,
+        equity: snapData?.equity ?? acc.initial_capital ?? 0,
+        balance: snapData?.balance ?? acc.initial_capital ?? 0,
+        pnl: snapData?.pnl ?? 0,
+      }
     }
   } catch (error) {
-    console.error('加载模拟交易账户失败:', error)
+    console.error('加载期货模拟交易账户失败:', error)
     paperAccount.value = null
   }
 }
 
-// 跳转到模拟交易页面
+// 跳转到期货模拟交易页面
 const goToPaperTrading = () => {
-  router.push('/paper')
+  router.push('/commodity/paper')
 }
 
 // 格式化金额
