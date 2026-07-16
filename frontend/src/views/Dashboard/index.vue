@@ -273,7 +273,7 @@ import { ElMessage } from 'element-plus'
 import type { AnalysisStatus } from '@/types/analysis'
 import DataSourceLlmStatusCard from '@/components/Dashboard/DataSourceLlmStatusCard.vue'
 import { favoritesApi } from '@/api/favorites'
-import { commodityApi, commodityPaperApi, type CommodityTaskItem } from '@/api/commodity'
+import { commodityApi, commodityPaperApi, type CommodityTaskItem, type RecentReportItem } from '@/api/commodity'
 
 const router = useRouter()
 
