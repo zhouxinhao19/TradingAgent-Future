@@ -425,7 +425,8 @@ async function loadRecentCommodityRecords() {
 const viewAnalysis = (analysis: AnalysisTask) => {
   const status = (analysis as any)?.status
   if (status === 'completed') {
-    router.push({ name: 'ReportDetail', params: { id: analysis.task_id } })
+    // 报告详情已合并到商品分析页面
+    router.push('/commodity/analysis')
   } else {
     // 未完成任务跳转到任务中心的“进行中”标签页
     router.push('/tasks?tab=running')
