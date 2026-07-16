@@ -17,7 +17,7 @@ from tradingagents.dataflows.providers.commodity.commodity_metadata import norma
 from tradingagents.utils.commodity_utils import CommodityUtils
 
 # 便捷导出
-from .commodity.technical import compute_technical_metrics
+from .commodity.technical import compute_technical_metrics, compute_technical_metrics_multi_contract
 from .commodity.basis import compute_basis_metrics
 from .commodity.inventory import compute_inventory_metrics
 from .commodity.positioning import compute_positioning_metrics
@@ -44,6 +44,24 @@ async def _call_provider(provider, method_name, *args, **kwargs):
         return result
     except Exception as e:
         return None
+
+
+def _resolve_technical_symbols(full_symbol: str, underlying: str) -> Dict[str, Optional[str]]:
+    """解析技术分析所需的合约代码。
+
+    Args:
+        full_symbol: 完整合约代码, 如 ``CU2501.SHF`` 或主力连续码
+        underlying: 品种代码, 如 ``CU``
+
+    Returns:
+        {"main_symbol": str, "index_symbol": str or None}
+    """
+    from tradingagents.dataflows.providers.commodity.commodity_metadata import get_index_symbol
+
+    return {
+        "main_symbol": full_symbol,
+        "index_symbol": get_index_symbol(underlying),
+    }
 
 
 async def compute_all_features_from_provider(
@@ -91,6 +109,10 @@ async def compute_all_features_from_provider(
     if df_hist is None:
         result["errors"]["historical"] = "历史 K 线数据获取失败"
 
+    # 指数合约数据(用于技术面多合约分析, 不可用时回退到单合约)
+    index_df = await _call_provider(provider, "get_historical_data_for_index",
+        underlying, start_date="2025-01-01", end_date=trade_date or "2026-07-16")
+
     basis_df = await _call_provider(provider, "get_basis_history",
         "2025-01-01", trade_date or "2026-07-16", [underlying])
 
@@ -114,7 +136,11 @@ async def compute_all_features_from_provider(
     errors = result["errors"]
 
     features["technical"] = _safe(
-        lambda: compute_technical_metrics(df_hist) if df_hist is not None
+        lambda: compute_technical_metrics_multi_contract(
+            main_df=df_hist,
+            index_df=index_df,
+            include_weekly=True,
+        ) if df_hist is not None
         else _helpers.empty_result("无历史 K 线"),
         "技术面计算失败",
         errors,
@@ -168,6 +194,7 @@ async def compute_all_features_from_provider(
 
 __all__ = [
     "compute_technical_metrics",
+    "compute_technical_metrics_multi_contract",
     "compute_basis_metrics",
     "compute_inventory_metrics",
     "compute_positioning_metrics",
