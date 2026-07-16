@@ -531,7 +531,7 @@ async def list_commodity_tasks(
         return {
             "success": True,
             "data": {"total": 0, "tasks": []},
-            "message": f"查询失败: {e}",
+            "message": "查询失败，请稍后重试",
         }
     return {
         "success": True,
@@ -570,6 +570,46 @@ async def get_commodity_task(
         "data": _serialize_task(doc),
         "message": "获取任务成功",
     }
+
+
+@router.delete("/tasks/{task_id}", response_model=dict, summary="删除任务及关联报告")
+async def delete_commodity_task(
+    task_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """删除任务记录及关联的 JSON 报告文件。"""
+    coll = _tasks_collection()
+    if coll is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="任务存储不可用",
+        )
+    user_id = str(user.get("id", ""))
+    doc = await coll.find_one({
+        "task_id": task_id,
+        "$or": [
+            {"user_id": user_id},
+            {"user_id": "legacy-backfill"},
+        ],
+    })
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"任务不存在: {task_id}",
+        )
+    # 删除关联报告文件
+    report_id = doc.get("report_id")
+    if report_id:
+        for f_path in _REPORTS_BASE.rglob(f"{report_id}.json"):
+            try:
+                f_path.unlink()
+                logger.info(f"🗑️ 已删除报告文件: {f_path}")
+            except OSError as e:
+                logger.warning(f"⚠️ 删除报告文件失败: {f_path} - {e}")
+    # 删除 MongoDB 记录
+    await coll.delete_one({"task_id": task_id})
+    logger.info(f"🗑️ 已删除任务: {task_id}")
+    return {"success": True, "message": f"任务已删除"}
 
 
 @router.get("/reports/{report_id}", response_model=dict, summary="报告详情")
