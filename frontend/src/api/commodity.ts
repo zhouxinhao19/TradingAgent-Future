@@ -422,6 +422,13 @@ export const commodityApi = {
       `/api/commodity/tasks/${encodeURIComponent(taskId)}`,
     )
   },
+
+  /** 删除任务及关联报告 */
+  async deleteTask(taskId: string) {
+    return ApiClient.delete<ApiEnvelope<null>>(
+      `/api/commodity/tasks/${encodeURIComponent(taskId)}`,
+    )
+  },
 }
 
 /**

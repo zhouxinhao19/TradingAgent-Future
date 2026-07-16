@@ -129,6 +129,12 @@
               size="small"
               effect="plain"
             >分析中…</el-tag>
+            <el-button
+              type="text"
+              size="small"
+              style="margin-left: 8px; color: var(--el-color-danger)"
+              @click="deleteTask(row)"
+            >删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -173,7 +179,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { List, Refresh, TrendCharts } from '@element-plus/icons-vue'
 import { commodityApi, type CommodityTaskItem, type TaskStatus } from '@/api/commodity'
 import { formatDateTime } from '@/utils/datetime'
@@ -205,6 +211,22 @@ const allTasks = ref<CommodityTaskItem[]>([]) // 客户端筛选前的全集(做
 // 报告详情抽屉
 const detailDrawerVisible = ref(false)
 const detailData = ref<Record<string, any> | null>(null)
+
+// 删除任务
+async function deleteTask(row: CommodityTaskItem) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除 ${row.full_symbol} 的任务记录吗？${
+        row.status === 'completed' ? '关联的报告文件也会被删除。' : ''
+      }`,
+      '确认删除',
+      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' },
+    )
+    await commodityApi.deleteTask(row.task_id)
+    ElMessage.success('已删除')
+    await loadList()
+  } catch { /* 用户取消或删除失败忽略 */ }
+}
 
 // 自动轮询:列表里有 processing 状态的任务时每 5s 刷新一次
 let pollingTimer: ReturnType<typeof setInterval> | null = null
