@@ -428,7 +428,20 @@ class CommodityTradingAgentsGraph(TradingAgentsGraph):
         return final_state, decision
 
     def _extract_decision(self, final_state: Dict[str, Any]) -> Dict[str, Any]:
-        """从 CIO 输出提取结构化决策。"""
+        """从 CIO 输出提取结构化决策。
+
+        解析 CIO final_decision Markdown 中的结构化字段:
+          - **方向**:做多/做空/持有/平仓
+          - **置信度**:0.75
+
+        Bug 修复(2026-07-16):
+          - 旧逻辑: 全文搜索"做多"→"做空",但 CIO 文本同时包含两者时永远返回"long"
+          - 新逻辑: 用正则精确匹配"**方向**:做多/做空"字段行,消除歧义
+          - 旧逻辑: confidence 硬编码 0.5
+          - 新逻辑: 解析"**置信度**:0.75"字段,精确提取数值
+        """
+        import re
+
         final_decision = final_state.get("final_decision", "")
         if not final_decision:
             return {
@@ -438,19 +451,44 @@ class CommodityTradingAgentsGraph(TradingAgentsGraph):
                 "raw_text": "",
             }
 
-        # 简化解析 — 从 Markdown 文本提取方向
         text = final_decision
         action = "hold"
-        if "做多" in text or "买入" in text:
-            action = "long"
-        elif "做空" in text or "卖出" in text:
-            action = "short"
-        elif "平仓" in text:
-            action = "flat"
+        confidence = 0.5
+
+        # 1. 解析方向 — 精确匹配"**方向**:做多/做空/买入/卖出/持有/平仓"字段
+        #    CIO 输出格式: "- **方向**:做空" 或 "**方向**:做多"
+        dir_match = re.search(
+            r'\*{0,2}方向\*{0,2}\s*[:：]\s*(做多|做空|买入|卖出|持有|平仓)',
+            text,
+        )
+        if dir_match:
+            raw = dir_match.group(1)
+            if raw in ("做多", "买入"):
+                action = "long"
+            elif raw in ("做空", "卖出"):
+                action = "short"
+            elif raw == "平仓":
+                action = "flat"
+            elif raw == "持有":
+                action = "hold"
+
+        # 2. 解析置信度 — 精确匹配"**置信度**:0.75"字段
+        #    CIO 输出格式: "- **置信度**:0.75" 或 "**置信度**:0.75"
+        conf_match = re.search(
+            r'\*{0,2}置信度\*{0,2}\s*[:：]\s*([0-9]+\.?[0-9]*)',
+            text,
+        )
+        if conf_match:
+            try:
+                parsed = float(conf_match.group(1))
+                if 0.0 <= parsed <= 1.0:
+                    confidence = parsed
+            except ValueError:
+                pass
 
         return {
             "action": action,
-            "confidence": 0.5,  # 占位,可由 CIO prompt 输出 -1-1 范围后解析
+            "confidence": confidence,
             "reasoning": text,
             "raw_text": text,
         }
