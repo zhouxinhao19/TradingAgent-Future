@@ -235,14 +235,14 @@ async def lifespan(app: FastAPI):
             # 把卡在 processing 的老任务标为 failed (服务重启等场景)
             coll = _tasks_collection()
             if coll is not None:
-                from datetime import datetime, timedelta
-                cutoff = datetime.utcnow() - timedelta(minutes=5)
+                from datetime import datetime, timedelta, timezone
+                cutoff = datetime.now(timezone.utc) - timedelta(minutes=5)
                 result = await coll.update_many(
                     {"status": "processing", "created_at": {"$lt": cutoff}},
                     {"$set": {
                         "status": "failed",
                         "error_message": "服务重启,任务中断",
-                        "completed_at": datetime.utcnow(),
+                        "completed_at": datetime.now(timezone.utc),
                     }},
                 )
                 if result.modified_count > 0:

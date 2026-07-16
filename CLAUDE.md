@@ -338,48 +338,61 @@ python tests/debug_docker.py
 
 按 [`docs/plans/stock-to-commodity.md`](docs/plans/stock-to-commodity.md) 推进 **"股票 → 大宗商品"改造**。
 
-### 实际状态(2026-07-14 实测审计)
+### 实际状态(2026-07-16 实测审计)
 
 | Phase | 范围 | 实际交付 | 未交付 |
 |---|---|---|---|
 | **Phase 0** | 抽象统一 | ✅ 完成 | - |
-| **Phase 1** | 数据闭环(行情) | ✅ 后端 5 端点 + flag gating + 前端 commodity UI | - |
-| **Phase 2** | 数据层完备 + 6 类新闻 | ✅ Provider 实现 + 85 单测全过 + 17 HTTP 端点 + 前端 4 文件 | - |
-| **Phase 3a** | 路由 + 前端补全 | ✅ 后端 22 端点 200 + 前端 axios/store/views/router 全部交付 | ❌ 前端 TS 编译 / 浏览器实测未做(无 node_modules) |
-| **Phase 3b** | Features 层(纯规则) + 4 分析师 + 四阶段决策链 | 🟡 **待启动(P0 已修,开工 3b-i → 3b-ii)** | 全部 |
+| **Phase 1** | 数据闭环(行情) | ✅ 完成 | - |
+| **Phase 2** | 数据层完备 + 6 类新闻 | ✅ 完成 | - |
+| **Phase 3a** | 路由 + 前端补全 | ✅ 完成 | ❌ 前端 TS 编译 / 浏览器实测未做(无 node_modules) |
+| **Phase 3b** | Features 层 + 4 分析师 + 四阶段决策链 | ✅ **全部完成** | - |
+
+**Phase 3b 内部分阶段交付**:
+- **3b-i Features 层**:6 个纯规则模块(technical/basis/inventory/positioning/term_structure/news_sentiment),97 测试全过
+- **3b-ii-A 4 个 commodity analyst**:technical/fundamental/position/news,复用 stock 字段名,32 测试
+- **3b-ii-B 决策链 8 节点 commodity 化 + CIO**:bull/bear/manager/trader/3×risk/risk_manager/executive_decision_maker,最小侵入 asset_type 分支,32 测试
+- **3b-ii-C 子图接线**:`CommodityTradingAgentsGraph` + `CommodityPropagator` + `CommodityGraphSetup`
+- **3b-ii-D 路由+Vue**:`POST /api/commodity/{symbol}/analyze` + `Analysis.vue` + 分步轮询
+- **3b-ii-E 端到端实测**:DeepSeek v4-flash,13 次 LLM 调用,~280 秒,CIO 输出含换月检测+基差/库存/杠杆决策
+
+**累计 174+ commodity 测试 0 失败**:data_layer(90) + features(97) + analysts(45) + decision_chain(32) — 覆盖数据层→特征工程→分析师→全决策链。
 
 ### 关键约束
 - 开发期间**股票/商品并存**,每个 Phase 都能 `docker compose up` 跑通
 - **Feature Flag 渐进开启**:4 个 `FEATURE_COMMODITY_*` 渐进开启
   - `FEATURE_COMMODITY_ENABLED` / `FEATURE_COMMODITY_DATA`: Phase 3a 已翻 `true`
-  - `FEATURE_COMMODITY_ANALYSIS`: Phase 3b 翻 true
+  - `FEATURE_COMMODITY_ANALYSIS`: Phase 3b 已翻 `true`(当前 `.env` 值)
   - `FEATURE_COMMODITY_PAPER`: Phase 4 翻 true
-- 进度产出:`docs/progress/phase-N.md` + 截图(必须如实标注未交付项)
+- 进度产出:`docs/progress/phase-N.md` + 实测验证
 - 新建模块统一用 `commodity_*` 前缀,与 `stock_*` 隔离
 
-### 当前数据层实测状态(2026-07-14)
-- 85 个商品数据层单元测试全过(`pytest tests/test_commodity_data_layer.py`)
-- 13 扩展接口(provider 层实现 + 后端包装)
-- 82 品种(6 交易所 / 6 品类)
-- 6 类新闻 `metal/chemical/energy/agricultural/financial/global_macro`
-- HTTP 端点共 **22 个**(5 Phase 1 + 15 Phase 3a 扩展 + 2 Phase 3a 新闻)
-- curl 实测:`tests/test_phase3a_curl.py` — 24 个调用 100% 200 OK
-- 前端:`api/commodity.ts` (22 async 方法) + `stores/commodity.ts` (12 actions) + `views/Commodity/{List,Detail}.vue` + 路由 `/commodity/list` `/commodity/:fullSymbol`
+### 当前测试覆盖(2026-07-16)
+- **数据层**:`tests/test_commodity_data_layer.py` 90 测试(AKShare provider 35+ 函数 mock,16 测试组)
+- **Features 层**:`tests/test_commodity_features.py` 97 测试(6 模块 schema + 信号 + 边界)
+- **分析师**:`tests/test_commodity_analyst.py` 45 测试(4 个 analyst MagicMock LLM + 边界)
+- **决策链**:`tests/test_commodity_decision_chain.py` 32 测试(8 节点 commodity 分支 + CIO)
+- **数据+HTTP**:后端 22 端点 + curl `tests/test_phase3a_curl.py` 24 调用 100% 200 OK
+- **前端**:`api/commodity.ts`(22 async 方法) + `stores/commodity.ts`(12 actions) + `views/Commodity/{List,Detail,Analysis}.vue` + `router/index.ts`
 
-### 下次启动第一句话
+### 下一次启动推荐
 
-推荐 **3b-i → 3b-ii 顺序**:
+Phase 4 模拟交易改写:
 
-- **"开工 3b-i: 先做 Features 层 technical.py"**(纯规则计算,零 LLM,3-4 天)
-- **"开工 3b-ii: 做 technical_analyst 节点"**(Features 完成后,1 周)
-- **"继续修 P0-x"**(若 P0 还有未完成项)
+- **Phase 4-1 合约规格补齐**:在 `commodity_metadata.py` 新增 `margin_rate` / `commission_rate` / `limit_up_down_pct`
+- **Phase 4-2 纯规则引擎**:`tradingagents/paper/{spec,matcher,pnl,account,risk,repo}.py`
+- **Phase 4-3 HTTP + Vue**:`app/routers/commodity/paper_rules.py` + `PaperTrading.vue`
+- **Phase 4-4 CIO→Paper 联动**:`POST /api/commodity/paper/from-decision`
+- 详见 `docs/plans/stock-to-commodity.md` §6
 
-### 关键教训(2026-07-13 → 2026-07-14)
-- **代码完成 ≠ 用户可演示**:Phase 1/2 后端能力齐备,但用户无法在浏览器看到任何商品页面 → Phase 3a 已纠正(后端 22 端点 + 前端 4 文件齐备,curl 全 200)
-- **文档必须反映实测**:phase-1.md 原始版本夸大了前端交付,现已纠正;未来进度文档以"实测验证"为标准
-- **合约生命周期是结构性盲点**:Phase 3a 审计发现 `get_historical_data` 忽略 YYMM,用户传具体合约被静默替换为主连 — 这是 P0 缺陷,必须在 Phase 3b 前修复
-- **Phase 3b 前置条件**:复用 `期货TradingAgents系统_*` 决策链模式,避免直接照搬占位实现;必须先修 P0 三项合约生命周期问题
+### 关键教训(2026-07-13 → 2026-07-16)
+- **代码完成 ≠ 用户可演示**:Phase 1/2 后端能力齐备,但用户无法在浏览器看到任何商品页面 → Phase 3a 纠正
+- **文档必须反映实测**:夸大交付记录比不记录更糟;进度文档以"实测验证"为标准
+- **合约生命周期是结构性盲点**:Phase 3a 审计发现 get_historical_data 忽略 YYMM → 已修复(主力连续 fallback + 280 测试)
+- **最小侵入 commodity 化成功**:8 个决策链节点只需文件顶 COMMODITY_*_PROMPT + if/else 分支,stock 路径零改动
+- **LLM 调用约定**:MagicMock 不实现 `__or__`,必须用 `llm.invoke(messages_payload)` 而非 `chain.invoke`
+- **后端 200 ≠ 有数据**:前端必须按 `rows.length` / `count` 兜底"暂无数据"(AKShare 接口空时)
 
 ### 迁移说明
 - plan 原文已从 `~/.claude/plans/encapsulated-forging-hoare.md` 移到本仓库 `docs/plans/stock-to-commodity.md`,跨机器可用
-- plan v3 已更新,反映 Phase 0/1/2/3a 完成 + Phase 3b 待启动(前置:先修 §八 P0)
+- plan v4 对应 2026-07-16 状态:Phase 3b 完成,Phase 4 待启动

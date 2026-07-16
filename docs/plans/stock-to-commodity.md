@@ -1,7 +1,7 @@
 # TradingAgents-CN:股票 → 大宗商品 改造方案
 
-> **版本快照**:v3 — 反映 2026-07-14 实际进度(Phase 0/1/2/3a 完成,Phase 3b 待启动)。
-> 旧版 5-Phase 设计已退役,新 5-Phase 以"商品数据完备性 → 多源情报 → 多分析师 → 模拟交易 → 删股票"为骨架。
+> **版本快照**:v4 — 反映 2026-07-16 实际进度(Phase 0/1/2/3a/3b 全部完成)。
+> Phase 3b 六个子阶段(3b-i → 3b-ii-E)已全部交付,Four-Phase 剩余 Phase 4(模拟交易)+ Phase 5(删股票)。
 
 ## Context
 
@@ -65,9 +65,9 @@ TradingAgents-CN 当前是基于 LangGraph 的多智能体股票分析平台,核
 
 ### 1.4 实施阶段(5 个 Phase;Phase 0/1/2 部分完成)
 
-> **审计日期 2026-07-14**:Phase 0/1/2/3a 全部代码完成 + 后端实测通过。
-> Phase 3a 已补齐前端 4 文件(axios/store/List.vue/Detail.vue)并翻 flag。
-> Phase 3b 待启动,前置依赖:修复 §八 P0 三项合约生命周期问题。
+> **审计日期 2026-07-16**:Phase 0/1/2/3a/3b 全部完成。
+> Phase 3b 六个子阶段(3b-i Features 层 + 3b-ii 分析师+决策链+子图+路由+E2E)已全部交付并实测验证。
+> Phase 4 待启动,前置依赖:在 `commodity_metadata.py` 补齐合约规格字段。
 
 | Phase | 目标 | 状态 | 周期 | 关键交付 | 演示步骤 | 验证标准 |
 |---|---|---|---|---|---|---|
@@ -75,15 +75,19 @@ TradingAgents-CN 当前是基于 LangGraph 的多智能体股票分析平台,核
 | **Phase 1 — 数据闭环(行情)** | 行情拉取 → API → 前端只读 | ✅ 完成(flags/前端由 3a 补齐) | 2-3 周 | 后端 `commodity_*` provider/service/router 5 个端点 | 翻 flag → `curl /api/commodity/CU2501.SHF/info` | curl 验证 OK |
 | **Phase 2 — 数据层完备** | 13 扩展接口 + 82 品种 + 6 类新闻 + 全测试 | ✅ 完成(路由/前端由 3a 补齐) | 1 周 | provider 层 13 扩展接口 + 6 类新闻 + 5 合成器 + 情感评分 | `pytest tests/test_commodity_data_layer.py` 全绿 | 85 个单元测试全部通过 |
 | **Phase 3a — 路由 + 前端补全** | 22 后端端点 + 前端 commodity UI | ✅ **完成** | 1 天 | 22 HTTP 端点(5+15+2) + `views/Commodity/{List,Detail}.vue` + `api/commodity.ts` + `stores/commodity.ts` | 翻 flag + 浏览器访问 `/commodity/list` 看到品种列表 | 详见 [`docs/progress/phase-3a.md`](../progress/phase-3a.md) |
-| **Phase 3b — 多源情报 + 分析师扩展** | Features 层(纯规则) + 4 分析师 + 四阶段决策链 | 🟡 **待启动(前置:P0 已修完,开工 3b-i)** | 2 周 | `tradingagents/features/commodity/` 6 模块 + 4 分析师 + 多空辩论→交易员→风控→CIO 决策链 | `curl /api/commodity/CU2501.SHF/analyze` 返回完整多分析师报告 | screenshot:多分析师报告 |
+| **Phase 3b — 多源情报 + 分析师扩展** | Features 层(纯规则) + 4 分析师 + 四阶段决策链 | ✅ **全部完成** | 2 周(实际约 5 天) | `tradingagents/features/commodity/` 6 模块 + 4 分析师 + 多空辩论→交易员→风控→CIO + 子图+路由+E2E | `curl /api/commodity/CU2501.SHF/analyze` 返回完整报告 + DeepSeek 实测 ~280 秒 | 174+ commodity 测试 0 失败,E2E CIO 含换月检测 |
 
 ---
 
-**Phase 3b 内部拆为两个子阶段**(参考 `TradingAgents_for_Futures-main/qihuo/features/` 架构):
+**Phase 3b 内部分阶段(已完成)**:
 
-- **3b-i Features 层**(3-4 天):纯规则计算,零 LLM。新建 `tradingagents/features/commodity/` 含 technical/basis/inventory/positioning/term_structure/news_sentiment 6 模块。每个模块是纯函数:DataFrame → Dict。全程可单元测试。
-- **3b-ii 分析师+决策链**(1 周):4 个 analyst 节点(technical/fundamental/position/news)接收 features 层输出,可选 LLM 文字总结。四阶段决策链: analyst 报告 → 多空辩论 → 交易员 → 风控 → CIO。
-| **Phase 4 — 模拟交易改写** | 商品交易规则:保证金/杠杆/涨跌停/T+0/到期 | 🟡 待启动 | 2 周 | `paper_rules.py`、商品下单页、盯市/强平 | 下单 1 手 CU 多单 → 持仓列表 → 隔日盯市 | screenshot:商品模拟交易全流程 |
+- **3b-i Features 层**:6 个纯规则模块(technical/basis/inventory/positioning/term_structure/news_sentiment),97 测试全过,零 LLM
+- **3b-ii-A 4 个 commodity analyst**:technical/fundamental/position/news,复用 stock AgentState 字段名,45 测试
+- **3b-ii-B 决策链 8 节点 commodity 化 + CIO**:bull/bear/manager/trader/3×risk/risk_manager/executive_decision_maker,最小侵入 asset_type 分支,32 测试
+- **3b-ii-C 子图接线**:`CommodityTradingAgentsGraph` + `CommodityPropagator` + `CommodityGraphSetup`,测试覆盖
+- **3b-ii-D 路由+Vue**:`POST /api/commodity/{symbol}/analyze` + `frontend Analysis.vue` + 分步轮询
+- **3b-ii-E 端到端实测**:DeepSeek v4-flash,13 次 LLM 调用 ~280 秒,CIO 输出含 CU2501→CU2504 换月检测
+| **Phase 4 — 模拟交易改写** | 商品交易规则:保证金/杠杆/涨跌停/T+0/到期 | 🟡 **待启动(下一阶段)** | 2-3 周 | `tradingagents/paper/{spec,matcher,pnl,account,risk,repo}.py` + 下单页 + from_decision | 下单 1 手 CU 多单 → 持仓列表 → 隔日盯市 | screenshot:商品模拟交易全流程 |
 | **Phase 5 — 删除股票(最终)** | 清理所有 stock_* 文件/集合/路由/视图 | 🟡 待启动 | 1-2 周 | 见 §6 清理清单 | `docker compose up` 启动后只剩商品功能 | `grep -rE "stock_basic_info" tradingagents/ app/ --include="*.py"` 为空 |
 
 ### 1.5 增量部署设计(边开发边展示)
@@ -518,8 +522,8 @@ if settings.FEATURE_COMMODITY_PAPER:
 | 1 | `+ FEATURE_COMMODITY_DATA` | false | ✅ true(Phase 3a 一并翻) | `1.0.1-commodity-phase1` |
 | 2 | (路由层不变,数据层升级) | - | ✅ provider 完成(Phase 3a 补齐路由/前端) | `1.0.1-commodity-phase2` |
 | 3a | `+ FEATURE_COMMODITY_DATA` 启用 + 22 路由 + 前端 | - | ✅ **完成**(后端 22 端点全 200 + 前端 4 文件) | `1.0.1-commodity-phase3a` |
-| 3b | `+ FEATURE_COMMODITY_ANALYSIS` 启用 + 5 analyst | false | 🟡 待启动(前置:修复 §八 P0 三项) | `1.0.1-commodity-phase3b` |
-| 4 | `+ FEATURE_COMMODITY_PAPER` | false | 🟡 待启动 | `1.0.1-commodity-phase4` |
+| 3b | `+ FEATURE_COMMODITY_ANALYSIS` 启用 + 6 子阶段(Features→分析师→决策链→子图→路由→E2E) | false | ✅ **全部完成**(174+ 测试 0 失败,E2E DeepSeek 实测通过) | `1.0.1-commodity-phase3b` |
+| 4 | `+ FEATURE_COMMODITY_PAPER` | false | 🟡 **待启动(下一阶段)** | `1.0.1-commodity-phase4` |
 | 5 | 商品完全替代股票 | - | 🟡 待启动 | `2.0.0-commodity-only` |
 
 **flag 启用步骤**(任何 Phase 都必须先翻 flag 才能验证):
