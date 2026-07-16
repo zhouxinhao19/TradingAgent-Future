@@ -34,24 +34,24 @@
               v-for="source in dataSources"
               :key="source.name"
               class="status-item"
-              :class="{ available: source.available }"
+              :class="{ available: source.enabled }"
             >
               <div class="item-left">
                 <el-icon
                   class="status-dot"
-                  :class="source.available ? 'dot-success' : 'dot-error'"
+                  :class="source.enabled ? 'dot-success' : 'dot-error'"
                 >
-                  <component :is="source.available ? 'SuccessFilled' : 'CircleCloseFilled'" />
+                  <component :is="source.enabled ? 'SuccessFilled' : 'CircleCloseFilled'" />
                 </el-icon>
-                <span class="item-name">{{ source.name.toUpperCase() }}</span>
+                <span class="item-name">{{ source.display_name || source.name }}</span>
               </div>
               <div class="item-right">
                 <el-tag
-                  :type="source.available ? 'success' : 'danger'"
+                  :type="source.enabled ? 'success' : 'danger'"
                   size="small"
                   effect="plain"
                 >
-                  {{ source.available ? '可用' : '不可用' }}
+                  {{ source.enabled ? '已启用' : '已禁用' }}
                 </el-tag>
               </div>
             </div>
@@ -112,25 +112,22 @@ import {
   SuccessFilled,
   CircleCloseFilled
 } from '@element-plus/icons-vue'
-import { getDataSourcesStatus, type DataSourceStatus } from '@/api/sync'
-import { configApi, type LLMProvider } from '@/api/config'
+import { configApi, type LLMProvider, type DataSourceConfig } from '@/api/config'
 
 // 响应式数据
 const loading = ref(false)
 const refreshing = ref(false)
-const dataSources = ref<DataSourceStatus[]>([])
+const dataSources = ref<DataSourceConfig[]>([])
 const llmProviders = ref<LLMProvider[]>([])
 const refreshTimer = ref<NodeJS.Timeout | null>(null)
 
 // 获取数据源状态
 const fetchDataSources = async () => {
   try {
-    const response = await getDataSourcesStatus()
-    if (response.success) {
-      dataSources.value = response.data
-        .sort((a, b) => b.priority - a.priority)
-        .slice(0, 5) // 最多显示 5 个数据源
-    }
+    const configs = await configApi.getDataSourceConfigs()
+    dataSources.value = (configs || [])
+      .sort((a, b) => b.priority - a.priority)
+      .slice(0, 5) // 最多显示 5 个数据源
   } catch (err: any) {
     console.error('获取数据源状态失败:', err)
   }
