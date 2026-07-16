@@ -749,15 +749,7 @@ onUnmounted(() => {
           color: var(--el-text-color-placeholder);
           white-space: nowrap;
         }
-          font-size: 12px;
-          color: var(--el-text-color-placeholder);
-        }
       }
-    }
-
-    .news-footer {
-      text-align: center;
-      margin-top: 16px;
     }
   }
 
