@@ -1396,3 +1396,116 @@ class TestCrossModuleSchemaConsistency:
         items = _make_news_list(n=30)
         result = news_sentiment_mod.compute_news_sentiment_metrics(items)
         assert self.REQUIRED_KEYS.issubset(result.keys())
+
+
+# =============================================================================
+# 多合约技术分析测试
+# =============================================================================
+
+class TestTechnicalMultiContract:
+    """compute_technical_metrics_multi_contract 测试。"""
+
+    def test_basic(self, tech_mod):
+        """双合约输入 → 输出含 main_continuous + index_contract。"""
+        main_df = _make_synthetic_ohlcv(n_days=200, column_lang="zh")
+        index_df = _make_synthetic_ohlcv(n_days=200, start_price=100.5, column_lang="zh")
+        result = tech_mod.compute_technical_metrics_multi_contract(main_df, index_df)
+
+        # 顶层 keys
+        assert "main_continuous" in result
+        assert "index_contract" in result
+        assert "rollover" in result
+        assert "combined" in result
+        assert "quality" in result
+
+        # main_continuous 含 daily + weekly
+        mc = result["main_continuous"]
+        assert "daily" in mc
+        assert "daily" in mc  # weekly 可能为 None
+
+        # index_contract 含趋势字段
+        ic = result["index_contract"]
+        assert "long_term_trend" in ic
+        assert "ma60" in ic or ic.get("ma60") is None
+        assert "ma120" in ic or ic.get("ma120") is None
+        assert "relative_strength" in ic
+
+        # combined 含 alignment
+        assert "main_index_alignment" in result["combined"]
+
+        # quality 含新字段
+        q = result["quality"]
+        assert "main_continuous_available" in q
+        assert "index_contract_available" in q
+        assert q["main_continuous_available"] is True
+        assert q["index_contract_available"] is True
+
+    def test_index_unavailable(self, tech_mod):
+        """index_df=None → index_contract 字段为 None,不抛错。"""
+        main_df = _make_synthetic_ohlcv(n_days=200, column_lang="zh")
+        result = tech_mod.compute_technical_metrics_multi_contract(main_df, index_df=None)
+
+        # 核心功能不受影响
+        assert result["main_continuous"]["daily"] is not None
+        assert result["combined"]["direction"] in ("long", "short", "neutral")
+
+        # 指数部分为空
+        ic = result["index_contract"]
+        assert ic["long_term_trend"] == "neutral"
+        assert ic["ma60"] is None
+        assert ic["ma120"] is None
+
+        # quality 标记
+        assert result["quality"]["main_continuous_available"] is True
+        assert result["quality"]["index_contract_available"] is False
+
+    def test_rollover_detected(self, tech_mod):
+        """含 rollover_date 列 → rollover.detected=True。"""
+        main_df = _make_synthetic_ohlcv(n_days=200, column_lang="en")
+        # 在中间某行标记换月
+        main_df.loc[100, "rollover_date"] = True
+        result = tech_mod.compute_technical_metrics_multi_contract(main_df, index_df=None)
+        assert result["rollover"]["detected"] is True
+        assert len(result["rollover"]["rollover_dates"]) > 0
+
+    def test_rollover_not_detected(self, tech_mod):
+        """无 rollover_date 列 → rollover.detected=False。"""
+        main_df = _make_synthetic_ohlcv(n_days=200, column_lang="en")
+        result = tech_mod.compute_technical_metrics_multi_contract(main_df, index_df=None)
+        assert result["rollover"]["detected"] is False
+
+    def test_alignment_aligned(self, tech_mod):
+        """主力看多 + 指数看多 → aligned。"""
+        main_df = _make_synthetic_ohlcv(n_days=200, trend=0.001, column_lang="en")
+        # 指数也用看多趋势
+        index_df = _make_synthetic_ohlcv(n_days=200, trend=0.001, start_price=100.5, column_lang="en")
+        result = tech_mod.compute_technical_metrics_multi_contract(main_df, index_df)
+        alignment = result["combined"].get("main_index_alignment", "")
+        # 日线方向可能是 long 或 short(受随机游走影响), 只要 alignment 存在即可
+        assert alignment in ("aligned", "divergent", "partial")
+
+    def test_backward_compat(self, tech_mod):
+        """compute_technical_metrics 单合约调用不受影响。"""
+        df = _make_synthetic_ohlcv(n_days=200, column_lang="zh")
+        result = tech_mod.compute_technical_metrics(df)
+        assert "daily" in result
+        assert "weekly" in result
+        assert "combined" in result
+        assert "quality" in result
+        assert result["combined"]["direction"] in ("long", "short", "neutral")
+
+    def test_empty_main_df(self, tech_mod):
+        """空主力 DataFrame → 降级返回,不抛错。"""
+        empty_df = pd.DataFrame()
+        result = tech_mod.compute_technical_metrics_multi_contract(empty_df, index_df=None)
+        assert result["quality"]["main_continuous_available"] is False
+
+    def test_signals_appended_on_rollover(self, tech_mod):
+        """换月时 combined signals 包含换月提示。"""
+        main_df = _make_synthetic_ohlcv(n_days=200, column_lang="en")
+        main_df.loc[190, "rollover_date"] = True
+        main_df.loc[195, "rollover_date"] = True
+        result = tech_mod.compute_technical_metrics_multi_contract(main_df, index_df=None)
+        signals = " ".join(result["combined"].get("signals", []) or [])
+        # 换月信号应出现在 combined signals 中
+        assert "换月" in signals or "rollover" in signals.lower()

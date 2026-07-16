@@ -610,6 +610,58 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
             df = df.sort_values("日期").reset_index(drop=True)
             return df
 
+    async def get_historical_data_for_index(
+        self,
+        underlying: str,
+        start_date: Union[str, date],
+        end_date: Union[str, date] = None,
+    ) -> Optional[pd.DataFrame]:
+        """获取品种指数连续合约历史K线(99 代码)。
+
+        指数连续合约 = 当前品种全部可交易合约以累计持仓量为权重加权平均得到。
+        目前仅 CFFEX 金融期货有标准 99 代码; 商品期货尝试用 futures_main_sina 99 代码。
+
+        Args:
+            underlying: 品种代码, 如 "IF" / "CU"
+            start_date: 起始日期 YYYY-MM-DD
+            end_date: 结束日期 YYYY-MM-DD(默认到最新)
+
+        Returns:
+            DataFrame(列名: 日期/开盘价/最高价/最低价/收盘价/成交量/持仓量)
+            或 None(指数不可用)
+        """
+        if not await self._ensure_ak():
+            return None
+
+        from tradingagents.dataflows.providers.commodity.commodity_metadata import (
+            get_index_symbol,
+        )
+
+        index_code = get_index_symbol(underlying)
+        if index_code is None:
+            return None
+
+        # 用 futures_main_sina 获取指数连续合约 K 线
+        df = await self._call("futures_main_sina", symbol=index_code)
+        if df is None or df.empty:
+            return None
+
+        df["日期"] = pd.to_datetime(df["日期"]).dt.date
+        df = df.sort_values("日期").reset_index(drop=True)
+
+        # 日期过滤
+        start = pd.to_datetime(start_date).date() if isinstance(start_date, str) else start_date
+        if end_date is None:
+            end = df["日期"].max()
+        elif isinstance(end_date, str):
+            end = pd.to_datetime(end_date).date()
+        else:
+            end = end_date
+
+        df = df[(df["日期"] >= start) & (df["日期"] <= end)]
+        df = df.sort_values("日期").reset_index(drop=True)
+        return df
+
     # ============================================================
     # Phase 2 扩展接口
     # ============================================================

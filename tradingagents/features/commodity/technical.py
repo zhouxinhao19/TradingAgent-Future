@@ -1032,3 +1032,369 @@ def _empty_result(reason: str) -> Dict[str, Any]:
         },
         "quality": {"rows": 0, "coverage": 0.0, "data_freshness_days": None, "reason": reason},
     }
+
+
+# =============================================================================
+# 8. 多合约入口: 主力连续 + 指数合约 + 移仓检测
+# =============================================================================
+
+def _compute_long_term_trend(index_df: pd.DataFrame) -> Dict[str, Any]:
+    """从指数合约 DataFrame 计算长期趋势。
+
+    Args:
+        index_df: 指数合约 OHLCV DataFrame
+
+    Returns:
+        {
+            "ma60": float or None,
+            "ma120": float or None,
+            "long_term_trend": "bullish|bearish|neutral",
+            "quality": {rows, coverage, ...},
+        }
+    """
+    if index_df is None or index_df.empty:
+        return {
+            "ma60": None,
+            "ma120": None,
+            "long_term_trend": "neutral",
+            "quality": {"rows": 0, "coverage": 0.0, "data_freshness_days": None},
+        }
+
+    try:
+        df_norm = normalize_columns(index_df)
+    except ValueError:
+        return {"ma60": None, "ma120": None, "long_term_trend": "neutral",
+                "quality": {"rows": 0, "coverage": 0.0, "data_freshness_days": None}}
+
+    if df_norm.empty or "close" not in df_norm.columns:
+        return {"ma60": None, "ma120": None, "long_term_trend": "neutral",
+                "quality": _quality(df_norm) if not df_norm.empty else {"rows": 0, "coverage": 0.0, "data_freshness_days": None}}
+
+    close = df_norm["close"].astype(float)
+    ma60 = _ma(close, 60).iloc[-1] if len(close) >= 60 else None
+    ma120 = _ma(close, 120).iloc[-1] if len(close) >= 120 else None
+
+    # 判断长期趋势: MA60 与 MA120 的位置关系
+    if ma60 is not None and ma120 is not None:
+        if pd.notna(ma60) and pd.notna(ma120):
+            if ma60 > ma120:
+                long_term_trend = "bullish"
+            elif ma60 < ma120:
+                long_term_trend = "bearish"
+            else:
+                long_term_trend = "neutral"
+        else:
+            long_term_trend = "neutral"
+    else:
+        long_term_trend = "neutral"
+
+    return {
+        "ma60": _safe_float(ma60),
+        "ma120": _safe_float(ma120),
+        "long_term_trend": long_term_trend,
+        "quality": _quality(df_norm),
+    }
+
+
+def _compute_relative_strength(
+    main_close: pd.Series,
+    index_close: pd.Series,
+    window: int = 20,
+) -> Optional[float]:
+    """主力合约相对指数合约的强弱。
+
+    计算主力/指数比值在 window 期的 z-score。
+    正值 = 主力比指数更强(涨得多/跌得少), 负值 = 主力更弱。
+
+    Args:
+        main_close: 主力连续合约收盘价序列
+        index_close: 指数合约收盘价序列
+        window: 计算窗口(默认 20 日)
+
+    Returns:
+        float(z-score) 或 None(数据不足)
+    """
+    if main_close is None or index_close is None:
+        return None
+    main_s = main_close.astype(float).dropna()
+    index_s = index_close.astype(float).dropna()
+    if main_s.empty or index_s.empty:
+        return None
+    # 对齐索引后取比值
+    ratio = (main_s / index_s.reindex(main_s.index, method="ffill")) - 1.0
+    ratio = ratio.dropna().tail(window)
+    if len(ratio) < 5:
+        return None
+    last = float(ratio.iloc[-1])
+    mu = float(ratio.mean())
+    sd = float(ratio.std(ddof=0))
+    if sd == 0 or np.isnan(sd):
+        return None
+    return round((last - mu) / sd, 3)
+
+
+def _detect_rollover(df: pd.DataFrame) -> Dict[str, Any]:
+    """从主力连续合约 DataFrame 检测移仓换月。
+
+    Args:
+        df: 主力连续合约 OHLCV DataFrame(已含 rollover_date 标记列)
+
+    Returns:
+        {
+            "detected": bool,
+            "description": str,
+            "rollover_dates": List[str],  # 换月日期列表
+            "recent_rollover": bool,       # 最近 5 天内是否有换月
+        }
+    """
+    if df is None or df.empty:
+        return {"detected": False, "description": "无数据", "rollover_dates": [], "recent_rollover": False}
+
+    try:
+        df_norm = normalize_columns(df)
+    except ValueError:
+        return {"detected": False, "description": "列名规范化失败", "rollover_dates": [], "recent_rollover": False}
+
+    # 检查 rollover_date 列
+    rollover_col = None
+    for candidate in ("rollover_date", "rollover"):
+        if candidate in df_norm.columns:
+            rollover_col = candidate
+            break
+
+    if rollover_col is None:
+        return {"detected": False, "description": "无换月标记列", "rollover_dates": [], "recent_rollover": False}
+
+    dates = df_norm[df_norm[rollover_col].astype(bool)]
+    if dates.empty:
+        return {"detected": False, "description": "未检测到换月", "rollover_dates": [], "recent_rollover": False}
+
+    rollover_dates = []
+    if "date" in dates.columns:
+        try:
+            rollover_dates = [str(d.date()) if hasattr(d, "date") else str(d) for d in dates["date"].tolist()]
+        except Exception:
+            rollover_dates = []
+
+    # 最近 5 天是否有换月
+    recent_rollover = False
+    if rollover_dates and "date" in df_norm.columns:
+        try:
+            last_date = df_norm["date"].iloc[-1]
+            if pd.notna(last_date):
+                last_dt = pd.Timestamp(last_date)
+                for rd in rollover_dates:
+                    try:
+                        rd_dt = pd.Timestamp(rd)
+                        if 0 <= (last_dt - rd_dt).days <= 5:
+                            recent_rollover = True
+                            break
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+
+    n = len(rollover_dates)
+    if n == 1:
+        description = f"检测到 1 次换月({rollover_dates[-1]})"
+    else:
+        description = f"检测到 {n} 次换月,最近一次: {rollover_dates[-1]}"
+
+    return {
+        "detected": True,
+        "description": description,
+        "rollover_dates": rollover_dates,
+        "recent_rollover": recent_rollover,
+    }
+
+
+def _combine_multi_contract(
+    main_combined: Dict[str, Any],
+    index_trend: Dict[str, Any],
+    rollover: Dict[str, Any],
+) -> Dict[str, Any]:
+    """综合主力连续 + 指数合约 + 移仓状态, 给出最终方向、强度、信号。
+
+    Args:
+        main_combined: compute_technical_metrics 返回的 combined dict
+        index_trend: _compute_long_term_trend 返回的指数趋势
+        rollover: _detect_rollover 返回的移仓状态
+
+    Returns:
+        {direction, strength, signals, oi_divergence, volatility,
+         main_index_alignment, rollover_status, signals_multi_tf}
+    """
+    # 基础方向从主力连续继承
+    direction = main_combined.get("direction", "neutral")
+    strength = main_combined.get("strength", 0.0)
+    signals = list(main_combined.get("signals", []) or [])
+
+    # 主力-指数一致性判断
+    main_dir = direction  # "long" / "short" / "neutral"
+    index_dir = index_trend.get("long_term_trend", "neutral")  # "bullish" / "bearish" / "neutral"
+
+    # 映射 index 方向到统一方向
+    index_dir_mapped = {"bullish": "long", "bearish": "short"}.get(index_dir, "neutral")
+
+    if main_dir != "neutral" and index_dir_mapped != "neutral":
+        if main_dir == index_dir_mapped:
+            main_index_alignment = "aligned"
+        else:
+            main_index_alignment = "divergent"
+    else:
+        main_index_alignment = "partial"
+
+    # 若主力-指数背离, 追加信号说明
+    if main_index_alignment == "divergent":
+        signals.append(f"主力{main_dir} vs 指数{index_dir_mapped}, 方向背离, 需警惕")
+
+    # 移仓追加信号
+    if rollover.get("detected") and rollover.get("recent_rollover"):
+        signals.append(f"近期换月({rollover.get('description','')}), 历史信号可能因换月而失真")
+
+    # 去重
+    seen = set()
+    unique_signals = []
+    for s in signals:
+        if s not in seen:
+            seen.add(s)
+            unique_signals.append(s)
+
+    return {
+        "direction": direction,
+        "strength": strength,
+        "signals": unique_signals,
+        "oi_divergence": main_combined.get("oi_divergence", "neutral"),
+        "volatility": main_combined.get("volatility", {"atr": None, "regime": "low", "atr_ratio_pctl180": None}),
+        "main_index_alignment": main_index_alignment,
+        "rollover_status": {
+            "detected": rollover.get("detected", False),
+            "description": rollover.get("description", ""),
+            "recent_rollover": rollover.get("recent_rollover", False),
+        },
+        "signals_multi_tf": main_combined.get("signals_multi_tf", {"daily": [], "weekly": []}),
+    }
+
+
+def compute_technical_metrics_multi_contract(
+    main_df: pd.DataFrame,
+    index_df: Optional[pd.DataFrame] = None,
+    include_weekly: bool = True,
+    weekly_min_rows: int = 30,
+) -> Dict[str, Any]:
+    """商品期货技术面多合约特征主入口。
+
+    基于品种级分析, 内部自动处理:
+      - 主力连续合约(primary): 全部技术指标基于此计算
+      - 指数合约(auxiliary): 长期趋势验证(MA60/MA120), 可选
+      - 移仓换月检测: 从主力连续换月标记提取
+
+    Args:
+        main_df: 主力连续合约 OHLCV DataFrame
+        index_df: 指数合约 OHLCV DataFrame(可选, None 时跳过指数分析)
+        include_weekly: 是否计算周线维度(默认 True)
+        weekly_min_rows: 周线计算所需的最少日线行数(默认 30)
+
+    Returns:
+        {
+            "main_continuous": {         # 主力连续合约全量指标
+                "symbol": str or None,
+                "daily": {...},
+                "weekly": {...},
+            },
+            "index_contract": {           # 指数合约长期趋势(或 None)
+                "symbol": str or None,
+                "ma60": float or None,
+                "ma120": float or None,
+                "long_term_trend": "bullish|bearish|neutral",
+                "relative_strength": float or None,
+                "quality": {...},
+            },
+            "rollover": {                 # 移仓换月检测
+                "detected": bool,
+                "description": str,
+                "rollover_dates": List[str],
+                "recent_rollover": bool,
+            },
+            "combined": {                 # 综合判断(含 main-index alignment)
+                "direction": "long|short|neutral",
+                "strength": 0.0-1.0,
+                "signals": [...],
+                "oi_divergence": "confirm|conflict|neutral",
+                "volatility": {...},
+                "main_index_alignment": "aligned|divergent|partial",
+                "rollover_status": {...},
+                "signals_multi_tf": {...},
+            },
+            "quality": {                  # 数据质量
+                "rows": int,
+                "main_continuous_available": bool,
+                "index_contract_available": bool,
+            },
+        }
+    """
+    # ---- 1. 主力连续合约分析 ----
+    main_result = compute_technical_metrics(
+        main_df,
+        include_weekly=include_weekly,
+        weekly_min_rows=weekly_min_rows,
+    )
+
+    # ---- 2. 指数合约长期趋势 ----
+    index_trend = _compute_long_term_trend(index_df) if index_df is not None else {
+        "ma60": None, "ma120": None, "long_term_trend": "neutral",
+        "quality": {"rows": 0, "coverage": 0.0, "data_freshness_days": None},
+    }
+
+    # 相对强弱(主力 vs 指数)
+    rel_strength = None
+    if index_df is not None and not index_df.empty and not main_df.empty:
+        try:
+            main_norm = normalize_columns(main_df)
+            index_norm = normalize_columns(index_df)
+            if "close" in main_norm.columns and "close" in index_norm.columns:
+                rel_strength = _compute_relative_strength(
+                    main_norm["close"], index_norm["close"]
+                )
+        except Exception:
+            pass
+
+    # ---- 3. 移仓换月检测 ----
+    rollover = _detect_rollover(main_df)
+
+    # ---- 4. 综合判断 ----
+    combined = _combine_multi_contract(
+        main_result.get("combined", {}),
+        index_trend,
+        rollover,
+    )
+
+    # ---- 5. 质量汇总 ----
+    main_quality = main_result.get("quality", {})
+    index_quality = index_trend.get("quality", {})
+    total_rows = (main_quality.get("rows", 0) or 0) + (index_quality.get("rows", 0) or 0)
+
+    return {
+        "main_continuous": {
+            "daily": main_result.get("daily", {}),
+            "weekly": main_result.get("weekly"),
+        },
+        "index_contract": {
+            **index_trend,
+            "relative_strength": rel_strength,
+        },
+        "rollover": rollover,
+        "combined": combined,
+        "quality": {
+            "rows": total_rows,
+            "main_continuous_available": bool(main_quality.get("rows", 0)),
+            "index_contract_available": bool(index_quality.get("rows", 0)),
+        },
+    }
+
+
+__all__ = [
+    "compute_technical_metrics",
+    "compute_technical_metrics_multi_contract",
+    "normalize_columns",
+]

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import date, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -51,7 +52,7 @@ from tradingagents.agents.analysts.commodity._base import (
     quality_gate,
     truncate_snapshot,
 )
-from tradingagents.features.commodity.technical import compute_technical_metrics
+from tradingagents.features.commodity.technical import compute_technical_metrics, compute_technical_metrics_multi_contract
 from tradingagents.features.commodity.basis import compute_basis_metrics
 from tradingagents.features.commodity.inventory import compute_inventory_metrics
 from tradingagents.features.commodity.term_structure import compute_term_structure_metrics
@@ -137,8 +138,8 @@ def sample_ohlcv() -> pd.DataFrame:
 
 @pytest.fixture
 def sample_features_tech(sample_ohlcv) -> dict:
-    """3b-i features 层输出:compute_technical_metrics(sample_ohlcv)。"""
-    return {"technical": compute_technical_metrics(sample_ohlcv)}
+    """3b-i features 层输出:compute_technical_metrics_multi_contract(sample_ohlcv)。"""
+    return {"technical": compute_technical_metrics_multi_contract(sample_ohlcv, index_df=None)}
 
 
 @pytest.fixture
@@ -251,7 +252,7 @@ def sample_features_all(
 ) -> dict:
     """所有 6 个 features 模块的输出。"""
     return {
-        "technical": compute_technical_metrics(sample_ohlcv),
+        "technical": compute_technical_metrics_multi_contract(sample_ohlcv, index_df=None),
         "basis": compute_basis_metrics(sample_basis_df),
         "inventory": compute_inventory_metrics(sample_inventory_df),
         "term_structure": compute_term_structure_metrics(sample_term_structure_df),
@@ -537,11 +538,14 @@ class TestTechnicalAnalystNode:
         """weekly=None 时,周线信息应填 N/A 不抛错。"""
         from tradingagents.agents.analysts.commodity import create_technical_analyst
 
-        # 强制 weekly = None
+        # 强制 main_continuous.weekly = None
         feats = {
             "technical": {
                 **sample_features_tech["technical"],
-                "weekly": None,
+                "main_continuous": {
+                    **sample_features_tech["technical"].get("main_continuous", {}),
+                    "weekly": None,
+                },
             }
         }
         node = create_technical_analyst(mock_llm)
@@ -550,6 +554,73 @@ class TestTechnicalAnalystNode:
         assert "market_report" in result
         assert result["market_tool_call_count"] == 0
         mock_llm.invoke.assert_called_once()
+
+    def test_multi_contract_index_available(self, mock_llm, sample_ohlcv):
+        """含指数合约 features → prompt 包含指数合约字段。"""
+        from tradingagents.agents.analysts.commodity import create_technical_analyst
+
+        # 构造带指数合约的 features
+        index_df = _make_index_ohlcv(n_days=200, start_price=100.5)
+        tech_feats = compute_technical_metrics_multi_contract(sample_ohlcv, index_df=index_df)
+        feats = {"technical": tech_feats}
+        node = create_technical_analyst(mock_llm)
+        node(_state(commodity_features=feats))
+
+        # 验证 prompt 包含指数合约相关内容
+        call_kwargs = mock_llm.invoke.call_args
+        messages = call_kwargs[0][0]
+        system_msg = messages[0].content if hasattr(messages[0], "content") else str(messages[0])
+        assert "指数合约" in system_msg
+        assert "MA60" in system_msg or "MA120" in system_msg
+
+    def test_multi_contract_index_unavailable(self, mock_llm, sample_ohlcv):
+        """指数合约不可用时 → prompt 标注指数不可得,不抛错。"""
+        from tradingagents.agents.analysts.commodity import create_technical_analyst
+
+        tech_feats = compute_technical_metrics_multi_contract(sample_ohlcv, index_df=None)
+        feats = {"technical": tech_feats}
+        node = create_technical_analyst(mock_llm)
+        node(_state(commodity_features=feats))
+
+        call_kwargs = mock_llm.invoke.call_args
+        messages = call_kwargs[0][0]
+        system_msg = messages[0].content if hasattr(messages[0], "content") else str(messages[0])
+        # 指数合约相关字段存在,即使数据不可用
+        assert "指数合约" in system_msg
+
+    def test_rollover_alert_in_fallback(self, sample_ohlcv):
+        """rollover.detected=True → fallback 报告含移仓换月预警。"""
+        from tradingagents.agents.analysts.commodity import create_technical_analyst
+
+        # 在主力合约添加换月标记
+        sample_ohlcv.loc[180, "rollover_date"] = True
+        tech_feats = compute_technical_metrics_multi_contract(sample_ohlcv, index_df=None)
+        feats = {"technical": tech_feats}
+
+        mock = MagicMock()
+        mock.invoke.side_effect = RuntimeError("LLM down")
+        node = create_technical_analyst(mock)
+        result = node(_state(commodity_features=feats))
+
+        assert "market_report" in result
+        assert "移仓换月" in result["market_report"] or "rollover" in result["market_report"].lower()
+
+
+def _make_index_ohlcv(n_days=200, start_price=100.0):
+    """构造指数合约 OHLCV 测试数据。"""
+    np.random.seed(43)
+    rets = np.random.normal(0.0003, 0.015, n_days)
+    close = start_price * np.exp(np.cumsum(rets))
+    dates = [date(2025, 1, 1) + timedelta(days=i) for i in range(n_days)]
+    return pd.DataFrame({
+        "日期": dates,
+        "开盘价": close * (1 - 0.002),
+        "最高价": close * (1 + 0.005),
+        "最低价": close * (1 - 0.005),
+        "收盘价": close,
+        "成交量": np.random.randint(50000, 200000, n_days),
+        "持仓量": np.random.randint(100000, 300000, n_days),
+    })
 
 
 # =============================================================================
