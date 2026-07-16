@@ -215,6 +215,18 @@ def _run_commodity_analysis(
     """同步运行 CommodityTradingAgentsGraph 分析。"""
     from tradingagents.graph.commodity_graph import CommodityTradingAgentsGraph
 
+    # 初始化 provider 用于 auto_features
+    from tradingagents.dataflows.providers.commodity.akshare_futures import (
+        AkshareFuturesProvider,
+    )
+
+    provider = None
+    try:
+        provider = AkshareFuturesProvider()
+        provider.connect()
+    except Exception as e:
+        logger.warning(f"⚠️ 商品 provider 初始化失败,将使用空特征: {e}")
+
     cfg = _build_config()
     if config_override:
         cfg.update(config_override)
@@ -229,6 +241,8 @@ def _run_commodity_analysis(
         exchange=exchange,
         category=category,
         quote_unit=quote_unit,
+        auto_features=True,
+        provider=provider,
     )
 
     return {

@@ -66,16 +66,30 @@ def create_trader(llm, memory):
         exchange = state.get("exchange", "")
         quote_unit = state.get("quote_unit", "")
 
-        # 使用统一的股票类型检测
-        from tradingagents.utils.stock_utils import StockUtils
-        market_info = StockUtils.get_market_info(company_name)
-        is_china = market_info['is_china']
-        is_hk = market_info['is_hk']
-        is_us = market_info['is_us']
-
-        # 根据股票类型确定货币单位
-        currency = market_info['currency_name']
-        currency_symbol = market_info['currency_symbol']
+        # 使用统一的股票类型检测(仅 stock 路径需要)
+        if asset_type == "commodity":
+            # commodity 路径:跳过 StockUtils,提供默认值
+            is_china = False
+            is_hk = False
+            is_us = False
+            currency = 'CNY'
+            currency_symbol = '¥'
+        else:
+            try:
+                from tradingagents.utils.stock_utils import StockUtils
+                market_info = StockUtils.get_market_info(company_name)
+                is_china = market_info['is_china']
+                is_hk = market_info['is_hk']
+                is_us = market_info['is_us']
+                currency = market_info['currency_name']
+                currency_symbol = market_info['currency_symbol']
+            except ImportError:
+                logger.warning(f"StockUtils 不可用,使用默认市场信息")
+                is_china = False
+                is_hk = False
+                is_us = False
+                currency = 'CNY'
+                currency_symbol = '¥'
 
         logger.debug(f"💰 [DEBUG] ===== 交易员节点开始 =====")
         logger.debug(f"💰 [DEBUG] 交易员检测股票类型: {company_name} -> {market_info['market_name']}, 货币: {currency}")
