@@ -46,7 +46,7 @@ POSITION_SYSTEM_PROMPT = """你是一位资深的期货持仓分析师,解读主
 - 品种:{variety_name}
 - 交易所:{exchange}
 - 分析日期:{trade_date}
-
+- 持仓数据来源:{contract_source}
 ## 特征层(已计算,直接消费)
 
 ### 多头持仓
@@ -389,11 +389,19 @@ def create_position_analyst(llm):
         variety_name = state.get("variety_name", full_symbol)
         exchange = state.get("exchange", "")
 
+        # 数据来源:特征层中的实际合约代码(多合约时已选主力)
+        features_symbol = pos_block.get("quality", {}).get("symbol") or latest.get("symbol", "")
+        if features_symbol and "." not in full_symbol and features_symbol != full_symbol:
+            contract_source = f"{features_symbol}(主力合约)"
+        else:
+            contract_source = full_symbol
+
         prompt_vars = dict(
             full_symbol=full_symbol,
             variety_name=variety_name,
             exchange=exchange,
             trade_date=trade_date,
+            contract_source=contract_source,
             net_long_change_5d=_fmt(net_long_change),
             concentration=_fmt(concentration),
             crowding_pctl=_fmt(crowding_pctl),
