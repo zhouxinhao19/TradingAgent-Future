@@ -368,7 +368,7 @@ class CommodityTradingAgentsGraph(TradingAgentsGraph):
             try:
                 from tradingagents.features import compute_all_features_from_provider
 
-                aggregated = compute_all_features_from_provider(
+                aggregated = await compute_all_features_from_provider(
                     provider, full_symbol, trade_date
                 )
                 # 仅补缺,保留显式传入
@@ -376,7 +376,7 @@ class CommodityTradingAgentsGraph(TradingAgentsGraph):
                     commodity_features = aggregated.get("features", {}) or {}
                 if latest_news is None:
                     try:
-                        latest_news = provider.get_futures_news("all", 100) or []
+                        latest_news = await provider.get_futures_news("all", 100) or []
                     except Exception as e:  # noqa: BLE001
                         logger.warning(f"⚠️ provider.get_futures_news 失败: {e}")
                         latest_news = []

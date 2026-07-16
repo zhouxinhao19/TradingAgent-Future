@@ -93,6 +93,9 @@ def _prepare(df: pd.DataFrame) -> pd.DataFrame:
             out["content"] = ""
     if "date" in out.columns:
         out["date"] = pd.to_datetime(out["date"], errors="coerce")
+        # 去除时区信息,统一为 tz-naive
+        if out["date"].dt.tz is not None:
+            out["date"] = out["date"].dt.tz_localize(None)
         out = out.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
     out["content"] = out["content"].fillna("").astype(str)
     if "title" in out.columns:

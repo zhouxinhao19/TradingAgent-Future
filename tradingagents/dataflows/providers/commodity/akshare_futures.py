@@ -354,6 +354,28 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
             self.logger.warning(f"❌ AKShare.{func_name} 执行失败: {e}")
             return None
 
+    async def _call_roll_yield(self, func_name: str, *args, **kwargs) -> Any:
+        """展期收益率接口的容错调用包装。
+
+        AKShare get_roll_yield_bar/get_roll_yield 内部调用了 get_futures_daily，
+        部分交易日/交易所源站不可用时会抛出异常或返回空数据。做多层容错。
+        """
+        result = await self._call(func_name, *args, **kwargs)
+        if result is not None and not (hasattr(result, 'empty') and result.empty):
+            return result
+        # 尝试前一个交易日
+        if "date" in kwargs:
+            from datetime import timedelta
+            orig = datetime.strptime(str(kwargs["date"]), "%Y%m%d")
+            for days_back in (1, 2, 3, 5, 7):
+                prev = (orig - timedelta(days=days_back)).strftime("%Y%m%d")
+                new_kwargs = {**kwargs, "date": prev}
+                r = await self._call(func_name, *args, **new_kwargs)
+                if r is not None and not (hasattr(r, 'empty') and r.empty):
+                    self.logger.info(f"ℹ️ roll_yield 回退到 {prev}")
+                    return r
+        return None
+
     # ============================================================
     # Phase 1 基础接口
     # ============================================================
@@ -662,14 +684,23 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         if not await self._ensure_ak():
             return None
 
-        # 1. 东方财富(品种代码)
-        df = await self._call("futures_inventory_em", symbol=symbol)
+        # 1. 东方财富(先试中文名;英文名通过 _symbol_to_chinese 映射)
+        cn = self._symbol_to_chinese(symbol) or symbol
+        df = await self._call("futures_inventory_em", symbol=cn)
         if df is not None and not df.empty:
             return df
 
         # 2. 99 期货(支持中文品种名,长期)
-        df = await self._call("futures_inventory_99", symbol=symbol)
-        return df
+        df = await self._call("futures_inventory_99", symbol=cn)
+        if df is not None and not df.empty:
+            return df
+
+        # 3. 尝试原始传入的符号
+        if cn != symbol:
+            df = await self._call("futures_inventory_99", symbol=symbol)
+            return df
+
+        return None
 
     async def get_warehouse_receipt(
         self,
@@ -690,10 +721,20 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
 
         ex = exchange.upper()
         if ex == "SHFE":
-            return await self._call("futures_shfe_warehouse_receipt", date=date_str)
+            df = await self._call("futures_shfe_warehouse_receipt", date=date_str)
+            if df is not None:
+                if isinstance(df, dict):
+                    return df
+                # 空 dict 或空 DataFrame 也返回空
+                if hasattr(df, 'empty') and df.empty:
+                    return None
+                return {"data": df}
+            return None
         if ex == "DCE":
             df = await self._call("futures_warehouse_receipt_dce", date=date_str)
-            return {"data": df} if df is not None else None
+            if df is not None:
+                return {"data": df}
+            return None
         if ex in ("CZCE", "CZC"):
             return await self._call("futures_warehouse_receipt_czce", date=date_str)
         if ex == "GFEX":
@@ -840,25 +881,25 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         if type_method == "date":
             start = start_day.strftime("%Y%m%d") if hasattr(start_day, "strftime") else str(start_day)
             end = end_day.strftime("%Y%m%d") if hasattr(end_day, "strftime") else str(end_day)
-            return await self._call(
+            return await self._call_roll_yield(
                 "get_roll_yield_bar",
                 type_method="date", var=var, start_day=start, end_day=end,
             )
         if type_method == "symbol":
             date_str = date.strftime("%Y%m%d") if hasattr(date, "strftime") else str(date)
-            return await self._call(
+            return await self._call_roll_yield(
                 "get_roll_yield_bar", type_method="symbol", var=var, date=date_str,
             )
         if type_method == "var":
             date_str = date.strftime("%Y%m%d") if hasattr(date, "strftime") else str(date)
-            return await self._call(
+            return await self._call_roll_yield(
                 "get_roll_yield_bar", type_method="var", date=date_str,
             )
 
         # 单合约两期对比
         if symbol1 and symbol2:
             date_str = date.strftime("%Y%m%d") if hasattr(date, "strftime") else str(date)
-            return await self._call(
+            return await self._call_roll_yield(
                 "get_roll_yield", date=date_str, var=var,
                 symbol1=symbol1, symbol2=symbol2,
             )
@@ -891,17 +932,17 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
             date_str = str(date)
 
         if ex == "SHFE":
-            return await self._call("futures_contract_info_shfe", date=date_str)
+            return await self._call("futures_contract_info_shfe")
         if ex == "INE":
-            return await self._call("futures_contract_info_ine", date=date_str)
+            return await self._call("futures_contract_info_ine")
         if ex == "DCE":
             return await self._call("futures_contract_info_dce")
         if ex in ("CZCE", "CZC"):
-            return await self._call("futures_contract_info_czce", date=date_str)
+            return await self._call("futures_contract_info_czce")
         if ex == "GFEX":
             return await self._call("futures_contract_info_gfex")
         if ex == "CFFEX":
-            return await self._call("futures_contract_info_cffex", date=date_str)
+            return await self._call("futures_contract_info_cffex")
 
         self.logger.warning(f"⚠️ 不支持的交易所: {exchange}")
         return None
@@ -945,8 +986,54 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
             symbols_str = ",".join(symbols_clean)
         else:
             symbols_str = self._strip_exchange(symbols)
+            symbols_clean = [symbols_str]
 
-        return await self._call("futures_zh_spot", symbol=symbols_str, market=market)
+        df = await self._call("futures_zh_spot", symbol=symbols_str, market=market)
+        if df is not None and not df.empty:
+            return df
+
+        # Fallback: futures_zh_spot 因 AKShare 版本列不匹配失败时,用新浪原始 API
+        self.logger.info("ℹ️ futures_zh_spot 返回空,尝试新浪原始 API 回退")
+        return await self._get_realtime_quote_fallback(symbols_clean)
+
+    async def _get_realtime_quote_fallback(self, symbols: List[str]) -> Optional[pd.DataFrame]:
+        """新浪原始 API 回退: 通过 sinajs.cn 获取实时行情。"""
+        try:
+            import requests
+            loop = asyncio.get_event_loop()
+            headers = {"Referer": "https://finance.sina.com.cn"}
+            rows = []
+            for sym in symbols:
+                url = f"http://hq.sinajs.cn/list={sym}"
+                r = await loop.run_in_executor(None, lambda: requests.get(url, timeout=10, headers=headers))
+                text = r.text.strip()
+                if not text or "=" not in text:
+                    continue
+                data_str = text.split('"')[1] if '"' in text else ""
+                parts = data_str.split(",")
+                # 新浪期货实时行情格式(28列):
+                # [0]=名称 [1]=今开盘 [2]=昨结算 [3]=最新价 [4]=最高 [5]=最低
+                # [6]=买价 [7]=卖价 [8]=持仓量 [9]=成交量
+                if len(parts) >= 10:
+                    f = lambda x: float(x) if x else 0.0  # noqa: E731
+                    rows.append({
+                        "symbol": parts[0],
+                        "open": f(parts[1]),
+                        "last_settle": f(parts[2]),
+                        "current_price": f(parts[3]),
+                        "high": f(parts[4]),
+                        "low": f(parts[5]),
+                        "bid": f(parts[6]),
+                        "ask": f(parts[7]),
+                        "hold": f(parts[8]),
+                        "volume": f(parts[9]),
+                    })
+            if not rows:
+                return None
+            return pd.DataFrame(rows)
+        except Exception as e:
+            self.logger.warning(f"⚠️ 新浪实时行情回退失败: {e}")
+            return None
 
     async def get_minute_kline(
         self,
@@ -1719,6 +1806,49 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
     # ============================================================
     # 辅助方法
     # ============================================================
+
+    @staticmethod
+    def _symbol_to_chinese(symbol: str) -> Optional[str]:
+        """将品种英文代码转为中文名(用于 AKShare 部分需中文名的接口)。
+
+        例: ``"A"`` → ``"豆一"``, ``"CU"`` → ``"铜"``。
+        如果传入的已经是中文名或查不到,返回 None。
+        """
+        # 先用静态映射表(兼容 AKShare futures_inventory_em 的中文名)
+        _EN_TO_CN = {
+            "A": "豆一", "B": "豆二", "C": "玉米", "M": "豆粕", "Y": "豆油",
+            "P": "棕榈油", "I": "铁矿石", "J": "焦炭", "JM": "焦煤",
+            "L": "聚乙烯", "V": "PVC", "PP": "聚丙烯", "EG": "乙二醇",
+            "EB": "苯乙烯", "PG": "液化石油气", "JD": "鸡蛋", "RR": "粳米",
+            "LH": "生猪", "FB": "纤维板", "BB": "胶合板", "LG": "原木",
+            "CU": "铜", "AL": "铝", "ZN": "锌", "PB": "铅", "NI": "镍",
+            "SN": "锡", "AU": "黄金", "AG": "白银", "RB": "螺纹钢",
+            "WR": "线材", "HC": "热轧卷板", "SS": "不锈钢", "BU": "石油沥青",
+            "RU": "天然橡胶", "BR": "合成橡胶", "SP": "纸浆", "FU": "燃料油",
+            "AO": "氧化铝",
+            "SC": "原油", "NR": "20号胶", "LU": "低硫燃料油",
+            "EC": "集运指数", "BC": "国际铜",
+            "CF": "郑棉", "SR": "白糖", "CY": "棉纱", "AP": "苹果",
+            "CJ": "红枣", "PK": "花生", "RM": "菜粕", "OI": "菜籽油",
+            "RS": "菜籽", "TA": "PTA", "MA": "甲醇", "FG": "玻璃",
+            "SA": "纯碱", "SH": "烧碱", "UR": "尿素", "PF": "短纤",
+            "PX": "对二甲苯", "PR": "瓶片", "ZC": "动力煤", "SF": "硅铁",
+            "SM": "锰硅",
+            "SI": "工业硅", "LC": "碳酸锂", "PS": "多晶硅",
+            "IF": "沪深300", "IH": "上证50", "IC": "中证500",
+            "IM": "中证1000", "TS": "2年期国债", "TF": "5年期国债",
+            "T": "10年期国债", "TL": "30年期国债",
+        }
+        cn = _EN_TO_CN.get(symbol)
+        if cn:
+            return cn
+        try:
+            v = get_variety(symbol)
+            if v:
+                return v.get("name_cn")
+        except Exception:
+            pass
+        return None
 
     @staticmethod
     def _strip_exchange(full_symbol: str) -> str:
