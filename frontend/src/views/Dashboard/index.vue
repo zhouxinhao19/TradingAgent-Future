@@ -148,7 +148,7 @@
               class="news-item"
               @click="openNewsUrl(news.url)"
             >
-              <span class="news-title">{{ news.title }}</span>
+              <span class="news-title"><strong>{{ news.title }}</strong> {{ news.content }}</span>
               <span class="news-time">{{ newsRelativeTime(news.time) }}</span>
             </div>
           </div>
@@ -442,7 +442,8 @@ const loadMarketNews = async () => {
       marketNews.value = body.items
         .map((item: any) => ({
           id: item.title,
-          title: (item.title || "") + " " + (item.content || ""),
+          title: (item.title || ""),
+          content: (item.content || ""),
           time: item.published_at || item.date,
           url: item.url,
           source: item.source
