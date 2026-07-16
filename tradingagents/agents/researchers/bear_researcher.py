@@ -27,7 +27,7 @@ COMMODITY_BEAR_PROMPT = """你是一位看跌期货研究员,负责论证放弃�
 
 可用资源:
 - 技术面报告: {market_research_report}
-- 持仓/情绪报告: {sentiment_report}
+- 持仓分析报告(主力加减仓/集中度/拥挤度): {sentiment_report}
 - 新闻/产业事件: {news_report}
 - 基本面报告(基差+库存+期限结构): {fundamentals_report}
 - 辩论对话历史: {history}
@@ -45,7 +45,7 @@ def create_bear_researcher(llm, memory):
 
         current_response = investment_debate_state.get("current_response", "")
         market_research_report = state["market_report"]
-        sentiment_report = state["sentiment_report"]
+        sentiment_report = state.get("position_report") or state.get("sentiment_report", "")
         news_report = state["news_report"]
         fundamentals_report = state["fundamentals_report"]
 

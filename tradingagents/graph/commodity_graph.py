@@ -108,6 +108,8 @@ class CommodityPropagator(Propagator):
             "fundamentals_report": "",
             "fundamentals_structured": {},
             "sentiment_report": "",
+            "position_report": "",
+            "position_structured": {},
             "news_report": "",
             "commodity_features": commodity_features or {},
             "latest_news": latest_news or [],

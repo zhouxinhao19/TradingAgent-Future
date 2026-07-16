@@ -23,7 +23,7 @@ COMMODITY_CONSERVATIVE_PROMPT = """作为保守期货风险分析师,您认为�
 
 积极反驳激进和中性分析师,强调保守策略的稳健性:
 - 市场研究(趋势确认 + 突破有效性): {market_research_report}
-- 持仓/情绪报告(拥挤度 + 主力翻空): {sentiment_report}
+- 持仓分析报告(拥挤度 + 主力翻空): {sentiment_report}
 - 新闻/产业事件(供给过剩 + 需求疲软): {news_report}
 - 基本面报告(基差走弱 + 库存累积 + Contango): {fundamentals_report}
 - 当前对话历史: {history}
@@ -43,7 +43,7 @@ def create_safe_debator(llm):
         current_neutral_response = risk_debate_state.get("current_neutral_response", "")
 
         market_research_report = state["market_report"]
-        sentiment_report = state["sentiment_report"]
+        sentiment_report = state.get("position_report") or state.get("sentiment_report", "")
         news_report = state["news_report"]
         fundamentals_report = state["fundamentals_report"]
 

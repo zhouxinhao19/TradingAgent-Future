@@ -53,11 +53,31 @@ class FundamentalReport(AnalystSignal):
 
 
 class PositionReport(AnalystSignal):
-    """持仓分析师输出。"""
+    """持仓分析师输出(增强版:多空双边+趋势+价格交叉验证)."""
 
+    # 多空双边
+    long_change_5d: Optional[float] = Field(None, description="前 20 名多头 5 日变化")
+    short_change_5d: Optional[float] = Field(None, description="前 20 名空头 5 日变化")
     net_long_change_5d: Optional[float] = Field(None, description="前 20 名净多头 5 日变化")
+    long_short_ratio: Optional[float] = Field(None, description="多空比(long_top20/short_top20)")
+    long_short_ratio_change_5d: Optional[float] = Field(None, description="多空比 5 日变化")
+    long_side_trend: Optional[str] = Field(None, description="多头趋势:加仓/减仓/平稳")
+    short_side_trend: Optional[str] = Field(None, description="空头趋势:加仓/减仓/平稳")
+
+    # 趋势
+    consecutive_net_long_days: Optional[int] = Field(None, description="连续净多变化天数(正=增加,负=减少)")
+    slope_20d: Optional[float] = Field(None, description="20d 净多斜率")
+
+    # 集中度/拥挤度
+    concentration: Optional[float] = Field(None, ge=0.0, le=1.0, description="前 20 集中度")
     crowding_pctl_180d: Optional[float] = Field(None, ge=0.0, le=1.0, description="拥挤度 180d 分位")
-    concentration: Optional[float] = Field(None, ge=0.0, le=1.0, description="前 5 名持仓占比")
+    crowding_status: Optional[str] = Field(None, description="拥挤度:拥挤/正常/冷清")
+    reversal_risk: bool = Field(False, description="是否触发拥挤反转风险")
+
+    # 价格交叉
+    price_direction: Optional[str] = Field(None, description="日线价格方向:bullish/bearish/neutral")
+    price_position_alignment: Optional[str] = Field(None, description="价格-持仓对齐:同向/背离/待定")
+
     snapshot: Dict[str, Any] = Field(default_factory=dict)
 
 
