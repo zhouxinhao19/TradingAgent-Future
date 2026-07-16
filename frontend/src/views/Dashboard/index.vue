@@ -291,8 +291,8 @@
           </div>
         </el-card>
 
-        <!-- 多数据源同步 -->
-        <MultiSourceSyncCard style="margin-top: 24px;" />
+        <!-- 数据源和 LLM 供应商状态 -->
+        <DataSourceLlmStatusCard style="margin-top: 24px;" />
       </el-col>
     </el-row>
   </div>
@@ -314,7 +314,7 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { AnalysisTask, AnalysisStatus } from '@/types/analysis'
-import MultiSourceSyncCard from '@/components/Dashboard/MultiSourceSyncCard.vue'
+import DataSourceLlmStatusCard from '@/components/Dashboard/DataSourceLlmStatusCard.vue'
 import { favoritesApi } from '@/api/favorites'
 import { analysisApi } from '@/api/analysis'
 import { newsApi } from '@/api/news'
