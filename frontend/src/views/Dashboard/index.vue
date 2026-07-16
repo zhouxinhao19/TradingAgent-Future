@@ -438,13 +438,16 @@ const loadMarketNews = async () => {
     const res = await commodityApi.getNews('all', 10)
     const body = (res as any)?.data
     if (body?.items?.length) {
-      marketNews.value = body.items.map((item: any) => ({
-        id: item.title,
-        title: item.title,
-        time: item.published_at || item.date,
-        url: item.url,
-        source: item.source
-      }))
+      // 按发布时间倒排取最新
+      marketNews.value = body.items
+        .map((item: any) => ({
+          id: item.title,
+          title: item.title,
+          time: item.published_at || item.date,
+          url: item.url,
+          source: item.source
+        }))
+        .sort((a: any, b: any) => new Date(b.time).getTime() - new Date(a.time).getTime())
     }
   } catch (error) {
     console.error('加载市场快讯失败:', error)
