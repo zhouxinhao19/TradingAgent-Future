@@ -56,9 +56,33 @@ def create_bull_researcher(llm, memory):
 
         # 使用统一的股票类型检测(仅 stock 路径需要)
         ticker = state.get('company_of_interest', 'Unknown')
-        from tradingagents.utils.stock_utils import StockUtils
-        market_info = StockUtils.get_market_info(ticker)
-        is_china = market_info['is_china']
+        if asset_type == "commodity":
+            # commodity 路径:跳过 StockUtils,提供默认值
+            is_china = False
+            market_info = {
+                'is_china': False,
+                'is_hk': False,
+                'is_us': False,
+                'market_name': '大宗商品期货',
+                'currency_name': 'CNY',
+                'currency_symbol': '¥',
+            }
+        else:
+            try:
+                from tradingagents.utils.stock_utils import StockUtils
+                market_info = StockUtils.get_market_info(ticker)
+                is_china = market_info['is_china']
+            except ImportError:
+                logger.warning(f"StockUtils 不可用,使用默认市场信息")
+                is_china = False
+                market_info = {
+                    'is_china': False,
+                    'is_hk': False,
+                    'is_us': False,
+                    'market_name': '未知',
+                    'currency_name': 'CNY',
+                    'currency_symbol': '¥',
+                }
 
         # 获取公司名称
         def _get_company_name(ticker_code: str, market_info_dict: dict) -> str:

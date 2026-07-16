@@ -2,6 +2,7 @@
 数据流接口层 (Phase 5: 已移除股票数据流, 仅保留通用接口)
 """
 import logging
+from typing import Annotated, Dict
 
 logger = logging.getLogger("dataflows.interface")
 
