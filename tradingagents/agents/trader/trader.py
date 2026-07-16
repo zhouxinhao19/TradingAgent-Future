@@ -55,7 +55,7 @@ def create_trader(llm, memory):
         instrument_context = build_instrument_context(company_name)
         investment_plan = state["investment_plan"]
         market_research_report = state["market_report"]
-        sentiment_report = state["sentiment_report"]
+        sentiment_report = state.get("position_report") or state.get("sentiment_report", "")
         news_report = state["news_report"]
         fundamentals_report = state["fundamentals_report"]
 
@@ -74,6 +74,8 @@ def create_trader(llm, memory):
             is_us = False
             currency = 'CNY'
             currency_symbol = '¥'
+            logger.debug(f"💰 [DEBUG] ===== 交易员节点(商品)开始 =====")
+            logger.debug(f"💰 [DEBUG] 交易员检测商品: {company_name}, 货币: {currency}")
         else:
             try:
                 from tradingagents.utils.stock_utils import StockUtils
@@ -83,6 +85,10 @@ def create_trader(llm, memory):
                 is_us = market_info['is_us']
                 currency = market_info['currency_name']
                 currency_symbol = market_info['currency_symbol']
+                logger.debug(f"💰 [DEBUG] ===== 交易员节点(股票)开始 =====")
+                logger.debug(f"💰 [DEBUG] 交易员检测股票类型: {company_name} -> {market_info['market_name']}, 货币: {currency}")
+                logger.debug(f"💰 [DEBUG] 货币符号: {currency_symbol}")
+                logger.debug(f"💰 [DEBUG] 市场详情: 中国A股={is_china}, 港股={is_hk}, 美股={is_us}")
             except ImportError:
                 logger.warning(f"StockUtils 不可用,使用默认市场信息")
                 is_china = False
@@ -90,11 +96,9 @@ def create_trader(llm, memory):
                 is_us = False
                 currency = 'CNY'
                 currency_symbol = '¥'
+                logger.debug(f"💰 [DEBUG] ===== 交易员节点(默认)开始 =====")
+                logger.debug(f"💰 [DEBUG] 交易员检测: {company_name}, 货币: {currency}")
 
-        logger.debug(f"💰 [DEBUG] ===== 交易员节点开始 =====")
-        logger.debug(f"💰 [DEBUG] 交易员检测股票类型: {company_name} -> {market_info['market_name']}, 货币: {currency}")
-        logger.debug(f"💰 [DEBUG] 货币符号: {currency_symbol}")
-        logger.debug(f"💰 [DEBUG] 市场详情: 中国A股={is_china}, 港股={is_hk}, 美股={is_us}")
         logger.debug(f"💰 [DEBUG] 基本面报告长度: {len(fundamentals_report)}")
         logger.debug(f"💰 [DEBUG] 基本面报告前200字符: {fundamentals_report[:200]}...")
 

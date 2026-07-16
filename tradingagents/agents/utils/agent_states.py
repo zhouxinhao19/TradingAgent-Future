@@ -59,6 +59,10 @@ class AgentState(MessagesState):
     # research step
     market_report: Annotated[str, "Report from the Market Analyst"]
     sentiment_report: Annotated[str, "Report from the Social Media Analyst"]
+    position_report: Annotated[str, "Report from the Position Analyst(commodity)"] = ""
+    position_structured: Annotated[
+        dict, "结构化持仓分析报告(多空双边/集中度/价格交叉验证)"
+    ] = {}
     news_report: Annotated[
         str, "Report from the News Researcher of current world affairs"
     ]

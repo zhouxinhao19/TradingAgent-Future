@@ -39,6 +39,7 @@ def base_state():
         "trade_date": "2026-07-14",
         "market_report": "技术面:突破 3500 元/吨,日线 MACD 金叉,周线布林带上轨",
         "sentiment_report": "持仓:前 20 名净多头增加 12%,主力加多,拥挤度 0.45",
+        "position_report": "",  # 新字段,初始为空(测试 fallback)
         "news_report": "宏观:美联储维持利率;产业:钢厂限产 + 基建开工旺季",
         "fundamentals_report": "基差:现货升水 80 元;库存:螺纹钢社会库存环比 -3.2%;期限结构:Backwardation",
         "investment_plan": "建议做多 RB2501,目标 3800,止损 3400",
@@ -462,3 +463,40 @@ def test_all_risk_debators_return_risk_debate_state(mock_llm, base_state):
     assert "risk_debate_state" in risky
     assert "risk_debate_state" in safe
     assert "risk_debate_state" in neutral
+
+
+# === Phase 4: 双写兼容测试 ===
+
+def test_bull_prefers_position_report_over_sentiment(mock_llm, mock_memory, base_state):
+    """当 position_report 有值时,bull 节点优先使用它而非 sentiment_report。"""
+    from tradingagents.agents.researchers.bull_researcher import create_bull_researcher
+
+    base_state["position_report"] = "持仓分析:净多增加,价格-持仓同向"
+    base_state["sentiment_report"] = "旧情绪数据(不应被使用)"
+
+    node = create_bull_researcher(mock_llm, mock_memory)
+    result = node(base_state)
+
+    assert mock_llm.invoke.called
+    call_args = mock_llm.invoke.call_args[0][0]
+    prompt_str = str(call_args)
+    # prompt 应包含 position_report 的内容而非 sentiment_report
+    assert "净多增加" in prompt_str
+    # 旧数据中的内容不应出现
+    assert "旧情绪数据" not in prompt_str
+
+
+def test_bull_falls_back_to_sentiment(mock_llm, mock_memory, base_state):
+    """当 position_report 为空时,bull 节点应回退到 sentiment_report。"""
+    from tradingagents.agents.researchers.bull_researcher import create_bull_researcher
+
+    assert base_state["position_report"] == ""  # fixture 确保
+    base_state["sentiment_report"] = "备用持仓数据(无 position_report 时)"
+
+    node = create_bull_researcher(mock_llm, mock_memory)
+    result = node(base_state)
+
+    assert mock_llm.invoke.called
+    call_args = mock_llm.invoke.call_args[0][0]
+    prompt_str = str(call_args)
+    assert "备用持仓数据" in prompt_str

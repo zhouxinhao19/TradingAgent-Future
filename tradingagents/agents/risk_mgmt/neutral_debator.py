@@ -20,7 +20,7 @@ COMMODITY_NEUTRAL_PROMPT = """作为中性期货风险分析师,您认为期货�
 
 挑战激进和保守分析师,提出平衡方案:
 - 市场研究(震荡/趋势判断): {market_research_report}
-- 持仓/情绪报告(主力持仓变化): {sentiment_report}
+- 持仓分析报告(主力持仓变化): {sentiment_report}
 - 新闻/产业事件(中性影响): {news_report}
 - 基本面报告(基差 + 库存 + 期限结构组合): {fundamentals_report}
 - 当前对话历史: {history}
@@ -40,7 +40,7 @@ def create_neutral_debator(llm):
         current_safe_response = risk_debate_state.get("current_safe_response", "")
 
         market_research_report = state["market_report"]
-        sentiment_report = state["sentiment_report"]
+        sentiment_report = state.get("position_report") or state.get("sentiment_report", "")
         news_report = state["news_report"]
         fundamentals_report = state["fundamentals_report"]
 

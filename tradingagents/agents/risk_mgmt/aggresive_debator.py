@@ -20,7 +20,7 @@ COMMODITY_AGGRESSIVE_PROMPT = """作为激进期货风险分析师,您认为高�
 
 挑战保守和中性分析师,用以下数据来源为激进策略辩护:
 - 市场研究(技术形态 + 突破信号): {market_research_report}
-- 持仓/情绪报告(主力加仓 + 净多头增加): {sentiment_report}
+- 持仓分析报告(主力加仓 + 净多头增加): {sentiment_report}
 - 新闻/产业事件(供给收紧 + 需求爆发): {news_report}
 - 基本面报告(基差走强 + 库存去化 + Backwardation): {fundamentals_report}
 - 当前对话历史: {history}
@@ -40,7 +40,7 @@ def create_risky_debator(llm):
         current_neutral_response = risk_debate_state.get("current_neutral_response", "")
 
         market_research_report = state["market_report"]
-        sentiment_report = state["sentiment_report"]
+        sentiment_report = state.get("position_report") or state.get("sentiment_report", "")
         news_report = state["news_report"]
         fundamentals_report = state["fundamentals_report"]
 

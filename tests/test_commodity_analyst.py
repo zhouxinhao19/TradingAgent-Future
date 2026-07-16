@@ -660,13 +660,20 @@ class TestPositionAnalystNode:
         node = create_position_analyst(mock_llm)
         result = node(_state())
         assert "sentiment_report" in result
+        assert "position_report" in result
+        assert "position_structured" in result
         assert "数据缺失" in result["sentiment_report"]
+        assert result["position_report"] == result["sentiment_report"]
+        assert result["position_structured"] == {}
         mock_llm.invoke.assert_not_called()
 
     def test_with_features_calls_llm(self, mock_llm, sample_features_all):
         node = create_position_analyst(mock_llm)
         result = node(_state(commodity_features=sample_features_all))
         assert "sentiment_report" in result
+        assert "position_report" in result
+        assert "position_structured" in result
+        assert isinstance(result["position_structured"], dict)
         mock_llm.invoke.assert_called_once()
 
     def test_llm_failure_falls_back(self, sample_features_all):
@@ -675,6 +682,10 @@ class TestPositionAnalystNode:
         node = create_position_analyst(mock)
         result = node(_state(commodity_features=sample_features_all))
         assert "降级版本" in result["sentiment_report"]
+        assert "position_report" in result
+        assert result["sentiment_report"] == result["position_report"]
+        assert "position_structured" in result
+        assert isinstance(result["position_structured"], dict)
 
     def test_extreme_crowding_signals(self, mock_llm):
         """拥挤度 180d 分位 > 0.9 时应触发反向风险提示。"""
@@ -692,6 +703,7 @@ class TestPositionAnalystNode:
         node = create_position_analyst(mock_llm)
         result = node(_state(commodity_features=feats))
         assert "sentiment_report" in result
+        assert "position_report" in result
 
 
 # =============================================================================
@@ -767,6 +779,8 @@ class TestOutputFieldMapping:
         node = create_position_analyst(mock_llm)
         result = node(_state(commodity_features=sample_features_all))
         assert "sentiment_report" in result
+        assert "position_report" in result
+        assert "position_structured" in result
         assert "market_report" not in result
         assert "fundamentals_report" not in result
         assert "news_report" not in result

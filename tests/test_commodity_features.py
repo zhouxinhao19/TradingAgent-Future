@@ -849,6 +849,96 @@ class TestPositioning:
         signals_text = " ".join(result["signals"])
         assert "净多增加" in signals_text
 
+    # === Phase 4: 持仓分析师增强测试 ===
+
+    def test_long_short_split_fields(self, positioning_mod):
+        """验证多空双边独立变化字段存在。"""
+        df = _make_position_df()
+        result = positioning_mod.compute_positioning_metrics(df)
+        snap = result["snapshot"]
+        assert "long_top20_change_5d" in snap
+        assert "short_top20_change_5d" in snap
+        assert "long_short_ratio" in snap
+        assert "long_short_ratio_change_5d" in snap
+        assert "consecutive_net_long_days" in snap
+
+    def test_consecutive_net_long_days_positive(self, positioning_mod):
+        """连续 5 日净多增加 → consecutive_net_long_days >= 5。"""
+        df = _make_position_df(n_days=100, seed=42)
+        # 让最后 6 个 net_long_top20 递增(+100 每日)
+        nl = df["long_top20"] - df["short_top20"]
+        last_nl = nl.iloc[-7]
+        for i in range(6, 0, -1):
+            last_nl += 100
+            df.loc[df.index[-i], "long_top20"] = df["short_top20"].iloc[-i] + last_nl
+        result = positioning_mod.compute_positioning_metrics(df)
+        consec = result["snapshot"]["consecutive_net_long_days"]
+        assert consec is not None and consec >= 5, f"期望 >=5, 实际 {consec}"
+
+    def test_consecutive_net_long_days_negative(self, positioning_mod):
+        """连续 5 日净多减少 → consecutive_net_long_days <= -5。"""
+        df = _make_position_df(n_days=100, seed=42)
+        nl = df["long_top20"] - df["short_top20"]
+        last_nl = nl.iloc[-7]
+        for i in range(6, 0, -1):
+            last_nl -= 100
+            df.loc[df.index[-i], "long_top20"] = df["short_top20"].iloc[-i] + last_nl
+        result = positioning_mod.compute_positioning_metrics(df)
+        consec = result["snapshot"]["consecutive_net_long_days"]
+        assert consec is not None and consec <= -5, f"期望 <= -5, 实际 {consec}"
+
+    def test_price_position_alignment_bullish(self, positioning_mod):
+        """price_direction=bullish + 净多增加 → 同向看多。"""
+        df = _make_position_df(n_days=100, seed=42)
+        # 让 net_long 最近 5 日增加
+        nl = df["long_top20"] - df["short_top20"]
+        last_nl = nl.iloc[-6]
+        for i in range(5, 0, -1):
+            last_nl += 200
+            df.loc[df.index[-i], "long_top20"] = df["short_top20"].iloc[-i] + last_nl
+        result = positioning_mod.compute_positioning_metrics(df, price_direction="bullish")
+        alignment = result["snapshot"]["price_position_alignment"]
+        assert alignment is not None and "同向" in alignment, f"期望同向, 实际 {alignment}"
+
+    def test_price_position_alignment_divergence(self, positioning_mod):
+        """price_direction=bullish + 净多减少 → 背离(价涨仓减)。"""
+        df = _make_position_df(n_days=100, seed=42)
+        nl = df["long_top20"] - df["short_top20"]
+        last_nl = nl.iloc[-6]
+        for i in range(5, 0, -1):
+            last_nl -= 200
+            df.loc[df.index[-i], "long_top20"] = df["short_top20"].iloc[-i] + last_nl
+        result = positioning_mod.compute_positioning_metrics(df, price_direction="bullish")
+        alignment = result["snapshot"]["price_position_alignment"]
+        assert alignment is not None and "背离" in alignment, f"期望背离, 实际 {alignment}"
+
+    def test_price_position_alignment_no_price_dir(self, positioning_mod):
+        """不传 price_direction → alignment 为 N/A。"""
+        df = _make_position_df()
+        result = positioning_mod.compute_positioning_metrics(df)
+        assert result["snapshot"]["price_position_alignment"] == "N/A"
+
+    def test_signal_for_long_split(self, positioning_mod):
+        """long_top20_change_5d > 0 → 应触发多头加仓信号。"""
+        df = _make_position_df()
+        for i in range(1, 6):
+            df.loc[df.index[-i], "long_top20"] += i * 2000
+        result = positioning_mod.compute_positioning_metrics(df)
+        signals_text = " ".join(result["signals"])
+        assert "多头" in signals_text and "加仓" in signals_text
+
+    def test_signal_for_lsr_extreme_change(self, positioning_mod):
+        """多空比 5 日变化 > 0.2 → 应触发信号。"""
+        df = _make_position_df(n_days=100, seed=42)
+        # 6 天前多空比很低,现在很高
+        df.loc[df.index[-6], "long_top20"] = 50000
+        df.loc[df.index[-6], "short_top20"] = 150000
+        df.loc[df.index[-1], "long_top20"] = 150000
+        df.loc[df.index[-1], "short_top20"] = 50000
+        result = positioning_mod.compute_positioning_metrics(df)
+        signals_text = " ".join(result["signals"])
+        assert "多空比" in signals_text
+
 
 # =============================================================================
 # 16. term_structure.py — 期限结构 / 展期收益
