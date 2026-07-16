@@ -143,7 +143,7 @@
           </template>
           <div v-if="marketNews.length > 0" class="news-list">
             <div
-              v-for="news in marketNews"
+              v-for="news in visibleNews"
               :key="news.id"
               class="news-item"
               @click="openNewsUrl(news.url)"
@@ -259,7 +259,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   TrendCharts,
@@ -288,6 +288,16 @@ const favoriteStocks = ref<any[]>([])
 
 // 市场快讯数据
 const marketNews = ref<any[]>([])
+/** 当前轮播起点 */
+const newsStart = ref(0)
+const NEWS_PAGE_SIZE = 5
+
+/** 当前可见的快讯（滚动窗口） */
+const visibleNews = computed(() => {
+  const all = marketNews.value
+  if (all.length <= NEWS_PAGE_SIZE) return all
+  return all.slice(newsStart.value, newsStart.value + NEWS_PAGE_SIZE)
+})
 
 // 模拟交易账户数据
 const paperAccount = ref<{ name: string; equity: number; balance: number; realized_pnl: number } | null>(null)
@@ -295,6 +305,7 @@ const paperAccount = ref<{ name: string; equity: number; balance: number; realiz
 // 实时相对时间 tick（每分钟驱动一次）
 const tick = ref(0)
 let tickTimer: ReturnType<typeof setInterval> | null = null
+let newsRollTimer: ReturnType<typeof setInterval> | null = null
 
 // 方法
 const goToQueue = () => {
@@ -500,12 +511,24 @@ onMounted(async () => {
 
   // 每分钟刷一次 tick，保持相对时间实时更新
   tickTimer = setInterval(() => { tick.value++ }, 60_000)
+
+  // 每 6 秒轮播市场快讯起点
+  newsRollTimer = setInterval(() => {
+    const total = marketNews.value.length
+    if (total > NEWS_PAGE_SIZE) {
+      newsStart.value = (newsStart.value + NEWS_PAGE_SIZE) % total
+    }
+  }, 6_000)
 })
 
 onUnmounted(() => {
   if (tickTimer) {
     clearInterval(tickTimer)
     tickTimer = null
+  }
+  if (newsRollTimer) {
+    clearInterval(newsRollTimer)
+    newsRollTimer = null
   }
 })
 </script>
@@ -718,7 +741,7 @@ onUnmounted(() => {
         justify-content: space-between;
         align-items: center;
         gap: 12px;
-        padding: 10px 0;
+        padding: 7px 0;
         cursor: pointer;
         border-bottom: 1px solid var(--el-border-color-lighter);
 
@@ -729,7 +752,7 @@ onUnmounted(() => {
         &:hover {
           background-color: var(--el-fill-color-lighter);
           margin: 0 -16px;
-          padding: 10px 16px;
+          padding: 7px 16px;
           border-radius: 4px;
         }
 
@@ -738,9 +761,9 @@ onUnmounted(() => {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-          font-size: 14px;
+          font-size: 13px;
           color: var(--el-text-color-primary);
-          line-height: 1.4;
+          line-height: 1.3;
         }
 
         .news-time {
