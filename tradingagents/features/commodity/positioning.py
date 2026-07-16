@@ -28,16 +28,25 @@ def _coerce_input(
     df_or_dict: Union[pd.DataFrame, Dict[str, pd.DataFrame], None],
     symbol: Optional[str],
 ) -> pd.DataFrame:
-    """统一输入: DataFrame 直接用;Dict 按 symbol 选;否则返回空。"""
+    """统一输入: DataFrame 直接用;Dict 按 symbol 匹配品种;否则返回空。"""
     if df_or_dict is None:
         return pd.DataFrame()
     if isinstance(df_or_dict, dict):
+        if not df_or_dict:
+            return pd.DataFrame()
         if symbol is None:
-            # 取第一个
-            if not df_or_dict:
-                return pd.DataFrame()
             symbol = next(iter(df_or_dict.keys()))
-        return df_or_dict.get(symbol, pd.DataFrame())
+        # 优先精确匹配 key
+        if symbol in df_or_dict:
+            return df_or_dict[symbol]
+        # 按 underlying symbol 模糊匹配(如 'au2612' → 'AU')
+        from tradingagents.utils.commodity_utils import CommodityUtils
+        sym_upper = symbol.upper()
+        for key, val in df_or_dict.items():
+            underlying = (CommodityUtils.get_underlying_symbol(key) or "").upper()
+            if underlying == sym_upper:
+                return val
+        return pd.DataFrame()
     if isinstance(df_or_dict, pd.DataFrame):
         return df_or_dict
     return pd.DataFrame()
@@ -48,7 +57,12 @@ def _prepare(df: pd.DataFrame, symbol: Optional[str]) -> pd.DataFrame:
         return pd.DataFrame()
     out = h.normalize_columns(df)
     if symbol and "symbol" in out.columns:
-        out = out[out["symbol"].astype(str).str.upper() == symbol.upper()].copy()
+        # 用 underlying symbol 匹配(如 'AU2612' → 'AU')
+        from tradingagents.utils.commodity_utils import CommodityUtils
+        sym_upper = symbol.upper()
+        out = out[out["symbol"].astype(str).str.upper().apply(
+            lambda s: (CommodityUtils.get_underlying_symbol(s) or "").upper() == sym_upper
+        )].copy()
     out = h.ensure_columns(
         out,
         ["date", "long_top20", "short_top20", "total_oi", "net_long_top20"],
@@ -57,7 +71,13 @@ def _prepare(df: pd.DataFrame, symbol: Optional[str]) -> pd.DataFrame:
         out[c] = h.to_numeric(out[c])
     if "date" in out.columns:
         out["date"] = pd.to_datetime(out["date"], errors="coerce")
-        out = out.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+        # 仅当 date 列不全为 NaT 时才按日期过滤
+        if out["date"].notna().any():
+            out = out.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
+        else:
+            # 无日期数据时,用行号作伪日期(保留所有行)
+            out = out.drop(columns=["date"])
+            out["date"] = pd.Timestamp.now().normalize()
     if "net_long_top20" not in out.columns or out["net_long_top20"].isna().all():
         if {"long_top20", "short_top20"}.issubset(out.columns):
             out["net_long_top20"] = out["long_top20"] - out["short_top20"]

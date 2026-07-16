@@ -31,7 +31,11 @@ def _prepare(df: pd.DataFrame, symbol: Optional[str]) -> pd.DataFrame:
         return pd.DataFrame()
     out = h.normalize_columns(df)
     if symbol and "symbol" in out.columns:
-        out = out[out["symbol"].astype(str).str.upper() == symbol.upper()].copy()
+        from tradingagents.utils.commodity_utils import CommodityUtils
+        sym_upper = symbol.upper()
+        out = out[out["symbol"].astype(str).str.upper().apply(
+            lambda s: (CommodityUtils.get_underlying_symbol(s) or "").upper() == sym_upper
+        )].copy()
     out = h.ensure_columns(out, ["date", "value"])
     out["value"] = h.to_numeric(out["value"])
     if "delta" in out.columns:

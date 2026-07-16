@@ -53,9 +53,13 @@ def _prepare(df: pd.DataFrame, symbol: Optional[str]) -> pd.DataFrame:
     if df is None or df.empty:
         return pd.DataFrame()
     out = h.normalize_columns(df)
-    # 多品种时过滤
+    # 多品种时过滤(按 underlying symbol 匹配)
     if symbol and "symbol" in out.columns:
-        out = out[out["symbol"].astype(str).str.upper() == symbol.upper()].copy()
+        from tradingagents.utils.commodity_utils import CommodityUtils
+        sym_upper = symbol.upper()
+        out = out[out["symbol"].astype(str).str.upper().apply(
+            lambda s: (CommodityUtils.get_underlying_symbol(s) or "").upper() == sym_upper
+        )].copy()
     # 缺失列补 NA
     out = h.ensure_columns(out, _BASIS_REQUIRED)
     # 数值化

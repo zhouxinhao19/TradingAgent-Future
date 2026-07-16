@@ -13,6 +13,8 @@ from typing import Any, Dict, Optional
 
 from .commodity import _helpers  # noqa: F401  供内层模块 cross-import
 from . import commodity as _commodity  # noqa: F401
+from tradingagents.dataflows.providers.commodity.commodity_metadata import normalize_exchange_code
+from tradingagents.utils.commodity_utils import CommodityUtils
 
 # 便捷导出
 from .commodity.technical import compute_technical_metrics
@@ -32,7 +34,19 @@ def _safe(callable_, fallback_reason: str, errors: Dict[str, str], key: str):
         return _helpers.empty_result(fallback_reason)
 
 
-def compute_all_features_from_provider(
+async def _call_provider(provider, method_name, *args, **kwargs):
+    """安全调用 provider 的异步方法,失败返回 None。"""
+    try:
+        method = getattr(provider, method_name, None)
+        if method is None:
+            return None
+        result = await method(*args, **kwargs)
+        return result
+    except Exception as e:
+        return None
+
+
+async def compute_all_features_from_provider(
     provider: Any,
     full_symbol: str,
     trade_date: Optional[str] = None,
@@ -69,58 +83,31 @@ def compute_all_features_from_provider(
         "errors": {},
     }
 
-    # ---- 1. 拉取数据(逐模块独立 try) ----
-    df_hist: Any = None
-    try:
-        df_hist = provider.get_historical_data(
-            full_symbol, start_date="", end_date=trade_date or ""
-        )
-    except Exception as e:  # noqa: BLE001
-        result["errors"]["historical"] = repr(e)
+    underlying = CommodityUtils.get_underlying_symbol(full_symbol) or full_symbol.split(".")[0]
 
-    basis_df: Any = None
-    try:
-        # 简化:只用近 180 天区间查询
-        basis_df = provider.get_basis_history(
-            vars_list=[full_symbol.split(".")[0]],
-            start_day="",
-            end_day=trade_date or "",
-        )
-    except Exception as e:  # noqa: BLE001
-        result["errors"]["basis_history"] = repr(e)
+    # ---- 1. 拉取数据(逐模块独立 await) ----
+    df_hist = await _call_provider(provider, "get_historical_data",
+        full_symbol, start_date="2025-01-01", end_date=trade_date or "2026-07-16")
+    if df_hist is None:
+        result["errors"]["historical"] = "历史 K 线数据获取失败"
 
-    spot_df: Any = None
-    try:
-        spot_df = provider.get_spot_price(trade_date or "")
-    except Exception as e:  # noqa: BLE001
-        result["errors"]["spot_price"] = repr(e)
+    basis_df = await _call_provider(provider, "get_basis_history",
+        "2025-01-01", trade_date or "2026-07-16", [underlying])
 
-    inv_df: Any = None
-    try:
-        inv_df = provider.get_inventory(full_symbol.split(".")[0])
-    except Exception as e:  # noqa: BLE001
-        result["errors"]["inventory_data"] = repr(e)
+    spot_df = await _call_provider(provider, "get_spot_price",
+        trade_date or "2026-07-15")
 
-    pos_df: Any = None
-    try:
-        pos_df = provider.get_position_rank(full_symbol.split(".")[0])
-    except Exception as e:  # noqa: BLE001
-        result["errors"]["position_rank"] = repr(e)
+    inv_df = await _call_provider(provider, "get_inventory", underlying)
 
-    roll_df: Any = None
-    try:
-        roll_df = provider.get_roll_yield(
-            "date",
-            {"var": full_symbol.split(".")[0], "date": trade_date or ""},
-        )
-    except Exception as e:  # noqa: BLE001
-        result["errors"]["roll_yield"] = repr(e)
+    pos_df = await _call_provider(provider, "get_position_rank",
+        normalize_exchange_code(full_symbol.split(".")[-1]) if "." in full_symbol else "SHFE",
+        trade_date.replace("-", "")[:8] if trade_date else "20260715")
 
-    news_list: Any = None
-    try:
-        news_list = provider.get_futures_news("all", 100)
-    except Exception as e:  # noqa: BLE001
-        result["errors"]["futures_news"] = repr(e)
+    roll_df = await _call_provider(provider, "get_roll_yield",
+        "date", var=underlying, start_day="20260101",
+        end_day=trade_date.replace("-", "") if trade_date else "20260715")
+
+    news_list = await _call_provider(provider, "get_futures_news", "all", 100)
 
     # ---- 2. 调用 6 个 features 计算函数 ----
     features = result["features"]
@@ -134,20 +121,20 @@ def compute_all_features_from_provider(
         "technical",
     )
     features["basis"] = _safe(
-        lambda: compute_basis_metrics(basis_df if basis_df is not None else spot_df, full_symbol),
+        lambda: compute_basis_metrics(basis_df if basis_df is not None else spot_df, underlying),
         "基差计算失败",
         errors,
         "basis",
     )
     features["inventory"] = _safe(
-        lambda: compute_inventory_metrics(inv_df, full_symbol) if inv_df is not None
+        lambda: compute_inventory_metrics(inv_df, underlying) if inv_df is not None
         else _helpers.empty_result("无库存数据"),
         "库存计算失败",
         errors,
         "inventory",
     )
     features["positioning"] = _safe(
-        lambda: compute_positioning_metrics(pos_df, full_symbol) if pos_df is not None
+        lambda: compute_positioning_metrics(pos_df, underlying) if pos_df is not None
         else _helpers.empty_result("无持仓数据"),
         "持仓计算失败",
         errors,

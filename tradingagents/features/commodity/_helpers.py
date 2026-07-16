@@ -23,7 +23,7 @@ import pandas as pd
 
 # 按 canonical key 注册别名(aliases)。canonical key 即规范化后列名。
 COLUMN_ALIASES: Dict[str, List[str]] = {
-    "date": ["日期", "时间", "date", "trade_date", "datetime", "time", "发布时间"],
+    "date": ["日期", "时间", "date", "trade_date", "datetime", "time", "发布时间", "published_at"],
     "open": ["开盘价", "开盘", "open"],
     "high": ["最高价", "最高", "high"],
     "low": ["最低价", "最低", "low"],
@@ -38,8 +38,8 @@ COLUMN_ALIASES: Dict[str, List[str]] = {
     "dom_basis": ["dom_basis", "主力基差"],
     "near_basis_rate": ["near_basis_rate", "近月基差率"],
     "dom_basis_rate": ["dom_basis_rate", "主力基差率", "basis_rate"],
-    "long_top20": ["long_top20", "long_open_interest_top20", "前20多头"],
-    "short_top20": ["short_top20", "short_open_interest_top20", "前20空头"],
+    "long_top20": ["long_top20", "long_open_interest_top20", "long_open_interest", "前20多头"],
+    "short_top20": ["short_top20", "short_open_interest_top20", "short_open_interest", "前20空头"],
     "total_oi": ["total_oi", "total_open_interest", "总持仓"],
     "net_long_top20": ["net_long_top20", "前20净多"],
     "roll_yield": ["roll_yield", "rollYield", "roll", "yield", "展期收益率"],
@@ -65,6 +65,7 @@ CHINESE_TO_CANONICAL: Dict[str, str] = {
     "库存": "value",
     "数量": "value",
     "发布时间": "date",
+    "published_at": "date",
     "内容": "content",
     "标题": "content",
 }
@@ -78,6 +79,7 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
       2. 再扫一遍剩余未匹配列,按 `COLUMN_ALIASES` 的别名表匹配
       3. 不在别名中的列原样保留(供调用方识别额外字段)
       4. 日期列尝试转 datetime
+      5. 若 index 包含日期对象,将其重置为 `date` 列(如 AKShare roll_yield_bar)
 
     注意: 同一 canonical 名只被占用一次。若 "标题" 和 "内容" 都映射到 "content",
           后到的会跳过(避免 pandas rename 覆盖丢失数据)。
@@ -110,6 +112,18 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
         used_sources.add(c)
 
     out = df.rename(columns=rename_map)
+
+    # 若 index 包含日期对象且没有 date 列,重置为 date 列
+    if "date" not in out.columns and len(out.index) > 0:
+        try:
+            first = out.index[0]
+            if hasattr(first, "strftime"):
+                out = out.reset_index()
+                if "index" in out.columns and "date" not in out.columns:
+                    out = out.rename(columns={"index": "date"})
+        except (IndexError, TypeError):
+            pass
+
     if "date" in out.columns and not pd.api.types.is_datetime64_any_dtype(out["date"]):
         try:
             out["date"] = pd.to_datetime(out["date"], errors="coerce")
