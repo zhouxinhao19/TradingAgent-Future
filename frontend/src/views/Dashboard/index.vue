@@ -148,8 +148,8 @@
               class="news-item"
               @click="openNewsUrl(news.url)"
             >
-              <div class="news-title">{{ news.title }}</div>
-              <div class="news-time">{{ formatTime(news.time) }}</div>
+              <span class="news-title">{{ news.title }}</span>
+              <span class="news-time">{{ newsRelativeTime(news.time) }}</span>
             </div>
           </div>
           <div v-else class="empty-state">
@@ -259,7 +259,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   TrendCharts,
@@ -291,6 +291,10 @@ const marketNews = ref<any[]>([])
 
 // 模拟交易账户数据
 const paperAccount = ref<{ name: string; equity: number; balance: number; realized_pnl: number } | null>(null)
+
+// 实时相对时间 tick（每分钟驱动一次）
+const tick = ref(0)
+let tickTimer: ReturnType<typeof setInterval> | null = null
 
 // 方法
 const goToQueue = () => {
@@ -368,10 +372,17 @@ const getStatusText = (status: string | AnalysisStatus) => {
   return statusMap[status] || String(status)
 }
 
-import { formatDateTime } from '@/utils/datetime'
+import { formatDateTime, formatRelativeTime } from '@/utils/datetime'
 
 const formatTime = (time: string) => {
   return formatDateTime(time)
+}
+
+/** 相对时间（依赖 tick 以自动刷新） */
+const newsRelativeTime = (timeStr: string) => {
+  // 通过 tick.value 触发 Vue 重新求值
+  void tick.value
+  return formatRelativeTime(timeStr)
 }
 
 // 自选股相关方法
@@ -429,7 +440,7 @@ const loadMarketNews = async () => {
     if (body?.items?.length) {
       marketNews.value = body.items.map((item: any) => ({
         id: item.title,
-        title: item.content ? (item.title + ' ' + item.content).substring(0, 120) : item.title,
+        title: item.title || (item.content || '').substring(0, 60),
         time: item.published_at || item.date,
         url: item.url,
         source: item.source
@@ -486,6 +497,16 @@ onMounted(async () => {
   await loadMarketNews()
   // 加载期货模拟交易账户
   await loadPaperAccount()
+
+  // 每分钟刷一次 tick，保持相对时间实时更新
+  tickTimer = setInterval(() => { tick.value++ }, 60_000)
+})
+
+onUnmounted(() => {
+  if (tickTimer) {
+    clearInterval(tickTimer)
+    tickTimer = null
+  }
 })
 </script>
 
@@ -693,7 +714,11 @@ onMounted(async () => {
   .market-news-card {
     .news-list {
       .news-item {
-        padding: 12px 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 0;
         cursor: pointer;
         border-bottom: 1px solid var(--el-border-color-lighter);
 
@@ -704,18 +729,26 @@ onMounted(async () => {
         &:hover {
           background-color: var(--el-fill-color-lighter);
           margin: 0 -16px;
-          padding: 12px 16px;
+          padding: 10px 16px;
           border-radius: 4px;
         }
 
         .news-title {
+          flex: 1;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
           font-size: 14px;
           color: var(--el-text-color-primary);
-          margin-bottom: 4px;
           line-height: 1.4;
         }
 
         .news-time {
+          flex-shrink: 0;
+          font-size: 12px;
+          color: var(--el-text-color-placeholder);
+          white-space: nowrap;
+        }
           font-size: 12px;
           color: var(--el-text-color-placeholder);
         }
