@@ -16,12 +16,6 @@
       <template #title>学习中心</template>
     </el-menu-item>
 
-    <!-- 分析报告 -->
-    <el-menu-item index="/reports">
-      <el-icon><Document /></el-icon>
-      <template #title>分析报告</template>
-    </el-menu-item>
-
     <el-menu-item index="/tasks">
       <el-icon><List /></el-icon>
       <template #title>任务中心</template>

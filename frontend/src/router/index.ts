@@ -160,46 +160,10 @@ const routes: RouteRecordRaw[] = [
     ]
   },
   { path: '/queue', redirect: '/tasks' },
-  {
-    path: '/reports',
-    name: 'Reports',
-    component: () => import('@/layouts/BasicLayout.vue'),
-    meta: {
-      title: '分析报告',
-      icon: 'Document',
-      requiresAuth: true,
-      transition: 'fade'
-    },
-    children: [
-      {
-        path: '',
-        name: 'ReportsHome',
-        component: () => import('@/views/Reports/index.vue'),
-        meta: {
-          title: '分析报告',
-          requiresAuth: true
-        }
-      },
-      {
-        path: 'view/:id',
-        name: 'ReportDetail',
-        component: () => import('@/views/Reports/ReportDetail.vue'),
-        meta: {
-          title: '报告详情',
-          requiresAuth: true
-        }
-      },
-      {
-        path: 'token',
-        name: 'TokenStatistics',
-        component: () => import('@/views/Reports/TokenStatistics.vue'),
-        meta: {
-          title: 'Token统计',
-          requiresAuth: true
-        }
-      }
-    ]
-  },
+  // 报告列表/详情已合并到商品分析页面,旧 /reports 路由重定向
+  { path: '/reports', redirect: '/commodity/analysis' },
+  { path: '/reports/view/:id', redirect: '/commodity/analysis' },
+  { path: '/reports/token', redirect: '/settings/usage' },
   {
     path: '/settings',
     name: 'Settings',
