@@ -20,10 +20,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
 from pydantic import BaseModel, Field
 
 from app.routers.auth_db import get_current_user
+from app.services.websocket_manager import get_websocket_manager
 
 logger = logging.getLogger("webapi")
 router = APIRouter(prefix="/commodity", tags=["commodity-analysis"])
@@ -148,6 +149,24 @@ async def _task_set(task_id: str, fields: Dict[str, Any]) -> None:
         await coll.update_one({"task_id": task_id}, {"$set": fields}, upsert=True)
     except Exception as e:  # noqa: BLE001
         logger.warning(f"⚠️ 任务元数据写入失败 (task={task_id}): {e}")
+
+
+async def _push_progress(task_id: str, progress: int, message: str = "") -> None:
+    """更新任务进度并推送 WebSocket。"""
+    fields: Dict[str, Any] = {"progress": progress}
+    if message:
+        fields["progress_message"] = message
+    await _task_set(task_id, fields)
+    try:
+        ws = get_websocket_manager()
+        await ws.send_progress_update(task_id, {
+            "type": "progress_update",
+            "task_id": task_id,
+            "progress": progress,
+            "message": message,
+        })
+    except Exception as e:
+        logger.debug(f"⚠️ WebSocket 推送失败 (task={task_id}): {e}")
 
 
 async def _backfill_completed_tasks() -> int:
@@ -474,14 +493,19 @@ async def _run_and_save_analysis(
         "exchange": exchange,
         "user_id": user_id,
         "status": "processing",
+        "progress": 0,
+        "progress_message": "初始化中…",
         "created_at": datetime.now(timezone.utc),
     })
 
     try:
+        await _push_progress(task_id, 5, "构建分析配置…")
         config = _build_config(
             max_debate_rounds=max_debate_rounds,
             max_risk_discuss_rounds=max_risk_discuss_rounds,
         )
+
+        await _push_progress(task_id, 15, "执行分析中(多智能体决策链)…")
         result = _run_commodity_analysis(
             full_symbol=full_symbol,
             trade_date=trade_date,
@@ -491,14 +515,20 @@ async def _run_and_save_analysis(
             quote_unit=quote_unit,
             config_override=config,
         )
+
+        await _push_progress(task_id, 75, "分析完成，保存报告…")
         result["task_id"] = task_id
         report_id = _save_report(full_symbol, trade_date, result)
+
         # 2. 标记完成
         await _task_set(task_id, {
             "status": "completed",
             "report_id": report_id,
+            "progress": 100,
+            "progress_message": "已完成",
             "completed_at": datetime.now(timezone.utc),
         })
+        await _push_progress(task_id, 100, "分析完成")
         logger.info(f"✅ [BackgroundTask] 分析完成: {full_symbol}, report_id={report_id}")
     except Exception as e:
         # 3. 标记失败 (截断长错误避免 MongoDB 文档过大)
@@ -506,11 +536,128 @@ async def _run_and_save_analysis(
         await _task_set(task_id, {
             "status": "failed",
             "error_message": err_msg,
+            "progress": 0,
+            "progress_message": "失败",
             "completed_at": datetime.now(timezone.utc),
         })
+        await _push_progress(task_id, 0, f"失败: {err_msg[:100]}")
         logger.error(
             f"❌ [BackgroundTask] 分析失败: {full_symbol}, error={err_msg}", exc_info=True
         )
+
+
+@router.post("/tasks/{task_id}/mark-failed", response_model=dict, summary="标记任务为失败")
+async def mark_commodity_task_failed(
+    task_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """将 stuck(processing 超时)的任务标记为失败。"""
+    coll = _tasks_collection()
+    if coll is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="任务存储不可用",
+        )
+    user_id = str(user.get("id", ""))
+    doc = await coll.find_one({
+        "task_id": task_id,
+        "$or": [
+            {"user_id": user_id},
+            {"user_id": "legacy-backfill"},
+        ],
+    })
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"任务不存在: {task_id}",
+        )
+    if doc.get("status") not in ("processing", "pending"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"只能标记 processing/pending 状态的任务,当前状态: {doc.get('status')}",
+        )
+    await _task_set(task_id, {
+        "status": "failed",
+        "error_message": "用户手动标记为失败",
+        "progress": 0,
+        "progress_message": "手动标记失败",
+        "completed_at": datetime.now(timezone.utc),
+    })
+    return {"success": True, "message": "任务已标记为失败"}
+
+
+@router.get("/tasks/{task_id}/result", response_model=dict, summary="获取任务结果")
+async def get_commodity_task_result(
+    task_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """获取已完成任务的完整分析结果（读取 report JSON）。"""
+    coll = _tasks_collection()
+    if coll is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="任务存储不可用",
+        )
+    user_id = str(user.get("id", ""))
+    doc = await coll.find_one({
+        "task_id": task_id,
+        "$or": [
+            {"user_id": user_id},
+            {"user_id": "legacy-backfill"},
+        ],
+    })
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"任务不存在: {task_id}",
+        )
+    if doc.get("status") != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"任务尚未完成,当前状态: {doc.get('status')}",
+        )
+    report_id = doc.get("report_id")
+    if not report_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="任务无关联报告",
+        )
+    safe_id = _safe_symbol(report_id)
+    for symbol_dir in _REPORTS_BASE.iterdir():
+        if not symbol_dir.is_dir():
+            continue
+        for date_dir in symbol_dir.iterdir():
+            if not date_dir.is_dir():
+                continue
+            report_path = (date_dir / f"{safe_id}.json").resolve()
+            if not str(report_path).startswith(str(_REPORTS_BASE.resolve())):
+                continue
+            if report_path.exists():
+                data = json.loads(report_path.read_text(encoding="utf-8"))
+                return {
+                    "success": True,
+                    "data": data,
+                    "message": "获取任务结果成功",
+                }
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"报告文件不存在: {report_id}",
+    )
+
+
+@router.websocket("/ws/task/{task_id}")
+async def commodity_task_ws(websocket: WebSocket, task_id: str):
+    """WebSocket 实时推送指定任务的进度更新。"""
+    ws_manager = get_websocket_manager()
+    await ws_manager.connect(websocket, task_id)
+    try:
+        # 保持连接，等待客户端断开
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        await ws_manager.disconnect(websocket, task_id)
 
 
 @router.get("/{full_symbol}/reports", response_model=dict, summary="历史报告列表")
