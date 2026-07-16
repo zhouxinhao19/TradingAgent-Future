@@ -28,7 +28,7 @@ def _coerce_input(
     df_or_dict: Union[pd.DataFrame, Dict[str, pd.DataFrame], None],
     symbol: Optional[str],
 ) -> pd.DataFrame:
-    """统一输入: DataFrame 直接用;Dict 按 symbol 匹配品种;否则返回空。"""
+    """统一输入: DataFrame 直接用;Dict 按 symbol 匹配品种,多合约时选数据最多的(主力合约);否则返回空。"""
     if df_or_dict is None:
         return pd.DataFrame()
     if isinstance(df_or_dict, dict):
@@ -42,11 +42,25 @@ def _coerce_input(
         # 按 underlying symbol 模糊匹配(如 'au2612' → 'AU')
         from tradingagents.utils.commodity_utils import CommodityUtils
         sym_upper = symbol.upper()
+        candidates = []
         for key, val in df_or_dict.items():
             underlying = (CommodityUtils.get_underlying_symbol(key) or "").upper()
             if underlying == sym_upper:
-                return val
-        return pd.DataFrame()
+                candidates.append((key, val))
+        if not candidates:
+            return pd.DataFrame()
+        if len(candidates) == 1:
+            return candidates[0][1]
+        # 多合约匹配:选数据行数最多的(主力合约数据最丰富)
+        candidates.sort(key=lambda kv: len(kv[1]) if kv[1] is not None else 0, reverse=True)
+        best_key, best_df = candidates[0]
+        if len(candidates) > 1:
+            from tradingagents.utils.logging_init import get_logger
+            get_logger("default").info(
+                f"📊 _coerce_input: 品种 {symbol} 有 {len(candidates)} 个合约匹配,"
+                f"选主力 {best_key}({len(best_df)} 行)"
+            )
+        return best_df
     if isinstance(df_or_dict, pd.DataFrame):
         return df_or_dict
     return pd.DataFrame()

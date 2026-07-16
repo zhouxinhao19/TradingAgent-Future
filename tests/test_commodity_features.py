@@ -939,6 +939,20 @@ class TestPositioning:
         signals_text = " ".join(result["signals"])
         assert "多空比" in signals_text
 
+    def test_multi_contract_picks_most_rows(self, positioning_mod):
+        """Dict 输入多合约匹配时,选数据行数最多的(主力合约)。"""
+        df_short = _make_position_df(n_days=30, seed=1)   # 30 行
+        df_long = _make_position_df(n_days=200, seed=2)   # 200 行
+        data = {"RB2501": df_long, "RB2505": df_short}
+        result = positioning_mod.compute_positioning_metrics(data, symbol="RB")
+        # 应选中 RB2501(200 行 > 30 行)
+        latest = result.get("latest", {})
+        assert latest.get("symbol") is None or latest.get("symbol") == "", (
+            f"期望选中主力 RB2501 的数据,但 latest.symbol={latest.get('symbol')}"
+        )
+        # quality 的行数应从 RB2501 来(≈200)
+        assert result.get("quality", {}).get("rows", 0) >= 150
+
 
 # =============================================================================
 # 16. term_structure.py — 期限结构 / 展期收益
