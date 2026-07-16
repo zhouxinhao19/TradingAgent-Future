@@ -952,6 +952,138 @@ class TestPositioning:
         )
         # quality 的行数应从 RB2501 来(≈200)
         assert result.get("quality", {}).get("rows", 0) >= 150
+        # 新品种级多合约字段
+        assert "contracts" in result
+        assert "variety_aggregate" in result
+        assert "rollover" in result
+        assert "cross_contract" in result
+        assert len(result["contracts"]) == 2
+        assert result["variety_aggregate"]["active_contracts"] == 2
+        # 合约明细字段
+        for c in result["contracts"]:
+            assert "contract" in c
+            assert "oi_share" in c
+            assert "is_dominant" in c
+
+    def test_multi_contract_aggregation(self, positioning_mod):
+        """多合约聚合:品种级总 OI 应等于各合约 OI 之和。"""
+        df1 = _make_position_df(n_days=100, seed=10)
+        df1["symbol"] = "CU"
+        df2 = _make_position_df(n_days=80, seed=11)
+        df2["symbol"] = "CU"
+        # 确保 OI 不同
+        df2["total_open_interest"] = df2["total_open_interest"] * 0.5
+        data = {"CU2501": df1, "CU2503": df2}
+        result = positioning_mod.compute_positioning_metrics(data, symbol="CU")
+        va = result["variety_aggregate"]
+        contracts = result["contracts"]
+        expected_total = sum(c["oi"] for c in contracts if c["oi"] is not None)
+        assert va["total_oi"] == expected_total, f"{va['total_oi']} != {expected_total}"
+        assert va["active_contracts"] == 2
+        # OI 占比之和应为 1.0
+        total_share = sum(c["oi_share"] for c in contracts)
+        assert abs(total_share - 1.0) < 0.01, f"OI 占比之和={total_share}"
+
+    def test_multi_contract_rollover_detected(self, positioning_mod):
+        """移仓检测:近月 OI 下降 + 远月 OI 上升 → rollover.detected=True。"""
+        n_days = 60
+        dates = [date(2025, 1, 1) + timedelta(days=i) for i in range(n_days)]
+        # 近月(主力):OI 从 20 万下降到 14 万(最后 5 日下降约 3% > 2%),保持最高 OI
+        front_oi = np.linspace(200000, 140000, n_days)
+        front_long = front_oi * 0.55
+        front_short = front_oi * 0.45
+        front_df = pd.DataFrame({
+            "日期": dates,
+            "long_top20": front_long,
+            "short_top20": front_short,
+            "total_open_interest": front_oi,
+        })
+        # 远月(次主力):OI 从 5 万上升到 10 万(最后 5 日上升约 8% > 2%)
+        next_oi = np.linspace(50000, 100000, n_days)
+        next_long = next_oi * 0.60
+        next_short = next_oi * 0.40
+        next_df = pd.DataFrame({
+            "日期": dates,
+            "long_top20": next_long,
+            "short_top20": next_short,
+            "total_open_interest": next_oi,
+        })
+        data = {"CU2501": front_df, "CU2503": next_df}
+        result = positioning_mod.compute_positioning_metrics(data, symbol="CU")
+        rollover = result["rollover"]
+        assert rollover["detected"], f"应检测到移仓,但: {rollover}"
+        assert rollover["from_contract"] == "CU2501"
+        assert rollover["to_contract"] == "CU2503"
+        assert 0 < rollover["progress"] < 1
+
+    def test_multi_contract_cross_consistency(self, positioning_mod):
+        """跨合约一致性:所有合约净多均 > 0 → 同向看多。"""
+        df1 = _make_position_df(n_days=60, seed=20)
+        df1["symbol"] = "CU"
+        # 确保 net_long > 0 (long > short)
+        df1["long_top20"] = df1["long_top20"].clip(lower=df1["short_top20"] + 1000)
+        df2 = _make_position_df(n_days=50, seed=21)
+        df2["symbol"] = "CU"
+        df2["long_top20"] = df2["long_top20"].clip(lower=df2["short_top20"] + 500)
+        data = {"CU2501": df1, "CU2503": df2}
+        result = positioning_mod.compute_positioning_metrics(data, symbol="CU")
+        cc = result["cross_contract"]
+        assert "同向看多" in cc["consistency"], f"期望同向看多,实际: {cc['consistency']}"
+        assert cc["contracts_same_direction"] == cc["total_active_contracts"]
+
+    def test_price_oi_regime_bullish_accumulation(self, positioning_mod):
+        """价涨 + 仓增 → 多头强势(价涨仓增)。"""
+        df = _make_position_df(n_days=100, seed=30)
+        # 让最后 5 日 OI 大幅增加而价格看涨
+        for i in range(1, 6):
+            df.loc[df.index[-i], "total_open_interest"] *= 1.05
+        result = positioning_mod.compute_positioning_metrics(df, price_direction="bullish")
+        regime = result["snapshot"]["price_oi_regime"]
+        assert "多头强势" in regime, f"期望多头强势,实际: {regime}"
+
+    def test_price_oi_regime_short_covering(self, positioning_mod):
+        """价涨 + 仓减 → 空头回补(价涨仓减)。"""
+        df = _make_position_df(n_days=100, seed=31)
+        # 让最后 5 日 OI 大幅减少
+        for i in range(1, 6):
+            df.loc[df.index[-i], "total_open_interest"] *= 0.95
+        result = positioning_mod.compute_positioning_metrics(df, price_direction="bullish")
+        regime = result["snapshot"]["price_oi_regime"]
+        assert "空头回补" in regime, f"期望空头回补,实际: {regime}"
+
+    def test_price_oi_regime_bearish_accumulation(self, positioning_mod):
+        """价跌 + 仓增 → 空头强势(价跌仓增)。"""
+        df = _make_position_df(n_days=100, seed=32)
+        for i in range(1, 6):
+            df.loc[df.index[-i], "total_open_interest"] *= 1.05
+        result = positioning_mod.compute_positioning_metrics(df, price_direction="bearish")
+        regime = result["snapshot"]["price_oi_regime"]
+        assert "空头强势" in regime, f"期望空头强势,实际: {regime}"
+
+    def test_price_oi_regime_no_price_dir(self, positioning_mod):
+        """不传 price_direction → 震荡待判。"""
+        df = _make_position_df()
+        result = positioning_mod.compute_positioning_metrics(df)
+        assert result["snapshot"]["price_oi_regime"] == "震荡待判"
+
+    def test_oi_change_5d_computed(self, positioning_mod):
+        """验证 oi_change_5d 和 oi_change_pct_5d 字段存在。"""
+        df = _make_position_df(n_days=100, seed=40)
+        result = positioning_mod.compute_positioning_metrics(df)
+        snap = result["snapshot"]
+        assert "oi_change_5d" in snap
+        assert "oi_change_pct_5d" in snap
+        assert snap["oi_change_5d"] is not None
+        assert snap["oi_change_pct_5d"] is not None
+
+    def test_single_dataframe_no_contracts_returned(self, positioning_mod):
+        """单 DataFrame 输入(非 Dict) → contracts 字段存在但为空列表。"""
+        df = _make_position_df()
+        result = positioning_mod.compute_positioning_metrics(df)
+        assert "contracts" in result
+        assert "variety_aggregate" in result
+        assert "rollover" in result
+        assert "cross_contract" in result
 
 
 # =============================================================================
