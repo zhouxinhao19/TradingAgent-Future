@@ -429,6 +429,20 @@ export const commodityApi = {
       `/api/commodity/tasks/${encodeURIComponent(taskId)}`,
     )
   },
+
+  /** 标记任务为失败（仅限 stuck processing 任务） */
+  async markTaskAsFailed(taskId: string) {
+    return ApiClient.post<ApiEnvelope<null>>(
+      `/api/commodity/tasks/${encodeURIComponent(taskId)}/mark-failed`,
+    )
+  },
+
+  /** 获取已完成任务的完整分析结果 */
+  async getTaskResult(taskId: string) {
+    return ApiClient.get<ApiEnvelope<Record<string, unknown>>>(
+      `/api/commodity/tasks/${encodeURIComponent(taskId)}/result`,
+    )
+  },
 }
 
 /**
@@ -455,6 +469,8 @@ export interface CommodityTaskItem {
   variety_name?: string
   exchange?: string
   status: TaskStatus
+  progress?: number
+  progress_message?: string
   created_at: string
   completed_at?: string
   report_id?: string

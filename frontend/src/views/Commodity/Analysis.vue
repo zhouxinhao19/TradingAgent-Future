@@ -98,6 +98,9 @@
             >
               {{ submitting ? '分析执行中...' : '🚀 提交分析' }}
             </el-button>
+            <el-button v-if="lastTaskId" type="text" size="small" style="width:100%;margin-top:8px" @click="goToTaskCenter">
+              📋 前往任务中心查看进度
+            </el-button>
           </el-form>
         </el-card>
       </el-col>
@@ -184,8 +187,11 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { commodityApi, type VarietyItem } from '@/api/commodity'
+
+const router = useRouter()
 
 // 交易所 → 后缀映射
 const EXCHANGE_SUFFIX: Record<string, string> = {
@@ -206,6 +212,7 @@ const form = ref({
   max_risk_discuss_rounds: 1,
 })
 const submitting = ref(false)
+const lastTaskId = ref('') // 最近一次提交的 task_id，用于显示"前往任务中心"按钮
 const latestResult = ref<Record<string, any> | null>(null)
 const reports = ref<Array<Record<string, any>>>([])
 const detailVisible = ref(false)
@@ -314,7 +321,9 @@ async function submitAnalysis() {
       max_risk_discuss_rounds: form.value.max_risk_discuss_rounds,
     })
     if (res?.success) {
-      ElMessage.success(`分析任务已提交: ${res.data?.task_id}`)
+      const tid = res.data?.task_id
+      lastTaskId.value = tid || ''
+      ElMessage.success(tid ? `分析任务已提交: ${tid}，可前往任务中心查看进度` : '分析任务已提交')
       // 立即释放按钮，不再耦合轮询逻辑
       await loadReports(fullSymbol)
       // 后台启动轮询，但按钮状态已恢复
@@ -353,6 +362,10 @@ function startPolling(fullSymbol: string) {
     }
   }
   pollingTimer = setTimeout(poll, 5000)
+}
+
+function goToTaskCenter() {
+  router.push('/tasks')
 }
 
 async function fetchLatestReport(fullSymbol: string): Promise<Record<string, any> | null> {
