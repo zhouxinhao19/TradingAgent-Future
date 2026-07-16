@@ -400,6 +400,28 @@ export const commodityApi = {
       reports: Array<RecentReportItem>
     }>>(`/api/commodity/reports/recent`, { limit })
   },
+
+  /**
+   * 任务中心 — 商品分析任务列表 (Phase 5+)
+   * @param params.status 可选过滤 processing/completed/failed
+   */
+  async getTaskList(params?: {
+    status?: TaskStatus
+    limit?: number
+    offset?: number
+  }) {
+    return ApiClient.get<ApiEnvelope<{
+      total: number
+      tasks: Array<CommodityTaskItem>
+    }>>(`/api/commodity/tasks`, params)
+  },
+
+  /** 查询单个任务状态 */
+  async getTaskStatus(taskId: string) {
+    return ApiClient.get<ApiEnvelope<CommodityTaskItem>>(
+      `/api/commodity/tasks/${encodeURIComponent(taskId)}`,
+    )
+  },
 }
 
 /**
@@ -412,6 +434,24 @@ export interface RecentReportItem {
   direction: string
   confidence: number
   created_at: string
+}
+
+/**
+ * 商品分析任务状态 (Phase 5+: task center)
+ */
+export type TaskStatus = 'processing' | 'completed' | 'failed'
+
+export interface CommodityTaskItem {
+  task_id: string
+  full_symbol: string
+  trade_date: string
+  variety_name?: string
+  exchange?: string
+  status: TaskStatus
+  created_at: string
+  completed_at?: string
+  report_id?: string
+  error_message?: string
 }
 
 // ============================================================

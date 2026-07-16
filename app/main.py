@@ -222,6 +222,36 @@ async def lifespan(app: FastAPI):
     # 显示配置摘要
     await _print_config_summary(logger)
 
+    # Phase 5+: 商品分析任务回填 + 卡死任务清理
+    try:
+        from app.routers.commodity.analysis import (
+            _backfill_completed_tasks,
+            _tasks_collection,
+        )
+        if settings.FEATURE_COMMODITY_ANALYSIS:
+            count = await _backfill_completed_tasks()
+            logger.info(f"✅ 商品任务回填: {count} 条历史报告已导入任务中心")
+
+            # 把卡在 processing 的老任务标为 failed (服务重启等场景)
+            coll = _tasks_collection()
+            if coll is not None:
+                from datetime import datetime, timedelta
+                cutoff = datetime.utcnow() - timedelta(minutes=5)
+                result = await coll.update_many(
+                    {"status": "processing", "created_at": {"$lt": cutoff}},
+                    {"$set": {
+                        "status": "failed",
+                        "error_message": "服务重启,任务中断",
+                        "completed_at": datetime.utcnow(),
+                    }},
+                )
+                if result.modified_count > 0:
+                    logger.info(
+                        f"✅ 商品任务清理: {result.modified_count} 条 processing 任务被标记为失败"
+                    )
+    except Exception as e:
+        logger.warning(f"⚠️ 商品任务初始化失败 (非阻塞): {e}")
+
     logger.info("TradingAgents FastAPI backend started")
 
     try:

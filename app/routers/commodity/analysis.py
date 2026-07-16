@@ -90,6 +90,91 @@ def _today() -> str:
     return datetime.now().strftime("%Y-%m-%d")
 
 
+# ==================== 任务元数据 MongoDB 层 ====================
+# 商品分析任务元数据存于 `commodity_analysis_tasks` 集合 (Phase 5+)
+# 与报告文件 (data/analysis_results/commodity/...) 物理隔离
+
+def _tasks_collection():
+    """懒加载 MongoDB 集合句柄。失败时返回 None(允许任务跟踪降级)。"""
+    try:
+        from app.core.database import get_database
+        return get_database().commodity_analysis_tasks
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"⚠️ MongoDB 不可用，任务跟踪降级: {e}")
+        return None
+
+
+def _serialize_task(doc: Dict[str, Any]) -> Dict[str, Any]:
+    """MongoDB doc → API 响应;剥离 _id,统一 datetime 为 ISO 字符串"""
+    if doc is None:
+        return {}
+    doc = {k: v for k, v in doc.items() if k != "_id"}
+    for k in ("created_at", "completed_at"):
+        v = doc.get(k)
+        if v is not None and hasattr(v, "isoformat"):
+            doc[k] = v.isoformat()
+    return doc
+
+
+async def _task_set(task_id: str, fields: Dict[str, Any]) -> None:
+    """Best-effort 写任务元数据;失败仅日志,不影响业务逻辑"""
+    coll = _tasks_collection()
+    if coll is None:
+        return
+    try:
+        await coll.update_one({"task_id": task_id}, {"$set": fields}, upsert=True)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"⚠️ 任务元数据写入失败 (task={task_id}): {e}")
+
+
+async def _backfill_completed_tasks() -> int:
+    """回填:扫描现有报告 JSON,创建任务记录 (status=completed)
+
+    给历史报告补 task 记录,保证任务中心能看到老数据。
+    重复执行幂等 (upsert by task_id)。
+    """
+    coll = _tasks_collection()
+    if coll is None:
+        return 0
+    count = 0
+    if not _REPORTS_BASE.exists():
+        return 0
+    for report_file in _REPORTS_BASE.rglob("*.json"):
+        try:
+            data = json.loads(report_file.read_text(encoding="utf-8"))
+            tid = data.get("task_id")
+            if not tid:
+                continue
+            full_sym = data.get("full_symbol", "")
+            trade_date = data.get("trade_date", "")
+            mtime = datetime.fromtimestamp(report_file.stat().st_mtime)
+            await coll.update_one(
+                {"task_id": tid},
+                {"$set": {
+                    "task_id": tid,
+                    "full_symbol": full_sym,
+                    "trade_date": trade_date,
+                    "user_id": "legacy-backfill",
+                    "status": "completed",
+                    "report_id": report_file.stem,
+                    "created_at": mtime,
+                    "completed_at": mtime,
+                }},
+                upsert=True,
+            )
+            count += 1
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"跳过报告 {report_file}: {e}")
+            continue
+    if count > 0:
+        # 加索引 (幂等)
+        try:
+            await coll.create_index([("user_id", 1), ("status", 1), ("created_at", -1)])
+        except Exception:  # noqa: BLE001
+            pass
+    return count
+
+
 def _build_config(
     max_debate_rounds: int = 1,
     max_risk_discuss_rounds: int = 1,
@@ -295,6 +380,7 @@ async def submit_commodity_analysis(
         max_debate_rounds=request.max_debate_rounds,
         max_risk_discuss_rounds=request.max_risk_discuss_rounds,
         task_id=task_id,
+        user_id=str(user.get("id", "anonymous")),
     )
 
     return {
@@ -319,9 +405,22 @@ async def _run_and_save_analysis(
     max_debate_rounds: int,
     max_risk_discuss_rounds: int,
     task_id: str,
+    user_id: str = "anonymous",
 ):
-    """后台运行分析 + 保存报告。"""
+    """后台运行分析 + 保存报告 + 更新任务状态。"""
     logger.info(f"🚀 [BackgroundTask] 开始商品分析: {full_symbol} (task={task_id})")
+
+    # 1. 创建/更新任务为 processing
+    await _task_set(task_id, {
+        "task_id": task_id,
+        "full_symbol": full_symbol,
+        "trade_date": trade_date,
+        "variety_name": variety_name,
+        "exchange": exchange,
+        "user_id": user_id,
+        "status": "processing",
+        "created_at": datetime.utcnow(),
+    })
 
     try:
         config = _build_config(
@@ -339,10 +438,23 @@ async def _run_and_save_analysis(
         )
         result["task_id"] = task_id
         report_id = _save_report(full_symbol, trade_date, result)
+        # 2. 标记完成
+        await _task_set(task_id, {
+            "status": "completed",
+            "report_id": report_id,
+            "completed_at": datetime.utcnow(),
+        })
         logger.info(f"✅ [BackgroundTask] 分析完成: {full_symbol}, report_id={report_id}")
     except Exception as e:
+        # 3. 标记失败 (截断长错误避免 MongoDB 文档过大)
+        err_msg = str(e)[:500]
+        await _task_set(task_id, {
+            "status": "failed",
+            "error_message": err_msg,
+            "completed_at": datetime.utcnow(),
+        })
         logger.error(
-            f"❌ [BackgroundTask] 分析失败: {full_symbol}, error={e}", exc_info=True
+            f"❌ [BackgroundTask] 分析失败: {full_symbol}, error={err_msg}", exc_info=True
         )
 
 
@@ -379,6 +491,84 @@ async def get_recent_commodity_reports(
             "reports": reports,
         },
         "message": "获取最近报告成功" if reports else "暂无历史报告",
+    }
+
+
+@router.get("/tasks", response_model=dict, summary="商品分析任务列表")
+async def list_commodity_tasks(
+    status: Optional[str] = Query(None, description="processing|completed|failed"),
+    limit: int = Query(20, ge=1, le=100, description="返回条数"),
+    offset: int = Query(0, ge=0, description="偏移量"),
+    user: dict = Depends(get_current_user),
+):
+    """按状态过滤返回商品分析任务列表。
+
+    返回当前用户创建的任务 + 系统回填的旧报告。
+    """
+    coll = _tasks_collection()
+    if coll is None:
+        return {
+            "success": True,
+            "data": {"total": 0, "tasks": []},
+            "message": "任务存储不可用",
+        }
+    user_id = str(user.get("id", ""))
+    # 当前用户的 + legacy 回填的(供 admin / 任何活跃用户查看历史)
+    query: Dict[str, Any] = {
+        "$or": [
+            {"user_id": user_id},
+            {"user_id": "legacy-backfill"},
+        ]
+    }
+    if status:
+        query["status"] = status
+    try:
+        cursor = coll.find(query).sort("created_at", -1).skip(offset).limit(limit)
+        tasks = [_serialize_task(doc) async for doc in cursor]
+        total = await coll.count_documents(query)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"⚠️ 任务列表查询失败: {e}")
+        return {
+            "success": True,
+            "data": {"total": 0, "tasks": []},
+            "message": f"查询失败: {e}",
+        }
+    return {
+        "success": True,
+        "data": {"total": total, "tasks": tasks},
+        "message": "获取任务列表成功" if tasks else "暂无任务",
+    }
+
+
+@router.get("/tasks/{task_id}", response_model=dict, summary="查询单个任务")
+async def get_commodity_task(
+    task_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """查询单个任务的当前状态。"""
+    coll = _tasks_collection()
+    if coll is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="任务存储不可用",
+        )
+    user_id = str(user.get("id", ""))
+    doc = await coll.find_one({
+        "task_id": task_id,
+        "$or": [
+            {"user_id": user_id},
+            {"user_id": "legacy-backfill"},
+        ],
+    })
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"任务不存在: {task_id}",
+        )
+    return {
+        "success": True,
+        "data": _serialize_task(doc),
+        "message": "获取任务成功",
     }
 
 
