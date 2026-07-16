@@ -232,8 +232,8 @@
               </div>
               <div class="account-item">
                 <div class="account-label">累计盈亏</div>
-                <div class="account-value" :class="paperAccount.pnl >= 0 ? 'price-up' : 'price-down'">
-                  {{ paperAccount.pnl >= 0 ? '+' : '' }}¥{{ formatMoney(Math.abs(paperAccount.pnl)) }}
+                <div class="account-value" :class="paperAccount.realized_pnl >= 0 ? 'price-up' : 'price-down'">
+                  {{ paperAccount.realized_pnl >= 0 ? '+' : '' }}¥{{ formatMoney(Math.abs(paperAccount.realized_pnl)) }}
                 </div>
               </div>
             </div>
@@ -492,28 +492,17 @@ const loadRecentAnalyses = async () => {
 
 const loadMarketNews = async () => {
   try {
-    // 使用期货新闻接口获取市场快讯
-    const res = await commodityApi.getNews('global_macro', 10)
+    // 使用期货新闻接口获取市场快讯(global_macro 源慢,改用不依赖外部源的 all)
+    const res = await commodityApi.getNews('all', 10)
     const body = (res as any)?.data
     if (body?.items?.length) {
       marketNews.value = body.items.map((item: any) => ({
         id: item.title,
-        title: item.title,
+        title: item.content ? (item.title + ' ' + item.content).substring(0, 120) : item.title,
         time: item.published_at || item.date,
         url: item.url,
         source: item.source
       }))
-    } else {
-      // 降级:获取 all 分类
-      const res2 = await commodityApi.getNews('all', 10)
-      const body2 = (res2 as any)?.data
-      marketNews.value = body2?.items?.map((item: any) => ({
-        id: item.title,
-        title: item.title,
-        time: item.published_at || item.date,
-        url: item.url,
-        source: item.source
-      })) || []
     }
   } catch (error) {
     console.error('加载市场快讯失败:', error)
@@ -535,7 +524,7 @@ const loadPaperAccount = async () => {
         name: acc.name,
         equity: snapData?.equity ?? acc.initial_capital ?? 0,
         balance: snapData?.balance ?? acc.initial_capital ?? 0,
-        pnl: snapData?.pnl ?? 0,
+        realized_pnl: snapData?.realized_pnl ?? 0,
       }
     }
   } catch (error) {
