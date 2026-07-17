@@ -373,8 +373,7 @@ function sectionTitle(key: string): string {
   const map: Record<string, string> = {
     market_report: '技术分析', fundamentals_report: '基本面分析',
     sentiment_report: '持仓情绪', news_report: '新闻分析',
-    investment_plan: '投资计划', trader_investment_plan: '交易员计划',
-    final_trade_decision: '最终交易决策', final_decision: 'CIO 决策',
+    investment_plan: '投资计划', final_decision: '投研总监决策',
   }
   return map[key] || key
 }
