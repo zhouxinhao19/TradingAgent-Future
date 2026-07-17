@@ -44,7 +44,7 @@ def create_risky_debator(llm):
         news_report = state["news_report"]
         fundamentals_report = state["fundamentals_report"]
 
-        trader_decision = state["trader_investment_plan"]
+        trader_decision = state.get("investment_plan", "")
 
         # === Phase 3b-ii-B:检测 asset_type ===
         asset_type = state.get("asset_type", "stock")

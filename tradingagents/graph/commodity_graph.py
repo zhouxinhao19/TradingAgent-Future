@@ -34,12 +34,9 @@ from tradingagents.agents.managers.executive_decision_maker import (
 )
 from tradingagents.agents.managers.research_manager import create_research_manager
 from tradingagents.agents.managers.risk_manager import create_risk_manager
-from tradingagents.agents.researchers.bear_researcher import create_bear_researcher
-from tradingagents.agents.researchers.bull_researcher import create_bull_researcher
 from tradingagents.agents.risk_mgmt.aggresive_debator import create_risky_debator
 from tradingagents.agents.risk_mgmt.conservative_debator import create_safe_debator
 from tradingagents.agents.risk_mgmt.neutral_debator import create_neutral_debator
-from tradingagents.agents.trader.trader import create_trader
 
 from tradingagents.utils.logging_init import get_logger
 
@@ -113,6 +110,7 @@ class CommodityPropagator(Propagator):
             "news_report": "",
             "commodity_features": commodity_features or {},
             "latest_news": latest_news or [],
+            "analyst_registry": {},
         }
 
 
@@ -129,9 +127,6 @@ class CommodityGraphSetup:
         self,
         quick_thinking_llm,
         deep_thinking_llm,
-        bull_memory,
-        bear_memory,
-        trader_memory,
         invest_judge_memory,
         risk_manager_memory,
         conditional_logic,
@@ -139,9 +134,6 @@ class CommodityGraphSetup:
     ):
         self.quick_thinking_llm = quick_thinking_llm
         self.deep_thinking_llm = deep_thinking_llm
-        self.bull_memory = bull_memory
-        self.bear_memory = bear_memory
-        self.trader_memory = trader_memory
         self.invest_judge_memory = invest_judge_memory
         self.risk_manager_memory = risk_manager_memory
         self.conditional_logic = conditional_logic
@@ -156,10 +148,7 @@ class CommodityGraphSetup:
         news_analyst = create_news_analyst(self.quick_thinking_llm)
 
         # === 决策链节点(commodity 化通过 state['asset_type']) ===
-        bull_node = create_bull_researcher(self.quick_thinking_llm, self.bull_memory)
-        bear_node = create_bear_researcher(self.quick_thinking_llm, self.bear_memory)
         rm_node = create_research_manager(self.deep_thinking_llm, self.invest_judge_memory)
-        trader_node = create_trader(self.quick_thinking_llm, self.trader_memory)
 
         risky_node = create_risky_debator(self.quick_thinking_llm)
         safe_node = create_safe_debator(self.quick_thinking_llm)
@@ -179,10 +168,7 @@ class CommodityGraphSetup:
         workflow.add_node("News Analyst", news_analyst)
 
         # 注册决策链节点
-        workflow.add_node("Bull Researcher", bull_node)
-        workflow.add_node("Bear Researcher", bear_node)
         workflow.add_node("Research Manager", rm_node)
-        workflow.add_node("Trader", trader_node)
 
         # 注册风控辩论节点
         workflow.add_node("Risky Analyst", risky_node)
@@ -200,29 +186,9 @@ class CommodityGraphSetup:
         workflow.add_edge("Fundamentals Analyst", "Sentiment Analyst")
         workflow.add_edge("Sentiment Analyst", "News Analyst")
 
-        # News Analyst → Bull Researcher → Bear/Research Manager(debate 循环)
-        workflow.add_edge("News Analyst", "Bull Researcher")
-
-        workflow.add_conditional_edges(
-            "Bull Researcher",
-            self.conditional_logic.should_continue_debate,
-            {
-                "Bear Researcher": "Bear Researcher",
-                "Research Manager": "Research Manager",
-            },
-        )
-        workflow.add_conditional_edges(
-            "Bear Researcher",
-            self.conditional_logic.should_continue_debate,
-            {
-                "Bull Researcher": "Bull Researcher",
-                "Research Manager": "Research Manager",
-            },
-        )
-
-        # Research Manager → Trader → Risky Analyst → (辩论循环) → Risk Judge → CIO → END
-        workflow.add_edge("Research Manager", "Trader")
-        workflow.add_edge("Trader", "Risky Analyst")
+        # News Analyst → Research Manager（推理分析师）→ Risky Analyst（跳过辩论+交易员）
+        workflow.add_edge("News Analyst", "Research Manager")
+        workflow.add_edge("Research Manager", "Risky Analyst")
 
         workflow.add_conditional_edges(
             "Risky Analyst",
@@ -278,9 +244,6 @@ class CommodityTradingAgentsGraph(TradingAgentsGraph):
         self.graph_setup = CommodityGraphSetup(
             self.quick_thinking_llm,
             self.deep_thinking_llm,
-            self.bull_memory,
-            self.bear_memory,
-            self.trader_memory,
             self.invest_judge_memory,
             self.risk_manager_memory,
             self.conditional_logic,
@@ -298,10 +261,7 @@ class CommodityTradingAgentsGraph(TradingAgentsGraph):
         "Fundamentals Analyst": "💼 产业分析师",
         "Sentiment Analyst": "🧠 持仓情绪分析师",
         "News Analyst": "📰 新闻分析师",
-        "Bull Researcher": "🐂 看涨研究员",
-        "Bear Researcher": "🐻 看跌研究员",
-        "Research Manager": "👔 研究经理",
-        "Trader": "💼 交易员决策",
+        "Research Manager": "🧠 推理分析师",
         "Risky Analyst": "🔥 激进风险评估",
         "Safe Analyst": "🛡️ 保守风险评估",
         "Neutral Analyst": "⚖️ 中性风险评估",
@@ -369,17 +329,18 @@ class CommodityTradingAgentsGraph(TradingAgentsGraph):
         # ---- auto_features:从 provider 自动补 features/news ----
         if auto_features and provider is not None:
             try:
+                import asyncio
                 from tradingagents.features import compute_all_features_from_provider
 
-                aggregated = await compute_all_features_from_provider(
+                aggregated = asyncio.run(compute_all_features_from_provider(
                     provider, full_symbol, trade_date
-                )
+                ))
                 # 仅补缺,保留显式传入
                 if commodity_features is None:
                     commodity_features = aggregated.get("features", {}) or {}
                 if latest_news is None:
                     try:
-                        latest_news = await provider.get_futures_news("all", 100) or []
+                        latest_news = asyncio.run(provider.get_futures_news("all", 100)) or []
                     except Exception as e:  # noqa: BLE001
                         logger.warning(f"⚠️ provider.get_futures_news 失败: {e}")
                         latest_news = []

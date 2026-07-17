@@ -25,8 +25,11 @@ from tradingagents.utils.logging_init import get_logger
 
 from ._base import (
     empty_report,
+    extract_first_sentence,
     get_full_symbol,
+    inject_analyst_id,
     load_features,
+    make_analyst_id,
     quality_gate,
     truncate_snapshot,
 )
@@ -203,10 +206,15 @@ def create_news_analyst(llm):
         # --- 降级 1:features 与 latest_news 都空 ---
         if not isinstance(news_block, dict) and not recent_events:
             reason = "新闻 features 与 latest_news 均空"
+            report_md = empty_report("neutral", reason)
+            analyst_id = make_analyst_id("NEWS", full_symbol, trade_date, seed="empty")
+            tagged_report = inject_analyst_id(report_md, analyst_id)
+            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "NEWS", "analyst": "news", "report_key": "news_report", "direction": "neutral", "summary": "(数据缺失: 跳过)"}}
             return {
-                "news_report": empty_report("neutral", reason),
+                "news_report": tagged_report,
                 "messages": [],
                 "news_tool_call_count": 0,
+                "analyst_registry": registry_entry,
             }
 
         # --- 准备 prompt 变量 ---
@@ -274,10 +282,14 @@ def create_news_analyst(llm):
             logger.info(f"✅ [新闻分析师] LLM 报告生成: {len(report_md)} 字符")
 
             msg_out = result if hasattr(result, "content") else AIMessage(content=report_md)
+            analyst_id = make_analyst_id("NEWS", full_symbol, trade_date)
+            tagged_report = inject_analyst_id(report_md, analyst_id)
+            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "NEWS", "analyst": "news", "report_key": "news_report", "direction": "neutral", "summary": extract_first_sentence(report_md)}}
             return {
-                "news_report": report_md,
+                "news_report": tagged_report,
                 "messages": [msg_out],
                 "news_tool_call_count": 0,
+                "analyst_registry": registry_entry,
             }
 
         except Exception as e:
@@ -297,10 +309,14 @@ def create_news_analyst(llm):
                 logger.error(f"❌ [新闻分析师] fallback 也失败: {inner_e}")
                 fallback_md = empty_report("neutral", f"LLM 失败且 fallback 异常: {inner_e}")
 
+            analyst_id = make_analyst_id("NEWS", full_symbol, trade_date, seed="fallback")
+            tagged_fallback = inject_analyst_id(fallback_md, analyst_id)
+            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "NEWS", "analyst": "news", "report_key": "news_report", "direction": "neutral", "summary": "(降级: LLM 不可用)"}}
             return {
-                "news_report": fallback_md,
+                "news_report": tagged_fallback,
                 "messages": [],
                 "news_tool_call_count": 0,
+                "analyst_registry": registry_entry,
             }
 
     return news_analyst_node

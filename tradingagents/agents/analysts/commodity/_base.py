@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
+import re
+
 from tradingagents.utils.logging_init import get_logger
 
 logger = get_logger("default")
@@ -101,6 +103,124 @@ def get_full_symbol(state: dict) -> str:
     )
 
 
+# Analyst ID 前缀常量
+ANALYST_PREFIXES = {
+    "technical": "TECH",
+    "fundamental": "FUND",
+    "position": "POSN",
+    "news": "NEWS",
+}
+
+
+def make_analyst_id(prefix: str, full_symbol: str, trade_date: str, seed: str = "") -> str:
+    """生成稳定、可追溯的 analyst 报告 ID。
+
+    ID 格式: REF-{PREFIX}-{sha256前缀8位}
+    确定性: 相同 full_symbol + trade_date + seed 产生相同 ID。
+
+    Args:
+        prefix: TECH / FUND / POSN / NEWS
+        full_symbol: 合约代码(如 RB2501.SHF)
+        trade_date: 交易日期
+        seed: 额外种子,默认空; fallback/empty 路径传入区分
+
+    Returns:
+        str, 形如 "REF-TECH-a1b2c3d4"
+    """
+    import hashlib
+
+    raw = f"{full_symbol}|{trade_date}|{prefix}|{seed}"
+    h = hashlib.sha256(raw.encode()).hexdigest()[:8]
+    return f"REF-{prefix}-{h}"
+
+
+def inject_analyst_id(report_md: str, analyst_id: str) -> str:
+    """在 Markdown 报告头部注入 HTML 注释形式的 ID 标记。
+
+    Args:
+        report_md: 原始 Markdown 报告
+        analyst_id: 形如 REF-TECH-a1b2c3d4
+
+    Returns:
+        注入 ID 标记后的 Markdown
+    """
+    return f"<!-- ANALYST-ID: {analyst_id} -->\n\n{report_md}"
+
+
+ANALYST_CN_NAMES = {
+    "technical": "技术分析师",
+    "fundamental": "基本面分析师",
+    "position": "持仓分析师",
+    "news": "新闻分析师",
+}
+
+
+def make_conclusion_id(prefix: str, index: int = 1) -> str:
+    """生成简短结论 ID，格式: {prefix_lower}_conc_{index}
+
+    示例: "tech_conc_1", "fund_conc_1"
+
+    Args:
+        prefix: TECH / FUND / POSN / NEWS
+        index: 结论序号，同一 analyst 有多条结论时递增
+
+    Returns:
+        str, 形如 "tech_conc_1"
+    """
+    return f"{prefix.lower()}_conc_{index}"
+
+
+def make_registry_entry(
+    analyst_id: str,
+    conclusion_id: str,
+    prefix: str,
+    analyst_key: str,
+    report_key: str,
+    direction: str,
+    summary: str,
+) -> dict:
+    """构造标准化的 analyst registry entry。
+
+    Args:
+        analyst_id: make_analyst_id() 生成的 hash ID (REF-TECH-xxx)
+        conclusion_id: make_conclusion_id() 生成的结论 ID (tech_conc_1)
+        prefix: TECH / FUND / POSN / NEWS
+        analyst_key: "technical" / "fundamental" / "position" / "news"
+        report_key: "market_report" / "fundamentals_report" / "position_report" / "news_report"
+        direction: 方向信号
+        summary: 摘要文本
+
+    Returns:
+        dict, 单键值对: {analyst_id: {id, conclusion_id, prefix, analyst, cn_name, report_key, direction, summary}}
+    """
+    cn_name = ANALYST_CN_NAMES.get(analyst_key, analyst_key)
+    return {
+        analyst_id: {
+            "id": analyst_id,
+            "conclusion_id": conclusion_id,
+            "prefix": prefix,
+            "analyst": analyst_key,
+            "cn_name": cn_name,
+            "report_key": report_key,
+            "direction": direction,
+            "summary": summary,
+        }
+    }
+
+
+def extract_first_sentence(text: str) -> str:
+    """从 Markdown 报告中提取第一句有意义的句子作摘要。"""
+    # 去掉 ID 标记行
+    cleaned = re.sub(r'<!--.*?-->', '', text).strip()
+    # 取第一个有意义的行,最多 80 字
+    for line in cleaned.split("\n"):
+        line = line.strip()
+        line = line.lstrip("#").strip()
+        if line and len(line) > 3:
+            return line[:80]
+    return "(无摘要)"
+
+
 __all__ = [
     "load_features",
     "empty_report",
@@ -109,4 +229,11 @@ __all__ = [
     "get_full_symbol",
     "MIN_ROWS_THRESHOLD",
     "SNAPSHOT_MAX_KEYS",
+    "make_analyst_id",
+    "make_conclusion_id",
+    "make_registry_entry",
+    "inject_analyst_id",
+    "extract_first_sentence",
+    "ANALYST_PREFIXES",
+    "ANALYST_CN_NAMES",
 ]

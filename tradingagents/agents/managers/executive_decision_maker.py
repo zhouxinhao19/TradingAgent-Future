@@ -1,11 +1,8 @@
 """
-executive_decision_maker.py — CIO 最终决策节点 (Phase 3b-ii)
+executive_decision_maker.py — CIO 最终决策节点 (Phase 3b-ii + L2-L4 合并)
 
-参考:TradingAgents_for_Futures-main/qihuo/agents/CIO/
-
-CIO 整合三层决策,输出最终可执行决策:
-  - 研究经理辩论结果 → investment_plan
-  - 交易员决策     → trader_investment_plan
+CIO 整合两层决策,输出最终可执行决策:
+  - 推理分析师报告 → investment_plan
   - 风控评估       → final_trade_decision
 
 输出 state['final_decision'] = Markdown 报告(决策方向 + 合约 + 入场 + 止损 + 目标 + 持仓手数 + 风险敞口)
@@ -21,15 +18,17 @@ logger = get_logger("default")
 
 COMMODITY_CIO_SYSTEM_PROMPT = """你是大宗商品期货投资决策委员会(CIO)的最终决策者。
 
-你的职责是综合以下三层决策,给出**明确可执行**的最终指令:
+你的职责是综合以下两层决策,给出**明确可执行**的最终指令:
 
-### 1. 研究经理辩论结果(基本面 + 技术面 + 多空辩论)
+### 1. 推理分析师综合报告（估值-驱动矩阵 + 多空对照 + 情景推演）
 {investment_plan}
 
-### 2. 交易员计划(具体入场 + 仓位 + 止损止盈)
-{trader_plan}
+推理分析师的 `investment_plan` 是 JSON 格式，包含"估值驱动矩阵"、"多空对照表"、"三种情景推演"三大模块。请重点关注：
+- 估值驱动矩阵中的"综合估值判断"和"核心驱动"→ 作为你的方向判断基准
+- 多空对照表中的"关键分歧"→ 识别最核心的争议点
+- 情景推演中的"触发条件"和"风险节点"→ 作为决策边界和风险控制依据
 
-### 3. 风控评估(激进 / 中性 / 保守三方意见)
+### 2. 风控评估(激进 / 中性 / 保守三方意见)
 {final_trade_decision}
 
 ---
@@ -45,14 +44,14 @@ COMMODITY_CIO_SYSTEM_PROMPT = """你是大宗商品期货投资决策委员会(C
 7. **持有周期**:日内 / 短线(1-5 日) / 波段(1-4 周) / 趋势(1-3 月)
 8. **置信度**:0-1 之间的数值
 9. **风险敞口**:账户百分比 + 杠杆倍数
-10. **决策理由**:基于以上三层证据,300-500 字综合论证
+10. **决策理由**:基于以上两层证据,300-500 字综合论证
 
 ## ⚠️ 严格要求
 
 - 决策必须**明确可执行**,不允许"建议观望"或"需要更多信息"
 - 入场/止损/目标价位**必须具体数值**,绝对不能 null 或"待定"
 - 合约代码必须来自研究报告中的真实数据
-- 决策理由必须直接回应三层证据,不得凭空捏造
+- 决策理由必须直接回应两层证据,不得凭空捏造
 
 ## 输出格式
 
@@ -113,9 +112,8 @@ def create_executive_decision_maker(llm):
 
         logger.info(f"👔 [CIO] 最终决策启动: {full_symbol} (asset_type={asset_type})")
 
-        # 收集三层决策
+        # 收集两层决策
         investment_plan = state.get("investment_plan", "(空)")
-        trader_plan = state.get("trader_investment_plan", "(空)")
         final_trade_decision = state.get("final_trade_decision", "(空)")
 
         # === Commodity 路径(LLM 必调,失败 fallback) ===
@@ -132,7 +130,6 @@ def create_executive_decision_maker(llm):
                 ).partial(
                     full_symbol=full_symbol,
                     investment_plan=investment_plan,
-                    trader_plan=trader_plan,
                     final_trade_decision=final_trade_decision,
                 )
 

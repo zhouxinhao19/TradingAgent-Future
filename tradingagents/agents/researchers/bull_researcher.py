@@ -25,8 +25,23 @@ COMMODITY_BULL_PROMPT = """你是一位看涨期货研究员,负责为标的 {fu
 - **宏观与产业**:全球宏观(美联储/OPEC+/地缘) + 产业事件(产能/限产/天气)
 - **反驳看跌观点**:用具体数据(库存/基差/持仓)批判性分析
 
+## 分析师报告索引(ID引用规则)
+
+以下是各分析师报告的编号ID。在论证中引用具体数据时,必须使用对应的ID标注来源:
+
+{analyst_registry_summary}
+
+引用格式示例:
+  - "根据技术分析报告[TECH-a1b2c3d4],MACD金叉确认..."
+  - "持仓数据[POSN-x9y8z7w6]显示净多增加..."
+
+强制规则:
+  1. 每个论证要点必须引用至少 2 个不同的分析师报告ID。
+  2. 引用格式为 [PREFIX-hash8],如 [TECH-a1b2c3d4]。
+  3. 不得凭空编造未提供的ID。如果某方面无对应ID,注明"无分析师索引"。
+
 可用资源:
-- 技术面报告: {market_research_report}
+- 技术面报告(编号如上): {market_research_report}
 - 持仓分析报告(主力加减仓/集中度/拥挤度): {sentiment_report}
 - 新闻/产业事件: {news_report}
 - 基本面报告(基差+库存+期限结构): {fundamentals_report}
@@ -34,7 +49,7 @@ COMMODITY_BULL_PROMPT = """你是一位看涨期货研究员,负责为标的 {fu
 - 最后的看跌论点: {current_response}
 - 经验教训: {past_memory_str}
 
-请构建有说服力的看涨论点,聚焦期货特定证据(基差/库存/期限结构/持仓),反驳看跌担忧。"""
+请构建有说服力的看涨论点,聚焦期货特定证据(基差/库存/期限结构/持仓),反驳看跌担忧。每个论点必须引用分析师报告ID。"""
 
 
 def create_bull_researcher(llm, memory):
@@ -155,8 +170,24 @@ def create_bull_researcher(llm, memory):
             past_memory_str += rec["recommendation"] + "\n\n"
 
         if asset_type == "commodity":
+            # 构造 analyst_registry_summary
+            analyst_registry = state.get("analyst_registry", {})
+            if analyst_registry:
+                registry_lines = []
+                for aid, entry in analyst_registry.items():
+                    summary = entry.get("summary", "") or ""
+                    direction = entry.get("direction", "neutral") or "neutral"
+                    analyst_name = entry.get("analyst", "unknown")
+                    registry_lines.append(
+                        f"  - {aid}: {analyst_name}分析师, 方向={direction}, {summary}"
+                    )
+                analyst_registry_summary = "\n".join(registry_lines)
+            else:
+                analyst_registry_summary = "(暂无分析师报告索引)"
+
             prompt = COMMODITY_BULL_PROMPT.format(
                 full_symbol=state.get("full_symbol") or ticker,
+                analyst_registry_summary=analyst_registry_summary,
                 market_research_report=market_research_report,
                 sentiment_report=sentiment_report,
                 news_report=news_report,
