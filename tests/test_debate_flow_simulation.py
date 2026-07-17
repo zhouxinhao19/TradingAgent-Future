@@ -252,6 +252,50 @@ class TestDebateFlowSummary:
         assert logic.max_risk_discuss_rounds == 3
 
 
-if __name__ == "__main__":
+class TestDebateTerminationBoundary:
+    """测试 should_continue_debate 在各种边界条件下的终止行为。"""
+
+    @pytest.mark.parametrize("max_rounds,initial_count,current_response,expected", [
+        (1, 0, "Bull Researcher", "Bear Researcher"),   # 开始: count=0, Bull 刚说完 → Bear
+        (1, 1, "Bull Researcher", "Bear Researcher"),   # 中间: count=1<2, Bull → Bear
+        (1, 2, "Bull Researcher", "Research Manager"),  # 结束: count=2=2*1
+        (2, 0, "Bull Researcher", "Bear Researcher"),   # 开始: count=0
+        (2, 3, "Bull Researcher", "Bear Researcher"),   # 中间: count=3<4, Bull → Bear
+        (2, 4, "Bull Researcher", "Research Manager"),  # 结束: count=4=2*2
+        (0, 0, "Bull Researcher", "Research Manager"),  # 0 轮立即终止
+        (1, 5, "Bull Researcher", "Research Manager"),  # count 超 max 边界安全
+    ])
+    def test_investment_debate_boundary(self, max_rounds, initial_count, current_response, expected):
+        """参数化测试投资辩论边界条件。"""
+        logic = ConditionalLogic(max_debate_rounds=max_rounds)
+        state = {
+            "investment_debate_state": {
+                "count": initial_count,
+                "current_response": current_response,
+            }
+        }
+        result = logic.should_continue_debate(state)
+        assert result == expected, (
+            f"max_rounds={max_rounds}, count={initial_count}, "
+            f"speaker={current_response}: 期望 {expected}, 实际 {result}"
+        )
+
+    @pytest.mark.parametrize("current_response,expected_next", [
+        ("Bull Researcher", "Bear Researcher"),   # Bull 说完 → Bear
+        ("Bear Researcher", "Bull Researcher"),   # Bear 说完 → Bull
+    ])
+    def test_investment_debate_speaker_switch(self, current_response, expected_next):
+        """验证发言人切换逻辑。"""
+        logic = ConditionalLogic(max_debate_rounds=2)
+        state = {
+            "investment_debate_state": {
+                "count": 0,
+                "current_response": current_response,
+            }
+        }
+        result = logic.should_continue_debate(state)
+        assert result == expected_next, (
+            f"current_response={current_response}: 期望 {expected_next}, 实际 {result}"
+        )
     pytest.main([__file__, "-v", "-s"])
 

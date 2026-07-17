@@ -10,6 +10,11 @@ from tradingagents.utils.logging_init import get_logger
 logger = get_logger("default")
 
 
+def merge_dicts(current: dict, update: dict) -> dict:
+    """LangGraph reducer: 合并两个 dict，update 覆盖 current 同名 key。"""
+    return {**current, **update}
+
+
 # Researcher team state
 class InvestDebateState(TypedDict):
     bull_history: Annotated[
@@ -102,3 +107,6 @@ class AgentState(MessagesState):
     latest_news: Annotated[list, "最新新闻列表 List[Dict],来自 provider.get_futures_news()"]
     final_decision: Annotated[str, "CIO 最终决策(Markdown 文本)"]
     cio_decision_timestamp: Annotated[str, "CIO 决策 ISO 时间戳"]
+
+    # 大宗商品 analyst 报告注册索引（merge 模式，自动累积）
+    analyst_registry: Annotated[dict, merge_dicts]

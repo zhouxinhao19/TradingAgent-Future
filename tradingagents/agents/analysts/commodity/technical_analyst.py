@@ -26,8 +26,13 @@ from tradingagents.utils.logging_init import get_logger
 
 from ._base import (
     empty_report,
+    extract_first_sentence,
     get_full_symbol,
+    inject_analyst_id,
     load_features,
+    make_analyst_id,
+    make_conclusion_id,
+    make_registry_entry,
     quality_gate,
     truncate_snapshot,
 )
@@ -290,10 +295,15 @@ def create_technical_analyst(llm):
             reason = "特征层技术数据缺失(features['technical'] 为空)"
             report_md = empty_report("neutral", reason)
             logger.warning(f"⚠️ [技术分析师] {reason}")
+            analyst_id = make_analyst_id("TECH", full_symbol, trade_date, seed="empty")
+            conclusion_id = make_conclusion_id("TECH", 1)
+            tagged_report = inject_analyst_id(report_md, analyst_id)
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "TECH", "technical", "market_report", "neutral", "(数据缺失: 跳过)")
             return {
-                "market_report": report_md,
+                "market_report": tagged_report,
                 "messages": [],
                 "market_tool_call_count": 0,
+                "analyst_registry": registry_entry,
             }
 
         # --- 降级路径 2:数据稀疏(quality.rows < 阈值) ---
@@ -303,10 +313,15 @@ def create_technical_analyst(llm):
             reason = f"特征层技术数据稀疏(quality.rows={rows} < {30})"
             report_md = empty_report("neutral", reason)
             logger.warning(f"⚠️ [技术分析师] {reason}")
+            analyst_id = make_analyst_id("TECH", full_symbol, trade_date, seed="sparse")
+            conclusion_id = make_conclusion_id("TECH", 1)
+            tagged_report = inject_analyst_id(report_md, analyst_id)
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "TECH", "technical", "market_report", "neutral", "(数据稀疏: 跳过)")
             return {
-                "market_report": report_md,
+                "market_report": tagged_report,
                 "messages": [],
                 "market_tool_call_count": 0,
+                "analyst_registry": registry_entry,
             }
 
         # --- 主路径:features 可信,准备 LLM prompt ---
@@ -420,10 +435,17 @@ def create_technical_analyst(llm):
             else:
                 msg_out = AIMessage(content=report_md)
 
+            direction = combined.get("direction", "neutral") or "neutral"
+            analyst_id = make_analyst_id("TECH", full_symbol, trade_date)
+            conclusion_id = make_conclusion_id("TECH", 1)
+            tagged_report = inject_analyst_id(report_md, analyst_id)
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "TECH", "technical", "market_report", direction, extract_first_sentence(report_md))
+
             return {
-                "market_report": report_md,
+                "market_report": tagged_report,
                 "messages": [msg_out],
                 "market_tool_call_count": 0,
+                "analyst_registry": registry_entry,
             }
 
         except Exception as e:
@@ -440,10 +462,14 @@ def create_technical_analyst(llm):
                 logger.error(f"❌ [技术分析师] fallback 也失败: {inner_e}")
                 fallback_md = empty_report("neutral", f"features 与 LLM 均不可用: {e}; fallback 异常: {inner_e}")
 
+            analyst_id = make_analyst_id("TECH", full_symbol, trade_date, seed="fallback")
+            tagged_report = inject_analyst_id(fallback_md, analyst_id)
+            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "TECH", "analyst": "technical", "report_key": "market_report", "direction": "neutral", "summary": "(降级: LLM 不可用)"}}
             return {
-                "market_report": fallback_md,
+                "market_report": tagged_report,
                 "messages": [],
                 "market_tool_call_count": 0,
+                "analyst_registry": registry_entry,
             }
 
     return technical_analyst_node

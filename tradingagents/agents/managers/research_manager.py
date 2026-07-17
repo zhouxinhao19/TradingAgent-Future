@@ -6,52 +6,99 @@ from tradingagents.utils.logging_init import get_logger
 from tradingagents.agents.utils.instrument_utils import build_instrument_context
 logger = get_logger("default")
 
-# === Phase 3b-ii-B:Commodity prompt 注入(占位) ===
-COMMODITY_RESEARCH_MANAGER_PROMPT = """作为期货研究经理和辩论主持人,您需要批判性地评估这轮多空辩论,并为标的 {full_symbol} 做出明确决策:做多、做空或持有。
+COMMODITY_REASONING_PROMPT = """你是期货推理分析师。在单次分析中完成多空双向推理，输出结构化分析报告。
 
-⚠️ 这是大宗商品期货分析(非股票),必须包含以下期货特定内容:
-- **目标价格**:具体入场价位、止损、止盈、目标位(以合约报价单位)
-- **合约选择**:主力合约代码、换月计划、展期成本估算
-- **杠杆与保证金**:建议持仓手数、保证金占用、风险敞口
-- **基差与期限结构**:对进场时机的指示(Contango 时谨慎,Backwardation 时积极)
-- **时间维度**:日内/短线/波段/趋势,建议持有周期
+⚠️ 本报告是投研辅助工具，**不是交易指令**。严禁输出具体交易价位。
 
-简洁地总结双方关键观点,重点关注最有说服力的证据或推理。您的建议——做多、做空或持有——必须明确且可操作。避免仅仅因为双方都有有效观点就默认选择持有;要基于辩论中最强有力的论点做出承诺。
+## 分析对象
+- 合约: {full_symbol}
+- 品种: {variety_name}
+- 分析日期: {analysis_date}
 
-请用中文撰写所有内容。
-
-以下是您对错误的过去反思:
-\"{past_memory_str}\"
-
-标的约束:
+## 标的约束
 {instrument_context}
 
-以下是综合分析报告:
-市场研究: {market_research_report}
+## L1 分析师报告索引（证据链 — 每个结论必须引用至少 1 个 ID）
+{analyst_registry_summary}
 
-持仓分析: {sentiment_report}
+## 输入报告
 
-新闻分析: {news_report}
+### 技术面报告
+{market_research_report}
 
-基本面分析: {fundamentals_report}
+### 基本面报告（基差+库存+期限结构）
+{fundamentals_report}
 
-以下是辩论:
-辩论历史: {history}
+### 持仓情绪报告
+{sentiment_report}
 
-请做出明确决策:做多/做空/持有 + 目标价/止损/止盈 + 合约选择 + 持有周期。"""
+### 新闻/产业事件报告
+{news_report}
+
+## 历史经验教训
+{past_memory_str}
+
+---
+
+## 输出要求
+
+输出包含以下三大模块的复合 JSON。
+
+### 模块 A：估值-驱动矩阵
+
+评估以下维度的当前状态、估值判断和驱动方向：
+1. 基差（估值）
+2. 库存（驱动）
+3. 期限结构（估值+驱动）
+4. 技术面（驱动+择时）
+5. 持仓情绪（验证）
+6. 宏观/新闻（驱动）
+
+每个维度必须包含：
+- "维度": 维度名称
+- "当前状态": 简练描述
+- "估值判断": 低估/合理/高估
+- "驱动方向": bullish/bearish/neutral
+- "驱动因素": 关键驱动列表
+- "置信度": 0~1 浮点数
+- "数据来源": [引用至少 1 个分析师报告 ID，如 "REF-TECH-a1b2c3d4"]
+
+### 模块 B：多空对照表
+
+每个关键分歧包含看涨/看跌双方逻辑，每个逻辑后标注引用 ID。
+
+### 模块 C：三种情景推演
+
+三种情景（保守/基准/乐观），每个包含：
+- "推演方向": 做多/做空/中性
+- "触发条件": 可观测的市场信号列表
+- "关注焦点": 应关注的关键变量
+- "风险节点": 情景失效条件
+- "置信度": 0~1 浮点数
+- "数据来源": [引用至少 2 个不同分析师报告 ID]
+
+### 禁止项
+- ❌ 禁止 "买入"/"卖出"，统一用 "做多"/"做空"
+- ❌ 禁止具体交易价位（入场价/止损价/目标价/手数）
+- ❌ 禁止保证金占用比例
+- ❌ 禁止虚构未提供的分析师报告 ID
+
+### 允许项
+- ✅ 三种情景允许方向不同（如保守=做多、基准=中性、乐观=做空）
+- ✅ 方向不同时须在"综合情景判断"中标注核心分歧
+- ✅ 触发条件必须是可观测、可验证的市场信号
+
+请输出**纯 JSON**（无 Markdown 代码块包裹），包含以上三大模块。"""
 
 
 def create_research_manager(llm, memory):
     def research_manager_node(state) -> dict:
         ticker = state["company_of_interest"]
         instrument_context = build_instrument_context(ticker)
-        history = state["investment_debate_state"].get("history", "")
         market_research_report = state["market_report"]
         sentiment_report = state.get("position_report") or state.get("sentiment_report", "")
         news_report = state["news_report"]
         fundamentals_report = state["fundamentals_report"]
-
-        investment_debate_state = state["investment_debate_state"]
 
         # === Phase 3b-ii-B:检测 asset_type ===
         asset_type = state.get("asset_type", "stock")
@@ -70,17 +117,53 @@ def create_research_manager(llm, memory):
             past_memory_str += rec["recommendation"] + "\n\n"
 
         if asset_type == "commodity":
-            prompt = COMMODITY_RESEARCH_MANAGER_PROMPT.format(
-                full_symbol=state.get("full_symbol") or ticker,
+            # ===== 新推理分析师路径 =====
+            full_symbol = state.get("full_symbol") or ticker
+            variety_name = state.get("variety_name", "")
+            trade_date = state.get("trade_date", "")
+
+            # 构建 analyst_registry_summary
+            registry = state.get("analyst_registry", {}) or {}
+            if registry:
+                registry_lines = []
+                for ref_id, entry in registry.items():
+                    cn_name = entry.get("cn_name", entry.get("analyst", "?"))
+                    direction = entry.get("direction", "?")
+                    summary = entry.get("summary", "")
+                    registry_lines.append(f"- {cn_name} | {direction} | {summary} | ID:{ref_id}")
+                analyst_registry_summary = "\n".join(registry_lines)
+            else:
+                analyst_registry_summary = "(暂无分析师报告索引)"
+
+            prompt = COMMODITY_REASONING_PROMPT.format(
+                full_symbol=full_symbol,
+                variety_name=variety_name,
+                analysis_date=trade_date,
+                instrument_context=instrument_context,
                 market_research_report=market_research_report,
+                fundamentals_report=fundamentals_report,
                 sentiment_report=sentiment_report,
                 news_report=news_report,
-                fundamentals_report=fundamentals_report,
-                history=history,
+                analyst_registry_summary=analyst_registry_summary,
                 past_memory_str=past_memory_str,
-                instrument_context=instrument_context,
             )
+            # 直接调用 llm（不做 chain）
+            response = llm.invoke(prompt)
+            content = response.content if hasattr(response, "content") else str(response)
+
+            # 写入：简化 investment_debate_state（无辩论历史）
+            return {
+                "investment_debate_state": {
+                    "judge_decision": content,
+                    "history": "",
+                    "count": 0,
+                },
+                "investment_plan": content,
+            }
         else:
+            history = state["investment_debate_state"].get("history", "")
+            investment_debate_state = state["investment_debate_state"]
+
             prompt = f"""作为投资组合经理和辩论主持人，您的职责是批判性地评估这轮辩论并做出明确决策：支持看跌分析师、看涨分析师，或者仅在基于所提出论点有强有力理由时选择持有。
 
 简洁地总结双方的关键观点，重点关注最有说服力的证据或推理。您的建议——买入、卖出或持有——必须明确且可操作。避免仅仅因为双方都有有效观点就默认选择持有；要基于辩论中最强有力的论点做出承诺。

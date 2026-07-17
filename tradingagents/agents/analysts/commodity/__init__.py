@@ -17,6 +17,12 @@ Phase 3b-ii:商品期货分析师节点(技术/产业/持仓/新闻)
   - create_position_analyst   → state['sentiment_report'](旧)/state['position_report']+state['position_structured'](新)
   - create_news_analyst       → state['news_report']
 """
+from ._base import (
+    ANALYST_PREFIXES,
+    extract_first_sentence,
+    inject_analyst_id,
+    make_analyst_id,
+)
 from .fundamental_analyst import create_fundamental_analyst
 from .news_analyst import create_news_analyst
 from .position_analyst import create_position_analyst
@@ -34,6 +40,10 @@ __all__ = [
     "create_fundamental_analyst",
     "create_position_analyst",
     "create_news_analyst",
+    "make_analyst_id",
+    "inject_analyst_id",
+    "extract_first_sentence",
+    "ANALYST_PREFIXES",
     "AnalystSignal",
     "TechnicalReport",
     "FundamentalReport",

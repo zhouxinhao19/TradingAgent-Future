@@ -28,8 +28,11 @@ from tradingagents.utils.logging_init import get_logger
 
 from ._base import (
     empty_report,
+    extract_first_sentence,
     get_full_symbol,
+    inject_analyst_id,
     load_features,
+    make_analyst_id,
     quality_gate,
 )
 
@@ -502,24 +505,32 @@ def create_position_analyst(llm):
         if not isinstance(pos_block, dict):
             reason = "持仓 features 缺失(features['positioning'] 为空)"
             empty = empty_report("neutral", reason)
+            analyst_id = make_analyst_id("POSN", full_symbol, trade_date, seed="empty")
+            tagged_empty = inject_analyst_id(empty, analyst_id)
+            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "POSN", "analyst": "position", "report_key": "position_report", "direction": "neutral", "summary": "(数据缺失: 跳过)"}}
             return {
-                "sentiment_report": empty,
-                "position_report": empty,
+                "sentiment_report": empty,  # 保持纯净(stock 兼容)
+                "position_report": tagged_empty,
                 "position_structured": {},
                 "messages": [],
                 "sentiment_tool_call_count": 0,
+                "analyst_registry": registry_entry,
             }
 
         # --- 降级 2:数据稀疏 ---
         if not quality_gate(pos_block):
             reason = "持仓数据稀疏"
             empty = empty_report("neutral", reason)
+            analyst_id = make_analyst_id("POSN", full_symbol, trade_date, seed="sparse")
+            tagged_empty = inject_analyst_id(empty, analyst_id)
+            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "POSN", "analyst": "position", "report_key": "position_report", "direction": "neutral", "summary": "(数据稀疏: 跳过)"}}
             return {
-                "sentiment_report": empty,
-                "position_report": empty,
+                "sentiment_report": empty,  # 保持纯净
+                "position_report": tagged_empty,
                 "position_structured": {},
                 "messages": [],
                 "sentiment_tool_call_count": 0,
+                "analyst_registry": registry_entry,
             }
 
         # --- 从 technical features 提取上下文 ---
@@ -630,12 +641,16 @@ def create_position_analyst(llm):
             logger.info(f"✅ [持仓分析师] 报告生成: {len(report_md)} 字符")
 
             msg_out = result if hasattr(result, "content") else AIMessage(content=report_md)
+            analyst_id = make_analyst_id("POSN", full_symbol, trade_date)
+            tagged_report = inject_analyst_id(report_md, analyst_id)
+            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "POSN", "analyst": "position", "report_key": "position_report", "direction": direction or "neutral", "summary": extract_first_sentence(report_md)}}
             return {
-                "sentiment_report": report_md,
-                "position_report": report_md,
+                "sentiment_report": report_md,  # 保持纯净
+                "position_report": tagged_report,
                 "position_structured": structured_report,
                 "messages": [msg_out],
                 "sentiment_tool_call_count": 0,
+                "analyst_registry": registry_entry,
             }
 
         except Exception as e:
@@ -650,12 +665,16 @@ def create_position_analyst(llm):
                 fallback_md = empty_report("neutral", f"LLM 失败且 fallback 异常: {inner_e}")
                 structured = {}
 
+            analyst_id = make_analyst_id("POSN", full_symbol, trade_date, seed="fallback")
+            tagged_fallback = inject_analyst_id(fallback_md, analyst_id)
+            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "POSN", "analyst": "position", "report_key": "position_report", "direction": direction or "neutral", "summary": "(降级: LLM 不可用)"}}
             return {
-                "sentiment_report": fallback_md,
-                "position_report": fallback_md,
+                "sentiment_report": fallback_md,  # 保持纯净
+                "position_report": tagged_fallback,
                 "position_structured": structured,
                 "messages": [],
                 "sentiment_tool_call_count": 0,
+                "analyst_registry": registry_entry,
             }
 
     return position_analyst_node

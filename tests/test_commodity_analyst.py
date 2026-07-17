@@ -734,7 +734,7 @@ class TestPositionAnalystNode:
         assert "position_report" in result
         assert "position_structured" in result
         assert "数据缺失" in result["sentiment_report"]
-        assert result["position_report"] == result["sentiment_report"]
+        assert "数据缺失" in result["position_report"]  # position_report 含 ID 标签,不再严格相等
         assert result["position_structured"] == {}
         mock_llm.invoke.assert_not_called()
 
@@ -754,7 +754,7 @@ class TestPositionAnalystNode:
         result = node(_state(commodity_features=sample_features_all))
         assert "降级版本" in result["sentiment_report"]
         assert "position_report" in result
-        assert result["sentiment_report"] == result["position_report"]
+        assert "降级版本" in result["position_report"]  # position_report 含 ID 标签
         assert "position_structured" in result
         assert isinstance(result["position_structured"], dict)
 
@@ -1066,3 +1066,220 @@ class TestTechnicalContractAwareness:
         assert "market_report" in result
         assert "期限合约" in result["market_report"]
         assert "2025-05" in result["market_report"]
+
+
+# =============================================================================
+# L1 → L2 编号引用机制:分析师 ID 生成测试
+# =============================================================================
+
+_MOCK_REPORT_TEXT = "螺纹钢日线突破 3500 元/吨关口,日线 MACD 金叉确认,周线布林带上轨。"
+
+
+@pytest.fixture
+def id_mock_llm():
+    """模拟 LLM,返回含丰富内容的报告,便于 extract_first_sentence 提取摘要。"""
+    llm = MagicMock()
+    llm.invoke = MagicMock(return_value=MagicMock(content=_MOCK_REPORT_TEXT))
+    return llm
+
+
+class TestAnalystIdGeneration:
+    """验证每个 analyst 生成有效 ID + analyst_registry。"""
+
+    def test_technical_analyst_generates_id(self, id_mock_llm):
+        from tradingagents.agents.analysts.commodity import create_technical_analyst
+
+        node = create_technical_analyst(id_mock_llm)
+        result = node(_state(
+            commodity_features={"technical": {
+                "quality": {"rows": 60, "main_continuous_available": True},
+                "combined": {"direction": "bullish", "strength": 0.6, "signals": [],
+                            "oi_divergence": "neutral", "volatility": {"regime": "low"},
+                            "main_index_alignment": "partial"},
+                "main_continuous": {"daily": {"snapshot": {}, "trend": {}, "signals": []}, "weekly": None},
+                "index_contract": {"symbol": None, "ma60": None, "ma120": None, "long_term_trend": "neutral",
+                                  "relative_strength": None, "quality": {"rows": 0}},
+                "rollover": {"detected": False, "description": "", "recent_rollover": False},
+            }},
+        ))
+        assert "analyst_registry" in result
+        assert "market_report" in result
+        aid = next(iter(result["analyst_registry"]))
+        assert aid.startswith("REF-TECH-"), f"ID 格式错误: {aid}"
+        assert len(aid) == 17, f"ID 长度错误: {aid}"  # REF-TECH-a1b2c3d4 = 17
+        # report 包含 ID 注释
+        assert f"<!-- ANALYST-ID: {aid}" in result["market_report"]
+        # registry entry 结构
+        entry = result["analyst_registry"][aid]
+        assert entry["prefix"] == "TECH"
+        assert entry["analyst"] == "technical"
+        assert entry["direction"] == "bullish"
+        assert len(entry["summary"]) > 0
+
+    def test_fundamental_analyst_generates_id(self, id_mock_llm):
+        from tradingagents.agents.analysts.commodity import create_fundamental_analyst
+
+        node = create_fundamental_analyst(id_mock_llm)
+        result = node(_state(
+            commodity_features={
+                "basis": {"latest": {"dom_basis_rate": 0.03}, "stats": {"zscore_180d": {"dom_basis_rate": 0.5},
+                         "slope_20d": {"dom_basis_rate": 0.1}}, "signals": [], "quality": {"rows": 60}},
+                "inventory": {"latest": {"value": 100}, "snapshot": {"wow_change": -0.02},
+                             "signals": [], "quality": {"rows": 60}},
+                "term_structure": {"latest": {"carry_score": 0.3}, "signals": [], "quality": {"rows": 60}},
+            },
+        ))
+        assert "analyst_registry" in result
+        aid = next(iter(result["analyst_registry"]))
+        assert aid.startswith("REF-FUND-"), f"ID 格式错误: {aid}"
+        assert f"<!-- ANALYST-ID: {aid}" in result["fundamentals_report"]
+        entry = result["analyst_registry"][aid]
+        assert entry["prefix"] == "FUND"
+        assert entry["analyst"] == "fundamental"
+
+    def test_position_analyst_generates_id(self, id_mock_llm):
+        from tradingagents.agents.analysts.commodity import create_position_analyst
+
+        node = create_position_analyst(id_mock_llm)
+        result = node(_state(
+            commodity_features={"positioning": {
+                "quality": {"rows": 60},
+                "signals": [{"name": "net_long_increase", "value": 0.12}],
+                "snapshot": {"net_long_change_5d": 0.12, "concentration": 0.35, "crowding_pctl_180d": 0.45,
+                            "long_trend": "increasing", "short_trend": "decreasing"},
+                "latest": {"oi_change_pct": 0.05},
+            }},
+        ))
+        assert "analyst_registry" in result
+        aid = next(iter(result["analyst_registry"]))
+        assert aid.startswith("REF-POSN-"), f"ID 格式错误: {aid}"
+        # position_report 含 ID, sentiment_report 不含(保持纯净)
+        assert f"<!-- ANALYST-ID: {aid}" in result["position_report"]
+        assert "<!-- ANALYST-ID:" not in result.get("sentiment_report", "")
+        entry = result["analyst_registry"][aid]
+        assert entry["prefix"] == "POSN"
+
+    def test_news_analyst_generates_id(self, id_mock_llm):
+        from tradingagents.agents.analysts.commodity import create_news_analyst
+
+        node = create_news_analyst(id_mock_llm)
+        result = node(_state(
+            commodity_features={"news_sentiment": {
+                "latest": {"positive_count": 10, "negative_count": 3, "neutral_count": 5, "sentiment_ratio": 0.77},
+                "quality": {"rows": 18},
+                "signals": [{"name": "positive_sentiment", "value": 0.77}],
+            }},
+        ))
+        assert "analyst_registry" in result
+        aid = next(iter(result["analyst_registry"]))
+        assert aid.startswith("REF-NEWS-"), f"ID 格式错误: {aid}"
+        assert f"<!-- ANALYST-ID: {aid}" in result["news_report"]
+        entry = result["analyst_registry"][aid]
+        assert entry["prefix"] == "NEWS"
+        assert entry["analyst"] == "news"
+
+    def test_analyst_id_determinism(self):
+        """相同 full_symbol + trade_date → 相同 ID; 不同 full_symbol → 不同 ID。"""
+        from tradingagents.agents.analysts.commodity._base import make_analyst_id
+
+        id1a = make_analyst_id("TECH", "RB2501.SHF", "2026-07-14")
+        id1b = make_analyst_id("TECH", "RB2501.SHF", "2026-07-14")
+        assert id1a == id1b, "相同输入应产生相同 ID"
+
+        id2 = make_analyst_id("TECH", "CU2501.SHF", "2026-07-14")
+        assert id1a != id2, "不同合约应产生不同 ID"
+
+    def test_analyst_id_fallback_path(self, id_mock_llm):
+        """LLM 失败时,降级路径仍生成有效 ID。"""
+        from tradingagents.agents.analysts.commodity import create_technical_analyst
+
+        failing_llm = MagicMock()
+        failing_llm.invoke = MagicMock(side_effect=RuntimeError("LLM down"))
+
+        node = create_technical_analyst(failing_llm)
+        result = node(_state(
+            commodity_features={"technical": {
+                "quality": {"rows": 60, "main_continuous_available": True},
+                "combined": {"direction": "neutral", "strength": 0.0, "signals": [],
+                            "oi_divergence": "neutral", "volatility": {"regime": "low"},
+                            "main_index_alignment": "partial"},
+                "main_continuous": {"daily": {"snapshot": {}, "trend": {}, "signals": []}, "weekly": None},
+                "index_contract": {"symbol": None, "ma60": None, "ma120": None, "long_term_trend": "neutral",
+                                  "relative_strength": None, "quality": {"rows": 0}},
+                "rollover": {"detected": False, "description": "", "recent_rollover": False},
+            }},
+        ))
+        assert "analyst_registry" in result
+        aid = next(iter(result["analyst_registry"]))
+        assert aid.startswith("REF-TECH-")
+        assert f"<!-- ANALYST-ID: {aid}" in result["market_report"]
+
+    def test_analyst_id_empty_path(self):
+        """features 缺失 → empty_report 路径仍生成有效 ID。"""
+        from tradingagents.agents.analysts.commodity import create_technical_analyst
+
+        # 不需要 LLM,因为 features 缺失就走 empty 路径
+        node = create_technical_analyst(MagicMock())
+        result = node(_state(commodity_features={}))
+        assert "analyst_registry" in result
+        aid = next(iter(result["analyst_registry"]))
+        assert aid.startswith("REF-TECH-")
+        assert f"<!-- ANALYST-ID: {aid}" in result["market_report"]
+
+    def test_all_registry_ids_unique(self, id_mock_llm):
+        """同一 state 跑 4 个 analyst → 4 个 registry entry ID 互不相同。"""
+        from tradingagents.agents.analysts.commodity import (
+            create_fundamental_analyst,
+            create_news_analyst,
+            create_position_analyst,
+            create_technical_analyst,
+        )
+
+        features = {
+            "technical": {
+                "quality": {"rows": 60, "main_continuous_available": True},
+                "combined": {"direction": "neutral", "strength": 0.0, "signals": [],
+                            "oi_divergence": "neutral", "volatility": {"regime": "low"},
+                            "main_index_alignment": "partial"},
+                "main_continuous": {"daily": {"snapshot": {}, "trend": {}, "signals": []}, "weekly": None},
+                "index_contract": {"symbol": None, "ma60": None, "ma120": None, "long_term_trend": "neutral",
+                                  "relative_strength": None, "quality": {"rows": 0}},
+                "rollover": {"detected": False, "description": "", "recent_rollover": False},
+            },
+            "basis": {"latest": {"dom_basis_rate": 0.03}, "stats": {"zscore_180d": {"dom_basis_rate": 0.5},
+                      "slope_20d": {"dom_basis_rate": 0.1}}, "signals": [], "quality": {"rows": 60}},
+            "inventory": {"latest": {"value": 100}, "snapshot": {"wow_change": -0.02},
+                         "signals": [], "quality": {"rows": 60}},
+            "term_structure": {"latest": {"carry_score": 0.3}, "signals": [], "quality": {"rows": 60}},
+            "positioning": {
+                "quality": {"rows": 60},
+                "signals": [{"name": "net_long_increase", "value": 0.12}],
+                "snapshot": {"net_long_change_5d": 0.12, "concentration": 0.35, "crowding_pctl_180d": 0.45,
+                            "long_trend": "increasing", "short_trend": "decreasing"},
+                "latest": {"oi_change_pct": 0.05},
+            },
+            "news_sentiment": {
+                "latest": {"positive_count": 10, "negative_count": 3, "neutral_count": 5, "sentiment_ratio": 0.77},
+                "quality": {"rows": 18},
+                "signals": [{"name": "positive_sentiment", "value": 0.77}],
+            },
+        }
+        state = _state(commodity_features=features)
+
+        tech_node = create_technical_analyst(id_mock_llm)
+        fund_node = create_fundamental_analyst(id_mock_llm)
+        pos_node = create_position_analyst(id_mock_llm)
+        news_node = create_news_analyst(id_mock_llm)
+
+        tech_r = tech_node(state)
+        fund_r = fund_node(state)
+        pos_r = pos_node(state)
+        news_r = news_node(state)
+
+        ids = [
+            next(iter(tech_r["analyst_registry"])),
+            next(iter(fund_r["analyst_registry"])),
+            next(iter(pos_r["analyst_registry"])),
+            next(iter(news_r["analyst_registry"])),
+        ]
+        assert len(set(ids)) == 4, f"4 个 ID 应互不相同,实际: {ids}"

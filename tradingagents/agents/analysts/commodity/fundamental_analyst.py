@@ -29,8 +29,11 @@ from tradingagents.utils.logging_init import get_logger
 
 from ._base import (
     empty_report,
+    extract_first_sentence,
     get_full_symbol,
+    inject_analyst_id,
     load_features,
+    make_analyst_id,
     quality_gate,
     truncate_snapshot,
 )
@@ -346,11 +349,16 @@ def create_fundamental_analyst(llm):
         # --- 降级 1:三个模块全部缺失 ---
         if not any(isinstance(b, dict) for b in [basis_block, inventory_block, term_block]):
             reason = "基差/库存/期限结构三因子 features 全部缺失"
+            report_md = empty_report("neutral", reason)
+            analyst_id = make_analyst_id("FUND", full_symbol, trade_date, seed="empty")
+            tagged_report = inject_analyst_id(report_md, analyst_id)
+            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "FUND", "analyst": "fundamental", "report_key": "fundamentals_report", "direction": "neutral", "summary": "(数据缺失: 跳过)"}}
             return {
-                "fundamentals_report": empty_report("neutral", reason),
+                "fundamentals_report": tagged_report,
                 "fundamentals_structured": {},
                 "messages": [],
                 "fundamentals_tool_call_count": 0,
+                "analyst_registry": registry_entry,
             }
 
         # --- 数据稀疏判断(三个模块加起来 rows < 30) ---
@@ -361,11 +369,16 @@ def create_fundamental_analyst(llm):
         )
         if total_rows < 30:
             reason = f"三因子数据稀疏(total_rows={total_rows} < 30)"
+            report_md = empty_report("neutral", reason)
+            analyst_id = make_analyst_id("FUND", full_symbol, trade_date, seed="sparse")
+            tagged_report = inject_analyst_id(report_md, analyst_id)
+            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "FUND", "analyst": "fundamental", "report_key": "fundamentals_report", "direction": "neutral", "summary": "(数据稀疏: 跳过)"}}
             return {
-                "fundamentals_report": empty_report("neutral", reason),
+                "fundamentals_report": tagged_report,
                 "fundamentals_structured": {},
                 "messages": [],
                 "fundamentals_tool_call_count": 0,
+                "analyst_registry": registry_entry,
             }
 
         # --- 估值+驱动评估(纯规则) ---
@@ -468,11 +481,16 @@ def create_fundamental_analyst(llm):
             logger.info(f"✅ [产业分析师] 报告生成: {len(report_md)} 字符")
 
             msg_out = result if hasattr(result, "content") else AIMessage(content=report_md)
+            direction = assessment.get("drive_direction", "neutral") or "neutral"
+            analyst_id = make_analyst_id("FUND", full_symbol, trade_date)
+            tagged_report = inject_analyst_id(report_md, analyst_id)
+            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "FUND", "analyst": "fundamental", "report_key": "fundamentals_report", "direction": direction, "summary": extract_first_sentence(report_md)}}
             return {
-                "fundamentals_report": report_md,
+                "fundamentals_report": tagged_report,
                 "fundamentals_structured": structured_report,
                 "messages": [msg_out],
                 "fundamentals_tool_call_count": 0,
+                "analyst_registry": registry_entry,
             }
 
         except Exception as e:
@@ -483,8 +501,12 @@ def create_fundamental_analyst(llm):
                 logger.error(f"❌ [产业分析师] fallback 也失败: {inner_e}")
                 fallback_md = empty_report("neutral", f"LLM 失败且 fallback 异常: {inner_e}")
 
+            fallback_direction = assessment.get("drive_direction", "neutral") or "neutral"
+            analyst_id = make_analyst_id("FUND", full_symbol, trade_date, seed="fallback")
+            tagged_report = inject_analyst_id(fallback_md, analyst_id)
+            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "FUND", "analyst": "fundamental", "report_key": "fundamentals_report", "direction": fallback_direction, "summary": "(降级: LLM 不可用)"}}
             return {
-                "fundamentals_report": fallback_md,
+                "fundamentals_report": tagged_report,
                 "fundamentals_structured": {
                     "valuation": {"level": assessment["valuation_position"], "safety_margin": assessment["safety_margin"]},
                     "drive": {"direction": assessment["drive_direction"], "strength": assessment["drive_strength"]},
@@ -495,6 +517,7 @@ def create_fundamental_analyst(llm):
                 },
                 "messages": [],
                 "fundamentals_tool_call_count": 0,
+                "analyst_registry": registry_entry,
             }
 
     return fundamental_analyst_node
