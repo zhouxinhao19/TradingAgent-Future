@@ -34,6 +34,8 @@ from ._base import (
     inject_analyst_id,
     load_features,
     make_analyst_id,
+    make_conclusion_id,
+    make_registry_entry,
     quality_gate,
     truncate_snapshot,
 )
@@ -351,8 +353,9 @@ def create_fundamental_analyst(llm):
             reason = "基差/库存/期限结构三因子 features 全部缺失"
             report_md = empty_report("neutral", reason)
             analyst_id = make_analyst_id("FUND", full_symbol, trade_date, seed="empty")
+            conclusion_id = make_conclusion_id("FUND", 1)
             tagged_report = inject_analyst_id(report_md, analyst_id)
-            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "FUND", "analyst": "fundamental", "report_key": "fundamentals_report", "direction": "neutral", "summary": "(数据缺失: 跳过)"}}
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "FUND", "fundamental", "fundamentals_report", "neutral", "(数据缺失: 跳过)")
             return {
                 "fundamentals_report": tagged_report,
                 "fundamentals_structured": {},
@@ -371,8 +374,9 @@ def create_fundamental_analyst(llm):
             reason = f"三因子数据稀疏(total_rows={total_rows} < 30)"
             report_md = empty_report("neutral", reason)
             analyst_id = make_analyst_id("FUND", full_symbol, trade_date, seed="sparse")
+            conclusion_id = make_conclusion_id("FUND", 1)
             tagged_report = inject_analyst_id(report_md, analyst_id)
-            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "FUND", "analyst": "fundamental", "report_key": "fundamentals_report", "direction": "neutral", "summary": "(数据稀疏: 跳过)"}}
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "FUND", "fundamental", "fundamentals_report", "neutral", "(数据稀疏: 跳过)")
             return {
                 "fundamentals_report": tagged_report,
                 "fundamentals_structured": {},
@@ -483,8 +487,9 @@ def create_fundamental_analyst(llm):
             msg_out = result if hasattr(result, "content") else AIMessage(content=report_md)
             direction = assessment.get("drive_direction", "neutral") or "neutral"
             analyst_id = make_analyst_id("FUND", full_symbol, trade_date)
+            conclusion_id = make_conclusion_id("FUND", 1)
             tagged_report = inject_analyst_id(report_md, analyst_id)
-            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "FUND", "analyst": "fundamental", "report_key": "fundamentals_report", "direction": direction, "summary": extract_first_sentence(report_md)}}
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "FUND", "fundamental", "fundamentals_report", direction, extract_first_sentence(report_md))
             return {
                 "fundamentals_report": tagged_report,
                 "fundamentals_structured": structured_report,
@@ -503,8 +508,9 @@ def create_fundamental_analyst(llm):
 
             fallback_direction = assessment.get("drive_direction", "neutral") or "neutral"
             analyst_id = make_analyst_id("FUND", full_symbol, trade_date, seed="fallback")
+            conclusion_id = make_conclusion_id("FUND", 1)
             tagged_report = inject_analyst_id(fallback_md, analyst_id)
-            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "FUND", "analyst": "fundamental", "report_key": "fundamentals_report", "direction": fallback_direction, "summary": "(降级: LLM 不可用)"}}
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "FUND", "fundamental", "fundamentals_report", fallback_direction, "(降级: LLM 不可用)")
             return {
                 "fundamentals_report": tagged_report,
                 "fundamentals_structured": {
