@@ -1,3 +1,12 @@
+"""
+[DEPRECATED — commodity 路径]
+
+该文件的 commodity 分支（Phase 3b-ii-B）已被 Phase 4 投研总监节点替代。
+commodity 决策链不再经过风控辩论 → 风控经理，改为：
+  L2 推理分析师 → 量化检查器(纯规则) → 投研总监(1xLLM) → END
+
+stock 路径仍通过 asset_type 分支使用此文件，请勿删除。
+"""
 import time
 import json
 

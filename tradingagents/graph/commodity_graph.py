@@ -2,7 +2,7 @@
 commodity_graph.py — CommodityTradingAgentsGraph 子图 (Phase 3b-ii-C)
 
 继承自 TradingAgentsGraph,复用 LLM/内存初始化,重写:
-  1. GraphSetup — 注册 4 个 commodity analyst + 决策链节点 + CIO
+  1. GraphSetup — 注册 4 个 commodity analyst + 投研总监节点
   2. Propagator — 注入 commodity state (asset_type + full_symbol + commodity_features + latest_news)
   3. propagate() — 接受 full_symbol (非 ticker),commodity 默认参数
 
@@ -29,14 +29,8 @@ from tradingagents.agents.analysts.commodity import (
     create_position_analyst,
     create_technical_analyst,
 )
-from tradingagents.agents.managers.executive_decision_maker import (
-    create_executive_decision_maker,
-)
+from tradingagents.agents.managers.investment_director import create_investment_director
 from tradingagents.agents.managers.research_manager import create_research_manager
-from tradingagents.agents.managers.risk_manager import create_risk_manager
-from tradingagents.agents.risk_mgmt.aggresive_debator import create_risky_debator
-from tradingagents.agents.risk_mgmt.conservative_debator import create_safe_debator
-from tradingagents.agents.risk_mgmt.neutral_debator import create_neutral_debator
 
 from tradingagents.utils.logging_init import get_logger
 
@@ -150,13 +144,8 @@ class CommodityGraphSetup:
         # === 决策链节点(commodity 化通过 state['asset_type']) ===
         rm_node = create_research_manager(self.deep_thinking_llm, self.invest_judge_memory)
 
-        risky_node = create_risky_debator(self.quick_thinking_llm)
-        safe_node = create_safe_debator(self.quick_thinking_llm)
-        neutral_node = create_neutral_debator(self.quick_thinking_llm)
-        risk_mgr_node = create_risk_manager(self.deep_thinking_llm, self.risk_manager_memory)
-
-        # === CIO 最终决策(新节点) ===
-        cio_node = create_executive_decision_maker(self.deep_thinking_llm)
+        # === Phase 4: 投研总监（替代 L3-L5 风控辩论 → 风控经理 → CIO） ===
+        id_node = create_investment_director(self.deep_thinking_llm)
 
         # === 构造 StateGraph ===
         workflow = StateGraph(AgentState)
@@ -170,14 +159,8 @@ class CommodityGraphSetup:
         # 注册决策链节点
         workflow.add_node("Research Manager", rm_node)
 
-        # 注册风控辩论节点
-        workflow.add_node("Risky Analyst", risky_node)
-        workflow.add_node("Safe Analyst", safe_node)
-        workflow.add_node("Neutral Analyst", neutral_node)
-        workflow.add_node("Risk Judge", risk_mgr_node)
-
-        # 注册 CIO(新)
-        workflow.add_node("CIO", cio_node)
+        # 注册投研总监（Phase 4，替代 L3-L5 共 5 节点 + 7 条边）
+        workflow.add_node("Investment Director", id_node)
 
         # === 边(commodity 路径:analyst 不调工具,直接决策链) ===
         # START → Technical Analyst → Fundamentals Analyst → Sentiment Analyst → News Analyst
@@ -186,37 +169,10 @@ class CommodityGraphSetup:
         workflow.add_edge("Fundamentals Analyst", "Sentiment Analyst")
         workflow.add_edge("Sentiment Analyst", "News Analyst")
 
-        # News Analyst → Research Manager（推理分析师）→ Risky Analyst（跳过辩论+交易员）
+        # News Analyst → Research Manager（推理分析师）→ Investment Director → END
         workflow.add_edge("News Analyst", "Research Manager")
-        workflow.add_edge("Research Manager", "Risky Analyst")
-
-        workflow.add_conditional_edges(
-            "Risky Analyst",
-            self.conditional_logic.should_continue_risk_analysis,
-            {
-                "Safe Analyst": "Safe Analyst",
-                "Risk Judge": "Risk Judge",
-            },
-        )
-        workflow.add_conditional_edges(
-            "Safe Analyst",
-            self.conditional_logic.should_continue_risk_analysis,
-            {
-                "Neutral Analyst": "Neutral Analyst",
-                "Risk Judge": "Risk Judge",
-            },
-        )
-        workflow.add_conditional_edges(
-            "Neutral Analyst",
-            self.conditional_logic.should_continue_risk_analysis,
-            {
-                "Risky Analyst": "Risky Analyst",
-                "Risk Judge": "Risk Judge",
-            },
-        )
-
-        workflow.add_edge("Risk Judge", "CIO")
-        workflow.add_edge("CIO", END)
+        workflow.add_edge("Research Manager", "Investment Director")
+        workflow.add_edge("Investment Director", END)
 
         return workflow.compile()
 
@@ -257,16 +213,12 @@ class CommodityTradingAgentsGraph(TradingAgentsGraph):
 
     # === 进度映射(覆盖父类,适配 commodity 节点名) ===
     _COMMODITY_NODE_MAPPING = {
-        "Technical Analyst": "📈 技术分析师",
-        "Fundamentals Analyst": "💼 产业分析师",
-        "Sentiment Analyst": "🧠 持仓情绪分析师",
-        "News Analyst": "📰 新闻分析师",
-        "Research Manager": "🧠 推理分析师",
-        "Risky Analyst": "🔥 激进风险评估",
-        "Safe Analyst": "🛡️ 保守风险评估",
-        "Neutral Analyst": "⚖️ 中性风险评估",
-        "Risk Judge": "🎯 风险经理",
-        "CIO": "🏛️ 首席投资官决策",
+        "Technical Analyst": "技术分析师",
+        "Fundamentals Analyst": "产业分析师",
+        "Sentiment Analyst": "持仓情绪分析师",
+        "News Analyst": "新闻分析师",
+        "Research Manager": "推理分析师",
+        "Investment Director": "投研总监",
     }
 
     def _send_progress_update(self, chunk, progress_callback):

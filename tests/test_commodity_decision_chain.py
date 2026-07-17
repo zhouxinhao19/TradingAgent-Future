@@ -319,207 +319,376 @@ def test_research_manager_commodity(mock_llm, mock_memory, base_state):
 
 
 # =============================================================================
-# 风险辩论节点（6 个不变）
+# 量化检查器测试（compute_risk_assessment — 纯规则，0 LLM）
 # =============================================================================
 
-def test_aggresive_commodity(mock_llm, base_state):
-    from tradingagents.agents.risk_mgmt.aggresive_debator import create_risky_debator
-
-    node = create_risky_debator(mock_llm)
-    result = node(base_state)
-
-    assert mock_llm.invoke.called
-    call_args = mock_llm.invoke.call_args[0][0]
-    prompt_str = str(call_args)
-    assert "期货" in prompt_str or "杠杆" in prompt_str or "做多" in prompt_str
-    assert "risk_debate_state" in result
-
-
-def test_aggresive_stock(mock_llm, base_state):
-    from tradingagents.agents.risk_mgmt.aggresive_debator import create_risky_debator
-
-    base_state["asset_type"] = "stock"
-    node = create_risky_debator(mock_llm)
-    node(base_state)
-
-    call_args = mock_llm.invoke.call_args[0][0]
-    prompt_str = str(call_args)
-    assert "激进" in prompt_str
-
-
-def test_conservative_commodity(mock_llm, base_state):
-    from tradingagents.agents.risk_mgmt.conservative_debator import create_safe_debator
-
-    node = create_safe_debator(mock_llm)
-    result = node(base_state)
-
-    assert mock_llm.invoke.called
-    call_args = mock_llm.invoke.call_args[0][0]
-    prompt_str = str(call_args)
-    assert "期货" in prompt_str or "穿仓" in prompt_str or "止损" in prompt_str
-    assert "risk_debate_state" in result
-
-
-def test_conservative_stock(mock_llm, base_state):
-    from tradingagents.agents.risk_mgmt.conservative_debator import create_safe_debator
-
-    base_state["asset_type"] = "stock"
-    node = create_safe_debator(mock_llm)
-    node(base_state)
-
-    call_args = mock_llm.invoke.call_args[0][0]
-    prompt_str = str(call_args)
-    assert "保守" in prompt_str
-
-
-def test_neutral_commodity(mock_llm, base_state):
-    from tradingagents.agents.risk_mgmt.neutral_debator import create_neutral_debator
-
-    node = create_neutral_debator(mock_llm)
-    result = node(base_state)
-
-    assert mock_llm.invoke.called
-    call_args = mock_llm.invoke.call_args[0][0]
-    prompt_str = str(call_args)
-    assert "期货" in prompt_str or "对冲" in prompt_str or "跨期" in prompt_str
-    assert "risk_debate_state" in result
-
-
-def test_neutral_stock(mock_llm, base_state):
-    from tradingagents.agents.risk_mgmt.neutral_debator import create_neutral_debator
-
-    base_state["asset_type"] = "stock"
-    node = create_neutral_debator(mock_llm)
-    node(base_state)
-
-    call_args = mock_llm.invoke.call_args[0][0]
-    prompt_str = str(call_args)
-    assert "中性" in prompt_str
-
-
-# =============================================================================
-# 风险经理（4 个不变）
-# =============================================================================
-
-def test_risk_manager_commodity(mock_llm, mock_memory, base_state):
-    from tradingagents.agents.managers.risk_manager import create_risk_manager
-
-    node = create_risk_manager(mock_llm, mock_memory)
-    result = node(base_state)
-
-    assert mock_llm.invoke.called
-    call_args = mock_llm.invoke.call_args[0][0]
-    prompt_str = str(call_args)
-    assert "期货" in prompt_str or "做多" in prompt_str or "做空" in prompt_str or "RB2501" in prompt_str
-    assert "risk_debate_state" in result
-    assert "final_trade_decision" in result
-
-
-def test_risk_manager_stock(mock_llm, mock_memory, base_state):
-    from tradingagents.agents.managers.risk_manager import create_risk_manager
-
-    base_state["asset_type"] = "stock"
-    base_state["company_of_interest"] = "AAPL"
-
-    node = create_risk_manager(mock_llm, mock_memory)
-    node(base_state)
-
-    call_args = mock_llm.invoke.call_args[0][0]
-    prompt_str = str(call_args)
-    assert "买入" in prompt_str or "卖出" in prompt_str
-
-
-def test_risk_manager_commodity_fallback(mock_llm, mock_memory, base_state):
-    """LLM 失败时,commodity 路径返回平仓默认决策。"""
-    from tradingagents.agents.managers.risk_manager import create_risk_manager
-
-    mock_llm.invoke = MagicMock(side_effect=RuntimeError("LLM 不可用"))
-
-    node = create_risk_manager(mock_llm, mock_memory)
-    result = node(base_state)
-
-    assert "平仓" in result["final_trade_decision"] or "RB2501" in result["final_trade_decision"]
-
-
-def test_risk_manager_stock_fallback(mock_llm, mock_memory, base_state):
-    """LLM 失败时,stock 路径返回持有默认决策。"""
-    from tradingagents.agents.managers.risk_manager import create_risk_manager
-
-    base_state["asset_type"] = "stock"
-    base_state["company_of_interest"] = "AAPL"
-    mock_llm.invoke = MagicMock(side_effect=RuntimeError("LLM 不可用"))
-
-    node = create_risk_manager(mock_llm, mock_memory)
-    result = node(base_state)
-
-    assert "持有" in result["final_trade_decision"]
-
-
-# =============================================================================
-# Prompt 占位符完整性（风控辩论节点）
-# =============================================================================
-
-def test_aggresive_commodity_prompt_placeholders():
-    from tradingagents.agents.risk_mgmt.aggresive_debator import COMMODITY_AGGRESSIVE_PROMPT
-    import string
-    formatter = string.Formatter()
-    actual_placeholders = {
-        fname for _, fname, _, _ in formatter.parse(COMMODITY_AGGRESSIVE_PROMPT)
-        if fname
+def _make_features(**overrides):
+    """生成完整的 commodity_features dict，允许 override 特定模块。"""
+    base = {
+        "technical": {
+            "quality": {"rows": 100, "coverage": 0.95, "data_freshness_days": 0},
+            "combined": {
+                "volatility": {"atr_ratio_pctl180": 35.0},
+                "oi_divergence": "confirm",
+            },
+        },
+        "basis": {
+            "quality": {"rows": 100, "coverage": 0.90, "data_freshness_days": 0},
+            "stats": {"zscore_180d": {"dom_basis_rate": 0.5}},
+        },
+        "inventory": {
+            "quality": {"rows": 80, "coverage": 0.85, "data_freshness_days": 0},
+            "stats": {"zscore_180d": 0.3},
+            "jump_flag": False,
+        },
+        "positioning": {
+            "quality": {"rows": 60, "coverage": 0.80, "data_freshness_days": 1},
+            "snapshot": {"crowding_pctl_180d": 45.0},
+        },
+        "term_structure": {
+            "quality": {"rows": 50, "coverage": 0.75, "data_freshness_days": 1},
+            "snapshot": {"carry_score": 0.2, "structure": "backwardation"},
+        },
+        "news_sentiment": {
+            "quality": {"rows": 20, "coverage": 0.70, "data_freshness_days": 0},
+            "snapshot": {"sentiment": {"ratio": 0.55}},
+        },
     }
-    expected = {
-        "trader_decision", "market_research_report", "sentiment_report",
-        "news_report", "fundamentals_report", "history",
-        "current_safe_response", "current_neutral_response"
-    }
-    assert actual_placeholders == expected
+    # Apply overrides at top level
+    for key, val in overrides.items():
+        base[key] = val
+    return base
 
 
-def test_conservative_commodity_prompt_placeholders():
-    from tradingagents.agents.risk_mgmt.conservative_debator import COMMODITY_CONSERVATIVE_PROMPT
-    import string
-    formatter = string.Formatter()
-    actual_placeholders = {
-        fname for _, fname, _, _ in formatter.parse(COMMODITY_CONSERVATIVE_PROMPT)
-        if fname
-    }
-    expected = {
-        "trader_decision", "market_research_report", "sentiment_report",
-        "news_report", "fundamentals_report", "history",
-        "current_risky_response", "current_neutral_response"
-    }
-    assert actual_placeholders == expected
+class TestComputeRiskAssessment:
 
+    def test_empty_features(self):
+        """空 features → UNKNOWN + data_insufficient。"""
+        from tradingagents.agents.managers.investment_director import compute_risk_assessment
 
-def test_neutral_commodity_prompt_placeholders():
-    from tradingagents.agents.risk_mgmt.neutral_debator import COMMODITY_NEUTRAL_PROMPT
-    import string
-    formatter = string.Formatter()
-    actual_placeholders = {
-        fname for _, fname, _, _ in formatter.parse(COMMODITY_NEUTRAL_PROMPT)
-        if fname
-    }
-    expected = {
-        "trader_decision", "market_research_report", "sentiment_report",
-        "news_report", "fundamentals_report", "history",
-        "current_risky_response", "current_safe_response"
-    }
-    assert actual_placeholders == expected
+        result = compute_risk_assessment({})
+        assert result["composite_risk_level"] == "UNKNOWN"
+        assert result["data_insufficient"] is True
+
+    def test_none_features(self):
+        """None features → UNKNOWN。"""
+        from tradingagents.agents.managers.investment_director import compute_risk_assessment
+
+        result = compute_risk_assessment(None)
+        assert result["composite_risk_level"] == "UNKNOWN"
+
+    def test_normal_features_risk_level_2(self):
+        """所有维度正常 → composite R2（carry_score=0.2 属于 R3）。"""
+        from tradingagents.agents.managers.investment_director import compute_risk_assessment
+
+        result = compute_risk_assessment(_make_features())
+        assert result["composite_risk_level"] == 2
+        assert result["data_insufficient"] is False
+
+    def test_volatility_thresholds(self):
+        """波动率百分位阈值边界。"""
+        from tradingagents.agents.managers.investment_director import compute_risk_assessment
+
+        # R1: < 20
+        r1 = compute_risk_assessment(_make_features(technical={
+            "quality": {"rows": 100, "coverage": 0.95, "data_freshness_days": 0},
+            "combined": {"volatility": {"atr_ratio_pctl180": 15.0}, "oi_divergence": "confirm"},
+        }))
+        assert r1["dimensions"]["volatility"]["level"] == 1
+
+        # R3 boundary: exactly 50 → < 50 is R2, >= 50 is R3
+        r3 = compute_risk_assessment(_make_features(technical={
+            "quality": {"rows": 100, "coverage": 0.95, "data_freshness_days": 0},
+            "combined": {"volatility": {"atr_ratio_pctl180": 50.0}, "oi_divergence": "confirm"},
+        }))
+        assert r3["dimensions"]["volatility"]["level"] == 3  # >= 50 → R3
+
+        # R4: 80-95
+        r4 = compute_risk_assessment(_make_features(technical={
+            "quality": {"rows": 100, "coverage": 0.95, "data_freshness_days": 0},
+            "combined": {"volatility": {"atr_ratio_pctl180": 85.0}, "oi_divergence": "confirm"},
+        }))
+        assert r4["dimensions"]["volatility"]["level"] == 4
+
+        # R5: >= 95
+        r5 = compute_risk_assessment(_make_features(technical={
+            "quality": {"rows": 100, "coverage": 0.95, "data_freshness_days": 0},
+            "combined": {"volatility": {"atr_ratio_pctl180": 99.0}, "oi_divergence": "confirm"},
+        }))
+        assert r5["dimensions"]["volatility"]["level"] == 5
+
+    def test_basis_zscore_thresholds(self):
+        """基差 z-score 阈值边界。"""
+        from tradingagents.agents.managers.investment_director import compute_risk_assessment
+
+        # |z| < 1 → R2
+        r2 = compute_risk_assessment(_make_features(basis={
+            "quality": {"rows": 100, "coverage": 0.90, "data_freshness_days": 0},
+            "stats": {"zscore_180d": {"dom_basis_rate": 0.5}},
+        }))
+        assert r2["dimensions"]["basis"]["level"] == 2
+
+        # 1 <= |z| < 2 → R3
+        r3 = compute_risk_assessment(_make_features(basis={
+            "quality": {"rows": 100, "coverage": 0.90, "data_freshness_days": 0},
+            "stats": {"zscore_180d": {"dom_basis_rate": 1.5}},
+        }))
+        assert r3["dimensions"]["basis"]["level"] == 3
+
+        # |z| >= 3 → R5 + basis_extreme flag
+        r5 = compute_risk_assessment(_make_features(basis={
+            "quality": {"rows": 100, "coverage": 0.90, "data_freshness_days": 0},
+            "stats": {"zscore_180d": {"dom_basis_rate": 3.5}},
+        }))
+        assert r5["dimensions"]["basis"]["level"] == 5
+        assert any(f["name"] == "basis_extreme" for f in r5["flags"])
+
+    def test_crowding_thresholds(self):
+        """持仓拥挤度阈值边界。"""
+        from tradingagents.agents.managers.investment_director import compute_risk_assessment
+
+        # < 20 → R1
+        r1 = compute_risk_assessment(_make_features(positioning={
+            "quality": {"rows": 60, "coverage": 0.80, "data_freshness_days": 1},
+            "snapshot": {"crowding_pctl_180d": 10.0},
+        }))
+        assert r1["dimensions"]["crowding"]["level"] == 1
+
+        # >= 95 → R5
+        r5 = compute_risk_assessment(_make_features(positioning={
+            "quality": {"rows": 60, "coverage": 0.80, "data_freshness_days": 1},
+            "snapshot": {"crowding_pctl_180d": 98.0},
+        }))
+        assert r5["dimensions"]["crowding"]["level"] == 5
+
+    def test_hard_interceptor_vol_crowding(self):
+        """高波动 + 高拥挤 → vol_crowding flag。"""
+        from tradingagents.agents.managers.investment_director import compute_risk_assessment
+
+        features = _make_features(
+            technical={
+                "quality": {"rows": 100, "coverage": 0.95, "data_freshness_days": 0},
+                "combined": {"volatility": {"atr_ratio_pctl180": 90.0}, "oi_divergence": "confirm"},
+            },
+            positioning={
+                "quality": {"rows": 60, "coverage": 0.80, "data_freshness_days": 1},
+                "snapshot": {"crowding_pctl_180d": 90.0},
+            },
+        )
+        result = compute_risk_assessment(features)
+        assert any(f["name"] == "vol_crowding" for f in result["flags"])
+
+    def test_hard_interceptor_multi_extreme(self):
+        """≥3 维度 R4+ → multi_extreme flag + R5。"""
+        from tradingagents.agents.managers.investment_director import compute_risk_assessment
+
+        features = _make_features(
+            technical={
+                "quality": {"rows": 100, "coverage": 0.95, "data_freshness_days": 0},
+                "combined": {"volatility": {"atr_ratio_pctl180": 90.0}, "oi_divergence": "confirm"},
+            },
+            basis={
+                "quality": {"rows": 100, "coverage": 0.90, "data_freshness_days": 0},
+                "stats": {"zscore_180d": {"dom_basis_rate": 3.5}},
+            },
+            positioning={
+                "quality": {"rows": 60, "coverage": 0.80, "data_freshness_days": 1},
+                "snapshot": {"crowding_pctl_180d": 90.0},
+            },
+            term_structure={
+                "quality": {"rows": 50, "coverage": 0.75, "data_freshness_days": 1},
+                "snapshot": {"carry_score": -0.7, "structure": "contango"},
+            },
+        )
+        result = compute_risk_assessment(features)
+        assert any(f["name"] == "multi_extreme" for f in result["flags"])
+        # 3+ R4 dimensions → R5
+        assert result["composite_risk_level"] == 5
+
+    def test_inventory_jump_flag(self):
+        """inventory.jump_flag==True → inventory_jump flag。"""
+        from tradingagents.agents.managers.investment_director import compute_risk_assessment
+
+        features = _make_features(inventory={
+            "quality": {"rows": 80, "coverage": 0.85, "data_freshness_days": 0},
+            "stats": {"zscore_180d": 0.3},
+            "jump_flag": True,
+        })
+        result = compute_risk_assessment(features)
+        assert any(f["name"] == "inventory_jump" for f in result["flags"])
+
+    def test_data_quality_missing_module(self):
+        """模块 rows==0 → 标记不可用，不参与综合评级。"""
+        from tradingagents.agents.managers.investment_director import compute_risk_assessment
+
+        features = _make_features(basis={
+            "quality": {"rows": 0, "coverage": 0.0, "data_freshness_days": 99},
+            "stats": {"zscore_180d": {"dom_basis_rate": 0.5}},
+        })
+        result = compute_risk_assessment(features)
+        assert result["data_quality"]["details"]["basis"]["available"] is False
+        assert result["dimensions"]["basis"]["level"] == 0
+        # Other dimensions still calculate properly
+        assert result["dimensions"]["volatility"]["level"] >= 1
+
+    def test_carry_cost_flag_contango(self):
+        """carry_score<-0.5 + structure=contango → carry_cost flag。"""
+        from tradingagents.agents.managers.investment_director import compute_risk_assessment
+
+        features = _make_features(term_structure={
+            "quality": {"rows": 50, "coverage": 0.75, "data_freshness_days": 1},
+            "snapshot": {"carry_score": -0.6, "structure": "contango"},
+        })
+        result = compute_risk_assessment(features)
+        assert any(f["name"] == "carry_cost" for f in result["flags"])
 
 
 # =============================================================================
-# 字段一致性
+# 投研总监节点测试
 # =============================================================================
 
-def test_all_risk_debators_return_risk_debate_state(mock_llm, base_state):
-    from tradingagents.agents.risk_mgmt.aggresive_debator import create_risky_debator
-    from tradingagents.agents.risk_mgmt.conservative_debator import create_safe_debator
-    from tradingagents.agents.risk_mgmt.neutral_debator import create_neutral_debator
+def make_commodity_state(overrides=None):
+    """生成 commodity 状态用于投研总监测试。"""
+    state = {
+        "asset_type": "commodity",
+        "full_symbol": "RB2501.SHF",
+        "variety_name": "螺纹钢",
+        "exchange": "SHF",
+        "quote_unit": "元/吨",
+        "trade_date": "2026-07-14",
+        "company_of_interest": "RB2501.SHF",
+        "commodity_features": _make_features(),
+        "investment_plan": json.dumps({
+            "估值驱动矩阵": {"综合估值判断": "偏多"},
+            "多空对照表": {"综合判断": "短期看涨略占优"},
+            "三种情景推演": {"综合情景判断": "偏多基调"},
+        }, ensure_ascii=False),
+        "analyst_registry": {
+            "REF-TECH-a1b2c3": {
+                "id": "REF-TECH-a1b2c3", "analyst": "technical",
+                "cn_name": "技术分析师", "direction": "bullish",
+                "summary": "日线突破 3500",
+            },
+        },
+        "messages": [],
+    }
+    if overrides:
+        state.update(overrides)
+    return state
 
-    risky = create_risky_debator(mock_llm)(base_state)
-    safe = create_safe_debator(mock_llm)(base_state)
-    neutral = create_neutral_debator(mock_llm)(base_state)
 
-    assert "risk_debate_state" in risky
-    assert "risk_debate_state" in safe
-    assert "risk_debate_state" in neutral
+def make_stock_state():
+    """生成 stock 状态（验证跳过逻辑）。"""
+    return {
+        "asset_type": "stock",
+        "company_of_interest": "AAPL",
+        "full_symbol": "AAPL",
+        "messages": [],
+    }
+
+
+class TestInvestmentDirectorNode:
+
+    def test_commodity_path(self):
+        """commodity 路径正常返回所有字段。"""
+        from tradingagents.agents.managers.investment_director import create_investment_director
+
+        mock_llm = MagicMock()
+        mock_llm.invoke = MagicMock(return_value=MagicMock(content=json.dumps({
+            "投研备忘录": {"投研结论": {"方向倾向": "做多", "置信度": 0.7}},
+            "风险评估卡": {"风险裁定": {"总体风险等级": "R2"}},
+            "final_decision_markdown": "# RB2501.SHF 决策\n- **方向**:做多\n- **置信度**:0.70",
+        }, ensure_ascii=False)))
+
+        director = create_investment_director(mock_llm)
+        result = director(make_commodity_state())
+
+        assert mock_llm.invoke.called
+        assert "risk_assessment" in result
+        assert "risk_card" in result
+        assert "investment_memo" in result
+        assert "final_decision" in result
+        assert "cio_decision_timestamp" in result
+        # Verify quant data is never lost
+        assert result["risk_assessment"]["composite_risk_level"] == 2
+        assert "做多" in result["final_decision"]
+
+    def test_stock_path_skips(self):
+        """stock 路径直接跳过。"""
+        from tradingagents.agents.managers.investment_director import create_investment_director
+
+        mock_llm = MagicMock()
+        director = create_investment_director(mock_llm)
+        result = director(make_stock_state())
+
+        assert result == {}
+        assert not mock_llm.invoke.called
+
+    def test_llm_fallback(self):
+        """LLM 3 次重试失败 → fallback（量化数据不丢失）。"""
+        from tradingagents.agents.managers.investment_director import create_investment_director
+
+        mock_failing_llm = MagicMock()
+        mock_failing_llm.invoke = MagicMock(side_effect=RuntimeError("LLM 不可用"))
+
+        director = create_investment_director(mock_failing_llm)
+        result = director(make_commodity_state())
+
+        assert "risk_assessment" in result  # 量化数据永不丢失
+        assert result["risk_assessment"]["composite_risk_level"] == 2
+        assert "investment_memo" in result
+        assert "risk_card" in result
+        assert "持有" in result["final_decision"]  # fallback 方向
+        assert "置信度" in result["final_decision"]  # 兼容 _extract_decision 解析
+        assert mock_failing_llm.invoke.call_count == 3  # 确实重试了 3 次
+
+    def test_llm_short_content_triggers_retry(self):
+        """LLM 返回内容过短 → 应触发重试。"""
+        from tradingagents.agents.managers.investment_director import create_investment_director
+
+        mock_llm = MagicMock()
+        mock_llm.invoke = MagicMock(return_value=MagicMock(content="短"))
+
+        director = create_investment_director(mock_llm)
+        result = director(make_commodity_state())
+
+        # Should fallback (short content rejected)
+        assert "持有" in result["final_decision"]
+        assert mock_llm.invoke.call_count == 3
+
+    def test_graph_wiring(self):
+        """CommodityGraphSetup 正确注册 Investment Director 节点。"""
+        from tradingagents.graph.commodity_graph import CommodityGraphSetup
+
+        # Simulate minimal mock params
+        class MockConditionalLogic:
+            def should_continue_risk_analysis(self, state):
+                return "Risk Judge"
+
+        mock_llm = MagicMock()
+        mock_memory = MagicMock()
+        conditional = MockConditionalLogic()
+
+        setup = CommodityGraphSetup(
+            mock_llm, mock_llm, mock_memory, mock_memory, conditional, {}
+        )
+        compiled = setup.setup_graph()
+
+        # Verify the graph has the correct node names
+        graph_nodes = list(compiled.nodes.keys())
+        assert "Investment Director" in graph_nodes
+        assert "Research Manager" in graph_nodes
+
+        # Old L3-L5 nodes should not exist
+        assert "Risky Analyst" not in graph_nodes
+        assert "Safe Analyst" not in graph_nodes
+        assert "Neutral Analyst" not in graph_nodes
+        assert "Risk Judge" not in graph_nodes
+        assert "CIO" not in graph_nodes
+
+        # Verify edges: Research Manager → Investment Director
+        # LangGraph's get_graph() returns edges; check adjacency
+        graph = compiled.get_graph()
+        edges = [(e.source, e.target) for e in graph.edges]
+        assert ("Research Manager", "Investment Director") in edges
+        assert ("Investment Director", "__end__") in edges

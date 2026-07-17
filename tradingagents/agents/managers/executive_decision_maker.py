@@ -1,6 +1,11 @@
 """
 executive_decision_maker.py — CIO 最终决策节点 (Phase 3b-ii + L2-L4 合并)
 
+[DEPRECATED — commodity 路径]
+
+该文件的 commodity 分支（Phase 3b-ii-B）已被 Phase 4 投研总监节点替代。
+commodity_graph.py 已不再将 CIO 注册为节点，commodity 分支仅作为 fallback 保留。
+
 CIO 整合两层决策,输出最终可执行决策:
   - 推理分析师报告 → investment_plan
   - 风控评估       → final_trade_decision
@@ -116,53 +121,17 @@ def create_executive_decision_maker(llm):
         investment_plan = state.get("investment_plan", "(空)")
         final_trade_decision = state.get("final_trade_decision", "(空)")
 
-        # === Commodity 路径(LLM 必调,失败 fallback) ===
+        # === Commodity 路径: DEPRECATED (Phase 4 已改用投研总监) ===
         if asset_type == "commodity":
-            try:
-                from langchain_core.messages import AIMessage
-                from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-
-                prompt = ChatPromptTemplate.from_messages(
-                    [
-                        ("system", COMMODITY_CIO_SYSTEM_PROMPT),
-                        MessagesPlaceholder(variable_name="messages"),
-                    ]
-                ).partial(
-                    full_symbol=full_symbol,
-                    investment_plan=investment_plan,
-                    final_trade_decision=final_trade_decision,
-                )
-
-                messages_payload = prompt.format_messages(
-                    messages=state.get("messages", []) or []
-                )
-
-                logger.info(f"👔 [CIO] 调用 LLM 综合决策(commodity)")
-                result = llm.invoke(messages_payload)
-
-                if hasattr(result, "content"):
-                    content = result.content
-                    if not isinstance(content, str):
-                        content = str(content) if content is not None else ""
-                else:
-                    content = str(result) if result is not None else ""
-
-                msg_out = result if hasattr(result, "content") else AIMessage(content=content)
-
-                logger.info(f"✅ [CIO] 决策生成: {len(content)} 字符")
-                return {
-                    "final_decision": content,
-                    "messages": [msg_out],
-                    "cio_decision_timestamp": "now",
-                }
-
-            except Exception as e:
-                logger.error(f"❌ [CIO] LLM 调用失败: {e},使用 commodity 默认决策")
-                return {
-                    "final_decision": COMMODITY_DEFAULT_DECISION.format(full_symbol=full_symbol),
-                    "messages": [],
-                    "cio_decision_timestamp": "now",
-                }
+            logger.warning(
+                f"⚠️ [CIO] commodity 路径已被 Phase 4 投研总监替代"
+                f"(commodity_graph 中已不再路由到 CIO 节点)"
+            )
+            return {
+                "final_decision": COMMODITY_DEFAULT_DECISION.format(full_symbol=full_symbol),
+                "messages": [],
+                "cio_decision_timestamp": "now",
+            }
 
         # === Stock 路径:占位(Phase 3b-ii 不实现,CIO 由现有 decision 节点处理) ===
         logger.warning(f"⚠️ [CIO] stock 路径未实现(Phase 3b-ii 仅交付 commodity),返回 None")
