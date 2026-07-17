@@ -2,7 +2,7 @@
   <div class="commodity-analysis">
     <div class="page-header">
       <h2>📊 大宗商品分析</h2>
-      <p class="text-secondary">多智能体决策链 — 4 分析师 → 多空辩论 → 交易员 → 风控 → CIO</p>
+      <p class="text-secondary">多智能体决策链 — 技术分析师 → 产业分析师 → 持仓情绪分析师 → 新闻分析师 → 推理分析师 → 投研总监</p>
     </div>
 
     <el-row :gutter="24">
@@ -71,23 +71,6 @@
               />
             </el-form-item>
 
-            <el-divider />
-
-            <el-form-item label="辩论轮次">
-              <el-row :gutter="12">
-                <el-col :span="12">
-                  <el-form-item label="多空辩论">
-                    <el-slider v-model="form.max_debate_rounds" :min="0" :max="3" :step="1" show-stops />
-                  </el-form-item>
-                </el-col>
-                <el-col :span="12">
-                  <el-form-item label="风控辩论">
-                    <el-slider v-model="form.max_risk_discuss_rounds" :min="0" :max="3" :step="1" show-stops />
-                  </el-form-item>
-                </el-col>
-              </el-row>
-            </el-form-item>
-
             <el-button
               type="primary"
               size="large"
@@ -136,10 +119,10 @@
             <el-tab-pane label="📰 新闻" lazy>
               <div class="report-content">{{ latestResult.news_report || '(空)' }}</div>
             </el-tab-pane>
-            <el-tab-pane label="💼 交易员计划" lazy>
-              <div class="report-content">{{ latestResult.trader_investment_plan || '(空)' }}</div>
+            <el-tab-pane label="📋 投资计划" lazy>
+              <div class="report-content">{{ formatInvestmentPlan(latestResult.investment_plan) || '(空)' }}</div>
             </el-tab-pane>
-            <el-tab-pane label="🏛️ CIO 决策" lazy>
+            <el-tab-pane label="🏛️ 投研总监" lazy>
               <div class="report-content">{{ latestResult.final_decision || '(空)' }}</div>
             </el-tab-pane>
           </el-tabs>
@@ -149,8 +132,8 @@
           <el-empty description="输入合约代码并提交分析">
             <template #image><div style="font-size: 64px">📈</div></template>
             <p class="text-secondary">
-              分析将依次执行:技术分析师 → 基本面分析师 → 持仓分析师 → 新闻分析师<br>
-              → 多空辩论 → 交易员决策 → 风控评估 → CIO 最终决策
+              分析将依次执行:技术分析师 → 产业分析师 → 持仓情绪分析师 → 新闻分析师<br>
+              → 推理分析师 → 投研总监
             </p>
           </el-empty>
         </el-card>
@@ -208,8 +191,6 @@ const form = ref({
   variety_symbol: '',
   contract: '',
   trade_date: '',
-  max_debate_rounds: 1,
-  max_risk_discuss_rounds: 1,
 })
 const submitting = ref(false)
 const lastTaskId = ref('') // 最近一次提交的 task_id，用于显示"前往任务中心"按钮
@@ -238,12 +219,16 @@ function directionTagType(action?: string): string {
   const map: Record<string, string> = { long: 'success', short: 'danger', hold: 'info', flat: 'warning' }
   return map[action || 'hold']
 }
+function formatInvestmentPlan(text: string): string {
+  if (!text) return ''
+  try { return JSON.stringify(JSON.parse(text), null, 2) }
+  catch { return text }
+}
 function sectionTitle(key: string): string {
   const map: Record<string, string> = {
     market_report: '📈 技术分析', fundamentals_report: '💼 基本面分析',
     sentiment_report: '🧠 持仓情绪', news_report: '📰 新闻分析',
-    investment_plan: '📋 投资计划', trader_investment_plan: '💼 交易员计划',
-    final_trade_decision: '🎯 最终交易决策', final_decision: '🏛️ CIO 决策',
+    investment_plan: '📋 投资计划', final_decision: '🏛️ 投研总监决策',
   }
   return map[key] || key
 }
@@ -317,8 +302,6 @@ async function submitAnalysis() {
       trade_date: form.value.trade_date || undefined,
       variety_name: selectedVarietyName.value || undefined,
       exchange: form.value.exchange || undefined,
-      max_debate_rounds: form.value.max_debate_rounds,
-      max_risk_discuss_rounds: form.value.max_risk_discuss_rounds,
     })
     if (res?.success) {
       const tid = res.data?.task_id
@@ -327,7 +310,7 @@ async function submitAnalysis() {
       // 立即释放按钮，不再耦合轮询逻辑
       await loadReports(fullSymbol)
       // 后台启动轮询，但按钮状态已恢复
-      startPolling(fullSymbol)
+      startPolling(tid)
     } else {
       ElMessage.error(res?.message || '提交失败')
     }
@@ -342,23 +325,30 @@ async function submitAnalysis() {
 // 分离轮询逻辑，不触碰 submitting 状态
 let pollingTimer: ReturnType<typeof setTimeout> | null = null
 
-function startPolling(fullSymbol: string) {
+function startPolling(taskId: string) {
   let attempts = 0; const maxAttempts = 60
   const poll = async () => {
     attempts++
     try {
-      const res = await commodityApi.getReports(fullSymbol, 1)
-      if (res?.data?.reports?.length) {
-        latestResult.value = await fetchLatestReport(fullSymbol)
-        await loadReports(fullSymbol)
-        ElMessage.success('✅ 分析完成!')
+      const res = await commodityApi.getTaskStatus(taskId)
+      if (res?.data?.status === 'completed') {
+        const detail = await commodityApi.getTaskResult(taskId)
+        if (detail?.data) {
+          latestResult.value = detail.data as Record<string, any>
+          await loadReports()
+          ElMessage.success('✅ 分析完成!')
+        }
+        return
+      }
+      if (res?.data?.status === 'failed') {
+        ElMessage.error(res.data.progress_message || '分析失败')
         return
       }
     } catch { /* continue polling */ }
     if (attempts < maxAttempts) {
       pollingTimer = setTimeout(poll, 5000)
     } else {
-      ElMessage.warning('分析超时,请稍后查看报告列表')
+      ElMessage.warning('分析超时,请稍后查看任务中心')
     }
   }
   pollingTimer = setTimeout(poll, 5000)
@@ -366,17 +356,6 @@ function startPolling(fullSymbol: string) {
 
 function goToTaskCenter() {
   router.push('/tasks')
-}
-
-async function fetchLatestReport(fullSymbol: string): Promise<Record<string, any> | null> {
-  try {
-    const res = await commodityApi.getReports(fullSymbol, 1)
-    if (res?.data?.reports?.length) {
-      const detail = await commodityApi.getReportDetail(res.data.reports[0].report_id)
-      return detail?.data || null
-    }
-  } catch { /* ignore */ }
-  return null
 }
 
 async function loadReports(fullSymbol?: string) {
