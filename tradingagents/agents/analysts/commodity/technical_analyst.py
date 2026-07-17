@@ -34,20 +34,8 @@ from ._base import (
 
 logger = get_logger("default")
 
-# 技术分析师系统 prompt(中文,期货特定)
-# - 不调工具,所有数据已由 features 层算好注入
-# - 强调多周期(日+周)、OI 背离、波动率、关键位
-TECHNICAL_SYSTEM_PROMPT = """你是一位资深的期货技术分析师,与基本面、持仓、新闻分析师协作。
-
-## 分析对象
-- 标的代码:{full_symbol}
-- 品种名称:{variety_name}
-- 交易所:{exchange}
-- 分析日期:{trade_date}
-
-## 合约分析策略
-
-你是基于品种级技术分析的期货分析师。技术分析遵循以下合约层级:
+# 合约分析策略(主力连续)
+MAIN_CONTINUOUS_STRATEGY = """你是基于品种级技术分析的期货分析师。技术分析遵循以下合约层级:
 
 1. **主力连续合约(Primary)**: 持仓量最大的合约的拼接序列。
    所有技术指标(均线、MACD、RSI、BOLL)基于此计算。这是技术分析的主战场。
@@ -58,7 +46,69 @@ TECHNICAL_SYSTEM_PROMPT = """你是一位资深的期货技术分析师,与基�
 3. **近月合约(Avoid)**: 距到期不足 30 天的合约。
    价格向现货回归、持仓限制导致技术图形失真,不用于纯技术分析。
 
-4. **移仓换月预警**: 当新主力 OI 连续超过旧主力时发出预警,确保分析标的已更新。
+4. **移仓换月预警**: 当新主力 OI 连续超过旧主力时发出预警,确保分析标的已更新。"""
+
+# 合约分析策略(期限合约)
+TERM_CONTRACT_STRATEGY = """你是基于期货合约技术分析的期货分析师。当前分析的是一张具体合约(非主力连续)。分析遵循以下框架:
+
+1. **期限合约(Primary)**: 锁定特定到期月的合约。
+   所有技术指标(均线、MACD、RSI、BOLL)基于此合约的 K 线计算。价格体现市场对该到期月供需的预期。
+
+2. **指数合约(Auxiliary)**: 所有可交易合约持仓量加权平均的连续序列。
+   用于验证长期趋势(MA60/MA120)、判断该期限合约与品种整体趋势是否一致。
+
+3. **基差/升贴水**: 期限合约价格相对于现货价格存在升贴水。
+   合约临近到期时价格向现货回归,到期前基差趋向收敛,这是期限合约独有的分析要点。
+
+4. **无需讨论移仓换月**: 期限合约不存在换月问题(一张合约到期即退市)。"""
+
+
+def _detect_contract_type(full_symbol: str) -> tuple:
+    """检测合约类型,返回 (is_main_continuous, contract_type_label)。
+
+    Args:
+        full_symbol: 完整标的代码(如 CU2501.SHF / CU0.SHF)
+
+    Returns:
+        (is_main_continuous, label)
+        - 主力连续(CU0.SHF) → (True, "主力连续合约")
+        - 期限合约(CU2501.SHF) → (False, "期限合约(到期月:2025-01)")
+        - 无法识别(CU) → (True, "主力连续合约")  # fallback 保持现有行为
+    """
+    import re
+    symbol_body = full_symbol.split(".")[0] if "." in full_symbol else full_symbol
+    match = re.match(r"^([A-Za-z]+)(\d+)$", symbol_body)
+    if match:
+        digits = match.group(2)
+        if digits == "0":
+            return True, "主力连续合约"
+        # 期限合约: 格式化 YYMM → YYYY-MM
+        if len(digits) == 4:
+            try:
+                year = "20" + digits[:2]
+                month = digits[2:]
+                return False, f"期限合约(到期月:{year}-{month})"
+            except Exception:
+                pass
+        return False, f"期限合约(代码:{symbol_body})"
+    # fallback: 无法识别时按主力连续处理
+    return True, "主力连续合约"
+
+# 技术分析师系统 prompt(中文,期货特定)
+# - 不调工具,所有数据已由 features 层算好注入
+# - 强调多周期(日+周)、OI 背离、波动率、关键位
+TECHNICAL_SYSTEM_PROMPT = """你是一位资深的期货技术分析师,与基本面、持仓、新闻分析师协作。
+
+## 分析对象
+- 标的代码:{full_symbol}
+- 品种名称:{variety_name}
+- 交易所:{exchange}
+- 分析日期:{trade_date}
+- 合约类型:{contract_type_label}
+
+## 合约分析策略
+
+{contract_strategy}
 
 ## 特征层(已计算,直接消费)
 
@@ -98,7 +148,7 @@ TECHNICAL_SYSTEM_PROMPT = """你是一位资深的期货技术分析师,与基�
 
 ## 数据质量
 - 数据条数:{quality_rows}
-- 主力连续合约:{main_available}
+- {contract_type_label}:{main_available}
 - 指数合约:{index_available}
 
 ---
@@ -157,6 +207,7 @@ def _build_fallback_report(
     quality: Dict[str, Any],
     index_contract: Optional[Dict[str, Any]] = None,
     rollover: Optional[Dict[str, Any]] = None,
+    contract_type_label: str = "主力连续合约",
 ) -> str:
     """LLM 调用失败时,直接用 features snapshot 拼 Markdown 报告。
 
@@ -176,6 +227,8 @@ def _build_fallback_report(
         f"- OI 背离:{combined.get('oi_divergence', 'neutral')}\n"
         f"- 波动率:{vol.get('regime', 'low')} (ATR={_fmt(vol.get('atr'))})\n"
     )
+
+    md += f"- 合约类型:{contract_type_label}\n"
 
     # 指数合约摘要
     if index_contract:
@@ -200,7 +253,7 @@ def _build_fallback_report(
     md += "\n".join(f"- {s}" for s in signals) or "- (无触发信号)"
     md += "\n\n## 数据质量\n"
     md += f"- 数据条数:{quality.get('rows', 0)}\n"
-    md += f"- 主力连续合约:{quality.get('main_continuous_available', 'N/A')}\n"
+    md += f"- {contract_type_label}:{quality.get('main_continuous_available', 'N/A')}\n"
     md += f"- 指数合约:{quality.get('index_contract_available', 'N/A')}\n"
     md += (
         f"\n---\n"
@@ -291,11 +344,21 @@ def create_technical_analyst(llm):
         weekly_trend = weekly.get("trend", {}) or {} if weekly else {}
         vol = combined.get("volatility", {}) or {}
 
+        # --- 合约类型检测 ---
+        is_main_continuous, contract_type_label = _detect_contract_type(full_symbol)
+        if is_main_continuous:
+            contract_strategy = MAIN_CONTINUOUS_STRATEGY
+        else:
+            contract_strategy = TERM_CONTRACT_STRATEGY
+        logger.info(f"📈 [技术分析师] 合约类型: {contract_type_label} (full_symbol={full_symbol})")
+
         prompt_vars = dict(
             full_symbol=full_symbol,
             variety_name=variety_name,
             exchange=exchange,
             trade_date=trade_date,
+            contract_type_label=contract_type_label,
+            contract_strategy=contract_strategy,
             combined_direction=combined.get("direction", "neutral"),
             combined_strength=float(combined.get("strength", 0.0) or 0.0),
             daily_direction=daily_trend.get("direction", "neutral"),
@@ -371,6 +434,7 @@ def create_technical_analyst(llm):
                     full_symbol, combined, daily, weekly, quality,
                     index_contract=index_contract,
                     rollover=rollover,
+                    contract_type_label=contract_type_label,
                 )
             except Exception as inner_e:
                 logger.error(f"❌ [技术分析师] fallback 也失败: {inner_e}")
