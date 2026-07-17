@@ -868,3 +868,201 @@ class TestOutputFieldMapping:
         assert "market_report" not in result
         assert "fundamentals_report" not in result
         assert "sentiment_report" not in result
+
+
+# =============================================================================
+# 测试 9:新闻分析师增强 — 四层分析框架
+# =============================================================================
+
+class TestNewsAnalystEnhancement:
+    """验证增强后的新闻分析师 prompt 包含四层分析框架关键字。"""
+
+    def test_prompt_contains_four_layers(self, mock_llm, sample_features_all, sample_news_items):
+        """正常路径:prompt 应包含"宏观""产业""综合判断"等框架关键字。"""
+        from tradingagents.agents.analysts.commodity import create_news_analyst
+
+        node = create_news_analyst(mock_llm)
+        node(_state(commodity_features=sample_features_all, latest_news=sample_news_items))
+
+        call_args = mock_llm.invoke.call_args
+        assert call_args is not None
+        messages = call_args[0][0]
+        system_msg = messages[0].content if hasattr(messages[0], "content") else str(messages[0])
+        assert "宏观" in system_msg
+        assert "产业" in system_msg
+        assert "综合判断" in system_msg
+
+    def test_fallback_includes_news_summary(self, sample_features_all, sample_news_items):
+        """降级路径:应包含"LLM 不可用""叙事不可得"及新闻原文。"""
+        mock = MagicMock()
+        mock.invoke.side_effect = RuntimeError("LLM down")
+        from tradingagents.agents.analysts.commodity import create_news_analyst
+
+        node = create_news_analyst(mock)
+        result = node(
+            _state(
+                commodity_features=sample_features_all,
+                latest_news=sample_news_items,
+            )
+        )
+        assert "news_report" in result
+        assert "LLM 不可用" in result["news_report"]
+        assert "叙事不可得" in result["news_report"]
+        # 应包含新闻原文标题
+        assert "美联储鸽派转向" in result["news_report"]
+        assert "库存数据超预期" in result["news_report"]
+
+    def test_fallback_without_events(self, sample_features_all):
+        """latest_news 为空时,fallback 不应报错。"""
+        mock = MagicMock()
+        mock.invoke.side_effect = RuntimeError("LLM down")
+        from tradingagents.agents.analysts.commodity import create_news_analyst
+
+        node = create_news_analyst(mock)
+        result = node(_state(commodity_features=sample_features_all))
+        assert "news_report" in result
+        assert "LLM 不可用" in result["news_report"]
+
+
+# =============================================================================
+# 测试 10:合约类型检测
+# =============================================================================
+
+class TestContractTypeDetection:
+    """验证 _detect_contract_type 函数。"""
+
+    def test_main_continuous_zero(self):
+        """CU0.SHF → 主力连续。"""
+        from tradingagents.agents.analysts.commodity.technical_analyst import _detect_contract_type
+        is_main, label = _detect_contract_type("CU0.SHF")
+        assert is_main is True
+        assert "主力连续" in label
+
+    def test_term_contract_yyyymm(self):
+        """CU2501.SHF → 期限合约(到期月:2025-01)。"""
+        from tradingagents.agents.analysts.commodity.technical_analyst import _detect_contract_type
+        is_main, label = _detect_contract_type("CU2501.SHF")
+        assert is_main is False
+        assert "2025-01" in label
+
+    def test_no_dot_symbol_fallback(self):
+        """裸品种代码 CU → fallback 主力连续。"""
+        from tradingagents.agents.analysts.commodity.technical_analyst import _detect_contract_type
+        is_main, label = _detect_contract_type("CU")
+        assert is_main is True
+
+    def test_no_yyyymm_dot_only(self):
+        """CU.SHF → fallback 主力连续。"""
+        from tradingagents.agents.analysts.commodity.technical_analyst import _detect_contract_type
+        is_main, label = _detect_contract_type("CU.SHF")
+        assert is_main is True
+
+    def test_rb_continuous(self):
+        """RB0.SHF → 主力连续。"""
+        from tradingagents.agents.analysts.commodity.technical_analyst import _detect_contract_type
+        is_main, label = _detect_contract_type("RB0.SHF")
+        assert is_main is True
+        assert "主力连续" in label
+
+    def test_rb_term_contract(self):
+        """RB2505.SHF → 期限合约(到期月:2025-05)。"""
+        from tradingagents.agents.analysts.commodity.technical_analyst import _detect_contract_type
+        is_main, label = _detect_contract_type("RB2505.SHF")
+        assert is_main is False
+        assert "2025-05" in label
+
+
+# =============================================================================
+# 测试 11:技术分析师合约类型感知
+# =============================================================================
+
+class TestTechnicalContractAwareness:
+    """验证技术分析师根据合约类型切换 prompt 策略。"""
+
+    def test_main_continuous_has_rollover(self):
+        """CU0.SHF → prompt 应包含"移仓换月"和"主力连续合约"。"""
+        from tradingagents.agents.analysts.commodity import create_technical_analyst
+
+        mock = MagicMock()
+        response = MagicMock()
+        response.content = "# 报告"
+        mock.invoke.return_value = response
+
+        node = create_technical_analyst(mock)
+        result = node(_state(
+            commodity_features={"technical": {
+                "quality": {"rows": 60, "main_continuous_available": True},
+                "combined": {"direction": "neutral", "strength": 0.0, "signals": [],
+                            "oi_divergence": "neutral", "volatility": {"regime": "low"},
+                            "main_index_alignment": "partial"},
+                "main_continuous": {"daily": {"snapshot": {}, "trend": {}, "signals": []}, "weekly": None},
+                "index_contract": {"symbol": None, "ma60": None, "ma120": None, "long_term_trend": "neutral",
+                                  "relative_strength": None, "quality": {"rows": 0}},
+                "rollover": {"detected": False, "description": "", "recent_rollover": False},
+            }},
+            full_symbol="CU0.SHF",
+        ))
+        assert "market_report" in result
+
+        call_kwargs = mock.invoke.call_args
+        messages = call_kwargs[0][0]
+        system_msg = messages[0].content if hasattr(messages[0], "content") else str(messages[0])
+        assert "移仓换月" in system_msg
+        assert "主力连续合约" in system_msg
+
+    def test_term_contract_no_rollover(self):
+        """CU2501.SHF → prompt 不应包含"移仓换月预警",应包含"期限合约"和"无需讨论移仓换月"。"""
+        from tradingagents.agents.analysts.commodity import create_technical_analyst
+
+        mock = MagicMock()
+        response = MagicMock()
+        response.content = "# 报告"
+        mock.invoke.return_value = response
+
+        node = create_technical_analyst(mock)
+        result = node(_state(
+            commodity_features={"technical": {
+                "quality": {"rows": 60, "main_continuous_available": True},
+                "combined": {"direction": "neutral", "strength": 0.0, "signals": [],
+                            "oi_divergence": "neutral", "volatility": {"regime": "low"},
+                            "main_index_alignment": "partial"},
+                "main_continuous": {"daily": {"snapshot": {}, "trend": {}, "signals": []}, "weekly": None},
+                "index_contract": {"symbol": None, "ma60": None, "ma120": None, "long_term_trend": "neutral",
+                                  "relative_strength": None, "quality": {"rows": 0}},
+                "rollover": {"detected": False, "description": "", "recent_rollover": False},
+            }},
+            full_symbol="CU2501.SHF",
+        ))
+        assert "market_report" in result
+
+        call_kwargs = mock.invoke.call_args
+        messages = call_kwargs[0][0]
+        system_msg = messages[0].content if hasattr(messages[0], "content") else str(messages[0])
+        assert "期限合约" in system_msg
+        # 期限合约策略说明含"无需讨论移仓换月",但不含主力策略的"移仓换月预警"section
+        assert "无需讨论移仓换月" in system_msg
+        assert "移仓换月预警" not in system_msg
+
+    def test_term_contract_fallback_label(self):
+        """期限合约 LLM 失败 → fallback 报告含合约类型标签。"""
+        mock = MagicMock()
+        mock.invoke.side_effect = RuntimeError("LLM down")
+        from tradingagents.agents.analysts.commodity import create_technical_analyst
+
+        node = create_technical_analyst(mock)
+        result = node(_state(
+            commodity_features={"technical": {
+                "quality": {"rows": 60, "main_continuous_available": True},
+                "combined": {"direction": "neutral", "strength": 0.0, "signals": [],
+                            "oi_divergence": "neutral", "volatility": {"regime": "low"},
+                            "main_index_alignment": "partial"},
+                "main_continuous": {"daily": {"snapshot": {}, "trend": {}, "signals": []}, "weekly": None},
+                "index_contract": {"symbol": None, "ma60": None, "ma120": None, "long_term_trend": "neutral",
+                                  "relative_strength": None, "quality": {"rows": 0}},
+                "rollover": {"detected": False, "description": "", "recent_rollover": False},
+            }},
+            full_symbol="CU2505.SHF",
+        ))
+        assert "market_report" in result
+        assert "期限合约" in result["market_report"]
+        assert "2025-05" in result["market_report"]

@@ -33,7 +33,7 @@ from ._base import (
 
 logger = get_logger("default")
 
-NEWS_SYSTEM_PROMPT = """你是一位资深的期货新闻分析师,聚焦宏观叙事 + 产业事件。
+NEWS_SYSTEM_PROMPT = """你是一位资深的期货新闻分析师,采用"宏观-产业-资金-情绪"四层分析框架。
 
 ## 分析对象
 - 标的代码:{full_symbol}
@@ -56,23 +56,44 @@ NEWS_SYSTEM_PROMPT = """你是一位资深的期货新闻分析师,聚焦宏观�
 
 ---
 
-## 分析要求
+## 四层分析框架
 
-1. **宏观叙事**:美联储/中国央行/OPEC+/地缘政治 等宏观因子对当前品种的影响
-2. **产业叙事**:产业链上下游事件(产能/库存/限产/替代品)
-3. **情感倾向**:基于正面/负面事件数量与情感比,给出方向
-4. **关键事件卡片**:列出 3-5 条最重要的事件,每条 1-2 句话
-5. **风险提示**:数据稀疏或新闻源少时,降低 confidence
+### 第一层:宏观叙事
+聚焦影响当前品种的全球宏观因子:
+- 美联储/ECB/央行货币政策(利率/QT/QE)
+- OPEC+决策与地缘政治(制裁/冲突/贸易摩擦)
+- 中国经济政策(基建/房地产/制造业PMI)
+- 美元指数与汇率波动
+- 全球经济增长预期(IMF/世界银行)
+
+### 第二层:产业叙事
+根据品种行业分类(category)聚焦产业级事件:
+- **金属(Metal)**: 矿山产能/冶炼开工率/下游加工/废料回收/LME库存
+- **化工(Chemical)**: 炼厂检修/PTA负荷/甲醇开工/聚酯需求/乙烯价格
+- **能源(Energy)**: 油田产量/炼油利润/裂解价差/电力需求/天然气库存
+- **农产品(Agricultural)**: 天气/种植面积/USDA报告/生猪存栏/压榨利润
+- **金融(Financial)**: 股指估值/债市收益率/信用利差/资金流向
+
+### 第三层:资金情绪
+- 新闻情感比反映当前市场情绪倾向
+- 正面事件与负面事件的数量对比
+- 关键事件的潜在影响大小
+
+### 第四层:综合判断
+- 汇总宏观+产业+情绪三层证据,给出明确方向
+- 标注主要不确定性来源
+- 与其他分析师(技术/基本面/持仓)的信号交叉验证
 
 ## 输出格式
 
-使用 Markdown,500-800 字,结构:
+使用 Markdown,500-800 字。结构:
 - ## 宏观叙事
 - ## 产业叙事
-- ## 情感倾向
-- ## 关键事件卡片(列表)
+- ## 资金情绪
+- ## 综合判断(方向+置信度+核心叙事)
 - ## 风险提示
-"""
+
+禁止使用 emoji;保持专业性。"""
 
 
 def _fmt(v: Any) -> str:
@@ -119,8 +140,9 @@ def _build_fallback_report(
     negative_count: int,
     neutral_count: int,
     signals: List[str],
+    recent_events: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
-    """LLM 失败时,返回情感统计 + 触发信号(无叙事)。"""
+    """LLM 失败时,返回情感统计 + 新闻原文摘要(无 LLM 叙事)。"""
     direction = "中性"
     if sentiment_ratio is not None:
         if sentiment_ratio > 0.2:
@@ -137,9 +159,28 @@ def _build_fallback_report(
         f"## 触发信号\n"
     )
     md += "\n".join(f"- {s}" for s in signals[:10]) or "- (无触发信号)"
+
+    # 加入新闻原文摘要(前 5 条)
+    if recent_events:
+        md += "\n\n## 新闻原文摘要(最近事件)\n"
+        for i, evt in enumerate(recent_events[:5], 1):
+            title = evt.get("title", "")
+            content = evt.get("content", "")
+            source = evt.get("source", "")
+            if title:
+                md += f"\n{i}. **{title}**"
+                if content:
+                    md += f"\n   {content[:200]}"
+                if source:
+                    md += f"\n   来源:{source}"
+                md += "\n"
+    else:
+        md += "\n\n(无新闻原文数据)"
+
     md += (
-        f"\n\n---\n"
-        f"_本报告仅含情感统计,无叙事;LLM 故障恢复后请重新提交任务。_\n"
+        f"\n---\n"
+        f"_本报告仅含情感统计与新闻原文摘要,叙事不可得;"
+        f"LLM 故障恢复后请重新提交任务。_\n"
     )
     return md
 
@@ -250,6 +291,7 @@ def create_news_analyst(llm):
                     negative_count,
                     neutral_count,
                     signals,
+                    recent_events=recent_events,
                 )
             except Exception as inner_e:
                 logger.error(f"❌ [新闻分析师] fallback 也失败: {inner_e}")
