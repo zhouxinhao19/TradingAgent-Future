@@ -463,8 +463,9 @@ def create_technical_analyst(llm):
                 fallback_md = empty_report("neutral", f"features 与 LLM 均不可用: {e}; fallback 异常: {inner_e}")
 
             analyst_id = make_analyst_id("TECH", full_symbol, trade_date, seed="fallback")
+            conclusion_id = make_conclusion_id("TECH", 1)
             tagged_report = inject_analyst_id(fallback_md, analyst_id)
-            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "TECH", "analyst": "technical", "report_key": "market_report", "direction": "neutral", "summary": "(降级: LLM 不可用)"}}
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "TECH", "technical", "market_report", "neutral", "(降级: LLM 不可用)")
             return {
                 "market_report": tagged_report,
                 "messages": [],

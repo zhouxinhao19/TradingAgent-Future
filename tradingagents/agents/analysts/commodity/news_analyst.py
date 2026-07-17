@@ -30,6 +30,8 @@ from ._base import (
     inject_analyst_id,
     load_features,
     make_analyst_id,
+    make_conclusion_id,
+    make_registry_entry,
     quality_gate,
     truncate_snapshot,
 )
@@ -208,8 +210,9 @@ def create_news_analyst(llm):
             reason = "新闻 features 与 latest_news 均空"
             report_md = empty_report("neutral", reason)
             analyst_id = make_analyst_id("NEWS", full_symbol, trade_date, seed="empty")
+            conclusion_id = make_conclusion_id("NEWS", 1)
             tagged_report = inject_analyst_id(report_md, analyst_id)
-            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "NEWS", "analyst": "news", "report_key": "news_report", "direction": "neutral", "summary": "(数据缺失: 跳过)"}}
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "NEWS", "news", "news_report", "neutral", "(数据缺失: 跳过)")
             return {
                 "news_report": tagged_report,
                 "messages": [],
@@ -283,8 +286,9 @@ def create_news_analyst(llm):
 
             msg_out = result if hasattr(result, "content") else AIMessage(content=report_md)
             analyst_id = make_analyst_id("NEWS", full_symbol, trade_date)
+            conclusion_id = make_conclusion_id("NEWS", 1)
             tagged_report = inject_analyst_id(report_md, analyst_id)
-            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "NEWS", "analyst": "news", "report_key": "news_report", "direction": "neutral", "summary": extract_first_sentence(report_md)}}
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "NEWS", "news", "news_report", "neutral", extract_first_sentence(report_md))
             return {
                 "news_report": tagged_report,
                 "messages": [msg_out],
@@ -310,8 +314,9 @@ def create_news_analyst(llm):
                 fallback_md = empty_report("neutral", f"LLM 失败且 fallback 异常: {inner_e}")
 
             analyst_id = make_analyst_id("NEWS", full_symbol, trade_date, seed="fallback")
+            conclusion_id = make_conclusion_id("NEWS", 1)
             tagged_fallback = inject_analyst_id(fallback_md, analyst_id)
-            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "NEWS", "analyst": "news", "report_key": "news_report", "direction": "neutral", "summary": "(降级: LLM 不可用)"}}
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "NEWS", "news", "news_report", "neutral", "(降级: LLM 不可用)")
             return {
                 "news_report": tagged_fallback,
                 "messages": [],

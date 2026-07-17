@@ -33,6 +33,8 @@ from ._base import (
     inject_analyst_id,
     load_features,
     make_analyst_id,
+    make_conclusion_id,
+    make_registry_entry,
     quality_gate,
 )
 
@@ -506,8 +508,9 @@ def create_position_analyst(llm):
             reason = "持仓 features 缺失(features['positioning'] 为空)"
             empty = empty_report("neutral", reason)
             analyst_id = make_analyst_id("POSN", full_symbol, trade_date, seed="empty")
+            conclusion_id = make_conclusion_id("POSN", 1)
             tagged_empty = inject_analyst_id(empty, analyst_id)
-            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "POSN", "analyst": "position", "report_key": "position_report", "direction": "neutral", "summary": "(数据缺失: 跳过)"}}
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "POSN", "position", "position_report", "neutral", "(数据缺失: 跳过)")
             return {
                 "sentiment_report": empty,  # 保持纯净(stock 兼容)
                 "position_report": tagged_empty,
@@ -522,8 +525,9 @@ def create_position_analyst(llm):
             reason = "持仓数据稀疏"
             empty = empty_report("neutral", reason)
             analyst_id = make_analyst_id("POSN", full_symbol, trade_date, seed="sparse")
+            conclusion_id = make_conclusion_id("POSN", 1)
             tagged_empty = inject_analyst_id(empty, analyst_id)
-            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "POSN", "analyst": "position", "report_key": "position_report", "direction": "neutral", "summary": "(数据稀疏: 跳过)"}}
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "POSN", "position", "position_report", "neutral", "(数据稀疏: 跳过)")
             return {
                 "sentiment_report": empty,  # 保持纯净
                 "position_report": tagged_empty,
@@ -642,8 +646,9 @@ def create_position_analyst(llm):
 
             msg_out = result if hasattr(result, "content") else AIMessage(content=report_md)
             analyst_id = make_analyst_id("POSN", full_symbol, trade_date)
+            conclusion_id = make_conclusion_id("POSN", 1)
             tagged_report = inject_analyst_id(report_md, analyst_id)
-            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "POSN", "analyst": "position", "report_key": "position_report", "direction": direction or "neutral", "summary": extract_first_sentence(report_md)}}
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "POSN", "position", "position_report", direction or "neutral", extract_first_sentence(report_md))
             return {
                 "sentiment_report": report_md,  # 保持纯净
                 "position_report": tagged_report,
@@ -666,8 +671,9 @@ def create_position_analyst(llm):
                 structured = {}
 
             analyst_id = make_analyst_id("POSN", full_symbol, trade_date, seed="fallback")
+            conclusion_id = make_conclusion_id("POSN", 1)
             tagged_fallback = inject_analyst_id(fallback_md, analyst_id)
-            registry_entry = {analyst_id: {"id": analyst_id, "prefix": "POSN", "analyst": "position", "report_key": "position_report", "direction": direction or "neutral", "summary": "(降级: LLM 不可用)"}}
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "POSN", "position", "position_report", direction or "neutral", "(降级: LLM 不可用)")
             return {
                 "sentiment_report": fallback_md,  # 保持纯净
                 "position_report": tagged_fallback,
