@@ -110,3 +110,8 @@ class AgentState(MessagesState):
 
     # 大宗商品 analyst 报告注册索引（merge 模式，自动累积）
     analyst_registry: Annotated[dict, merge_dicts]
+
+    # ===== Phase 4: 投研总监字段（替代 L3-L5 风控链） =====
+    investment_memo: Annotated[dict, "投研备忘录(从 LLM JSON 解析)"] = {}
+    risk_card: Annotated[dict, "风险评估卡(纯规则+LLM 增强)"] = {}
+    risk_assessment: Annotated[dict, "量化检查器输出(纯规则)"] = {}
