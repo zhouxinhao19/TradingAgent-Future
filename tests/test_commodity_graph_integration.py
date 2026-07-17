@@ -151,8 +151,11 @@ class TestGraphCompilation:
 
         # 验证关键节点均已执行
         expected = {"Technical Analyst", "Fundamentals Analyst", "Sentiment Analyst",
-                    "News Analyst", "Research Manager", "Risky Analyst", "Safe Analyst",
-                    "Neutral Analyst", "Risk Judge", "CIO"}
+                    "News Analyst", "Research Manager", "Investment Director"}
         executed = set(completed_nodes)
         missing = expected - executed
         assert not missing, f"缺少节点执行: {missing}"
+
+        # 验证投研总监输出了 final_decision
+        assert final_state.get("final_decision"), "final_decision 为空"
+        assert final_state.get("risk_assessment"), "risk_assessment 为空"
