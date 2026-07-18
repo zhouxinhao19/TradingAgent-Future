@@ -535,10 +535,6 @@ class UnifiedCommodityService:
                     "metal": ["CU", "AL", "ZN", "PB", "NI", "SN", "AO", "BC"],
                     "precious": ["AU", "AG"],
                     "black": ["RB", "HC", "I", "J", "JM", "SS", "WR", "SI", "LC", "PS"],
-                    "energy": ["SC", "FU", "LU", "BU", "PG", "EC", "NR"],
-                    "chemical": ["MA", "TA", "RU", "BR", "SP", "PP", "L", "V", "EG", "EB", "PF", "PX", "PR", "SA", "SH", "UR", "FG"],
-                    "agricultural": ["A", "B", "M", "Y", "P", "C", "CS", "JD", "LH", "CF", "SR", "CY", "AP", "CJ", "PK", "RM", "OI", "RS"],
-                    "financial": ["IF", "IH", "IC", "IM", "TS", "TF", "T", "TL"],
                     "minor": ["SI", "LC", "PS", "SF", "SM"],
                 }
                 variety_codes = cat_map.get(category, [category.upper()])
@@ -596,7 +592,7 @@ class UnifiedCommodityService:
 
         # 尝试实时 LLM 标注(降级)
         try:
-            from tradingagents.features.commodity.news_annotator import NewsAnnotator
+            from tradingagents.annotators.commodity.news_annotator import NewsAnnotator
             from app.core.database import get_database
 
             db = get_database()
@@ -643,10 +639,6 @@ class UnifiedCommodityService:
             {"code": "metal",       "name": "有色金属"},
             {"code": "precious",    "name": "贵金属"},
             {"code": "black",       "name": "黑色系"},
-            {"code": "energy",      "name": "能源"},
-            {"code": "chemical",    "name": "化工"},
-            {"code": "agricultural","name": "农产品"},
-            {"code": "financial",   "name": "金融期货"},
             {"code": "global_macro","name": "全球宏观"},
         ]
 

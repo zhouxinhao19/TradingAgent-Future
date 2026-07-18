@@ -17,7 +17,6 @@ from .inventory import compute_inventory_metrics
 from .positioning import compute_positioning_metrics
 from .term_structure import compute_term_structure_metrics
 from .news_sentiment import compute_news_sentiment_metrics
-from .news_annotator import NewsAnnotator, NewsAnnotation
 
 __all__ = [
     "_helpers",
@@ -27,6 +26,4 @@ __all__ = [
     "compute_positioning_metrics",
     "compute_term_structure_metrics",
     "compute_news_sentiment_metrics",
-    "NewsAnnotator",
-    "NewsAnnotation",
 ]

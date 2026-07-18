@@ -18,6 +18,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+import re
+
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import AIMessage
 
@@ -64,7 +66,7 @@ NEWS_SYSTEM_PROMPT = """你是一位资深的期货新闻分析师,采用"情绪
 如果预标注与你的判断矛盾,注明差异。
 
 ### 第一层:宏观叙事
-聚焦影响当前品种的全球宏观因子:
+从下方"🌍 宏观背景事件"区块中提取宏观因子,聚焦影响当前品种的全球宏观因素:
 - 美联储/ECB/央行货币政策(利率/QT/QE)
 - OPEC+决策与地缘政治(制裁/冲突/贸易摩擦)
 - 中国经济政策(基建/房地产/制造业PMI)
@@ -72,7 +74,9 @@ NEWS_SYSTEM_PROMPT = """你是一位资深的期货新闻分析师,采用"情绪
 - 全球经济增长预期(IMF/世界银行)
 
 ### 第二层:产业叙事
-根据品种行业分类(category)聚焦产业级事件:
+从下方"📊 品种相关事件"区块中提取产业级事件,根据品种行业分类(category)聚焦:
+
+如果产品相关事件为"宏观平静期",说明当前无直接产业冲击,以宏观驱动为主。
 - **金属(Metal)**: 矿山产能/冶炼开工率/下游加工/废料回收/LME库存
 - **化工(Chemical)**: 炼厂检修/PTA负荷/甲醇开工/聚酯需求/乙烯价格
 - **能源(Energy)**: 油田产量/炼油利润/裂解价差/电力需求/天然气库存
@@ -112,60 +116,81 @@ def _fmt(v: Any) -> str:
     return str(v)
 
 
-def _format_events(events: List[Dict[str, Any]], max_items: int = 50) -> str:
-    """把新闻列表(含 LLM 预标注)格式化为 markdown。"""
+def _format_events(events: List[Dict[str, Any]], full_symbol: str = "", max_items: int = 50) -> str:
+    """把新闻列表(含 LLM 预标注)格式化为 markdown,按品种相关/宏观背景分组。
+
+    分组规则:
+      - 品种相关:relevant_varieties 包含本品种代码 或 source=shmet
+      - 宏观背景:relevant_varieties=[] 且非 shmet
+    """
     if not events:
         return "(无新闻原文)"
-    items = events[:max_items]
-    lines = []
-    for e in items:
-        published = e.get("published_at", "")
-        title = e.get("title", "")
-        content = e.get("content", "")
-        source = e.get("source", "")
 
-        # LLM 预标注字段(优先)
-        sentiment = e.get("llm_sentiment", e.get("sentiment", ""))
-        confidence = e.get("llm_sentiment_confidence", "")
-        reasoning = e.get("llm_sentiment_reasoning", "")
-        summary = e.get("llm_summary", "")
-        importance = e.get("llm_importance", "")
+    # 从 full_symbol 提取品种代码(如 CU2501.SHF → CU)
+    _underlying = full_symbol.split(".")[0] if "." in full_symbol else full_symbol
+    _pure = re.sub(r"\d+$", "", _underlying) if _underlying else _underlying
+
+    variety_events: List[Dict[str, Any]] = []
+    macro_events: List[Dict[str, Any]] = []
+
+    for e in events:
         varieties = e.get("relevant_varieties", [])
+        source = e.get("source", "")
+        # 品种相关:relevant_varieties 含本品种,或 shmet 原文
+        if _pure.upper() in [v.upper() for v in varieties] or source == "shmet":
+            variety_events.append(e)
+        elif not varieties:
+            macro_events.append(e)
 
-        # 使用 summary(精炼) 或 title
-        heading = summary or title
-        line = f"- [{published}] {heading}"
+    def _fmt_group(grp_items: List[Dict[str, Any]], limit: int) -> List[str]:
+        lines = []
+        for e in grp_items[:limit]:
+            published = e.get("published_at", "")
+            heading = e.get("llm_summary", "") or e.get("title", "")
+            sentiment = e.get("llm_sentiment", e.get("sentiment", ""))
+            confidence = e.get("llm_sentiment_confidence", "")
+            reasoning = e.get("llm_sentiment_reasoning", "")
+            importance = e.get("llm_importance", "")
+            source = e.get("source", "")
+            content = e.get("content", "")
 
-        # 情感标签
-        if sentiment:
-            line += f" [{sentiment}"
-            if confidence:
-                line += f", 置信度{confidence}"
-            line += "]"
+            line = f"- [{published}] {heading}"
+            if sentiment:
+                line += f" [{sentiment}"
+                if confidence:
+                    line += f", 置信度{confidence}"
+                line += "]"
+            if reasoning:
+                line += f" — {reasoning}"
+            if content:
+                line += f"\n  原文:{content[:150]}"
+            meta_bits = []
+            if source:
+                meta_bits.append(f"来源:{source}")
+            if importance:
+                meta_bits.append(f"重要度:{importance}")
+            if meta_bits:
+                line += f" ({', '.join(meta_bits)})"
+            lines.append(line)
+        return lines
 
-        # 品种归属
-        if varieties:
-            line += f" 品种:{','.join(varieties)}"
+    lines: List[str] = []
+    has_variety = False
+    has_macro = False
+    if variety_events:
+        has_variety = True
+        lines.append("### 📊 品种相关事件")
+        lines.extend(_fmt_group(variety_events, max_items))
+    if macro_events:
+        has_macro = True
+        lines.append("### 🌍 宏观背景事件")
+        lines.extend(_fmt_group(macro_events, max_items))
 
-        # 推理理由
-        if reasoning:
-            line += f" — {reasoning}"
+    # 无品种归属但有宏观事件 → 标记"宏观平静期"
+    if not has_variety and has_macro:
+        lines.insert(0, "> **注**:当前无直接品种相关新闻,市场处于宏观平静期,以下仅提供宏观背景参考。\n")
 
-        # 原文(前 150 字)
-        if content:
-            line += f"\n  原文:{content[:150]}"
-
-        # 元信息
-        meta_bits = []
-        if source:
-            meta_bits.append(f"来源:{source}")
-        if importance:
-            meta_bits.append(f"重要度:{importance}")
-        if meta_bits:
-            line += f" ({', '.join(meta_bits)})"
-
-        lines.append(line)
-    return "\n".join(lines)
+    return "\n".join(lines) if lines else "(无新闻原文)"
 
 
 def _build_fallback_report(
@@ -277,7 +302,7 @@ def create_news_analyst(llm):
             exchange=exchange,
             category=category,
             trade_date=trade_date,
-            recent_events=_format_events(recent_events, max_items=50),
+            recent_events=_format_events(recent_events, full_symbol=full_symbol, max_items=50),
         )
 
         try:

@@ -73,6 +73,14 @@ class CommodityPropagator(Propagator):
             f"请对大宗商品期货 {full_symbol} 进行全面分析,交易日期为 {trade_date}。"
         )
 
+        # 计算 news_summary(利多/利空/高重要度 条数统计,供 L1 分析师引用)
+        news_summary = ""
+        if latest_news:
+            _pos = sum(1 for e in latest_news if e.get("llm_sentiment", e.get("sentiment")) == "positive")
+            _neg = sum(1 for e in latest_news if e.get("llm_sentiment", e.get("sentiment")) == "negative")
+            _high = sum(1 for e in latest_news if e.get("llm_importance") == "high")
+            news_summary = f"当前新闻情感: 利多{_pos}条 利空{_neg}条 高重要度{_high}条。"
+
         return {
             "messages": [HumanMessage(content=analysis_request)],
             "company_of_interest": full_symbol,  # 复用 stock 字段
@@ -105,6 +113,7 @@ class CommodityPropagator(Propagator):
             "commodity_features": commodity_features or {},
             "latest_news": latest_news or [],
             "analyst_registry": {},
+            "news_summary": news_summary,
         }
 
 

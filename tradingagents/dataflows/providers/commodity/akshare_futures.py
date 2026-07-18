@@ -87,8 +87,7 @@ def _to_ak_exchange(exchange: str) -> Optional[str]:
 # 期货资讯(category → futures_news_shmet symbol)
 # AKShare `futures_news_shmet` 只支持以下 symbol:
 #   {"全部", "要闻", "VIP", "财经", "铜", "铝", "铅", "锌", "镍", "锡", "贵金属", "小金属"}
-# 化学/能源/农产品/金融期货的文本快讯不在 shmet 范围,
-# 它们通过 `_NEWS_GENERATORS` 走宏观合成器。
+# global_macro 通过 `_synth_global_macro_news` 走全球宏观聚合。
 # =============================================================================
 _NEWS_CATEGORY_MAP = {
     "all": "全部",
@@ -171,54 +170,8 @@ def _parse_shmet_bracket_title(content: str) -> tuple:
     return ("", s)
 
 
-# =============================================================================
-# 化工/能源/农产品/金融 的"基本面事件卡片"生成器
-# --------------------------------------------------------------------------
-# 由于 AKShare 期货模块没有专门的化工/能源/农产品期货文本快讯,
-# 这里把以下宏观+产业数据接口合成统一格式的事件卡片:
-#   chemical  → energy_oil_hist (汽柴油价调整记录)
-#   energy    → macro_china_daily_energy (沿海六大电厂日耗煤)
-#              + energy_oil_hist
-#   agricultural → macro_china_agricultural_product (农产品批发价200指数)
-#              + futures_hog_supply (玄田-生猪供应 8 维度)
-#              + index_outer_quote_sugar_msweet (食糖进口日报)
-#   financial → 暂无稳定源,返回 []
-# =============================================================================
-
-# 每个 category 调用哪些 AKShare 函数(synthesize 函数入口)
+# 每个 category 调用的新闻生成器函数入口(仅保留 global_macro)
 _NEWS_GENERATORS = {
-    "chemical": {
-        "func": "_synth_oil_news",
-        "label": "能化",
-        "supported_funcs": ["energy_oil_hist"],
-    },
-    "energy": {
-        "func": "_synth_energy_news",
-        "label": "能源",
-        "supported_funcs": ["energy_oil_hist", "macro_china_daily_energy"],
-    },
-    "agricultural": {
-        "func": "_synth_agricultural_news",
-        "label": "农产品",
-        "supported_funcs": [
-            "macro_china_agricultural_product",
-            "futures_hog_supply",
-            "index_hog_spot_price",
-            "index_outer_quote_sugar_msweet",
-        ],
-    },
-    "financial": {
-        "func": "_synth_financial_news",
-        "label": "金融期货",
-        "supported_funcs": [
-            "index_option_300index_qvix",
-            "index_option_300etf_qvix",
-            "index_option_1000index_qvix",
-            "bond_zh_us_rate",
-            "macro_china_shibor_all",
-            "macro_china_lpr",
-        ],
-    },
     "global_macro": {
         "func": "_synth_global_macro_news",
         "label": "全球宏观",
@@ -1350,36 +1303,24 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         1. shmet 有色金属快讯:
            - all/metal/nonferrous/copper/aluminum/lead/zinc/nickel/tin
            - precious/minor/headline/vip/finance
-        2. 化学能化(chemical):
-           - 汽柴油价调整记录(energy_oil_hist)
-        3. 能源(energy):
-           - 沿海六大电厂日耗煤(macro_china_daily_energy)
-           - 汽柴油价调整记录(energy_oil_hist)
-        4. 农产品(agricultural):
-           - 农产品批发价200指数(macro_china_agricultural_product)
-           - 生猪产业链 8 维度(futures_hog_supply)
-           - 生猪市场行情指数(index_hog_spot_price)
-           - 食糖进口日报(index_outer_quote_sugar_msweet)
-        5. 金融期货(financial):
-           - shmet 没有专门分类,暂无稳定数据源 → 返回 []
+        2. 全球宏观(global_macro):
+           - 聚合 6 个资讯源(东全球快讯/财联社/同花顺/富途/财经早餐/新浪)
 
         Args:
             category: 资讯分类
-            limit: 最多返回条数(shmet 接口 ~1000 条 / 合成接口按 limit 取最后 N 条)
+            limit: 最多返回条数(shmet 接口 ~1000 条)
 
         Returns:
             [
                 {
                     "published_at": "2024-03-21T14:02:44+08:00",
-                    "title": "金诚信资源:Lonshi 铜矿增储情况",   # shmet 从【】解析
-                          或 "油价调整-20240904"               # 合成
-                          或 "电厂日耗-20240904"
+                    "title": "金诚信资源:Lonshi 铜矿增储情况",
                     "content": "金诚信近日接受机构调研时表示...",
                     "category": "copper",                        # 用户入参
-                    "metal": "铜",                                # shmet 分类或子分类
+                    "metal": "铜",                                # shmet 分类
                     "sentiment": "positive",
                     "sentiment_score": 0.6,
-                    "source": "shmet" | "akshare_synth",        # 标记来源
+                    "source": "shmet" | "global_macro",          # 标记来源
                     "url": "...",
                 },
                 ...
@@ -1449,200 +1390,16 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         )
         return []
 
-    # ========================================================================
-    # 化学能化合成器
-    # ========================================================================
-
-    async def _synth_oil_news(self, limit: int = 20) -> List[Dict[str, Any]]:
-        """汽柴油价调整记录(全国均价)"""
-        df = await _safe_call(self, "energy_oil_hist")
-        if df is None or df.empty:
-            return []
-
-        items: List[Dict[str, Any]] = []
-        # 取最近 N 条按日期倒序
-        tail = df.tail(limit) if limit else df
-        for _, row in tail.iterrows():
-            date = str(row.get("调整日期", "") or "")
-            gas = row.get("汽油价格", None)
-            die = row.get("柴油价格", None)
-            gas_chg = row.get("汽油涨跌", None)
-            die_chg = row.get("柴油涨跌", None)
-            body = (
-                f"汽油 {gas} 元/吨(涨跌 {gas_chg:+})  "
-                f"柴油 {die} 元/吨(涨跌 {die_chg:+})"
-            )
-            score = _analyze_futures_news_sentiment(body)
-            items.append({
-                "published_at": date,
-                "title": f"汽柴油调价-{date}",
-                "content": body,
-                "sentiment": _to_sentiment_label(score),
-                "sentiment_score": score,
-                "source": "akshare_synth",
-                "url": "https://data.eastmoney.com/cjsj/oil_default.html",
-            })
-        return items
 
     # ========================================================================
-    # 能源合成器(汽柴油 + 沿海六大电日耗煤)
+    # 全球宏观资讯流(聚合 6 个源: 财经早餐 / 东财 / 同花顺 / 富途 / 财联社 / 新浪)
+    # --------------------------------------------------------------------------
+    # 字段差异处理:
+    # - 财经早餐 / 东财: 标题 + 摘要 + 发布时间 + 链接
+    # - 同花顺 / 富途: 标题 + 内容 + 发布时间 + 链接
+    # - 新浪: 只有 时间 + 内容(无标题,从【】解析)
+    # - 财联社: 标题 + 内容 + 发布日期 + 发布时间(可能网络不通,失败兜底)
     # ========================================================================
-
-    async def _synth_energy_news(self, limit: int = 20) -> List[Dict[str, Any]]:
-        items: List[Dict[str, Any]] = []
-        # 1. 汽柴油
-        oil_df = await _safe_call(self, "energy_oil_hist")
-        if oil_df is not None and not oil_df.empty:
-            tail = oil_df.tail(limit or 20)
-            for _, row in tail.iterrows():
-                date = str(row.get("调整日期", "") or "")
-                gas = row.get("汽油价格", None)
-                gas_chg = row.get("汽油涨跌", None)
-                die_chg = row.get("柴油涨跌", None)
-                body = (
-                    f"汽油 {gas} 元/吨(涨跌 {gas_chg:+})  "
-                    f"柴油涨跌 {die_chg:+} 元/吨"
-                )
-                items.append({
-                    "published_at": date,
-                    "title": f"汽柴油调价-{date}",
-                    "content": body,
-                    "sentiment": _to_sentiment_label(
-                        _analyze_futures_news_sentiment(body)
-                    ),
-                    "sentiment_score": _analyze_futures_news_sentiment(body),
-                    "source": "akshare_synth",
-                    "url": "https://data.eastmoney.com/cjsj/oil_default.html",
-                })
-
-        # 2. 沿海六大电厂日耗煤
-        coal_df = await _safe_call(self, "macro_china_daily_energy")
-        if coal_df is not None and not coal_df.empty:
-            tail = coal_df.tail(limit or 30)
-            for _, row in tail.iterrows():
-                date = str(row.get("日期", "") or "")
-                stock = row.get("沿海六大电库存", None)
-                day_use = row.get("日耗", None)
-                available_days = row.get("存煤可用天数", None)
-                body = (
-                    f"沿海六大电 库存 {stock} 万吨 / 日耗 {day_use} 万吨 / "
-                    f"可用 {available_days} 天"
-                )
-                items.append({
-                    "published_at": date,
-                    "title": f"电厂日耗煤-{date}",
-                    "content": body,
-                    "sentiment": "neutral",
-                    "sentiment_score": 0.0,
-                    "source": "akshare_synth",
-                    "url": "https://datacenter.jin10.com/reportType/dc_qihuo_energy_report",
-                })
-        # 倒序:最新的在前(shmet 是一致的)
-        items.reverse()
-        if limit and len(items) > limit:
-            items = items[:limit]
-        return items
-
-    # ========================================================================
-    # 农产品合成器(批发价指数 + 生猪 + 食糖)
-    # ========================================================================
-
-    async def _synth_agricultural_news(self, limit: int = 20) -> List[Dict[str, Any]]:
-        items: List[Dict[str, Any]] = []
-
-        # 1. 农产品批发价 200 指数
-        df = await _safe_call(self, "macro_china_agricultural_product")
-        if df is not None and not df.empty:
-            tail = df.tail(limit or 30)
-            for _, row in tail.iterrows():
-                date = str(row.get("日期", "") or "")
-                latest = row.get("最新值", None)
-                chg = row.get("涨跌幅", None)
-                yoy = row.get("近1年涨跌幅", None)
-                body = (
-                    f"农产品批发价格200指数 {latest} "
-                    f"(日涨跌 {chg if pd.notna(chg) else '—'}% / "
-                    f"近1年 {yoy if pd.notna(yoy) else '—'}%)"
-                )
-                score = _analyze_futures_news_sentiment(body)
-                items.append({
-                    "published_at": date,
-                    "title": f"农产品批发价200指数-{date}",
-                    "content": body,
-                    "sentiment": _to_sentiment_label(score),
-                    "sentiment_score": score,
-                    "source": "akshare_synth",
-                    "url": "https://data.eastmoney.com/cjsj/hyzs_list_EMI00009274.html",
-                })
-
-        # 2. 玄田-猪肉批发价
-        hog_df = await _safe_call(self, "futures_hog_supply", symbol="猪肉批发价")
-        if hog_df is not None and not hog_df.empty:
-            tail = hog_df.tail(limit or 30)
-            for _, row in tail.iterrows():
-                date = str(row.get("date", "") or "")
-                val = row.get("value", None)
-                body = f"猪肉批发价 {val} 元/公斤"
-                items.append({
-                    "published_at": date,
-                    "title": f"猪肉批发价日报-{date}",
-                    "content": body,
-                    "sentiment": "neutral",
-                    "sentiment_score": 0.0,
-                    "source": "akshare_synth",
-                    "url": "https://zhujia.zhuwang.com.cn",
-                })
-
-        # 3. 生猪市场行情指数
-        hog_idx = await _safe_call(self, "index_hog_spot_price")
-        if hog_idx is not None and not hog_idx.empty:
-            tail = hog_idx.tail(limit or 10)
-            for _, row in tail.iterrows():
-                date = str(row.get("日期", "") or "")
-                idx = row.get("指数", None)
-                m4 = row.get("4个月均线", None)
-                spot = row.get("成交均价", None)
-                body = (
-                    f"生猪市场指数 {idx} (4月均线 {m4}) / 成交均价 {spot} 元/公斤"
-                )
-                items.append({
-                    "published_at": date,
-                    "title": f"生猪市场行情指数-{date}",
-                    "content": body,
-                    "sentiment": "neutral",
-                    "sentiment_score": 0.0,
-                    "source": "akshare_synth",
-                    "url": "https://hqb.nxin.com/pigindex/index.shtml",
-                })
-
-        # 4. 食糖进口日报
-        sugar = await _safe_call(self, "index_outer_quote_sugar_msweet")
-        if sugar is not None and not sugar.empty:
-            tail = sugar.tail(limit or 10)
-            for _, row in tail.iterrows():
-                date = str(row.get("日期", "") or "")
-                brazil_cost = row.get("巴西糖进口成本", None)
-                thai_profit = row.get("泰国糖进口利润空间", None)
-                spot = row.get("日照现货价", None)
-                body = (
-                    f"日照现货价 {spot} 元/吨 / "
-                    f"巴西进口成本 {brazil_cost} / "
-                    f"泰国进口利润 {thai_profit}"
-                )
-                items.append({
-                    "published_at": date,
-                    "title": f"食糖进口日报-{date}",
-                    "content": body,
-                    "sentiment": "neutral",
-                    "sentiment_score": 0.0,
-                    "source": "akshare_synth",
-                    "url": "https://www.msweet.com.cn/mtkj/sjzx13/index.html",
-                })
-
-        items.reverse()
-        if limit and len(items) > limit:
-            items = items[:limit]
-        return items
 
     # ========================================================================
     # 全球宏观资讯流(聚合 6 个源: 财经早餐 / 东财 / 同花顺 / 富途 / 财联社 / 新浪)
@@ -1741,148 +1498,6 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
     #   - macro_china_lpr             (LPR 1Y/5Y)
     # ========================================================================
 
-    async def _synth_financial_news(self, limit: int = 20) -> List[Dict[str, Any]]:
-        items: List[Dict[str, Any]] = []
-
-        # ----- 1) 三个 QVIX 指数(只取最近 10 个交易日) -----
-        qvix_sources = [
-            ("index_option_300index_qvix", "中证300股指 QVIX", ["IF", "IH"]),
-            ("index_option_300etf_qvix", "300 ETF 期权 QVIX", ["IF"]),
-            ("index_option_1000index_qvix", "中证1000股指 QVIX", ["IM"]),
-        ]
-        for func_name, label, contracts in qvix_sources:
-            df = await _safe_call(self, func_name)
-            if df is None or df.empty or "close" not in df.columns:
-                continue
-            tail = df.dropna(subset=["close"]).tail(limit or 10)
-            for _, row in tail.iterrows():
-                date = str(row.get("date", "") or "")
-                close = row.get("close", None)
-                high = row.get("high", None)
-                low = row.get("low", None)
-                if pd.isna(close):
-                    continue
-                # QVIX 阈值判定:
-                #   >30 恐慌 → -0.5
-                #   >25 偏紧 → -0.4
-                #   18-25 中性 → 0
-                #   <22 偏松 → 0.2
-                #   <18 平静 → 0.5
-                score = 0.0
-                if close > 30:
-                    score = -0.5
-                elif close > 25:
-                    score = -0.4
-                elif close < 18:
-                    score = 0.5
-                elif close < 22:
-                    score = 0.2
-                body = (
-                    f"{label} 收盘 {close:.2f} "
-                    f"(高 {high if not pd.isna(high) else '-'} / "
-                    f"低 {low if not pd.isna(low) else '-'}) "
-                    f"适用合约:{' / '.join(contracts)}"
-                )
-                items.append({
-                    "published_at": date,
-                    "title": f"{label}-{date}",
-                    "content": body,
-                    "sentiment": _to_sentiment_label(score),
-                    "sentiment_score": score,
-                    "source": "akshare_synth",
-                    "url": "https://1.optbbs.com/s/vix.shtml",
-                })
-
-        # ----- 2) 中美国债收益率(关键驱动 TL/T/TF/TS) -----
-        rate_df = await _safe_call(self, "bond_zh_us_rate")
-        if rate_df is not None and not rate_df.empty:
-            tail = rate_df.tail(limit or 10)
-            for _, row in tail.iterrows():
-                date = str(row.get("日期", "") or "")
-                cn10 = row.get("中国国债收益率10年", None)
-                us10 = row.get("美国国债收益率10年", None)
-                cn_us10 = row.get("中国国债收益率10年-2年", None)
-                us_2_10 = row.get("美国国债收益率10年-2年", None)
-                body_parts = []
-                if pd.notna(cn10):
-                    body_parts.append(f"中10Y {cn10}%")
-                if pd.notna(us10):
-                    body_parts.append(f"美10Y {us10}%")
-                if pd.notna(cn_us10):
-                    body_parts.append(f"中10-2Y {cn_us10}bp")
-                if pd.notna(us_2_10):
-                    body_parts.append(f"美10-2Y {us_2_10}bp")
-                if not body_parts:
-                    continue
-                body = " / ".join(body_parts) + " (适用 TL/T/TF/TS)"
-                score = _analyze_futures_news_sentiment(body)
-                items.append({
-                    "published_at": date,
-                    "title": f"中美国债收益率-{date}",
-                    "content": body,
-                    "sentiment": _to_sentiment_label(score),
-                    "sentiment_score": score,
-                    "source": "akshare_synth",
-                    "url": "https://data.eastmoney.com/cjsj/zmgzsyl.html",
-                })
-
-        # ----- 3) SHIBOR 8 品种利率(短端驱动) -----
-        shibor_df = await _safe_call(self, "macro_china_shibor_all")
-        if shibor_df is not None and not shibor_df.empty:
-            tail = shibor_df.tail(limit or 10)
-            for _, row in tail.iterrows():
-                date = str(row.get("日期", "") or "")
-                rates = []
-                for tenor in ("O/N", "1W", "2W", "1M", "3M", "6M", "9M", "1Y"):
-                    v = row.get(f"{tenor}-定价", None)
-                    if pd.notna(v):
-                        rates.append(f"{tenor} {v}%")
-                if not rates:
-                    continue
-                body = "SHIBOR " + " / ".join(rates) + " (适用 T/TS/TF)"
-                items.append({
-                    "published_at": date,
-                    "title": f"SHIBOR 利率-{date}",
-                    "content": body,
-                    "sentiment": "neutral",
-                    "sentiment_score": 0.0,
-                    "source": "akshare_synth",
-                    "url": "https://datacenter.jin10.com/reportType/dc_shibor",
-                })
-
-        # ----- 4) LPR 报价 -----
-        lpr_df = await _safe_call(self, "macro_china_lpr")
-        if lpr_df is not None and not lpr_df.empty:
-            tail = lpr_df.tail(limit or 5)
-            for _, row in tail.iterrows():
-                date = str(row.get("TRADE_DATE", "") or "")
-                lpr1y = row.get("LPR1Y", None)
-                lpr5y = row.get("LPR5Y", None)
-                body_parts = []
-                if pd.notna(lpr1y):
-                    body_parts.append(f"LPR 1Y {lpr1y}%")
-                if pd.notna(lpr5y):
-                    body_parts.append(f"LPR 5Y {lpr5y}%")
-                if not body_parts:
-                    continue
-                body = " / ".join(body_parts) + " (适用 T/TS/TF)"
-                items.append({
-                    "published_at": date,
-                    "title": f"LPR 报价-{date}",
-                    "content": body,
-                    "sentiment": _to_sentiment_label(
-                        _analyze_futures_news_sentiment(body)
-                    ),
-                    "sentiment_score": _analyze_futures_news_sentiment(body),
-                    "source": "akshare_synth",
-                    "url": "https://data.eastmoney.com/cjsj/globalRateLPR.html",
-                })
-
-        # ----- 倒序:最新在前 -----
-        items.reverse()
-        if limit and len(items) > limit:
-            items = items[:limit]
-        return items
 
     async def get_active_contract_history(
         self,

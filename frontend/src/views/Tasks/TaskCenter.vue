@@ -378,8 +378,18 @@ async function viewResult(row: CommodityTaskItem) {
   }
 }
 
-function retryTask(row: CommodityTaskItem) {
-  router.push({ path: '/commodity/analysis', query: { symbol: row.full_symbol } })
+async function retryTask(row: CommodityTaskItem) {
+  try {
+    await commodityApi.submitAnalysis(row.full_symbol, {
+      trade_date: row.trade_date || undefined,
+      variety_name: row.variety_name || undefined,
+      exchange: row.exchange || undefined,
+    })
+    ElMessage.success(`已重新提交 ${row.full_symbol} 分析任务`)
+    await loadList()
+  } catch (e: any) {
+    ElMessage.error(e?.message || `重试 ${row.full_symbol} 失败`)
+  }
 }
 
 // ---- 状态映射 ----

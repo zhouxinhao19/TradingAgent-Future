@@ -84,6 +84,9 @@ FUNDAMENTAL_SYSTEM_PROMPT = """你是一位永安期货体系下的产业分析�
 - 估值与驱动一致性:**{consistency}**
   {conflict_note}
 
+## 新闻摘要(跨分析师参考)
+{news_summary}
+
 ## 分析要求(三段式)
 
 ### 第一步:估值分析
@@ -439,6 +442,7 @@ def create_fundamental_analyst(llm):
             conflict_note=assessment.get("conflict_note", "无"),
             quality_rows=quality_rows,
             quality_coverage=_fmt((basis_block or {}).get("quality", {}).get("coverage")),
+            news_summary=state.get("news_summary", ""),
         )
 
         # --- 主路径:LLM 调用 ---

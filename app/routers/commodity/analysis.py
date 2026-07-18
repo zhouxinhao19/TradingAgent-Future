@@ -412,20 +412,30 @@ async def _run_commodity_analysis(
                 f"modules={list(commodity_features.keys())})"
             )
             try:
-                # Phase 新闻改造:优先从 MongoDB 读取已标注新闻
+                # Phase 新闻改造:优先从 MongoDB 读取已标注新闻(双路径:品种相关 + 宏观背景)
                 from app.core.database import get_database
                 db = get_database()
                 coll = db["commodity_news_annotations"]
                 # 从 full_symbol 提取品种代码(如 CU2501.SHF → CU)
                 _underlying = full_symbol.split(".")[0] if "." in full_symbol else full_symbol
                 _pure = re.sub(r"\d+$", "", _underlying) if _underlying else _underlying
-                _cursor = coll.find(
+                # 路径 1:品种相关新闻
+                _variety_cursor = coll.find(
                     {"relevant_varieties": {"$in": [_pure.upper(), _underlying.upper()]}}
-                ).sort("annotated_at", -1).limit(100)
-                _cached = await _cursor.to_list(length=100)
-                if _cached:
+                ).sort("annotated_at", -1).limit(80)
+                _variety_items = await _variety_cursor.to_list(length=80)
+                # 路径 2:宏观背景新闻(relevant_varieties=[] 的非 shmet 新闻)
+                _macro_cursor = coll.find({
+                    "relevant_varieties": {"$size": 0},
+                    "source": {"$ne": "shmet"},
+                    "importance": "high",
+                }).sort("annotated_at", -1).limit(20)
+                _macro_items = await _macro_cursor.to_list(length=20)
+
+                _all_cached = _variety_items + _macro_items
+                if _all_cached:
                     latest_news = []
-                    for _doc in _cached:
+                    for _doc in _all_cached:
                         latest_news.append({
                             "published_at": str(_doc.get("annotated_at", "")),
                             "title": _doc.get("summary", ""),
@@ -443,15 +453,20 @@ async def _run_commodity_analysis(
                             "annotated_at": str(_doc.get("annotated_at", "")),
                             "annotator_model": _doc.get("annotator_model", ""),
                         })
-                    logger.info(f"✅ 从 MongoDB 读取 {len(latest_news)} 条已标注新闻")
+                    logger.info(f"✅ 从 MongoDB 读取 {len(latest_news)} 条已标注新闻(品种={len(_variety_items)},宏观={len(_macro_items)})")
                 else:
-                    news = await provider.get_futures_news("all", 100)
-                    latest_news = news or []
+                    # 降级:同时拉 shmet + global_macro
+                    shmet_news = await provider.get_futures_news("all", 100) or []
+                    macro_news = await provider.get_futures_news("global_macro", 50) or []
+                    latest_news = shmet_news + macro_news
+                    logger.info(f"⚠️ MongoDB 空,走降级: shmet={len(shmet_news)} + global_macro={len(macro_news)}")
             except Exception as e:
-                logger.warning(f"⚠️ 新闻获取失败: {e}")
+                logger.warning(f"⚠️ MongoDB 新闻查询失败: {e}")
                 try:
-                    news = await provider.get_futures_news("all", 100)
-                    latest_news = news or []
+                    # 降级:同时拉 shmet + global_macro
+                    shmet_news = await provider.get_futures_news("all", 100) or []
+                    macro_news = await provider.get_futures_news("global_macro", 50) or []
+                    latest_news = shmet_news + macro_news
                 except Exception:
                     latest_news = []
         else:

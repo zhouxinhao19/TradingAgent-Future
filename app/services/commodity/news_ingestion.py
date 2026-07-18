@@ -2,8 +2,8 @@
 news_ingestion.py — 新闻定时拉取 + LLM 标注 Worker
 
 后台定期执行:
-1. 并行拉取所有新闻源(shmet / 合成器 / global_macro)
-2. content_hash 去重
+1. 并行拉取 shmet 多品种 + global_macro 聚合新闻
+2. content_hash + title_fingerprint 去重
 3. NewsAnnotator 批量 LLM 标注
 4. 写入 MongoDB commodity_news_annotations
 
@@ -118,12 +118,12 @@ async def _ingest_and_annotate() -> int:
     from tradingagents.dataflows.providers.commodity.akshare_futures import (
         AkshareFuturesProvider,
     )
-    from tradingagents.features.commodity.news_annotator import NewsAnnotator
+    from tradingagents.annotators.commodity.news_annotator import NewsAnnotator
 
     provider = AkshareFuturesProvider()
     await provider.connect()
 
-    # ── 并行拉取所有新闻源 ──
+    # ── 并行拉取新闻源(shmet + global_macro) ──
     all_items: List[Dict[str, Any]] = []
 
     async def _fetch(source_type: str, arg: Any) -> List[Dict[str, Any]]:
@@ -131,18 +131,6 @@ async def _ingest_and_annotate() -> int:
             if source_type == "global_macro":
                 result = await provider._synth_global_macro_news(100)
                 return result or []
-            elif source_type == "synth":
-                synth_map = {
-                    "energy": provider._synth_energy_news,
-                    "chemical": provider._synth_oil_news,
-                    "agricultural": provider._synth_agricultural_news,
-                    "financial": provider._synth_financial_news,
-                }
-                fn = synth_map.get(arg)
-                if fn:
-                    result = await fn(30)
-                    return result or []
-                return []
             else:
                 result = await provider.get_futures_news(arg, 100)
                 return result or []
@@ -155,15 +143,9 @@ async def _ingest_and_annotate() -> int:
         ("shmet", "cu"), ("shmet", "al"), ("shmet", "zn"),
         ("shmet", "ni"), ("shmet", "sn"), ("shmet", "precious"),
     ]
-    synth_sources = [
-        ("synth", "energy"),
-        ("synth", "chemical"),
-        ("synth", "agricultural"),
-        ("synth", "financial"),
-    ]
 
     all_tasks = []
-    for s_type, s_arg in shmet_sources + synth_sources:
+    for s_type, s_arg in shmet_sources:
         all_tasks.append(_fetch(s_type, s_arg))
     all_tasks.append(_fetch("global_macro", None))
 
@@ -178,7 +160,7 @@ async def _ingest_and_annotate() -> int:
         logger.info("⏭️ 新闻拉取结果为空,跳过本轮标注")
         return 0
 
-    # ── 去重(content_hash) ──
+    # ── content_hash 去重 ──
     seen = set()
     unique: List[Dict[str, Any]] = []
     for item in all_items:
@@ -189,6 +171,20 @@ async def _ingest_and_annotate() -> int:
         if h not in seen:
             seen.add(h)
             unique.append(item)
+
+    # ── title_fingerprint 跨源转载去重(前 40 字去标点,同 ingestion 周期内只保留最早一条) ──
+    import re as _re
+    _fingerprint_seen: set = set()
+    _fingerprint_unique: List[Dict[str, Any]] = []
+    for item in unique:
+        title = str(item.get("title", "") or "")
+        fp = _re.sub(r'[^\w\d一-鿿]', '', title)[:40]
+        if fp:
+            if fp in _fingerprint_seen:
+                continue
+            _fingerprint_seen.add(fp)
+        _fingerprint_unique.append(item)
+    unique = _fingerprint_unique
 
     logger.info(f"📰 新闻拉取: {len(all_items)} 条总, {len(unique)} 条去重后")
 

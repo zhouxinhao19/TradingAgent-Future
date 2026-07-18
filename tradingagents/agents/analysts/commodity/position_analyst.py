@@ -120,6 +120,9 @@ POSITION_SYSTEM_PROMPT = """你是一位资深的期货持仓分析师,擅长"�
 
 ---
 
+## 新闻摘要(跨分析师参考)
+{news_summary}
+
 ## 分析要求
 
 ### 第一层:总量判断
@@ -602,6 +605,7 @@ def create_position_analyst(llm):
             vol_z20=tech_ctx["vol_z20"],
             vol_regime=tech_ctx["vol_regime"],
             oi_divergence=tech_ctx["oi_divergence"],
+            news_summary=state.get("news_summary", ""),
         )
 
         try:
