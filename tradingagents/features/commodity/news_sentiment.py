@@ -21,6 +21,8 @@ Notes:
   - 纯规则,无 LLM
   - 情感判断使用扩展关键词词典(多空)
   - 重要性按"标题命中关键词"近似
+  - **新闻改造后:本模块仅用作 Agent LLM 失败时的降级兜底。
+    主情感标注已迁移到 NewsAnnotator(LLM 驱动,写入 MongoDB)。**
 """
 from __future__ import annotations
 

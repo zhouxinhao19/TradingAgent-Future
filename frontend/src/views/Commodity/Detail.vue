@@ -4,13 +4,13 @@
     <el-card class="header-card" shadow="never">
       <div class="header-inner">
         <div class="title-area" v-if="store.info">
-          <h2 class="code">{{ store.info.full_symbol }}</h2>
-          <span class="name">{{ store.info.name }}</span>
+          <h2 class="code">{{ store.info.underlying || store.info.code || store.info.full_symbol }}</h2>
+          <span class="name">{{ stripFuturesSuffix(store.info.name) }}</span>
           <el-tag size="small" :type="exchangeTagType(store.info.exchange)">{{ store.info.exchange }}</el-tag>
           <el-tag size="small" effect="plain">{{ categoryName(store.info.category) }}</el-tag>
         </div>
         <div class="title-area" v-else>
-          <h2 class="code">{{ fullSymbol }}</h2>
+          <h2 class="code">{{ extractUnderlying(fullSymbol) || fullSymbol }}</h2>
           <span class="name">加载中…</span>
         </div>
 
@@ -249,24 +249,37 @@
       <el-tab-pane label="新闻" name="news">
         <el-card shadow="never">
           <template #header>
-            <div style="display:flex; align-items:center; justify-content:space-between">
+            <div style="display:flex; align-items:center; gap:8px">
               <b>期货市场新闻</b>
-              <el-select v-model="newsCategory" size="small" placeholder="选择分类" @change="reloadNews" style="width: 180px">
-                <el-option v-for="c in store.newsCategories" :key="c.code" :label="c.name" :value="c.code" />
-              </el-select>
+              <el-tag v-if="currentVariety" size="small" type="primary" effect="plain">
+                {{ currentVariety }}
+              </el-tag>
+              <el-tag v-if="newsEmptyRelevant" size="small" type="info" effect="plain">暂无品种相关新闻</el-tag>
             </div>
           </template>
-          <el-empty v-if="!store.news.length && !store.loading(`news:${newsCategory}:30`)" description="暂无新闻" />
-          <ul class="news-list" v-loading="store.loading(`news:${newsCategory}:30`)">
-            <li v-for="(n, idx) in store.news" :key="idx" class="news-item">
+          <el-empty v-if="!store.news.length && !store.loading(newsLoadingKey)" :description="currentVariety ? '暂无品种相关新闻' : '暂无新闻'" />
+          <ul class="news-list" v-loading="store.loading(newsLoadingKey)">
+            <li v-for="(n, idx) in store.news" :key="idx" class="news-item" :class="importanceClass(n)">
               <div class="news-meta">
-                <el-tag size="small" :type="sentimentType(n.sentiment)">{{ n.sentiment }}</el-tag>
-                <span class="news-cat">{{ n.category }}</span>
+                <el-tag size="small" :type="sentimentType(n.llm_sentiment || n.sentiment)">
+                  {{ n.llm_sentiment || n.sentiment }}
+                </el-tag>
+                <span v-if="n.llm_sentiment_confidence !== undefined" class="news-conf">
+                  {{ (n.llm_sentiment_confidence * 100).toFixed(0) }}%
+                </span>
+                <template v-for="rv in (n.relevant_varieties || [])" :key="rv">
+                  <el-tag size="small" :type="rv === currentVariety ? 'primary' : 'info'" effect="plain">
+                    {{ rv }}
+                  </el-tag>
+                </template>
+                <span v-if="!n.relevant_varieties?.length && n.category" class="news-cat">{{ n.category }}</span>
                 <span class="news-time">{{ formatTime(n.published_at) }}</span>
                 <span class="news-src">{{ n.source }}</span>
+                <el-tag v-if="n.llm_importance === 'high'" size="small" type="warning" effect="dark">重要</el-tag>
               </div>
-              <div class="news-title">{{ n.title }}</div>
-              <div class="news-content" v-if="n.content">{{ n.content }}</div>
+              <div class="news-title" :title="n.title">{{ n.llm_summary || n.title }}</div>
+              <div class="news-content" v-if="n.llm_sentiment_reasoning">{{ n.llm_sentiment_reasoning }}</div>
+              <div class="news-content" v-else-if="n.content">{{ n.content }}</div>
             </li>
           </ul>
         </el-card>
@@ -276,16 +289,13 @@
       <el-tab-pane label="扩展数据" name="extra">
         <el-row :gutter="12">
           <el-col :span="12">
-            <el-card shadow="never">
+            <el-card shadow="never" v-loading="feesLoading">
               <template #header>
                 <b>手续费 / 保证金</b>
                 <el-tag size="small" type="info" style="margin-left: 8px">
                   交易所维度 · {{ exchangeInfo }}
                 </el-tag>
               </template>
-              <el-button type="primary" plain @click="loadFees" :loading="feesLoading">
-                拉取数据
-              </el-button>
               <el-tabs v-if="feesAllLoaded" v-model="feesTab" style="margin-top: 12px">
                 <el-tab-pane
                   :label="`当前品种 (${currentFeesRows.length})`"
@@ -326,11 +336,8 @@
           </el-col>
 
           <el-col :span="12">
-            <el-card shadow="never">
+            <el-card shadow="never" v-loading="contractLoading">
               <template #header><b>合约信息 ({{ exchangeInfo }})</b></template>
-              <el-button type="primary" plain @click="loadContractInfo" :loading="contractLoading">
-                拉取 {{ exchangeInfo }} 合约
-              </el-button>
               <div v-if="contractRows.length" style="margin-top: 12px">
                 <el-tag size="small" type="info" style="margin-bottom: 8px">
                   共 {{ contractRows.length }} 行
@@ -372,6 +379,21 @@ const klineSymbol = ref<string>('')
 const contractsList = ref<{ continuous: string | null; contracts: string[] }>({ continuous: null, contracts: [] })
 const holdingIndicator = ref<'成交量' | '多单持仓' | '空单持仓'>('成交量')
 const newsCategory = ref<string>('all')
+
+// 当前品种代码(如 CU),用于新闻按品种筛选
+const currentVariety = computed(() => extractUnderlying(fullSymbol.value))
+
+// 新闻加载 key,与 store.loadNews 的 key 保持一致
+const newsLoadingKey = computed(() =>
+  `news:${newsCategory.value}:30${currentVariety.value ? `:${currentVariety.value}` : ''}`,
+)
+
+// 品种相关新闻是否已加载但目前为空(区别于还未加载)
+const newsEmptyRelevant = computed(() => {
+  if (!currentVariety.value) return false
+  if (store.loading(newsLoadingKey.value)) return false
+  return store.news.length === 0
+})
 
 // K 线卡片的 loading/error 状态：根据当前模式动态取不同 key
 const klineLoadingKey = computed(() =>
@@ -471,7 +493,7 @@ async function reload() {
   const startStr = startDate.toISOString().slice(0, 10)
   const underlying = extractUnderlying(fullSymbol.value)
 
-  // 并行加载:基础数据 + 合约列表
+  // 并行加载:基础数据 + 合约列表 + 扩展数据(手续费/合约信息)
   await Promise.all([
     store.loadSymbolDetail(fullSymbol.value, klineDays.value),
     store.loadInventory(fullSymbol.value),
@@ -479,6 +501,8 @@ async function reload() {
     store.loadHoldingPosition(fullSymbol.value, holdingIndicator.value),
     store.loadNewsCategories(),
     loadContractsList(),
+    loadFees(),
+    loadContractInfo(),
   ])
   await nextTick()
   renderKline()
@@ -539,7 +563,7 @@ function reloadHolding() {
 }
 
 function reloadNews() {
-  store.loadNews(newsCategory.value, 30)
+  store.loadNews(newsCategory.value, 30, currentVariety.value)
 }
 
 async function loadFees() {
@@ -554,7 +578,6 @@ async function loadFees() {
       feesCols.value = []
       feesAllLoaded.value = true
       currentUnderlying.value = extractUnderlying(fullSymbol.value)
-      ElMessage.warning(`未拉到 ${exchangeInfo.value} 手续费/保证金数据`)
       return
     }
 
@@ -575,16 +598,6 @@ async function loadFees() {
     } else {
       // 找不到品种代码列 → 当前品种 tab 显示空,不由前端猜测/回退
       currentFeesRows.value = []
-    }
-
-    // 4. toast 区分命中 / 未命中,文案不再混淆"全表"和"当前品种"
-    const exh = exchangeInfo.value
-    if (symCol && currentFeesRows.value.length > 0) {
-      ElMessage.success(`拉取 ${exh} 费用/保证金:当前品种 ${underlying} 共 ${currentFeesRows.value.length} 行(全表 ${items.length} 行可在隔壁 tab 对比)`)
-    } else if (symCol) {
-      ElMessage.warning(`拉取 ${exh} 费用/保证金成功,但 ${underlying} 在该表无匹配(全表 ${items.length} 行,可在隔壁 tab 查找)`)
-    } else {
-      ElMessage.warning(`拉取 ${exh} 费用/保证金成功(全表 ${items.length} 行),但未识别出"品种代码"列,无法按品种过滤`)
     }
 
     feesAllLoaded.value = true
@@ -626,10 +639,6 @@ async function loadContractInfo() {
 
       contractRows.value = filtered
       contractCols.value = Object.keys(items[0] as Record<string, unknown>)
-      ElMessage.success(
-        `拉取 ${exchangeInfo.value} 合约信息: 当前品种 ${underlying} 共 ${filtered.length} 行` +
-        (filtered.length !== items.length ? `(全交易所 ${items.length} 行, 已按品种过滤)` : ''),
-      )
     } else {
       contractRows.value = []
     }
@@ -934,6 +943,15 @@ function sentimentType(sent: string): 'success' | 'danger' | 'info' {
   if (sent === 'negative') return 'danger'
   return 'info'
 }
+function importanceClass(n: any): string {
+  if (n.llm_importance === 'high') return 'news-high'
+  if (n.llm_importance === 'low') return 'news-low'
+  return ''
+}
+/** 去除中文名中的"期货"字样，与商品列表对齐 */
+function stripFuturesSuffix(name: string): string {
+  return name?.replace(/期货/g, '') || name
+}
 </script>
 
 <style scoped>
@@ -953,7 +971,10 @@ function sentimentType(sent: string): 'success' | 'danger' | 'info' {
 .kline-chart { width: 100%; min-width: 900px; height: 460px; }
 .news-list { padding: 0; margin: 0; list-style: none; }
 .news-item { padding: 12px 0; border-bottom: 1px solid var(--el-border-color-lighter); }
+.news-item.news-high { background-color: var(--el-color-warning-light-9); margin: 0 -8px; padding: 12px 8px; border-radius: 4px; }
+.news-item.news-low .news-title { font-weight: 400; color: var(--el-text-color-placeholder); }
 .news-meta { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; font-size: 12px; color: var(--el-text-color-secondary); }
+.news-conf { font-size: 11px; color: var(--el-text-color-placeholder); }
 .news-title { font-size: 14px; font-weight: 500; margin: 4px 0; }
 .news-content { font-size: 12px; color: var(--el-text-color-regular); line-height: 1.6; }
 </style>

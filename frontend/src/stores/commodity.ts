@@ -258,13 +258,16 @@ export const useCommodityStore = defineStore('commodity', {
       }
     },
 
-    async loadNews(category = 'all', limit = 30) {
-      const key = `news:${category}:${limit}`
+    async loadNews(category = 'all', limit = 30, variety?: string) {
+      const key = `news:${category}:${limit}${variety ? `:${variety}` : ''}`
       this._setLoading(key, true)
       try {
-        const r = await commodityApi.getNews(category, limit)
+        const r = await commodityApi.getNews(category, limit, variety)
         // /api/commodity/news 返回 {success, data: {items, count, category, limit}, message}
-        this.news = (r as any)?.data?.items ?? []
+        const items = ((r as any)?.data?.items ?? []) as any[]
+        // 按 published_at 降序排列(最新的在前)
+        items.sort((a, b) => (b.published_at || '').localeCompare(a.published_at || ''))
+        this.news = items
       } catch (e) {
         this._setError(key, String(e))
       } finally {

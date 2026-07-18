@@ -498,37 +498,156 @@ class UnifiedCommodityService:
         self,
         category: str = "all",
         limit: int = 50,
+        variety: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """6 类新闻聚合(任何错误都返 [])"""
+        """6 类新闻聚合,支持按品种筛选。
+
+        Phase 新闻改造:
+        优先从 MongoDB commodity_news_annotations 读取已 LLM 标注的新闻,
+        缓存不足时实时拉取 AKShare + LLM 标注作为降级。
+
+        Args:
+            category: 新闻分类(metal/energy/.../all)
+            limit: 返回条数
+            variety: 品种代码(如 CU),筛选 relevant_varieties 包含该品种的新闻
+
+        返回字段:
+          - 原始字段: published_at / title / content / source / url
+          - LLM 标注字段:
+            relevant_varieties / llm_sentiment / llm_sentiment_confidence /
+            llm_sentiment_reasoning / llm_summary / llm_importance /
+            annotated_at / annotator_model
+        """
         await self.initialize()
+
+        # ── 路径 A: 从 MongoDB 读取已标注新闻 ──
+        try:
+            from app.core.database import get_database
+            db = get_database()
+            coll = db["commodity_news_annotations"]
+
+            # 构建 MongoDB 查询:支持 category + variety 组合筛选
+            query = {}
+            conditions = []
+
+            if category and category not in ("all", "global_macro"):
+                cat_map = {
+                    "metal": ["CU", "AL", "ZN", "PB", "NI", "SN", "AO", "BC"],
+                    "precious": ["AU", "AG"],
+                    "black": ["RB", "HC", "I", "J", "JM", "SS", "WR", "SI", "LC", "PS"],
+                    "energy": ["SC", "FU", "LU", "BU", "PG", "EC", "NR"],
+                    "chemical": ["MA", "TA", "RU", "BR", "SP", "PP", "L", "V", "EG", "EB", "PF", "PX", "PR", "SA", "SH", "UR", "FG"],
+                    "agricultural": ["A", "B", "M", "Y", "P", "C", "CS", "JD", "LH", "CF", "SR", "CY", "AP", "CJ", "PK", "RM", "OI", "RS"],
+                    "financial": ["IF", "IH", "IC", "IM", "TS", "TF", "T", "TL"],
+                    "minor": ["SI", "LC", "PS", "SF", "SM"],
+                }
+                variety_codes = cat_map.get(category, [category.upper()])
+                conditions.append({"relevant_varieties": {"$in": variety_codes}})
+
+            if variety:
+                v = variety.upper()
+                conditions.append({"relevant_varieties": {"$in": [v]}})
+
+            if conditions:
+                query["$and"] = conditions
+
+            cursor = coll.find(query).sort("annotated_at", -1).limit(limit)
+            cached = await cursor.to_list(length=limit)
+
+            if len(cached) >= limit // 2:
+                result = []
+                for doc in cached:
+                    result.append({
+                        "published_at": doc.get("published_at") or str(doc.get("annotated_at", "")),
+                        "title": doc.get("title", ""),
+                        "content": doc.get("content", ""),
+                        "source": doc.get("source", "llm_annotated"),
+                        "url": doc.get("url", ""),
+                        "category": category,
+                        "metal": category,
+                        # 保留字段兼容
+                        "sentiment": doc.get("sentiment", "neutral"),
+                        "sentiment_score": 0.0,
+                        # LLM 标注字段
+                        "relevant_varieties": doc.get("relevant_varieties", []),
+                        "llm_sentiment": doc.get("sentiment", "neutral"),
+                        "llm_sentiment_confidence": float(doc.get("sentiment_confidence", 0.0)),
+                        "llm_sentiment_reasoning": doc.get("sentiment_reasoning", ""),
+                        "llm_importance": doc.get("importance", "medium"),
+                        "llm_summary": doc.get("summary", ""),
+                        "annotated_at": str(doc.get("annotated_at", "")),
+                        "annotator_model": doc.get("annotator_model", ""),
+                    })
+                return result[:limit]
+        except Exception as e:
+            logger.debug(f"MongoDB 查询已标注新闻失败: {e}")
+
+        # ── 路径 B: 降级 — 实时拉取 + 实时标注 ──
         provider = self._providers.get("akshare_futures")
         if not provider:
             return []
         try:
-            result = await provider.get_futures_news(category=category, limit=limit)
+            raw = await provider.get_futures_news(category=category, limit=limit)
         except Exception as e:
             logger.warning(f"get_futures_news({category}) 异常: {e}")
             return []
-        if not result:
+        if not raw:
             return []
-        # 截断到 limit
-        return result[:limit]
+
+        # 尝试实时 LLM 标注(降级)
+        try:
+            from tradingagents.features.commodity.news_annotator import NewsAnnotator
+            from app.core.database import get_database
+
+            db = get_database()
+            coll = db["commodity_news_annotations"]
+
+            llm = await self._get_quick_llm()
+            if llm:
+                annotator = NewsAnnotator(
+                    llm=llm,
+                    cache_collection=coll,
+                    annotator_model=getattr(llm, "model_name", "live_fallback"),
+                )
+                raw = await annotator.annotate_batch(raw, max_concurrent=3)
+        except Exception as e:
+            logger.debug(f"实时 LLM 标注降级失败: {e}")
+
+        # variety 客户端过滤(降级路径也支持按品种筛选)
+        if variety and raw:
+            v = variety.upper()
+            filtered = [it for it in raw if any(
+                rv.upper() == v for rv in (it.get("relevant_varieties") or [])
+            )]
+            return filtered[:limit] if filtered else []
+
+        return (raw or [])[:limit]
+
+    async def _get_quick_llm(self):
+        """获取用于标注的快速 LLM(降级用)。"""
+        try:
+            from tradingagents.llm_clients.factory import create_llm_client
+            llm_client = create_llm_client(
+                provider="deepseek",
+                model="deepseek-chat",
+                temperature=0,
+            )
+            return llm_client.get_llm() if llm_client else None
+        except Exception:
+            return None
 
     async def get_news_categories(self) -> List[Dict[str, str]]:
-        """新闻分类清单(供前端下拉)"""
+        """新闻分类清单(供前端下拉,仅保留有效大类)"""
         return [
-            {"code": "metal",       "name": "有色金属(shmet)"},
-            {"code": "precious",    "name": "贵金属(shmet)"},
-            {"code": "minor",       "name": "小金属(shmet)"},
-            {"code": "headline",    "name": "头条要闻(shmet)"},
-            {"code": "vip",         "name": "VIP 专享(shmet)"},
-            {"code": "finance",     "name": "财经要闻(shmet)"},
-            {"code": "chemical",    "name": "化工合成器"},
-            {"code": "energy",      "name": "能源合成器"},
-            {"code": "agricultural","name": "农产品合成器"},
-            {"code": "financial",   "name": "金融期货合成器"},
-            {"code": "global_macro","name": "全球宏观聚合"},
-            {"code": "all",         "name": "全部(去重后)"},
+            {"code": "all",         "name": "全部"},
+            {"code": "metal",       "name": "有色金属"},
+            {"code": "precious",    "name": "贵金属"},
+            {"code": "black",       "name": "黑色系"},
+            {"code": "energy",      "name": "能源"},
+            {"code": "chemical",    "name": "化工"},
+            {"code": "agricultural","name": "农产品"},
+            {"code": "financial",   "name": "金融期货"},
+            {"code": "global_macro","name": "全球宏观"},
         ]
 
 

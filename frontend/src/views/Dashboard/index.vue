@@ -136,25 +136,37 @@
           </div>
         </el-card>
 
-        <!-- 市场快讯 -->
+        <!-- 市场快讯（带标注、双标签页） -->
         <el-card class="market-news-card" style="margin-top: 24px;">
           <template #header>
-            <span>市场快讯</span>
+            <div style="display:flex; align-items:center; justify-content:space-between">
+              <span>市场快讯</span>
+              <el-radio-group v-model="newsTab" size="small" @change="reloadMarketNews">
+                <el-radio-button value="all">全市场</el-radio-button>
+                <el-radio-button value="favorites">自选相关</el-radio-button>
+              </el-radio-group>
+            </div>
           </template>
-          <div v-if="marketNews.length > 0" class="news-list">
+          <div v-if="filteredNews.length > 0" class="news-list">
             <div
-              v-for="news in marketNews.slice(0, 5)"
-              :key="news.id"
+              v-for="(news, idx) in filteredNews.slice(0, 8)"
+              :key="idx"
               class="news-item"
               @click="openNewsUrl(news.url)"
             >
-              <span class="news-title"><strong>{{ news.title }}</strong> {{ news.content }}</span>
-              <span class="news-time">{{ newsRelativeTime(news.time) }}</span>
+              <div class="news-meta">
+                <el-tag size="small" :type="sentimentTag(news.llm_sentiment || news.sentiment)" effect="plain">
+                  {{ news.llm_sentiment || news.sentiment }}
+                </el-tag>
+                <span v-for="rv in (news.relevant_varieties || []).slice(0, 3)" :key="rv" class="news-variety-tag">{{ rv }}</span>
+                <span class="news-time">{{ newsRelativeTime(news.published_at || news.annotated_at) }}</span>
+              </div>
+              <div class="news-title">{{ news.llm_summary || news.title }}</div>
             </div>
           </div>
           <div v-else class="empty-state">
             <el-icon class="empty-icon"><InfoFilled /></el-icon>
-            <p>暂无市场快讯</p>
+            <p>{{ newsTab === 'favorites' ? '暂无自选品种相关新闻' : '暂无市场快讯' }}</p>
           </div>
         </el-card>
       </el-col>
@@ -192,9 +204,10 @@
                   <el-tag :type="item.asset_type === 'commodity' ? 'warning' : ''" size="small" effect="plain" style="margin-right:4px">
                     {{ item.asset_type === 'commodity' ? '📦' : '📈' }}
                   </el-tag>
-                  {{ item.asset_type === 'commodity' ? item.full_symbol : item.stock_code }}
+                  {{ item.asset_type === 'commodity' ? (item.full_symbol?.split('.')[0]?.replace(/\d+$/, '') || item.full_symbol) : item.stock_code }}
+                  <template v-if="item.asset_type === 'commodity'">{{ item.commodity_name || '' }}</template>
+                  <template v-else>{{ item.display_name || item.stock_name || '' }}</template>
                 </div>
-                <div class="stock-name">{{ item.display_name || item.stock_name || item.commodity_name }}</div>
               </div>
               <div class="stock-price">
                 <div class="current-price">{{ item.current_price != null ? '¥' + item.current_price : (item.snapshot_price != null ? '¥' + item.snapshot_price : '--') }}</div>
@@ -296,6 +309,33 @@ const favoriteItems = computed(() => favoritesStore.items)
 
 // 市场快讯数据
 const marketNews = ref<any[]>([])
+const newsTab = ref<'all' | 'favorites'>('all')
+
+/** 基于当前 tab 和自选品种筛选新闻 */
+const filteredNews = computed(() => {
+  if (newsTab.value === 'all') return marketNews.value
+  // 自选相关: 取 currentVariety 有交集且 relevant_varieties 非空的新闻
+  const favCodes = new Set(
+    favoriteItems.value
+      .filter(i => i.asset_type === 'commodity' && i.full_symbol)
+      .map(i => (i.full_symbol || '').split('.')[0]?.replace(/\d+$/, '').toUpperCase())
+      .filter(Boolean),
+  )
+  return marketNews.value.filter(n => {
+    const rvs: string[] = n.relevant_varieties || []
+    return rvs.length > 0 && rvs.some(rv => favCodes.has(rv.toUpperCase()))
+  })
+})
+
+function reloadMarketNews() {
+  // tab 切换时不需要重新拉取, computed 自动过滤
+}
+
+function sentimentTag(sent?: string): 'success' | 'danger' | 'info' {
+  if (sent === 'positive') return 'success'
+  if (sent === 'negative') return 'danger'
+  return 'info'
+}
 
 // 模拟交易账户数据
 const paperAccount = ref<{ name: string; equity: number; balance: number; realized_pnl: number } | null>(null)
@@ -400,7 +440,7 @@ const goToFavorites = () => {
 
 const viewFavoriteDetail = (item: any) => {
   if (item.asset_type === 'commodity') {
-    router.push(`/commodity/analysis?symbol=${item.full_symbol}`)
+    router.push(`/commodity/${item.full_symbol}`)
   } else {
     router.push(`/analysis/single?stock_code=${item.stock_code}`)
   }
@@ -429,21 +469,19 @@ const loadRecentAnalyses = async () => {
 
 const loadMarketNews = async () => {
   try {
-    // 使用期货新闻接口获取市场快讯(global_macro 源慢,改用不依赖外部源的 all)
-    const res = await commodityApi.getNews('all', 10)
+    const res = await commodityApi.getNews('all', 20)
     const body = (res as any)?.data
     if (body?.items?.length) {
-      // 按发布时间倒排取最新
       marketNews.value = body.items
         .map((item: any) => ({
-          id: item.title,
-          title: (item.title || ""),
-          content: (item.content || ""),
-          time: item.published_at || item.date,
-          url: item.url,
-          source: item.source
+          ...item,
+          id: item.title || item.llm_summary || Math.random(),
         }))
-        .sort((a: any, b: any) => new Date(b.time).getTime() - new Date(a.time).getTime())
+        .sort((a: any, b: any) => {
+          const ta = a.annotated_at || a.published_at || ''
+          const tb = b.annotated_at || b.published_at || ''
+          return tb.localeCompare(ta)
+        })
     }
   } catch (error) {
     console.error('加载市场快讯失败:', error)
@@ -716,10 +754,6 @@ onUnmounted(() => {
   .market-news-card {
     .news-list {
       .news-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
         padding: 10px 0;
         cursor: pointer;
         border-bottom: 1px solid var(--el-border-color-lighter);
@@ -734,20 +768,34 @@ onUnmounted(() => {
           padding: 10px 16px;
           border-radius: 4px;
         }
+      }
 
-        .news-title {
-          flex: 1;
-          font-size: 14px;
-          color: var(--el-text-color-primary);
-          line-height: 1.4;
-        }
+      .news-meta {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 4px;
+      }
 
-        .news-time {
-          flex-shrink: 0;
-          font-size: 12px;
-          color: var(--el-text-color-placeholder);
-          white-space: nowrap;
-        }
+      .news-variety-tag {
+        font-size: 11px;
+        background: var(--el-color-primary-light-9);
+        color: var(--el-color-primary);
+        padding: 1px 6px;
+        border-radius: 3px;
+      }
+
+      .news-title {
+        font-size: 14px;
+        color: var(--el-text-color-primary);
+        line-height: 1.4;
+        margin-left: 0;
+      }
+
+      .news-time {
+        font-size: 12px;
+        color: var(--el-text-color-placeholder);
+        white-space: nowrap;
       }
     }
   }
@@ -805,12 +853,9 @@ onUnmounted(() => {
             font-weight: 600;
             font-size: 14px;
             color: var(--el-text-color-primary);
-          }
-
-          .stock-name {
-            font-size: 12px;
-            color: var(--el-text-color-regular);
-            margin-top: 2px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
           }
         }
 

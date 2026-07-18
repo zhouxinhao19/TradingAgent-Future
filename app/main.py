@@ -254,6 +254,15 @@ async def lifespan(app: FastAPI):
             # P0: 启动后台 worker（拾取 queued 任务）
             ensure_worker()
             app.state.commodity_worker_started = True
+
+        # Phase 新闻改造:启动新闻标注 worker
+        try:
+            from app.services.commodity.news_ingestion import ensure_ingestion_worker
+            ensure_ingestion_worker()
+            app.state.news_ingestion_started = True
+            logger.info("✅ 新闻标注 worker 已启动")
+        except Exception as e:
+            logger.warning(f"⚠️ 新闻标注 worker 启动失败 (非阻塞): {e}")
     except Exception as e:
         logger.warning(f"⚠️ 商品任务初始化失败 (非阻塞): {e}")
 
@@ -269,6 +278,14 @@ async def lifespan(app: FastAPI):
                 await stop_worker()
             except Exception as e:
                 logger.warning(f"Worker stop error: {e}")
+
+        # Phase 新闻改造:停止新闻标注 worker
+        if getattr(app.state, 'news_ingestion_started', False):
+            try:
+                from app.services.commodity.news_ingestion import stop_ingestion_worker
+                await stop_ingestion_worker()
+            except Exception as e:
+                logger.warning(f"新闻标注 worker 停止失败: {e}")
 
         # 关闭 UserService MongoDB 连接
         try:

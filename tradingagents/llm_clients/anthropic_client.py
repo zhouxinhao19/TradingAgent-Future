@@ -12,6 +12,10 @@ class NormalizedChatAnthropic(ChatAnthropic):
     def invoke(self, input, config=None, **kwargs):
         return normalize_content(super().invoke(input, config, **kwargs))
 
+    async def ainvoke(self, input, config=None, **kwargs):
+        response = await super().ainvoke(input, config, **kwargs)
+        return normalize_content(response)
+
 
 class AnthropicClient(BaseLLMClient):
     """Client for Anthropic Claude models."""
