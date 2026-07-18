@@ -1,7 +1,7 @@
 <template>
   <div class="commodity-analysis">
     <div class="page-header">
-      <h2>📊 大宗商品分析</h2>
+      <h2>大宗商品分析</h2>
       <p class="text-secondary">多智能体决策链 — 技术分析师 → 产业分析师 → 持仓情绪分析师 → 新闻分析师 → 推理分析师 → 投研总监</p>
     </div>
 
@@ -10,7 +10,7 @@
       <el-col :span="8">
         <el-card shadow="never" class="form-card">
           <template #header>
-            <span><b>🔍 启动新分析</b></span>
+            <span><b>启动新分析</b></span>
           </template>
 
           <el-form :model="form" label-position="top" size="large">
@@ -38,25 +38,8 @@
                 <el-option
                   v-for="v in varietyOptions"
                   :key="v.symbol"
-                  :label="`${v.symbol} - ${v.name_cn}`"
+                  :label="`${v.symbol} - ${v.name}`"
                   :value="v.symbol"
-                />
-              </el-select>
-            </el-form-item>
-
-            <el-form-item label="合约选择" required>
-              <el-select
-                v-model="form.contract"
-                placeholder="先选品种"
-                style="width: 100%"
-                :loading="loadingContracts"
-                :disabled="!form.variety_symbol"
-              >
-                <el-option
-                  v-for="c in contractOptions"
-                  :key="c.value"
-                  :label="c.label"
-                  :value="c.value"
                 />
               </el-select>
             </el-form-item>
@@ -75,15 +58,73 @@
               type="primary"
               size="large"
               :loading="submitting"
-              :disabled="submitting || !form.contract"
+              :disabled="submitting || !form.variety_symbol"
               style="width: 100%"
               @click="submitAnalysis"
             >
-              {{ submitting ? '分析执行中...' : '🚀 提交分析' }}
+              {{ submitting ? '提交中...' : '提交分析' }}
             </el-button>
-            <el-button v-if="lastTaskId" type="text" size="small" style="width:100%;margin-top:8px" @click="goToTaskCenter">
-              📋 前往任务中心查看进度
+
+            <!-- 分析中进度提示 -->
+            <el-alert
+              v-if="pollingActive && progressMessage"
+              :title="progressMessage"
+              type="info"
+              :closable="false"
+              show-icon
+              style="margin-top: 12px"
+            />
+          </el-form>
+        </el-card>
+
+        <!-- 批量分析卡 -->
+        <el-card shadow="never" class="form-card" style="margin-top: 16px">
+          <template #header>
+            <span><b>批量分析</b></span>
+          </template>
+          <el-form label-position="top" size="large">
+            <el-form-item label="品种代码（每行一个）">
+              <el-input
+                v-model="batchSymbols"
+                type="textarea"
+                :rows="5"
+                placeholder="CU&#10;RB&#10;I&#10;SA"
+              />
+            </el-form-item>
+            <el-form-item label="交易日期">
+              <el-date-picker
+                v-model="batchTradeDate"
+                type="date"
+                placeholder="默认当天"
+                style="width: 100%"
+                value-format="YYYY-MM-DD"
+              />
+            </el-form-item>
+            <el-button
+              type="success"
+              size="large"
+              :loading="batchSubmitting"
+              :disabled="batchSubmitting || !batchSymbols.trim()"
+              style="width: 100%"
+              @click="submitBatch"
+            >
+              {{ batchSubmitting ? '提交中…' : '批量提交' }}
             </el-button>
+            <div v-if="batchResult" style="margin-top: 12px">
+              <el-alert
+                :title="batchResult.message"
+                :type="batchResult.failed > 0 ? 'warning' : 'success'"
+                :closable="false"
+                show-icon
+              >
+                <template #default>
+                  <div style="margin-top: 4px; font-size: 13px">
+                    成功 {{ batchResult.created }}/{{ batchResult.total }}
+                    <el-button text size="small" @click="goToTaskCenter">查看任务中心</el-button>
+                  </div>
+                </template>
+              </el-alert>
+            </div>
           </el-form>
         </el-card>
       </el-col>
@@ -93,7 +134,7 @@
         <el-card v-if="latestResult" shadow="never" class="result-card">
           <template #header>
             <div style="display: flex; justify-content: space-between; align-items: center">
-              <span><b>📋 分析结果 — {{ latestResult.full_symbol }}</b></span>
+              <span><b>分析结果 — {{ latestResult.full_symbol }}</b></span>
               <el-tag :type="directionTagType(latestResult.decision?.action)">
                 {{ directionLabel(latestResult.decision?.action) }}
               </el-tag>
@@ -107,30 +148,29 @@
           />
 
           <el-tabs>
-            <el-tab-pane label="📈 技术分析" lazy>
+            <el-tab-pane label="技术分析" lazy>
               <div class="report-content">{{ latestResult.market_report || '(空)' }}</div>
             </el-tab-pane>
-            <el-tab-pane label="💼 基本面" lazy>
+            <el-tab-pane label="基本面" lazy>
               <div class="report-content">{{ latestResult.fundamentals_report || '(空)' }}</div>
             </el-tab-pane>
-            <el-tab-pane label="🧠 持仓情绪" lazy>
+            <el-tab-pane label="持仓情绪" lazy>
               <div class="report-content">{{ latestResult.sentiment_report || '(空)' }}</div>
             </el-tab-pane>
-            <el-tab-pane label="📰 新闻" lazy>
+            <el-tab-pane label="新闻" lazy>
               <div class="report-content">{{ latestResult.news_report || '(空)' }}</div>
             </el-tab-pane>
-            <el-tab-pane label="📋 投资计划" lazy>
+            <el-tab-pane label="投资计划" lazy>
               <div class="report-content">{{ formatInvestmentPlan(latestResult.investment_plan) || '(空)' }}</div>
             </el-tab-pane>
-            <el-tab-pane label="🏛️ 投研总监" lazy>
+            <el-tab-pane label="投研总监" lazy>
               <div class="report-content">{{ latestResult.final_decision || '(空)' }}</div>
             </el-tab-pane>
           </el-tabs>
         </el-card>
 
         <el-card v-if="!latestResult && !reports.length" shadow="never">
-          <el-empty description="输入合约代码并提交分析">
-            <template #image><div style="font-size: 64px">📈</div></template>
+          <el-empty description="选择品种并提交分析">
             <p class="text-secondary">
               分析将依次执行:技术分析师 → 产业分析师 → 持仓情绪分析师 → 新闻分析师<br>
               → 推理分析师 → 投研总监
@@ -139,7 +179,7 @@
         </el-card>
 
         <el-card v-if="reports.length" shadow="never" style="margin-top: 16px">
-          <template #header><span><b>📚 历史报告 ({{ reports.length }})</b></span></template>
+          <template #header><span><b>历史报告 ({{ reports.length }})</b></span></template>
           <el-table :data="reports" stripe style="width: 100%" @row-click="viewReport">
             <el-table-column prop="trade_date" label="日期" width="120" />
             <el-table-column prop="full_symbol" label="合约" width="140" />
@@ -189,30 +229,38 @@ const EXCHANGE_SUFFIX: Record<string, string> = {
 const form = ref({
   exchange: '',
   variety_symbol: '',
-  contract: '',
   trade_date: '',
 })
+
 const submitting = ref(false)
-const lastTaskId = ref('') // 最近一次提交的 task_id，用于显示"前往任务中心"按钮
+const pollingActive = ref(false)
+const progressMessage = ref('')
+const lastTaskId = ref('')
 const latestResult = ref<Record<string, any> | null>(null)
 const reports = ref<Array<Record<string, any>>>([])
 const detailVisible = ref(false)
 const detailData = ref<Record<string, any> | null>(null)
 
-// 品种和合约级联
-const loadingVarieties = ref(false)
-const loadingContracts = ref(false)
-const varietyOptions = ref<VarietyItem[]>([])
-const contractOptions = ref<Array<{ value: string; label: string }>>([])
+// 批量分析
+const batchSymbols = ref('')
+const batchTradeDate = ref('')
+const batchSubmitting = ref(false)
+const batchResult = ref<Record<string, any> | null>(null)
 
-// 选中品种的中文名(给 submit 用)
+// 品种级联
+const loadingVarieties = ref(false)
+const varietyOptions = ref<VarietyItem[]>([])
 const selectedVarietyName = ref('')
 
-// 已加载的合约列表(存 underlying 给 submit 用)
-const currentUnderlying = ref('')
+// 根据 form 状态计算 fullSymbol (品种代码 + 0 + 交易所后缀, 如 CU0.SHF)
+function computeFullSymbol(): string {
+  if (!form.value.exchange || !form.value.variety_symbol) return ''
+  const suffix = EXCHANGE_SUFFIX[form.value.exchange] || `.${form.value.exchange}`
+  return `${form.value.variety_symbol}0${suffix}`
+}
 
 function directionLabel(action?: string): string {
-  const map: Record<string, string> = { long: '📈 做多', short: '📉 做空', hold: '⏸️ 持有', flat: '🔒 平仓' }
+  const map: Record<string, string> = { long: '做多', short: '做空', hold: '持有', flat: '平仓' }
   return map[action || 'hold'] || action || 'hold'
 }
 function directionTagType(action?: string): string {
@@ -226,20 +274,17 @@ function formatInvestmentPlan(text: string): string {
 }
 function sectionTitle(key: string): string {
   const map: Record<string, string> = {
-    market_report: '📈 技术分析', fundamentals_report: '💼 基本面分析',
-    sentiment_report: '🧠 持仓情绪', news_report: '📰 新闻分析',
-    investment_plan: '📋 投资计划', final_decision: '🏛️ 投研总监决策',
+    market_report: '技术分析', fundamentals_report: '基本面分析',
+    sentiment_report: '持仓情绪', news_report: '新闻分析',
+    investment_plan: '投资计划', final_decision: '投研总监决策',
   }
   return map[key] || key
 }
 
 async function onExchangeChange() {
   form.value.variety_symbol = ''
-  form.value.contract = ''
   varietyOptions.value = []
-  contractOptions.value = []
   selectedVarietyName.value = ''
-  currentUnderlying.value = ''
   if (!form.value.exchange) return
   loadingVarieties.value = true
   try {
@@ -252,50 +297,69 @@ async function onExchangeChange() {
 }
 
 async function onVarietyChange() {
-  form.value.contract = ''
-  contractOptions.value = []
   selectedVarietyName.value = ''
-  currentUnderlying.value = ''
   if (!form.value.variety_symbol) return
-
-  // 找到品种中文名
   const found = varietyOptions.value.find(v => v.symbol === form.value.variety_symbol)
-  selectedVarietyName.value = found?.name_cn || form.value.variety_symbol
+  selectedVarietyName.value = found?.name || found?.name_cn || form.value.variety_symbol
+}
 
-  loadingContracts.value = true
-  try {
-    // 用品种代码+主力连续后缀获取合约列表
-    const suffix = EXCHANGE_SUFFIX[form.value.exchange] || `.${form.value.exchange}`
-    const fullSymbol = `${form.value.variety_symbol}0${suffix}`
-    const res = await commodityApi.getContractsList(fullSymbol)
-    if (res?.success && res?.data) {
-      currentUnderlying.value = res.data.underlying
-      const continuous = res.data.continuous
-      const current = res.data.current
-      const contracts = res.data.contracts || []
+// 轮询
+let pollingTimer: ReturnType<typeof setTimeout> | null = null
 
-      contractOptions.value = contracts.map((c: string) => {
-        const isContinuous = continuous && c === continuous
-        const isCurrent = current && c === current
-        let label = c
-        if (isContinuous) label += ' (主力连续)'
-        if (isCurrent) label += ' (当前主力)'
-        return { value: c, label }
-      })
+function stopPolling() {
+  if (pollingTimer !== null) {
+    clearTimeout(pollingTimer)
+    pollingTimer = null
+  }
+}
+
+function startPolling(taskId: string) {
+  let attempts = 0; const maxAttempts = 60
+  const poll = async () => {
+    attempts++
+    try {
+      const res = await commodityApi.getTaskStatus(taskId)
+      if (!res?.data) { /* continue */ }
+      else if (res.data.status === 'completed') {
+        pollingActive.value = false
+        progressMessage.value = ''
+        const detail = await commodityApi.getTaskResult(taskId)
+        if (detail?.data) {
+          latestResult.value = detail.data as Record<string, any>
+          await loadReports()
+          ElMessage.success('分析完成!')
+        }
+        return
+      } else if (res.data.status === 'failed') {
+        pollingActive.value = false
+        progressMessage.value = ''
+        ElMessage.error(res.data.progress_message || '分析失败')
+        return
+      } else {
+        // processing — 更新进度信息
+        if (res.data.progress_message) {
+          progressMessage.value = res.data.progress_message
+        }
+      }
+    } catch { /* continue polling */ }
+    if (attempts < maxAttempts) {
+      pollingTimer = setTimeout(poll, 5000)
+    } else {
+      pollingActive.value = false
+      progressMessage.value = ''
+      ElMessage.warning('分析超时,请稍后查看任务中心')
     }
-  } catch { /* ignore */ }
-  loadingContracts.value = false
+  }
+  pollingTimer = setTimeout(poll, 5000)
 }
 
 async function submitAnalysis() {
-  if (!form.value.contract) { ElMessage.warning('请选择合约'); return }
-  submitting.value = true; latestResult.value = null
-  const fullSymbol = form.value.contract
+  const fullSymbol = computeFullSymbol()
+  if (!fullSymbol) { ElMessage.warning('请选择品种'); return }
 
-  // 安全兜底:15秒后强制释放按钮,避免 API 卡死导致按钮永远转圈
-  const fallbackTimer = setTimeout(() => {
-    submitting.value = false
-  }, 15000)
+  submitting.value = true
+  progressMessage.value = ''
+  lastTaskId.value = ''
 
   try {
     const res = await commodityApi.submitAnalysis(fullSymbol, {
@@ -306,10 +370,10 @@ async function submitAnalysis() {
     if (res?.success) {
       const tid = res.data?.task_id
       lastTaskId.value = tid || ''
-      ElMessage.success(tid ? `分析任务已提交: ${tid}，可前往任务中心查看进度` : '分析任务已提交')
-      // 立即释放按钮，不再耦合轮询逻辑
+      progressMessage.value = '任务已提交,后台分析中...'
+      pollingActive.value = true
+      submitting.value = false // 立即释放按钮,不等后续异步操作
       await loadReports(fullSymbol)
-      // 后台启动轮询，但按钮状态已恢复
       startPolling(tid)
     } else {
       ElMessage.error(res?.message || '提交失败')
@@ -317,41 +381,35 @@ async function submitAnalysis() {
   } catch (e: any) {
     ElMessage.error(e?.message || '提交异常')
   } finally {
-    clearTimeout(fallbackTimer)
     submitting.value = false
   }
 }
 
-// 分离轮询逻辑，不触碰 submitting 状态
-let pollingTimer: ReturnType<typeof setTimeout> | null = null
+async function submitBatch() {
+  const symbols = batchSymbols.value
+    .split('\n')
+    .map(s => s.trim())
+    .filter(s => s.length > 0)
+  if (!symbols.length) { ElMessage.warning('请输入至少一个品种代码'); return }
 
-function startPolling(taskId: string) {
-  let attempts = 0; const maxAttempts = 60
-  const poll = async () => {
-    attempts++
-    try {
-      const res = await commodityApi.getTaskStatus(taskId)
-      if (res?.data?.status === 'completed') {
-        const detail = await commodityApi.getTaskResult(taskId)
-        if (detail?.data) {
-          latestResult.value = detail.data as Record<string, any>
-          await loadReports()
-          ElMessage.success('✅ 分析完成!')
-        }
-        return
-      }
-      if (res?.data?.status === 'failed') {
-        ElMessage.error(res.data.progress_message || '分析失败')
-        return
-      }
-    } catch { /* continue polling */ }
-    if (attempts < maxAttempts) {
-      pollingTimer = setTimeout(poll, 5000)
+  batchSubmitting.value = true
+  batchResult.value = null
+  try {
+    const res = await commodityApi.submitBatchAnalysis({
+      symbols,
+      trade_date: batchTradeDate.value || undefined,
+    })
+    if (res?.success && res.data) {
+      batchResult.value = res.data
+      ElMessage.success(`批量提交成功: ${res.data.created}/${res.data.total}`)
     } else {
-      ElMessage.warning('分析超时,请稍后查看任务中心')
+      ElMessage.error(res?.message || '批量提交失败')
     }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '批量提交异常')
+  } finally {
+    batchSubmitting.value = false
   }
-  pollingTimer = setTimeout(poll, 5000)
 }
 
 function goToTaskCenter() {
@@ -359,7 +417,7 @@ function goToTaskCenter() {
 }
 
 async function loadReports(fullSymbol?: string) {
-  const sym = fullSymbol || form.value.contract
+  const sym = fullSymbol || computeFullSymbol()
   if (!sym) return
   try { const res = await commodityApi.getReports(sym, 20); reports.value = res?.data?.reports || [] }
   catch { reports.value = [] }
@@ -376,28 +434,26 @@ onMounted(() => {
   const params = new URLSearchParams(window.location.search)
   const symbol = params.get('symbol')
   if (symbol) {
-    // 从 URL 参数解析交易所和品种
     const parts = symbol.split('.')
     if (parts.length === 2) {
-      // 通过后缀反查交易所代码
+      const raw = parts[0]
       const suffix = '.' + parts[1]
+      const variety = raw.endsWith('0') ? raw.slice(0, -1) : raw
       for (const [ex, sfx] of Object.entries(EXCHANGE_SUFFIX)) {
         if (sfx === suffix) {
           form.value.exchange = ex
+          form.value.variety_symbol = variety
+          onExchangeChange().then(() => onVarietyChange())
           break
         }
       }
-      form.value.contract = symbol
       loadReports(symbol)
     }
   }
 })
 
 onUnmounted(() => {
-  if (pollingTimer !== null) {
-    clearTimeout(pollingTimer)
-    pollingTimer = null
-  }
+  stopPolling()
 })
 </script>
 

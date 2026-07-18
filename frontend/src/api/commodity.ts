@@ -33,7 +33,8 @@ export interface ExchangeItem {
 export interface VarietyItem {
   variety_code?: string
   symbol: string
-  name_cn: string
+  name: string
+  name_cn?: string
   abbreviation_akshare?: string
   category: string
   unit?: string
@@ -416,6 +417,17 @@ export const commodityApi = {
     }>>(`/api/commodity/tasks`, params)
   },
 
+  /** 聚合任务统计（单次 aggregation 替代多次 count 查询） */
+  async getTaskStats() {
+    return ApiClient.get<ApiEnvelope<{
+      total: number
+      queued: number
+      processing: number
+      completed: number
+      failed: number
+    }>>(`/api/commodity/tasks/stats`)
+  },
+
   /** 查询单个任务状态 */
   async getTaskStatus(taskId: string) {
     return ApiClient.get<ApiEnvelope<CommodityTaskItem>>(
@@ -442,6 +454,38 @@ export const commodityApi = {
     return ApiClient.get<ApiEnvelope<Record<string, unknown>>>(
       `/api/commodity/tasks/${encodeURIComponent(taskId)}/result`,
     )
+  },
+
+  // ---- 批量任务 ----
+
+  /** 批量提交商品分析任务 */
+  async submitBatchAnalysis(params: {
+    symbols: string[]
+    trade_date?: string
+    max_debate_rounds?: number
+    max_risk_discuss_rounds?: number
+  }) {
+    return ApiClient.post<ApiEnvelope<{
+      batch_id: string
+      total: number
+      created: number
+      failed: number
+      tasks: Array<{ full_symbol: string; task_id: string }>
+      errors?: Array<{ full_symbol: string; error: string }> | null
+    }>>(`/api/commodity/batch`, params)
+  },
+
+  /** 查询批量任务状态 */
+  async getBatchStatus(batchId: string) {
+    return ApiClient.get<ApiEnvelope<{
+      batch_id: string
+      total: number
+      queued: number
+      processing: number
+      completed: number
+      failed: number
+      tasks: Array<CommodityTaskItem>
+    }>>(`/api/commodity/batch/${encodeURIComponent(batchId)}`)
   },
 }
 
@@ -475,6 +519,7 @@ export interface CommodityTaskItem {
   completed_at?: string
   report_id?: string
   error_message?: string
+  batch_id?: string
 }
 
 // ============================================================

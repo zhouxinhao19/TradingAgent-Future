@@ -46,6 +46,26 @@ async def _call_provider(provider, method_name, *args, **kwargs):
         return None
 
 
+async def _call_provider_with_timeout(
+    provider, method_name: str, timeout: float, *args, **kwargs
+):
+    """安全调用 provider 异步方法,带单调用超时。
+
+    超时后返回 None(不抛异常),保证一个慢调用不阻塞整个 features 流程。
+    """
+    import asyncio as _asyncio
+
+    try:
+        method = getattr(provider, method_name, None)
+        if method is None:
+            return None
+        return await _asyncio.wait_for(
+            method(*args, **kwargs), timeout=timeout,
+        )
+    except (_asyncio.TimeoutError, Exception):
+        return None
+
+
 def _resolve_technical_symbols(full_symbol: str, underlying: str) -> Dict[str, Optional[str]]:
     """解析技术分析所需的合约代码。
 
@@ -103,33 +123,77 @@ async def compute_all_features_from_provider(
 
     underlying = CommodityUtils.get_underlying_symbol(full_symbol) or full_symbol.split(".")[0]
 
-    # ---- 1. 拉取数据(逐模块独立 await) ----
-    df_hist = await _call_provider(provider, "get_historical_data",
-        full_symbol, start_date="2025-01-01", end_date=trade_date or "2026-07-16")
+    # ---- 1. 并行拉取数据(每调用独立超时 20s) ----
+    exchange_code = (
+        normalize_exchange_code(full_symbol.split(".")[-1])
+        if "." in full_symbol else "SHFE"
+    )
+    date_compact = trade_date.replace("-", "")[:8] if trade_date else "20260715"
+
+    import asyncio as _asyncio
+
+    results = await _asyncio.gather(
+        # 历史 K 线
+        _call_provider_with_timeout(
+            provider, "get_historical_data", 20,
+            full_symbol, start_date="2025-01-01", end_date=trade_date or "2026-07-16",
+        ),
+        # 指数合约数据
+        _call_provider_with_timeout(
+            provider, "get_historical_data_for_index", 20,
+            underlying, start_date="2025-01-01", end_date=trade_date or "2026-07-16",
+        ),
+        # 基差历史
+        _call_provider_with_timeout(
+            provider, "get_basis_history", 20,
+            "2025-01-01", trade_date or "2026-07-16", [underlying],
+        ),
+        # 现货价格(可能调 100ppi.com,单独超时)
+        _call_provider_with_timeout(
+            provider, "get_spot_price", 15,
+            trade_date or "2026-07-15", underlying,
+        ),
+        # 库存
+        _call_provider_with_timeout(
+            provider, "get_inventory", 15, underlying,
+        ),
+        # 持仓排名
+        _call_provider_with_timeout(
+            provider, "get_position_rank", 15,
+            exchange_code, date_compact, None, underlying,
+        ),
+        # 展期收益率
+        _call_provider_with_timeout(
+            provider, "get_roll_yield", 15,
+            "date", var=underlying, start_day="20260101", end_day=date_compact,
+        ),
+        # 新闻
+        _call_provider_with_timeout(
+            provider, "get_futures_news", 15, "all", 100,
+        ),
+        return_exceptions=True,
+    )
+
+    (
+        df_hist, index_df, basis_df, spot_df,
+        inv_df, pos_df, roll_df, news_list,
+    ) = results
+
+    # 将异常转为 None
+    def _unwrap(r):
+        return None if isinstance(r, (BaseException, Exception)) else r
+
+    df_hist = _unwrap(df_hist)
+    index_df = _unwrap(index_df)
+    basis_df = _unwrap(basis_df)
+    spot_df = _unwrap(spot_df)
+    inv_df = _unwrap(inv_df)
+    pos_df = _unwrap(pos_df)
+    roll_df = _unwrap(roll_df)
+    news_list = _unwrap(news_list)
+
     if df_hist is None:
         result["errors"]["historical"] = "历史 K 线数据获取失败"
-
-    # 指数合约数据(用于技术面多合约分析, 不可用时回退到单合约)
-    index_df = await _call_provider(provider, "get_historical_data_for_index",
-        underlying, start_date="2025-01-01", end_date=trade_date or "2026-07-16")
-
-    basis_df = await _call_provider(provider, "get_basis_history",
-        "2025-01-01", trade_date or "2026-07-16", [underlying])
-
-    spot_df = await _call_provider(provider, "get_spot_price",
-        trade_date or "2026-07-15")
-
-    inv_df = await _call_provider(provider, "get_inventory", underlying)
-
-    pos_df = await _call_provider(provider, "get_position_rank",
-        normalize_exchange_code(full_symbol.split(".")[-1]) if "." in full_symbol else "SHFE",
-        trade_date.replace("-", "")[:8] if trade_date else "20260715")
-
-    roll_df = await _call_provider(provider, "get_roll_yield",
-        "date", var=underlying, start_day="20260101",
-        end_day=trade_date.replace("-", "") if trade_date else "20260715")
-
-    news_list = await _call_provider(provider, "get_futures_news", "all", 100)
 
     # ---- 2. 调用 6 个 features 计算函数 ----
     features = result["features"]

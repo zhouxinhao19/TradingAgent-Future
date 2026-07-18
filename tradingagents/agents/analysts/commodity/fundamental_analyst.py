@@ -188,7 +188,7 @@ def _valuation_drive_assessment(
     # --- 估值维度:基差分位 + 期限结构类型 ---
     dom_pctl = None
     if isinstance(basis_block, dict):
-        dom_pctl = (basis_block.get("stats") or {}).get("zscore_180d", {}).get("dom_basis_rate")
+        dom_pctl = (((basis_block.get("stats") or {}).get("zscore_180d") or {}).get("dom_basis_rate"))
     term_structure = None
     if isinstance(term_structure_block, dict):
         term_structure = (term_structure_block.get("snapshot") or {}).get("structure")
@@ -398,17 +398,17 @@ def create_fundamental_analyst(llm):
             (basis_block or inventory_block or term_block or {}).get("quality", {}).get("rows", 0)
         )
 
-        basis_latest = _fmt((basis_block or {}).get("latest", {}).get("dom_basis_rate"))
-        basis_zscore = _fmt((basis_block or {}).get("stats", {}).get("zscore_180d", {}).get("dom_basis_rate"))
-        basis_slope = _fmt((basis_block or {}).get("stats", {}).get("slope_20d", {}).get("dom_basis_rate"))
+        basis_latest = _fmt(((basis_block or {}).get("latest") or {}).get("dom_basis_rate"))
+        basis_zscore = _fmt((((basis_block or {}).get("stats") or {}).get("zscore_180d") or {}).get("dom_basis_rate"))
+        basis_slope = _fmt((((basis_block or {}).get("stats") or {}).get("slope_20d") or {}).get("dom_basis_rate"))
 
-        inv_latest = _fmt((inventory_block or {}).get("latest", {}).get("value"))
-        inv_wow = _fmt((inventory_block or {}).get("snapshot", {}).get("wow_change"))
-        inv_zscore = _fmt((inventory_block or {}).get("stats", {}).get("zscore_180d"))
+        inv_latest = _fmt(((inventory_block or {}).get("latest") or {}).get("value"))
+        inv_wow = _fmt(((inventory_block or {}).get("snapshot") or {}).get("wow_change"))
+        inv_zscore = _fmt(((inventory_block or {}).get("stats") or {}).get("zscore_180d"))
 
-        term_type = (term_block or {}).get("snapshot", {}).get("structure", "N/A")
-        carry_score = _fmt((term_block or {}).get("snapshot", {}).get("carry_score"))
-        term_zscore = _fmt((term_block or {}).get("stats", {}).get("zscore_180d"))
+        term_type = ((term_block or {}).get("snapshot") or {}).get("structure", "N/A")
+        carry_score = _fmt(((term_block or {}).get("snapshot") or {}).get("carry_score"))
+        term_zscore = _fmt(((term_block or {}).get("stats") or {}).get("zscore_180d"))
 
         variety_name = state.get("variety_name", full_symbol)
         exchange = state.get("exchange", "")

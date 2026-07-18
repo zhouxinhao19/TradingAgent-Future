@@ -2,7 +2,9 @@
 大宗商品分析路由 (Phase 3b-ii-D)
 
 端点:
-  - POST /api/commodity/{full_symbol}/analyze — 提交分析任务(异步,走 BackgroundTasks)
+  - POST /api/commodity/{full_symbol}/analyze — 提交分析任务(异步队列)
+  - GET /api/commodity/tasks — 任务列表
+  - GET /api/commodity/tasks/stats — 聚合任务统计
   - GET /api/commodity/{full_symbol}/reports — 拉历史报告列表
   - GET /api/commodity/reports/{report_id} — 获取单份报告详情
 
@@ -12,21 +14,27 @@
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
 from pydantic import BaseModel, Field
 
 from app.routers.auth_db import get_current_user
 from app.services.websocket_manager import get_websocket_manager
 
 logger = logging.getLogger("webapi")
+
+# P0: 后台 worker 状态
+_task_worker_task: Optional[asyncio.Task] = None
+_MAX_CONCURRENT_ANALYSES = 2
+_semaphore = asyncio.Semaphore(_MAX_CONCURRENT_ANALYSES)
 router = APIRouter(prefix="/commodity", tags=["commodity-analysis"])
 
 # 报告存储目录(相对于项目根)
@@ -85,6 +93,14 @@ class ReportSummary(BaseModel):
     created_at: str
 
 
+class BatchAnalysisRequest(BaseModel):
+    """批量分析请求参数"""
+    symbols: List[str] = Field(..., min_length=1, max_length=50, description="品种代码列表")
+    trade_date: Optional[str] = Field(None, description="交易日期 YYYY-MM-DD(默认当天)")
+    max_debate_rounds: int = Field(1, ge=0, le=3, description="多空辩论轮次")
+    max_risk_discuss_rounds: int = Field(1, ge=0, le=3, description="风控辩论轮次")
+
+
 # ==================== 服务辅助函数 ====================
 
 def _today() -> str:
@@ -114,7 +130,46 @@ def _resolve_input_symbol(raw: str) -> Optional[Dict[str, str]]:
     return resolve_variety_to_symbol(raw)
 
 
-# ==================== 任务元数据 MongoDB 层 ====================
+async def _create_queued_task(
+    full_symbol: str,
+    trade_date: str,
+    variety_name: str = "",
+    exchange: str = "",
+    category: str = "",
+    quote_unit: str = "",
+    max_debate_rounds: int = 1,
+    max_risk_discuss_rounds: int = 1,
+    user_id: str = "anonymous",
+    batch_id: Optional[str] = None,
+) -> str:
+    """创建 queued 任务并写入 MongoDB，返回 task_id。
+
+    如果指定 batch_id，任务元数据会附带 batch_id 供后续批量查询。
+    """
+    task_id = f"commodity_{uuid.uuid4().hex[:12]}"
+    doc: Dict[str, Any] = {
+        "task_id": task_id,
+        "full_symbol": full_symbol,
+        "trade_date": trade_date,
+        "variety_name": variety_name,
+        "exchange": exchange,
+        "category": category,
+        "quote_unit": quote_unit,
+        "max_debate_rounds": max_debate_rounds,
+        "max_risk_discuss_rounds": max_risk_discuss_rounds,
+        "user_id": user_id,
+        "status": "queued",
+        "progress": 0,
+        "progress_message": "排队中…",
+        "created_at": datetime.now(timezone.utc),
+    }
+    if batch_id:
+        doc["batch_id"] = batch_id
+    await _task_set(task_id, doc)
+    return task_id
+
+
+# ==================== MongoDB 任务元数据层 ====================
 # 商品分析任务元数据存于 `commodity_analysis_tasks` 集合 (Phase 5+)
 # 与报告文件 (data/analysis_results/commodity/...) 物理隔离
 
@@ -129,14 +184,19 @@ def _tasks_collection():
 
 
 def _serialize_task(doc: Dict[str, Any]) -> Dict[str, Any]:
-    """MongoDB doc → API 响应;剥离 _id,统一 datetime 为 ISO 字符串"""
+    """MongoDB doc → API 响应;剥离 _id,统一 datetime 为北京时间 ISO 字符串"""
     if doc is None:
         return {}
     doc = {k: v for k, v in doc.items() if k != "_id"}
     for k in ("created_at", "completed_at"):
         v = doc.get(k)
         if v is not None and hasattr(v, "isoformat"):
-            doc[k] = v.isoformat()
+            # 统一转为北京时间(UTC+8),前端直接显示无需时区转换
+            if isinstance(v, datetime):
+                if v.tzinfo is None:
+                    v = v.replace(tzinfo=timezone.utc)
+                bj = v.astimezone(timezone(timedelta(hours=8)))
+                doc[k] = bj.isoformat()
     return doc
 
 
@@ -167,6 +227,77 @@ async def _push_progress(task_id: str, progress: int, message: str = "") -> None
         })
     except Exception as e:
         logger.debug(f"⚠️ WebSocket 推送失败 (task={task_id}): {e}")
+
+
+# ==================== P0: 后台任务 Worker ====================
+
+def ensure_worker() -> None:
+    """启动后台任务 worker（如果未运行）。"""
+    global _task_worker_task
+    if _task_worker_task is None or _task_worker_task.done():
+        _task_worker_task = asyncio.create_task(_run_worker())
+        logger.info("🚀 商品分析 worker 已启动(并发=%d)", _MAX_CONCURRENT_ANALYSES)
+
+
+async def stop_worker() -> None:
+    """停止后台任务 worker。"""
+    global _task_worker_task
+    if _task_worker_task and not _task_worker_task.done():
+        _task_worker_task.cancel()
+        try:
+            await _task_worker_task
+        except asyncio.CancelledError:
+            pass
+        _task_worker_task = None
+        logger.info("🛑 商品分析 worker 已停止")
+
+
+async def _run_worker() -> None:
+    """后台 worker 循环：轮询 MongoDB 中 status=queued 的任务并执行。
+
+    每次原子地 find_one_and_update 取出一个任务，确保多实例不重复消费。
+    _semaphore 控制最大并发数（_MAX_CONCURRENT_ANALYSES）。
+    """
+    while True:
+        try:
+            coll = _tasks_collection()
+            if coll is None:
+                await asyncio.sleep(10)
+                continue
+
+            doc = await coll.find_one_and_update(
+                {"status": "queued"},
+                {"$set": {
+                    "status": "processing",
+                    "progress": 0,
+                    "progress_message": "初始化中…",
+                    "started_at": datetime.now(timezone.utc),
+                }},
+                sort=[("created_at", 1)],
+            )
+
+            if doc:
+                task_id = doc.get("task_id", "")
+                async with _semaphore:
+                    await _run_and_save_analysis(
+                        full_symbol=doc.get("full_symbol", ""),
+                        trade_date=doc.get("trade_date", _today()),
+                        variety_name=doc.get("variety_name", ""),
+                        exchange=doc.get("exchange", ""),
+                        category=doc.get("category", ""),
+                        quote_unit=doc.get("quote_unit", ""),
+                        max_debate_rounds=doc.get("max_debate_rounds", 1),
+                        max_risk_discuss_rounds=doc.get("max_risk_discuss_rounds", 1),
+                        task_id=task_id,
+                        user_id=doc.get("user_id", "anonymous"),
+                    )
+            else:
+                await asyncio.sleep(2)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error("❌ Worker 循环异常: %s", e, exc_info=True)
+            await asyncio.sleep(5)
 
 
 async def _backfill_completed_tasks() -> int:
@@ -245,7 +376,7 @@ def _build_config(
     return config
 
 
-def _run_commodity_analysis(
+async def _run_commodity_analysis(
     full_symbol: str,
     trade_date: str,
     variety_name: str = "",
@@ -254,20 +385,41 @@ def _run_commodity_analysis(
     quote_unit: str = "",
     config_override: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """同步运行 CommodityTradingAgentsGraph 分析。"""
-    from tradingagents.graph.commodity_graph import CommodityTradingAgentsGraph
+    """异步运行 CommodityTradingAgentsGraph 分析。
 
-    # 初始化 provider 用于 auto_features
+    在 async 上下文中(BackgroundTasks)运行时,外部先 await 算好 features 再传入,
+    避免 propagate 内部调用 asyncio.run() 在已有事件循环中抛 RuntimeError。
+    """
+    from tradingagents.graph.commodity_graph import CommodityTradingAgentsGraph
     from tradingagents.dataflows.providers.commodity.akshare_futures import (
         AkshareFuturesProvider,
     )
+    from tradingagents.features import compute_all_features_from_provider
 
+    # ---- 异步算 features + 新闻(不在 propagate 内部调 asyncio.run) ----
     provider = None
+    commodity_features: Dict[str, Any] = {}
+    latest_news: List[Dict[str, Any]] = []
     try:
         provider = AkshareFuturesProvider()
-        provider.connect()
+        if await provider.connect():
+            aggregated = await compute_all_features_from_provider(
+                provider, full_symbol, trade_date
+            )
+            commodity_features = aggregated.get("features", {}) or {}
+            logger.info(
+                f"✅ auto_features 加载完成 (success={aggregated.get('success')}, "
+                f"modules={list(commodity_features.keys())})"
+            )
+            try:
+                news = await provider.get_futures_news("all", 100)
+                latest_news = news or []
+            except Exception as e:
+                logger.warning(f"⚠️ provider.get_futures_news 失败: {e}")
+        else:
+            logger.warning("⚠️ 商品 provider 连接失败,将使用空特征")
     except Exception as e:
-        logger.warning(f"⚠️ 商品 provider 初始化失败,将使用空特征: {e}")
+        logger.warning(f"⚠️ 商品 provider 初始化/features 计算失败,将使用空特征: {e}")
 
     cfg = _build_config()
     if config_override:
@@ -277,14 +429,14 @@ def _run_commodity_analysis(
     final_state, decision = graph.propagate(
         full_symbol=full_symbol,
         trade_date=trade_date,
-        commodity_features={},
-        latest_news=[],
+        commodity_features=commodity_features,  # 已算好直接传入
+        latest_news=latest_news,
         variety_name=variety_name,
         exchange=exchange,
         category=category,
         quote_unit=quote_unit,
-        auto_features=True,
-        provider=provider,
+        auto_features=False,   # 外部已算好,不走 propagate 内部的 asyncio.run
+        provider=None,
     )
 
     return {
@@ -303,8 +455,8 @@ def _run_commodity_analysis(
     }
 
 
-def _save_report(full_symbol: str, trade_date: str, result: Dict[str, Any]) -> str:
-    """保存分析报告到 JSON 文件,返回 report_id。"""
+def _save_report(full_symbol: str, trade_date: str, result: Dict[str, Any]) -> tuple[str, str]:
+    """保存分析报告到 JSON 文件,返回 (report_id, report_rel_path)。"""
     safe_sym = _safe_symbol(full_symbol)
     report_id = f"{safe_sym}_{trade_date}_{uuid.uuid4().hex[:8]}"
     report_dir = _REPORTS_BASE / safe_sym / trade_date
@@ -314,8 +466,14 @@ def _save_report(full_symbol: str, trade_date: str, result: Dict[str, Any]) -> s
     with open(report_path, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2, default=str)
 
+    # 计算相对路径供后续快速查找
+    try:
+        rel_path = str(report_path.relative_to(_REPORTS_BASE))
+    except ValueError:
+        rel_path = str(report_path)
+
     logger.info(f"✅ 报告已保存: {report_path}")
-    return report_id
+    return report_id, rel_path
 
 
 def _list_reports(full_symbol: str, limit: int = 20) -> List[Dict[str, Any]]:
@@ -339,7 +497,7 @@ def _list_reports(full_symbol: str, limit: int = 20) -> List[Dict[str, Any]]:
                     "confidence": decision.get("confidence", 0.0),
                     "created_at": datetime.fromtimestamp(
                         f_path.stat().st_mtime, tz=timezone.utc
-                    ).isoformat(),
+                    ).astimezone(timezone(timedelta(hours=8))).isoformat(),
                 })
             except Exception:
                 continue
@@ -371,7 +529,8 @@ def _list_recent_reports(limit: int = 10) -> List[Dict[str, Any]]:
                             "trade_date": date_dir.name,
                             "direction": decision.get("action", "hold"),
                             "confidence": decision.get("confidence", 0.0),
-                            "created_at": datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat(),
+                            "created_at": datetime.fromtimestamp(mtime, tz=timezone.utc).astimezone(
+                                timezone(timedelta(hours=8))).isoformat(),
                         },
                     ))
                 except Exception:
@@ -386,14 +545,16 @@ def _list_recent_reports(limit: int = 10) -> List[Dict[str, Any]]:
 @router.post("/{full_symbol}/analyze", response_model=dict, summary="提交商品分析任务")
 async def submit_commodity_analysis(
     full_symbol: str,
-    background_tasks: BackgroundTasks,
     raw_request: Request,
     user: dict = Depends(get_current_user),
 ):
     """提交大宗商品期货分析任务。
 
-    后台异步执行完整决策链:
-      4 分析师 → 多空辩论 → 交易员 → 风控 → CIO 最终决策
+    任务写入 MongoDB（status=queued）后立即返回，由后台 worker
+    轮询执行。Worker 带并发控制（Semaphore），防止 LLM 密集型
+    分析打满服务器。
+
+    完整决策链: 4 分析师 → 多空辩论 → 交易员 → 风控 → CIO
     耗时约 1-5 分钟(取决于 LLM 速度)。
     完成后报告自动保存,可通过 GET /reports 查看。
 
@@ -438,23 +599,30 @@ async def submit_commodity_analysis(
     task_id = f"commodity_{uuid.uuid4().hex[:12]}"
     trade_date = request.trade_date or _today()
 
-    logger.info(
-        f"🌾 [CommodityAnalysis] 提交分析: {request.full_symbol} @ {trade_date}, "
-        f"task_id={task_id}"
-    )
+    # ---- 写任务元数据 (status=queued), worker 会拾取 ----
+    await _task_set(task_id, {
+        "task_id": task_id,
+        "full_symbol": request.full_symbol,
+        "trade_date": trade_date,
+        "variety_name": request.variety_name,
+        "exchange": request.exchange,
+        "category": request.category,
+        "quote_unit": request.quote_unit,
+        "max_debate_rounds": request.max_debate_rounds,
+        "max_risk_discuss_rounds": request.max_risk_discuss_rounds,
+        "user_id": str(user.get("id", "anonymous")),
+        "status": "queued",
+        "progress": 0,
+        "progress_message": "排队中…",
+        "created_at": datetime.now(timezone.utc),
+    })
 
-    background_tasks.add_task(
-        _run_and_save_analysis,
-        full_symbol=request.full_symbol,
-        trade_date=trade_date,
-        variety_name=request.variety_name,
-        exchange=request.exchange,
-        category=request.category,
-        quote_unit=request.quote_unit,
-        max_debate_rounds=request.max_debate_rounds,
-        max_risk_discuss_rounds=request.max_risk_discuss_rounds,
-        task_id=task_id,
-        user_id=str(user.get("id", "anonymous")),
+    # 确保 worker 在运行（幂等）
+    ensure_worker()
+
+    logger.info(
+        f"🌾 [CommodityAnalysis] 任务已入队: {request.full_symbol} @ {trade_date}, "
+        f"task_id={task_id}"
     )
 
     return {
@@ -463,9 +631,129 @@ async def submit_commodity_analysis(
             "task_id": task_id,
             "full_symbol": request.full_symbol,
             "trade_date": trade_date,
-            "status": "submitted",
+            "status": "queued",
         },
-        "message": "分析任务已提交,后台执行中。请稍后通过 GET /reports 查看结果。",
+        "message": "分析任务已入队,排队执行中。",
+    }
+
+
+# ==================== 批量任务端点 ====================
+
+@router.post("/batch", response_model=dict, summary="批量提交商品分析")
+async def submit_commodity_batch(
+    body: BatchAnalysisRequest,
+    user: dict = Depends(get_current_user),
+):
+    """批量提交大宗商品分析任务。
+
+    一次提交最多 50 个品种，每个创建独立的 queued 任务，
+    共享同一 batch_id 便于后续追踪。
+    后台 worker 逐个拾取执行（受 Semaphore 并发控制）。
+    """
+    user_id = str(user.get("id", "anonymous"))
+    trade_date = body.trade_date or _today()
+    batch_id = f"batch_{uuid.uuid4().hex[:12]}"
+
+    created: List[Dict[str, str]] = []
+    errors: List[Dict[str, str]] = []
+
+    for raw_symbol in body.symbols:
+        raw_symbol = raw_symbol.strip().upper()
+        if not raw_symbol:
+            continue
+
+        # 品种代码解析
+        full_symbol = raw_symbol
+        variety_name = ""
+        exchange = ""
+        category = ""
+        quote_unit = ""
+        resolved = _resolve_input_symbol(raw_symbol)
+        if resolved:
+            full_symbol = resolved["full_symbol"]
+            variety_name = resolved.get("variety_name", "")
+            exchange = resolved.get("exchange", "")
+            category = resolved.get("category", "")
+            quote_unit = resolved.get("quote_unit", "")
+
+        try:
+            task_id = await _create_queued_task(
+                full_symbol=full_symbol,
+                trade_date=trade_date,
+                variety_name=variety_name,
+                exchange=exchange,
+                category=category,
+                quote_unit=quote_unit,
+                max_debate_rounds=body.max_debate_rounds,
+                max_risk_discuss_rounds=body.max_risk_discuss_rounds,
+                user_id=user_id,
+                batch_id=batch_id,
+            )
+            created.append({"full_symbol": full_symbol, "task_id": task_id})
+        except Exception as e:
+            errors.append({"full_symbol": full_symbol, "error": str(e)[:200]})
+
+    # 确保 worker 在运行
+    if created:
+        ensure_worker()
+
+    logger.info(
+        f"📦 [Batch] 批量任务已入队: batch_id={batch_id}, "
+        f"成功={len(created)}, 失败={len(errors)}"
+    )
+
+    return {
+        "success": True,
+        "data": {
+            "batch_id": batch_id,
+            "trade_date": trade_date,
+            "total": len(body.symbols),
+            "created": len(created),
+            "failed": len(errors),
+            "tasks": created,
+            "errors": errors if errors else None,
+        },
+        "message": f"批量任务已入队: 成功 {len(created)}/{len(body.symbols)}",
+    }
+
+
+@router.get("/batch/{batch_id}", response_model=dict, summary="查询批量任务状态")
+async def get_commodity_batch(
+    batch_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """查询一批批量任务的汇总状态。"""
+    coll = _tasks_collection()
+    if coll is None:
+        raise HTTPException(status_code=503, detail="任务存储不可用")
+    user_id = str(user.get("id", ""))
+    query: Dict[str, Any] = {
+        "batch_id": batch_id,
+        "$or": [
+            {"user_id": user_id},
+            {"user_id": "legacy-backfill"},
+        ],
+    }
+    try:
+        cursor = coll.find(query).sort("created_at", 1)
+        tasks = [_serialize_task(doc) async for doc in cursor]
+        total = len(tasks)
+        counts = {"total": total, "queued": 0, "processing": 0, "completed": 0, "failed": 0}
+        for t in tasks:
+            s = t.get("status", "")
+            if s in counts:
+                counts[s] += 1
+    except Exception as e:
+        logger.warning(f"⚠️ 批量任务查询失败: {e}")
+        raise HTTPException(status_code=500, detail="查询失败")
+    return {
+        "success": True,
+        "data": {
+            "batch_id": batch_id,
+            **counts,
+            "tasks": tasks,
+        },
+        "message": f"批量任务共 {total} 个",
     }
 
 
@@ -481,22 +769,12 @@ async def _run_and_save_analysis(
     task_id: str,
     user_id: str = "anonymous",
 ):
-    """后台运行分析 + 保存报告 + 更新任务状态。"""
-    logger.info(f"🚀 [BackgroundTask] 开始商品分析: {full_symbol} (task={task_id})")
+    """运行分析 + 保存报告 + 更新任务状态。
 
-    # 1. 创建/更新任务为 processing
-    await _task_set(task_id, {
-        "task_id": task_id,
-        "full_symbol": full_symbol,
-        "trade_date": trade_date,
-        "variety_name": variety_name,
-        "exchange": exchange,
-        "user_id": user_id,
-        "status": "processing",
-        "progress": 0,
-        "progress_message": "初始化中…",
-        "created_at": datetime.now(timezone.utc),
-    })
+    注意：调用方（worker）已先将任务从 queued→processing，
+    这里不再重复 _task_set 设置 status。
+    """
+    logger.info(f"🚀 [WorkerTask] 开始商品分析: {full_symbol} (task={task_id})")
 
     try:
         await _push_progress(task_id, 5, "构建分析配置…")
@@ -506,7 +784,7 @@ async def _run_and_save_analysis(
         )
 
         await _push_progress(task_id, 15, "执行分析中(多智能体决策链)…")
-        result = _run_commodity_analysis(
+        result = await _run_commodity_analysis(
             full_symbol=full_symbol,
             trade_date=trade_date,
             variety_name=variety_name,
@@ -518,18 +796,19 @@ async def _run_and_save_analysis(
 
         await _push_progress(task_id, 75, "分析完成，保存报告…")
         result["task_id"] = task_id
-        report_id = _save_report(full_symbol, trade_date, result)
+        report_id, report_rel_path = _save_report(full_symbol, trade_date, result)
 
         # 2. 标记完成
         await _task_set(task_id, {
             "status": "completed",
             "report_id": report_id,
+            "report_file_path": report_rel_path,
             "progress": 100,
             "progress_message": "已完成",
             "completed_at": datetime.now(timezone.utc),
         })
         await _push_progress(task_id, 100, "分析完成")
-        logger.info(f"✅ [BackgroundTask] 分析完成: {full_symbol}, report_id={report_id}")
+        logger.info(f"✅ [WorkerTask] 分析完成: {full_symbol}, report_id={report_id}")
     except Exception as e:
         # 3. 标记失败 (截断长错误避免 MongoDB 文档过大)
         err_msg = str(e)[:500]
@@ -591,7 +870,11 @@ async def get_commodity_task_result(
     task_id: str,
     user: dict = Depends(get_current_user),
 ):
-    """获取已完成任务的完整分析结果（读取 report JSON）。"""
+    """获取已完成任务的完整分析结果（读取 report JSON）。
+
+    优先使用 MongoDB 中存储的 report_file_path 直接定位，
+    无存储路径时回退到目录遍历（兼容旧记录）。
+    """
     coll = _tasks_collection()
     if coll is None:
         raise HTTPException(
@@ -622,6 +905,20 @@ async def get_commodity_task_result(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="任务无关联报告",
         )
+
+    # 快速路径：从存储的 report_file_path 直接读取
+    report_rel_path = doc.get("report_file_path")
+    if report_rel_path:
+        report_path = (_REPORTS_BASE / report_rel_path).resolve()
+        if str(report_path).startswith(str(_REPORTS_BASE.resolve())) and report_path.exists():
+            data = json.loads(report_path.read_text(encoding="utf-8"))
+            return {
+                "success": True,
+                "data": data,
+                "message": "获取任务结果成功",
+            }
+
+    # 回退路径：目录遍历（兼容旧记录）
     safe_id = _safe_symbol(report_id)
     for symbol_dir in _REPORTS_BASE.iterdir():
         if not symbol_dir.is_dir():
@@ -698,12 +995,13 @@ async def get_recent_commodity_reports(
 
 @router.get("/tasks", response_model=dict, summary="商品分析任务列表")
 async def list_commodity_tasks(
-    status: Optional[str] = Query(None, description="processing|completed|failed"),
+    status: Optional[str] = Query(None, description="processing|completed|failed|queued"),
+    batch_id: Optional[str] = Query(None, description="按 batch_id 过滤"),
     limit: int = Query(20, ge=1, le=100, description="返回条数"),
     offset: int = Query(0, ge=0, description="偏移量"),
     user: dict = Depends(get_current_user),
 ):
-    """按状态过滤返回商品分析任务列表。
+    """按状态 / batch_id 过滤返回商品分析任务列表。
 
     返回当前用户创建的任务 + 系统回填的旧报告。
     """
@@ -724,6 +1022,8 @@ async def list_commodity_tasks(
     }
     if status:
         query["status"] = status
+    if batch_id:
+        query["batch_id"] = batch_id
     try:
         cursor = coll.find(query).sort("created_at", -1).skip(offset).limit(limit)
         tasks = [_serialize_task(doc) async for doc in cursor]
@@ -740,6 +1040,42 @@ async def list_commodity_tasks(
         "data": {"total": total, "tasks": tasks},
         "message": "获取任务列表成功" if tasks else "暂无任务",
     }
+
+
+@router.get("/tasks/stats", response_model=dict, summary="任务统计")
+async def get_commodity_task_stats(
+    user: dict = Depends(get_current_user),
+):
+    """聚合返回各状态任务数量（单次 aggregation 替代多次查询）。"""
+    coll = _tasks_collection()
+    if coll is None:
+        return {
+            "success": True,
+            "data": {"total": 0, "queued": 0, "processing": 0, "completed": 0, "failed": 0},
+        }
+    user_id = str(user.get("id", ""))
+    base_filter: Dict[str, Any] = {
+        "$or": [
+            {"user_id": user_id},
+            {"user_id": "legacy-backfill"},
+        ]
+    }
+    try:
+        pipeline = [
+            {"$match": base_filter},
+            {"$group": {"_id": "$status", "count": {"$sum": 1}}},
+        ]
+        result: Dict[str, int] = {"total": 0, "queued": 0, "processing": 0, "completed": 0, "failed": 0}
+        async for doc in coll.aggregate(pipeline):
+            status = doc.get("_id", "")
+            count = doc.get("count", 0)
+            if status in result:
+                result[status] = count
+            result["total"] += count
+    except Exception as e:
+        logger.warning(f"⚠️ 任务统计查询失败: {e}")
+        result = {"total": 0, "queued": 0, "processing": 0, "completed": 0, "failed": 0}
+    return {"success": True, "data": result, "message": "获取统计成功"}
 
 
 @router.get("/tasks/{task_id}", response_model=dict, summary="查询单个任务")
@@ -799,15 +1135,26 @@ async def delete_commodity_task(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"任务不存在: {task_id}",
         )
-    # 删除关联报告文件
-    report_id = doc.get("report_id")
-    if report_id:
-        for f_path in _REPORTS_BASE.rglob(f"{report_id}.json"):
+    # 删除关联报告文件 — 优先使用 report_file_path 直接定位
+    report_path_str = doc.get("report_file_path")
+    if report_path_str:
+        report_path = (_REPORTS_BASE / report_path_str).resolve()
+        if str(report_path).startswith(str(_REPORTS_BASE.resolve())) and report_path.exists():
             try:
-                f_path.unlink()
-                logger.info(f"🗑️ 已删除报告文件: {f_path}")
+                report_path.unlink()
+                logger.info(f"已删除报告文件: {report_path}")
             except OSError as e:
-                logger.warning(f"⚠️ 删除报告文件失败: {f_path} - {e}")
+                logger.warning(f"删除报告文件失败: {report_path} - {e}")
+    else:
+        # 回退:兼容旧记录(无 report_file_path 字段)
+        report_id = doc.get("report_id")
+        if report_id:
+            for f_path in _REPORTS_BASE.rglob(f"{report_id}.json"):
+                try:
+                    f_path.unlink()
+                    logger.info(f"已删除报告文件: {f_path}")
+                except OSError as e:
+                    logger.warning(f"删除报告文件失败: {f_path} - {e}")
     # 删除 MongoDB 记录
     await coll.delete_one({"task_id": task_id})
     logger.info(f"🗑️ 已删除任务: {task_id}")

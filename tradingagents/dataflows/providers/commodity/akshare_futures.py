@@ -478,7 +478,13 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
             prev = df.iloc[-2] if len(df) > 1 else last
         else:
             # 主力连续:使用新浪主力连续接口(原逻辑)
-            df = await self._call("futures_main_sina", symbol=symbol)
+            # 注意: symbol 可能为裸品种代码(如 CU),futures_main_sina 需要 CU0 格式
+            main_symbol = symbol
+            if not main_symbol.endswith("0"):
+                u = CommodityUtils.get_underlying_symbol(full_symbol)
+                if u:
+                    main_symbol = u + "0"
+            df = await self._call("futures_main_sina", symbol=main_symbol)
             if df is None or df.empty:
                 return None
             last = df.iloc[-1]
@@ -584,7 +590,13 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
             return df
         else:
             # 主力连续:使用新浪主力连续接口
-            df = await self._call("futures_main_sina", symbol=symbol)
+            # 注意: symbol 可能为裸品种代码(如 CU),futures_main_sina 需要 CU0 格式
+            main_symbol = symbol
+            if not main_symbol.endswith("0"):
+                u = CommodityUtils.get_underlying_symbol(full_symbol)
+                if u:
+                    main_symbol = u + "0"
+            df = await self._call("futures_main_sina", symbol=main_symbol)
             if df is None or df.empty:
                 return None
 
@@ -800,14 +812,18 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         exchange: str,
         date: Union[str, date],
         vars_list: Optional[List[str]] = None,
+        symbol: Optional[str] = None,
     ) -> Optional[Dict[str, pd.DataFrame]]:
         """
         获取会员持仓排名。
+
+        在线获取失败时回退到本地缓存数据库 (CommodityLocalCacheAdapter)。
 
         Args:
             exchange: 交易所代码 DCE / GFEX / SHFE / CFFEX / CZCE
             date: 交易日
             vars_list: 品种代码列表(部分接口可选过滤)
+            symbol: 品种代码(可选,用于本地缓存回退的品种过滤)
         """
         if not await self._ensure_ak():
             return None
@@ -815,28 +831,51 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         date_str = date.strftime("%Y%m%d") if hasattr(date, "strftime") else str(date)
 
         ex = exchange.upper()
+        result = None
         if ex == "DCE":
             kwargs = {"date": date_str}
             if vars_list:
                 kwargs["vars_list"] = vars_list
-            return await self._call("futures_dce_position_rank", **kwargs)
-
-        if ex == "GFEX":
+            result = await self._call("futures_dce_position_rank", **kwargs)
+        elif ex == "GFEX":
             kwargs = {"date": date_str}
             if vars_list:
                 kwargs["vars_list"] = vars_list
-            return await self._call("futures_gfex_position_rank", **kwargs)
+            result = await self._call("futures_gfex_position_rank", **kwargs)
+        elif ex == "SHFE":
+            result = await self._call("get_shfe_rank_table", date=date_str)
+        elif ex == "CFFEX":
+            result = await self._call("get_cffex_rank_table", date=date_str)
+        elif ex in ("CZCE", "CZC"):
+            result = await self._call("get_rank_table_czce", date=date_str)
+        else:
+            self.logger.warning(f"⚠️ 不支持的交易所: {exchange}")
+            return None
 
-        if ex == "SHFE":
-            return await self._call("get_shfe_rank_table", date=date_str)
+        if result is not None:
+            # AKShare 返回 Dict[contract, DataFrame] 或 DataFrame
+            if isinstance(result, dict):
+                if any(not v.empty for v in result.values()):
+                    return result
+            elif isinstance(result, pd.DataFrame) and not result.empty:
+                return result
 
-        if ex == "CFFEX":
-            return await self._call("get_cffex_rank_table", date=date_str)
+        # AKShare 返回空 → 回退到本地缓存
+        # symbol 可以是品种代码(如 CU)或 None
+        sym = symbol or (vars_list[0] if vars_list else None)
+        if sym:
+            try:
+                from tradingagents.dataflows.providers.commodity.local_cache_adapter import (
+                    CommodityLocalCacheAdapter,
+                )
+                cache = CommodityLocalCacheAdapter()
+                df = cache.read_positioning(sym)
+                if df is not None and not df.empty:
+                    return df
+            except Exception:
+                pass
 
-        if ex in ("CZCE", "CZC"):
-            return await self._call("get_rank_table_czce", date=date_str)
-
-        self.logger.warning(f"⚠️ 不支持的交易所: {exchange}")
+        self.logger.warning(f"⚠️ get_position_rank({exchange}, {date_str}) 在线+本地缓存均无数据")
         return None
 
     async def get_registered_receipt(
@@ -864,16 +903,71 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
     async def get_spot_price(
         self,
         date: Union[str, date],
+        symbol: Optional[str] = None,
     ) -> Optional[pd.DataFrame]:
         """
-        获取某交易日现货价格 + 基差(AKShare: futures_spot_price)。
-        51 行(含品种 / 现货价格 / 最近合约 / 主力合约 / 基差 / 基差率)。
+        获取某交易日现货价格 + 基差。
+
+        改用 futures_spot_price_daily (避开 100ppi.com) 避免超时。
+        在 date 参数基础上取前后各 3 天窗口以增加命中率。
+        在线失败时回退到本地缓存数据库 (CommodityLocalCacheAdapter)。
+
+        Args:
+            date: 交易日
+            symbol: 品种代码(可选,传了则只返回该品种数据)
+
+        Returns:
+            DataFrame(列: date/symbol/spot_price/dominant_contract/dom_basis/dom_basis_rate/...)
         """
         if not await self._ensure_ak():
             return None
 
         date_str = date.strftime("%Y%m%d") if hasattr(date, "strftime") else str(date)
-        return await self._call("futures_spot_price", date_str)
+        base_date = date.strftime("%Y-%m-%d") if hasattr(date, "strftime") else date[:4] + "-" + date[4:6] + "-" + date[6:8]
+
+        # 1. 用 futures_spot_price_daily 取前后 3 天窗口(避免节假日偏移)
+        from datetime import timedelta
+        dt = pd.to_datetime(base_date)
+        start_win = (dt - timedelta(days=3)).strftime("%Y%m%d")
+        end_win = (dt + timedelta(days=3)).strftime("%Y%m%d")
+
+        vars_param = [symbol.upper()] if symbol else None
+        result = None
+        try:
+            result = await asyncio.wait_for(
+                self._call(
+                    "futures_spot_price_daily",
+                    start_day=start_win, end_day=end_win, vars_list=vars_param,
+                ),
+                timeout=10,
+            )
+        except (asyncio.TimeoutError, Exception):
+            pass
+
+        if result is not None and not (hasattr(result, 'empty') and result.empty):
+            # 只返回最接近 date 的那一天
+            if "date" in result.columns:
+                result["date"] = pd.to_datetime(result["date"], errors="coerce")
+                target = pd.to_datetime(base_date)
+                result = result.iloc[(result["date"] - target).abs().argsort()[:1]]
+            return result
+
+        # 2. 回退到本地缓存
+        try:
+            from tradingagents.dataflows.providers.commodity.local_cache_adapter import (
+                CommodityLocalCacheAdapter,
+            )
+            cache = CommodityLocalCacheAdapter()
+            sym = symbol or ""
+            df = cache.read_basis(sym)
+            if df is not None and not df.empty:
+                target = pd.to_datetime(base_date)
+                df = df.iloc[(df["date"] - target).abs().argsort()[:1]]
+                return df
+        except Exception:
+            pass
+
+        return None
 
     async def get_basis_spot_previous(
         self,
@@ -898,16 +992,50 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
     ) -> Optional[pd.DataFrame]:
         """
         获取某段时间的基差值(AKShare: futures_spot_price_daily)。
+
+        AKShare 内部可能依赖 100ppi.com 导致超时,故 AKShare 调用设
+        10 秒内部超时,超时后立即回退到本地缓存数据库 (CommodityLocalCacheAdapter)。
         """
         if not await self._ensure_ak():
             return None
 
         start = start_day.strftime("%Y%m%d") if hasattr(start_day, "strftime") else str(start_day)
         end = end_day.strftime("%Y%m%d") if hasattr(end_day, "strftime") else str(end_day)
-        return await self._call(
-            "futures_spot_price_daily",
-            start_day=start, end_day=end, vars_list=vars_list,
-        )
+        # AKShare 在线调用(最多等 10 秒)
+        result = None
+        try:
+            result = await asyncio.wait_for(
+                self._call(
+                    "futures_spot_price_daily",
+                    start_day=start, end_day=end, vars_list=vars_list,
+                ),
+                timeout=10,
+            )
+        except (asyncio.TimeoutError, Exception):
+            pass
+
+        if result is not None and not (hasattr(result, 'empty') and result.empty):
+            return result
+
+        # AKShare 超时/空 → 回退本地缓存
+        if vars_list:
+            sym = vars_list[0] if isinstance(vars_list, list) else vars_list
+            try:
+                from tradingagents.dataflows.providers.commodity.local_cache_adapter import (
+                    CommodityLocalCacheAdapter,
+                )
+                cache = CommodityLocalCacheAdapter()
+                df = cache.read_basis(sym)
+                if df is not None and not df.empty:
+                    # 按日期过滤
+                    start_dt = pd.to_datetime(start_day)
+                    end_dt = pd.to_datetime(end_day)
+                    df = df[(df["date"] >= start_dt) & (df["date"] <= end_dt)]
+                    return df
+            except Exception:
+                pass
+
+        return None
 
     async def get_roll_yield(
         self,
@@ -926,37 +1054,72 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         - "date": 某品种在不同日期的主力/次主力价差 -- 需要 var + start_day + end_day
         - "symbol": 某品种在某天的所有交割月合约价格 -- 需要 var + date
         - "var": 某交易日所有品种的主力/次主力展期收益率 -- 需要 date
+
+        AKShare 在线调用设 10 秒内部超时,超时后回退到本地缓存数据库。
         """
         if not await self._ensure_ak():
             return None
 
-        if type_method == "date":
-            start = start_day.strftime("%Y%m%d") if hasattr(start_day, "strftime") else str(start_day)
-            end = end_day.strftime("%Y%m%d") if hasattr(end_day, "strftime") else str(end_day)
-            return await self._call_roll_yield(
-                "get_roll_yield_bar",
-                type_method="date", var=var, start_day=start, end_day=end,
-            )
-        if type_method == "symbol":
-            date_str = date.strftime("%Y%m%d") if hasattr(date, "strftime") else str(date)
-            return await self._call_roll_yield(
-                "get_roll_yield_bar", type_method="symbol", var=var, date=date_str,
-            )
-        if type_method == "var":
-            date_str = date.strftime("%Y%m%d") if hasattr(date, "strftime") else str(date)
-            return await self._call_roll_yield(
-                "get_roll_yield_bar", type_method="var", date=date_str,
-            )
+        result = None
+        try:
+            if type_method == "date":
+                start = start_day.strftime("%Y%m%d") if hasattr(start_day, "strftime") else str(start_day)
+                end = end_day.strftime("%Y%m%d") if hasattr(end_day, "strftime") else str(end_day)
+                result = await asyncio.wait_for(
+                    self._call_roll_yield(
+                        "get_roll_yield_bar",
+                        type_method="date", var=var, start_day=start, end_day=end,
+                    ),
+                    timeout=10,
+                )
+            elif type_method == "symbol":
+                date_str = date.strftime("%Y%m%d") if hasattr(date, "strftime") else str(date)
+                result = await asyncio.wait_for(
+                    self._call_roll_yield(
+                        "get_roll_yield_bar", type_method="symbol", var=var, date=date_str,
+                    ),
+                    timeout=10,
+                )
+            elif type_method == "var":
+                date_str = date.strftime("%Y%m%d") if hasattr(date, "strftime") else str(date)
+                result = await asyncio.wait_for(
+                    self._call_roll_yield(
+                        "get_roll_yield_bar", type_method="var", date=date_str,
+                    ),
+                    timeout=10,
+                )
+            elif symbol1 and symbol2:
+                date_str = date.strftime("%Y%m%d") if hasattr(date, "strftime") else str(date)
+                result = await asyncio.wait_for(
+                    self._call_roll_yield(
+                        "get_roll_yield", date=date_str, var=var,
+                        symbol1=symbol1, symbol2=symbol2,
+                    ),
+                    timeout=10,
+                )
+            else:
+                self.logger.warning(f"⚠️ 不支持的 type_method 或参数缺失: {type_method}")
+                return None
+        except (asyncio.TimeoutError, Exception):
+            pass
 
-        # 单合约两期对比
-        if symbol1 and symbol2:
-            date_str = date.strftime("%Y%m%d") if hasattr(date, "strftime") else str(date)
-            return await self._call_roll_yield(
-                "get_roll_yield", date=date_str, var=var,
-                symbol1=symbol1, symbol2=symbol2,
-            )
+        # AKShare 在线有结果则返回
+        if result is not None and not (hasattr(result, 'empty') and result.empty):
+            return result
 
-        self.logger.warning(f"⚠️ 不支持的 type_method 或参数缺失: {type_method}")
+        # 回退到本地缓存 (type_method="date" 且有 var 时)
+        if type_method == "date" and var:
+            try:
+                from tradingagents.dataflows.providers.commodity.local_cache_adapter import (
+                    CommodityLocalCacheAdapter,
+                )
+                cache = CommodityLocalCacheAdapter()
+                df = cache.read_term_structure(var)
+                if df is not None and not df.empty:
+                    return df
+            except Exception:
+                pass
+
         return None
 
     async def get_contract_info(
@@ -1873,8 +2036,8 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
             "L": "聚乙烯", "V": "PVC", "PP": "聚丙烯", "EG": "乙二醇",
             "EB": "苯乙烯", "PG": "液化石油气", "JD": "鸡蛋", "RR": "粳米",
             "LH": "生猪", "FB": "纤维板", "BB": "胶合板", "LG": "原木",
-            "CU": "铜", "AL": "铝", "ZN": "锌", "PB": "铅", "NI": "镍",
-            "SN": "锡", "AU": "黄金", "AG": "白银", "RB": "螺纹钢",
+            "CU": "沪铜", "AL": "沪铝", "ZN": "沪锌", "PB": "沪铅", "NI": "镍",
+            "SN": "锡", "AU": "沪金", "AG": "沪银", "RB": "螺纹钢",
             "WR": "线材", "HC": "热轧卷板", "SS": "不锈钢", "BU": "石油沥青",
             "RU": "天然橡胶", "BR": "合成橡胶", "SP": "纸浆", "FU": "燃料油",
             "AO": "氧化铝",

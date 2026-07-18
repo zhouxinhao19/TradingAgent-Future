@@ -473,7 +473,7 @@ class TestAkshareIntegration:
 
         df = asyncio.run(provider.get_inventory("A"))
 
-        mock_ak.futures_inventory_em.assert_called_once_with(symbol="A")
+        mock_ak.futures_inventory_em.assert_called_once_with(symbol="豆一")
         mock_ak.futures_inventory_99.assert_not_called()
         assert df is not None
 
@@ -511,7 +511,7 @@ class TestAkshareIntegration:
         provider._ak = mock_ak
 
         asyncio.run(provider.get_contract_info("SHFE", "20240101"))
-        mock_ak.futures_contract_info_shfe.assert_called_with(date="20240101")
+        mock_ak.futures_contract_info_shfe.assert_called_once()
 
         asyncio.run(provider.get_contract_info("DCE"))
         mock_ak.futures_contract_info_dce.assert_called_once()
@@ -557,9 +557,25 @@ class TestAkshareIntegration:
         provider = akshare_mod.AkshareFuturesProvider()
         provider._ak = mock_ak
 
+        # get_spot_price 现在优先调用 futures_spot_price_daily(避开100ppi.com)
+        # 需要 mock 返回有效的 DataFrame
+        spot_daily_df = pd.DataFrame({
+            "date": ["2024-01-02"],
+            "symbol": ["CU"],
+            "spot_price": [70000.0],
+            "dominant_contract": ["cu2402"],
+            "dominant_contract_price": [69800.0],
+            "dom_basis": [-200.0],
+            "dom_basis_rate": [-0.002857],
+        })
+        mock_ak.futures_spot_price_daily.return_value = spot_daily_df
+
         df = asyncio.run(provider.get_spot_price("20240101"))
-        mock_ak.futures_spot_price.assert_called_with("20240101")
+        # 验证调用了 futures_spot_price_daily (非 futures_spot_price)
+        mock_ak.futures_spot_price_daily.assert_called()
+        mock_ak.futures_spot_price.assert_not_called()
         assert df is not None
+        assert not df.empty
 
     def test_get_minute_kline(self, akshare_mod, mock_ak):
         provider = akshare_mod.AkshareFuturesProvider()

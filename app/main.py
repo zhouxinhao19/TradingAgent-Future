@@ -222,11 +222,12 @@ async def lifespan(app: FastAPI):
     # 显示配置摘要
     await _print_config_summary(logger)
 
-    # Phase 5+: 商品分析任务回填 + 卡死任务清理
+    # Phase 5+: 商品分析任务回填 + 卡死任务清理 + worker 启动
     try:
         from app.routers.commodity.analysis import (
             _backfill_completed_tasks,
             _tasks_collection,
+            ensure_worker,
         )
         if settings.FEATURE_COMMODITY_ANALYSIS:
             count = await _backfill_completed_tasks()
@@ -249,6 +250,10 @@ async def lifespan(app: FastAPI):
                     logger.info(
                         f"✅ 商品任务清理: {result.modified_count} 条 processing 任务被标记为失败"
                     )
+
+            # P0: 启动后台 worker（拾取 queued 任务）
+            ensure_worker()
+            app.state.commodity_worker_started = True
     except Exception as e:
         logger.warning(f"⚠️ 商品任务初始化失败 (非阻塞): {e}")
 
@@ -257,6 +262,14 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        # P0: 停止商品分析 worker
+        if getattr(app.state, 'commodity_worker_started', False):
+            try:
+                from app.routers.commodity.analysis import stop_worker
+                await stop_worker()
+            except Exception as e:
+                logger.warning(f"Worker stop error: {e}")
+
         # 关闭 UserService MongoDB 连接
         try:
             from app.services.user_service import user_service
