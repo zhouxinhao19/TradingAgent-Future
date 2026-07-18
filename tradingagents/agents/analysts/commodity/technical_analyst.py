@@ -156,6 +156,9 @@ TECHNICAL_SYSTEM_PROMPT = """你是一位资深的期货技术分析师,与基�
 - {contract_type_label}:{main_available}
 - 指数合约:{index_available}
 
+## 新闻摘要(跨分析师参考)
+{news_summary}
+
 ---
 
 ## 分析要求
@@ -396,6 +399,7 @@ def create_technical_analyst(llm):
             quality_rows=quality.get("rows", 0),
             main_available=str(quality.get("main_continuous_available", "N/A")),
             index_available=str(quality.get("index_contract_available", "N/A")),
+            news_summary=state.get("news_summary", ""),
         )
 
         try:
