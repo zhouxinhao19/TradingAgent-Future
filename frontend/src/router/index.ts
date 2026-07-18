@@ -139,6 +139,25 @@ const routes: RouteRecordRaw[] = [
     ]
   },
 
+  {
+    path: '/favorites',
+    name: 'Favorites',
+    component: () => import('@/layouts/BasicLayout.vue'),
+    meta: {
+      title: '自选品种',
+      icon: 'Star',
+      requiresAuth: true,
+      transition: 'fade'
+    },
+    children: [
+      {
+        path: '',
+        name: 'FavoritesHome',
+        component: () => import('@/views/Favorites/index.vue'),
+        meta: { title: '自选品种', requiresAuth: true }
+      }
+    ]
+  },
 
   {
     path: '/tasks',

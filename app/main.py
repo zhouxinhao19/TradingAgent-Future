@@ -383,6 +383,11 @@ app.include_router(system_config_router.router, prefix="/api/system", tags=["sys
 # 通知模块（REST + SSE）
 app.include_router(notifications_router.router, prefix="/api", tags=["notifications"])
 
+# ===== 自选品种模块（统一支持股票+商品期货） =====
+from app.routers import favorites as favorites_router
+app.include_router(favorites_router.router, prefix="/api")
+logger.info("✅ 自选品种路由已注册(/api/favorites/*)")
+
 # 🔥 WebSocket 通知模块（替代 SSE + Redis PubSub）
 app.include_router(websocket_notifications_router.router, prefix="/api", tags=["websocket"])
 

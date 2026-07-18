@@ -30,6 +30,10 @@
       <el-icon><Box /></el-icon>
       <template #title>商品分析</template>
     </el-menu-item>
+    <el-menu-item v-if="featureStore.commodityEnabled" index="/favorites">
+      <el-icon><Star /></el-icon>
+      <template #title>自选品种</template>
+    </el-menu-item>
     <el-menu-item v-if="featureStore.commodityPaper" index="/commodity/paper">
       <el-icon><Box /></el-icon>
       <template #title>期货模拟交易</template>
@@ -89,7 +93,8 @@ import {
   Document,
   Setting,
   InfoFilled,
-  Box
+  Box,
+  Star
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
