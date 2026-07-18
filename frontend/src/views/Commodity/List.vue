@@ -80,13 +80,20 @@
         <el-table-column prop="tick_size" label="最小变动" width="100" align="right">
           <template #default="{ row }">{{ row.tick_size || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" width="240" fixed="right">
           <template #default="{ row }">
             <el-button text type="primary" @click.stop="goDetail(row)">
               <el-icon><View /></el-icon> 详情
             </el-button>
             <el-button text type="success" @click.stop="quickQuote(row)">
               <el-icon><DataLine /></el-icon> 行情
+            </el-button>
+            <el-button
+              text
+              :type="favoritesStore.isFavorited('commodity', buildContinuousSymbol(row)) ? 'info' : 'warning'"
+              @click.stop="addToFavorites(row)"
+            >
+              {{ favoritesStore.isFavorited('commodity', buildContinuousSymbol(row)) ? '已自选' : '自选' }}
             </el-button>
           </template>
         </el-table-column>
@@ -103,11 +110,14 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Refresh, Search, View, DataLine } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { useCommodityStore } from '@/stores/commodity'
-import type { VarietyItem } from '@/api/commodity'
+import { useFavoritesStore } from '@/stores/favorites'
+import { commodityApi, type VarietyItem } from '@/api/commodity'
 
 const router = useRouter()
 const store = useCommodityStore()
+const favoritesStore = useFavoritesStore()
 
 const filters = ref({
   exchange: '' as string,
@@ -170,6 +180,37 @@ async function quickQuote(row: VarietyItem) {
     params: { fullSymbol: buildContinuousSymbol(row) },
     query: { variety: row.symbol, tab: 'quotes' },
   })
+}
+
+async function addToFavorites(row: VarietyItem) {
+  const fullSymbol = buildContinuousSymbol(row)
+  if (favoritesStore.isFavorited('commodity', fullSymbol)) return
+
+  // 尝试获取行情作为快照价
+  let snapshotPrice: number | undefined
+  try {
+    const quote = await commodityApi.getQuotes(fullSymbol) as any
+    if (quote?.data?.current_price != null) {
+      snapshotPrice = quote.data.current_price
+    }
+  } catch {
+    // 行情获取失败不影响添加自选
+  }
+
+  const ok = await favoritesStore.addFavorite({
+    asset_type: 'commodity',
+    full_symbol: fullSymbol,
+    commodity_name: row.name,
+    exchange: row.exchange,
+    category: row.category,
+    display_name: `${row.symbol} ${row.name}`,
+    snapshot_price: snapshotPrice,
+  })
+  if (ok) {
+    ElMessage.success(`已添加 ${row.symbol} 到自选${snapshotPrice != null ? ` (参考价 ¥${snapshotPrice})` : ''}`)
+  } else {
+    ElMessage.warning('添加失败，可能已在自选列表中')
+  }
 }
 
 function exchangeTagType(code: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' {

@@ -159,53 +159,59 @@
         </el-card>
       </el-col>
 
-      <!-- 右侧：自选股和快讯 -->
+      <!-- 右侧：自选品种和快讯 -->
       <el-col :span="8">
-        <!-- 我的自选股 -->
+        <!-- 我的自选品种 -->
         <el-card class="favorites-card">
           <template #header>
             <div class="card-header">
-              <span>我的自选股</span>
+              <span>我的自选品种</span>
               <el-button type="text" size="small" @click="goToFavorites">
                 查看全部 <el-icon><ArrowRight /></el-icon>
               </el-button>
             </div>
           </template>
 
-          <div v-if="favoriteStocks.length === 0" class="empty-favorites">
-            <el-empty description="暂无自选股" :image-size="60">
+          <div v-if="favoriteItems.length === 0" class="empty-favorites">
+            <el-empty description="暂无自选品种" :image-size="60">
               <el-button type="primary" size="small" @click="goToFavorites">
-                添加自选股
+                添加自选品种
               </el-button>
             </el-empty>
           </div>
 
           <div v-else class="favorites-list">
             <div
-              v-for="stock in favoriteStocks.slice(0, 5)"
-              :key="stock.stock_code"
+              v-for="item in favoriteItems.slice(0, 5)"
+              :key="item.id"
               class="favorite-item"
-              @click="viewStockDetail(stock)"
+              @click="viewFavoriteDetail(item)"
             >
               <div class="stock-info">
-                <div class="stock-code">{{ stock.stock_code }}</div>
-                <div class="stock-name">{{ stock.stock_name }}</div>
+                <div class="stock-code">
+                  <el-tag :type="item.asset_type === 'commodity' ? 'warning' : ''" size="small" effect="plain" style="margin-right:4px">
+                    {{ item.asset_type === 'commodity' ? '📦' : '📈' }}
+                  </el-tag>
+                  {{ item.asset_type === 'commodity' ? item.full_symbol : item.stock_code }}
+                </div>
+                <div class="stock-name">{{ item.display_name || item.stock_name || item.commodity_name }}</div>
               </div>
               <div class="stock-price">
-                <div class="current-price">¥{{ stock.current_price }}</div>
+                <div class="current-price">{{ item.current_price != null ? '¥' + item.current_price : (item.snapshot_price != null ? '¥' + item.snapshot_price : '--') }}</div>
                 <div
+                  v-if="item.change_percent != null"
                   class="change-percent"
-                  :class="getPriceChangeClass(stock.change_percent)"
+                  :class="getPriceChangeClass(item.change_percent)"
                 >
-                  {{ stock.change_percent > 0 ? '+' : '' }}{{ Number(stock.change_percent).toFixed(2) }}%
+                  {{ item.change_percent > 0 ? '+' : '' }}{{ Number(item.change_percent).toFixed(2) }}%
                 </div>
               </div>
             </div>
           </div>
 
-          <div v-if="favoriteStocks.length > 5" class="favorites-footer">
+          <div v-if="favoriteItems.length > 5" class="favorites-footer">
             <el-button type="text" size="small" @click="goToFavorites">
-              查看全部 {{ favoriteStocks.length }} 只自选股
+              查看全部 {{ favoriteItems.length }} 个自选品种
             </el-button>
           </div>
         </el-card>
@@ -259,7 +265,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   TrendCharts,
@@ -272,7 +278,7 @@ import {
 import { ElMessage } from 'element-plus'
 import type { AnalysisStatus } from '@/types/analysis'
 import DataSourceLlmStatusCard from '@/components/Dashboard/DataSourceLlmStatusCard.vue'
-import { favoritesApi } from '@/api/favorites'
+import { useFavoritesStore } from '@/stores/favorites'
 import { commodityApi, commodityPaperApi, type CommodityTaskItem, type RecentReportItem } from '@/api/commodity'
 
 const router = useRouter()
@@ -283,8 +289,10 @@ const recentAnalyses = ref<CommodityTaskItem[]>([])
 /** 商品分析最近记录(用于"最近分析"卡片) */
 const recentCommodityRecords = ref<RecentReportItem[]>([])
 
-// 自选股数据
-const favoriteStocks = ref<any[]>([])
+const favoritesStore = useFavoritesStore()
+
+// 自选品种列表（来自 store，支持股票+商品）
+const favoriteItems = computed(() => favoritesStore.items)
 
 // 市场快讯数据
 const marketNews = ref<any[]>([])
@@ -385,36 +393,23 @@ const newsRelativeTime = (timeStr: string) => {
   return formatRelativeTime(timeStr)
 }
 
-// 自选股相关方法
+// 自选品种相关方法
 const goToFavorites = () => {
   router.push('/favorites')
 }
 
-const viewStockDetail = (stock: any) => {
-  // 可以跳转到股票详情页或分析页
-  router.push(`/analysis/single?stock_code=${stock.stock_code}`)
+const viewFavoriteDetail = (item: any) => {
+  if (item.asset_type === 'commodity') {
+    router.push(`/commodity/analysis?symbol=${item.full_symbol}`)
+  } else {
+    router.push(`/analysis/single?stock_code=${item.stock_code}`)
+  }
 }
 
 const getPriceChangeClass = (changePercent: number) => {
   if (changePercent > 0) return 'price-up'
   if (changePercent < 0) return 'price-down'
   return 'price-neutral'
-}
-
-const loadFavoriteStocks = async () => {
-  try {
-    const response = await favoritesApi.list()
-    if (response.success && response.data) {
-      favoriteStocks.value = response.data.map((item: any) => ({
-        stock_code: item.stock_code,
-        stock_name: item.stock_name,
-        current_price: item.current_price || 0,
-        change_percent: item.change_percent || 0
-      }))
-    }
-  } catch (error) {
-    console.error('加载自选股失败:', error)
-  }
 }
 
 const loadRecentAnalyses = async () => {
@@ -491,8 +486,8 @@ const formatMoney = (value: number) => {
 
 // 生命周期
 onMounted(async () => {
-  // 加载自选股数据
-  await loadFavoriteStocks()
+  // 加载自选品种数据
+  await favoritesStore.loadFavorites()
   // 加载最近分析(商品任务中心)
   await loadRecentAnalyses()
   // 加载最近商品分析记录
