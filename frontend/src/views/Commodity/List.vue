@@ -62,7 +62,7 @@
         style="cursor: pointer"
       >
         <el-table-column prop="symbol" label="品种代码" width="100" sortable />
-        <el-table-column prop="name_cn" label="中文名" min-width="140" sortable />
+        <el-table-column prop="name" label="中文名" min-width="140" sortable />
         <el-table-column prop="exchange" label="交易所" width="100">
           <template #default="{ row }">
             <el-tag size="small" :type="exchangeTagType(row.exchange)">{{ row.exchange }}</el-tag>
@@ -120,7 +120,7 @@ const filteredVarieties = computed<VarietyItem[]>(() => {
   return store.varieties.filter((v) => {
     if (filters.value.exchange && v.exchange !== filters.value.exchange) return false
     if (filters.value.category && v.category !== filters.value.category) return false
-    if (kw && !v.symbol.toUpperCase().includes(kw) && !(v.name_cn || '').includes(kw)) return false
+    if (kw && !v.symbol.toUpperCase().includes(kw) && !(v.name || '').includes(kw)) return false
     return true
   })
 })

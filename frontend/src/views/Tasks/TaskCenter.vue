@@ -8,16 +8,6 @@
       <p class="page-description">查看所有大宗商品品种的分析任务（含提交 → 执行 → 完成/失败）</p>
     </div>
 
-    <!-- 标签页 -->
-    <el-card class="tabs-card" shadow="never">
-      <el-tabs v-model="activeTab" @tab-change="onTabChange">
-        <el-tab-pane label="进行中" name="processing" />
-        <el-tab-pane label="已完成" name="completed" />
-        <el-tab-pane label="失败" name="failed" />
-        <el-tab-pane label="全部" name="" />
-      </el-tabs>
-    </el-card>
-
     <!-- 筛选表单 -->
     <el-card class="filter-card" shadow="never">
       <el-form :inline="true" @submit.prevent>
@@ -45,22 +35,22 @@
     <!-- 统计卡片 -->
     <el-row :gutter="16" style="margin-top: 12px">
       <el-col :span="6">
-        <el-card shadow="never" class="stat-card-clickable" @click="switchTab('')">
+        <el-card shadow="never" class="stat-card-clickable" @click="setFilter('')">
           <div class="stat"><div class="value">{{ stats.total }}</div><div class="label">总任务</div></div>
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="never" class="stat-card-clickable" @click="switchTab('processing')">
+        <el-card shadow="never" class="stat-card-clickable" @click="setFilter('processing')">
           <div class="stat"><div class="value processing-color">{{ stats.processing }}</div><div class="label">进行中</div></div>
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="never" class="stat-card-clickable" @click="switchTab('completed')">
+        <el-card shadow="never" class="stat-card-clickable" @click="setFilter('completed')">
           <div class="stat"><div class="value completed-color">{{ stats.completed }}</div><div class="label">已完成</div></div>
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="never" class="stat-card-clickable" @click="switchTab('failed')">
+        <el-card shadow="never" class="stat-card-clickable" @click="setFilter('failed')">
           <div class="stat"><div class="value failed-color">{{ stats.failed }}</div><div class="label">失败</div></div>
         </el-card>
       </el-col>
@@ -83,9 +73,9 @@
       </div>
 
       <el-table :data="list" v-loading="loading" style="width: 100%">
-        <el-table-column label="合约代码" width="180">
+        <el-table-column label="品种代码" width="180">
           <template #default="{ row }">
-            {{ row.full_symbol }}
+            <span style="font-weight: 600">{{ extractVariety(row.full_symbol) }}</span>
             <el-tag v-if="row.variety_name" size="small" type="info" effect="plain" style="margin-left: 6px">
               {{ row.variety_name }}
             </el-tag>
@@ -132,6 +122,21 @@
         <el-table-column label="完成时间" min-width="170">
           <template #default="{ row }">
             <span v-if="row.completed_at">{{ formatTime(row.completed_at) }}</span>
+            <span v-else class="muted">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="批次" width="180">
+          <template #default="{ row }">
+            <el-tag
+              v-if="row.batch_id"
+              size="small"
+              type="info"
+              effect="plain"
+              style="cursor: pointer"
+              @click="filterByBatch(row.batch_id)"
+            >
+              {{ shortBatchId(row.batch_id) }}
+            </el-tag>
             <span v-else class="muted">—</span>
           </template>
         </el-table-column>
@@ -249,13 +254,26 @@ const pageSize = ref(20)
 const total = ref(0)
 const list = ref<CommodityTaskItem[]>([])
 
-// 标签页
-const activeTab = ref<string>('processing')
+// 当前筛选状态（统计卡片点击切换）
+const statusFilter = ref<string>('')
+const batchFilter = ref<string>('')
 
-function switchTab(tab: string) {
-  activeTab.value = tab
+function setFilter(status: string) {
+  statusFilter.value = status
+  batchFilter.value = ''
   currentPage.value = 1
   loadList()
+}
+
+function filterByBatch(batchId: string) {
+  batchFilter.value = batchId
+  statusFilter.value = ''
+  currentPage.value = 1
+  loadList()
+}
+
+function shortBatchId(batchId: string): string {
+  return batchId.length > 14 ? batchId.slice(0, 14) + '…' : batchId
 }
 
 // 筛选
@@ -326,8 +344,14 @@ async function deleteTask(row: CommodityTaskItem) {
       { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' },
     )
     await commodityApi.deleteTask(row.task_id)
+    // 就地移除，避免全量刷新
+    list.value = list.value.filter(t => t.task_id !== row.task_id)
+    if (total.value > 0) total.value -= 1
+    // 同步更新统计
+    const statusKey = row.status as keyof typeof stats.value
+    if (stats.value[statusKey] !== undefined) stats.value[statusKey] -= 1
+    if (stats.value.total > 0) stats.value.total -= 1
     ElMessage.success('已删除')
-    await loadList()
   } catch { /* ignore */ }
 }
 
@@ -380,20 +404,24 @@ function sectionTitle(key: string): string {
 
 const formatTime = (t: string) => (t ? formatDateTime(t) : '-')
 
+// 从 full_symbol (如 CU0.SHF) 中提取品种代码 (CU)
+function extractVariety(fullSymbol: string): string {
+  if (!fullSymbol) return ''
+  return fullSymbol.split('.')[0]?.replace(/0$/, '') || fullSymbol
+}
+
 // ---- 数据加载（服务端分页） ----
 async function loadStats() {
   try {
-    const [allRes, procRes, doneRes, failRes] = await Promise.all([
-      commodityApi.getTaskList({ limit: 1 }),
-      commodityApi.getTaskList({ status: 'processing', limit: 1 }),
-      commodityApi.getTaskList({ status: 'completed', limit: 1 }),
-      commodityApi.getTaskList({ status: 'failed', limit: 1 }),
-    ])
-    stats.value = {
-      total: ((allRes as any)?.data?.total) ?? 0,
-      processing: ((procRes as any)?.data?.total) ?? 0,
-      completed: ((doneRes as any)?.data?.total) ?? 0,
-      failed: ((failRes as any)?.data?.total) ?? 0,
+    const res = await commodityApi.getTaskStats()
+    const d = (res as any)?.data
+    if (d) {
+      stats.value = {
+        total: d.total || 0,
+        processing: d.processing || 0,
+        completed: d.completed || 0,
+        failed: d.failed || 0,
+      }
     }
   } catch { /* stale stats ok */ }
 }
@@ -401,12 +429,14 @@ async function loadStats() {
 async function loadList() {
   loading.value = true
   try {
-    const statusParam = activeTab.value || undefined
+    const statusParam = statusFilter.value || undefined
+    const batchParam = batchFilter.value || undefined
     const params: Record<string, any> = {
       limit: pageSize.value,
       offset: (currentPage.value - 1) * pageSize.value,
     }
     if (statusParam) params.status = statusParam
+    if (batchParam) params.batch_id = batchParam
 
     const res = await commodityApi.getTaskList(params)
     const body = (res as any)?.data
@@ -430,12 +460,36 @@ async function loadList() {
   }
 }
 
+/** 轻量轮询:只更新统计卡片 + 就地更新 processing 任务进度,不刷新整个表格 */
 function ensurePolling() {
   if (hasProcessing.value && !pollingTimer) {
-    pollingTimer = setInterval(() => loadList(), POLLING_INTERVAL_MS)
+    pollingTimer = setInterval(() => pollProgressOnly(), POLLING_INTERVAL_MS)
   } else if (!hasProcessing.value && pollingTimer) {
     clearInterval(pollingTimer)
     pollingTimer = null
+  }
+}
+
+async function pollProgressOnly() {
+  // 只更新统计卡片(轻量,只请求 count)
+  await loadStats()
+
+  // 就地更新每个 processing 任务的进度,不重新加载整个列表
+  const processingTasks = list.value.filter(t => t.status === 'processing')
+  for (const task of processingTasks) {
+    try {
+      const res = await commodityApi.getTaskStatus(task.task_id)
+      if (!res?.data) continue
+      const idx = list.value.findIndex(t => t.task_id === task.task_id)
+      if (idx < 0) continue
+      if (res.data.status === 'completed' || res.data.status === 'failed') {
+        // 任务状态变更 → 完整刷新一次获取最新数据
+        await loadList()
+        return
+      }
+      // 进度就地更新,不触发表格重渲染
+      list.value[idx] = { ...list.value[idx], progress: res.data.progress, progress_message: res.data.progress_message }
+    } catch { /* 单任务查询失败不影响其他 */ }
   }
 }
 
@@ -461,12 +515,6 @@ function goToCommodityAnalysis() {
   router.push('/commodity/analysis')
 }
 
-// ---- 标签页切换 ----
-function onTabChange() {
-  currentPage.value = 1
-  loadList()
-}
-
 // ---- 筛选 ----
 function applyFilters() {
   currentPage.value = 1
@@ -474,6 +522,8 @@ function applyFilters() {
 }
 function resetFilters() {
   filters.value = { exchange: '', dateRange: [] }
+  batchFilter.value = ''
+  statusFilter.value = ''
   currentPage.value = 1
   loadList()
 }
@@ -503,7 +553,6 @@ onUnmounted(() => {
   .page-header { margin-bottom: 24px; }
   .page-title { display:flex; align-items:center; gap:8px; font-size:24px; font-weight:600; margin:0 0 8px 0; }
   .page-description { color: var(--el-text-color-regular); margin:0; }
-  .tabs-card { margin-bottom: 16px; }
   .filter-card { margin-bottom: 16px; }
   .list-header { display:flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap:8px; }
   .pagination-wrapper { display:flex; justify-content:center; margin-top: 16px; }
