@@ -193,8 +193,19 @@ export interface NewsItem {
   content?: string
   category: string
   metal?: string
+  // 旧关键词情感(逐步废弃)
   sentiment: 'positive' | 'negative' | 'neutral'
   sentiment_score: number
+  // LLM 标注情感(新)
+  llm_sentiment?: 'positive' | 'negative' | 'neutral'
+  llm_sentiment_confidence?: number
+  llm_sentiment_reasoning?: string
+  llm_importance?: 'high' | 'medium' | 'low'
+  llm_summary?: string
+  relevant_varieties?: string[]
+  annotated_at?: string
+  annotator_model?: string
+  // 不变
   source: string
   url?: string
 }
@@ -351,8 +362,10 @@ export const commodityApi = {
     return ApiClient.get<ApiEnvelope<ListResponse<NewsCategory>>>(`/api/commodity/news/categories`)
   },
 
-  async getNews(category: string = 'all', limit: number = 50) {
-    return ApiClient.get<ApiEnvelope<NewsResponse>>(`/api/commodity/news`, { category, limit })
+  async getNews(category: string = 'all', limit: number = 50, variety?: string) {
+    const params: Record<string, any> = { category, limit }
+    if (variety) params.variety = variety
+    return ApiClient.get<ApiEnvelope<NewsResponse>>(`/api/commodity/news`, params)
   },
 
   // ---- Phase 3b-ii-D:分析端点 ----

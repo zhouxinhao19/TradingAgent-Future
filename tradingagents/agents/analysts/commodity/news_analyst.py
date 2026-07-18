@@ -1,18 +1,18 @@
 """
-news_analyst.py — 商品期货新闻分析师节点 (Phase 3b-ii)
+news_analyst.py — 商品期货新闻分析师节点 (Phase 3b-ii / 新闻改造)
 
 输入:
   - state['commodity_features']['news_sentiment']
-  - state.get('latest_news', [])  # 来自 Propagator 调用 provider.get_futures_news()
+  - state.get('latest_news', [])  # 从 Propagator 获取,含 LLM 预标注
 
-输出:state['news_report'] = Markdown 新闻叙事分析报告
+输出:
+  state['news_report'] = Markdown 新闻叙事分析报告
 
-新闻分析师必调 LLM(features 层只算情感统计,叙事需要 LLM 总结):
-  - 宏观叙事(全球宏观聚合)
-  - 产业叙事(按商品 category 分类:金属/化工/能源/农产品/金融)
-  - 关键事件卡片
-
-LLM 失败降级:仅返回 features.news_sentiment 的统计部分(情感比 + 计数)。
+关键变化(新闻改造):
+  - 关键词统计不再注入 prompt,改为注入 LLM 预标注的情感标签
+  - _format_events 条数从 10 → 50
+  - 框架从四层改为五层:情绪总览→宏观→产业→关键矛盾→综合判断
+  - LLM 失败时降级仍使用关键词统计与新闻原文
 """
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ from ._base import (
 
 logger = get_logger("default")
 
-NEWS_SYSTEM_PROMPT = """你是一位资深的期货新闻分析师,采用"宏观-产业-资金-情绪"四层分析框架。
+NEWS_SYSTEM_PROMPT = """你是一位资深的期货新闻分析师,采用"情绪总览→宏观→产业→关键矛盾→综合判断"五层框架。
 
 ## 分析对象
 - 标的代码:{full_symbol}
@@ -47,21 +47,21 @@ NEWS_SYSTEM_PROMPT = """你是一位资深的期货新闻分析师,采用"宏观
 - 行业分类:{category}
 - 分析日期:{trade_date}
 
-## 特征层(已计算)
+## 预标注情感(LLM 标注,仅供参考)
+每条新闻已附带 LLM 预标注的情感标签和品种归属,仅供参考。
+如果有矛盾信号或你觉得标注不准确的地方,请在你的分析中指出。
 
-### 情感统计
-- 正面数量:{positive_count}
-- 负面数量:{negative_count}
-- 中性数量:{neutral_count}
-- 情感比:{sentiment_ratio}
-- 触发信号:{signals}
-
-### 最近重要事件(原文)
+### 提供的事件列表(含预标注)
 {recent_events}
 
 ---
 
-## 四层分析框架
+## 五层分析框架
+
+### 第〇步:情绪总览
+列出利多信号(最多5条)、利空信号(最多5条)、中性信息(最多3条)。
+每条例证直接引用 LLM 预标注的 reasoning。
+如果预标注与你的判断矛盾,注明差异。
 
 ### 第一层:宏观叙事
 聚焦影响当前品种的全球宏观因子:
@@ -79,10 +79,10 @@ NEWS_SYSTEM_PROMPT = """你是一位资深的期货新闻分析师,采用"宏观
 - **农产品(Agricultural)**: 天气/种植面积/USDA报告/生猪存栏/压榨利润
 - **金融(Financial)**: 股指估值/债市收益率/信用利差/资金流向
 
-### 第三层:资金情绪
-- 新闻情感比反映当前市场情绪倾向
-- 正面事件与负面事件的数量对比
-- 关键事件的潜在影响大小
+### 第三层:关键矛盾
+- 多空证据冲突(如"库存去化利多 vs 下游需求疲软利空")
+- 不同来源的信号分歧
+- 需要后续关注的潜在转折
 
 ### 第四层:综合判断
 - 汇总宏观+产业+情绪三层证据,给出明确方向
@@ -92,9 +92,10 @@ NEWS_SYSTEM_PROMPT = """你是一位资深的期货新闻分析师,采用"宏观
 ## 输出格式
 
 使用 Markdown,500-800 字。结构:
+- ## 情绪总览
 - ## 宏观叙事
 - ## 产业叙事
-- ## 资金情绪
+- ## 关键矛盾
 - ## 综合判断(方向+置信度+核心叙事)
 - ## 风险提示
 
@@ -111,8 +112,8 @@ def _fmt(v: Any) -> str:
     return str(v)
 
 
-def _format_events(events: List[Dict[str, Any]], max_items: int = 10) -> str:
-    """把新闻列表格式化为 markdown。"""
+def _format_events(events: List[Dict[str, Any]], max_items: int = 50) -> str:
+    """把新闻列表(含 LLM 预标注)格式化为 markdown。"""
     if not events:
         return "(无新闻原文)"
     items = events[:max_items]
@@ -122,17 +123,47 @@ def _format_events(events: List[Dict[str, Any]], max_items: int = 10) -> str:
         title = e.get("title", "")
         content = e.get("content", "")
         source = e.get("source", "")
-        sentiment = e.get("sentiment", "")
-        line = f"- [{published}] {title}"
+
+        # LLM 预标注字段(优先)
+        sentiment = e.get("llm_sentiment", e.get("sentiment", ""))
+        confidence = e.get("llm_sentiment_confidence", "")
+        reasoning = e.get("llm_sentiment_reasoning", "")
+        summary = e.get("llm_summary", "")
+        importance = e.get("llm_importance", "")
+        varieties = e.get("relevant_varieties", [])
+
+        # 使用 summary(精炼) 或 title
+        heading = summary or title
+        line = f"- [{published}] {heading}"
+
+        # 情感标签
+        if sentiment:
+            line += f" [{sentiment}"
+            if confidence:
+                line += f", 置信度{confidence}"
+            line += "]"
+
+        # 品种归属
+        if varieties:
+            line += f" 品种:{','.join(varieties)}"
+
+        # 推理理由
+        if reasoning:
+            line += f" — {reasoning}"
+
+        # 原文(前 150 字)
         if content:
-            line += f" — {content[:200]}"
+            line += f"\n  原文:{content[:150]}"
+
+        # 元信息
         meta_bits = []
         if source:
             meta_bits.append(f"来源:{source}")
-        if sentiment:
-            meta_bits.append(f"情感:{sentiment}")
+        if importance:
+            meta_bits.append(f"重要度:{importance}")
         if meta_bits:
             line += f" ({', '.join(meta_bits)})"
+
         lines.append(line)
     return "\n".join(lines)
 
@@ -165,15 +196,16 @@ def _build_fallback_report(
     )
     md += "\n".join(f"- {s}" for s in signals[:10]) or "- (无触发信号)"
 
-    # 加入新闻原文摘要(前 5 条)
     if recent_events:
         md += "\n\n## 新闻原文摘要(最近事件)\n"
         for i, evt in enumerate(recent_events[:5], 1):
             title = evt.get("title", "")
             content = evt.get("content", "")
+            summary = evt.get("llm_summary", "")
             source = evt.get("source", "")
-            if title:
-                md += f"\n{i}. **{title}**"
+            heading = summary or title
+            if heading:
+                md += f"\n{i}. **{heading}**"
                 if content:
                     md += f"\n   {content[:200]}"
                 if source:
@@ -220,30 +252,24 @@ def create_news_analyst(llm):
                 "analyst_registry": registry_entry,
             }
 
-        # --- 准备 prompt 变量 ---
-        if isinstance(news_block, dict):
-            latest = news_block.get("latest", {}) or {}
-            stats = news_block.get("stats", {}) or {}
-            signals = news_block.get("signals", []) or []
-            positive_count = int(latest.get("positive_count", 0) or 0)
-            negative_count = int(latest.get("negative_count", 0) or 0)
-            neutral_count = int(latest.get("neutral_count", 0) or 0)
-            sentiment_ratio = latest.get("sentiment_ratio")
-            if sentiment_ratio is None:
-                total = positive_count + negative_count
-                sentiment_ratio = positive_count / total if total > 0 else None
-        else:
-            positive_count = 0
-            negative_count = 0
-            neutral_count = 0
-            sentiment_ratio = None
-            signals = []
-            latest = {}
-            stats = {}
-
+        # --- 准备 prompt 变量:优先使用 LLM 预标注,降级用关键词统计 ---
         variety_name = state.get("variety_name", full_symbol)
         exchange = state.get("exchange", "")
         category = state.get("category", "general")
+
+        # 从 latest_news 提取预标注摘要
+        positive_count = sum(1 for e in recent_events if e.get("llm_sentiment") == "positive")
+        negative_count = sum(1 for e in recent_events if e.get("llm_sentiment") == "negative")
+        neutral_count = sum(1 for e in recent_events if e.get("llm_sentiment") == "neutral")
+        total = positive_count + negative_count
+        sentiment_ratio = (positive_count - negative_count) / total if total > 0 else None
+
+        # 同时保留 features 统计作为 fallback
+        if isinstance(news_block, dict):
+            latest = news_block.get("latest", {}) or {}
+            signals = news_block.get("signals", []) or []
+        else:
+            signals = []
 
         prompt_vars = dict(
             full_symbol=full_symbol,
@@ -251,12 +277,7 @@ def create_news_analyst(llm):
             exchange=exchange,
             category=category,
             trade_date=trade_date,
-            positive_count=positive_count,
-            negative_count=negative_count,
-            neutral_count=neutral_count,
-            sentiment_ratio=_fmt(sentiment_ratio),
-            signals="\n".join(f"- {s}" for s in signals[:8]) or "- (无触发信号)",
-            recent_events=_format_events(recent_events, max_items=10),
+            recent_events=_format_events(recent_events, max_items=50),
         )
 
         try:

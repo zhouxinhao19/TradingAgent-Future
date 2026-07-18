@@ -412,10 +412,48 @@ async def _run_commodity_analysis(
                 f"modules={list(commodity_features.keys())})"
             )
             try:
-                news = await provider.get_futures_news("all", 100)
-                latest_news = news or []
+                # Phase 新闻改造:优先从 MongoDB 读取已标注新闻
+                from app.core.database import get_database
+                db = get_database()
+                coll = db["commodity_news_annotations"]
+                # 从 full_symbol 提取品种代码(如 CU2501.SHF → CU)
+                _underlying = full_symbol.split(".")[0] if "." in full_symbol else full_symbol
+                _pure = re.sub(r"\d+$", "", _underlying) if _underlying else _underlying
+                _cursor = coll.find(
+                    {"relevant_varieties": {"$in": [_pure.upper(), _underlying.upper()]}}
+                ).sort("annotated_at", -1).limit(100)
+                _cached = await _cursor.to_list(length=100)
+                if _cached:
+                    latest_news = []
+                    for _doc in _cached:
+                        latest_news.append({
+                            "published_at": str(_doc.get("annotated_at", "")),
+                            "title": _doc.get("summary", ""),
+                            "content": _doc.get("sentiment_reasoning", ""),
+                            "source": "llm_annotated",
+                            "category": "all",
+                            "sentiment": _doc.get("sentiment", "neutral"),
+                            "sentiment_score": 0.0,
+                            "relevant_varieties": _doc.get("relevant_varieties", []),
+                            "llm_sentiment": _doc.get("sentiment", "neutral"),
+                            "llm_sentiment_confidence": float(_doc.get("sentiment_confidence", 0.0)),
+                            "llm_sentiment_reasoning": _doc.get("sentiment_reasoning", ""),
+                            "llm_importance": _doc.get("importance", "medium"),
+                            "llm_summary": _doc.get("summary", ""),
+                            "annotated_at": str(_doc.get("annotated_at", "")),
+                            "annotator_model": _doc.get("annotator_model", ""),
+                        })
+                    logger.info(f"✅ 从 MongoDB 读取 {len(latest_news)} 条已标注新闻")
+                else:
+                    news = await provider.get_futures_news("all", 100)
+                    latest_news = news or []
             except Exception as e:
-                logger.warning(f"⚠️ provider.get_futures_news 失败: {e}")
+                logger.warning(f"⚠️ 新闻获取失败: {e}")
+                try:
+                    news = await provider.get_futures_news("all", 100)
+                    latest_news = news or []
+                except Exception:
+                    latest_news = []
         else:
             logger.warning("⚠️ 商品 provider 连接失败,将使用空特征")
     except Exception as e:

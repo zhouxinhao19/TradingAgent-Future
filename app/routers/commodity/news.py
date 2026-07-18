@@ -32,24 +32,15 @@ async def get_news_categories():
 async def get_news(
     category: str = Query("all", description="分类(见 /news/categories)"),
     limit: int = Query(50, ge=1, le=500, description="条目数 1-500,默认 50"),
+    variety: Optional[str] = Query(None, description="品种代码(如 CU),按 relevant_varieties 筛选"),
 ):
     """
-    获取期货新闻(聚合多源)。
+    获取期货新闻(支持按品种筛选)。
 
     Path: GET /api/commodity/news?category=metal&limit=30
-    Path: GET /api/commodity/news?category=global_macro&limit=100
-
-    字段统一:
-      - published_at: ISO 字符串
-      - title: 新闻标题(shmet 解析【标题】)
-      - content: 正文
-      - category: 标准化分类
-      - sentiment: positive/negative/neutral
-      - sentiment_score: -1.0 ~ 1.0
-      - source: shmet / akshare_synth / macro_news_em / ...
-      - url: 可选(仅 global_macro 才有)
+    Path: GET /api/commodity/news?variety=CU&limit=20
     """
-    items = await service.get_futures_news(category=category, limit=limit)
+    items = await service.get_futures_news(category=category, limit=limit, variety=variety)
     return ok(
         data={"items": items, "count": len(items), "category": category, "limit": limit},
         message=f"获取 {category} 新闻成功",

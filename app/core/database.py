@@ -441,4 +441,4 @@ def get_database():
     """获取数据库实例"""
     if db_manager.mongo_client is None:
         raise RuntimeError("MongoDB客户端未初始化")
-    return db_manager.mongo_client.tradingagents
+    return db_manager.mongo_client[settings.MONGO_DB]
