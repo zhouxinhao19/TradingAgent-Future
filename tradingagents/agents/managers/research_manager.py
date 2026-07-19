@@ -226,9 +226,9 @@ COMMODITY_REASONING_PROMPT = """你是期货推理分析师。在单次分析中
 1. 基差（估值）
 2. 库存（驱动）
 3. 期限结构（估值+驱动）
-4. 技术面（驱动+择时）
-5. 持仓情绪（验证）
-6. 宏观/新闻（驱动）
+4. 技术面（择时信号）
+5. 持仓情绪（验证信号）
+6. 宏观/新闻（外部驱动）
 
 每个维度必须包含：
 - "维度": 维度名称
@@ -312,6 +312,8 @@ def create_research_manager(llm, memory):
 
             features = state.get("commodity_features", {}) or {}
             news_summary = state.get("news_summary", "")
+            # 提前读取 registry（第 322 行需此变量）
+            registry = state.get("analyst_registry", {}) or {}
             # Phase Agent: 结构化摘要替代 4 份完整 Markdown
             structured_summary = _build_analyst_summary(features, registry, news_summary)
             logger.info(
@@ -319,7 +321,6 @@ def create_research_manager(llm, memory):
                 f"报告数={len(registry)}"
             )
             # 构建 analyst_registry_summary (短引用列表,供 LLM 输出引用)
-            registry = state.get("analyst_registry", {}) or {}
             if registry:
                 registry_lines = []
                 for ref_id, entry in registry.items():

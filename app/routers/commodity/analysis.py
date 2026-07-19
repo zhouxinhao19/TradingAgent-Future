@@ -500,6 +500,7 @@ async def _run_commodity_analysis(
         "fundamentals_report": final_state.get("fundamentals_report", ""),
         "fundamentals_structured": final_state.get("fundamentals_structured", {}),
         "sentiment_report": final_state.get("sentiment_report", ""),
+        "position_report": final_state.get("position_report", ""),
         "news_report": final_state.get("news_report", ""),
         "investment_plan": final_state.get("investment_plan", ""),
         "trader_investment_plan": final_state.get("trader_investment_plan", ""),

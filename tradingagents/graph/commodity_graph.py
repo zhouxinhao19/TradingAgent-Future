@@ -92,14 +92,43 @@ def _wrap_llm_with_retry(llm, label: str = "LLM", default_timeout: int = 60):
                     )
         raise last_error  # noqa: B018
 
+    @wraps(original_ainvoke)
+    async def _ainvoke_with_retry(*args, **kwargs):
+        max_retries = _LLM_MAX_RETRIES
+        last_error = None
+        for attempt in range(max_retries + 1):
+            try:
+                return await original_ainvoke(*args, **kwargs)
+            except Exception as e:
+                last_error = e
+                if attempt < max_retries:
+                    logger.warning(
+                        f"⚠️ {label} Async LLM 调用失败(第{attempt+1}/{max_retries+1}次重试前): {e}"
+                    )
+                else:
+                    logger.error(
+                        f"❌ {label} Async LLM {max_retries+1}次重试均失败: {e}"
+                    )
+        raise last_error  # noqa: B018
+
+    # NormalizedChatOpenAI 是 Pydantic v2 模型，直接属性赋值会触发字段校验失败
+    # 使用 object.__setattr__ 绕过 Pydantic 的 __setattr__ 拦截
+    object.__setattr__(llm, "invoke", _invoke_with_retry)
+    if original_ainvoke is not None:
+        object.__setattr__(llm, "ainvoke", _ainvoke_with_retry)
+    return llm
+
 def _create_checkpointer():
     """创建 Graph checkpointer 实例。
 
-    环境变量 CHECKPOINTER_BACKEND=memory(默认)|sqlite
+    环境变量 CHECKPOINTER_BACKEND=memory(默认)|sqlite|none
     - memory: MemorySaver，仅存进程内存，重启丢失
     - sqlite: SqliteSaver，持久化到文件，重启可恢复（需安装 langgraph-checkpoint-sqlite）
+    - none: 不创建 checkpointer（适用于 E2E 测试，避免 numpy 类型 msgpack 序列化失败）
     """
     backend = os.environ.get("CHECKPOINTER_BACKEND", "memory").lower()
+    if backend == "none":
+        return None
     if backend == "sqlite":
         try:
             from langgraph.checkpoint.sqlite import SqliteSaver
@@ -270,6 +299,9 @@ class CommodityGraphSetup:
 
     def setup_graph(self):
         """构造并编译 commodity 子图。"""
+        # === 创建 Checkpointer ===
+        checkpointer = _create_checkpointer()
+
         # === 4 个 commodity analyst 节点 ===
         tech_analyst = create_technical_analyst(self.quick_thinking_llm)
         fund_analyst = create_fundamental_analyst(self.quick_thinking_llm)
@@ -732,14 +764,34 @@ def build_evidence_chain(final_state: Dict[str, Any]) -> Dict[str, Any]:
             # 不是标准 JSON（可能是 stock 路径的 Markdown），兜底
             L2_data = {"raw_summary": investment_plan[:300]}
 
-    # --- L3: risk_assessment + safety_override + final_decision ---
+    # --- L3: risk_assessment + safety_override + final_decision + CIO memo ---
     risk_card = final_state.get("risk_card", {})
     safety_override = risk_card.get("safety_override", {})
+
+    # 尝试从 investment_plan 解析 CIO 结构化输出（投研备忘录 + 风险评估卡）
+    cio_memo = {}
+    cio_risk_card = {}
+    _investment_plan_raw = final_state.get("investment_plan", "")
+    if _investment_plan_raw:
+        try:
+            _cio_parsed = json.loads(_investment_plan_raw)
+            if isinstance(_cio_parsed, dict):
+                _memo = _cio_parsed.get("投研备忘录")
+                if isinstance(_memo, dict):
+                    cio_memo = _memo
+                _rc = _cio_parsed.get("风险评估卡")
+                if isinstance(_rc, dict):
+                    cio_risk_card = _rc
+        except (json.JSONDecodeError, TypeError):
+            pass
+
     L3_data = {
         "risk_assessment": risk_assessment if isinstance(risk_assessment, dict) else {},
         "risk_card": risk_card if isinstance(risk_card, dict) else {},
         "final_decision_raw": final_decision[:500] if final_decision else "",
         "safety_override": safety_override if isinstance(safety_override, dict) else {},
+        "cio_memo": cio_memo,
+        "cio_risk_card": cio_risk_card,
     }
 
     return {

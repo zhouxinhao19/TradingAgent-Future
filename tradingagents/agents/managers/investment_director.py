@@ -605,9 +605,10 @@ INVESTMENT_DIRECTOR_SYSTEM_PROMPT = """你是大宗商品期货的**投研总监
 LLM 仅负责以下定性维度：
 
 - 三方视角 (dict):
-  - "激进": {"概率权重": 0.3, "条件": "..."}
-  - "保守": {"概率权重": 0.2, "条件": "..."}
-  - "中性": {"概率权重": 0.5, "条件": "..."}
+	- 三方视角 (dict):
+	  - "激进": {{"概率权重": 0.3, "条件": "..."}}
+	  - "保守": {{"概率权重": 0.2, "条件": "..."}}
+	  - "中性": {{"概率权重": 0.5, "条件": "..."}}
 
 - 风险裁定 (dict):
   - "建议动作": "开仓" | "观望" | "减仓" | "平仓"
@@ -632,7 +633,7 @@ LLM 仅负责以下定性维度：
 2. 情景裁决必须给出排除理由，不能只写选定不写排除
 3. 建议动作必须是"开仓"|"观望"|"减仓"|"平仓"之一，仓位上限仅在"开仓"时给出
 4. final_decision_markdown 必须包含 **方向** 和 **置信度** 字段
-5. 【硬约束】输出纯 JSON，禁止使用 ```json 代码块包裹，否则解析失败将视为系统降级。直接以 `{` 开头，`}` 结尾
+5. 【硬约束】输出纯 JSON，禁止使用 ```json 代码块包裹，否则解析失败将视为系统降级。直接以 `{{` 开头，`}}` 结尾
 6. 全文中文
 """
 
@@ -747,6 +748,21 @@ def create_investment_director(deep_thinking_llm):
         callable: LangGraph 节点函数
     """
 
+    def _to_native(o):
+        """递归将 numpy 类型转为 Python 原生类型（MemorySaver msgpack 兼容）。"""
+        import numpy as np
+        if isinstance(o, (np.integer,)):
+            return int(o)
+        if isinstance(o, (np.floating,)):
+            return float(o)
+        if isinstance(o, (np.ndarray,)):
+            return o.tolist()
+        if isinstance(o, dict):
+            return {k: _to_native(v) for k, v in o.items()}
+        if isinstance(o, (list, tuple)):
+            return [_to_native(v) for v in o]
+        return o
+
     def investment_director_node(state: Dict[str, Any]) -> Dict[str, Any]:
         """投研总监节点函数。"""
         from langchain_core.messages import AIMessage
@@ -763,7 +779,7 @@ def create_investment_director(deep_thinking_llm):
 
         # ---- Step 1: 量化检查器（纯规则，0 LLM） ----
         commodity_features = state.get("commodity_features", {})
-        risk_assessment = compute_risk_assessment(commodity_features)
+        risk_assessment = _to_native(compute_risk_assessment(commodity_features))
 
         # 合并合约到期警告到 risk_assessment.flags
         contract_expiry = state.get("contract_expiry_warning", {}) or {}
