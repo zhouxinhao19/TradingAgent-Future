@@ -131,46 +131,7 @@
 
       <!-- 右侧:结果面板 -->
       <el-col :span="16">
-        <el-card v-if="latestResult" shadow="never" class="result-card">
-          <template #header>
-            <div style="display: flex; justify-content: space-between; align-items: center">
-              <span><b>分析结果 — {{ latestResult.full_symbol }}</b></span>
-              <el-tag :type="directionTagType(latestResult.decision?.action)">
-                {{ directionLabel(latestResult.decision?.action) }}
-              </el-tag>
-            </div>
-          </template>
-
-          <el-alert
-            v-if="latestResult.final_decision"
-            :title="latestResult.final_decision.slice(0, 200) + (latestResult.final_decision.length > 200 ? '...' : '')"
-            type="success" :closable="false" show-icon style="margin-bottom: 16px"
-          />
-
-          <el-tabs>
-            <el-tab-pane label="证据链" lazy>
-              <EvidenceChain :data="latestResult?.evidence_chain || null" />
-            </el-tab-pane>
-            <el-tab-pane label="技术分析" lazy>
-              <div class="report-content">{{ cleanText(latestResult.market_report) || '(空)' }}</div>
-            </el-tab-pane>
-            <el-tab-pane label="基本面" lazy>
-              <div class="report-content">{{ cleanText(latestResult.fundamentals_report) || '(空)' }}</div>
-            </el-tab-pane>
-            <el-tab-pane label="持仓分析" lazy>
-              <div class="report-content">{{ cleanText(latestResult.position_report) || '(空)' }}</div>
-            </el-tab-pane>
-            <el-tab-pane label="新闻" lazy>
-              <div class="report-content">{{ cleanText(latestResult.news_report) || '(空)' }}</div>
-            </el-tab-pane>
-            <el-tab-pane label="推理分析" lazy>
-              <div class="report-content">{{ formatInvestmentPlan(latestResult.investment_plan) || '(空)' }}</div>
-            </el-tab-pane>
-            <el-tab-pane label="总结" lazy>
-              <div class="report-content" v-html="renderMarkdown(cleanText(latestResult.final_decision)) || '(空)'" />
-            </el-tab-pane>
-          </el-tabs>
-        </el-card>
+        <CommodityReportDetail v-if="latestResult" :data="latestResult" />
 
         <el-card v-if="!latestResult && !reports.length" shadow="never">
           <el-empty description="选择品种并提交分析">
@@ -211,9 +172,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { commodityApi, type VarietyItem } from '@/api/commodity'
-import EvidenceChain from '@/components/Commodity/EvidenceChain.vue'
 import CommodityReportDetail from '@/components/Commodity/CommodityReportDetail.vue'
-import { renderMarkdown } from '@/utils/markdown'
 
 const router = useRouter()
 
@@ -260,12 +219,6 @@ function computeFullSymbol(): string {
   return `${form.value.variety_symbol}0${suffix}`
 }
 
-/** 清理报告文本中的遗留品牌词 */
-function cleanText(text: string | null | undefined): string {
-  if (!text) return ''
-  return text.replace(/永安期货/g, '').replace(/永安/g, '')
-}
-
 function directionLabel(action?: string): string {
   const map: Record<string, string> = { long: '做多', short: '做空', hold: '持有', flat: '平仓' }
   return map[action || 'hold'] || action || 'hold'
@@ -273,11 +226,6 @@ function directionLabel(action?: string): string {
 function directionTagType(action?: string): string {
   const map: Record<string, string> = { long: 'success', short: 'danger', hold: 'info', flat: 'warning' }
   return map[action || 'hold']
-}
-function formatInvestmentPlan(text: string): string {
-  if (!text) return ''
-  try { return JSON.stringify(JSON.parse(text), null, 2) }
-  catch { return text }
 }
 
 async function onExchangeChange() {
@@ -461,11 +409,5 @@ onUnmounted(() => {
 .page-header { margin-bottom: 24px; }
 .page-header h2 { margin: 0 0 4px; }
 .text-secondary { color: #909399; font-size: 14px; }
-.form-card, .result-card { border: 1px solid var(--el-border-color-light, #e4e7ed); }
-.report-content {
-  white-space: pre-wrap; font-size: 14px; line-height: 1.7;
-  max-height: 500px; overflow-y: auto; padding: 8px;
-  background: var(--el-fill-color-light, #f5f7fa); border-radius: 4px;
-}
-.report-detail { max-height: 70vh; overflow-y: auto; }
+.form-card { border: 1px solid var(--el-border-color-light, #e4e7ed); }
 </style>

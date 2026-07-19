@@ -880,6 +880,7 @@ watch(activeTab, () => {
     }
     if (activeTab.value === 'inventory') renderInventory()
     if (activeTab.value === 'basis') renderBasis()
+    if (activeTab.value === 'news') reloadNews()
   })
 })
 

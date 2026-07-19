@@ -21,7 +21,7 @@
               <span v-if="report.variety_name" class="variety-tag">{{ report.variety_name }}</span>
             </div>
           </el-col>
-          <el-col :span="18">
+          <el-col :span="14">
             <el-space>
               <span class="meta-chip">
                 <el-icon><Calendar /></el-icon>
@@ -36,6 +36,14 @@
                 {{ exchangeName(report.exchange) }}
               </span>
             </el-space>
+          </el-col>
+          <el-col :span="6" style="text-align: right">
+            <el-tag v-if="decisionAction" :type="decisionTagType as any" size="large" effect="dark">
+              {{ decisionLabel }}
+            </el-tag>
+            <span v-if="decisionConfidence !== null" style="margin-left: 8px; font-weight: 600; font-size: 14px;">
+              {{ (decisionConfidence * 100).toFixed(0) }}%
+            </span>
           </el-col>
         </el-row>
       </el-card>
@@ -493,6 +501,19 @@ watch(() => props.data, () => {
 
 // ---- 计算属性 ----
 const report = computed(() => props.data || null)
+
+/** 从 report.decision 或 evidence_chain 提取方向标签 */
+const decisionAction = computed(() => {
+  if (report.value?.decision?.action) return report.value?.decision?.action
+  // 从 evidence_chain summary 提取
+  return report.value?.evidence_chain?.summary?.final_action || null
+})
+const decisionConfidence = computed(() => {
+  if (report.value?.decision?.confidence !== undefined) return report.value?.decision?.confidence
+  return report.value?.evidence_chain?.summary?.final_confidence ?? null
+})
+const decisionLabel = computed(() => directionLabel(decisionAction.value || ''))
+const decisionTagType = computed(() => directionTagType(decisionAction.value || ''))
 
 /** 品种显示: 品种代码 + 中文名，不要主力合约名 */
 const varietyDisplay = computed(() => {

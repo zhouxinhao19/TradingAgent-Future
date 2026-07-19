@@ -11,10 +11,13 @@
       <template #title>仪表板</template>
     </el-menu-item>
 
+    <!-- 学习中心（暂屏蔽） -->
+    <!--
     <el-menu-item index="/learning">
       <el-icon><Reading /></el-icon>
       <template #title>学习中心</template>
     </el-menu-item>
+    -->
 
     <el-menu-item index="/tasks">
       <el-icon><List /></el-icon>
@@ -27,17 +30,20 @@
       <template #title>商品列表</template>
     </el-menu-item>
     <el-menu-item v-if="featureStore.commodityAnalysis" index="/commodity/analysis">
-      <el-icon><Box /></el-icon>
+      <el-icon><TrendCharts /></el-icon>
       <template #title>商品分析</template>
     </el-menu-item>
     <el-menu-item v-if="featureStore.commodityEnabled" index="/favorites">
       <el-icon><Star /></el-icon>
       <template #title>自选品种</template>
     </el-menu-item>
+    <!-- 期货模拟交易（暂屏蔽） -->
+    <!--
     <el-menu-item v-if="featureStore.commodityPaper" index="/commodity/paper">
       <el-icon><Box /></el-icon>
       <template #title>期货模拟交易</template>
     </el-menu-item>
+    -->
 
     <el-sub-menu index="/settings">
       <template #title>
@@ -45,39 +51,19 @@
         <span>设置</span>
       </template>
 
-      <!-- 个人设置 -->
-      <el-sub-menu index="/settings-personal">
-        <template #title>个人设置</template>
-        <el-menu-item index="/settings">通用设置</el-menu-item>
-        <el-menu-item index="/settings?tab=appearance">外观设置</el-menu-item>
-        <el-menu-item index="/settings?tab=analysis">分析偏好</el-menu-item>
-        <el-menu-item index="/settings?tab=notifications">通知设置</el-menu-item>
-        <el-menu-item index="/settings?tab=security">安全设置</el-menu-item>
-      </el-sub-menu>
-
-      <!-- 系统配置 -->
-      <el-sub-menu index="/settings-config">
-        <template #title>系统配置</template>
-        <el-menu-item index="/settings/config">配置管理</el-menu-item>
-        <el-menu-item index="/settings/cache">缓存管理</el-menu-item>
-      </el-sub-menu>
-
-      <!-- 系统管理 -->
-      <el-sub-menu index="/settings-admin">
-        <template #title>系统管理</template>
-        <el-menu-item index="/settings/database">数据库管理</el-menu-item>
-        <el-menu-item index="/settings/logs">操作日志</el-menu-item>
-        <el-menu-item index="/settings/system-logs">系统日志</el-menu-item>
-        <el-menu-item index="/settings/sync">多数据源同步</el-menu-item>
-        <el-menu-item index="/settings/scheduler">定时任务</el-menu-item>
-        <el-menu-item index="/settings/usage">使用统计</el-menu-item>
-      </el-sub-menu>
+      <el-menu-item index="/settings">系统配置</el-menu-item>
+      <el-menu-item index="/settings/config">配置管理</el-menu-item>
+      <el-menu-item index="/settings/cache">缓存管理</el-menu-item>
+      <el-menu-item index="/settings/usage">使用统计</el-menu-item>
     </el-sub-menu>
 
+    <!-- 关于（暂屏蔽） -->
+    <!--
     <el-menu-item index="/about">
       <el-icon><InfoFilled /></el-icon>
       <template #title>关于</template>
     </el-menu-item>
+    -->
   </el-menu>
 </template>
 
@@ -88,11 +74,9 @@ import { useAppStore } from '@/stores/app'
 import { useFeatureStore } from '@/stores/feature'
 import {
   Odometer,
-  Reading,
   List,
-  Document,
   Setting,
-  InfoFilled,
+  TrendCharts,
   Box,
   Star
 } from '@element-plus/icons-vue'

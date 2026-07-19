@@ -8,7 +8,7 @@
           <span class="version-badge">v1.0.1</span>
         </h1>
         <p class="welcome-subtitle">
-          现代化的多智能体股票分析学习平台，辅助你掌握更全面的市场视角分析股票
+          多智能体期货分析平台
         </p>
       </div>
       <div class="welcome-actions">
@@ -16,40 +16,8 @@
           <el-icon><TrendCharts /></el-icon>
           商品分析
         </el-button>
-        <el-button size="large" @click="goToCommodityPaper">
-          <el-icon><Box /></el-icon>
-          期货模拟
-        </el-button>
       </div>
     </div>
-
-
-    <!-- 学习中心推荐卡片 -->
-    <el-card class="learning-highlight-card">
-      <div class="learning-highlight">
-        <div class="learning-icon">
-          <el-icon size="48"><Reading /></el-icon>
-        </div>
-        <div class="learning-content">
-          <h2>📚 AI股票分析学习中心</h2>
-          <p>从零开始学习AI、大语言模型和智能股票分析。了解多智能体系统如何协作分析股票，掌握提示词工程技巧，选择合适的大模型，理解AI的能力与局限性。</p>
-          <div class="learning-features">
-            <span class="feature-tag">🤖 AI基础知识</span>
-            <span class="feature-tag">✍️ 提示词工程</span>
-            <span class="feature-tag">🎯 模型选择</span>
-            <span class="feature-tag">📊 分析原理</span>
-            <span class="feature-tag">⚠️ 风险认知</span>
-            <span class="feature-tag">🎓 实战教程</span>
-          </div>
-        </div>
-        <div class="learning-action">
-          <el-button type="primary" size="large" @click="goToLearning">
-            <el-icon><Reading /></el-icon>
-            开始学习
-          </el-button>
-        </div>
-      </div>
-    </el-card>
 
     <!-- 主要功能区域 -->
     <el-row :gutter="24" class="main-content">
@@ -64,17 +32,6 @@
               <div class="action-content">
                 <h3>商品分析</h3>
                 <p>多智能体决策链分析大宗商品期货</p>
-              </div>
-              <el-icon class="action-arrow"><ArrowRight /></el-icon>
-            </div>
-
-            <div class="action-item" @click="goToCommodityPaper">
-              <div class="action-icon">
-                <el-icon><TrendCharts /></el-icon>
-              </div>
-              <div class="action-content">
-                <h3>期货模拟</h3>
-                <p>基于分析决策进行模拟期货交易</p>
               </div>
               <el-icon class="action-arrow"><ArrowRight /></el-icon>
             </div>
@@ -95,9 +52,12 @@
         <!-- 最近分析（任务中心联动） -->
         <el-card class="recent-analyses-card" header="最近分析" style="margin-top: 24px;">
           <el-table :data="recentAnalyses" style="width: 100%">
-            <el-table-column label="合约代码" width="160">
+            <el-table-column label="品种代码" width="180">
               <template #default="{ row }">
-                <span class="symbol-link" @click="viewCommodityReport(row)">{{ row.full_symbol }}</span>
+                <span style="font-weight: 600" class="symbol-link" @click="viewCommodityReport(row)">{{ extractVariety(row.full_symbol) }}</span>
+                <el-tag v-if="row.variety_name" size="small" type="info" effect="plain" style="margin-left: 6px">
+                  {{ row.variety_name }}
+                </el-tag>
               </template>
             </el-table-column>
             <el-table-column prop="trade_date" label="交易日期" width="110" />
@@ -133,40 +93,6 @@
             <el-button type="text" @click="goToQueue">
               查看全部任务 <el-icon><ArrowRight /></el-icon>
             </el-button>
-          </div>
-        </el-card>
-
-        <!-- 市场快讯（带标注、双标签页） -->
-        <el-card class="market-news-card" style="margin-top: 24px;">
-          <template #header>
-            <div style="display:flex; align-items:center; justify-content:space-between">
-              <span>市场快讯</span>
-              <el-radio-group v-model="newsTab" size="small" @change="reloadMarketNews">
-                <el-radio-button value="all">全市场</el-radio-button>
-                <el-radio-button value="favorites">自选相关</el-radio-button>
-              </el-radio-group>
-            </div>
-          </template>
-          <div v-if="filteredNews.length > 0" class="news-list">
-            <div
-              v-for="(news, idx) in filteredNews.slice(0, 8)"
-              :key="idx"
-              class="news-item"
-              @click="openNewsUrl(news.url)"
-            >
-              <div class="news-meta">
-                <el-tag size="small" :type="sentimentTag(news.llm_sentiment || news.sentiment)" effect="plain">
-                  {{ news.llm_sentiment || news.sentiment }}
-                </el-tag>
-                <span v-for="rv in (news.relevant_varieties || []).slice(0, 3)" :key="rv" class="news-variety-tag">{{ rv }}</span>
-                <span class="news-time">{{ newsRelativeTime(news.published_at || news.annotated_at) }}</span>
-              </div>
-              <div class="news-title">{{ news.llm_summary || news.title }}</div>
-            </div>
-          </div>
-          <div v-else class="empty-state">
-            <el-icon class="empty-icon"><InfoFilled /></el-icon>
-            <p>{{ newsTab === 'favorites' ? '暂无自选品种相关新闻' : '暂无市场快讯' }}</p>
           </div>
         </el-card>
       </el-col>
@@ -229,44 +155,37 @@
           </div>
         </el-card>
 
-        <!-- 模拟交易账户 -->
-        <el-card class="paper-trading-card" style="margin-top: 24px;">
+        <!-- 市场快讯（带标注、双标签页） -->
+        <el-card class="market-news-card" style="margin-top: 24px;">
           <template #header>
-            <div class="card-header">
-              <span>模拟交易账户</span>
-              <el-button type="text" size="small" @click="goToPaperTrading">
-                查看详情 <el-icon><ArrowRight /></el-icon>
-              </el-button>
+            <div style="display:flex; align-items:center; justify-content:space-between">
+              <span>市场快讯</span>
+              <el-radio-group v-model="newsTab" size="small" @change="reloadMarketNews">
+                <el-radio-button value="all">全市场</el-radio-button>
+                <el-radio-button value="favorites">自选相关</el-radio-button>
+              </el-radio-group>
             </div>
           </template>
-
-          <div v-if="paperAccount" class="paper-account-info">
-            <!-- 期货模拟账户 -->
-            <div class="account-section">
-              <div class="account-section-title">📦 {{ paperAccount.name }}</div>
-              <div class="account-item">
-                <div class="account-label">账户权益</div>
-                <div class="account-value primary">¥{{ formatMoney(paperAccount.equity) }}</div>
+          <div v-if="filteredNews.length > 0" class="news-list">
+            <div
+              v-for="(news, idx) in filteredNews.slice(0, 8)"
+              :key="idx"
+              class="news-item"
+              @click="openNewsUrl(news.url)"
+            >
+              <div class="news-meta">
+                <el-tag size="small" :type="sentimentTag(news.llm_sentiment || news.sentiment)" effect="plain">
+                  {{ news.llm_sentiment || news.sentiment }}
+                </el-tag>
+                <span v-for="rv in (news.relevant_varieties || []).slice(0, 3)" :key="rv" class="news-variety-tag">{{ rv }}</span>
+                <span class="news-time">{{ newsRelativeTime(news.published_at || news.annotated_at) }}</span>
               </div>
-              <div class="account-item">
-                <div class="account-label">可用资金</div>
-                <div class="account-value">¥{{ formatMoney(paperAccount.balance) }}</div>
-              </div>
-              <div class="account-item">
-                <div class="account-label">累计盈亏</div>
-                <div class="account-value" :class="paperAccount.realized_pnl >= 0 ? 'price-up' : 'price-down'">
-                  {{ paperAccount.realized_pnl >= 0 ? '+' : '' }}¥{{ formatMoney(Math.abs(paperAccount.realized_pnl)) }}
-                </div>
-              </div>
+              <div class="news-title">{{ news.llm_summary || news.title }}</div>
             </div>
           </div>
-
           <div v-else class="empty-state">
             <el-icon class="empty-icon"><InfoFilled /></el-icon>
-            <p>暂无账户信息</p>
-            <el-button type="primary" size="small" @click="goToPaperTrading">
-              查看模拟交易
-            </el-button>
+            <p>{{ newsTab === 'favorites' ? '暂无自选品种相关新闻' : '暂无市场快讯' }}</p>
           </div>
         </el-card>
 
@@ -285,22 +204,18 @@ import {
   Box,
   List,
   ArrowRight,
-  InfoFilled,
-  Reading
+  InfoFilled
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { AnalysisStatus } from '@/types/analysis'
 import DataSourceLlmStatusCard from '@/components/Dashboard/DataSourceLlmStatusCard.vue'
 import { useFavoritesStore } from '@/stores/favorites'
-import { commodityApi, commodityPaperApi, type CommodityTaskItem, type RecentReportItem } from '@/api/commodity'
+import { commodityApi, type CommodityTaskItem } from '@/api/commodity'
 
 const router = useRouter()
 
 // 响应式数据
 const recentAnalyses = ref<CommodityTaskItem[]>([])
-
-/** 商品分析最近记录(用于"最近分析"卡片) */
-const recentCommodityRecords = ref<RecentReportItem[]>([])
 
 const favoritesStore = useFavoritesStore()
 
@@ -337,20 +252,15 @@ function sentimentTag(sent?: string): 'success' | 'danger' | 'info' {
   return 'info'
 }
 
-// 模拟交易账户数据
-const paperAccount = ref<{ name: string; equity: number; balance: number; realized_pnl: number } | null>(null)
-
 // 实时相对时间 tick（每分钟驱动一次）
 const tick = ref(0)
 let tickTimer: ReturnType<typeof setInterval> | null = null
+/** 市场快讯自动刷新定时器 */
+let newsPollTimer: ReturnType<typeof setInterval> | null = null
 
 // 方法
 const goToQueue = () => {
   router.push('/queue')
-}
-
-const goToLearning = () => {
-  router.push('/learning')
 }
 
 // ---------- 商品分析相关 ----------
@@ -369,21 +279,10 @@ function goToCommodityAnalysis() {
   router.push('/commodity/analysis')
 }
 
-/** 前往期货模拟 */
-function goToCommodityPaper() {
-  router.push('/commodity/paper')
-}
-
-/** 加载最近商品分析记录 */
-async function loadRecentCommodityRecords() {
-  try {
-    const res = await commodityApi.getRecentReports(10)
-    const body = (res as any)?.data
-    recentCommodityRecords.value = body?.reports || []
-  } catch (error) {
-    console.error('加载最近商品分析记录失败:', error)
-    recentCommodityRecords.value = []
-  }
+/** 从 full_symbol (如 CU0.SHF) 中提取品种代码 (CU) */
+function extractVariety(fullSymbol: string): string {
+  if (!fullSymbol) return ''
+  return fullSymbol.split('.')[0]?.replace(/0$/, '') || fullSymbol
 }
 
 
@@ -489,56 +388,20 @@ const loadMarketNews = async () => {
   }
 }
 
-// 加载期货模拟交易账户信息
-const loadPaperAccount = async () => {
-  try {
-    // 取第一个期货模拟账户的快照
-    const listRes = await commodityPaperApi.listAccounts()
-    const accounts = (listRes as any)?.data?.accounts
-    if (accounts?.length) {
-      const acc = accounts[0]
-      const snap = await commodityPaperApi.getAccountSnapshot(acc.account_id)
-      const snapData = (snap as any)?.data
-      paperAccount.value = {
-        name: acc.name,
-        equity: snapData?.equity ?? acc.initial_capital ?? 0,
-        balance: snapData?.balance ?? acc.initial_capital ?? 0,
-        realized_pnl: snapData?.realized_pnl ?? 0,
-      }
-    }
-  } catch (error) {
-    console.error('加载期货模拟交易账户失败:', error)
-    paperAccount.value = null
-  }
-}
-
-// 跳转到期货模拟交易页面
-const goToPaperTrading = () => {
-  router.push('/commodity/paper')
-}
-
-// 格式化金额
-const formatMoney = (value: number) => {
-  return value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-}
-
 // 生命周期
 onMounted(async () => {
   // 加载自选品种数据
   await favoritesStore.loadFavorites()
   // 加载最近分析(商品任务中心)
   await loadRecentAnalyses()
-  // 加载最近商品分析记录
-  await loadRecentCommodityRecords()
   // 加载市场快讯
   await loadMarketNews()
-  // 加载期货模拟交易账户
-  await loadPaperAccount()
 
   // 每分钟刷一次 tick，保持相对时间实时更新
   tickTimer = setInterval(() => { tick.value++ }, 60_000)
 
-
+  // 每 60 秒自动刷新市场快讯
+  newsPollTimer = setInterval(() => { loadMarketNews() }, 60_000)
 })
 
 onUnmounted(() => {
@@ -546,7 +409,10 @@ onUnmounted(() => {
     clearInterval(tickTimer)
     tickTimer = null
   }
-
+  if (newsPollTimer) {
+    clearInterval(newsPollTimer)
+    newsPollTimer = null
+  }
 })
 </script>
 
@@ -590,68 +456,6 @@ onUnmounted(() => {
     .welcome-actions {
       display: flex;
       gap: 16px;
-    }
-  }
-
-  .learning-highlight-card {
-    margin-bottom: 24px;
-    border: 2px solid var(--el-color-primary);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
-
-    .learning-highlight {
-      display: flex;
-      align-items: center;
-      gap: 24px;
-      padding: 8px;
-
-      .learning-icon {
-        flex-shrink: 0;
-        width: 80px;
-        height: 80px;
-        border-radius: 12px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-      }
-
-      .learning-content {
-        flex: 1;
-
-        h2 {
-          font-size: 20px;
-          font-weight: 600;
-          margin: 0 0 12px 0;
-          color: var(--el-text-color-primary);
-        }
-
-        p {
-          font-size: 14px;
-          color: var(--el-text-color-regular);
-          line-height: 1.6;
-          margin: 0 0 16px 0;
-        }
-
-        .learning-features {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-
-          .feature-tag {
-            padding: 4px 12px;
-            background: var(--el-color-primary-light-9);
-            color: var(--el-color-primary);
-            border-radius: 16px;
-            font-size: 13px;
-            font-weight: 500;
-          }
-        }
-      }
-
-      .learning-action {
-        flex-shrink: 0;
-      }
     }
   }
 
@@ -896,119 +700,11 @@ onUnmounted(() => {
     }
   }
 
-  .paper-trading-card {
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .paper-account-info {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-
-      .account-section {
-        border: 1px solid var(--el-border-color-lighter);
-        border-radius: 8px;
-        padding: 12px;
-        background-color: var(--el-fill-color-blank);
-
-        .account-section-title {
-          font-size: 14px;
-          font-weight: 600;
-          color: var(--el-text-color-primary);
-          margin-bottom: 12px;
-          padding-bottom: 8px;
-          border-bottom: 1px solid var(--el-border-color-lighter);
-        }
-      }
-
-      .account-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 8px 0;
-
-        .account-label {
-          font-size: 13px;
-          color: var(--el-text-color-regular);
-        }
-
-        .account-value {
-          font-size: 15px;
-          font-weight: 600;
-          color: var(--el-text-color-primary);
-
-          &.primary {
-            color: var(--el-color-primary);
-            font-size: 16px;
-          }
-
-          &.price-up {
-            color: #f56c6c;
-          }
-
-          &.price-down {
-            color: #67c23a;
-          }
-
-          &.price-neutral {
-            color: var(--el-text-color-regular);
-          }
-        }
-      }
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 20px 0;
-
-      .empty-icon {
-        font-size: 48px;
-        color: var(--el-text-color-placeholder);
-        margin-bottom: 12px;
-      }
-
-      p {
-        color: var(--el-text-color-secondary);
-        margin-bottom: 16px;
-      }
-    }
-  }
-}
-
-// 响应式设计
-@media (max-width: 768px) {
-  .dashboard {
-    .welcome-section {
-      flex-direction: column;
-      text-align: center;
-      gap: 24px;
-
-      .welcome-actions {
-        justify-content: center;
-      }
-    }
-
-    .learning-highlight-card {
-      .learning-highlight {
-        flex-direction: column;
-        text-align: center;
-
-        .learning-content {
-          .learning-features {
-            justify-content: center;
-          }
-        }
-      }
-    }
-
-    .main-content {
-      .el-col {
-        margin-bottom: 24px;
-      }
-    }
+  /* 空数据状态（快讯暂无时） */
+  .empty-state {
+    text-align: center; padding: 20px 0;
+    .empty-icon { font-size: 48px; color: var(--el-text-color-placeholder); }
+    p { color: var(--el-text-color-secondary); font-size: 14px; }
   }
 }
 </style>
