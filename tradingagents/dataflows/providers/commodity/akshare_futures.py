@@ -259,6 +259,7 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
     def __init__(self):
         super().__init__("akshare_futures")
         self._ak = None
+        self._cache = None  # 延时加载 CommodityCacheManager
 
     async def connect(self) -> bool:
         """延迟加载 akshare(避免启动时强依赖)"""
@@ -268,6 +269,10 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
             import akshare as ak
             self._ak = ak
             self.connected = True
+            # 延时加载缓存管理器
+            if self._cache is None:
+                from tradingagents.dataflows.cache.commodity_cache import CommodityCacheManager
+                self._cache = CommodityCacheManager()
             self.logger.info("✅ AkshareFuturesProvider 连接成功(懒加载)")
             return True
         except ImportError as e:
@@ -400,6 +405,13 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
           并在响应里标记 ``used_continuous_fallback=True`` 与 ``data_source`` 改为
           ``akshare_futures+continuous_fallback``,便于上游识别与排查。
         """
+        # ── Layer 1 内存缓存(30秒TTL) ──
+        cache_key = f"quotes:{full_symbol}"
+        if self._cache:
+            cached = self._cache.mem.get(cache_key)
+            if cached is not None:
+                return cached
+
         if not await self._ensure_ak():
             return None
 
@@ -451,7 +463,7 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         change = close - pre_close
         pct_chg = (change / pre_close * 100) if pre_close else 0.0
 
-        return {
+        result = {
             "full_symbol": full_symbol,
             "code": info.get("code", full_symbol),
             "exchange": info.get("exchange", ""),
@@ -476,6 +488,10 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
             "used_continuous_fallback": used_continuous_fallback,
             "updated_at": _now_iso(),
         }
+        # ── 写入内存缓存(30秒TTL) ──
+        if self._cache:
+            self._cache.mem.set(cache_key, result, ttl_sec=30.0)
+        return result
 
     async def get_historical_data(
         self,
@@ -498,6 +514,20 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
                 "back" — 后复权(向前调整)
                 "forward" — 前复权(向后调整)
         """
+        # ── Layer 2+1: Parquet + 内存缓存 ──
+        underlying = CommodityUtils.get_underlying_symbol(full_symbol)
+        if underlying and self._cache:
+            sd = start_date.strftime("%Y%m%d") if isinstance(start_date, date) else str(start_date).replace("-", "")
+            ed = end_date.strftime("%Y%m%d") if end_date and isinstance(end_date, date) else str(end_date or "20500101").replace("-", "")
+            # 提取交易所前缀
+            mkt = full_symbol.split(".")[-1].upper() if "." in full_symbol else ""
+            mkt_long = {"SHF": "SHFE", "CZC": "CZCE"}.get(mkt, mkt)
+            # 先尝试 Parquet 文件缓存
+            cached = self._cache.get_historical(underlying, sd, ed, mkt_long)
+            if cached is not None and not cached.empty:
+                self.logger.debug("📂 历史 K 线缓存命中: %s [%s ~ %s]", underlying, sd, ed)
+                return cached
+
         if not await self._ensure_ak():
             return None
 
@@ -540,6 +570,9 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
             df = df.sort_values("日期").reset_index(drop=True)
             if used_continuous_fallback:
                 df.attrs["data_source_note"] = "continuous_fallback"
+            # ── 写入 Parquet 缓存 ──
+            if underlying and self._cache:
+                self._cache.save_historical(underlying, sd, ed, mkt_long, df)
             return df
         else:
             # 主力连续:使用新浪主力连续接口
@@ -573,6 +606,9 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
 
             df = df[(df["日期"] >= start) & (df["日期"] <= end)]
             df = df.sort_values("日期").reset_index(drop=True)
+            # ── 写入 Parquet 缓存 ──
+            if underlying and self._cache:
+                self._cache.save_historical(underlying, sd, ed, mkt_long, df)
             return df
 
     async def get_historical_data_for_index(
@@ -770,12 +806,30 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
             symbol: 品种代码,如 'A' / '豆一'
             start_date / end_date: 仅 99 期货网支持,em 接口固定返回近 60 个交易日
         """
+        # ── Layer 2+1: Parquet + 内存缓存 ──
+        if self._cache:
+            cached = self._cache.get_inventory(symbol)
+            if cached is not None and not cached.empty:
+                self.logger.debug("📂 库存缓存命中: %s (%d 行)", symbol, len(cached))
+                # 按日期范围过滤
+                if start_date:
+                    s = pd.to_datetime(start_date)
+                    cached = cached[cached.iloc[:, 0] >= s] if cached.shape[1] > 0 and hasattr(cached.iloc[:, 0], 'dtype') else cached
+                if end_date:
+                    e = pd.to_datetime(end_date)
+                    cached = cached[cached.iloc[:, 0] <= e] if cached.shape[1] > 0 and hasattr(cached.iloc[:, 0], 'dtype') else cached
+                if not cached.empty:
+                    return cached
+
         if not await self._ensure_ak():
             return None
 
         # 1. 东方财富(支持代码或中文名;先代码后中文)
         df = await self._call("futures_inventory_em", symbol=symbol)
         if df is not None and not df.empty:
+            # ── 写入缓存 ──
+            if self._cache:
+                self._cache.save_inventory(symbol, df)
             return df
 
         # 2. 东方财富(中文名,部分品种代码不识别)
@@ -783,16 +837,22 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         if cn != symbol:
             df = await self._call("futures_inventory_em", symbol=cn)
             if df is not None and not df.empty:
+                if self._cache:
+                    self._cache.save_inventory(symbol, df)
                 return df
 
         # 3. 99 期货(需精确中文名,已备 99qh 映射表兜底)
         df = await self._call("futures_inventory_99", symbol=cn)
         if df is not None and not df.empty:
+            if self._cache:
+                self._cache.save_inventory(symbol, df)
             return df
 
         # 4. 尝试原始传入的符号(兼容已传入中文名)
         if cn != symbol:
             df = await self._call("futures_inventory_99", symbol=symbol)
+            if df is not None and not df.empty and self._cache:
+                self._cache.save_inventory(symbol, df)
             return df
 
         return None
@@ -945,18 +1005,8 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         改用 futures_spot_price_daily (避开 100ppi.com) 避免超时。
         在 date 参数基础上取前后各 3 天窗口以增加命中率。
         在线失败时回退到本地缓存数据库 (CommodityLocalCacheAdapter)。
-
-        Args:
-            date: 交易日
-            symbol: 品种代码(可选,传了则只返回该品种数据)
-
-        Returns:
-            DataFrame(列: date/symbol/spot_price/dominant_contract/dom_basis/dom_basis_rate/...)
         """
-        if not await self._ensure_ak():
-            return None
-
-        # 统一日期格式: 先归一化再切片,兼容 YYYYMMDD 和 YYYY-MM-DD
+        # 统一日期格式
         if hasattr(date, "strftime"):
             date_str = date.strftime("%Y%m%d")
             base_date = date.strftime("%Y-%m-%d")
@@ -964,6 +1014,20 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
             raw = str(date).replace("-", "")
             date_str = raw
             base_date = raw[:4] + "-" + raw[4:6] + "-" + raw[6:8]
+
+        # ── Layer 2+1: Parquet 缓存 ──
+        cache_key = f"spot:{date_str}"
+        if self._cache:
+            cached = self._cache.get_spot_price(date_str)
+            if cached is not None and not cached.empty:
+                self.logger.debug("📂 现货基差缓存命中: %s", date_str)
+                if symbol:
+                    cached = cached[cached["symbol"].astype(str).str.upper() == symbol.upper()]
+                if not cached.empty:
+                    return cached
+
+        if not await self._ensure_ak():
+            return None
 
         # 1. 用 futures_spot_price_daily 取前后 3 天窗口(避免节假日偏移)
         from datetime import timedelta
@@ -990,6 +1054,9 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
                 result["date"] = pd.to_datetime(result["date"], errors="coerce")
                 target = pd.to_datetime(base_date)
                 result = result.iloc[(result["date"] - target).abs().argsort()[:1]]
+            # ── 写入 Parquet 缓存 ──
+            if self._cache and not result.empty:
+                self._cache.save_spot_price(date_str, result)
             return result
 
         # 2. 用 99qh 现货走势作为在线回退
@@ -1061,11 +1128,19 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         AKShare 内部可能依赖 100ppi.com 导致超时,故 AKShare 调用设
         10 秒内部超时,超时后立即回退到本地缓存数据库 (CommodityLocalCacheAdapter)。
         """
-        if not await self._ensure_ak():
-            return None
-
         start = start_day.strftime("%Y%m%d") if hasattr(start_day, "strftime") else str(start_day)
         end = end_day.strftime("%Y%m%d") if hasattr(end_day, "strftime") else str(end_day)
+
+        # ── Layer 2+1: Parquet 缓存 ──
+        _var = vars_list[0].upper() if vars_list else ""
+        if _var and self._cache:
+            cached = self._cache.get_basis(_var, start, end)
+            if cached is not None and not cached.empty:
+                self.logger.debug("📂 基差历史缓存命中: %s [%s~%s]", _var, start, end)
+                return cached
+
+        if not await self._ensure_ak():
+            return None
         # AKShare 在线调用(最多等 10 秒)
         result = None
         try:
@@ -1080,6 +1155,9 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
             pass
 
         if result is not None and not (hasattr(result, 'empty') and result.empty):
+            # ── 写入 Parquet 缓存 ──
+            if _var and self._cache:
+                self._cache.save_basis(_var, start, end, result)
             return result
 
         # AKShare 100ppi 超时/空 → 2. 用 99qh 现货走势(spot_price_qh)作为在线回退
@@ -1110,6 +1188,9 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
                     if not df_99qh.empty:
                         df_99qh = df_99qh.sort_values("date").reset_index(drop=True)
                         self.logger.info(f"✅ basis 回退到 99qh 成功({sym_99qh}, {len(df_99qh)}行)")
+                        # ── 写入 Parquet 缓存 ──
+                        if _var and self._cache:
+                            self._cache.save_basis(_var, start, end, df_99qh)
                         return df_99qh
             except Exception:
                 pass
@@ -1154,6 +1235,17 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
 
         AKShare 在线调用设 10 秒内部超时,超时后回退到本地缓存数据库。
         """
+        # ── 构建缓存 key ──
+        if type_method == "date" and var and start_day and end_day:
+            s = start_day.strftime("%Y%m%d") if hasattr(start_day, "strftime") else str(start_day)
+            e = end_day.strftime("%Y%m%d") if hasattr(end_day, "strftime") else str(end_day)
+            cache_key = f"roll_yield:date:{var.upper()}:{s}:{e}"
+            if self._cache:
+                cached = self._cache.get_roll_yield(cache_key)
+                if cached is not None and not cached.empty:
+                    self.logger.debug("📂 展期收益率缓存命中: %s", cache_key)
+                    return cached
+
         if not await self._ensure_ak():
             return None
 
@@ -1202,6 +1294,9 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
 
         # AKShare 在线有结果则返回
         if result is not None and not (hasattr(result, 'empty') and result.empty):
+            # ── 写入 Parquet 缓存 ──
+            if type_method == "date" and var and self._cache:
+                self._cache.save_roll_yield(cache_key, result)
             return result
 
         # 在线调用失败 → 尝试用交易所日线数据自行计算展期收益率
@@ -1211,6 +1306,9 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
                     var, start_day, end_day,
                 )
                 if diy_df is not None and not diy_df.empty:
+                    # ── 写入缓存 ──
+                    if self._cache:
+                        self._cache.save_roll_yield(cache_key, diy_df)
                     return diy_df
             except Exception:
                 pass
