@@ -1,7 +1,8 @@
 # TradingAgents-CN:股票 → 大宗商品 改造方案
 
-> **版本快照**:v4 — 反映 2026-07-16 实际进度(Phase 0/1/2/3a/3b 全部完成)。
-> Phase 3b 六个子阶段(3b-i → 3b-ii-E)已全部交付,Four-Phase 剩余 Phase 4(模拟交易)+ Phase 5(删股票)。
+> **版本快照**:v5 — 反映 2026-07-18 实际进度(Phase 0/1/2/3a/3b/3c 全部完成)。
+> Phase 3b 六个子阶段(3b-i → 3b-ii-E)已全部交付,Phase 3c(队列+批量+任务中心优化)已完成,
+> Four-Phase 剩余 Phase 4(模拟交易)+ Phase 5(删股票)。
 
 ## Context
 
@@ -65,8 +66,9 @@ TradingAgents-CN 当前是基于 LangGraph 的多智能体股票分析平台,核
 
 ### 1.4 实施阶段(5 个 Phase;Phase 0/1/2 部分完成)
 
-> **审计日期 2026-07-16**:Phase 0/1/2/3a/3b 全部完成。
+> **审计日期 2026-07-18**:Phase 0/1/2/3a/3b/3c 全部完成。
 > Phase 3b 六个子阶段(3b-i Features 层 + 3b-ii 分析师+决策链+子图+路由+E2E)已全部交付并实测验证。
+> Phase 3c(异步队列+批量任务+任务中心优化)已完成。
 > Phase 4 待启动,前置依赖:在 `commodity_metadata.py` 补齐合约规格字段。
 
 | Phase | 目标 | 状态 | 周期 | 关键交付 | 演示步骤 | 验证标准 |
@@ -76,6 +78,7 @@ TradingAgents-CN 当前是基于 LangGraph 的多智能体股票分析平台,核
 | **Phase 2 — 数据层完备** | 13 扩展接口 + 82 品种 + 6 类新闻 + 全测试 | ✅ 完成(路由/前端由 3a 补齐) | 1 周 | provider 层 13 扩展接口 + 6 类新闻 + 5 合成器 + 情感评分 | `pytest tests/test_commodity_data_layer.py` 全绿 | 85 个单元测试全部通过 |
 | **Phase 3a — 路由 + 前端补全** | 22 后端端点 + 前端 commodity UI | ✅ **完成** | 1 天 | 22 HTTP 端点(5+15+2) + `views/Commodity/{List,Detail}.vue` + `api/commodity.ts` + `stores/commodity.ts` | 翻 flag + 浏览器访问 `/commodity/list` 看到品种列表 | 详见 [`docs/progress/phase-3a.md`](../progress/phase-3a.md) |
 | **Phase 3b — 多源情报 + 分析师扩展** | Features 层(纯规则) + 4 分析师 + 四阶段决策链 | ✅ **全部完成** | 2 周(实际约 5 天) | `tradingagents/features/commodity/` 6 模块 + 4 分析师 + 多空辩论→交易员→风控→CIO + 子图+路由+E2E | `curl /api/commodity/CU2501.SHF/analyze` 返回完整报告 + DeepSeek 实测 ~280 秒 | 174+ commodity 测试 0 失败,E2E CIO 含换月检测 |
+| **Phase 3c — 异步队列 + 批量任务** | 队列系统取代 BackgroundTasks + 批量任务 + 删除优化 | ✅ **完成** | 1 天 | MongoDB 队列 + Semaphore 并发 + batch 端点 + 聚合 stats + 删除直接用 `report_file_path` | curl stats/batch/submit/list/delete 全部 200 OK | 队列消费不丢任务、不重复消费;批量 POST/GET 端点工作正常 |
 
 ---
 

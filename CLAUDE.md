@@ -338,7 +338,7 @@ python tests/debug_docker.py
 
 按 [`docs/plans/stock-to-commodity.md`](docs/plans/stock-to-commodity.md) 推进 **"股票 → 大宗商品"改造**。
 
-### 实际状态(2026-07-16 实测审计)
+### 实际状态(2026-07-18 实测审计)
 
 | Phase | 范围 | 实际交付 | 未交付 |
 |---|---|---|---|
@@ -347,6 +347,7 @@ python tests/debug_docker.py
 | **Phase 2** | 数据层完备 + 6 类新闻 | ✅ 完成 | - |
 | **Phase 3a** | 路由 + 前端补全 | ✅ 完成 | ❌ 前端 TS 编译 / 浏览器实测未做(无 node_modules) |
 | **Phase 3b** | Features 层 + 4 分析师 + 四阶段决策链 | ✅ **全部完成** | - |
+| **Phase 3c** | 异步队列 + 批量任务 + 任务中心优化 | ✅ **完成** | - |
 
 **Phase 3b 内部分阶段交付**:
 - **3b-i Features 层**:6 个纯规则模块(technical/basis/inventory/positioning/term_structure/news_sentiment),97 测试全过
@@ -356,7 +357,13 @@ python tests/debug_docker.py
 - **3b-ii-D 路由+Vue**:`POST /api/commodity/{symbol}/analyze` + `Analysis.vue` + 分步轮询
 - **3b-ii-E 端到端实测**:DeepSeek v4-flash,13 次 LLM 调用,~280 秒,CIO 输出含换月检测+基差/库存/杠杆决策
 
-**累计 174+ commodity 测试 0 失败**:data_layer(90) + features(97) + analysts(45) + decision_chain(32) — 覆盖数据层→特征工程→分析师→全决策链。
+**Phase 3c 基础架构加固(2026-07-18)**:
+- **P0 异步队列**:MongoDB `commodity_analysis_tasks` 集合 + `find_one_and_update` 原子消费 + `asyncio.Semaphore(2)` 并发控制,替代 BackgroundTasks
+- **P0 Worker 生命周期**:`ensure_worker()` / `stop_worker()` 在 FastAPI lifespan 中自动启停
+- **P1 聚合统计**:单次 MongoDB aggregation pipeline (`$group`) 替代 4 次独立 `count_documents`
+- **批量任务**:`POST /api/commodity/batch` 共享 `batch_id` 创建 N 个 queued 任务 + `GET /api/commodity/batch/{batch_id}` 汇总状态
+- **删除优化**:后端 `report_file_path` 直接定位替代 `rglob` 递归扫描;前端就地从 `list` 移除替代全量 `loadList()`
+- **全端点实测**:stats/batch/submit/list/delete 均 curl 验证 200 OK
 
 ### 关键约束
 - 开发期间**股票/商品并存**,每个 Phase 都能 `docker compose up` 跑通
@@ -367,13 +374,13 @@ python tests/debug_docker.py
 - 进度产出:`docs/progress/phase-N.md` + 实测验证
 - 新建模块统一用 `commodity_*` 前缀,与 `stock_*` 隔离
 
-### 当前测试覆盖(2026-07-16)
+### 当前测试覆盖(2026-07-18)
 - **数据层**:`tests/test_commodity_data_layer.py` 90 测试(AKShare provider 35+ 函数 mock,16 测试组)
 - **Features 层**:`tests/test_commodity_features.py` 97 测试(6 模块 schema + 信号 + 边界)
 - **分析师**:`tests/test_commodity_analyst.py` 45 测试(4 个 analyst MagicMock LLM + 边界)
 - **决策链**:`tests/test_commodity_decision_chain.py` 32 测试(8 节点 commodity 分支 + CIO)
 - **数据+HTTP**:后端 22 端点 + curl `tests/test_phase3a_curl.py` 24 调用 100% 200 OK
-- **前端**:`api/commodity.ts`(22 async 方法) + `stores/commodity.ts`(12 actions) + `views/Commodity/{List,Detail,Analysis}.vue` + `router/index.ts`
+- **前端**:`api/commodity.ts`(25 async 方法) + `stores/commodity.ts`(12 actions) + `views/Commodity/{List,Detail,Analysis}.vue` + `views/Tasks/TaskCenter.vue` + `router/index.ts`
 
 ### 下一次启动推荐
 
@@ -385,14 +392,16 @@ Phase 4 模拟交易改写:
 - **Phase 4-4 CIO→Paper 联动**:`POST /api/commodity/paper/from-decision`
 - 详见 `docs/plans/stock-to-commodity.md` §6
 
-### 关键教训(2026-07-13 → 2026-07-16)
+### 关键教训(2026-07-13 → 2026-07-18)
 - **代码完成 ≠ 用户可演示**:Phase 1/2 后端能力齐备,但用户无法在浏览器看到任何商品页面 → Phase 3a 纠正
 - **文档必须反映实测**:夸大交付记录比不记录更糟;进度文档以"实测验证"为标准
 - **合约生命周期是结构性盲点**:Phase 3a 审计发现 get_historical_data 忽略 YYMM → 已修复(主力连续 fallback + 280 测试)
 - **最小侵入 commodity 化成功**:8 个决策链节点只需文件顶 COMMODITY_*_PROMPT + if/else 分支,stock 路径零改动
 - **LLM 调用约定**:MagicMock 不实现 `__or__`,必须用 `llm.invoke(messages_payload)` 而非 `chain.invoke`
 - **后端 200 ≠ 有数据**:前端必须按 `rows.length` / `count` 兜底"暂无数据"(AKShare 接口空时)
+- **删除操作避免 rglob**:直接使用 MongoDB 中 `report_file_path` 定位文件,不递归扫描文件系统
+- **worktree 分支用完即删**:Claude Code 自动创建的 worktree 分支确认合并后应及时清理(25→3 分支)
 
 ### 迁移说明
 - plan 原文已从 `~/.claude/plans/encapsulated-forging-hoare.md` 移到本仓库 `docs/plans/stock-to-commodity.md`,跨机器可用
-- plan v4 对应 2026-07-16 状态:Phase 3b 完成,Phase 4 待启动
+- plan v5 对应 2026-07-18 状态:Phase 3c 完成(队列+批量),Phase 4 待启动

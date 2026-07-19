@@ -162,10 +162,10 @@ async def compute_all_features_from_provider(
             provider, "get_position_rank", 15,
             exchange_code, date_compact, None, underlying,
         ),
-        # 展期收益率
+        # 展期收益率(最长等待 60s,DIY 计算需抓取日线全市场数据)
         _call_provider_with_timeout(
-            provider, "get_roll_yield", 15,
-            "date", var=underlying, start_day="20260101", end_day=date_compact,
+            provider, "get_roll_yield", 60,
+            "date", var=underlying, start_day="20260201", end_day=date_compact,
         ),
         # 新闻
         _call_provider_with_timeout(

@@ -393,7 +393,7 @@ def get_main_continuous_symbol(symbol: str) -> Optional[str]:
 
 # 各品种的指数连续合约代码(AKShare 约定: 代码以 99 结尾)
 # 指数连续合约 = 当前品种全部可交易合约以累计持仓量为权重加权平均得到
-# 目前仅 CFFEX 金融期货有标准 99 代码; 商品期货 AKShare 支持有限
+# CFFEX 金融期货有标准 99 代码; 商品期货通过 get_futures_daily(交易所官方)获得
 INDEX_SYMBOLS: Dict[str, str] = {
     # CFFEX 金融期货
     "IF": "IF99",
@@ -405,6 +405,23 @@ INDEX_SYMBOLS: Dict[str, str] = {
     "TS": "TS99",
 }
 
+# 可通过 get_futures_daily 获取交易所官方指数数据的商品期货品种
+COMMODITY_INDEX_VARIETIES: set = {
+    # SHFE
+    "CU", "AL", "ZN", "PB", "NI", "SN", "AU", "AG",
+    "RB", "WR", "HC", "SS", "BU", "RU", "BR", "SP", "FU", "AO",
+    # INE
+    "SC", "NR", "LU", "BC", "EC",
+    # DCE
+    "A", "B", "C", "CS", "M", "Y", "P", "I", "J", "JM",
+    "L", "V", "PP", "EG", "EB", "PG", "JD", "RR", "LH", "FB", "BB", "LG",
+    # CZCE
+    "CF", "SR", "CY", "AP", "CJ", "PK", "RM", "OI", "RS",
+    "TA", "MA", "FG", "SA", "SH", "UR", "PF", "PX", "PR", "ZC", "SF", "SM",
+    # GFEX
+    "SI", "LC", "PS",
+}
+
 
 def get_index_symbol(underlying: str) -> Optional[str]:
     """获取品种的指数连续合约代码(AKShare 99 格式)。
@@ -413,11 +430,20 @@ def get_index_symbol(underlying: str) -> Optional[str]:
         underlying: 品种代码, 如 "IF" / "CU"
 
     Returns:
-        指数连续合约代码, 如 "IF99"; 不存在返回 None
+        指数连续合约代码, 如 "IF99"; 商品期货返回 "{UPPER}99" 供 provider 尝试;
+        不存在返回 None
     """
     if not underlying:
         return None
-    return INDEX_SYMBOLS.get(underlying.upper())
+    u = underlying.upper()
+    # CFFEX 金融期货精确映射
+    result = INDEX_SYMBOLS.get(u)
+    if result:
+        return result
+    # 商品期货品种 — 返回 99 标记供 provider 通过 get_futures_daily 获取
+    if u in COMMODITY_INDEX_VARIETIES:
+        return f"{u}99"
+    return None
 
 
 # =============================================================================

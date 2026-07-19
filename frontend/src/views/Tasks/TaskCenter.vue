@@ -304,6 +304,7 @@ const hasProcessing = computed(() => list.value.some((t) => t.status === 'proces
 
 // ---- WebSocket 实时进度 ----
 let wsConnections: Map<string, WebSocket> = new Map()
+const WS_TIMEOUT_MS = 3000
 
 function connectTaskWebSocket(taskId: string) {
   if (wsConnections.has(taskId)) return
@@ -313,6 +314,14 @@ function connectTaskWebSocket(taskId: string) {
     const wsUrl = `${wsProtocol}//${host}/api/commodity/ws/task/${taskId}`
     const ws = new WebSocket(wsUrl)
 
+    // 连接超时自动关闭
+    const wsTimeout = setTimeout(() => {
+      if (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN) {
+        ws.close()
+      }
+    }, WS_TIMEOUT_MS)
+
+    ws.onopen = () => { clearTimeout(wsTimeout) }
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data)
@@ -324,8 +333,8 @@ function connectTaskWebSocket(taskId: string) {
         }
       } catch { /* ignore */ }
     }
-    ws.onclose = () => { wsConnections.delete(taskId) }
-    ws.onerror = () => { wsConnections.delete(taskId) }
+    ws.onclose = () => { clearTimeout(wsTimeout); wsConnections.delete(taskId) }
+    ws.onerror = () => { clearTimeout(wsTimeout); wsConnections.delete(taskId) }
     wsConnections.set(taskId, ws)
   } catch { /* ignore */ }
 }
@@ -438,6 +447,10 @@ async function loadStats() {
 
 async function loadList() {
   loading.value = true
+  // 加载超时保护：10 秒后强制关闭 loading
+  const loadTimeout = setTimeout(() => {
+    loading.value = false
+  }, 10000)
   try {
     const statusParam = statusFilter.value || undefined
     const batchParam = batchFilter.value || undefined
@@ -454,18 +467,20 @@ async function loadList() {
     total.value = body?.total ?? tasks.length
     list.value = tasks
 
-    // WebSocket: 为 processing 任务建立连接
+    // WebSocket: 为 processing 任务建立连接（非阻塞，失败不影响 loading）
     tasks.forEach(t => {
       if (t.status === 'processing') connectTaskWebSocket(t.task_id)
     })
 
     ensurePolling()
-    await loadStats()
+    // 独立加载统计，失败不影响列表显示
+    loadStats().catch(() => {})
   } catch (e: any) {
     ElMessage.error(e?.message || '加载失败')
     list.value = []
     total.value = 0
   } finally {
+    clearTimeout(loadTimeout)
     loading.value = false
   }
 }
@@ -482,7 +497,7 @@ function ensurePolling() {
 
 async function pollProgressOnly() {
   // 只更新统计卡片(轻量,只请求 count)
-  await loadStats()
+  try { await loadStats() } catch { /* ignore */ }
 
   // 就地更新每个 processing 任务的进度,不重新加载整个列表
   const processingTasks = list.value.filter(t => t.status === 'processing')
