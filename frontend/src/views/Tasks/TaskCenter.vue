@@ -146,12 +146,6 @@
               v-if="row.status === 'completed'"
               type="text"
               size="small"
-              @click="viewReport(row)"
-            >查看报告</el-button>
-            <el-button
-              v-if="row.status === 'completed'"
-              type="text"
-              size="small"
               @click="viewResult(row)"
             >查看结果</el-button>
             <el-tooltip
@@ -201,37 +195,15 @@
     <el-drawer
       v-model="detailDrawerVisible"
       title="报告详情"
-      size="60%"
+      size="70%"
       direction="rtl"
     >
-      <template v-if="detailData">
-        <div v-for="(value, key) in detailData" :key="key" class="detail-section">
-          <h4 v-if="typeof value === 'string' && value.length > 20" class="section-title">
-            {{ sectionTitle(key) }}
-          </h4>
-          <div v-if="typeof value === 'string' && value.length > 20" class="section-content">
-            {{ value }}
-          </div>
-        </div>
-      </template>
-      <div v-else class="empty-detail">
-        <el-empty description="加载报告详情中..." />
-      </div>
+      <CommodityReportDetail :data="detailData" :loading="detailLoading" />
     </el-drawer>
 
     <!-- 结果详情弹窗 -->
-    <el-dialog v-model="resultDialogVisible" title="分析结果" width="70%" top="5vh">
-      <div v-if="resultData" class="result-detail">
-        <div v-for="(value, key) in resultData" :key="key" class="detail-section">
-          <h4 v-if="typeof value === 'string' && value.length > 20" class="section-title">
-            {{ sectionTitle(key) }}
-          </h4>
-          <div v-if="typeof value === 'string' && value.length > 20" class="section-content">
-            {{ value }}
-          </div>
-        </div>
-      </div>
-      <div v-else><el-empty description="加载中..." /></div>
+    <el-dialog v-model="resultDialogVisible" title="分析结果" width="80%" top="3vh">
+      <CommodityReportDetail :data="resultData" :loading="resultLoading" />
     </el-dialog>
   </div>
 </template>
@@ -243,6 +215,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { List, Refresh, TrendCharts } from '@element-plus/icons-vue'
 import { commodityApi, type CommodityTaskItem, type TaskStatus } from '@/api/commodity'
 import { formatDateTime } from '@/utils/datetime'
+import CommodityReportDetail from '@/components/Commodity/CommodityReportDetail.vue'
 
 const router = useRouter()
 
@@ -291,10 +264,12 @@ const stats = ref({ total: 0, processing: 0, completed: 0, failed: 0 })
 // 报告详情抽屉
 const detailDrawerVisible = ref(false)
 const detailData = ref<Record<string, any> | null>(null)
+const detailLoading = ref(false)
 
 // 结果弹窗
 const resultDialogVisible = ref(false)
 const resultData = ref<Record<string, any> | null>(null)
+const resultLoading = ref(false)
 
 // 自动轮询
 let pollingTimer: ReturnType<typeof setInterval> | null = null
@@ -379,11 +354,14 @@ async function markAsFailed(row: CommodityTaskItem) {
 
 async function viewResult(row: CommodityTaskItem) {
   try {
+    resultLoading.value = true
     const res = await commodityApi.getTaskResult(row.task_id)
     resultData.value = (res as any)?.data || null
     resultDialogVisible.value = true
   } catch (e: any) {
     ElMessage.error(e?.message || '获取结果失败')
+  } finally {
+    resultLoading.value = false
   }
 }
 
@@ -412,14 +390,7 @@ function statusTagType(status: string): 'success' | 'info' | 'warning' | 'danger
   }
   return map[status] ?? 'info'
 }
-function sectionTitle(key: string): string {
-  const map: Record<string, string> = {
-    market_report: '技术分析', fundamentals_report: '基本面分析',
-    sentiment_report: '持仓情绪', news_report: '新闻分析',
-    investment_plan: '投资计划', final_decision: '投研总监决策',
-  }
-  return map[key] || key
-}
+
 
 const formatTime = (t: string) => (t ? formatDateTime(t) : '-')
 
@@ -526,12 +497,15 @@ async function viewReport(row: CommodityTaskItem) {
   }
   detailDrawerVisible.value = true
   detailData.value = null
+  detailLoading.value = true
   try {
     const res = await commodityApi.getReportDetail(row.report_id)
     detailData.value = (res as any)?.data || null
   } catch {
     ElMessage.error('获取报告详情失败')
     detailDrawerVisible.value = false
+  } finally {
+    detailLoading.value = false
   }
 }
 
@@ -590,18 +564,5 @@ onUnmounted(() => {
     .failed-color { color: var(--el-color-danger); }
     .label { font-size: 13px; color: var(--el-text-color-secondary); margin-top: 4px; }
   }
-  .detail-section { margin-bottom: 20px; }
-  .section-title {
-    margin: 0 0 8px; padding: 8px 12px;
-    background: var(--el-color-primary-light-9, #ecf5ff);
-    border-radius: 4px; font-size: 15px;
-  }
-  .section-content {
-    white-space: pre-wrap; font-size: 14px; line-height: 1.6; padding: 0 12px;
-    max-height: 400px; overflow-y: auto;
-  }
-  .empty-detail { display: flex; align-items: center; justify-content: center; height: 300px; }
-  .muted { color: var(--el-text-color-placeholder); }
-  .result-detail { max-height: 70vh; overflow-y: auto; }
 }
 </style>

@@ -2,7 +2,7 @@
   <div class="commodity-analysis">
     <div class="page-header">
       <h2>大宗商品分析</h2>
-      <p class="text-secondary">多智能体决策链 — 技术分析师 → 产业分析师 → 持仓情绪分析师 → 新闻分析师 → 推理分析师 → 投研总监</p>
+      <p class="text-secondary">多智能体决策链 — 技术分析师 → 产业分析师 → 持仓情绪分析师 → 新闻分析师 → 推理分析师 → 总结</p>
     </div>
 
     <el-row :gutter="24">
@@ -152,22 +152,22 @@
               <EvidenceChain :data="latestResult?.evidence_chain || null" />
             </el-tab-pane>
             <el-tab-pane label="技术分析" lazy>
-              <div class="report-content">{{ latestResult.market_report || '(空)' }}</div>
+              <div class="report-content">{{ cleanText(latestResult.market_report) || '(空)' }}</div>
             </el-tab-pane>
             <el-tab-pane label="基本面" lazy>
-              <div class="report-content">{{ latestResult.fundamentals_report || '(空)' }}</div>
+              <div class="report-content">{{ cleanText(latestResult.fundamentals_report) || '(空)' }}</div>
             </el-tab-pane>
-            <el-tab-pane label="持仓情绪" lazy>
-              <div class="report-content">{{ latestResult.sentiment_report || '(空)' }}</div>
+            <el-tab-pane label="持仓分析" lazy>
+              <div class="report-content">{{ cleanText(latestResult.position_report) || '(空)' }}</div>
             </el-tab-pane>
             <el-tab-pane label="新闻" lazy>
-              <div class="report-content">{{ latestResult.news_report || '(空)' }}</div>
+              <div class="report-content">{{ cleanText(latestResult.news_report) || '(空)' }}</div>
             </el-tab-pane>
-            <el-tab-pane label="投资计划" lazy>
+            <el-tab-pane label="推理分析" lazy>
               <div class="report-content">{{ formatInvestmentPlan(latestResult.investment_plan) || '(空)' }}</div>
             </el-tab-pane>
-            <el-tab-pane label="投研总监" lazy>
-              <div class="report-content">{{ latestResult.final_decision || '(空)' }}</div>
+            <el-tab-pane label="总结" lazy>
+              <div class="report-content" v-html="renderMarkdown(cleanText(latestResult.final_decision)) || '(空)'" />
             </el-tab-pane>
           </el-tabs>
         </el-card>
@@ -176,7 +176,7 @@
           <el-empty description="选择品种并提交分析">
             <p class="text-secondary">
               分析将依次执行:技术分析师 → 产业分析师 → 持仓情绪分析师 → 新闻分析师<br>
-              → 推理分析师 → 投研总监
+              → 推理分析师 → 总结
             </p>
           </el-empty>
         </el-card>
@@ -200,13 +200,8 @@
       </el-col>
     </el-row>
 
-    <el-dialog v-model="detailVisible" title="报告详情" width="80%" top="5vh">
-      <div v-if="detailData" class="report-detail">
-        <div v-for="(value, key) in detailData" :key="key" class="detail-section">
-          <h4 v-if="typeof value === 'string' && value.length > 20">{{ sectionTitle(key) }}</h4>
-          <div v-if="typeof value === 'string' && value.length > 20" class="detail-content">{{ value }}</div>
-        </div>
-      </div>
+    <el-dialog v-model="detailVisible" title="报告详情" width="80%" top="3vh">
+      <CommodityReportDetail :data="detailData" />
     </el-dialog>
   </div>
 </template>
@@ -217,6 +212,8 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { commodityApi, type VarietyItem } from '@/api/commodity'
 import EvidenceChain from '@/components/Commodity/EvidenceChain.vue'
+import CommodityReportDetail from '@/components/Commodity/CommodityReportDetail.vue'
+import { renderMarkdown } from '@/utils/markdown'
 
 const router = useRouter()
 
@@ -263,6 +260,12 @@ function computeFullSymbol(): string {
   return `${form.value.variety_symbol}0${suffix}`
 }
 
+/** 清理报告文本中的遗留品牌词 */
+function cleanText(text: string | null | undefined): string {
+  if (!text) return ''
+  return text.replace(/永安期货/g, '').replace(/永安/g, '')
+}
+
 function directionLabel(action?: string): string {
   const map: Record<string, string> = { long: '做多', short: '做空', hold: '持有', flat: '平仓' }
   return map[action || 'hold'] || action || 'hold'
@@ -275,14 +278,6 @@ function formatInvestmentPlan(text: string): string {
   if (!text) return ''
   try { return JSON.stringify(JSON.parse(text), null, 2) }
   catch { return text }
-}
-function sectionTitle(key: string): string {
-  const map: Record<string, string> = {
-    market_report: '技术分析', fundamentals_report: '基本面分析',
-    sentiment_report: '持仓情绪', news_report: '新闻分析',
-    investment_plan: '投资计划', final_decision: '投研总监决策',
-  }
-  return map[key] || key
 }
 
 async function onExchangeChange() {
@@ -473,10 +468,4 @@ onUnmounted(() => {
   background: var(--el-fill-color-light, #f5f7fa); border-radius: 4px;
 }
 .report-detail { max-height: 70vh; overflow-y: auto; }
-.detail-section { margin-bottom: 20px; }
-.detail-section h4 {
-  margin: 0 0 8px; padding: 8px 12px;
-  background: var(--el-color-primary-light-9, #ecf5ff); border-radius: 4px; font-size: 15px;
-}
-.detail-content { white-space: pre-wrap; font-size: 14px; line-height: 1.6; padding: 0 12px; }
 </style>
