@@ -419,6 +419,114 @@ def compute_risk_assessment(commodity_features: Dict[str, Any]) -> Dict[str, Any
 
 
 # =============================================================================
+# SafetyOverride — 纯规则硬约束二审（0 LLM）
+# =============================================================================
+
+def safety_override(
+    risk_assessment: Dict[str, Any],
+    llm_direction: str,
+    llm_confidence: float,
+    llm_raw: str = "",
+) -> Dict[str, Any]:
+    """纯规则风控硬约束二审。
+
+    在 LLM 输出之后强制执行，不可协商。
+
+    Args:
+        risk_assessment: compute_risk_assessment() 的返回值
+        llm_direction: LLM 输出的方向 ("long"/"short"/"hold"/"flat")
+        llm_confidence: LLM 输出的置信度 (0-1)
+        llm_raw: LLM 原始输出文本
+
+    Returns:
+        dict: {
+            "action": 覆盖后的最终方向,
+            "confidence": 覆盖后的置信度,
+            "max_position": 仓位上限(0-1，0=禁止开仓),
+            "overridden": bool,
+            "override_reason": str,  # 人类可读的覆盖原因
+            "override_rules_triggered": List[str],
+        }
+    """
+    composite = risk_assessment.get("composite_risk_level", "UNKNOWN")
+    flags = risk_assessment.get("flags", [])
+    dimensions = risk_assessment.get("dimensions", {})
+    data_insufficient = risk_assessment.get("data_insufficient", False)
+
+    # ---- 检测触发规则 ----
+    triggered: list[str] = []
+    max_position = 1.0  # 仓位上限 0-1
+    action = llm_direction
+    confidence = llm_confidence
+
+    # --- 强制规则（不可协商） ---
+
+    # R5 极端风险 → 拒绝开仓
+    if composite == 5 or composite == "R5":
+        triggered.append("R5_REJECT")
+        action = "hold"
+        confidence = 0.0
+        max_position = 0.0
+
+    # R4 + 至少一个 high 级 flag → 仓位上限减半
+    if composite == 4 and any(f.get("severity") == "high" for f in flags):
+        triggered.append("R4_FLAG_HALF_POSITION")
+
+    # R4 但无 high flag → 警告但允许
+    if composite == 4 and not any(f.get("severity") in ("high", "critical") for f in flags):
+        triggered.append("R4_WARN_ONLY")
+
+    # 数据不足 → 禁止激进方向
+    if data_insufficient:
+        triggered.append("DATA_INSUFFICIENT")
+        if action in ("long", "short"):
+            action = "hold"
+            confidence = min(confidence, 0.2)
+            max_position = min(max_position, 0.3)
+
+    # near_delivery flag → 仅观望
+    if any(f.get("name") == "near_delivery" for f in flags):
+        triggered.append("NEAR_DELIVERY_REJECT")
+        action = "hold"
+        confidence = 0.0
+        max_position = 0.0
+
+    # R4 且 R1(波动率)也高 → 仓位上限减半 (与 LLM 方向无关)
+    vol_level = dimensions.get("volatility", {}).get("level", 0)
+    if isinstance(vol_level, int) and vol_level >= 4 and composite >= 4:
+        if "R4_FLAG_HALF_POSITION" not in triggered:
+            triggered.append("R4_PLUS_HIGH_VOL")
+        max_position = min(max_position, 0.5)
+
+    # --- 最终 verdict ---
+    overridden = len(triggered) > 0 and action != llm_direction
+
+    # 构造人类可读的覆盖原因
+    if overridden:
+        rule_descriptions = {
+            "R5_REJECT": "综合风险等级 R5（极端风险），触发强制拒绝开仓规则",
+            "R4_FLAG_HALF_POSITION": "综合风险等级 R4 + 高风险标志，仓位上限减半",
+            "R4_WARN_ONLY": "综合风险等级 R4，仅警告仍按 LLM 决策",
+            "DATA_INSUFFICIENT": "数据不足，禁止激进方向交易，仓位上限降至 30%",
+            "NEAR_DELIVERY_REJECT": "合约临近交割（<10天），仅观望禁止开仓",
+            "R4_PLUS_HIGH_VOL": "波动率维度 R4+ 且综合风险 R4+，仓位上限减半",
+        }
+        reasons = [rule_descriptions.get(r, r) for r in triggered if r != "R4_WARN_ONLY"]
+        override_reason = "；".join(reasons) if reasons else "触发风控规则，覆盖 LLM 决策"
+    else:
+        override_reason = ""
+
+    return {
+        "action": action,
+        "confidence": confidence,
+        "max_position": max_position,
+        "overridden": overridden,
+        "override_reason": override_reason,
+        "override_rules_triggered": triggered,
+    }
+
+
+# =============================================================================
 # 投研总监 LLM Prompt（使用 LangChain .partial() 替换变量）
 # =============================================================================
 
@@ -493,21 +601,16 @@ INVESTMENT_DIRECTOR_SYSTEM_PROMPT = """你是大宗商品期货的**投研总监
 
 ### key 2: 风险评估卡 的详细结构
 
-- 量化风险矩阵 (dict): 每个维度的值是 {{
-    "等级": "R3",
-    "值": 数值或字符串,
-    "解读": "简短解读"
-  }}
-  维度：波动率、基差、持仓拥挤、库存、期限结构、价仓关系
+⚠️ 量化风险矩阵由系统纯规则唯一产出，LLM 不需要重新输出。
+LLM 仅负责以下定性维度：
 
 - 三方视角 (dict):
-  - "激进": {{"概率权重": 0.3, "条件": "..."}}
-  - "保守": {{"概率权重": 0.2, "条件": "..."}}
-  - "中性": {{"概率权重": 0.5, "条件": "..."}}
+  - "激进": {"概率权重": 0.3, "条件": "..."}
+  - "保守": {"概率权重": 0.2, "条件": "..."}
+  - "中性": {"概率权重": 0.5, "条件": "..."}
 
 - 风险裁定 (dict):
-  - "总体风险等级": "R3"
-  - "是否建议入场": true 或 false
+  - "建议动作": "开仓" | "观望" | "减仓" | "平仓"
   - "仓位上限": "账户30%"
   - "杠杆上限": "3倍"
 
@@ -527,9 +630,9 @@ INVESTMENT_DIRECTOR_SYSTEM_PROMPT = """你是大宗商品期货的**投研总监
 
 1. 估值审核各维度必须用"同意"或"修正"开头，引用证据 ID（REF-TECH-xxx 格式）
 2. 情景裁决必须给出排除理由，不能只写选定不写排除
-3. 风险裁定的"是否建议入场"必须与风险等级一致（R4+ 时建议 false）
+3. 建议动作必须是"开仓"|"观望"|"减仓"|"平仓"之一，仓位上限仅在"开仓"时给出
 4. final_decision_markdown 必须包含 **方向** 和 **置信度** 字段
-5. 输出纯 JSON，无额外包裹
+5. 【硬约束】输出纯 JSON，禁止使用 ```json 代码块包裹，否则解析失败将视为系统降级。直接以 `{` 开头，`}` 结尾
 6. 全文中文
 """
 
@@ -661,6 +764,22 @@ def create_investment_director(deep_thinking_llm):
         # ---- Step 1: 量化检查器（纯规则，0 LLM） ----
         commodity_features = state.get("commodity_features", {})
         risk_assessment = compute_risk_assessment(commodity_features)
+
+        # 合并合约到期警告到 risk_assessment.flags
+        contract_expiry = state.get("contract_expiry_warning", {}) or {}
+        expiry_warning = contract_expiry.get("warning", "")
+        if expiry_warning:
+            risk_assessment.setdefault("flags", []).append({
+                "name": "near_delivery",
+                "flag": expiry_warning,
+                "severity": "high",
+            })
+            risk_assessment["composite_risk_level"] = max(
+                risk_assessment.get("composite_risk_level", 0) if isinstance(risk_assessment.get("composite_risk_level"), int) else 0,
+                4
+            )
+            logger.warning(f"[投研总监] 合约到期风险注入: {expiry_warning}")
+
         composite = risk_assessment.get("composite_risk_level", "UNKNOWN")
         logger.info(
             f"[投研总监] 量化检查: 综合等级={composite}, "
@@ -773,6 +892,54 @@ def create_investment_director(deep_thinking_llm):
             final_decision = _build_fallback_decision(full_symbol, risk_assessment)
             msg_out = AIMessage(content="(系统降级)")
             logger.warning("[投研总监] 使用 fallback 输出")
+
+        # ---- Step 6: SafetyOverride 纯规则二审（0 LLM） ----
+        # 提取 LLM 输出的方向用于二审
+        _llm_dir = "hold"
+        _llm_conf = 0.0
+        _raw_text = final_decision or ""
+        import re as _re
+        _dm = _re.search(r'[*]{0,2}方向[*]{0,2}\s*[:：]\s*(做多|做空|买入|卖出|持有|平仓)', _raw_text)
+        if _dm:
+            _raw_dir = _dm.group(1)
+            if _raw_dir in ("做多", "买入"): _llm_dir = "long"
+            elif _raw_dir in ("做空", "卖出"): _llm_dir = "short"
+            elif _raw_dir == "平仓": _llm_dir = "flat"
+            elif _raw_dir == "持有": _llm_dir = "hold"
+        _cm = _re.search(r'[*]{0,2}置信度[*]{0,2}\s*[:：]\s*([0-9]+\.?[0-9]*)', _raw_text)
+        if _cm:
+            try:
+                _parsed = float(_cm.group(1))
+                if 0.0 <= _parsed <= 1.0: _llm_conf = _parsed
+            except ValueError: pass
+
+        _override = safety_override(risk_assessment, _llm_dir, _llm_conf, _raw_text)
+
+        if _override["overridden"]:
+            logger.warning(
+                f"[投研总监] SafetyOverride 触发: {_override['override_reason']}"
+            )
+            # 如果方向被覆盖，修改 final_decision
+            if _override["action"] != _llm_dir:
+                new_dir_map = {"long": "做多", "short": "做空", "hold": "持有", "flat": "平仓"}
+                new_dir_cn = new_dir_map.get(_override["action"], "持有")
+                _raw_text_new = _raw_text
+                if _dm:
+                    _raw_text_new = _raw_text[:_dm.start()] + f"**方向**:{new_dir_cn}" + _raw_text[_dm.end():]
+                if _override["confidence"] != _llm_conf:
+                    _raw_text_new = _raw_text_new.replace(f"**置信度**:{_llm_conf}", f"**置信度**:{_override['confidence']}")
+                final_decision = _raw_text_new
+                msg_out = AIMessage(content=final_decision)
+
+            # 注入 override_info 到 risk_card
+            risk_card["safety_override"] = {
+                "overridden": True,
+                "override_reason": _override["override_reason"],
+                "override_rules_triggered": _override["override_rules_triggered"],
+                "original_llm_direction": _llm_dir,
+                "overridden_action": _override["action"],
+                "max_position_pct": _override["max_position"] * 100,
+            }
 
         return {
             "investment_memo": investment_memo,

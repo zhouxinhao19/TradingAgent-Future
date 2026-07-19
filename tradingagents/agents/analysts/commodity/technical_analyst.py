@@ -301,7 +301,7 @@ def create_technical_analyst(llm):
             analyst_id = make_analyst_id("TECH", full_symbol, trade_date, seed="empty")
             conclusion_id = make_conclusion_id("TECH", 1)
             tagged_report = inject_analyst_id(report_md, analyst_id)
-            registry_entry = make_registry_entry(analyst_id, conclusion_id, "TECH", "technical", "market_report", "neutral", "(数据缺失: 跳过)")
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "TECH", "technical", "market_report", "skip", "(数据缺失: 跳过)", status="skipped")
             return {
                 "market_report": tagged_report,
                 "messages": [],
@@ -319,7 +319,7 @@ def create_technical_analyst(llm):
             analyst_id = make_analyst_id("TECH", full_symbol, trade_date, seed="sparse")
             conclusion_id = make_conclusion_id("TECH", 1)
             tagged_report = inject_analyst_id(report_md, analyst_id)
-            registry_entry = make_registry_entry(analyst_id, conclusion_id, "TECH", "technical", "market_report", "neutral", "(数据稀疏: 跳过)")
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "TECH", "technical", "market_report", "skip", "(数据稀疏: 跳过)", status="skipped")
             return {
                 "market_report": tagged_report,
                 "messages": [],
@@ -469,7 +469,7 @@ def create_technical_analyst(llm):
             analyst_id = make_analyst_id("TECH", full_symbol, trade_date, seed="fallback")
             conclusion_id = make_conclusion_id("TECH", 1)
             tagged_report = inject_analyst_id(fallback_md, analyst_id)
-            registry_entry = make_registry_entry(analyst_id, conclusion_id, "TECH", "technical", "market_report", "neutral", "(降级: LLM 不可用)")
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "TECH", "technical", "market_report", "neutral", "(降级: LLM 不可用)", status="degraded")
             return {
                 "market_report": tagged_report,
                 "messages": [],

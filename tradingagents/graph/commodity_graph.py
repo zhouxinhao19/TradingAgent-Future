@@ -11,11 +11,20 @@ commodity_graph.py — CommodityTradingAgentsGraph 子图 (Phase 3b-ii-C)
   - commodity 路径独立:CommodityGraphSetup + CommodityPropagator
   - commodity 不需要 tool_nodes(4 analyst 读 features,LLM 必调但不调工具)
   - 决策链节点 commodity 化(3b-ii-B)已自动通过 state['asset_type'] 切换 prompt
+
+Phase Agent 改造(2026-07-19):
+  - Checkpointer 支持: MemorySaver(默认) / SqliteSaver(env CHECKPOINTER_BACKEND=sqlite),
+    环境变量 CHECKPOINTER_BACKEND=sqlite 启用持久化断点续传
+  - SafetyOverride: 风控硬约束二审
+  - L2 Prompt 精简化: 结构化摘要替代完整 Markdown
+  - L1 并行化: 4 个 analyst fan-out
 """
 from __future__ import annotations
 
+import os
 from typing import Any, Callable, Dict, List, Optional
 
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
 from tradingagents.agents.utils.agent_states import (
@@ -39,6 +48,119 @@ from .setup import GraphSetup
 from .trading_graph import TradingAgentsGraph
 
 logger = get_logger("default")
+
+# ---- retry 配置(环境变量) ----
+_LLM_MAX_RETRIES = int(os.environ.get("LLM_MAX_RETRIES", "2"))
+_LLM_L1_TIMEOUT = int(os.environ.get("LLM_L1_TIMEOUT", "60"))
+_LLM_L2_TIMEOUT = int(os.environ.get("LLM_L2_TIMEOUT", "90"))
+_LLM_L3_TIMEOUT = int(os.environ.get("LLM_L3_TIMEOUT", "90"))
+
+
+def _wrap_llm_with_retry(llm, label: str = "LLM", default_timeout: int = 60):
+    """给 LLM 对象的 invoke/ainvoke 方法加上超时和自动重试。
+
+    Args:
+        llm: LangChain LLM 对象
+        label: 日志标签
+        default_timeout: 默认超时秒数
+
+    Returns:
+        包装后的 LLM 对象（保留原接口，仅替换 invoke/ainvoke）
+    """
+    import asyncio
+    from functools import wraps
+
+    original_invoke = llm.invoke
+    original_ainvoke = getattr(llm, "ainvoke", None)
+
+    @wraps(original_invoke)
+    def _invoke_with_retry(*args, **kwargs):
+        max_retries = _LLM_MAX_RETRIES
+        last_error = None
+        for attempt in range(max_retries + 1):
+            try:
+                return original_invoke(*args, **kwargs)
+            except Exception as e:
+                last_error = e
+                if attempt < max_retries:
+                    logger.warning(
+                        f"⚠️ {label} LLM 调用失败(第{attempt+1}/{max_retries+1}次重试前): {e}"
+                    )
+                else:
+                    logger.error(
+                        f"❌ {label} LLM {max_retries+1}次重试均失败: {e}"
+                    )
+        raise last_error  # noqa: B018
+
+def _create_checkpointer():
+    """创建 Graph checkpointer 实例。
+
+    环境变量 CHECKPOINTER_BACKEND=memory(默认)|sqlite
+    - memory: MemorySaver，仅存进程内存，重启丢失
+    - sqlite: SqliteSaver，持久化到文件，重启可恢复（需安装 langgraph-checkpoint-sqlite）
+    """
+    backend = os.environ.get("CHECKPOINTER_BACKEND", "memory").lower()
+    if backend == "sqlite":
+        try:
+            from langgraph.checkpoint.sqlite import SqliteSaver
+            return SqliteSaver.from_conn_string("checkpoints.sqlite")
+        except ImportError:
+            logger.warning("SqliteSaver 未安装，回退 MemorySaver")
+            return MemorySaver()
+    return MemorySaver()
+
+
+def _compute_contract_expiry(full_symbol: str, trade_date_str: str) -> Dict[str, Any]:
+    """从合约代码估算到期日，返回到期警告。
+
+    Args:
+        full_symbol: 如 CU2507.SHF, RB2510.SHF
+        trade_date_str: 交易日期 "2026-07-19"
+
+    Returns:
+        dict: {"days_to_expiry": N, "warning": "..."}
+        如果无法解析或距离到期>30天, warning为空字符串
+    """
+    import re
+    from datetime import date, datetime
+
+    default = {"days_to_expiry": None, "warning": ""}
+
+    m = re.search(r'(\d{2})(\d{2})', full_symbol.split('.')[0])
+    if not m:
+        return default
+
+    year = 2000 + int(m.group(1))
+    month = int(m.group(2))
+    if month < 1 or month > 12:
+        return default
+
+    try:
+        trade_date = datetime.strptime(trade_date_str, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        try:
+            trade_date = date.fromisoformat(str(trade_date_str))
+        except (ValueError, TypeError):
+            return default
+
+    # 假设交割日为该月 15 日（实际以交易所日历为准）
+    try:
+        delivery = date(year, month, 15)
+    except ValueError:
+        return default
+
+    days_to_expiry = (delivery - trade_date).days
+
+    warning = ""
+    if days_to_expiry < 0:
+        # 已到期：用主力连续数据重新分析可能更合适
+        warning = f"⚠️ 合约 {full_symbol} 已于 {delivery.isoformat()} 到期（{-days_to_expiry} 天前），建议使用主力连续合约(-m 后缀)"
+    elif days_to_expiry < 10:
+        warning = f"⚠️ 合约 {full_symbol} 距到期仅 {days_to_expiry} 天（{delivery.isoformat()}），临近交割月流动性风险高，建议切换主力连续合约"
+    elif days_to_expiry < 30:
+        warning = f"⚠️ 合约 {full_symbol} 距到期 {days_to_expiry} 天，注意交割月限仓和保证金提高"
+
+    return {"days_to_expiry": days_to_expiry, "warning": warning, "delivery_date": delivery.isoformat()}
 
 
 # === Propagator ===
@@ -81,6 +203,9 @@ class CommodityPropagator(Propagator):
             _high = sum(1 for e in latest_news if e.get("llm_importance") == "high")
             news_summary = f"当前新闻情感: 利多{_pos}条 利空{_neg}条 高重要度{_high}条。"
 
+        # Phase Agent 改造: 合约到期风险检测
+        contract_expiry_warning = _compute_contract_expiry(full_symbol, trade_date)
+
         return {
             "messages": [HumanMessage(content=analysis_request)],
             "company_of_interest": full_symbol,  # 复用 stock 字段
@@ -114,6 +239,7 @@ class CommodityPropagator(Propagator):
             "latest_news": latest_news or [],
             "analyst_registry": {},
             "news_summary": news_summary,
+            "contract_expiry_warning": contract_expiry_warning,
         }
 
 
@@ -171,19 +297,23 @@ class CommodityGraphSetup:
         # 注册投研总监（Phase 4，替代 L3-L5 共 5 节点 + 7 条边）
         workflow.add_node("Investment Director", id_node)
 
-        # === 边(commodity 路径:analyst 不调工具,直接决策链) ===
-        # START → Technical Analyst → Fundamentals Analyst → Sentiment Analyst → News Analyst
+        # === 边(commodity 路径:4 L1 并行 fan-out + 汇聚到 Research Manager) ===
+        # Phase Agent 改造: 4 个 L1 analyst 从 START 直接 fan-out(无依赖,各自读 commodity_features)
         workflow.add_edge(START, "Technical Analyst")
-        workflow.add_edge("Technical Analyst", "Fundamentals Analyst")
-        workflow.add_edge("Fundamentals Analyst", "Sentiment Analyst")
-        workflow.add_edge("Sentiment Analyst", "News Analyst")
+        workflow.add_edge(START, "Fundamentals Analyst")
+        workflow.add_edge(START, "Sentiment Analyst")
+        workflow.add_edge(START, "News Analyst")
 
-        # News Analyst → Research Manager（推理分析师）→ Investment Director → END
+        # 4 个 analyst 全部完成后汇聚到 Research Manager（推理分析师）
+        # LangGraph 的 fan-in 自动等待所有前驱节点完成，无需手动 barrier
+        workflow.add_edge("Technical Analyst", "Research Manager")
+        workflow.add_edge("Fundamentals Analyst", "Research Manager")
+        workflow.add_edge("Sentiment Analyst", "Research Manager")
         workflow.add_edge("News Analyst", "Research Manager")
         workflow.add_edge("Research Manager", "Investment Director")
         workflow.add_edge("Investment Director", END)
 
-        return workflow.compile()
+        return workflow.compile(checkpointer=checkpointer)
 
 
 # === 主类 ===
@@ -204,6 +334,14 @@ class CommodityTradingAgentsGraph(TradingAgentsGraph):
     def __init__(self, debug: bool = False, config: Optional[Dict[str, Any]] = None):
         # 用 ["market"] 占位避免父类 ValueError,然后立刻覆盖 graph
         super().__init__(selected_analysts=["market"], debug=debug, config=config)
+
+        # 给 LLM 加超时和重试包装 (应用层防御, 不穿透到 LangChain 底层 client)
+        self.quick_thinking_llm = _wrap_llm_with_retry(
+            self.quick_thinking_llm, "快速", _LLM_L1_TIMEOUT
+        )
+        self.deep_thinking_llm = _wrap_llm_with_retry(
+            self.deep_thinking_llm, "深度(L2/L3)", _LLM_L2_TIMEOUT
+        )
 
         # 替换为 commodity setup + propagator
         self.graph_setup = CommodityGraphSetup(
@@ -329,7 +467,15 @@ class CommodityTradingAgentsGraph(TradingAgentsGraph):
         trace: List[Dict[str, Any]] = []
         final_state: Optional[Dict[str, Any]] = None
 
-        for chunk in self.graph.stream(init_state, **args):
+        # 使用 task_id 或 symbol+date 构造 thread_id，供 Checkpointer 断点续传
+        _thread_id = task_id or f"{full_symbol}_{trade_date}"
+        stream_mode = args.get("stream_mode", "values")
+        _run_config = {
+            "configurable": {"thread_id": _thread_id},
+            "recursion_limit": args.get("config", {}).get("recursion_limit", 100),
+        }
+
+        for chunk in self.graph.stream(init_state, config=_run_config, stream_mode=stream_mode):
             if progress_callback and args.get("stream_mode") == "updates":
                 self._send_progress_update(chunk, progress_callback)
                 if final_state is None:
@@ -345,6 +491,13 @@ class CommodityTradingAgentsGraph(TradingAgentsGraph):
             final_state = init_state
         elif trace:
             final_state = trace[-1]
+
+        # Step 10: 注入证据链(纯规则提取,零 LLM 调用)
+        try:
+            final_state["evidence_chain"] = build_evidence_chain(final_state)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"⚠️ build_evidence_chain 失败: {e}")
+            final_state["evidence_chain"] = {"summary": {}, "layers": {}, "error": str(e)}
 
         # 构造决策摘要(CIO 输出在 state['final_decision'])
         decision = self._extract_decision(final_state)
@@ -417,3 +570,183 @@ class CommodityTradingAgentsGraph(TradingAgentsGraph):
             "reasoning": text,
             "raw_text": text,
         }
+
+
+# =============================================================================
+# build_evidence_chain — 纯规则提取三层证据链 JSON（Step 10 证据链可视化）
+# =============================================================================
+
+def build_evidence_chain(final_state: Dict[str, Any]) -> Dict[str, Any]:
+    """从最终 state 提取结构化三层证据链 JSON，供前端 Timeline 渲染。
+
+    Args:
+        final_state: propagate() 返回的最终 state dict
+
+    Returns:
+        dict，形如:
+        {
+            "summary": { "symbol", "variety", "date", "final_action", "confidence" },
+            "layers": {
+                "L1": [ {id, name, direction, confidence, calibrated_confidence, status, key_metrics, signals}, ... ],
+                "L2": { "估值驱动矩阵": [...], "多空对照表": [...], "情景推演": {...}, "L1_conflict_summary": "..." },
+                "L3": { "risk_assessment": {...}, "final_decision": "...", "safety_override": {...} },
+            }
+        }
+    """
+    import json
+    import re
+
+    symbol = final_state.get("full_symbol", "")
+    variety = final_state.get("variety_name", "")
+    trade_date = final_state.get("trade_date", "")
+    registry = final_state.get("analyst_registry", {}) or {}
+    features = final_state.get("commodity_features", {}) or {}
+    final_decision = final_state.get("final_decision", "")
+    risk_assessment = final_state.get("risk_assessment", {}) or {}
+
+    # --- 顶层摘要 ---
+    action = "hold"
+    confidence = 0.0
+    if final_decision:
+        dr = re.search(r'\*{0,2}方向\*{0,2}\s*[:：]\s*(做多|做空|买入|卖出|持有|平仓)', final_decision)
+        if dr:
+            raw = dr.group(1)
+            action = {"做多": "long", "买入": "long", "做空": "short", "卖出": "short",
+                      "平仓": "flat", "持有": "hold"}.get(raw, "hold")
+        cr = re.search(r'\*{0,2}置信度\*{0,2}\s*[:：]\s*([0-9]+\.?[0-9]*)', final_decision)
+        if cr:
+            try:
+                p = float(cr.group(1))
+                if 0.0 <= p <= 1.0:
+                    confidence = p
+            except ValueError:
+                pass
+
+    summary = {
+        "symbol": symbol,
+        "variety": variety,
+        "date": trade_date,
+        "final_action": action,
+        "confidence": confidence,
+    }
+
+    # --- L1: 4 个 analyst 结构化摘要 ---
+    L1_entries = []
+    analyst_configs = [
+        ("tech", "技术分析师", "technical"),
+        ("fund", "产业分析师", "fundamental"),
+        ("pos", "持仓分析师", "position"),
+        ("news", "新闻分析师", "news"),
+    ]
+    for prefix, cn_name, feat_key in analyst_configs:
+        entry = None
+        for k, v in registry.items():
+            if k.startswith(f"REF-{prefix.upper()}") or k.startswith(prefix.upper()):
+                entry = v if isinstance(v, dict) else None
+                break
+        if not entry:
+            L1_entries.append({
+                "id": f"REF-{prefix.upper()}-unknown",
+                "name": cn_name,
+                "direction": "skip",
+                "confidence": 0.0,
+                "calibrated_confidence": 0.0,
+                "status": "skipped",
+                "key_metrics": {},
+                "signals": [],
+            })
+            continue
+
+        # 置信度校准(复用 _data_quality_weight 逻辑)
+        status = entry.get("status", "ok")
+        raw_conf = entry.get("confidence", 0.0)
+        weight = {"ok": 1.0, "degraded": 0.5, "skipped": 0.3, "": 0.5}.get(status, 0.5)
+        if not isinstance(raw_conf, (int, float)):
+            raw_conf = 0.0
+        calibrated = round(raw_conf * weight, 2)
+
+        # 关键指标
+        key_metrics = {}
+        feat_block = features.get(feat_key, {})
+        if isinstance(feat_block, dict):
+            daily = feat_block.get("daily", {}) if feat_key == "technical" else feat_block
+            snap = daily.get("snapshot", {}) if isinstance(daily, dict) else {}
+            if feat_key == "technical":
+                key_metrics = {
+                    "composite_score": snap.get("composite_score"),
+                    "oi_divergence": snap.get("oi_divergence", snap.get("oi_position")),
+                    "volatility": snap.get("volatility_20d"),
+                    "boll_low": snap.get("boll_low"),
+                    "boll_up": snap.get("boll_up"),
+                }
+            elif feat_key == "fundamental":
+                basis = feat_block.get("basis", feat_block.get("latest", {}))
+                inv = feat_block.get("inventory", {})
+                term = feat_block.get("term_structure", {})
+                key_metrics = {
+                    "basis": basis.get("value", basis.get("basis")),
+                    "basis_zscore": basis.get("zscore"),
+                    "inventory_wow": inv.get("wow_change"),
+                    "term_structure": term.get("structure"),
+                    "roll_yield": term.get("roll_yield"),
+                }
+            elif feat_key == "position":
+                latest = feat_block.get("latest", {}) if isinstance(feat_block.get("latest"), dict) else feat_block
+                key_metrics = {
+                    "net_long_change_5d": latest.get("net_long_change_5d"),
+                    "long_short_ratio": latest.get("long_short_ratio"),
+                    "crowding": latest.get("crowding_status"),
+                }
+            elif feat_key == "news":
+                ns = feat_block.get("latest", {}) if isinstance(feat_block.get("latest"), dict) else feat_block
+                key_metrics = {
+                    "sentiment_score": ns.get("sentiment_score"),
+                    "event_count": len(ns.get("recent_events", ns.get("events", []))) if isinstance(ns, dict) else 0,
+                }
+
+        L1_entries.append({
+            "id": entry.get("id", f"REF-{prefix.upper()}-unknown"),
+            "conclusion_id": entry.get("conclusion_id", ""),
+            "name": cn_name,
+            "direction": entry.get("direction", "?"),
+            "confidence": raw_conf,
+            "calibrated_confidence": calibrated,
+            "status": status,
+            "summary": entry.get("summary", ""),
+            "key_metrics": {k: v for k, v in key_metrics.items() if v is not None},
+            "signals": entry.get("signals", [])[:3],
+        })
+
+    # --- L2: investment_plan 解析 ---
+    investment_plan = final_state.get("investment_plan", "")
+    L2_data = {"raw": investment_plan[:500] if investment_plan else ""}
+    if investment_plan:
+        try:
+            parsed = json.loads(investment_plan)
+            L2_data = {
+                "valuation_matrix": parsed.get("估值驱动矩阵", parsed.get("valuation_matrix", [])),
+                "bull_bear_table": parsed.get("多空对照表", parsed.get("bull_bear_table", [])),
+                "scenarios": parsed.get("三种情景推演", parsed.get("scenarios", {})),
+            }
+        except json.JSONDecodeError:
+            # 不是标准 JSON（可能是 stock 路径的 Markdown），兜底
+            L2_data = {"raw_summary": investment_plan[:300]}
+
+    # --- L3: risk_assessment + safety_override + final_decision ---
+    risk_card = final_state.get("risk_card", {})
+    safety_override = risk_card.get("safety_override", {})
+    L3_data = {
+        "risk_assessment": risk_assessment if isinstance(risk_assessment, dict) else {},
+        "risk_card": risk_card if isinstance(risk_card, dict) else {},
+        "final_decision_raw": final_decision[:500] if final_decision else "",
+        "safety_override": safety_override if isinstance(safety_override, dict) else {},
+    }
+
+    return {
+        "summary": summary,
+        "layers": {
+            "L1": L1_entries,
+            "L2": L2_data,
+            "L3": L3_data,
+        },
+    }

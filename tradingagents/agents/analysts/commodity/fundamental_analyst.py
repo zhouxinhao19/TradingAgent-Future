@@ -358,7 +358,7 @@ def create_fundamental_analyst(llm):
             analyst_id = make_analyst_id("FUND", full_symbol, trade_date, seed="empty")
             conclusion_id = make_conclusion_id("FUND", 1)
             tagged_report = inject_analyst_id(report_md, analyst_id)
-            registry_entry = make_registry_entry(analyst_id, conclusion_id, "FUND", "fundamental", "fundamentals_report", "neutral", "(数据缺失: 跳过)")
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "FUND", "fundamental", "fundamentals_report", "skip", "(数据缺失: 跳过)", status="skipped")
             return {
                 "fundamentals_report": tagged_report,
                 "fundamentals_structured": {},
@@ -379,7 +379,7 @@ def create_fundamental_analyst(llm):
             analyst_id = make_analyst_id("FUND", full_symbol, trade_date, seed="sparse")
             conclusion_id = make_conclusion_id("FUND", 1)
             tagged_report = inject_analyst_id(report_md, analyst_id)
-            registry_entry = make_registry_entry(analyst_id, conclusion_id, "FUND", "fundamental", "fundamentals_report", "neutral", "(数据稀疏: 跳过)")
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "FUND", "fundamental", "fundamentals_report", "skip", "(数据稀疏: 跳过)", status="skipped")
             return {
                 "fundamentals_report": tagged_report,
                 "fundamentals_structured": {},
@@ -514,7 +514,7 @@ def create_fundamental_analyst(llm):
             analyst_id = make_analyst_id("FUND", full_symbol, trade_date, seed="fallback")
             conclusion_id = make_conclusion_id("FUND", 1)
             tagged_report = inject_analyst_id(fallback_md, analyst_id)
-            registry_entry = make_registry_entry(analyst_id, conclusion_id, "FUND", "fundamental", "fundamentals_report", fallback_direction, "(降级: LLM 不可用)")
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "FUND", "fundamental", "fundamentals_report", fallback_direction, "(降级: LLM 不可用)", status="degraded")
             return {
                 "fundamentals_report": tagged_report,
                 "fundamentals_structured": {

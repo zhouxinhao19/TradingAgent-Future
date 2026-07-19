@@ -148,6 +148,9 @@
           />
 
           <el-tabs>
+            <el-tab-pane label="证据链" lazy>
+              <EvidenceChain :data="latestResult?.evidence_chain || null" />
+            </el-tab-pane>
             <el-tab-pane label="技术分析" lazy>
               <div class="report-content">{{ latestResult.market_report || '(空)' }}</div>
             </el-tab-pane>
@@ -213,6 +216,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { commodityApi, type VarietyItem } from '@/api/commodity'
+import EvidenceChain from '@/components/Commodity/EvidenceChain.vue'
 
 const router = useRouter()
 

@@ -269,7 +269,7 @@ def create_news_analyst(llm):
             analyst_id = make_analyst_id("NEWS", full_symbol, trade_date, seed="empty")
             conclusion_id = make_conclusion_id("NEWS", 1)
             tagged_report = inject_analyst_id(report_md, analyst_id)
-            registry_entry = make_registry_entry(analyst_id, conclusion_id, "NEWS", "news", "news_report", "neutral", "(数据缺失: 跳过)")
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "NEWS", "news", "news_report", "skip", "(数据缺失: 跳过)", status="skipped")
             return {
                 "news_report": tagged_report,
                 "messages": [],
@@ -281,6 +281,29 @@ def create_news_analyst(llm):
         variety_name = state.get("variety_name", full_symbol)
         exchange = state.get("exchange", "")
         category = state.get("category", "general")
+
+        # ---- 降级 2: 数据稀疏（与其他 3 个 analyst 一致） ----
+        # news_sentiment features 足够但 latest_news 稀疏 → 走降级避免浪费 LLM
+        if isinstance(news_block, dict) and not quality_gate(news_block):
+            _has_enough_news = len(recent_events) >= 3 and sum(
+                1 for e in recent_events if e.get("llm_sentiment", e.get("sentiment")) != "neutral"
+            ) >= 1
+            if not _has_enough_news:
+                reason = "新闻数据稀疏"
+                report_md = empty_report("neutral", reason)
+                analyst_id = make_analyst_id("NEWS", full_symbol, trade_date, seed="sparse")
+                conclusion_id = make_conclusion_id("NEWS", 1)
+                tagged_report = inject_analyst_id(report_md, analyst_id)
+                registry_entry = make_registry_entry(
+                    analyst_id, conclusion_id, "NEWS", "news", "news_report",
+                    "skip", "(数据稀疏: 跳过)", status="skipped",
+                )
+                return {
+                    "news_report": tagged_report,
+                    "messages": [],
+                    "news_tool_call_count": 0,
+                    "analyst_registry": registry_entry,
+                }
 
         # 从 latest_news 提取预标注摘要
         positive_count = sum(1 for e in recent_events if e.get("llm_sentiment") == "positive")
@@ -362,7 +385,7 @@ def create_news_analyst(llm):
             analyst_id = make_analyst_id("NEWS", full_symbol, trade_date, seed="fallback")
             conclusion_id = make_conclusion_id("NEWS", 1)
             tagged_fallback = inject_analyst_id(fallback_md, analyst_id)
-            registry_entry = make_registry_entry(analyst_id, conclusion_id, "NEWS", "news", "news_report", "neutral", "(降级: LLM 不可用)")
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "NEWS", "news", "news_report", "neutral", "(降级: LLM 不可用)", status="degraded")
             return {
                 "news_report": tagged_fallback,
                 "messages": [],
