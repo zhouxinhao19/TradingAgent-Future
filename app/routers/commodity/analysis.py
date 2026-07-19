@@ -370,7 +370,7 @@ def _build_config(
         "max_debate_rounds": max_debate_rounds,
         "max_risk_discuss_rounds": max_risk_discuss_rounds,
         "online_tools": False,
-        "memory_enabled": False,
+        "memory_enabled": os.getenv("COMMODITY_MEMORY_ENABLED", "false").lower() == "true",
         "project_dir": str(Path(__file__).resolve().parents[3]),
     }
     return config
@@ -500,11 +500,15 @@ async def _run_commodity_analysis(
         "fundamentals_report": final_state.get("fundamentals_report", ""),
         "fundamentals_structured": final_state.get("fundamentals_structured", {}),
         "sentiment_report": final_state.get("sentiment_report", ""),
+        "position_report": final_state.get("position_report", ""),
         "news_report": final_state.get("news_report", ""),
         "investment_plan": final_state.get("investment_plan", ""),
         "trader_investment_plan": final_state.get("trader_investment_plan", ""),
         "final_trade_decision": final_state.get("final_trade_decision", ""),
         "final_decision": final_state.get("final_decision", ""),
+        "evidence_chain": final_state.get("evidence_chain", {}),
+        "safety_override": final_state.get("safety_override", {}),
+        "analyst_registry": final_state.get("analyst_registry", {}),
     }
 
 

@@ -115,3 +115,9 @@ class AgentState(MessagesState):
     investment_memo: Annotated[dict, "投研备忘录(从 LLM JSON 解析)"] = {}
     risk_card: Annotated[dict, "风险评估卡(纯规则+LLM 增强)"] = {}
     risk_assessment: Annotated[dict, "量化检查器输出(纯规则)"] = {}
+
+    # ===== Phase Agent 改造(2026-07-19): 合约到期警告 =====
+    contract_expiry_warning: Annotated[dict, "合约到期风险({days_to_expiry, warning})"] = {}
+
+    # ===== Step 10: 证据链可视化(2026-07-19) =====
+    evidence_chain: Annotated[dict, "结构化三层证据链(L1→L2→L3)，供前端 Timeline 渲染"] = {}

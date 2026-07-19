@@ -513,7 +513,7 @@ def create_position_analyst(llm):
             analyst_id = make_analyst_id("POSN", full_symbol, trade_date, seed="empty")
             conclusion_id = make_conclusion_id("POSN", 1)
             tagged_empty = inject_analyst_id(empty, analyst_id)
-            registry_entry = make_registry_entry(analyst_id, conclusion_id, "POSN", "position", "position_report", "neutral", "(数据缺失: 跳过)")
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "POSN", "position", "position_report", "skip", "(数据缺失: 跳过)", status="skipped")
             return {
                 "sentiment_report": empty,  # 保持纯净(stock 兼容)
                 "position_report": tagged_empty,
@@ -530,7 +530,7 @@ def create_position_analyst(llm):
             analyst_id = make_analyst_id("POSN", full_symbol, trade_date, seed="sparse")
             conclusion_id = make_conclusion_id("POSN", 1)
             tagged_empty = inject_analyst_id(empty, analyst_id)
-            registry_entry = make_registry_entry(analyst_id, conclusion_id, "POSN", "position", "position_report", "neutral", "(数据稀疏: 跳过)")
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "POSN", "position", "position_report", "skip", "(数据稀疏: 跳过)", status="skipped")
             return {
                 "sentiment_report": empty,  # 保持纯净
                 "position_report": tagged_empty,
@@ -677,7 +677,7 @@ def create_position_analyst(llm):
             analyst_id = make_analyst_id("POSN", full_symbol, trade_date, seed="fallback")
             conclusion_id = make_conclusion_id("POSN", 1)
             tagged_fallback = inject_analyst_id(fallback_md, analyst_id)
-            registry_entry = make_registry_entry(analyst_id, conclusion_id, "POSN", "position", "position_report", direction or "neutral", "(降级: LLM 不可用)")
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "POSN", "position", "position_report", direction or "neutral", "(降级: LLM 不可用)", status="degraded")
             return {
                 "sentiment_report": fallback_md,  # 保持纯净
                 "position_report": tagged_fallback,

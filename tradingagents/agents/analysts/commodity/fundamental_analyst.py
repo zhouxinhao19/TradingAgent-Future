@@ -6,7 +6,7 @@ fundamental_analyst.py — 商品期货产业分析师节点 (Phase 3b-ii → �
   - inventory:库存(周/月变化 + 180d 分位)
   - term_structure:期限结构(contango/backwardation/flat + carry_score)
 
-分析框架:永安期货"估值+驱动"方法论
+分析框架:"估值+驱动"方法论
   1. 估值维度:基差分位 + 期限结构类型 → 低估/合理/高估
   2. 驱动维度:库存边际变化 + carry_score → 向上/中性/向下
   3. 交叉验证:估值与驱动是否同向
@@ -42,7 +42,7 @@ from ._base import (
 
 logger = get_logger("default")
 
-FUNDAMENTAL_SYSTEM_PROMPT = """你是一位永安期货体系下的产业分析师,聚焦产业链研究,运用"估值+驱动"框架.
+FUNDAMENTAL_SYSTEM_PROMPT = """你是一位产业分析师,聚焦产业链研究,运用"估值+驱动"框架.
 
 ## 分析对象
 - 标的代码:{full_symbol}
@@ -298,7 +298,7 @@ def _structured_to_markdown(parsed: dict) -> str:
     risk_flags = parsed.get("risk_flags", [])
     data_quality = parsed.get("data_quality", "")
 
-    md = f"# 永安期货估值+驱动分析\n\n"
+    md = f"# 估值+驱动分析\n\n"
     md += f"## 综合判断\n{summary}\n\n"
     md += f"- **估值**:{val.get('level','N/A')} | 安全边际:{val.get('safety_margin','N/A')}\n"
     md += f"- **驱动**:{drv.get('direction','N/A')}({drv.get('strength','N/A')}) | 主导因子:{drv.get('dominant_factor','N/A')}\n"
@@ -321,7 +321,7 @@ def _structured_to_markdown(parsed: dict) -> str:
 def _build_fallback_structured(assessment: dict) -> str:
     """LLM 失败时,用规则评估结果拼 Markdown(降级版本)。"""
     md = (
-        f"# 永安期货估值+驱动分析(降级版本 — LLM 不可用)\n\n"
+        f"# 估值+驱动分析(降级版本 — LLM 不可用)\n\n"
         f"## 综合判断\n估值{assessment['valuation_position']} / 驱动{assessment['drive_direction']} / "
         f"一致性{assessment['consistency']}\n\n"
         f"## 估值维度\n- 估值位置:{assessment['valuation_position']}\n"
@@ -358,7 +358,7 @@ def create_fundamental_analyst(llm):
             analyst_id = make_analyst_id("FUND", full_symbol, trade_date, seed="empty")
             conclusion_id = make_conclusion_id("FUND", 1)
             tagged_report = inject_analyst_id(report_md, analyst_id)
-            registry_entry = make_registry_entry(analyst_id, conclusion_id, "FUND", "fundamental", "fundamentals_report", "neutral", "(数据缺失: 跳过)")
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "FUND", "fundamental", "fundamentals_report", "skip", "(数据缺失: 跳过)", status="skipped")
             return {
                 "fundamentals_report": tagged_report,
                 "fundamentals_structured": {},
@@ -379,7 +379,7 @@ def create_fundamental_analyst(llm):
             analyst_id = make_analyst_id("FUND", full_symbol, trade_date, seed="sparse")
             conclusion_id = make_conclusion_id("FUND", 1)
             tagged_report = inject_analyst_id(report_md, analyst_id)
-            registry_entry = make_registry_entry(analyst_id, conclusion_id, "FUND", "fundamental", "fundamentals_report", "neutral", "(数据稀疏: 跳过)")
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "FUND", "fundamental", "fundamentals_report", "skip", "(数据稀疏: 跳过)", status="skipped")
             return {
                 "fundamentals_report": tagged_report,
                 "fundamentals_structured": {},
@@ -514,7 +514,7 @@ def create_fundamental_analyst(llm):
             analyst_id = make_analyst_id("FUND", full_symbol, trade_date, seed="fallback")
             conclusion_id = make_conclusion_id("FUND", 1)
             tagged_report = inject_analyst_id(fallback_md, analyst_id)
-            registry_entry = make_registry_entry(analyst_id, conclusion_id, "FUND", "fundamental", "fundamentals_report", fallback_direction, "(降级: LLM 不可用)")
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "FUND", "fundamental", "fundamentals_report", fallback_direction, "(降级: LLM 不可用)", status="degraded")
             return {
                 "fundamentals_report": tagged_report,
                 "fundamentals_structured": {
