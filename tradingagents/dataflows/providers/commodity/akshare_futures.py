@@ -584,7 +584,8 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         """获取品种指数连续合约历史K线(99 代码)。
 
         指数连续合约 = 当前品种全部可交易合约以累计持仓量为权重加权平均得到。
-        目前仅 CFFEX 金融期货有标准 99 代码; 商品期货尝试用 futures_main_sina 99 代码。
+        优先尝试 futures_main_sina(99 代码); 商品期货无 99 代码时,
+        通过 get_futures_daily 获取交易所官方指数数据。
 
         Args:
             underlying: 品种代码, 如 "IF" / "CU"
@@ -599,33 +600,104 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
             return None
 
         from tradingagents.dataflows.providers.commodity.commodity_metadata import (
-            get_index_symbol,
+            get_index_symbol, get_variety,
         )
 
         index_code = get_index_symbol(underlying)
-        if index_code is None:
+        if index_code is not None:
+            # 金融期货:有标准 99 代码,用 futures_main_sina 获取
+            df = await self._call("futures_main_sina", symbol=index_code)
+            if df is not None and not df.empty:
+                df["日期"] = pd.to_datetime(df["日期"]).dt.date
+                df = df.sort_values("日期").reset_index(drop=True)
+                # 日期过滤
+                start = pd.to_datetime(start_date).date() if isinstance(start_date, str) else start_date
+                if end_date is None:
+                    end = df["日期"].max()
+                elif isinstance(end_date, str):
+                    end = pd.to_datetime(end_date).date()
+                else:
+                    end = end_date
+                df = df[(df["日期"] >= start) & (df["日期"] <= end)]
+                df = df.sort_values("日期").reset_index(drop=True)
+                return df
+
+        # 无标准 99 代码 → 尝试通过 get_futures_daily 获取交易所官方指数
+        variety_meta = get_variety(underlying.upper())
+        if not variety_meta:
+            return None
+        exchange = variety_meta.get("exchange", "")
+        exchange_market_map = {"SHFE": "SHFE", "INE": "INE", "DCE": "DCE",
+                               "CZCE": "CZCE", "GFEX": "GFEX", "CFFEX": "CFFEX"}
+        market = exchange_market_map.get(exchange)
+        if not market:
             return None
 
-        # 用 futures_main_sina 获取指数连续合约 K 线
-        df = await self._call("futures_main_sina", symbol=index_code)
-        if df is None or df.empty:
+        start = start_date if isinstance(start_date, str) else start_date.strftime("%Y%m%d")
+        start = start.replace("-", "") if "-" in start else start
+        end = end_date if end_date else date.today().strftime("%Y%m%d")
+        if isinstance(end, date):
+            end = end.strftime("%Y%m%d")
+        end = end.replace("-", "") if isinstance(end, str) and "-" in end else end
+
+        df_all = await self._call("get_futures_daily", start_date=start, end_date=end, market=market)
+        if df_all is None or df_all.empty:
             return None
 
-        df["日期"] = pd.to_datetime(df["日期"]).dt.date
-        df = df.sort_values("日期").reset_index(drop=True)
+        # 过滤该品种的 99 指数合约(如 CU99 / RB99)
+        var_upper = underlying.upper()
+        index_pattern = rf"^{var_upper}99$"
+        match_col = None
+        for col in ["symbol", "合约", "合约代码"]:
+            if col in df_all.columns:
+                match_col = col
+                break
+        if match_col is None:
+            return None
+
+        index_rows = df_all[df_all[match_col].astype(str).str.upper().str.match(index_pattern)]
+        if index_rows.empty:
+            return None
+
+        # 重命名为标准列
+        date_col = "date" if "date" in df_all.columns else ("日期" if "日期" in df_all.columns else None)
+        if date_col is None:
+            return None
+
+        col_map = {
+            date_col: "日期",
+            "open": "开盘价", "open_": "开盘价",
+            "high": "最高价", "high_": "最高价",
+            "low": "最低价", "low_": "最低价",
+            "close": "收盘价", "close_": "收盘价",
+            "volume": "成交量", "volume_": "成交量",
+            "open_interest": "持仓量", "oi": "持仓量",
+        }
+        # 映射列
+        rename = {}
+        for c in index_rows.columns:
+            cl = c.lower().replace(" ", "_")
+            if cl in col_map:
+                rename[c] = col_map[cl]
+        rename_cols = {k: v for k, v in rename.items() if k != v}
+
+        result = index_rows.rename(columns=rename_cols)
+        result["日期"] = pd.to_datetime(result["日期"], errors="coerce")
+        result = result.dropna(subset=["日期"])
+
+        std_cols = ["日期", "开盘价", "最高价", "最低价", "收盘价", "成交量", "持仓量"]
+        available = [c for c in std_cols if c in result.columns]
+        result = result[available]
 
         # 日期过滤
-        start = pd.to_datetime(start_date).date() if isinstance(start_date, str) else start_date
-        if end_date is None:
-            end = df["日期"].max()
-        elif isinstance(end_date, str):
-            end = pd.to_datetime(end_date).date()
-        else:
-            end = end_date
+        start_dt = pd.to_datetime(start_date)
+        end_dt = pd.to_datetime(end_date) if end_date else pd.Timestamp.today()
+        result = result[(result["日期"] >= start_dt) & (result["日期"] <= end_dt)]
 
-        df = df[(df["日期"] >= start) & (df["日期"] <= end)]
-        df = df.sort_values("日期").reset_index(drop=True)
-        return df
+        result = result.sort_values("日期").reset_index(drop=True)
+        result["日期"] = result["日期"].dt.date
+        self.logger.info(f"✅ index 从交易所日线获得({underlying}, {len(result)}行)")
+        return result
 
     # ============================================================
     # Phase 2 扩展接口
@@ -701,18 +773,24 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         if not await self._ensure_ak():
             return None
 
-        # 1. 东方财富(先试中文名;英文名通过 _symbol_to_chinese 映射)
-        cn = self._symbol_to_chinese(symbol) or symbol
-        df = await self._call("futures_inventory_em", symbol=cn)
+        # 1. 东方财富(支持代码或中文名;先代码后中文)
+        df = await self._call("futures_inventory_em", symbol=symbol)
         if df is not None and not df.empty:
             return df
 
-        # 2. 99 期货(支持中文品种名,长期)
+        # 2. 东方财富(中文名,部分品种代码不识别)
+        cn = self._symbol_to_chinese(symbol) or symbol
+        if cn != symbol:
+            df = await self._call("futures_inventory_em", symbol=cn)
+            if df is not None and not df.empty:
+                return df
+
+        # 3. 99 期货(需精确中文名,已备 99qh 映射表兜底)
         df = await self._call("futures_inventory_99", symbol=cn)
         if df is not None and not df.empty:
             return df
 
-        # 3. 尝试原始传入的符号
+        # 4. 尝试原始传入的符号(兼容已传入中文名)
         if cn != symbol:
             df = await self._call("futures_inventory_99", symbol=symbol)
             return df
@@ -797,6 +875,9 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
             result = await self._call("futures_gfex_position_rank", **kwargs)
         elif ex == "SHFE":
             result = await self._call("get_shfe_rank_table", date=date_str)
+        elif ex == "INE":
+            # 上期能源(INE)与上期所共用 SHFE 持仓排名接口
+            result = await self._call("get_shfe_rank_table", date=date_str)
         elif ex == "CFFEX":
             result = await self._call("get_cffex_rank_table", date=date_str)
         elif ex in ("CZCE", "CZC"):
@@ -875,8 +956,14 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         if not await self._ensure_ak():
             return None
 
-        date_str = date.strftime("%Y%m%d") if hasattr(date, "strftime") else str(date)
-        base_date = date.strftime("%Y-%m-%d") if hasattr(date, "strftime") else date[:4] + "-" + date[4:6] + "-" + date[6:8]
+        # 统一日期格式: 先归一化再切片,兼容 YYYYMMDD 和 YYYY-MM-DD
+        if hasattr(date, "strftime"):
+            date_str = date.strftime("%Y%m%d")
+            base_date = date.strftime("%Y-%m-%d")
+        else:
+            raw = str(date).replace("-", "")
+            date_str = raw
+            base_date = raw[:4] + "-" + raw[4:6] + "-" + raw[6:8]
 
         # 1. 用 futures_spot_price_daily 取前后 3 天窗口(避免节假日偏移)
         from datetime import timedelta
@@ -905,7 +992,32 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
                 result = result.iloc[(result["date"] - target).abs().argsort()[:1]]
             return result
 
-        # 2. 回退到本地缓存
+        # 2. 用 99qh 现货走势作为在线回退
+        if symbol:
+            cn_name = self._symbol_to_chinese(symbol) or symbol
+            try:
+                df_spot = await asyncio.wait_for(
+                    self._call("spot_price_qh", symbol=cn_name),
+                    timeout=10,
+                )
+                if df_spot is not None and not df_spot.empty:
+                    df_spot = df_spot.rename(columns={
+                        "日期": "date",
+                        "现货价格": "spot_price",
+                        "期货收盘价": "dominant_contract_price",
+                    })
+                    df_spot["symbol"] = symbol.upper()
+                    if "date" in df_spot.columns:
+                        df_spot["date"] = pd.to_datetime(df_spot["date"], errors="coerce")
+                    # 返回最接近 date 的行
+                    target = pd.to_datetime(base_date)
+                    df_spot = df_spot.iloc[(df_spot["date"] - target).abs().argsort()[:1]]
+                    self.logger.info(f"✅ spot_price 回退到 99qh 成功({symbol})")
+                    return df_spot
+            except Exception:
+                pass
+
+        # 3. 回退到本地缓存
         try:
             from tradingagents.dataflows.providers.commodity.local_cache_adapter import (
                 CommodityLocalCacheAdapter,
@@ -970,7 +1082,39 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         if result is not None and not (hasattr(result, 'empty') and result.empty):
             return result
 
-        # AKShare 超时/空 → 回退本地缓存
+        # AKShare 100ppi 超时/空 → 2. 用 99qh 现货走势(spot_price_qh)作为在线回退
+        # spot_price_qh 不限 100ppi.com,来自 99qh.com,速度快不超时
+        if vars_list:
+            sym_99qh = vars_list[0] if isinstance(vars_list, list) else vars_list
+            cn_name = self._symbol_to_chinese(sym_99qh) or sym_99qh
+            try:
+                df_99qh = await asyncio.wait_for(
+                    self._call("spot_price_qh", symbol=cn_name),
+                    timeout=10,
+                )
+                if df_99qh is not None and not df_99qh.empty:
+                    # 标准化列名: 日期/期货收盘价(作主力合约价)/现货价格
+                    df_99qh = df_99qh.rename(columns={
+                        "日期": "date",
+                        "现货价格": "spot_price",
+                        "期货收盘价": "dominant_contract_price",
+                    })
+                    df_99qh["symbol"] = sym_99qh
+                    df_99qh["near_contract_price"] = df_99qh["dominant_contract_price"]
+                    if "date" in df_99qh.columns:
+                        df_99qh["date"] = pd.to_datetime(df_99qh["date"], errors="coerce")
+                    # 按日期过滤
+                    start_dt = pd.to_datetime(start_day)
+                    end_dt = pd.to_datetime(end_day)
+                    df_99qh = df_99qh[(df_99qh["date"] >= start_dt) & (df_99qh["date"] <= end_dt)]
+                    if not df_99qh.empty:
+                        df_99qh = df_99qh.sort_values("date").reset_index(drop=True)
+                        self.logger.info(f"✅ basis 回退到 99qh 成功({sym_99qh}, {len(df_99qh)}行)")
+                        return df_99qh
+            except Exception:
+                pass
+
+        # 3. 回退本地缓存
         if vars_list:
             sym = vars_list[0] if isinstance(vars_list, list) else vars_list
             try:
@@ -1060,6 +1204,17 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         if result is not None and not (hasattr(result, 'empty') and result.empty):
             return result
 
+        # 在线调用失败 → 尝试用交易所日线数据自行计算展期收益率
+        if type_method == "date" and var:
+            try:
+                diy_df = await self._compute_roll_yield_from_exchange(
+                    var, start_day, end_day,
+                )
+                if diy_df is not None and not diy_df.empty:
+                    return diy_df
+            except Exception:
+                pass
+
         # 回退到本地缓存 (type_method="date" 且有 var 时)
         if type_method == "date" and var:
             try:
@@ -1074,6 +1229,117 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
                 pass
 
         return None
+
+    async def _compute_roll_yield_from_exchange(
+        self,
+        var: str,
+        start_day: Union[str, date],
+        end_day: Union[str, date],
+    ) -> Optional[pd.DataFrame]:
+        """
+        用交易所日线数据(get_futures_daily)自行计算展期收益率。
+
+        当 AKShare get_roll_yield_bar 依赖的 100ppi.com 不可用时,
+        直接从交易所官方数据计算主力-次主力展期收益率。
+
+        Returns:
+            DataFrame: [date, var, near_contract, dominant_contract,
+                        roll_yield, near_price, dominant_price, spread]
+        """
+        from tradingagents.dataflows.providers.commodity.commodity_metadata import get_variety
+        variety_meta = get_variety(var.upper())
+        if not variety_meta:
+            return None
+
+        exchange = variety_meta.get("exchange", "")
+        exchange_market_map = {"SHFE": "SHFE", "INE": "INE", "DCE": "DCE",
+                               "CZCE": "CZCE", "GFEX": "GFEX", "CFFEX": "CFFEX"}
+        market = exchange_market_map.get(exchange)
+        if not market:
+            return None
+
+        start = start_day.strftime("%Y%m%d") if hasattr(start_day, "strftime") else str(start_day)
+        end = end_day.strftime("%Y%m%d") if hasattr(end_day, "strftime") else str(end_day)
+
+        # get_futures_daily 返回该交易所所有合约的日线
+        df_raw = await self._call("get_futures_daily", start_date=start, end_date=end, market=market)
+        if df_raw is None or df_raw.empty:
+            return None
+
+        # 过滤该品种(列名可能是 variety 或 symbol)
+        var_upper = var.upper()
+        if "variety" in df_raw.columns:
+            df_raw = df_raw[df_raw["variety"].astype(str).str.upper() == var_upper].copy()
+        elif "symbol" in df_raw.columns:
+            df_raw = df_raw[df_raw["symbol"].astype(str).str.upper().str.match(
+                rf"^{var_upper}\d{{3,4}}$"
+            )].copy()
+        else:
+            return None
+
+        if df_raw.empty:
+            return None
+
+        # 标准化日期
+        date_col = "date" if "date" in df_raw.columns else ("日期" if "日期" in df_raw.columns else None)
+        if not date_col:
+            return None
+        df_raw[date_col] = pd.to_datetime(df_raw[date_col], errors="coerce")
+
+        # 标准化列名
+        sym_col = "symbol" if "symbol" in df_raw.columns else ("合约" if "合约" in df_raw.columns else None)
+        oi_col = "open_interest" if "open_interest" in df_raw.columns else ("持仓量" if "持仓量" in df_raw.columns else None)
+        close_col = "close" if "close" in df_raw.columns else ("收盘" if "收盘" in df_raw.columns else None)
+
+        if not sym_col or not oi_col or not close_col:
+            # 尝试英文列
+            for c in df_raw.columns:
+                cl = c.lower()
+                if cl in ("symbol", "contract", "合约", "合约代码"):
+                    sym_col = c
+                elif cl in ("open_interest", "oi", "持仓", "持仓量"):
+                    oi_col = c
+                elif cl in ("close", "收盘", "收盘价"):
+                    close_col = c
+
+        if not all([sym_col, oi_col, close_col]):
+            self.logger.warning(f"⚠️ _compute_roll_yield: 无法识别列 {list(df_raw.columns)}")
+            return None
+
+        # 对每个交易日，找持仓量最大的两个合约
+        records = []
+        for dt, group in df_raw.groupby(date_col):
+            valid = group[pd.to_numeric(group[oi_col], errors="coerce").fillna(0) > 0]
+            if len(valid) < 2:
+                continue
+            sorted_group = valid.sort_values(by=oi_col, ascending=False)
+            near = sorted_group.iloc[0]
+            far = sorted_group.iloc[1]
+
+            near_close = pd.to_numeric(near.get(close_col), errors="coerce")
+            far_close = pd.to_numeric(far.get(close_col), errors="coerce")
+            if pd.isna(near_close) or pd.isna(far_close) or near_close == 0:
+                continue
+
+            roll_yield = (near_close - far_close) / near_close
+            records.append({
+                "date": dt,
+                "var": var_upper,
+                "near_contract": near.get(sym_col),
+                "dominant_contract": far.get(sym_col),
+                "roll_yield": round(float(roll_yield), 6),
+                "near_price": float(near_close),
+                "dominant_price": float(far_close),
+                "spread": float(near_close - far_close),
+            })
+
+        if not records:
+            return None
+
+        result = pd.DataFrame(records)
+        result = result.sort_values("date").reset_index(drop=True)
+        self.logger.info(f"✅ roll_yield 从交易所日线 DIY 计算成功({var}, {len(result)}行)")
+        return result
 
     async def get_contract_info(
         self,
@@ -1657,7 +1923,7 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
             "RU": "天然橡胶", "BR": "合成橡胶", "SP": "纸浆", "FU": "燃料油",
             "AO": "氧化铝",
             "SC": "原油", "NR": "20号胶", "LU": "低硫燃料油",
-            "EC": "集运指数", "BC": "国际铜",
+            "EC": "集运指数(欧线)", "BC": "国际铜",
             "CF": "郑棉", "SR": "白糖", "CY": "棉纱", "AP": "苹果",
             "CJ": "红枣", "PK": "花生", "RM": "菜粕", "OI": "菜籽油",
             "RS": "菜籽", "TA": "PTA", "MA": "甲醇", "FG": "玻璃",

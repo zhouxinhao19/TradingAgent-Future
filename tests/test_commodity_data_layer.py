@@ -473,7 +473,8 @@ class TestAkshareIntegration:
 
         df = asyncio.run(provider.get_inventory("A"))
 
-        mock_ak.futures_inventory_em.assert_called_once_with(symbol="豆一")
+        # 新逻辑: 先尝试英文代码"A"，成功后直接返回
+        mock_ak.futures_inventory_em.assert_called_once_with(symbol="A")
         mock_ak.futures_inventory_99.assert_not_called()
         assert df is not None
 
