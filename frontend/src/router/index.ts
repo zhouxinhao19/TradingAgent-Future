@@ -213,42 +213,6 @@ const routes: RouteRecordRaw[] = [
         }
       },
       {
-        path: 'database',
-        name: 'DatabaseManagement',
-        component: () => import('@/views/System/DatabaseManagement.vue'),
-        meta: {
-          title: '数据库管理',
-          requiresAuth: true
-        }
-      },
-      {
-        path: 'logs',
-        name: 'OperationLogs',
-        component: () => import('@/views/System/OperationLogs.vue'),
-        meta: {
-          title: '操作日志',
-          requiresAuth: true
-        }
-      },
-      {
-        path: 'system-logs',
-        name: 'LogManagement',
-        component: () => import('@/views/System/LogManagement.vue'),
-        meta: {
-          title: '系统日志',
-          requiresAuth: true
-        }
-      },
-      {
-        path: 'sync',
-        name: 'MultiSourceSync',
-        component: () => import('@/views/System/MultiSourceSync.vue'),
-        meta: {
-          title: '多数据源同步',
-          requiresAuth: true
-        }
-      },
-      {
         path: 'cache',
         name: 'CacheManagement',
         component: () => import('@/views/Settings/CacheManagement.vue'),
@@ -263,15 +227,6 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/Settings/UsageStatistics.vue'),
         meta: {
           title: '使用统计',
-          requiresAuth: true
-        }
-      },
-      {
-        path: 'scheduler',
-        name: 'SchedulerManagement',
-        component: () => import('@/views/System/SchedulerManagement.vue'),
-        meta: {
-          title: '定时任务',
           requiresAuth: true
         }
       }
