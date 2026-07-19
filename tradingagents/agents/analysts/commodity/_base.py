@@ -178,6 +178,7 @@ def make_registry_entry(
     report_key: str,
     direction: str,
     summary: str,
+    status: str = "ok",
 ) -> dict:
     """构造标准化的 analyst registry entry。
 
@@ -189,9 +190,10 @@ def make_registry_entry(
         report_key: "market_report" / "fundamentals_report" / "position_report" / "news_report"
         direction: 方向信号
         summary: 摘要文本
+        status: "ok" | "degraded" | "skipped" — Phase Agent 改造(2026-07-19)
 
     Returns:
-        dict, 单键值对: {analyst_id: {id, conclusion_id, prefix, analyst, cn_name, report_key, direction, summary}}
+        dict, 单键值对: {analyst_id: {id, conclusion_id, prefix, analyst, cn_name, report_key, direction, summary, status}}
     """
     cn_name = ANALYST_CN_NAMES.get(analyst_key, analyst_key)
     return {
@@ -204,6 +206,7 @@ def make_registry_entry(
             "report_key": report_key,
             "direction": direction,
             "summary": summary,
+            "status": status,
         }
     }
 

@@ -1,10 +1,195 @@
 import time
 import json
 
+from typing import Any, Dict, List
+
 # 导入统一日志系统
 from tradingagents.utils.logging_init import get_logger
 from tradingagents.agents.utils.instrument_utils import build_instrument_context
 logger = get_logger("default")
+
+
+# =============================================================================
+# _build_analyst_summary — 结构化摘要替代完整 Markdown（Phase Agent 改造）
+# =============================================================================
+
+def _build_analyst_summary(
+    features: Dict[str, Any],
+    registry: Dict[str, Any],
+    news_summary: str = "",
+) -> str:
+    """从 analyst_registry + commodity_features 构建结构化摘要。
+
+    替换 4 份完整 Markdown（~8000 字），输出约 1500 字的精简摘要。
+    每个 L1 分析师输出: direction / calibrated_confidence / top-3 signals / key_metrics。
+
+    附带修正:
+      - #9 技术分析数据截断: 注入 composite_score/key_levels/oi_divergence/volatility_regime
+      - #13 新闻摘要为空: news_summary 升级为含分类统计 + 情感比 + 事件标题
+      - #14 features 字段未被消费: 补入 inventory.mom_change/term_structure.roll_yield/basis.spot_price
+      - #16 置信度校准: 基于 data_quality 加权归一化
+    """
+    lines: List[str] = []
+    lines.append("## L1 分析师结构化摘要")
+
+    tech = features.get("technical", {})
+    daily = tech.get("daily", {}) if isinstance(tech, dict) else {}
+    snap = daily.get("snapshot", {}) if isinstance(daily, dict) else {}
+
+    # --- 技术分析师摘要 ---
+    tech_reg = _find_registry_entry(registry, "tech")
+    tech_dir = tech_reg.get("direction") if tech_reg else "?"
+    tech_conf = tech_reg.get("confidence", 0.0) if tech_reg else 0.0
+    tech_status = tech_reg.get("status", "ok") if tech_reg else "ok"
+    tech_weight = _data_quality_weight(tech_status)
+    tech_calibrated = round(tech_conf * tech_weight, 2) if isinstance(tech_conf, (int, float)) else 0.0
+    tech_signals = (tech_reg or {}).get("signals", [])
+
+    lines.append(f"\n### 技术分析师 | {tech_dir} | 原始置信度 {tech_conf} | 校准后 {tech_calibrated} | status={tech_status}")
+    if tech_signals:
+        lines.append(f"信号: {'; '.join(tech_signals[:3])}")
+    lines.append(f"composite_score={snap.get('composite_score', 'N/A')}, "
+                 f"oi_divergence={snap.get('oi_divergence', snap.get('oi_position', 'N/A'))}, "
+                 f"volatility_regime={snap.get('volatility_20d', snap.get('volatility_regime', 'N/A'))}, "
+                 f"atr_ratio_pctl180={snap.get('atr_ratio_pctl180', 'N/A')}, "
+                 f"支撑={snap.get('boll_low', 'N/A')}, 阻力={snap.get('boll_up', 'N/A')}")
+
+    # --- 产业分析师（基差+库存+期限结构）摘要 ---
+    fund_reg = _find_registry_entry(registry, "fund")
+    fund_dir = fund_reg.get("direction") if fund_reg else "?"
+    fund_conf = fund_reg.get("confidence", 0.0) if fund_reg else 0.0
+    fund_status = fund_reg.get("status", "ok") if fund_reg else "ok"
+    fund_weight = _data_quality_weight(fund_status)
+    fund_calibrated = round(fund_conf * fund_weight, 2) if isinstance(fund_conf, (int, float)) else 0.0
+    fund_signals = (fund_reg or {}).get("signals", [])
+
+    basis = features.get("basis", {})
+    inventory = features.get("inventory", {})
+    term = features.get("term_structure", {})
+
+    lines.append(f"\n### 产业分析师 | {fund_dir} | 原始置信度 {fund_conf} | 校准后 {fund_calibrated} | status={fund_status}")
+    if fund_signals:
+        lines.append(f"信号: {'; '.join(fund_signals[:3])}")
+
+    # 基差（补 spot_price 字段）
+    if isinstance(basis, dict):
+        basis_latest = basis.get("latest", {}) if isinstance(basis.get("latest"), dict) else basis
+        lines.append(f"基差: latest={basis_latest.get('value', basis_latest.get('basis', 'N/A'))}, "
+                     f"zscore={basis_latest.get('zscore', 'N/A')}, "
+                     f"spot_price={basis_latest.get('spot_price', 'N/A')}")
+
+    # 库存（补 mom_change/jump_flag 字段）
+    if isinstance(inventory, dict):
+        inv_latest = inventory.get("latest", {}) if isinstance(inventory.get("latest"), dict) else inventory
+        inv_snap = inventory.get("snapshot", {}) if isinstance(inventory.get("snapshot"), dict) else {}
+        lines.append(f"库存: wow_change={inv_latest.get('wow_change', inv_snap.get('wow_change', 'N/A'))}, "
+                     f"mom_change={inv_latest.get('mom_change', inv_snap.get('mom_change', 'N/A'))}, "
+                     f"jump_flag={inv_latest.get('jump_flag', inv_snap.get('jump_flag', 'N/A'))}")
+
+    # 期限结构（补 roll_yield/spread 字段）
+    if isinstance(term, dict):
+        lines.append(f"期限结构: structure={term.get('structure', term.get('term_structure', 'N/A'))}, "
+                     f"carry_score={term.get('carry_score', 'N/A')}, "
+                     f"roll_yield={term.get('roll_yield', 'N/A')}, "
+                     f"spread={term.get('spread', 'N/A')}")
+
+    # --- 持仓分析师摘要 ---
+    pos_reg = _find_registry_entry(registry, "pos")
+    pos_dir = pos_reg.get("direction") if pos_reg else "?"
+    pos_conf = pos_reg.get("confidence", 0.0) if pos_reg else 0.0
+    pos_status = pos_reg.get("status", "ok") if pos_reg else "ok"
+    pos_weight = _data_quality_weight(pos_status)
+    pos_calibrated = round(pos_conf * pos_weight, 2) if isinstance(pos_conf, (int, float)) else 0.0
+    pos_signals = (pos_reg or {}).get("signals", [])
+
+    positioning = features.get("positioning", {})
+    pos_latest = positioning.get("latest", {}) if isinstance(positioning.get("latest"), dict) else positioning
+
+    lines.append(f"\n### 持仓分析师 | {pos_dir} | 原始置信度 {pos_conf} | 校准后 {pos_calibrated} | status={pos_status}")
+    if pos_signals:
+        lines.append(f"信号: {'; '.join(pos_signals[:3])}")
+    lines.append(f"net_long_change_5d={pos_latest.get('net_long_change_5d', 'N/A')}, "
+                 f"long_short_ratio={pos_latest.get('long_short_ratio', 'N/A')}, "
+                 f"crowding={pos_latest.get('crowding_status', 'N/A')}")
+
+    # --- 新闻分析师摘要（升级版: 含分类统计 + 情感比 + 事件标题） ---
+    news_reg = _find_registry_entry(registry, "news")
+    news_dir = news_reg.get("direction") if news_reg else "?"
+    news_conf = news_reg.get("confidence", 0.0) if news_reg else 0.0
+    news_status = news_reg.get("status", "ok") if news_reg else "ok"
+    news_weight = _data_quality_weight(news_status)
+    news_calibrated = round(news_conf * news_weight, 2) if isinstance(news_conf, (int, float)) else 0.0
+    news_signals = (news_reg or {}).get("signals", [])
+
+    lines.append(f"\n### 新闻分析师 | {news_dir} | 原始置信度 {news_conf} | 校准后 {news_calibrated} | status={news_status}")
+    if news_signals:
+        lines.append(f"信号: {'; '.join(news_signals[:3])}")
+
+    # 新闻摘要替代 #13: 精确分类统计 + 情感比 + 事件标题
+    news_sent = features.get("news_sentiment", {})
+    ns_latest = news_sent.get("latest", {}) if isinstance(news_sent.get("latest"), dict) else news_sent
+    ns_events = ns_latest.get("recent_events", ns_latest.get("events", []))
+    if isinstance(ns_events, list) and ns_events:
+        pos_count = sum(1 for e in ns_events if isinstance(e, dict) and e.get("sentiment") == "positive")
+        neg_count = sum(1 for e in ns_events if isinstance(e, dict) and e.get("sentiment") == "negative")
+        neutral_count = sum(1 for e in ns_events if isinstance(e, dict) and e.get("sentiment") == "neutral")
+        total_events = pos_count + neg_count + neutral_count
+        sentiment_ratio = round((pos_count - neg_count) / max(total_events, 1), 2) if total_events > 0 else 0.0
+        lines.append(f"新闻情感: pos={pos_count}, neg={neg_count}, neutral={neutral_count}, ratio={sentiment_ratio}")
+        # 高重要度事件标题
+        high_events = [
+            e.get("title", e.get("summary", "?"))[:60]
+            for e in ns_events[:5]
+            if isinstance(e, dict) and e.get("llm_importance") == "high"
+        ]
+        if high_events:
+            lines.append(f"高重要度事件: {'; '.join(high_events)}")
+    else:
+        lines.append(f"新闻情感: {news_summary[:80] if news_summary else '(无新闻)'}")
+
+    # --- 置信度校准汇总 ---
+    calibrated = {
+        "technical": tech_calibrated,
+        "fundamental": fund_calibrated,
+        "position": pos_calibrated,
+        "news": news_calibrated,
+    }
+    lines.append(f"\n校准置信度汇总: {json.dumps(calibrated, ensure_ascii=False)}")
+
+    # --- L1 冲突检测（跳过 analyst 不计入） ---
+    active_dirs = []
+    for r_key, r_dir in [("tech", tech_dir), ("fund", fund_dir), ("pos", pos_dir), ("news", news_dir)]:
+        if r_dir not in ("skip", "?", None):
+            active_dirs.append(r_dir)
+    bullish_count = sum(1 for d in active_dirs if d in ("bullish", "long"))
+    bearish_count = sum(1 for d in active_dirs if d in ("bearish", "short"))
+    lines.append(f"\nL1 冲突: 看多={bullish_count}, 看空={bearish_count}, 活跃分析师={len(active_dirs)}")
+
+    return "\n".join(lines)
+
+
+def _find_registry_entry(registry: Dict[str, Any], prefix: str) -> Dict[str, Any]:
+    """从 analyst_registry 中按前缀查找第一个匹配项。"""
+    for key, entry in registry.items():
+        if key.startswith(f"REF-{prefix.upper()}") or key.startswith(prefix.upper()):
+            if isinstance(entry, dict):
+                return entry
+    return {}
+
+
+def _data_quality_weight(status: str) -> float:
+    """置信度权重校准：基于数据质量。"""
+    return {
+        "ok": 1.0,
+        "degraded": 0.5,
+        "skipped": 0.3,
+        "": 0.5,
+    }.get(status, 0.5)
+
+
+# =============================================================================
+# COMMODITY_REASONING_PROMPT — 精简版（结构化摘要替代完整 Markdown）
+# =============================================================================
 
 COMMODITY_REASONING_PROMPT = """你是期货推理分析师。在单次分析中完成多空双向推理，输出结构化分析报告。
 
@@ -18,22 +203,11 @@ COMMODITY_REASONING_PROMPT = """你是期货推理分析师。在单次分析中
 ## 标的约束
 {instrument_context}
 
-## L1 分析师报告索引（证据链 — 每个结论必须引用至少 1 个 ID）
+## L1 分析师结构化摘要（含校准置信度 + 关键数据）
+{structured_summary}
+
+## L1 分析师报告引用 ID
 {analyst_registry_summary}
-
-## 输入报告
-
-### 技术面报告
-{market_research_report}
-
-### 基本面报告（基差+库存+期限结构）
-{fundamentals_report}
-
-### 持仓情绪报告
-{sentiment_report}
-
-### 新闻/产业事件报告
-{news_report}
 
 ## 历史经验教训
 {past_memory_str}
@@ -108,15 +282,27 @@ def create_research_manager(llm, memory):
         curr_situation = f"{market_research_report}\n\n{sentiment_report}\n\n{news_report}\n\n{fundamentals_report}"
 
         # 安全检查：确保memory不为None
+        # Phase Agent: 降级策略 — ChromaDB 连接失败时静默降级
+        past_memories = []
         if memory is not None:
-            past_memories = memory.get_memories(curr_situation, n_matches=2)
+            try:
+                past_memories = memory.get_memories(curr_situation, n_matches=2)
+            except Exception as e:
+                logger.warning(
+                    f"⚠️ [Memory] ChromaDB 检索失败，静默降级: {e}"
+                )
+                past_memories = []
         else:
             logger.warning(f"⚠️ [DEBUG] memory为None，跳过历史记忆检索")
             past_memories = []
 
         past_memory_str = ""
-        for i, rec in enumerate(past_memories, 1):
-            past_memory_str += rec["recommendation"] + "\n\n"
+        if past_memories:
+            for i, rec in enumerate(past_memories, 1):
+                past_memory_str += rec["recommendation"] + "\n\n"
+        else:
+            # 冷启动处理：无历史记忆时提示
+            past_memory_str = "（历史相似情景：无（首次分析或记忆服务暂不可用，暂无历史参考））"
 
         if asset_type == "commodity":
             # ===== 新推理分析师路径 =====
@@ -124,7 +310,15 @@ def create_research_manager(llm, memory):
             variety_name = state.get("variety_name", "")
             trade_date = state.get("trade_date", "")
 
-            # 构建 analyst_registry_summary
+            features = state.get("commodity_features", {}) or {}
+            news_summary = state.get("news_summary", "")
+            # Phase Agent: 结构化摘要替代 4 份完整 Markdown
+            structured_summary = _build_analyst_summary(features, registry, news_summary)
+            logger.info(
+                f"[推理分析师] 结构化摘要={len(structured_summary)} 字符, "
+                f"报告数={len(registry)}"
+            )
+            # 构建 analyst_registry_summary (短引用列表,供 LLM 输出引用)
             registry = state.get("analyst_registry", {}) or {}
             if registry:
                 registry_lines = []
@@ -132,7 +326,7 @@ def create_research_manager(llm, memory):
                     cn_name = entry.get("cn_name", entry.get("analyst", "?"))
                     direction = entry.get("direction", "?")
                     summary = entry.get("summary", "")
-                    registry_lines.append(f"- {cn_name} | {direction} | {summary} | ID:{ref_id}")
+                    registry_lines.append(f"- [{ref_id}] {cn_name}: {direction} — {summary}")
                 analyst_registry_summary = "\n".join(registry_lines)
             else:
                 analyst_registry_summary = "(暂无分析师报告索引)"
@@ -142,10 +336,7 @@ def create_research_manager(llm, memory):
                 variety_name=variety_name,
                 analysis_date=trade_date,
                 instrument_context=instrument_context,
-                market_research_report=market_research_report,
-                fundamentals_report=fundamentals_report,
-                sentiment_report=sentiment_report,
-                news_report=news_report,
+                structured_summary=structured_summary,
                 analyst_registry_summary=analyst_registry_summary,
                 past_memory_str=past_memory_str,
             )
