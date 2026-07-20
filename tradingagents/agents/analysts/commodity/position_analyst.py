@@ -96,7 +96,7 @@ POSITION_SYSTEM_PROMPT = """你是一位资深的期货持仓分析师,擅长"�
 | 多空比 5日变化 | {lsr_change_5d} |
 | 连续净多变化天数 | {consecutive_days} |
 | 20d 净多斜率 | {slope_20d} |
-| 前20集中度 | {concentration} |
+| 前20多头份额(0~1) | {concentration} |
 | 拥挤度 180d 分位 | {crowding_pctl} |
 
 ### 触发信号
@@ -142,7 +142,7 @@ POSITION_SYSTEM_PROMPT = """你是一位资深的期货持仓分析师,擅长"�
 3. **多头 vs 空头行为分离**:区分主动加仓 vs 被动减仓
 4. **净多趋势持续性**:连续变化天数 + 20d 斜率 → 短期波动还是趋势性变化
 5. **多空比**:L/S 比值变化是多空力量转换的关键指标
-6. **集中度与拥挤度**:前 5 占比 > 60% 高集中;180d 分位 > 0.9 过度拥挤
+6. **集中度与拥挤度**:前20多头份额 > 0.6 = 多头相对集中,< 0.4 = 空头相对集中;180d 分位 > 0.9 过度拥挤
 
 ### 第三层:交叉验证
 - 成交量放大+价仓同向=趋势强化;成交量放大+价仓背离=分歧加大
@@ -382,10 +382,13 @@ def _build_fallback_structured(
             ),
         },
         "concentration": {
-            "level": "高" if (concentration or 0) >= 0.5 else ("低" if (concentration or 0) <= 0.2 else "中"),
+            "level": "高" if (concentration or 0) >= 0.6 else ("低" if (concentration or 0) <= 0.4 else "中"),
             "crowding_status": "拥挤" if (crowding_pctl or 0) > 0.9 else ("冷清" if (crowding_pctl or 0) < 0.1 else "正常"),
             "reversal_risk": (crowding_pctl or 0) > 0.9,
-            "analysis": f"集中度{_fmt(concentration)},拥挤度分位{_fmt(crowding_pctl)}",
+            "analysis": (
+                f"前20多头份额{_fmt(concentration)}(>0.6 多头相对集中,<0.4 空头相对集中),"
+                f"拥挤度分位{_fmt(crowding_pctl)}"
+            ),
         },
         "cross_contract": {
             "consistency": cross_consistency if cross_consistency != "N/A" else "待定",
@@ -529,7 +532,9 @@ def create_position_analyst(llm):
             }
 
         # --- 降级 2:数据稀疏 ---
-        if not quality_gate(pos_block):
+        # 持仓排名接口部分日期无数据,主力合约通常 ~21 天有效行;
+        # 这里用 15(低于 features 内部的 5d 最低 + 信号缓冲),避免正常样本被误判为稀疏。
+        if not quality_gate(pos_block, min_rows=15):
             reason = "持仓数据稀疏"
             empty = empty_report("neutral", reason, custom_data_context=custom_data_context)
             analyst_id = make_analyst_id("POSN", full_symbol, trade_date, seed="sparse")
