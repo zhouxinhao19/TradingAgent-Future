@@ -145,6 +145,62 @@ class BaseCommodityDataProvider(ABC):
             f"{self.provider_name} 未实现 get_position_rank"
         )
 
+    async def get_position_rank_history(
+        self,
+        exchange: str,
+        end_date: Union[str, date],
+        lookback_days: int = 30,
+        vars_list: Optional[List[str]] = None,
+        symbol: Optional[str] = None,
+    ) -> Optional[Dict[str, pd.DataFrame]]:
+        """
+        多日持仓排名(默认实现 = 循环调用 get_position_rank 拼接)。
+        子类可重写以走缓存或更高效的实现(AkshareFuturesProvider 有并发版)。
+        """
+        import asyncio
+        from datetime import datetime, timedelta
+
+        if isinstance(end_date, str):
+            for fmt in ("%Y%m%d", "%Y-%m-%d"):
+                try:
+                    end_dt = datetime.strptime(end_date, fmt)
+                    break
+                except ValueError:
+                    continue
+            else:
+                raise ValueError(f"无法解析 end_date: {end_date}")
+        else:
+            end_dt = datetime.combine(end_date, datetime.min.time())
+
+        dates = [
+            (end_dt - timedelta(days=i)).strftime("%Y%m%d")
+            for i in range(lookback_days + 5)
+        ][:lookback_days]
+
+        results = await asyncio.gather(
+            *[self.get_position_rank(exchange, d, vars_list) for d in dates],
+            return_exceptions=True,
+        )
+        merged: Dict[str, List[Any]] = {}
+        for d_str, res in zip(dates, results):
+            if isinstance(res, BaseException) or res is None:
+                continue
+            if isinstance(res, dict):
+                for contract, df in res.items():
+                    if df is None or (isinstance(df, pd.DataFrame) and df.empty):
+                        continue
+                    df = df.copy()
+                    df["date"] = pd.to_datetime(d_str, format="%Y%m%d")
+                    merged.setdefault(contract, []).append(df)
+        if not merged:
+            return None
+        return {
+            contract: pd.concat(dfs, ignore_index=True)
+            .drop_duplicates(subset=["date"], keep="last")
+            .sort_values("date").reset_index(drop=True)
+            for contract, dfs in merged.items()
+        }
+
     async def get_registered_receipt(
         self,
         start_date: Union[str, date],
