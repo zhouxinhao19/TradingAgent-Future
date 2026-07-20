@@ -4,6 +4,8 @@ import ElementPlus from 'element-plus'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import 'element-plus/dist/index.css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
+// 设计令牌 — 覆盖 Element Plus 变量（必须在 Element Plus 样式之后）
+import './styles/tokens.css'
 
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import dayjs from 'dayjs'
@@ -143,7 +145,7 @@ initApp()
 
 // 开发环境下的调试信息
 if (import.meta.env.DEV) {
-  console.log('🚀 TradingAgents-CN v1.0.0-preview 前端应用已启动')
+  console.log('🚀 TradingAgents-Future 前端应用已启动')
   console.log('📊 当前环境:', import.meta.env.MODE)
   console.log('🔗 API地址:', import.meta.env.VITE_API_BASE_URL || '/api')
 }

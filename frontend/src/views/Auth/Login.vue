@@ -2,9 +2,8 @@
   <div class="login-page">
     <div class="login-container">
       <div class="login-header">
-        <img src="/logo.svg" alt="TradingAgents-CN" class="logo" />
-        <h1 class="title">TradingAgents-CN</h1>
-        <p class="subtitle">多智能体股票分析学习平台</p>
+        <h1 class="title">TradingAgents-Future</h1>
+        <p class="subtitle">多智能体期货分析平台</p>
       </div>
 
       <el-card class="login-card" shadow="always">
@@ -64,10 +63,10 @@
         </el-form>
       </el-card>
 
-      <div class="login-footer">
-        <p>&copy; 2025 TradingAgents-CN. All rights reserved.</p>
-        <p class="disclaimer">
-          TradingAgents-CN 是一个 AI 多 Agents 的股票分析学习平台。平台中的分析结论、观点和“投资建议”均由 AI 自动生成，仅用于学习、研究与交流，不构成任何形式的投资建议或承诺。用户据此进行的任何投资行为及其产生的风险与后果，均由用户自行承担。市场有风险，入市需谨慎。
+      <div class=”login-footer”>
+        <p>&copy; 2026 TradingAgents-Future</p>
+        <p class=”disclaimer”>
+          本平台分析结论由 AI 自动生成，仅供学习研究与技术交流，不构成投资建议。市场有风险，入市需谨慎。
         </p>
       </div>
     </div>
@@ -151,7 +150,7 @@ const handleLogin = async () => {
 <style lang="scss" scoped>
 .login-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #162031 0%, #1a3048 40%, #1a3a54 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -160,7 +159,7 @@ const handleLogin = async () => {
 
 .login-container {
   width: 100%;
-  max-width: 400px;
+  max-width: 420px;
 }
 
 .login-header {
@@ -169,25 +168,37 @@ const handleLogin = async () => {
   color: white;
 
   .logo {
-    width: 64px;
-    height: 64px;
-    margin-bottom: 16px;
+    /* removed */
   }
 
   .title {
-    font-size: 32px;
-    font-weight: 600;
+    font-size: 28px;
+    font-weight: 700;
     margin: 0 0 8px 0;
+    letter-spacing: -0.02em;
   }
 
   .subtitle {
-    font-size: 16px;
-    opacity: 0.9;
+    font-size: 15px;
+    opacity: 0.70;
     margin: 0;
+    font-weight: 400;
   }
 }
 
 .login-card {
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+
+  :deep(.el-card__body) {
+    padding: 32px 28px 20px;
+  }
+
+  :deep(.el-form-item__label) {
+    font-weight: 600;
+    font-size: 13px;
+  }
+
   .form-options {
     display: flex;
     justify-content: space-between;
@@ -198,30 +209,27 @@ const handleLogin = async () => {
   .login-tip {
     text-align: center;
     width: 100%;
-    color: var(--el-text-color-regular);
   }
 }
 
 .login-footer {
   text-align: center;
-  margin-top: 32px;
-  color: white;
-  opacity: 0.9;
+  margin-top: 28px;
+  color: rgba(255, 255, 255, 0.55);
 
   p {
     margin: 0;
-    font-size: 14px;
+    font-size: 13px;
   }
 
   .disclaimer {
     margin-top: 8px;
-    font-size: 12px;
+    font-size: 11px;
     line-height: 1.6;
-    max-width: 800px;
+    max-width: 600px;
     margin-left: auto;
     margin-right: auto;
-    color: white;
-    opacity: 0.85;
+    opacity: 0.8;
   }
 }
 </style>
