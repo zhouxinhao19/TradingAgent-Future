@@ -73,6 +73,10 @@ class AnalysisRequest(BaseModel):
     quote_unit: str = Field("", description="报价单位,如 元/吨")
     max_debate_rounds: int = Field(1, ge=0, le=3, description="多空辩论轮次")
     max_risk_discuss_rounds: int = Field(1, ge=0, le=3, description="风控辩论轮次")
+    # 自定义数据文件（可选）
+    file_ids: List[str] = Field(default_factory=list, description="上传数据文件 ID 列表")
+    skill_name: str = Field("general-analysis", description="自定义数据分析技能")
+    user_context: str = Field("", description="用户上下文描述")
 
 
 class AnalysisTaskResponse(BaseModel):
@@ -141,10 +145,14 @@ async def _create_queued_task(
     max_risk_discuss_rounds: int = 1,
     user_id: str = "anonymous",
     batch_id: Optional[str] = None,
+    custom_data_file_paths: Optional[List[str]] = None,
+    custom_data_skill_name: str = "general-analysis",
+    custom_data_user_context: str = "",
 ) -> str:
     """创建 queued 任务并写入 MongoDB，返回 task_id。
 
     如果指定 batch_id，任务元数据会附带 batch_id 供后续批量查询。
+    custom_data_* 字段在此单次写入，避免与后续 _task_set 的竞态条件。
     """
     task_id = f"commodity_{uuid.uuid4().hex[:12]}"
     doc: Dict[str, Any] = {
@@ -162,10 +170,17 @@ async def _create_queued_task(
         "progress": 0,
         "progress_message": "排队中…",
         "created_at": datetime.now(timezone.utc),
+        "custom_data_file_paths": custom_data_file_paths or [],
+        "custom_data_skill_name": custom_data_skill_name,
+        "custom_data_user_context": custom_data_user_context,
     }
     if batch_id:
         doc["batch_id"] = batch_id
     await _task_set(task_id, doc)
+    logger.info(
+        f"[_create_queued_task] task_id={task_id}, custom_data_file_paths={custom_data_file_paths}, "
+        f"has_paths={bool(custom_data_file_paths)}"
+    )
     return task_id
 
 
@@ -278,6 +293,10 @@ async def _run_worker() -> None:
 
             if doc:
                 task_id = doc.get("task_id", "")
+                logger.info(
+                    f"[Worker] picked task {task_id}, "
+                    f"has_custom_data={bool(doc.get('custom_data_file_paths'))}"
+                )
                 async with _semaphore:
                     await _run_and_save_analysis(
                         full_symbol=doc.get("full_symbol", ""),
@@ -290,6 +309,9 @@ async def _run_worker() -> None:
                         max_risk_discuss_rounds=doc.get("max_risk_discuss_rounds", 1),
                         task_id=task_id,
                         user_id=doc.get("user_id", "anonymous"),
+                        custom_data_file_paths=doc.get("custom_data_file_paths", []),
+                        custom_data_skill_name=doc.get("custom_data_skill_name", "general-analysis"),
+                        custom_data_user_context=doc.get("custom_data_user_context", ""),
                     )
             else:
                 await asyncio.sleep(2)
@@ -384,6 +406,9 @@ async def _run_commodity_analysis(
     category: str = "",
     quote_unit: str = "",
     config_override: Optional[Dict[str, Any]] = None,
+    custom_data_file_paths: Optional[List[str]] = None,
+    custom_data_skill_name: str = "general-analysis",
+    custom_data_user_context: str = "",
 ) -> Dict[str, Any]:
     """异步运行 CommodityTradingAgentsGraph 分析。
 
@@ -411,6 +436,27 @@ async def _run_commodity_analysis(
                 f"✅ auto_features 加载完成 (success={aggregated.get('success')}, "
                 f"modules={list(commodity_features.keys())})"
             )
+
+            # ---- 自定义数据文件解析：注入 features["custom_data"] ----
+            if custom_data_file_paths:
+                try:
+                    from tradingagents.features.custom_data_adapter import parse_custom_data
+                    custom_data_result = parse_custom_data(
+                        file_paths=custom_data_file_paths,
+                        skill_name=custom_data_skill_name or "general-analysis",
+                        user_context=custom_data_user_context or "",
+                    )
+                    commodity_features["custom_data"] = custom_data_result
+                    logger.info(
+                        f"✅ 自定义数据注入 features: {len(custom_data_file_paths)} 文件, "
+                        f"parsed={custom_data_result.get('parsed')}"
+                    )
+                except Exception as e:
+                    logger.warning(f"⚠️ 自定义数据解析失败: {e}")
+                    commodity_features["custom_data"] = {
+                        "parsed": False, "error": str(e),
+                    }
+
             try:
                 # Phase 新闻改造:优先从 MongoDB 读取已标注新闻(双路径:品种相关 + 宏观背景)
                 from app.core.database import get_database
@@ -623,6 +669,12 @@ async def submit_commodity_analysis(
     # 容错:body 缺失或为空时用路径参数填充 full_symbol
     try:
         body_bytes = await raw_request.body()
+        # body 可能是 bytes 或 str；统一 utf-8 解码后再 json.loads
+        if isinstance(body_bytes, bytes):
+            try:
+                body_bytes = body_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                body_bytes = body_bytes.decode("utf-8", errors="replace")
         body_data: Dict[str, Any] = json.loads(body_bytes) if body_bytes else {}
     except (json.JSONDecodeError, ValueError):
         body_data = {}
@@ -656,6 +708,22 @@ async def submit_commodity_analysis(
     task_id = f"commodity_{uuid.uuid4().hex[:12]}"
     trade_date = request.trade_date or _today()
 
+    # ---- 处理自定义数据文件 ----
+    custom_data_file_paths: List[str] = []
+    if request.file_ids:
+        try:
+            from app.routers.commodity.custom_data_router import _get_file_path
+            user_id = str(user.get("id", "anonymous"))
+            for fid in request.file_ids:
+                fp = _get_file_path(fid, user_id=user_id)
+                if fp:
+                    custom_data_file_paths.append(str(fp.resolve()))
+                    logger.info(f"[submit_analysis] 自定义数据文件: {fid} → {fp}")
+                else:
+                    logger.warning(f"[submit_analysis] 文件未找到: {fid}")
+        except Exception as e:
+            logger.warning(f"[submit_analysis] 文件解析失败: {e}")
+
     # ---- 写任务元数据 (status=queued), worker 会拾取 ----
     await _task_set(task_id, {
         "task_id": task_id,
@@ -672,6 +740,9 @@ async def submit_commodity_analysis(
         "progress": 0,
         "progress_message": "排队中…",
         "created_at": datetime.now(timezone.utc),
+        "custom_data_file_paths": custom_data_file_paths,
+        "custom_data_skill_name": request.skill_name,
+        "custom_data_user_context": request.user_context,
     })
 
     # 确保 worker 在运行（幂等）
@@ -825,6 +896,9 @@ async def _run_and_save_analysis(
     max_risk_discuss_rounds: int,
     task_id: str,
     user_id: str = "anonymous",
+    custom_data_file_paths: Optional[List[str]] = None,
+    custom_data_skill_name: str = "general-analysis",
+    custom_data_user_context: str = "",
 ):
     """运行分析 + 保存报告 + 更新任务状态。
 
@@ -849,6 +923,9 @@ async def _run_and_save_analysis(
             category=category,
             quote_unit=quote_unit,
             config_override=config,
+            custom_data_file_paths=custom_data_file_paths or [],
+            custom_data_skill_name=custom_data_skill_name,
+            custom_data_user_context=custom_data_user_context,
         )
 
         await _push_progress(task_id, 75, "分析完成，保存报告…")
