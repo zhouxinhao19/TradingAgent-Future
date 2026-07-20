@@ -84,6 +84,17 @@ def _prepare(df: pd.DataFrame, symbol: Optional[str]) -> pd.DataFrame:
     )
     for c in ["long_top20", "short_top20", "total_oi", "net_long_top20"]:
         out[c] = h.to_numeric(out[c])
+
+    # 修复口径:AKShare get_shfe_rank_table / 同类接口返回长表(每行 = 一日一合约的
+    # 前 20 多/空合计,rank=999 表示汇总行),并不直接提供 total_oi。
+    # 用 (long_top20 + short_top20) 作为该合约 OI 近似值:前 20 名通常吃掉 60%+
+    # 双边持仓,既能反映品种活跃度又避免分母为 0 时的 nan 链式污染。
+    if "total_oi" not in out.columns or out["total_oi"].isna().all():
+        if {"long_top20", "short_top20"}.issubset(out.columns):
+            out["total_oi"] = out["long_top20"].fillna(0) + out["short_top20"].fillna(0)
+        else:
+            out["total_oi"] = np.nan
+
     if "date" in out.columns:
         out["date"] = pd.to_datetime(out["date"], errors="coerce")
         if out["date"].notna().any():
@@ -98,13 +109,23 @@ def _prepare(df: pd.DataFrame, symbol: Optional[str]) -> pd.DataFrame:
 
 
 def _concentration(data: pd.DataFrame) -> pd.Series:
-    """前 20 名集中度:(long + short) / (2 * total_oi)。"""
-    if "total_oi" in data.columns and data["total_oi"].notna().any():
-        denom = (2.0 * data["total_oi"]).replace(0, np.nan)
-        return (
-            data.get("long_top20", 0).fillna(0) + data.get("short_top20", 0).fillna(0)
-        ) / denom
+    """前 20 名多/空持仓份额。
+
+    由于 AKShare get_shfe_rank_table 等接口仅返回长表(每行 = 一日一合约的
+    前 20 多/空合计),不直接提供 total_market_oi。`_prepare` 已用
+    `long_top20 + short_top20` 作为合约 OI 近似,故此处直接返回 `long_share`:
+        concentration = long_top20 / (long_top20 + short_top20)
+    该值越大,表示前 20 名多头相对空头越集中(多头集中度)。
+    范围 [0, 1];0.5 = 多空对称,>0.6 = 多头相对集中,<0.4 = 空头相对集中。
+    """
+    if {"long_top20", "short_top20"}.issubset(data.columns):
+        long_v = data["long_top20"].fillna(0)
+        short_v = data["short_top20"].fillna(0)
+        total = long_v + short_v
+        # 防止分母为 0
+        return long_v / total.replace(0, np.nan)
     if "long_top20" in data.columns:
+        # 退化路径:无 short 数据时,用 zscore 当"集中度变化"
         m = data["long_top20"].rolling(60, min_periods=10).mean()
         sd = data["long_top20"].rolling(60, min_periods=10).std()
         return (data["long_top20"] - m) / sd.replace(0, np.nan)
@@ -441,10 +462,10 @@ def _signals(
         elif net_chg_5d < 0:
             sigs.append("前20净多减少(主力看空)")
     if concentration is not None:
-        if concentration >= 0.5:
-            sigs.append(f"前20集中度偏高({concentration:.1%})")
-        elif concentration <= 0.2:
-            sigs.append(f"前20集中度偏低({concentration:.1%})")
+        if concentration >= 0.6:
+            sigs.append(f"前20多头相对集中({concentration:.1%},空头相对分散)")
+        elif concentration <= 0.4:
+            sigs.append(f"前20空头相对集中({concentration:.1%},多头相对分散)")
     if long_change_5d is not None:
         if long_change_5d > 0:
             sigs.append(f"多头前20主动加仓({long_change_5d:+.0f})")

@@ -9,6 +9,7 @@
 """
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
 from .commodity import _helpers  # noqa: F401  供内层模块 cross-import
@@ -130,6 +131,18 @@ async def compute_all_features_from_provider(
     )
     date_compact = trade_date.replace("-", "")[:8] if trade_date else "20260715"
 
+    # AKShare 部分接口(futures_spot_price_daily / get_roll_yield)对超过
+    # ~45 天的查询窗口直接返回空(实测 60d / 18m 均为 0;30d / 15d / 7d 正常)。
+    # 详情页用 6d 窗口能拿到数据。把这两个查询限制在 30d 内。
+    _basis_start = (
+        (datetime.strptime(trade_date, "%Y-%m-%d") - timedelta(days=30)).strftime("%Y-%m-%d")
+        if trade_date else "2026-06-20"
+    )
+    _roll_start = (
+        (datetime.strptime(trade_date, "%Y-%m-%d") - timedelta(days=30)).strftime("%Y-%m-%d")
+        if trade_date else "2026-06-20"
+    )
+
     import asyncio as _asyncio
 
     results = await _asyncio.gather(
@@ -146,7 +159,7 @@ async def compute_all_features_from_provider(
         # 基差历史
         _call_provider_with_timeout(
             provider, "get_basis_history", 20,
-            "2025-01-01", trade_date or "2026-07-16", [underlying],
+            _basis_start, trade_date or "2026-07-16", [underlying],
         ),
         # 现货价格(可能调 100ppi.com,单独超时)
         _call_provider_with_timeout(
@@ -157,15 +170,15 @@ async def compute_all_features_from_provider(
         _call_provider_with_timeout(
             provider, "get_inventory", 15, underlying,
         ),
-        # 持仓排名
+        # 持仓排名(30 天历史,供 positioning 5d/60d 指标计算)
         _call_provider_with_timeout(
-            provider, "get_position_rank", 15,
-            exchange_code, date_compact, None, underlying,
+            provider, "get_position_rank_history", 60,
+            exchange_code, date_compact, 30, None, underlying,
         ),
         # 展期收益率(最长等待 60s,DIY 计算需抓取日线全市场数据)
         _call_provider_with_timeout(
             provider, "get_roll_yield", 60,
-            "date", var=underlying, start_day="20260201", end_day=date_compact,
+            "date", var=underlying, start_day=_roll_start, end_day=date_compact,
         ),
         # 新闻
         _call_provider_with_timeout(
@@ -176,7 +189,7 @@ async def compute_all_features_from_provider(
 
     (
         df_hist, index_df, basis_df, spot_df,
-        inv_df, pos_df, roll_df, news_list,
+        inv_df, pos_data, roll_df, news_list,
     ) = results
 
     # 将异常转为 None
@@ -188,7 +201,7 @@ async def compute_all_features_from_provider(
     basis_df = _unwrap(basis_df)
     spot_df = _unwrap(spot_df)
     inv_df = _unwrap(inv_df)
-    pos_df = _unwrap(pos_df)
+    pos_data = _unwrap(pos_data)
     roll_df = _unwrap(roll_df)
     news_list = _unwrap(news_list)
 
@@ -224,7 +237,7 @@ async def compute_all_features_from_provider(
         "inventory",
     )
     features["positioning"] = _safe(
-        lambda: compute_positioning_metrics(pos_df, underlying) if pos_df is not None
+        lambda: compute_positioning_metrics(pos_data, underlying) if pos_data is not None
         else _helpers.empty_result("无持仓数据"),
         "持仓计算失败",
         errors,

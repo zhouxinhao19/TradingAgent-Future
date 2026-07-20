@@ -1,101 +1,135 @@
-// 全局样式文件
+/**
+ * 全局基础样式 — TradingAgents-Future
+ */
 
-// 重置样式
-* {
+/* ── 重置 ── */
+*,
+*::before,
+*::after {
   box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 html, body {
   margin: 0;
   padding: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--el-font-family);
+  font-size: 14px;
+  color: var(--el-text-color-primary);
+  background-color: var(--el-bg-color-page);
 }
 
-// 优化标题样式（浅色主题）
+/* ── 标题 ── */
 h1, h2, h3, h4, h5, h6 {
-  color: #1a202c;
+  color: var(--el-text-color-primary);
   font-weight: 600;
+  line-height: 1.3;
+  margin: 0;
 }
 
-h1 {
-  font-size: 32px;
+h1 { font-size: 28px; letter-spacing: -0.02em; }
+h2 { font-size: 24px; letter-spacing: -0.01em; }
+h3 { font-size: 20px; }
+h4 { font-size: 18px; }
+h5 { font-size: 16px; }
+h6 { font-size: 14px; }
+
+/* ── 链接 ── */
+a {
+  color: var(--el-color-primary);
+  text-decoration: none;
+  &:hover { text-decoration: underline; }
 }
 
-h2 {
-  font-size: 28px;
+/* ── 滚动条 ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--el-border-color);
+  border-radius: 3px;
+  &:hover { background: var(--el-text-color-placeholder); }
 }
 
-h3 {
-  font-size: 24px;
+/* ── 选中 ── */
+::selection {
+  background: var(--el-color-primary-light-5);
+  color: #fff;
 }
 
-h4 {
-  font-size: 20px;
-}
-
-h5 {
-  font-size: 18px;
-}
-
-h6 {
-  font-size: 16px;
-}
-
-// 优化卡片标题
-.el-card__header {
-  h1, h2, h3, h4, h5, h6 {
-    color: #1a202c;
-    font-weight: 600;
-    margin: 0;
+/* ── 页面标题工具类 ── */
+.page-header {
+  margin-bottom: 20px;
+  h1, h2 {
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .page-description {
+    color: var(--el-text-color-secondary);
+    font-size: 14px;
+    margin-top: 4px;
   }
 }
 
-// 优化页面标题
-.page-title,
-.section-title,
-.card-title {
-  color: #1a202c !important;
-  font-weight: 600 !important;
-}
+/* ── 布局工具类 ── */
+.text-center { text-align: center; }
+.text-left   { text-align: left; }
+.text-right  { text-align: right; }
+.text-secondary { color: var(--el-text-color-secondary); }
 
-// 全局工具类
-.text-center {
-  text-align: center;
-}
+.flex         { display: flex; }
+.flex-center  { display: flex; align-items: center; justify-content: center; }
+.flex-between { display: flex; align-items: center; justify-content: space-between; }
+.flex-col     { display: flex; flex-direction: column; }
+.gap-xs       { gap: 4px; }
+.gap-sm       { gap: 8px; }
+.gap-md       { gap: 16px; }
+.gap-lg       { gap: 24px; }
 
-.text-left {
-  text-align: left;
-}
-
-.text-right {
-  text-align: right;
-}
-
-.flex {
-  display: flex;
-}
-
-.flex-center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.flex-between {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-// 响应式工具类
+/* ── 响应式工具类 ── */
 @media (max-width: 768px) {
-  .mobile-hidden {
-    display: none !important;
+  .mobile-hidden { display: none !important; }
+}
+@media (min-width: 769px) {
+  .desktop-hidden { display: none !important; }
+}
+
+/* ── 金融数据格式化 ── */
+.price-up   { color: var(--el-color-danger); }   /* 中国市场红涨 */
+.price-down { color: var(--el-color-success); }   /* 中国市场绿跌 */
+.price-flat { color: var(--el-text-color-secondary); }
+.mono-num   { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* ── 卡片微调 ── */
+.el-card {
+  border-radius: var(--el-border-radius-base);
+  box-shadow: var(--app-shadow-sm);
+  transition: box-shadow var(--app-transition-normal);
+  &:hover {
+    box-shadow: var(--app-shadow-md);
+  }
+  .el-card__header {
+    font-weight: 600;
   }
 }
 
-@media (min-width: 769px) {
-  .desktop-hidden {
-    display: none !important;
+/* ── 表格微调 ── */
+.el-table {
+  --el-table-header-bg-color: var(--el-fill-color-light);
+  th.el-table__cell {
+    font-weight: 600;
+    color: var(--el-text-color-secondary);
+    font-size: 13px;
+    text-transform: none;
+    letter-spacing: 0;
   }
 }
