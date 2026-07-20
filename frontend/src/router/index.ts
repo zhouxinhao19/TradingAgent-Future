@@ -135,6 +135,15 @@ const routes: RouteRecordRaw[] = [
           title: '期货模拟交易',
           requiresAuth: true,
         }
+      },
+      {
+        path: 'custom-analysis',
+        name: 'CustomDataAnalysis',
+        component: () => import('@/views/Commodity/CustomDataAnalysis.vue'),
+        meta: {
+          title: '自定义数据分析',
+          requiresAuth: true,
+        }
       }
     ]
   },

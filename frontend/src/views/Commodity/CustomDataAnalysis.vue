@@ -79,10 +79,10 @@
               />
             </el-form-item>
 
-            <el-form-item label="关联合约（可选）">
+            <el-form-item label="关联合约" required>
               <el-input
                 v-model="fullSymbol"
-                placeholder="如 RB2510.SHF，留空则不关联合约"
+                placeholder="如 CU.SHF、RB2510.SHF"
               />
             </el-form-item>
 
@@ -213,7 +213,7 @@ const reportLoading = ref(false)
 // ====== 计算属性 ======
 
 const canSubmit = computed(() => {
-  return uploadedFiles.value.length > 0 && skillName.value
+  return uploadedFiles.value.length > 0 && skillName.value && fullSymbol.value.trim()
 })
 
 // ====== 文件上传 ======
@@ -245,10 +245,11 @@ async function handleUpload(options: UploadRequestOptions) {
         loaded: pct,
       } as any)
     })
-    if (res?.success && res.data) {
-      fileIdMap.set(file.name, res.data.file_id)
-      uploadedFiles.value.push(res.data)
-      options.onSuccess(res.data)
+    if (res?.data?.file_id) {
+      const fileInfo = res.data
+      fileIdMap.set(file.name, fileInfo.file_id)
+      uploadedFiles.value.push(fileInfo)
+      options.onSuccess(fileInfo)
     } else {
       options.onError(new Error(res?.message || '上传失败') as any)
     }
@@ -304,7 +305,7 @@ function onSkillChange(name: string) {
 async function loadSkills() {
   try {
     const res = await commodityApi.listCustomSkills()
-    const items = (res as any)?.data
+    const items = Array.isArray(res) ? res : (res as any)?.data
     if (items && Array.isArray(items)) {
       skills.value = items
       if (skills.value.length > 0) {
@@ -336,12 +337,12 @@ async function submitAnalysis() {
       file_ids: uploadedFiles.value.map(f => f.file_id),
       skill_name: skillName.value,
       user_context: userContext.value,
-      full_symbol: fullSymbol.value || undefined,
+      full_symbol: fullSymbol.value.trim(),
       trade_date: tradeDate.value || undefined,
     })
 
-    if ((res as any)?.success) {
-      const tid = (res as any)?.data?.task_id
+    if ((res as any)?.data?.task_id) {
+      const tid = (res as any).data.task_id
       lastTaskId.value = tid || ''
       progressMessage.value = '任务已提交，后台分析中...'
       pollingActive.value = true

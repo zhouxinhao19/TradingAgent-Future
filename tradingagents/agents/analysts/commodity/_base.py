@@ -43,7 +43,7 @@ def empty_report(direction: str = "neutral", reason: str = "", custom_data_conte
     Args:
         direction: bullish/bearish/neutral,默认中性
         reason: 数据缺失的具体原因,会写进报告
-        custom_data_context: 自定义数据上下文,非空时追加到报告末尾
+        custom_data_context: 保留参数(不再追加到 skip 报告中,避免 skip 时数据噪音)
 
     Returns:
         Markdown 字符串,适合直接落到 state['xxx_report']
@@ -56,8 +56,6 @@ def empty_report(direction: str = "neutral", reason: str = "", custom_data_conte
         f"{reason},跳过本分析师。\n\n"
         f"建议结合其他分析师(基本面/持仓/新闻)综合判断。\n"
     )
-    if custom_data_context:
-        report += f"\n## 用户上传数据参考\n{custom_data_context}\n"
     return report
 
 

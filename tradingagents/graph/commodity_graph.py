@@ -482,6 +482,25 @@ class CommodityTradingAgentsGraph(TradingAgentsGraph):
             except Exception as e:  # noqa: BLE001
                 logger.error(f"❌ auto_features 拉取失败: {e}", exc_info=True)
 
+        # ---- 转换 numpy 类型为 Python 原生（MemorySaver msgpack 兼容） ----
+        if commodity_features is not None:
+            import numpy as np
+
+            def _to_native(o):
+                """递归将 numpy 类型转为 Python 原生类型（MemorySaver msgpack 兼容）。"""
+                if isinstance(o, (np.integer,)):
+                    return int(o)
+                if isinstance(o, (np.floating,)):
+                    return float(o)
+                if isinstance(o, (np.ndarray,)):
+                    return o.tolist()
+                if isinstance(o, dict):
+                    return {k: _to_native(v) for k, v in o.items()}
+                if isinstance(o, (list, tuple)):
+                    return [_to_native(v) for v in o]
+                return o
+            commodity_features = _to_native(commodity_features)
+
         init_state = self.propagator.create_initial_state(
             full_symbol=full_symbol,
             trade_date=trade_date,
