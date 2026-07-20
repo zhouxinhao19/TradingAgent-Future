@@ -39,7 +39,7 @@ async def _get_annotator_llm() -> Any:
 
     读取链路与 agent 一致:
       model = unified_config.get_quick_analysis_model()
-      provider = normalize_provider_key(get_provider_by_model_name(model))
+      provider = normalize_provider_key(await get_provider_by_model_name(model))
     然后用 create_llm_by_provider（返回底层 .get_llm()，有 ainvoke）。
     """
     from app.core.unified_config import unified_config
@@ -48,7 +48,12 @@ async def _get_annotator_llm() -> Any:
     from tradingagents.graph.trading_graph import create_llm_by_provider
 
     model = unified_config.get_quick_analysis_model()
-    provider = normalize_provider_key(get_provider_by_model_name(model))
+    # ⚠️ get_provider_by_model_name 是 async 函数,必须 await。
+    # 历史 bug: 未 await 直接传 coroutine 对象给 normalize_provider_key,
+    # 导致 provider 变成 "<coroutine object ... at 0x...>",
+    # 进而 create_llm_by_provider 抛 Connection error,新闻标注全失败。
+    provider_raw = await get_provider_by_model_name(model)
+    provider = normalize_provider_key(provider_raw)
     backend_url = unified_config.get_system_settings().get("backend_url", "")
 
     try:
@@ -115,6 +120,7 @@ async def _ingest_and_annotate() -> int:
     Returns:
         本次标注的新增新闻条数。
     """
+    logger.info("📡 [ingest] 开始拉取新闻源...")
     from tradingagents.dataflows.providers.commodity.akshare_futures import (
         AkshareFuturesProvider,
     )
@@ -222,14 +228,20 @@ async def _run_ingestion_loop() -> None:
     except Exception as e:
         logger.error(f"❌ 首次新闻标注失败: {e}")
 
+    tick_count = 0
     while True:
+        # 关键: sleep 必须等够才能让 tick 心跳按节奏出来
         await asyncio.sleep(_FETCH_INTERVAL_SECONDS)
+        tick_count += 1
+        logger.info(f"⏰ [ingest loop] tick={tick_count} 开始新一轮")
         try:
             count = await _ingest_and_annotate()
             if count:
-                logger.info(f"✅ 新增 {count} 条新闻已标注")
+                logger.info(f"✅ 新增 {count} 条新闻已标注 (tick={tick_count})")
+            else:
+                logger.debug(f"⏭️ 本轮 tick={tick_count} 无新增新闻 (worker 存活)")
         except Exception as e:
-            logger.error(f"❌ 定时新闻拉取失败: {e}")
+            logger.error(f"❌ 定时新闻拉取失败 (tick={tick_count}): {e}")
 
 
 # ========================================================================

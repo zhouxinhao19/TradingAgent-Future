@@ -50,120 +50,33 @@
         </el-card>
 
         <!-- 最近分析（任务中心联动） -->
-        <el-card class="recent-analyses-card" header="最近分析" style="margin-top: 24px;">
-          <el-table :data="recentAnalyses" style="width: 100%">
-            <el-table-column label="品种代码" width="180">
-              <template #default="{ row }">
-                <span style="font-weight: 600" class="symbol-link" @click="viewCommodityReport(row)">{{ extractVariety(row.full_symbol) }}</span>
-                <el-tag v-if="row.variety_name" size="small" type="info" effect="plain" style="margin-left: 6px">
-                  {{ row.variety_name }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="trade_date" label="交易日期" width="110" />
-            <el-table-column label="状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="getStatusType(row.status)" size="small">
-                  {{ getStatusText(row.status) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="提交时间" width="170">
-              <template #default="{ row }">
-                {{ formatTime(row.created_at) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="操作">
-              <template #default="{ row }">
-                <el-button type="text" size="small" @click="viewCommodityReport(row)">
-                  查看报告
-                </el-button>
-                <el-tooltip
-                  v-if="row.status === 'failed' && row.error_message"
-                  :content="row.error_message"
-                  placement="top"
-                >
-                  <el-tag type="danger" size="small" effect="plain">失败原因</el-tag>
-                </el-tooltip>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <div class="table-footer">
-            <el-button type="text" @click="goToQueue">
-              查看全部任务 <el-icon><ArrowRight /></el-icon>
-            </el-button>
-          </div>
-        </el-card>
+        <RecentAnalysesCard style="margin-top: 24px;" />
       </el-col>
 
       <!-- 右侧：自选品种和快讯 -->
       <el-col :span="8">
         <!-- 我的自选品种 -->
-        <el-card class="favorites-card">
-          <template #header>
-            <div class="card-header">
-              <span>我的自选品种</span>
-              <el-button type="text" size="small" @click="goToFavorites">
-                查看全部 <el-icon><ArrowRight /></el-icon>
-              </el-button>
-            </div>
-          </template>
-
-          <div v-if="favoriteItems.length === 0" class="empty-favorites">
-            <el-empty description="暂无自选品种" :image-size="60">
-              <el-button type="primary" size="small" @click="goToFavorites">
-                添加自选品种
-              </el-button>
-            </el-empty>
-          </div>
-
-          <div v-else class="favorites-list">
-            <div
-              v-for="item in favoriteItems.slice(0, 5)"
-              :key="item.id"
-              class="favorite-item"
-              @click="viewFavoriteDetail(item)"
-            >
-              <div class="stock-info">
-                <div class="stock-code">
-                  <el-tag :type="item.asset_type === 'commodity' ? 'warning' : ''" size="small" effect="plain" style="margin-right:4px">
-                    {{ item.asset_type === 'commodity' ? '📦' : '📈' }}
-                  </el-tag>
-                  {{ item.asset_type === 'commodity' ? (item.full_symbol?.split('.')[0]?.replace(/\d+$/, '') || item.full_symbol) : item.stock_code }}
-                  <template v-if="item.asset_type === 'commodity'">{{ item.commodity_name || '' }}</template>
-                  <template v-else>{{ item.display_name || item.stock_name || '' }}</template>
-                </div>
-              </div>
-              <div class="stock-price">
-                <div class="current-price">{{ item.current_price != null ? '¥' + item.current_price : (item.snapshot_price != null ? '¥' + item.snapshot_price : '--') }}</div>
-                <div
-                  v-if="item.change_percent != null"
-                  class="change-percent"
-                  :class="getPriceChangeClass(item.change_percent)"
-                >
-                  {{ item.change_percent > 0 ? '+' : '' }}{{ Number(item.change_percent).toFixed(2) }}%
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="favoriteItems.length > 5" class="favorites-footer">
-            <el-button type="text" size="small" @click="goToFavorites">
-              查看全部 {{ favoriteItems.length }} 个自选品种
-            </el-button>
-          </div>
-        </el-card>
+        <FavoritesCard />
 
         <!-- 市场快讯（带标注、双标签页） -->
         <el-card class="market-news-card" style="margin-top: 24px;">
           <template #header>
             <div style="display:flex; align-items:center; justify-content:space-between">
               <span>市场快讯</span>
-              <el-radio-group v-model="newsTab" size="small" @change="reloadMarketNews">
-                <el-radio-button value="all">全市场</el-radio-button>
-                <el-radio-button value="favorites">自选相关</el-radio-button>
-              </el-radio-group>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <el-radio-group v-model="newsTab" size="small" @change="reloadMarketNews">
+                  <el-radio-button value="all">全市场</el-radio-button>
+                  <el-radio-button value="favorites">自选相关</el-radio-button>
+                </el-radio-group>
+                <el-button
+                  size="small"
+                  text
+                  :loading="newsRefreshing"
+                  @click="refreshNews"
+                >
+                  <el-icon><Refresh /></el-icon> 刷新
+                </el-button>
+              </div>
             </div>
           </template>
           <div v-if="filteredNews.length > 0" class="news-list">
@@ -204,46 +117,70 @@ import {
   Box,
   List,
   ArrowRight,
-  InfoFilled
+  InfoFilled,
+  Refresh,
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import type { AnalysisStatus } from '@/types/analysis'
 import DataSourceLlmStatusCard from '@/components/Dashboard/DataSourceLlmStatusCard.vue'
+import RecentAnalysesCard from '@/components/Dashboard/RecentAnalysesCard.vue'
+import FavoritesCard from '@/components/Dashboard/FavoritesCard.vue'
+import { commodityApi } from '@/api/commodity'
 import { useFavoritesStore } from '@/stores/favorites'
-import { commodityApi, type CommodityTaskItem } from '@/api/commodity'
 
 const router = useRouter()
-
-// 响应式数据
-const recentAnalyses = ref<CommodityTaskItem[]>([])
-
 const favoritesStore = useFavoritesStore()
 
-// 自选品种列表（来自 store，支持股票+商品）
-const favoriteItems = computed(() => favoritesStore.items)
+// 提取用户自选品种的品种代码列表（CU、AL 等）
+const favoriteVarietyCodes = computed(() => {
+  return favoritesStore.commodityItems
+    .map(item => (item.full_symbol || '').split('.')[0]?.replace(/\d+$/, '') || '')
+    .filter(Boolean)
+})
 
 // 市场快讯数据
 const marketNews = ref<any[]>([])
 const newsTab = ref<'all' | 'favorites'>('all')
+const newsRefreshing = ref(false)
 
-/** 基于当前 tab 和自选品种筛选新闻 */
-const filteredNews = computed(() => {
-  if (newsTab.value === 'all') return marketNews.value
-  // 自选相关: 取 currentVariety 有交集且 relevant_varieties 非空的新闻
-  const favCodes = new Set(
-    favoriteItems.value
-      .filter(i => i.asset_type === 'commodity' && i.full_symbol)
-      .map(i => (i.full_symbol || '').split('.')[0]?.replace(/\d+$/, '').toUpperCase())
-      .filter(Boolean),
-  )
-  return marketNews.value.filter(n => {
-    const rvs: string[] = n.relevant_varieties || []
-    return rvs.length > 0 && rvs.some(rv => favCodes.has(rv.toUpperCase()))
-  })
-})
+/** 基于当前 tab 加载新闻（借鉴期货详情页方式：tab 切换触发后端筛选） */
+const filteredNews = computed(() => marketNews.value)
 
-function reloadMarketNews() {
-  // tab 切换时不需要重新拉取, computed 自动过滤
+async function reloadMarketNews() {
+  if (newsTab.value === 'all') {
+    // 全市场: 拉取全部新闻
+    await loadMarketNews()
+  } else {
+    // 自选相关: 借鉴详情页方式,逐品种从后端筛选
+    // 确保自选已加载
+    if (!favoritesStore.commodityItems.length && !favoritesStore.loading) {
+      await favoritesStore.loadFavorites('commodity')
+    }
+    const codes = favoriteVarietyCodes.value
+    if (!codes.length) {
+      marketNews.value = []
+      return
+    }
+    // 逐品种调 API（同详情页 store.loadNews(category, limit, variety)）
+    const seen = new Set<string>()
+    const items: any[] = []
+    for (const code of codes) {
+      try {
+        const res = await commodityApi.getNews('all', 8, code)
+        const batch = ((res as any)?.data?.items ?? []) as any[]
+        for (const item of batch) {
+          const key = item.title || item.content_hash || ''
+          if (key && !seen.has(key)) {
+            seen.add(key)
+            items.push({ ...item, id: key })
+          }
+        }
+      } catch {
+        // 单个品种失败不影响其他品种
+      }
+    }
+    items.sort((a, b) => (b.published_at || '').localeCompare(a.published_at || ''))
+    marketNews.value = items
+  }
 }
 
 function sentimentTag(sent?: string): 'success' | 'danger' | 'info' {
@@ -255,7 +192,6 @@ function sentimentTag(sent?: string): 'success' | 'danger' | 'info' {
 // 实时相对时间 tick（每分钟驱动一次）
 const tick = ref(0)
 let tickTimer: ReturnType<typeof setInterval> | null = null
-/** 市场快讯自动刷新定时器 */
 let newsPollTimer: ReturnType<typeof setInterval> | null = null
 
 // 方法
@@ -265,27 +201,10 @@ const goToQueue = () => {
 
 // ---------- 商品分析相关 ----------
 
-/** 查看商品分析报告详情 */
-function viewCommodityReport(row: CommodityTaskItem) {
-  if (row.status === 'completed') {
-    router.push(`/commodity/analysis?symbol=${row.full_symbol}`)
-  } else {
-    router.push('/queue')
-  }
-}
-
 /** 前往商品分析页 */
 function goToCommodityAnalysis() {
   router.push('/commodity/analysis')
 }
-
-/** 从 full_symbol (如 CU0.SHF) 中提取品种代码 (CU) */
-function extractVariety(fullSymbol: string): string {
-  if (!fullSymbol) return ''
-  return fullSymbol.split('.')[0]?.replace(/0$/, '') || fullSymbol
-}
-
-
 
 const openNewsUrl = (url?: string) => {
   if (url) {
@@ -295,75 +214,12 @@ const openNewsUrl = (url?: string) => {
   }
 }
 
-const getStatusType = (status: string | AnalysisStatus): 'success' | 'info' | 'warning' | 'danger' => {
-  const statusMap: Record<string, 'success' | 'info' | 'warning' | 'danger'> = {
-    pending: 'info',
-    processing: 'warning',
-    running: 'warning',
-    completed: 'success',
-    failed: 'danger',
-    cancelled: 'info'
-  }
-  return statusMap[status] || 'info'
-}
-
-const getStatusText = (status: string | AnalysisStatus) => {
-  const statusMap: Record<string, string> = {
-    pending: '等待中',
-    processing: '处理中',
-    running: '处理中',
-    completed: '已完成',
-    failed: '失败',
-    cancelled: '已取消'
-  }
-  return statusMap[status] || String(status)
-}
-
-import { formatDateTime, formatRelativeTime } from '@/utils/datetime'
-
-const formatTime = (time: string) => {
-  return formatDateTime(time)
-}
+import { formatRelativeTime } from '@/utils/datetime'
 
 /** 相对时间（依赖 tick 以自动刷新） */
 const newsRelativeTime = (timeStr: string) => {
-  // 通过 tick.value 触发 Vue 重新求值
   void tick.value
   return formatRelativeTime(timeStr)
-}
-
-// 自选品种相关方法
-const goToFavorites = () => {
-  router.push('/favorites')
-}
-
-const viewFavoriteDetail = (item: any) => {
-  if (item.asset_type === 'commodity') {
-    router.push(`/commodity/${item.full_symbol}`)
-  } else {
-    router.push(`/analysis/single?stock_code=${item.stock_code}`)
-  }
-}
-
-const getPriceChangeClass = (changePercent: number) => {
-  if (changePercent > 0) return 'price-up'
-  if (changePercent < 0) return 'price-down'
-  return 'price-neutral'
-}
-
-const loadRecentAnalyses = async () => {
-  try {
-    // 使用商品分析任务中心接口，获取最近10条
-    const res = await commodityApi.getTaskList({ limit: 10, offset: 0 })
-
-    const body: any = (res as any)?.data || {}
-    const tasks: CommodityTaskItem[] = body.tasks || []
-
-    recentAnalyses.value = tasks as any
-  } catch (error) {
-    console.error('加载最近分析失败:', error)
-    recentAnalyses.value = []
-  }
 }
 
 const loadMarketNews = async () => {
@@ -377,8 +233,8 @@ const loadMarketNews = async () => {
           id: item.title || item.llm_summary || Math.random(),
         }))
         .sort((a: any, b: any) => {
-          const ta = a.annotated_at || a.published_at || ''
-          const tb = b.annotated_at || b.published_at || ''
+          const ta = a.published_at || a.annotated_at || ''
+          const tb = b.published_at || b.annotated_at || ''
           return tb.localeCompare(ta)
         })
     }
@@ -388,20 +244,24 @@ const loadMarketNews = async () => {
   }
 }
 
+/** 手动触发后端拉取+重新 LLM 标注 */
+async function refreshNews() {
+  newsRefreshing.value = true
+  try {
+    await commodityApi.refreshNews()
+    ElMessage.success('已触发新闻刷新,约 30 秒后生效')
+  } catch (e: any) {
+    ElMessage.error(`刷新失败: ${e?.message || e}`)
+  } finally {
+    newsRefreshing.value = false
+  }
+}
+
 // 生命周期
 onMounted(async () => {
-  // 加载自选品种数据
-  await favoritesStore.loadFavorites()
-  // 加载最近分析(商品任务中心)
-  await loadRecentAnalyses()
-  // 加载市场快讯
   await loadMarketNews()
-
-  // 每分钟刷一次 tick，保持相对时间实时更新
   tickTimer = setInterval(() => { tick.value++ }, 60_000)
-
-  // 每 60 秒自动刷新市场快讯
-  newsPollTimer = setInterval(() => { loadMarketNews() }, 60_000)
+  newsPollTimer = setInterval(() => { reloadMarketNews() }, 30_000)
 })
 
 onUnmounted(() => {
@@ -520,20 +380,7 @@ onUnmounted(() => {
     }
   }
 
-  .recent-analyses-card {
-    .symbol-link {
-      color: var(--el-color-primary);
-      cursor: pointer;
-      font-weight: 500;
-      &:hover { text-decoration: underline; }
-    }
-    .table-footer {
-      text-align: center;
-      margin-top: 16px;
-    }
-  }
-
-  .system-status-card {
+    .system-status-card {
     .status-item {
       display: flex;
       justify-content: space-between;
@@ -620,84 +467,7 @@ onUnmounted(() => {
   }
 
   .favorites-card {
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
 
-    .empty-favorites {
-      text-align: center;
-      padding: 20px 0;
-    }
-
-    .favorites-list {
-      .favorite-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 12px 0;
-        border-bottom: 1px solid var(--el-border-color-lighter);
-        cursor: pointer;
-        transition: background-color 0.3s ease;
-
-        &:hover {
-          background-color: var(--el-fill-color-lighter);
-          margin: 0 -16px;
-          padding: 12px 16px;
-          border-radius: 6px;
-        }
-
-        &:last-child {
-          border-bottom: none;
-        }
-
-        .stock-info {
-          .stock-code {
-            font-weight: 600;
-            font-size: 14px;
-            color: var(--el-text-color-primary);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-          }
-        }
-
-        .stock-price {
-          text-align: right;
-
-          .current-price {
-            font-weight: 600;
-            font-size: 14px;
-            color: var(--el-text-color-primary);
-          }
-
-          .change-percent {
-            font-size: 12px;
-            margin-top: 2px;
-
-            &.price-up {
-              color: #f56c6c;
-            }
-
-            &.price-down {
-              color: #67c23a;
-            }
-
-            &.price-neutral {
-              color: var(--el-text-color-regular);
-            }
-          }
-        }
-      }
-    }
-
-    .favorites-footer {
-      text-align: center;
-      padding-top: 12px;
-      border-top: 1px solid var(--el-border-color-lighter);
-      margin-top: 12px;
-    }
   }
 
   /* 空数据状态（快讯暂无时） */

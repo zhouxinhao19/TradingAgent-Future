@@ -17,6 +17,8 @@ from typing import Any, Dict, Optional
 
 from tradingagents.utils.logging_init import get_logger
 
+from tradingagents.agents.analysts.commodity import build_custom_data_context
+
 logger = get_logger("default")
 
 
@@ -564,6 +566,9 @@ INVESTMENT_DIRECTOR_SYSTEM_PROMPT = """你是大宗商品期货的**投研总监
 - 报价单位: {quote_unit}
 - 交易日期: {trade_date}
 
+### 5. 用户上传数据参考
+{custom_data_context}
+
 ---
 
 ## 输出要求
@@ -840,6 +845,7 @@ def create_investment_director(deep_thinking_llm):
             investment_plan=investment_plan,
             risk_assessment_json=risk_assessment_json,
             analyst_registry_summary=analyst_registry_summary,
+            custom_data_context=build_custom_data_context(commodity_features),
         )
 
         messages_payload = prompt.format_messages(

@@ -17,7 +17,7 @@ import json
 import logging
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -98,8 +98,8 @@ class NewsAnnotation:
     sentiment_reasoning: str          # 必填,至少 10 字
     importance: str                   # "high" | "medium" | "low"
     summary: str                      # ≤40 字
-    annotated_at: datetime
     annotator_model: str              # 标注使用的模型
+    annotated_at: str = ""              # ISO 格式北京时间字符串, 避免 MongoDB datetime 时区丢失
     title: str = ""                   # 原标题(前端展示用)
     content: str = ""                 # 原内容(前端展示用)
     published_at: str = ""            # 原始发布时间
@@ -132,6 +132,9 @@ class NewsAnnotation:
 
     @classmethod
     def from_mongo(cls, doc: Dict[str, Any]) -> "NewsAnnotation":
+        ann_at = doc.get("annotated_at", "")
+        if isinstance(ann_at, datetime):
+            ann_at = ann_at.isoformat()
         return cls(
             content_hash=doc.get("content_hash", ""),
             relevant_varieties=doc.get("relevant_varieties", []),
@@ -140,13 +143,13 @@ class NewsAnnotation:
             sentiment_reasoning=doc.get("sentiment_reasoning", ""),
             importance=doc.get("importance", "medium"),
             summary=doc.get("summary", ""),
+            annotator_model=doc.get("annotator_model", ""),
+            annotated_at=ann_at,
             title=doc.get("title", ""),
             content=doc.get("content", ""),
             published_at=doc.get("published_at", ""),
             source=doc.get("source", ""),
             url=doc.get("url", ""),
-            annotated_at=doc.get("annotated_at", datetime.min),
-            annotator_model=doc.get("annotator_model", ""),
             _review_flag=doc.get("_review_flag", False),
             _keyword_conflict=doc.get("_keyword_conflict", False),
         )
@@ -308,7 +311,7 @@ class NewsAnnotator:
                     "llm_sentiment_reasoning": ann.sentiment_reasoning,
                     "llm_importance": ann.importance,
                     "llm_summary": ann.summary,
-                    "annotated_at": ann.annotated_at.isoformat() if ann.annotated_at else "",
+                    "annotated_at": ann.annotated_at or "",
                     "annotator_model": ann.annotator_model,
                     "_review_flag": ann._review_flag,
                 })
@@ -384,7 +387,10 @@ class NewsAnnotator:
             logger.warning(f"LLM 返回非 JSON:{raw_text[:200]}")
             return []
 
-        now = datetime.now(timezone.utc)
+        # 使用北京时间(UTC+8),与前端的"所有入库数据都是UTC+8时间"约定一致。
+        # 若用 UTC 存储,前端 `new Date()` 会当作北京时间解析,引起 ~8小时偏差。
+        BJT = timezone(timedelta(hours=8))
+        now_str = datetime.now(BJT).isoformat()
         result: List[NewsAnnotation] = []
         item_map = {_compute_content_hash(it): it for it in batch}
         audit_samples: List[NewsAnnotation] = []
@@ -425,7 +431,7 @@ class NewsAnnotator:
                 published_at=str(item.get("published_at", "") or ""),
                 source=str(item.get("source", "") or ""),
                 url=str(item.get("url", "") or ""),
-                annotated_at=now,
+                annotated_at=now_str,
                 annotator_model=self.annotator_model,
             )
 

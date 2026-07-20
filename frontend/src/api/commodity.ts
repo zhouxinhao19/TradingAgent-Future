@@ -368,6 +368,13 @@ export const commodityApi = {
     return ApiClient.get<ApiEnvelope<NewsResponse>>(`/api/commodity/news`, params)
   },
 
+  /** 手动触发新闻拉取+标注(worker 卡死时手动重启) */
+  async refreshNews() {
+    return ApiClient.post<ApiEnvelope<{ message: string }>>(
+      `/api/commodity/news/refresh`,
+    )
+  },
+
   // ---- Phase 3b-ii-D:分析端点 ----
   async submitAnalysis(fullSymbol: string, params?: {
     trade_date?: string
@@ -377,6 +384,9 @@ export const commodityApi = {
     quote_unit?: string
     max_debate_rounds?: number
     max_risk_discuss_rounds?: number
+    file_ids?: string[]
+    skill_name?: string
+    user_context?: string
   }) {
     // 后端 AnalysisRequest 必填 full_symbol(虽然也在 URL 里,但 Pydantic 仍校验 body)
     const body = { full_symbol: fullSymbol, ...(params || {}) }
@@ -499,6 +509,48 @@ export const commodityApi = {
       failed: number
       tasks: Array<CommodityTaskItem>
     }>>(`/api/commodity/batch/${encodeURIComponent(batchId)}`)
+  },
+
+  // ============================================================
+  // 自定义数据文件分析 (Phase Data Analyst)
+  // ============================================================
+
+  /** 上传自定义数据文件(.xlsx/.xls/.csv)，返回 file_id */
+  async uploadCustomData(file: File, onProgress?: (pct: number) => void) {
+    return ApiClient.upload<{
+      file_id: string
+      original_name: string
+      size: number
+      content_type: string
+      uploaded_at: string
+    }>(`/api/commodity/custom-data/upload`, file, onProgress)
+  },
+
+  /** 获取可用自定义数据分析技能列表 */
+  async listCustomSkills() {
+    return ApiClient.get<ApiEnvelope<Array<{
+      name: string
+      title: string
+      description: string
+      content_types: string[]
+    }>>>(`/api/commodity/custom-data/skills`)
+  },
+
+  /** 提交自定义数据文件分析任务 */
+  async submitCustomDataAnalysis(params: {
+    file_ids: string[]
+    skill_name?: string
+    user_context?: string
+    full_symbol?: string
+    trade_date?: string
+  }) {
+    return ApiClient.post<ApiEnvelope<{
+      task_id: string
+      full_symbol: string
+      status: string
+      message: string
+      file_count: number
+    }>>(`/api/commodity/custom-data/analyze`, params)
   },
 }
 

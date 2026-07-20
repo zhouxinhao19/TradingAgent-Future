@@ -444,8 +444,8 @@ class ConfigService:
                     api_base="https://open.bigmodel.cn/api/paas/v4",
                     max_tokens=4000,
                     temperature=0.7,
-                    enabled=True,
-                    description="智谱AI GLM-4模型（推荐）"
+                    enabled=False,
+                    description="智谱AI GLM-4模型（需配置 ZHIPU_API_KEY）"
                 ),
                 LLMConfig(
                     provider=ModelProvider.QWEN,
@@ -458,7 +458,7 @@ class ConfigService:
                     description="阿里云通义千问模型"
                 )
             ],
-            default_llm="glm-4",
+            default_llm="deepseek-chat",
             data_source_configs=[
                 DataSourceConfig(
                     name="AKShare",

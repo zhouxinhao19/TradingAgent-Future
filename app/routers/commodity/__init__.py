@@ -9,11 +9,12 @@ from .extended import router as extended_router
 from .news import router as news_router
 from .analysis import router as analysis_router
 from .paper_rules import router as paper_rules_router
+from .custom_data_router import router as custom_data_router
 
 __all__ = [
     "quotes_router", "extended_router", "news_router",
-    "analysis_router", "paper_rules_router",
+    "analysis_router", "paper_rules_router", "custom_data_router",
 ]
 
 # 防止未使用警告
-_ = (quotes_router, extended_router, news_router, analysis_router, paper_rules_router)
+_ = (quotes_router, extended_router, news_router, analysis_router, paper_rules_router, custom_data_router)

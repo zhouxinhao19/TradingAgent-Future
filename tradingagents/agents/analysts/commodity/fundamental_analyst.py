@@ -28,6 +28,7 @@ from langchain_core.messages import AIMessage
 from tradingagents.utils.logging_init import get_logger
 
 from ._base import (
+    build_custom_data_context,
     empty_report,
     extract_first_sentence,
     get_full_symbol,
@@ -86,6 +87,9 @@ FUNDAMENTAL_SYSTEM_PROMPT = """你是一位产业分析师,聚焦产业链研究
 
 ## 新闻摘要(跨分析师参考)
 {news_summary}
+
+## 用户上传数据参考
+{custom_data_context}
 
 ## 分析要求(三段式)
 
@@ -346,6 +350,7 @@ def create_fundamental_analyst(llm):
         logger.info(f"💼 [产业分析师] 启动: {full_symbol} @ {trade_date}")
 
         features = load_features(state)
+        custom_data_context = build_custom_data_context(features)
 
         basis_block = features.get("basis")
         inventory_block = features.get("inventory")
@@ -354,7 +359,7 @@ def create_fundamental_analyst(llm):
         # --- 降级 1:三个模块全部缺失 ---
         if not any(isinstance(b, dict) for b in [basis_block, inventory_block, term_block]):
             reason = "基差/库存/期限结构三因子 features 全部缺失"
-            report_md = empty_report("neutral", reason)
+            report_md = empty_report("neutral", reason, custom_data_context=custom_data_context)
             analyst_id = make_analyst_id("FUND", full_symbol, trade_date, seed="empty")
             conclusion_id = make_conclusion_id("FUND", 1)
             tagged_report = inject_analyst_id(report_md, analyst_id)
@@ -375,7 +380,7 @@ def create_fundamental_analyst(llm):
         )
         if total_rows < 30:
             reason = f"三因子数据稀疏(total_rows={total_rows} < 30)"
-            report_md = empty_report("neutral", reason)
+            report_md = empty_report("neutral", reason, custom_data_context=custom_data_context)
             analyst_id = make_analyst_id("FUND", full_symbol, trade_date, seed="sparse")
             conclusion_id = make_conclusion_id("FUND", 1)
             tagged_report = inject_analyst_id(report_md, analyst_id)
@@ -443,6 +448,7 @@ def create_fundamental_analyst(llm):
             quality_rows=quality_rows,
             quality_coverage=_fmt((basis_block or {}).get("quality", {}).get("coverage")),
             news_summary=state.get("news_summary", ""),
+            custom_data_context=build_custom_data_context(features),
         )
 
         # --- 主路径:LLM 调用 ---
@@ -506,9 +512,11 @@ def create_fundamental_analyst(llm):
             logger.error(f"❌ [产业分析师] LLM 调用失败: {e}")
             try:
                 fallback_md = _build_fallback_structured(assessment)
+                if custom_data_context:
+                    fallback_md += f"\n\n## 用户上传数据参考\n{custom_data_context}\n"
             except Exception as inner_e:
                 logger.error(f"❌ [产业分析师] fallback 也失败: {inner_e}")
-                fallback_md = empty_report("neutral", f"LLM 失败且 fallback 异常: {inner_e}")
+                fallback_md = empty_report("neutral", f"LLM 失败且 fallback 异常: {inner_e}", custom_data_context=custom_data_context)
 
             fallback_direction = assessment.get("drive_direction", "neutral") or "neutral"
             analyst_id = make_analyst_id("FUND", full_symbol, trade_date, seed="fallback")

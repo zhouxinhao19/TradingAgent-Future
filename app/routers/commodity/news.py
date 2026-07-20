@@ -2,13 +2,14 @@
 大宗商品新闻路由(Phase 3a)
 - GET /api/commodity/news?category=...&limit=...
 - GET /api/commodity/news/categories
+- POST /api/commodity/news/refresh  手动触发一次拉取+标注(worker 卡死时用)
 - 数据由 UnifiedCommodityService.get_futures_news() 提供(Phase 2 已实现)
 - 任何失败返 [],绝不抛 500
 """
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, BackgroundTasks
 
 from app.core.response import ok
 from app.services.commodity.unified_commodity_service import service
@@ -45,3 +46,22 @@ async def get_news(
         data={"items": items, "count": len(items), "category": category, "limit": limit},
         message=f"获取 {category} 新闻成功",
     )
+
+
+@router.post("/refresh", response_model=dict, summary="手动触发新闻拉取+标注")
+async def refresh_news(background: BackgroundTasks):
+    """手动触发一次新闻拉取+LLM标注(worker 周期任务卡死时备用)。
+
+    Path: POST /api/commodity/news/refresh
+    """
+    from app.services.commodity.news_ingestion import _ingest_and_annotate
+
+    async def _run():
+        try:
+            count = await _ingest_and_annotate()
+            logger.info(f"✅ 手动刷新完成: {count} 条新标注")
+        except Exception as e:
+            logger.error(f"❌ 手动刷新失败: {e}")
+
+    background.add_task(_run)
+    return ok(message="已触发新闻刷新,稍后查询 /api/commodity/news 查看")

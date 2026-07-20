@@ -188,7 +188,12 @@ _NEWS_GENERATORS = {
 
 
 async def _safe_call(provider, func_name: str, *args, **kwargs):
-    """在 executor 中调用 AKShare 接口并吞错(返回 None)"""
+    """在 executor 中调用 AKShare 接口并吞错(返回 None)。
+
+    新增 15s 超时保护:防止 stock_info_* 等全球宏观资讯源因对端挂死
+    导致整个 news ingestion worker 卡住(2026-07-20 事件:
+    global_macro gather 整体被一个 stock_info_* 端点阻塞 24h+)。
+    """
     if not await provider._ensure_ak():
         return None
     func = getattr(provider._ak, func_name, None)
@@ -196,10 +201,11 @@ async def _safe_call(provider, func_name: str, *args, **kwargs):
         return None
     try:
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
+        fut = loop.run_in_executor(
             None, lambda: func(*args, **kwargs)
         )
-    except Exception:
+        return await asyncio.wait_for(fut, timeout=15.0)
+    except (asyncio.TimeoutError, Exception):
         return None
 
 

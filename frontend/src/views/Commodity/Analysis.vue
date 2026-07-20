@@ -9,123 +9,182 @@
       <!-- 左侧:分析表单 -->
       <el-col :span="8">
         <el-card shadow="never" class="form-card">
-          <template #header>
-            <span><b>启动新分析</b></span>
-          </template>
+          <el-tabs v-model="activeTab">
+            <!-- ===== 单品种分析 Tab ===== -->
+            <el-tab-pane label="单品种分析" name="single">
+              <el-form :model="form" label-position="top" size="default">
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+                  <el-button text size="small" @click="clearForm">
+                    清空表单
+                  </el-button>
+                </div>
+                <el-row :gutter="12">
+                  <el-col :span="12">
+                    <el-form-item label="交易所" required>
+                      <el-select v-model="form.exchange" placeholder="选择交易所" style="width: 100%" @change="onExchangeChange">
+                        <el-option label="上期所" value="SHFE" />
+                        <el-option label="大商所" value="DCE" />
+                        <el-option label="郑商所" value="CZCE" />
+                        <el-option label="能源中心" value="INE" />
+                        <el-option label="广期所" value="GFEX" />
+                        <el-option label="中金所" value="CFFEX" />
+                      </el-select>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="12">
+                    <el-form-item label="品种代码" required>
+                      <el-select
+                        v-model="form.variety_symbol"
+                        placeholder="先选交易所"
+                        style="width: 100%"
+                        :loading="loadingVarieties"
+                        :disabled="!form.exchange"
+                        filterable
+                        @change="onVarietyChange"
+                      >
+                        <el-option
+                          v-for="v in varietyOptions"
+                          :key="v.symbol"
+                          :label="`${v.symbol} - ${v.name}`"
+                          :value="v.symbol"
+                        />
+                      </el-select>
+                    </el-form-item>
+                  </el-col>
+                </el-row>
 
-          <el-form :model="form" label-position="top" size="large">
-            <el-form-item label="交易所" required>
-              <el-select v-model="form.exchange" placeholder="选择交易所" style="width: 100%" @change="onExchangeChange">
-                <el-option label="上期所" value="SHFE" />
-                <el-option label="大商所" value="DCE" />
-                <el-option label="郑商所" value="CZCE" />
-                <el-option label="能源中心" value="INE" />
-                <el-option label="广期所" value="GFEX" />
-                <el-option label="中金所" value="CFFEX" />
-              </el-select>
-            </el-form-item>
+                <el-row :gutter="12">
+                  <el-col :span="16">
+                    <el-form-item label="交易日期">
+                      <el-date-picker
+                        v-model="form.trade_date"
+                        type="date"
+                        placeholder="默认当天"
+                        style="width: 100%"
+                        value-format="YYYY-MM-DD"
+                      />
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="8">
+                    <el-form-item label="&nbsp;">
+                      <el-button
+                        type="primary"
+                        :loading="submitting"
+                        :disabled="submitting || !form.variety_symbol"
+                        style="width: 100%"
+                        @click="submitAnalysis"
+                      >
+                        {{ submitting ? '提交中...' : '分析' }}
+                      </el-button>
+                    </el-form-item>
+                  </el-col>
+                </el-row>
 
-            <el-form-item label="品种代码" required>
-              <el-select
-                v-model="form.variety_symbol"
-                placeholder="先选交易所"
-                style="width: 100%"
-                :loading="loadingVarieties"
-                :disabled="!form.exchange"
-                filterable
-                @change="onVarietyChange"
-              >
-                <el-option
-                  v-for="v in varietyOptions"
-                  :key="v.symbol"
-                  :label="`${v.symbol} - ${v.name}`"
-                  :value="v.symbol"
+                <!-- 自定义数据文件上传 -->
+                <el-collapse style="margin-top: 8px">
+                  <el-collapse-item title="📎 附加数据文件（可选）" name="upload">
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                      <el-upload
+                        ref="uploadRef"
+                        :auto-upload="true"
+                        :http-request="handleFileUpload"
+                        :show-file-list="false"
+                        accept=".xlsx,.xls,.csv"
+                      >
+                        <el-button size="small" plain>
+                          <el-icon style="margin-right: 4px"><UploadFilled /></el-icon>选择文件
+                        </el-button>
+                      </el-upload>
+                      <span style="color: #909399; font-size: 12px">支持 .xlsx / .xls / .csv</span>
+                    </div>
+                    <el-tag
+                      v-for="f in uploadedFiles"
+                      :key="f.file_id"
+                      closable
+                      size="small"
+                      style="margin: 4px 4px 0 0"
+                      @close="removeFile(f.file_id)"
+                    >
+                      {{ f.original_name }}
+                    </el-tag>
+                    <el-form-item label="数据描述（可选）" style="margin-top: 8px">
+                      <el-input
+                        v-model="userContext"
+                        type="textarea"
+                        :rows="2"
+                        placeholder="描述文件内容和分析目的，例如：2024 年铜库存与价格数据"
+                      />
+                    </el-form-item>
+                  </el-collapse-item>
+                </el-collapse>
+
+                <!-- 分析中进度提示 -->
+                <el-alert
+                  v-if="pollingActive && progressMessage"
+                  :title="progressMessage"
+                  type="info"
+                  :closable="false"
+                  show-icon
+                  style="margin-top: 12px"
                 />
-              </el-select>
-            </el-form-item>
+              </el-form>
+            </el-tab-pane>
 
-            <el-form-item label="交易日期">
-              <el-date-picker
-                v-model="form.trade_date"
-                type="date"
-                placeholder="默认当天"
-                style="width: 100%"
-                value-format="YYYY-MM-DD"
-              />
-            </el-form-item>
-
-            <el-button
-              type="primary"
-              size="large"
-              :loading="submitting"
-              :disabled="submitting || !form.variety_symbol"
-              style="width: 100%"
-              @click="submitAnalysis"
-            >
-              {{ submitting ? '提交中...' : '提交分析' }}
-            </el-button>
-
-            <!-- 分析中进度提示 -->
-            <el-alert
-              v-if="pollingActive && progressMessage"
-              :title="progressMessage"
-              type="info"
-              :closable="false"
-              show-icon
-              style="margin-top: 12px"
-            />
-          </el-form>
-        </el-card>
-
-        <!-- 批量分析卡 -->
-        <el-card shadow="never" class="form-card" style="margin-top: 16px">
-          <template #header>
-            <span><b>批量分析</b></span>
-          </template>
-          <el-form label-position="top" size="large">
-            <el-form-item label="品种代码（每行一个）">
-              <el-input
-                v-model="batchSymbols"
-                type="textarea"
-                :rows="5"
-                placeholder="CU&#10;RB&#10;I&#10;SA"
-              />
-            </el-form-item>
-            <el-form-item label="交易日期">
-              <el-date-picker
-                v-model="batchTradeDate"
-                type="date"
-                placeholder="默认当天"
-                style="width: 100%"
-                value-format="YYYY-MM-DD"
-              />
-            </el-form-item>
-            <el-button
-              type="success"
-              size="large"
-              :loading="batchSubmitting"
-              :disabled="batchSubmitting || !batchSymbols.trim()"
-              style="width: 100%"
-              @click="submitBatch"
-            >
-              {{ batchSubmitting ? '提交中…' : '批量提交' }}
-            </el-button>
-            <div v-if="batchResult" style="margin-top: 12px">
-              <el-alert
-                :title="batchResult.message"
-                :type="batchResult.failed > 0 ? 'warning' : 'success'"
-                :closable="false"
-                show-icon
-              >
-                <template #default>
-                  <div style="margin-top: 4px; font-size: 13px">
-                    成功 {{ batchResult.created }}/{{ batchResult.total }}
-                    <el-button text size="small" @click="goToTaskCenter">查看任务中心</el-button>
-                  </div>
-                </template>
-              </el-alert>
-            </div>
-          </el-form>
+            <!-- ===== 批量分析 Tab ===== -->
+            <el-tab-pane label="批量分析" name="batch">
+              <el-form label-position="top" size="default">
+                <el-form-item label="品种代码（每行一个）">
+                  <el-input
+                    v-model="batchSymbols"
+                    type="textarea"
+                    :rows="5"
+                    placeholder="CU&#10;RB&#10;I&#10;SA"
+                  />
+                </el-form-item>
+                <el-row :gutter="12">
+                  <el-col :span="16">
+                    <el-form-item label="交易日期">
+                      <el-date-picker
+                        v-model="batchTradeDate"
+                        type="date"
+                        placeholder="默认当天"
+                        style="width: 100%"
+                        value-format="YYYY-MM-DD"
+                      />
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="8">
+                    <el-form-item label="&nbsp;">
+                      <el-button
+                        type="success"
+                        :loading="batchSubmitting"
+                        :disabled="batchSubmitting || !batchSymbols.trim()"
+                        style="width: 100%"
+                        @click="submitBatch"
+                      >
+                        {{ batchSubmitting ? '提交中…' : '批量提交' }}
+                      </el-button>
+                    </el-form-item>
+                  </el-col>
+                </el-row>
+                <div v-if="batchResult" style="margin-top: 4px">
+                  <el-alert
+                    :title="batchResult.message"
+                    :type="batchResult.failed > 0 ? 'warning' : 'success'"
+                    :closable="false"
+                    show-icon
+                  >
+                    <template #default>
+                      <div style="margin-top: 4px; font-size: 13px">
+                        成功 {{ batchResult.created }}/{{ batchResult.total }}
+                        <el-button text size="small" @click="router.push('/tasks')">查看任务中心</el-button>
+                      </div>
+                    </template>
+                  </el-alert>
+                </div>
+              </el-form>
+            </el-tab-pane>
+          </el-tabs>
         </el-card>
       </el-col>
 
@@ -133,46 +192,26 @@
       <el-col :span="16">
         <CommodityReportDetail v-if="latestResult" :data="latestResult" />
 
-        <el-card v-if="!latestResult && !reports.length" shadow="never">
-          <el-empty description="选择品种并提交分析">
-            <p class="text-secondary">
-              分析将依次执行:技术分析师 → 产业分析师 → 持仓情绪分析师 → 新闻分析师<br>
-              → 推理分析师 → 总结
-            </p>
-          </el-empty>
-        </el-card>
-
-        <el-card v-if="reports.length" shadow="never" style="margin-top: 16px">
-          <template #header><span><b>历史报告 ({{ reports.length }})</b></span></template>
-          <el-table :data="reports" stripe style="width: 100%" @row-click="viewReport">
-            <el-table-column prop="trade_date" label="日期" width="120" />
-            <el-table-column prop="full_symbol" label="合约" width="140" />
-            <el-table-column label="方向" width="80">
-              <template #default="{ row }">
-                <el-tag :type="directionTagType(row.direction)" size="small">{{ directionLabel(row.direction) }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="confidence" label="置信度" width="80">
-              <template #default="{ row }">{{ (row.confidence * 100).toFixed(0) }}%</template>
-            </el-table-column>
-            <el-table-column prop="created_at" label="分析时间" min-width="160" />
-          </el-table>
-        </el-card>
+        <!-- 无结果时显示自选品种 + 最近分析（与 Dashboard 共享组件） -->
+        <template v-if="!latestResult">
+          <FavoritesCard compact />
+          <div style="margin-top: 16px;"></div>
+          <RecentAnalysesCard compact />
+        </template>
       </el-col>
     </el-row>
-
-    <el-dialog v-model="detailVisible" title="报告详情" width="80%" top="3vh">
-      <CommodityReportDetail :data="detailData" />
-    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { UploadFilled } from '@element-plus/icons-vue'
 import { commodityApi, type VarietyItem } from '@/api/commodity'
 import CommodityReportDetail from '@/components/Commodity/CommodityReportDetail.vue'
+import FavoritesCard from '@/components/Dashboard/FavoritesCard.vue'
+import RecentAnalysesCard from '@/components/Dashboard/RecentAnalysesCard.vue'
 
 const router = useRouter()
 
@@ -192,14 +231,13 @@ const form = ref({
   trade_date: '',
 })
 
+const activeTab = ref('single')
+
 const submitting = ref(false)
 const pollingActive = ref(false)
 const progressMessage = ref('')
 const lastTaskId = ref('')
 const latestResult = ref<Record<string, any> | null>(null)
-const reports = ref<Array<Record<string, any>>>([])
-const detailVisible = ref(false)
-const detailData = ref<Record<string, any> | null>(null)
 
 // 批量分析
 const batchSymbols = ref('')
@@ -207,25 +245,43 @@ const batchTradeDate = ref('')
 const batchSubmitting = ref(false)
 const batchResult = ref<Record<string, any> | null>(null)
 
+// 文件上传
+const uploadRef = ref<any>(null)
+const uploadedFiles = ref<Array<{ file_id: string; original_name: string }>>([])
+const userContext = ref('')
+
 // 品种级联
 const loadingVarieties = ref(false)
 const varietyOptions = ref<VarietyItem[]>([])
 const selectedVarietyName = ref('')
+
+// ---- 文件上传 ----
+async function handleFileUpload(options: any) {
+  const { file, onSuccess, onError } = options
+  try {
+    const res = await commodityApi.uploadCustomData(file)
+    if (res?.file_id) {
+      uploadedFiles.value.push({ file_id: res.file_id, original_name: res.original_name || file.name })
+      onSuccess?.(res)
+      ElMessage.success(`已上传: ${res.original_name || file.name}`)
+    } else {
+      onError?.(new Error('上传失败'))
+    }
+  } catch (e: any) {
+    ElMessage.error(`上传失败: ${e?.message || e}`)
+    onError?.(e)
+  }
+}
+
+function removeFile(fileId: string) {
+  uploadedFiles.value = uploadedFiles.value.filter(f => f.file_id !== fileId)
+}
 
 // 根据 form 状态计算 fullSymbol (品种代码 + 0 + 交易所后缀, 如 CU0.SHF)
 function computeFullSymbol(): string {
   if (!form.value.exchange || !form.value.variety_symbol) return ''
   const suffix = EXCHANGE_SUFFIX[form.value.exchange] || `.${form.value.exchange}`
   return `${form.value.variety_symbol}0${suffix}`
-}
-
-function directionLabel(action?: string): string {
-  const map: Record<string, string> = { long: '做多', short: '做空', hold: '持有', flat: '平仓' }
-  return map[action || 'hold'] || action || 'hold'
-}
-function directionTagType(action?: string): string {
-  const map: Record<string, string> = { long: 'success', short: 'danger', hold: 'info', flat: 'warning' }
-  return map[action || 'hold']
 }
 
 async function onExchangeChange() {
@@ -273,7 +329,6 @@ function startPolling(taskId: string) {
         const detail = await commodityApi.getTaskResult(taskId)
         if (detail?.data) {
           latestResult.value = detail.data as Record<string, any>
-          await loadReports()
           ElMessage.success('分析完成!')
         }
         return
@@ -283,7 +338,6 @@ function startPolling(taskId: string) {
         ElMessage.error(res.data.progress_message || '分析失败')
         return
       } else {
-        // processing — 更新进度信息
         if (res.data.progress_message) {
           progressMessage.value = res.data.progress_message
         }
@@ -309,18 +363,22 @@ async function submitAnalysis() {
   lastTaskId.value = ''
 
   try {
-    const res = await commodityApi.submitAnalysis(fullSymbol, {
+    const params: Record<string, any> = {
       trade_date: form.value.trade_date || undefined,
       variety_name: selectedVarietyName.value || undefined,
       exchange: form.value.exchange || undefined,
-    })
+    }
+    if (uploadedFiles.value.length) {
+      params.file_ids = uploadedFiles.value.map(f => f.file_id)
+      params.user_context = userContext.value || ''
+    }
+    const res = await commodityApi.submitAnalysis(fullSymbol, params)
     if (res?.success) {
       const tid = res.data?.task_id
       lastTaskId.value = tid || ''
       progressMessage.value = '任务已提交,后台分析中...'
       pollingActive.value = true
-      submitting.value = false // 立即释放按钮,不等后续异步操作
-      await loadReports(fullSymbol)
+      submitting.value = false
       startPolling(tid)
     } else {
       ElMessage.error(res?.message || '提交失败')
@@ -359,22 +417,12 @@ async function submitBatch() {
   }
 }
 
-function goToTaskCenter() {
-  router.push('/tasks')
-}
-
-async function loadReports(fullSymbol?: string) {
-  const sym = fullSymbol || computeFullSymbol()
-  if (!sym) return
-  try { const res = await commodityApi.getReports(sym, 20); reports.value = res?.data?.reports || [] }
-  catch { reports.value = [] }
-}
-
-async function viewReport(row: Record<string, any>) {
-  try {
-    const res = await commodityApi.getReportDetail(row.report_id)
-    if (res?.data) { detailData.value = res.data; detailVisible.value = true }
-  } catch { ElMessage.error('获取报告详情失败') }
+function clearForm() {
+  form.value = { exchange: '', variety_symbol: '', trade_date: '' }
+  selectedVarietyName.value = ''
+  varietyOptions.value = []
+  uploadedFiles.value = []
+  userContext.value = ''
 }
 
 onMounted(() => {
@@ -394,7 +442,16 @@ onMounted(() => {
           break
         }
       }
-      loadReports(symbol)
+      // 加载该品种最新报告（如存在）
+      const sym = symbol.includes('.') ? symbol : `${symbol}0.SHF`
+      commodityApi.getReports(sym, 1).then(res => {
+        const rpts = res?.data?.reports || []
+        if (rpts.length > 0) {
+          commodityApi.getReportDetail(rpts[0].report_id).then(res => {
+            if (res?.data) latestResult.value = res.data as Record<string, any>
+          }).catch(() => {})
+        }
+      }).catch(() => {})
     }
   }
 })

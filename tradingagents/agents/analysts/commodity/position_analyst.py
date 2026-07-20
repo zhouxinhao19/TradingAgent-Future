@@ -27,6 +27,7 @@ from langchain_core.messages import AIMessage
 from tradingagents.utils.logging_init import get_logger
 
 from ._base import (
+    build_custom_data_context,
     empty_report,
     extract_first_sentence,
     get_full_symbol,
@@ -122,6 +123,9 @@ POSITION_SYSTEM_PROMPT = """你是一位资深的期货持仓分析师,擅长"�
 
 ## 新闻摘要(跨分析师参考)
 {news_summary}
+
+## 用户上传数据参考
+{custom_data_context}
 
 ## 分析要求
 
@@ -504,12 +508,13 @@ def create_position_analyst(llm):
         logger.info(f"🎯 [持仓分析师] 启动: {full_symbol} @ {trade_date}")
 
         features = load_features(state)
+        custom_data_context = build_custom_data_context(features)
         pos_block = features.get("positioning")
 
         # --- 降级 1:features 缺失 ---
         if not isinstance(pos_block, dict):
             reason = "持仓 features 缺失(features['positioning'] 为空)"
-            empty = empty_report("neutral", reason)
+            empty = empty_report("neutral", reason, custom_data_context=custom_data_context)
             analyst_id = make_analyst_id("POSN", full_symbol, trade_date, seed="empty")
             conclusion_id = make_conclusion_id("POSN", 1)
             tagged_empty = inject_analyst_id(empty, analyst_id)
@@ -526,7 +531,7 @@ def create_position_analyst(llm):
         # --- 降级 2:数据稀疏 ---
         if not quality_gate(pos_block):
             reason = "持仓数据稀疏"
-            empty = empty_report("neutral", reason)
+            empty = empty_report("neutral", reason, custom_data_context=custom_data_context)
             analyst_id = make_analyst_id("POSN", full_symbol, trade_date, seed="sparse")
             conclusion_id = make_conclusion_id("POSN", 1)
             tagged_empty = inject_analyst_id(empty, analyst_id)
@@ -606,6 +611,7 @@ def create_position_analyst(llm):
             vol_regime=tech_ctx["vol_regime"],
             oi_divergence=tech_ctx["oi_divergence"],
             news_summary=state.get("news_summary", ""),
+            custom_data_context=build_custom_data_context(features),
         )
 
         try:
@@ -669,9 +675,11 @@ def create_position_analyst(llm):
                 fallback_md = _build_fallback_report(
                     full_symbol, pos_block, direction, signals, quality_rows
                 )
+                if custom_data_context:
+                    fallback_md += f"\n\n## 用户上传数据参考\n{custom_data_context}\n"
             except Exception as inner_e:
                 logger.error(f"❌ [持仓分析师] fallback 也失败: {inner_e}")
-                fallback_md = empty_report("neutral", f"LLM 失败且 fallback 异常: {inner_e}")
+                fallback_md = empty_report("neutral", f"LLM 失败且 fallback 异常: {inner_e}", custom_data_context=custom_data_context)
                 structured = {}
 
             analyst_id = make_analyst_id("POSN", full_symbol, trade_date, seed="fallback")

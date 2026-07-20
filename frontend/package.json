@@ -17,6 +17,7 @@
     "@vueuse/core": "^10.7.0",
     "axios": "^1.6.2",
     "dayjs": "^1.11.10",
+    "dompurify": "^3.4.12",
     "echarts": "^5.4.3",
     "element-plus": "^2.4.4",
     "lodash-es": "^4.17.21",
@@ -31,6 +32,7 @@
     "vue3-markdown-it": "^1.0.10"
   },
   "devDependencies": {
+    "@types/dompurify": "^3.0.5",
     "@types/lodash-es": "^4.17.12",
     "@types/node": "^20.10.5",
     "@types/nprogress": "^0.2.3",

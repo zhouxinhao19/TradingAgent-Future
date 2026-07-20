@@ -78,7 +78,8 @@ import {
   Setting,
   TrendCharts,
   Box,
-  Star
+  Star,
+  UploadFilled,
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
