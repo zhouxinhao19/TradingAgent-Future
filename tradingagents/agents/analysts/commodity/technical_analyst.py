@@ -25,6 +25,7 @@ from langchain_core.messages import AIMessage
 from tradingagents.utils.logging_init import get_logger
 
 from ._base import (
+    build_custom_data_context,
     empty_report,
     extract_first_sentence,
     get_full_symbol,
@@ -159,6 +160,9 @@ TECHNICAL_SYSTEM_PROMPT = """你是一位资深的期货技术分析师,与基�
 ## 新闻摘要(跨分析师参考)
 {news_summary}
 
+## 用户上传数据参考
+{custom_data_context}
+
 ---
 
 ## 分析要求
@@ -291,12 +295,13 @@ def create_technical_analyst(llm):
         logger.info(f"📈 [技术分析师] 启动: {full_symbol} @ {trade_date}")
 
         features = load_features(state)
+        custom_data_context = build_custom_data_context(features)
         tech = features.get("technical")
 
         # --- 降级路径 1:features 完全缺失 ---
         if not isinstance(tech, dict):
             reason = "特征层技术数据缺失(features['technical'] 为空)"
-            report_md = empty_report("neutral", reason)
+            report_md = empty_report("neutral", reason, custom_data_context=custom_data_context)
             logger.warning(f"⚠️ [技术分析师] {reason}")
             analyst_id = make_analyst_id("TECH", full_symbol, trade_date, seed="empty")
             conclusion_id = make_conclusion_id("TECH", 1)
@@ -314,7 +319,7 @@ def create_technical_analyst(llm):
             quality = tech.get("quality", {}) if isinstance(tech, dict) else {}
             rows = quality.get("rows", 0)
             reason = f"特征层技术数据稀疏(quality.rows={rows} < {30})"
-            report_md = empty_report("neutral", reason)
+            report_md = empty_report("neutral", reason, custom_data_context=custom_data_context)
             logger.warning(f"⚠️ [技术分析师] {reason}")
             analyst_id = make_analyst_id("TECH", full_symbol, trade_date, seed="sparse")
             conclusion_id = make_conclusion_id("TECH", 1)
@@ -400,6 +405,7 @@ def create_technical_analyst(llm):
             main_available=str(quality.get("main_continuous_available", "N/A")),
             index_available=str(quality.get("index_contract_available", "N/A")),
             news_summary=state.get("news_summary", ""),
+            custom_data_context=build_custom_data_context(features),
         )
 
         try:
@@ -462,9 +468,11 @@ def create_technical_analyst(llm):
                     rollover=rollover,
                     contract_type_label=contract_type_label,
                 )
+                if custom_data_context:
+                    fallback_md += f"\n\n## 用户上传数据参考\n{custom_data_context}\n"
             except Exception as inner_e:
                 logger.error(f"❌ [技术分析师] fallback 也失败: {inner_e}")
-                fallback_md = empty_report("neutral", f"features 与 LLM 均不可用: {e}; fallback 异常: {inner_e}")
+                fallback_md = empty_report("neutral", f"features 与 LLM 均不可用: {e}; fallback 异常: {inner_e}", custom_data_context=custom_data_context)
 
             analyst_id = make_analyst_id("TECH", full_symbol, trade_date, seed="fallback")
             conclusion_id = make_conclusion_id("TECH", 1)

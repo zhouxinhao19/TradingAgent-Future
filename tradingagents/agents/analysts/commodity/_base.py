@@ -37,12 +37,13 @@ def load_features(state: dict) -> Dict[str, Any]:
     return state.get("commodity_features") or {}
 
 
-def empty_report(direction: str = "neutral", reason: str = "") -> str:
+def empty_report(direction: str = "neutral", reason: str = "", custom_data_context: str = "") -> str:
     """降级返回:features 缺失或质量不足时返回简短 Markdown 报告。
 
     Args:
         direction: bullish/bearish/neutral,默认中性
         reason: 数据缺失的具体原因,会写进报告
+        custom_data_context: 自定义数据上下文,非空时追加到报告末尾
 
     Returns:
         Markdown 字符串,适合直接落到 state['xxx_report']
@@ -50,11 +51,14 @@ def empty_report(direction: str = "neutral", reason: str = "") -> str:
     if not reason:
         reason = "特征层数据为空"
     direction_cn = {"bullish": "看多", "bearish": "看空", "neutral": "中性"}.get(direction, direction)
-    return (
+    report = (
         f"**{direction_cn} | 数据缺失**\n\n"
         f"{reason},跳过本分析师。\n\n"
         f"建议结合其他分析师(基本面/持仓/新闻)综合判断。\n"
     )
+    if custom_data_context:
+        report += f"\n## 用户上传数据参考\n{custom_data_context}\n"
+    return report
 
 
 def truncate_snapshot(snap: Optional[Dict[str, Any]], max_keys: int = SNAPSHOT_MAX_KEYS) -> Dict[str, Any]:
@@ -224,6 +228,26 @@ def extract_first_sentence(text: str) -> str:
     return "(无摘要)"
 
 
+def build_custom_data_context(features: dict) -> str:
+    """从 commodity_features 提取自定义数据上下文段落。
+
+    Args:
+        features: commodity_features dict
+
+    Returns:
+        str，格式化的自定义数据上下文段落，无自定义数据时返回空字符串
+    """
+    custom_data = features.get("custom_data", {})
+    if not isinstance(custom_data, dict) or not custom_data.get("parsed"):
+        return ""
+
+    summary_text = custom_data.get("summary_text", "")
+    if not summary_text:
+        return ""
+
+    return f"{summary_text}\n"
+
+
 __all__ = [
     "load_features",
     "empty_report",
@@ -237,6 +261,7 @@ __all__ = [
     "make_registry_entry",
     "inject_analyst_id",
     "extract_first_sentence",
+    "build_custom_data_context",
     "ANALYST_PREFIXES",
     "ANALYST_CN_NAMES",
 ]

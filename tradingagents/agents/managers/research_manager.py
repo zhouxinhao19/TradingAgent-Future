@@ -147,6 +147,17 @@ def _build_analyst_summary(
     else:
         lines.append(f"新闻情感: {news_summary[:80] if news_summary else '(无新闻)'}")
 
+    # --- 自定义数据摘要（直接从 features 读取，替换旧的 registry 查找） ---
+    custom_data = features.get("custom_data", {})
+    if isinstance(custom_data, dict) and custom_data.get("parsed"):
+        file_count = custom_data.get("file_count", 0)
+        summary_text = custom_data.get("summary_text", "")
+        if summary_text:
+            lines.append(f"\n### 用户上传数据\n已上传 {file_count} 个文件: {summary_text[:200]}")
+    else:
+        # 未上传自定义数据，静默跳过
+        pass
+
     # --- 置信度校准汇总 ---
     calibrated = {
         "technical": tech_calibrated,

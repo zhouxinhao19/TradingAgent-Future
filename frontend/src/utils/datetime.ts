@@ -41,7 +41,7 @@ export function formatDateTime(
 
     // 🔥 如果没有时区标识，假定为 UTC+8 时间（后端已经入库为 UTC+8），添加 +08:00 后缀
     // 注意：如果后端已经返回了带时区的时间（如 +08:00 或 Z），这里不会修改
-    if (timeStr.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/) && !hasTimezone) {
+    if (timeStr.match(/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/) && !hasTimezone) {
       console.debug('[时间处理] 检测到不带时区的时间字符串，添加 +08:00:', timeStr)
       timeStr += '+08:00'
       console.debug('[时间处理] 转换后:', timeStr)
@@ -100,7 +100,7 @@ export function formatDateTimeWithRelative(dateStr: string | number | null | und
     }
     
     // 🔥 如果时间字符串没有时区标识，假定为 UTC+8 时间（后端已经入库为 UTC+8），添加 +08:00 后缀
-    if (timeStr.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/) && !timeStr.endsWith('Z') && !timeStr.includes('+') && !timeStr.includes('-', 10)) {
+    if (timeStr.match(/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/) && !timeStr.endsWith('Z') && !timeStr.includes('+') && !timeStr.includes('-', 10)) {
       timeStr += '+08:00'
     }
     
@@ -200,7 +200,7 @@ export function formatRelativeTime(dateStr: string | number | null | undefined):
     }
 
     // 🔥 如果时间字符串没有时区标识，假定为 UTC+8 时间（后端已经入库为 UTC+8），添加 +08:00 后缀
-    if (timeStr.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/) && !timeStr.endsWith('Z') && !timeStr.includes('+') && !timeStr.includes('-', 10)) {
+    if (timeStr.match(/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/) && !timeStr.endsWith('Z') && !timeStr.includes('+') && !timeStr.includes('-', 10)) {
       timeStr += '+08:00'
     }
 

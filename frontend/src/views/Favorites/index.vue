@@ -40,14 +40,14 @@
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="40" />
-      <el-table-column label="合约代码" width="140">
+      <el-table-column label="品种代码" width="100">
         <template #default="{ row }">
-          <span class="symbol-text">{{ row.full_symbol }}</span>
+          <span class="symbol-text">{{ row.asset_type === 'commodity' ? (row.full_symbol?.split('.')[0]?.replace(/\d+$/, '') || row.full_symbol) : (row.stock_code || row.full_symbol) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="品种名称" min-width="120">
+      <el-table-column label="品种名称" min-width="140">
         <template #default="{ row }">
-          {{ row.commodity_name || row.display_name || '-' }}
+          {{ row.asset_type === 'commodity' ? (row.commodity_name || '-') : (row.display_name || row.stock_name || '-') }}
         </template>
       </el-table-column>
       <el-table-column label="交易所" width="100">

@@ -921,7 +921,7 @@ class TestNewsAnalystEnhancement:
         node = create_news_analyst(mock)
         result = node(_state(commodity_features=sample_features_all))
         assert "news_report" in result
-        assert "LLM 不可用" in result["news_report"]
+        assert "数据缺失" in result["news_report"] or "数据稀疏" in result["news_report"]
 
 
 # =============================================================================

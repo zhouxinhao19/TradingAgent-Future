@@ -338,18 +338,19 @@ python tests/debug_docker.py
 
 按 [`docs/plans/stock-to-commodity.md`](docs/plans/stock-to-commodity.md) 推进 **"股票 → 大宗商品"改造**。
 
-### 实际状态(2026-07-18 实测审计)
+### 实际状态(2026-07-19)
 
 | Phase | 范围 | 实际交付 | 未交付 |
 |---|---|---|---|
 | **Phase 0** | 抽象统一 | ✅ 完成 | - |
 | **Phase 1** | 数据闭环(行情) | ✅ 完成 | - |
 | **Phase 2** | 数据层完备 + 6 类新闻 | ✅ 完成 | - |
-| **Phase 3a** | 路由 + 前端补全 | ✅ 完成 | ❌ 前端 TS 编译 / 浏览器实测未做(无 node_modules) |
+| **Phase 3a** | 路由 + 前端补全 | ✅ 完成 | - |
 | **Phase 3b** | Features 层 + 4 分析师 + 四阶段决策链 | ✅ **全部完成** | - |
 | **Phase 3c** | 异步队列 + 批量任务 + 任务中心优化 | ✅ **完成** | - |
+| **Phase UI** | 前端 UI 全面梳理(2026-07-19) | ✅ **完成** | - |
 
-**Phase 3b 内部分阶段交付**:
+**Phase 3b 子阶段交付**:
 - **3b-i Features 层**:6 个纯规则模块(technical/basis/inventory/positioning/term_structure/news_sentiment),97 测试全过
 - **3b-ii-A 4 个 commodity analyst**:technical/fundamental/position/news,复用 stock 字段名,32 测试
 - **3b-ii-B 决策链 8 节点 commodity 化 + CIO**:bull/bear/manager/trader/3×risk/risk_manager/executive_decision_maker,最小侵入 asset_type 分支,32 测试
@@ -365,6 +366,14 @@ python tests/debug_docker.py
 - **删除优化**:后端 `report_file_path` 直接定位替代 `rglob` 递归扫描;前端就地从 `list` 移除替代全量 `loadList()`
 - **全端点实测**:stats/batch/submit/list/delete 均 curl 验证 200 OK
 
+**前端 UI 全面梳理(2026-07-19, commit `d31f9492`)**:
+- **品类分类修正**: RB/WR/HC/SS/I/J/JM/SF/SM → black(原metal), EC → financial(原energy)
+- **Dashboard 重构**:欢迎语"股票→期货",移除学习/模拟卡片,快讯移至右侧自选下方,轮询60秒
+- **设置页精简**:880 行→150 行,移除废弃 mock 表单(通用/外观/分析/通知/安全/改密)
+- **侧边栏扁平化**:3 子分组15 项→4 项扁平,屏蔽学习中心/模拟交易/关于
+- **详情页新闻修复**:切换到新闻 tab 时自动触发加载
+- **商品分析图标**: Box→TrendCharts
+
 ### 关键约束
 - 开发期间**股票/商品并存**,每个 Phase 都能 `docker compose up` 跑通
 - **Feature Flag 渐进开启**:4 个 `FEATURE_COMMODITY_*` 渐进开启
@@ -374,7 +383,7 @@ python tests/debug_docker.py
 - 进度产出:`docs/progress/phase-N.md` + 实测验证
 - 新建模块统一用 `commodity_*` 前缀,与 `stock_*` 隔离
 
-### 当前测试覆盖(2026-07-18)
+### 当前测试覆盖(2026-07-19)
 - **数据层**:`tests/test_commodity_data_layer.py` 90 测试(AKShare provider 35+ 函数 mock,16 测试组)
 - **Features 层**:`tests/test_commodity_features.py` 97 测试(6 模块 schema + 信号 + 边界)
 - **分析师**:`tests/test_commodity_analyst.py` 45 测试(4 个 analyst MagicMock LLM + 边界)
@@ -382,17 +391,16 @@ python tests/debug_docker.py
 - **数据+HTTP**:后端 22 端点 + curl `tests/test_phase3a_curl.py` 24 调用 100% 200 OK
 - **前端**:`api/commodity.ts`(25 async 方法) + `stores/commodity.ts`(12 actions) + `views/Commodity/{List,Detail,Analysis}.vue` + `views/Tasks/TaskCenter.vue` + `router/index.ts`
 
-### 下一次启动推荐
+### 当前进行中
 
-Phase 4 模拟交易改写:
+**分支 `feat/data-analysis-agent`** — 在 commodity 分析链中增加独立的数据分析 agent 节点:
 
-- **Phase 4-1 合约规格补齐**:在 `commodity_metadata.py` 新增 `margin_rate` / `commission_rate` / `limit_up_down_pct`
-- **Phase 4-2 纯规则引擎**:`tradingagents/paper/{spec,matcher,pnl,account,risk,repo}.py`
-- **Phase 4-3 HTTP + Vue**:`app/routers/commodity/paper_rules.py` + `PaperTrading.vue`
-- **Phase 4-4 CIO→Paper 联动**:`POST /api/commodity/paper/from-decision`
-- 详见 `docs/plans/stock-to-commodity.md` §6
+- **目标**: 在现有 4 个 L1 analyst(technical/fundamental/position/news)之后,增加一个纯数据驱动的分析 agent,输入 feature 数据,输出独立的数据洞察报告
+- **起点**: 基于现有 analyst 模式(4 个 commodity analyst 的 prompt/schema 模式)
+- **状态**: 分支已创建,待设计实现
+- 详见记忆: [[phase-3b-progress]]
 
-### 关键教训(2026-07-13 → 2026-07-18)
+### 关键教训(2026-07-13 → 2026-07-19)
 - **代码完成 ≠ 用户可演示**:Phase 1/2 后端能力齐备,但用户无法在浏览器看到任何商品页面 → Phase 3a 纠正
 - **文档必须反映实测**:夸大交付记录比不记录更糟;进度文档以"实测验证"为标准
 - **合约生命周期是结构性盲点**:Phase 3a 审计发现 get_historical_data 忽略 YYMM → 已修复(主力连续 fallback + 280 测试)
@@ -404,4 +412,4 @@ Phase 4 模拟交易改写:
 
 ### 迁移说明
 - plan 原文已从 `~/.claude/plans/encapsulated-forging-hoare.md` 移到本仓库 `docs/plans/stock-to-commodity.md`,跨机器可用
-- plan v5 对应 2026-07-18 状态:Phase 3c 完成(队列+批量),Phase 4 待启动
+- plan v6 对应 2026-07-19 状态:Phase 3a-3c + UI 梳理完成,分支 `feat/data-analysis-agent` 已创建

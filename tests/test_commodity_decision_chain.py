@@ -288,8 +288,7 @@ def test_reasoning_commodity_prompt_placeholders():
     expected_placeholders = {
         "full_symbol", "variety_name", "analysis_date",
         "instrument_context", "analyst_registry_summary",
-        "market_research_report", "fundamentals_report",
-        "sentiment_report", "news_report", "past_memory_str",
+        "structured_summary", "past_memory_str",
     }
     import string
     formatter = string.Formatter()

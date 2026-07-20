@@ -329,7 +329,7 @@ class CommodityGraphSetup:
         # 注册投研总监（Phase 4，替代 L3-L5 共 5 节点 + 7 条边）
         workflow.add_node("Investment Director", id_node)
 
-        # === 边(commodity 路径:4 L1 并行 fan-out + 汇聚到 Research Manager) ===
+        # === 边(commodity 路径:4 个 L1 并行 fan-out + 汇聚到 Research Manager) ===
         # Phase Agent 改造: 4 个 L1 analyst 从 START 直接 fan-out(无依赖,各自读 commodity_features)
         workflow.add_edge(START, "Technical Analyst")
         workflow.add_edge(START, "Fundamentals Analyst")
@@ -748,6 +748,12 @@ def build_evidence_chain(final_state: Dict[str, Any]) -> Dict[str, Any]:
             "key_metrics": {k: v for k, v in key_metrics.items() if v is not None},
             "signals": entry.get("signals", [])[:3],
         })
+
+    # 如果有自定义数据，在所有 L1 entry 的 key_metrics 中标注数据来源
+    custom_data = features.get("custom_data", {})
+    if isinstance(custom_data, dict) and custom_data.get("parsed"):
+        for entry in L1_entries:
+            entry["key_metrics"]["data_source"] = "用户上传文件"
 
     # --- L2: investment_plan 解析 ---
     investment_plan = final_state.get("investment_plan", "")

@@ -1,3 +1,5 @@
+import DOMPurify from 'dompurify'
+
 /**
  * 轻量级 Markdown → HTML 渲染（专为 Commodity 报告优化）
  *
@@ -9,6 +11,8 @@
  *  - | pipe 表格
  *  - HTML 注释（移除）
  *  - 换行转 <br>
+ *
+ * 所有输出经由 DOMPurify 清洗，防止 XSS。
  */
 export function renderMarkdown(text: string): string {
   if (!text) return ''
@@ -50,6 +54,9 @@ export function renderMarkdown(text: string): string {
     .replace(/((?:<tr>.*?<\/tr>\n?)+)/g, '<table class="md-table">\n$1</table>')
     // 换行
     .replace(/\n/g, '<br>')
+
+  // 最终清洗：移除所有不安全的 HTML 标签/属性，防止 XSS
+  html = DOMPurify.sanitize(html)
 
   return html
 }

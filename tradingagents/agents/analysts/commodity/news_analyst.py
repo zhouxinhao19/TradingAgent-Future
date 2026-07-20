@@ -26,6 +26,7 @@ from langchain_core.messages import AIMessage
 from tradingagents.utils.logging_init import get_logger
 
 from ._base import (
+    build_custom_data_context,
     empty_report,
     extract_first_sentence,
     get_full_symbol,
@@ -92,6 +93,9 @@ NEWS_SYSTEM_PROMPT = """你是一位资深的期货新闻分析师,采用"情绪
 - 汇总宏观+产业+情绪三层证据,给出明确方向
 - 标注主要不确定性来源
 - 与其他分析师(技术/基本面/持仓)的信号交叉验证
+
+## 用户上传数据参考
+{custom_data_context}
 
 ## 输出格式
 
@@ -257,6 +261,7 @@ def create_news_analyst(llm):
         logger.info(f"📰 [新闻分析师] 启动: {full_symbol} @ {trade_date}")
 
         features = load_features(state)
+        custom_data_context = build_custom_data_context(features)
         news_block = features.get("news_sentiment")
 
         # 读最近事件(state 注入,来自 Propagator)
@@ -265,7 +270,7 @@ def create_news_analyst(llm):
         # --- 降级 1:features 与 latest_news 都空 ---
         if not isinstance(news_block, dict) and not recent_events:
             reason = "新闻 features 与 latest_news 均空"
-            report_md = empty_report("neutral", reason)
+            report_md = empty_report("neutral", reason, custom_data_context=custom_data_context)
             analyst_id = make_analyst_id("NEWS", full_symbol, trade_date, seed="empty")
             conclusion_id = make_conclusion_id("NEWS", 1)
             tagged_report = inject_analyst_id(report_md, analyst_id)
@@ -290,7 +295,7 @@ def create_news_analyst(llm):
             ) >= 1
             if not _has_enough_news:
                 reason = "新闻数据稀疏"
-                report_md = empty_report("neutral", reason)
+                report_md = empty_report("neutral", reason, custom_data_context=custom_data_context)
                 analyst_id = make_analyst_id("NEWS", full_symbol, trade_date, seed="sparse")
                 conclusion_id = make_conclusion_id("NEWS", 1)
                 tagged_report = inject_analyst_id(report_md, analyst_id)
@@ -326,6 +331,7 @@ def create_news_analyst(llm):
             category=category,
             trade_date=trade_date,
             recent_events=_format_events(recent_events, full_symbol=full_symbol, max_items=50),
+            custom_data_context=build_custom_data_context(features),
         )
 
         try:
@@ -378,9 +384,11 @@ def create_news_analyst(llm):
                     signals,
                     recent_events=recent_events,
                 )
+                if custom_data_context:
+                    fallback_md += f"\n\n## 用户上传数据参考\n{custom_data_context}\n"
             except Exception as inner_e:
                 logger.error(f"❌ [新闻分析师] fallback 也失败: {inner_e}")
-                fallback_md = empty_report("neutral", f"LLM 失败且 fallback 异常: {inner_e}")
+                fallback_md = empty_report("neutral", f"LLM 失败且 fallback 异常: {inner_e}", custom_data_context=custom_data_context)
 
             analyst_id = make_analyst_id("NEWS", full_symbol, trade_date, seed="fallback")
             conclusion_id = make_conclusion_id("NEWS", 1)

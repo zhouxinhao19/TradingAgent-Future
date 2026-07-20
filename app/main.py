@@ -431,10 +431,13 @@ if settings.FEATURE_COMMODITY_ENABLED:
         logger.info("⏸️  大宗商品数据路由未启用(FEATURE_COMMODITY_DATA=false)")
 
     # Phase 3b-ii-D 启用:商品分析任务(异步跑决策链)
+    # 注意:custom_data_router 必须在 analysis_router 之前注册,否则 /custom-data/analyze
+    # 会被 analysis_router 的 /{full_symbol}/analyze 捕获(把 "custom-data" 当作 full_symbol)
     if settings.FEATURE_COMMODITY_ANALYSIS:
-        from app.routers.commodity import analysis_router
+        from app.routers.commodity import analysis_router, custom_data_router
+        app.include_router(custom_data_router, prefix="/api")
         app.include_router(analysis_router, prefix="/api")
-        logger.info("✅ 大宗商品分析路由已注册(/api/commodity/{symbol}/analyze + reports)")
+        logger.info("✅ 大宗商品分析路由已注册(/api/commodity/{symbol}/analyze + reports + custom-data)")
     else:
         logger.info("⏸️  大宗商品分析路由未启用(FEATURE_COMMODITY_ANALYSIS=false)")
 
