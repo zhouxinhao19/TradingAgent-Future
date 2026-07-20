@@ -538,6 +538,12 @@ async def _run_commodity_analysis(
         provider=None,
     )
 
+    # ---- 生成 custom_data_report ----
+    custom_data_report = ""
+    custom_data = commodity_features.get("custom_data", {})
+    if custom_data.get("parsed") and custom_data.get("summary_text"):
+        custom_data_report = custom_data["summary_text"]
+
     return {
         "full_symbol": full_symbol,
         "trade_date": trade_date,
@@ -545,9 +551,9 @@ async def _run_commodity_analysis(
         "market_report": final_state.get("market_report", ""),
         "fundamentals_report": final_state.get("fundamentals_report", ""),
         "fundamentals_structured": final_state.get("fundamentals_structured", {}),
-        "sentiment_report": final_state.get("sentiment_report", ""),
         "position_report": final_state.get("position_report", ""),
         "news_report": final_state.get("news_report", ""),
+        "custom_data_report": custom_data_report,
         "investment_plan": final_state.get("investment_plan", ""),
         "trader_investment_plan": final_state.get("trader_investment_plan", ""),
         "final_trade_decision": final_state.get("final_trade_decision", ""),

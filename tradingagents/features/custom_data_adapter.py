@@ -167,7 +167,7 @@ def _format_summaries(
         # 样本数据
         sample = s.get("sample", [])
         if sample:
-            sample_str = json.dumps(sample[:3], ensure_ascii=False)
+            sample_str = json.dumps(sample[:3], ensure_ascii=False, default=str)
             parts.append(f"数据样例: {sample_str[:300]}")
 
     # 截断

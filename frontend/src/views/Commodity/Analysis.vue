@@ -260,10 +260,11 @@ async function handleFileUpload(options: any) {
   const { file, onSuccess, onError } = options
   try {
     const res = await commodityApi.uploadCustomData(file)
-    if (res?.file_id) {
-      uploadedFiles.value.push({ file_id: res.file_id, original_name: res.original_name || file.name })
-      onSuccess?.(res)
-      ElMessage.success(`已上传: ${res.original_name || file.name}`)
+    const fileInfo = res?.data?.file_id ? res.data : (res?.file_id ? res : null)
+    if (fileInfo?.file_id) {
+      uploadedFiles.value.push({ file_id: fileInfo.file_id, original_name: fileInfo.original_name || file.name })
+      onSuccess?.(fileInfo)
+      ElMessage.success(`已上传: ${fileInfo.original_name || file.name}`)
     } else {
       onError?.(new Error('上传失败'))
     }
@@ -277,11 +278,11 @@ function removeFile(fileId: string) {
   uploadedFiles.value = uploadedFiles.value.filter(f => f.file_id !== fileId)
 }
 
-// 根据 form 状态计算 fullSymbol (品种代码 + 0 + 交易所后缀, 如 CU0.SHF)
+// 根据 form 状态计算 fullSymbol (品种代码 + 交易所后缀, 如 CU.SHF)
 function computeFullSymbol(): string {
   if (!form.value.exchange || !form.value.variety_symbol) return ''
   const suffix = EXCHANGE_SUFFIX[form.value.exchange] || `.${form.value.exchange}`
-  return `${form.value.variety_symbol}0${suffix}`
+  return `${form.value.variety_symbol}${suffix}`
 }
 
 async function onExchangeChange() {

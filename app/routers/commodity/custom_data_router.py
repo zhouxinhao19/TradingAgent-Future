@@ -58,14 +58,14 @@ class CustomDataAnalysisRequest(BaseModel):
     file_ids: List[str] = Field(..., min_length=1, max_length=10, description="上传文件的 UUID 列表")
     skill_name: str = Field("general-analysis", description="技能名称")
     user_context: str = Field("", description="用户上下文描述")
-    full_symbol: str = Field("", description="关联的合约代码(可选)")
+    full_symbol: str = Field(..., description="关联的合约代码,如 CU.SHF")
     trade_date: Optional[str] = Field(None, description="交易日期 YYYY-MM-DD")
 
 
 def _validate_file_id(file_id: str) -> None:
     """校验 file_id 是否为合法的 UUID hex 格式（防御路径穿越）。"""
     import re
-    if not re.match(r'^[0-9a-f]{12}$', file_id):
+    if not re.match(r'^[0-9a-fA-F]{12}$', file_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"非法的 file_id 格式: {file_id!r}",
@@ -194,7 +194,7 @@ def _get_file_path(file_id: str, user_id: str = "anonymous") -> Optional[Path]:
 
 # ==================== 端点 ====================
 
-@router.post("/upload", response_model=FileInfo)
+@router.post("/upload", response_model=dict)
 async def upload_file(
     file: UploadFile = File(..., description="数据文件(.xlsx/.xls/.csv)"),
     user: dict = Depends(get_current_user),
@@ -203,23 +203,30 @@ async def upload_file(
     user_id = str(user.get("id", "anonymous"))
 
     result = _save_upload_file(file, user_id=user_id)
-    return result
+    return {
+        "success": True,
+        "data": result,
+        "message": "上传成功",
+    }
 
 
-@router.get("/skills", response_model=List[SkillInfo])
+@router.get("/skills")
 async def list_skills():
     """获取所有可用的自定义数据分析技能。"""
     registry = SkillsRegistry()
     skills = registry.list_skills()
-    return [
-        SkillInfo(
-            name=s["name"],
-            title=s["title"],
-            description=s["description"],
-            content_types=s["content_types"],
-        )
-        for s in skills
-    ]
+    return {
+        "success": True,
+        "data": [
+            SkillInfo(
+                name=s["name"],
+                title=s["title"],
+                description=s["description"],
+                content_types=s["content_types"],
+            )
+            for s in skills
+        ],
+    }
 
 
 @router.post("/analyze")
@@ -256,7 +263,7 @@ async def custom_data_analyze(
     # 创建 commodity 分析任务（复用现有队列），custom_data 字段单次写入避免竞态
     from app.routers.commodity.analysis import _create_queued_task
 
-    full_symbol = req.full_symbol or "CUSTOM"
+    full_symbol = req.full_symbol
     trade_date = req.trade_date or datetime.now().strftime("%Y-%m-%d")
 
     web_logger.info(
@@ -279,12 +286,14 @@ async def custom_data_analyze(
     )
 
     return {
-        "task_id": task_id,
-        "full_symbol": full_symbol,
-        "status": "queued",
+        "success": True,
+        "data": {
+            "task_id": task_id,
+            "full_symbol": full_symbol,
+            "status": "queued",
+            "file_count": len(file_paths),
+        },
         "message": f"自定义数据文件分析已提交，file_ids={req.file_ids}, skill={req.skill_name}",
-        "file_count": len(file_paths),
-        "missing_files": missing if missing else None,
     }
 
 
