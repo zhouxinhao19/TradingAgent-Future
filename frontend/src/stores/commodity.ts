@@ -243,6 +243,87 @@ export const useCommodityStore = defineStore('commodity', {
       }
     },
 
+    /**
+     * 并行拉取成交/多单/空单 三个指标，按 会员简称 合并为一张表
+     * - 总成交量/总多单/总空单（合计统计）
+     * - 每会员:成交、多单、空单、净持仓(多-空)、多空比
+     */
+    async loadHoldingPositionAll(fullSymbol: string) {
+      const key = `holding:${fullSymbol}:all`
+      this._setLoading(key, true)
+      try {
+        const indicators = ['成交量', '多单持仓', '空单持仓'] as const
+        const responses = await Promise.all(
+          indicators.map((ind) => commodityApi.getHoldingPosition(fullSymbol, ind)),
+        )
+
+        // 三个指标的 raw rows 收集
+        const rawRows: Record<typeof indicators[number], any[]> = {
+          成交量: [],
+          多单持仓: [],
+          空单持仓: [],
+        }
+        responses.forEach((r, i) => {
+          rawRows[indicators[i]] = ((r as any)?.data?.rows ?? []) as any[]
+        })
+
+        // 按 会员简称 合并(去全角/半角空格,避免 Sora 看不见的字符差导致重复)
+        const normName = (s: any) => String(s ?? '').replace(/[\s　]+/g, '').trim()
+        const memberMap = new Map<string, Record<string, any>>()
+        indicators.forEach((ind) => {
+          rawRows[ind].forEach((row) => {
+            const name = normName(row['会员简称'])
+            if (!name) return
+            if (!memberMap.has(name)) {
+              memberMap.set(name, {
+                会员简称: String(row['会员简称']).trim(),
+                成交量: null,
+                多单持仓: null,
+                空单持仓: null,
+              } as Record<string, any>)
+            }
+            (memberMap.get(name) as Record<string, any>)[ind] = row[ind]
+          })
+        })
+
+        // 计算派生字段 + 合计
+        let totalVol = 0, totalLong = 0, totalShort = 0
+        const rows = Array.from(memberMap.values()).map((m) => {
+          const vol = Number(m['成交量'] || 0)
+          const long_ = Number(m['多单持仓'] || 0)
+          const short_ = Number(m['空单持仓'] || 0)
+          const net = long_ - short_
+          totalVol += vol
+          totalLong += long_
+          totalShort += short_
+          return {
+            ...m,
+            净持仓: net,
+            多空比: short_ > 0 ? +(long_ / short_).toFixed(2) : null,
+          }
+        })
+
+        // 默认按 成交量 降序
+        rows.sort((a, b) => Number((b as any)['成交量'] || 0) - Number((a as any)['成交量'] || 0))
+
+        this.holdingPosition = {
+          symbol: fullSymbol,
+          rows,
+          count: rows.length,
+          totals: {
+            成交量: totalVol,
+            多单持仓: totalLong,
+            空单持仓: totalShort,
+            净持仓: totalLong - totalShort,
+          },
+        }
+      } catch (e) {
+        this._setError(key, String(e))
+      } finally {
+        this.loadingFlags[key] = false
+      }
+    },
+
     // ---------- 新闻 ----------
     async loadNewsCategories(force = false) {
       if (!force && this.newsCategories.length) return
