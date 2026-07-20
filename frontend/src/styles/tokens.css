@@ -1,0 +1,155 @@
+/**
+ * Design Tokens — TradingAgents-Future "Precision Terminal"
+ *
+ * 覆盖 Element Plus 默认变量 + 自定义应用令牌。
+ * 在 main.ts 中于 Element Plus 样式之后导入。
+ */
+
+:root {
+  /* ============================================================
+   * 1. 品牌色 — 覆盖 Element Plus 主色
+   * ============================================================ */
+  --el-color-primary: #3b8cbf;
+  --el-color-primary-light-3: #5da3d0;
+  --el-color-primary-light-5: #82b9db;
+  --el-color-primary-light-7: #aad0e7;
+  --el-color-primary-light-8: #c2ddef;
+  --el-color-primary-light-9: #d9eaf5;
+  --el-color-primary-dark-2: #2f7099;
+
+  /* 语义色 — 中国市场涨跌惯例：绿涨红跌 */
+  --el-color-success: #1a9c6e;
+  --el-color-success-light-3: #2db581;
+  --el-color-success-light-5: #5cc99e;
+  --el-color-success-light-7: #8fdcbc;
+  --el-color-success-light-8: #b8e9d5;
+  --el-color-success-light-9: #daf4e8;
+  --el-color-success-dark-2: #147d58;
+
+  --el-color-danger: #dc4e4e;
+  --el-color-danger-light-3: #e57070;
+  --el-color-danger-light-5: #ec9292;
+  --el-color-danger-light-7: #f4b8b8;
+  --el-color-danger-light-8: #f8d0d0;
+  --el-color-danger-light-9: #fce8e8;
+  --el-color-danger-dark-2: #b83e3e;
+
+  --el-color-warning: #e0902a;
+  --el-color-warning-light-3: #e6a64f;
+  --el-color-warning-light-5: #ecbc78;
+  --el-color-warning-light-7: #f3d3a2;
+  --el-color-warning-light-8: #f7e2c0;
+  --el-color-warning-light-9: #fbf0de;
+  --el-color-warning-dark-2: #b37322;
+
+  --el-color-info: #6b7d8e;
+
+  /* ============================================================
+   * 2. 背景 & 表面
+   * ============================================================ */
+  --el-bg-color-page: #f0f2f5;
+  --el-bg-color: #ffffff;
+  --el-bg-color-overlay: #ffffff;
+  --el-fill-color-blank: #ffffff;
+  --el-fill-color-light: #f5f7fa;
+  --el-fill-color-lighter: #fafbfc;
+  --el-fill-color: #f0f2f5;
+
+  /* ============================================================
+   * 3. 文字
+   * ============================================================ */
+  --el-text-color-primary: #1a1d23;
+  --el-text-color-regular: #3a3f4a;
+  --el-text-color-secondary: #6b717d;
+  --el-text-color-placeholder: #9ba0ab;
+  --el-text-color-disabled: #c0c4cc;
+
+  /* ============================================================
+   * 4. 边框
+   * ============================================================ */
+  --el-border-color: #d8dce3;
+  --el-border-color-light: #e4e7ed;
+  --el-border-color-lighter: #eef0f4;
+  --el-border-color-extra-light: #f2f4f7;
+  --el-border-radius-base: 6px;
+  --el-border-radius-small: 4px;
+  --el-border-radius-round: 20px;
+  --el-border-radius-circle: 100%;
+
+  /* ============================================================
+   * 5. 排版
+   * ============================================================ */
+  --el-font-family: 'Inter', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Consolas', 'SF Mono', monospace;
+
+  /* ============================================================
+   * 6. 阴影
+   * ============================================================ */
+  --app-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --app-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --app-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10);
+
+  /* ============================================================
+   * 7. 应用自定义令牌
+   * ============================================================ */
+  /* 侧边栏 */
+  --app-sidebar-bg: #162031;
+  --app-sidebar-text: #8899aa;
+  --app-sidebar-text-active: #ffffff;
+  --app-sidebar-item-active-bg: rgba(59, 140, 191, 0.25);
+  --app-sidebar-item-hover-bg: rgba(255, 255, 255, 0.06);
+  --app-sidebar-accent: #e8a840;
+  --app-sidebar-width: 240px;
+  --app-sidebar-collapsed: 64px;
+
+  /* 顶栏 */
+  --app-header-height: 56px;
+  --app-header-bg: #ffffff;
+
+  /* 间距 */
+  --app-content-padding: 24px;
+  --app-section-gap: 20px;
+
+  /* 杂项 */
+  --app-transition-fast: 0.15s ease;
+  --app-transition-normal: 0.25s ease;
+  --app-transition-slow: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================================
+ * 暗色主题覆盖
+ * ============================================================ */
+html.dark {
+  --el-bg-color-page: #0f1419;
+  --el-bg-color: #1a1f2b;
+  --el-bg-color-overlay: #222834;
+  --el-fill-color-blank: #1a1f2b;
+  --el-fill-color-light: #252b38;
+  --el-fill-color-lighter: #2a303e;
+  --el-fill-color: #1e2430;
+
+  --el-text-color-primary: #e8eaef;
+  --el-text-color-regular: #c2c7d0;
+  --el-text-color-secondary: #9299a3;
+  --el-text-color-placeholder: #6b717d;
+  --el-text-color-disabled: #4a5059;
+
+  --el-border-color: #2e3540;
+  --el-border-color-light: #353c48;
+  --el-border-color-lighter: #3c4350;
+  --el-border-color-extra-light: #434a58;
+
+  --el-color-primary-light-9: rgba(59, 140, 191, 0.15);
+  --el-color-primary-light-8: rgba(59, 140, 191, 0.22);
+
+  --app-header-bg: #1a1f2b;
+  --app-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.20);
+  --app-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.30);
+  --app-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.40);
+
+  /* 暗色下侧边栏更深 */
+  --app-sidebar-bg: #0d151e;
+  --app-sidebar-text: #6b7988;
+  --app-sidebar-item-hover-bg: rgba(255, 255, 255, 0.04);
+  --app-sidebar-item-active-bg: rgba(59, 140, 191, 0.20);
+}
