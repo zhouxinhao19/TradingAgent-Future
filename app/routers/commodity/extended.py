@@ -4,6 +4,7 @@
 - 全部路由共享 /commodity 前缀,挂载在 main.py 的 FEATURE_COMMODITY_DATA 分支
 - 失败一律 4xx/404,服务端永不抛 500(防止爬虫挂掉)
 """
+import re
 import logging
 from datetime import datetime, date
 from typing import List, Optional
@@ -92,6 +93,7 @@ async def get_inventory(
     Path: GET /api/commodity/A.DCE/inventory
     """
     symbol = full_symbol.split(".")[0]
+    symbol = re.sub(r'\d+$', '', symbol)  # CU2501 → CU
     data = await service.get_inventory(symbol=symbol, start_date=start_date, end_date=end_date)
     if not data:
         return ok(data={"symbol": symbol, "rows": [], "count": 0},
@@ -404,6 +406,19 @@ async def get_holding_position(
             detail=f"indicator 必须是 成交量/多单持仓/空单持仓 之一: {indicator}",
         )
     symbol = full_symbol.split(".")[0]
+
+    # 连续合约(如 CU0) → 自动解析主力合约
+    if re.match(r'^[A-Z]+\d$', symbol.upper()):
+        try:
+            contracts_data = await service.get_contracts_list(full_symbol)
+            if contracts_data and contracts_data.get("contracts"):
+                # 合约列表已按字母排序，取第一个(最近到期)作为主力合约
+                main = contracts_data["contracts"][0].split(".")[0]
+                if main:
+                    symbol = main
+        except Exception:
+            pass  # 解析失败则用原始 symbol
+
     data = await service.get_holding_position(symbol=symbol, indicator=indicator, date=date)
     if not data:
         return ok(data={"symbol": symbol, "indicator": indicator, "rows": [], "count": 0},
