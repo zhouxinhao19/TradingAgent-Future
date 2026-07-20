@@ -114,6 +114,7 @@ export interface HistoricalResponse {
   count: number
   start_date: string
   end_date: string
+  data_source_note?: string  // 数据来源标记(如具体合约无数据时回退到主力连续)
 }
 
 // ============================================================
@@ -125,6 +126,9 @@ export interface RowsResponse<T = Record<string, unknown>> {
   count: number
   // 仓单/持仓排名可能按品种分组
   by_variety?: Record<string, T[]>
+  // 持仓排名(前端合并)增加 symbol + totals 字段
+  symbol?: string
+  totals?: Record<string, number>
 }
 
 export interface InventoryResponse extends RowsResponse {
