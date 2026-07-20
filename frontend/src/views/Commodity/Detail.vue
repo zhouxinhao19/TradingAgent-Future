@@ -113,6 +113,9 @@
                 <span v-if="klineSymbol !== fullSymbol" style="font-size:12px; color:var(--el-text-color-secondary);">
                   {{ klineSymbol }}
                 </span>
+                <el-tag v-if="klineFallback" size="small" type="warning" effect="light">
+                  主力连续(回退)
+                </el-tag>
                 <el-radio-group v-model="klineMode" size="small" @change="switchKlineMode">
                   <el-radio-button value="kline">K 线</el-radio-button>
                   <el-radio-button value="spot">现货价</el-radio-button>
@@ -121,7 +124,7 @@
               <div style="display:flex; align-items:center; gap:8px;">
                 <!-- 合约选择器(K线模式下) -->
                 <el-select
-                  v-if="klineMode === 'kline' && contractsList.contracts.length"
+                  v-if="klineMode === 'kline' && (contractsList.continuous || contractsList.contracts.length)"
                   v-model="klineSymbol"
                   size="small"
                   @change="onContractChange"
@@ -134,7 +137,7 @@
                       label="主力连续"
                     />
                   </el-option-group>
-                  <el-option-group label="到期合约">
+                  <el-option-group label="合约列表">
                     <el-option
                       v-for="c in contractsList.contracts"
                       :key="c"
@@ -143,12 +146,6 @@
                     />
                   </el-option-group>
                 </el-select>
-                <el-radio-group v-model="klineDays" size="small" @change="reloadKline">
-                  <el-radio-button :value="30">30 天</el-radio-button>
-                  <el-radio-button :value="90">90 天</el-radio-button>
-                  <el-radio-button :value="180">180 天</el-radio-button>
-                  <el-radio-button :value="365">1 年</el-radio-button>
-                </el-radio-group>
               </div>
             </div>
           </template>
@@ -217,31 +214,107 @@
 
       <!-- ⑤ 持仓 -->
       <el-tab-pane label="持仓" name="position">
-        <el-card shadow="never" v-loading="store.loading(`holding:${fullSymbol}:成交量`)">
+        <el-card shadow="never" v-loading="store.loading(`holding:${fullSymbol}:all`)">
           <template #header>
-            <div style="display:flex; align-items:center; justify-content:space-between">
-              <b>期货成交持仓</b>
-              <el-radio-group v-model="holdingIndicator" size="small" @change="reloadHolding">
-                <el-radio-button value="成交量">成交量</el-radio-button>
-                <el-radio-button value="多单持仓">多单持仓</el-radio-button>
-                <el-radio-button value="空单持仓">空单持仓</el-radio-button>
-              </el-radio-group>
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+              <b>会员成交持仓排名</b>
+              <div style="display:flex; gap:6px; align-items:center;">
+                <el-tag size="small" type="primary" effect="plain">
+                  主力 {{ (store.holdingPosition?.symbol || '').toUpperCase() }}
+                </el-tag>
+                <el-tag size="small" effect="plain">
+                  共 {{ store.holdingPosition?.count || 0 }} 家会员
+                </el-tag>
+              </div>
             </div>
           </template>
+
+          <!-- 顶部统计卡片 -->
+          <el-row :gutter="8" v-if="store.holdingPosition?.totals" class="stat-row">
+            <el-col :xs="12" :sm="6">
+              <div class="stat-card">
+                <div class="stat-label">总成交量</div>
+                <div class="stat-value">{{ formatNumber(store.holdingPosition.totals['成交量']) }}</div>
+              </div>
+            </el-col>
+            <el-col :xs="12" :sm="6">
+              <div class="stat-card stat-long">
+                <div class="stat-label">总多单持仓</div>
+                <div class="stat-value">{{ formatNumber(store.holdingPosition.totals['多单持仓']) }}</div>
+              </div>
+            </el-col>
+            <el-col :xs="12" :sm="6">
+              <div class="stat-card stat-short">
+                <div class="stat-label">总空单持仓</div>
+                <div class="stat-value">{{ formatNumber(store.holdingPosition.totals['空单持仓']) }}</div>
+              </div>
+            </el-col>
+            <el-col :xs="12" :sm="6">
+              <div class="stat-card" :class="(store.holdingPosition.totals['净持仓'] || 0) > 0 ? 'stat-long' : 'stat-short'">
+                <div class="stat-label">市场净持仓</div>
+                <div class="stat-value">
+                  {{ (store.holdingPosition.totals['净持仓'] || 0) > 0 ? '+' : '' }}{{ formatNumber(store.holdingPosition.totals['净持仓']) }}
+                </div>
+                <div class="stat-hint">
+                  {{ (store.holdingPosition.totals['净持仓'] || 0) > 0 ? '偏多' : '偏空' }}
+                </div>
+              </div>
+            </el-col>
+          </el-row>
+
           <el-empty v-if="!store.holdingPosition?.rows?.length" description="暂无持仓数据" />
-          <el-table
-            v-if="store.holdingPosition?.rows?.length"
-            :data="store.holdingPosition.rows"
-            stripe
-            border
-            size="small"
-            :max-height="420"
-          >
-            <el-table-column prop="合约代码" label="合约" width="100" />
-            <el-table-column prop="成交量" label="成交量" />
-            <el-table-column prop="多单持仓" label="多单持仓" />
-            <el-table-column prop="空单持仓" label="空单持仓" />
-          </el-table>
+
+          <!-- 前 10 名会员多空对比图 -->
+          <div v-if="store.holdingPosition?.rows?.length" style="margin: 16px 0;">
+            <div class="section-title">前 10 名会员多空对比</div>
+            <div ref="holdingChartRef" class="holding-chart"></div>
+          </div>
+
+          <!-- 完整会员明细表 -->
+          <div v-if="store.holdingPosition?.rows?.length">
+            <div class="section-title">会员明细</div>
+            <el-table
+              :data="store.holdingPosition.rows"
+              stripe
+              border
+              size="small"
+              :max-height="420"
+              :row-class-name="rowClassName"
+            >
+              <el-table-column type="index" label="#" width="50" align="center" />
+              <el-table-column prop="会员简称" label="会员简称" min-width="140" />
+              <el-table-column prop="成交量" label="成交量" align="right" sortable>
+                <template #default="{ row }">{{ formatNumber(row['成交量']) || '-' }}</template>
+              </el-table-column>
+              <el-table-column prop="多单持仓" label="多单持仓" align="right" sortable>
+                <template #default="{ row }">
+                  <span :class="row['多单持仓'] ? 'cell-long' : 'cell-empty'">
+                    {{ formatNumber(row['多单持仓']) || '-' }}
+                  </span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="空单持仓" label="空单持仓" align="right" sortable>
+                <template #default="{ row }">
+                  <span :class="row['空单持仓'] ? 'cell-short' : 'cell-empty'">
+                    {{ formatNumber(row['空单持仓']) || '-' }}
+                  </span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="净持仓" label="净持仓" align="right" sortable>
+                <template #default="{ row }">
+                  <span :class="netClass(row['净持仓'])">
+                    {{ row['净持仓'] != null ? ((row['净持仓'] > 0 ? '+' : '') + formatNumber(row['净持仓'])) : '-' }}
+                  </span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="多空比" label="多空比" width="100" align="right">
+                <template #default="{ row }">
+                  <span v-if="row['多空比'] != null">{{ row['多空比'] }}</span>
+                  <span v-else class="cell-empty">-</span>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
         </el-card>
       </el-tab-pane>
 
@@ -377,7 +450,6 @@ const klineDays = ref<number>(180)
 const klineMode = ref<'kline' | 'spot'>('kline')
 const klineSymbol = ref<string>('')
 const contractsList = ref<{ continuous: string | null; contracts: string[] }>({ continuous: null, contracts: [] })
-const holdingIndicator = ref<'成交量' | '多单持仓' | '空单持仓'>('成交量')
 const newsCategory = ref<string>('all')
 
 // 当前品种代码(如 CU),用于新闻按品种筛选
@@ -406,6 +478,9 @@ const hasKlineData = computed(() =>
     ? !!store.historical?.rows?.length
     : !!store.basis?.rows?.length && (store.basis.rows as any[]).some((r: any) => r.spot_price !== undefined),
 )
+const klineFallback = computed(() =>
+  klineMode.value === 'kline' && store.historical?.data_source_note === 'continuous_fallback',
+)
 
 // 后端 /contract-info 接收 SHFE/DCE/CZCE 等长码;前端从 fullSymbol 提取的
 // 是短码(SHF/CZC),需要映射成长码才能成功调用
@@ -433,9 +508,11 @@ function extractUnderlying(fs: string): string {
 const klineRef = ref<HTMLDivElement | null>(null)
 const inventoryChartRef = ref<HTMLDivElement | null>(null)
 const basisChartRef = ref<HTMLDivElement | null>(null)
+const holdingChartRef = ref<HTMLDivElement | null>(null)
 let klineChart: echarts.ECharts | null = null
 let inventoryChart: echarts.ECharts | null = null
 let basisChart: echarts.ECharts | null = null
+let holdingChart: echarts.ECharts | null = null
 
 // ---- 扩展数据(费用 / 合约信息) ----
 const feesLoading = ref(false)
@@ -493,14 +570,16 @@ async function reload() {
   const startStr = startDate.toISOString().slice(0, 10)
   const underlying = extractUnderlying(fullSymbol.value)
 
-  // 并行加载:基础数据 + 合约列表 + 扩展数据(手续费/合约信息)
+  // 先加载合约列表,确定 klineSymbol(到期合约自动切换到主力连续/未到期合约)
+  await loadContractsList()
+
+  // 并行加载:基础数据(K 线用 klineSymbol) + 合约列表 + 扩展数据(手续费/合约信息)
   await Promise.all([
-    store.loadSymbolDetail(fullSymbol.value, klineDays.value),
+    store.loadSymbolDetail(klineSymbol.value || fullSymbol.value, klineDays.value),
     store.loadInventory(fullSymbol.value),
     store.loadBasisForVars([underlying], startStr, endDate),
-    store.loadHoldingPosition(fullSymbol.value, holdingIndicator.value),
+    store.loadHoldingPositionAll(fullSymbol.value),
     store.loadNewsCategories(),
-    loadContractsList(),
     loadFees(),
     loadContractInfo(),
   ])
@@ -508,6 +587,7 @@ async function reload() {
   renderKline()
   renderInventory()
   renderBasis()
+  renderHolding()
 }
 
 function reloadKline() {
@@ -526,8 +606,12 @@ async function loadContractsList() {
     if (data?.contracts) {
       contractsList.value = { continuous: data.continuous, contracts: data.contracts }
     }
-    // 初始化 klineSymbol 为当前 fullSymbol
-    klineSymbol.value = fullSymbol.value
+    // 初始化 klineSymbol: 如果 fullSymbol 不在合约列表中,默认用主力连续
+    if (contractsList.value.continuous && !contractsList.value.contracts.includes(fullSymbol.value)) {
+      klineSymbol.value = contractsList.value.continuous
+    } else {
+      klineSymbol.value = fullSymbol.value
+    }
   } catch (e) {
     console.error('[commodity] loadContractsList failed', e)
     klineSymbol.value = fullSymbol.value
@@ -548,18 +632,9 @@ function onContractChange(newSymbol: string) {
   reloadKline()
 }
 
-async function loadSpotPrice() {
-  const underlying = extractUnderlying(fullSymbol.value)
-  const endDate = new Date().toISOString().slice(0, 10)
-  const startDate = new Date()
-  startDate.setDate(startDate.getDate() - klineDays.value)
-  await store.loadBasisForVars([underlying], startDate.toISOString().slice(0, 10), endDate)
+function loadSpotPrice() {
+  // 现货价数据依赖 basis 接口,已在 reload() 中加载,直接渲染即可
   nextTick(renderSpotPriceLine)
-}
-
-function reloadHolding() {
-  if (!fullSymbol.value) return
-  store.loadHoldingPosition(fullSymbol.value, holdingIndicator.value)
 }
 
 function reloadNews() {
@@ -776,6 +851,108 @@ function renderBasis() {
   basisChart.resize()
 }
 
+// 持仓排名图:前 10 名会员的多/空单对比(左右双向横条)
+function renderHolding() {
+  if (!holdingChartRef.value) return
+  if (!holdingChart) holdingChart = echarts.init(holdingChartRef.value)
+  const rows = ((store.holdingPosition as any)?.rows || []) as Record<string, any>[]
+  if (!rows.length) {
+    holdingChart.clear()
+    return
+  }
+  // 过滤出三项都存在的会员 + 按 (多+空) 合计降序取前 10
+  const filtered = rows.filter(
+    (r) => Number(r['多单持仓']) > 0 && Number(r['空单持仓']) > 0,
+  )
+  if (!filtered.length) {
+    holdingChart.clear()
+    return
+  }
+  const top = [...filtered]
+    .sort(
+      (a, b) =>
+        (Number(b['多单持仓']) + Number(b['空单持仓'])) -
+        (Number(a['多单持仓']) + Number(a['空单持仓'])),
+    )
+    .slice(0, 10)
+    .reverse()  // 反转让第一名在最上面
+
+  const names = top.map((r) => r['会员简称'])
+  const longVals = top.map((r) => Number(r['多单持仓']) || 0)
+  const shortVals = top.map((r) => Number(r['空单持仓']) || 0)
+  const maxVal = Math.max(...longVals, ...shortVals)
+
+  holdingChart.setOption({
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      formatter: (params: any) => {
+        const idx = params[0]?.dataIndex ?? 0
+        const r = top[idx]
+        const long_ = Number(r['多单持仓'] || 0)
+        const short_ = Number(r['空单持仓'] || 0)
+        const net = long_ - short_
+        return [
+          `<b>${r['会员简称']}</b>`,
+          `成交量: ${formatNumber(r['成交量'])}`,
+          `多单持仓: <span style="color:#ef232a">${formatNumber(long_)}</span>`,
+          `空单持仓: <span style="color:#14b143">${formatNumber(short_)}</span>`,
+          `净持仓: <b style="color:${net > 0 ? '#ef232a' : net < 0 ? '#14b143' : '#909399'}">${net > 0 ? '+' : ''}${formatNumber(net)}</b>`,
+        ].join('<br/>')
+      },
+    },
+    legend: { data: ['多单持仓', '空单持仓'], top: 0 },
+    grid: { left: 100, right: 50, top: 40, bottom: 30 },
+    xAxis: {
+      type: 'value',
+      name: '持仓量(手)',
+      max: Math.ceil(maxVal * 1.1),
+      axisLabel: {
+        formatter: (v: number) => Math.abs(v).toLocaleString('zh-CN'),
+      },
+    },
+    yAxis: {
+      type: 'category',
+      data: names,
+      axisLabel: { fontSize: 12 },
+    },
+    series: [
+      {
+        name: '多单持仓',
+        type: 'bar',
+        data: longVals,
+        itemStyle: { color: '#ef232a' },
+        barWidth: '35%',
+        barGap: '20%',
+      },
+      {
+        name: '空单持仓',
+        type: 'bar',
+        data: shortVals,
+        itemStyle: { color: '#14b143' },
+        barWidth: '35%',
+        barGap: '20%',
+      },
+    ],
+  }, true)
+  holdingChart.resize()
+}
+
+function netClass(net: any): string {
+  const n = Number(net)
+  if (!Number.isFinite(n)) return 'cell-empty'
+  if (n > 0) return 'cell-long'
+  if (n < 0) return 'cell-short'
+  return 'cell-empty'
+}
+
+function rowClassName({ row }: any): string {
+  const net = Number(row['净持仓'] || 0)
+  if (net > 0) return 'row-long'
+  if (net < 0) return 'row-short'
+  return ''
+}
+
 // 现货价走势图(在日K线卡片内渲染,利用基差接口的 spot_price 字段)
 function renderSpotPriceLine() {
   if (!klineRef.value) return
@@ -870,6 +1047,7 @@ onUnmounted(() => {
   klineChart?.dispose()
   inventoryChart?.dispose()
   basisChart?.dispose()
+  holdingChart?.dispose()
 })
 
 watch(activeTab, () => {
@@ -880,6 +1058,7 @@ watch(activeTab, () => {
     }
     if (activeTab.value === 'inventory') renderInventory()
     if (activeTab.value === 'basis') renderBasis()
+    if (activeTab.value === 'position') renderHolding()
     if (activeTab.value === 'news') reloadNews()
   })
 })
@@ -894,6 +1073,9 @@ watch(() => store.basis, () => {
   if (activeTab.value === 'basis') nextTick(renderBasis)
   // 现货价模式也依赖 basis 数据
   if (activeTab.value === 'kline' && klineMode.value === 'spot') nextTick(renderSpotPriceLine)
+}, { deep: true })
+watch(() => store.holdingPosition, () => {
+  if (activeTab.value === 'position') nextTick(renderHolding)
 }, { deep: true })
 watch(klineMode, () => {
   if (activeTab.value === 'kline') {
@@ -978,4 +1160,39 @@ function stripFuturesSuffix(name: string): string {
 .news-conf { font-size: 11px; color: var(--el-text-color-placeholder); }
 .news-title { font-size: 14px; font-weight: 500; margin: 4px 0; }
 .news-content { font-size: 12px; color: var(--el-text-color-regular); line-height: 1.6; }
+
+/* 持仓 tab */
+.stat-row { margin-bottom: 16px; }
+.stat-card {
+  background: #f7f8fa;
+  border-radius: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--el-border-color-lighter);
+  height: 100%;
+}
+.stat-card.stat-long { background: linear-gradient(135deg, #fef0f0, #fde2e2); border-color: #fbc4c4; }
+.stat-card.stat-short { background: linear-gradient(135deg, #f0f9eb, #e1f3d8); border-color: #c2e7b0; }
+.stat-label { font-size: 12px; color: var(--el-text-color-secondary); margin-bottom: 4px; }
+.stat-value { font-size: 20px; font-weight: 600; color: var(--el-text-color-primary); }
+.stat-card.stat-long .stat-value { color: #ef232a; }
+.stat-card.stat-short .stat-value { color: #14b143; }
+.stat-hint { font-size: 11px; color: var(--el-text-color-secondary); margin-top: 2px; }
+
+.section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-text-color-regular);
+  margin: 12px 0 8px;
+  padding-left: 8px;
+  border-left: 3px solid #409eff;
+}
+
+.holding-chart { width: 100%; height: 380px; }
+
+.cell-long { color: #ef232a; font-weight: 500; }
+.cell-short { color: #14b143; font-weight: 500; }
+.cell-empty { color: var(--el-text-color-placeholder); }
+
+:deep(.el-table .row-long) { background-color: rgba(239, 35, 42, 0.04) !important; }
+:deep(.el-table .row-short) { background-color: rgba(20, 177, 67, 0.04) !important; }
 </style>

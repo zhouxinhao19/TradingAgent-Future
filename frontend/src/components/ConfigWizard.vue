@@ -24,10 +24,10 @@
           <div class="welcome-icon">
             <el-icon :size="80" color="#409EFF"><Setting /></el-icon>
           </div>
-          <h2>欢迎使用 TradingAgents-CN</h2>
+          <h2>欢迎使用 TradingAgents-Future</h2>
           <p class="welcome-text">
             让我们通过几个简单的步骤来配置您的系统。
-            这将帮助您快速开始使用股票分析功能。
+            这将帮助您快速开始使用期货分析功能。
           </p>
           <el-alert
             title="提示"
@@ -169,7 +169,7 @@
         <div v-if="currentStep === 3" class="step-content">
           <h3>数据源配置</h3>
           <p class="step-description">
-            选择股票数据源，用于获取行情数据和基本信息。
+            选择数据源，用于获取行情数据和基本信息。
           </p>
 
           <el-form :model="wizardData" label-width="120px">
@@ -274,7 +274,7 @@
             <template #default>
               <div>
                 <div>• 访问"仪表盘"查看系统概览</div>
-                <div>• 访问"单股分析"开始分析股票</div>
+                <div>• 访问"商品分析"开始分析期货品种</div>
                 <div>• 访问"配置管理"调整详细设置</div>
               </div>
             </template>

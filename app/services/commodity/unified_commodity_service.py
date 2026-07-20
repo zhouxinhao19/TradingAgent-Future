@@ -100,13 +100,18 @@ class UnifiedCommodityService:
                 "settlement": float(r.get("动态结算价", 0) or 0),
             })
 
-        return {
+        result = {
             "full_symbol": full_symbol,
             "rows": rows,
             "count": len(rows),
             "start_date": str(df["日期"].min()) if not df.empty else start_date,
             "end_date": str(df["日期"].max()) if not df.empty else (end_date or ""),
         }
+        # 传递数据来源标记(如具体合约回退到主力连续)
+        note = df.attrs.get("data_source_note") if hasattr(df, "attrs") else None
+        if note:
+            result["data_source_note"] = note
+        return result
 
     async def get_categories(self) -> List[Dict[str, Any]]:
         """返回商品品类列表(用于前端筛选)"""
@@ -340,6 +345,10 @@ class UnifiedCommodityService:
 
         从 full_symbol (如 CU2501.SHF) 提取 underlying (CU) 和 exchange (SHF)，
         调用 get_contract_info 并过滤出该品种的所有合约。
+
+        过滤逻辑:
+        1. 合约代码以品种代码开头
+        2. 剔除已到期合约(到期日 < 今天)
         """
         await self.initialize()
         provider = self._providers.get("akshare_futures")
@@ -392,14 +401,38 @@ class UnifiedCommodityService:
         if not code_key:
             code_key = list(rows[0].keys())[0] if rows else "合约代码"
 
-        # 过滤:合约代码以 underlying 开头
+        # 找到期日/最后交易日列，用于过滤已到期合约
+        expiry_candidates = ['到期日', '最后交易日', 'expiry_date', 'last_trade_date', '最后交割日']
+        expiry_key = None
+        if rows:
+            for c in expiry_candidates:
+                if c in rows[0]:
+                    expiry_key = c
+                    break
+
+        today = date.today()
+
+        # 过滤:合约代码以 underlying 开头 + 未到期
         contracts = []
         seen = set()
         for r in rows:
             raw = str(r.get(code_key, "")).strip()
-            if raw.upper().startswith(underlying.upper()) and raw not in seen:
-                seen.add(raw)
-                contracts.append(f"{raw}.{exchange}")
+            if not raw.upper().startswith(underlying.upper()) or raw in seen:
+                continue
+            seen.add(raw)
+
+            # 过滤已到期合约(到期日 < 今天)
+            if expiry_key:
+                expiry_str = str(r.get(expiry_key, "")).strip()
+                if expiry_str:
+                    try:
+                        expiry_date = datetime.strptime(expiry_str, "%Y-%m-%d").date()
+                        if expiry_date < today:
+                            continue
+                    except ValueError:
+                        pass  # 日期解析失败则保留该合约
+
+            contracts.append(f"{raw}.{exchange}")
 
         contracts.sort()
         return {
