@@ -63,7 +63,7 @@ const handleCommand = async (command: string) => {
 
 <style lang="scss" scoped>
 .user-profile {
-  padding: 12px;
+  padding: 8px 12px;
 
   &.collapsed {
     padding: 8px;
@@ -73,14 +73,19 @@ const handleCommand = async (command: string) => {
   .profile-info {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     cursor: pointer;
-    padding: 8px;
-    border-radius: 6px;
-    transition: background-color 0.3s ease;
+    padding: 8px 10px;
+    border-radius: 8px;
+    transition: background-color var(--app-transition-fast);
 
     &:hover {
-      background-color: var(--el-fill-color-lighter);
+      background-color: var(--app-sidebar-item-hover-bg);
+    }
+
+    :deep(.el-avatar) {
+      background-color: rgba(255, 255, 255, 0.12);
+      color: $sidebar-accent;
     }
 
     .user-info {
@@ -88,17 +93,18 @@ const handleCommand = async (command: string) => {
       min-width: 0;
 
       .username {
-        font-size: 14px;
-        font-weight: 500;
-        color: var(--el-text-color-primary);
+        font-size: 13px;
+        font-weight: 600;
+        color: #c8d6e0;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
       }
 
       .user-role {
-        font-size: 12px;
-        color: var(--el-text-color-placeholder);
+        font-size: 11px;
+        color: $sidebar-text;
+        margin-top: 1px;
       }
     }
   }
