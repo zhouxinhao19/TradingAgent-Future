@@ -978,6 +978,148 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         self.logger.warning(f"⚠️ get_position_rank({exchange}, {date_str}) 在线+本地缓存均无数据")
         return None
 
+    async def get_position_rank_history(
+        self,
+        exchange: str,
+        end_date: Union[str, date],
+        lookback_days: int = 30,
+        vars_list: Optional[List[str]] = None,
+        symbol: Optional[str] = None,
+    ) -> Optional[Dict[str, pd.DataFrame]]:
+        """
+        多日持仓排名拉取(供 agent positioning 模块使用,需 5+ 天历史计算趋势)。
+
+        并发调用 lookback_days 天的持仓排名,每条结果标注 date 列,
+        按合约代码聚合为 Dict[contract, DataFrame with date col]。
+        失败日期静默跳过(单日缺失不影响整体)。
+
+        Args:
+            exchange: 交易所代码
+            end_date: 截止交易日(含)
+            lookback_days: 回溯天数,默认 30(超过 positioning 5d 趋势 + 60d 集中度窗口)
+            vars_list: 品种列表(可选,只对 DCE/GFEX 生效)
+            symbol: 品种代码(用于本地缓存回退)
+
+        Returns:
+            Dict[contract_code, DataFrame],DataFrame 包含 date / long_top20 / short_top20
+            / total_oi 等列;失败时返回 None
+        """
+        import asyncio
+        from datetime import datetime, timedelta
+
+        if not await self._ensure_ak():
+            return None
+
+        if isinstance(end_date, str):
+            try:
+                end_dt = datetime.strptime(end_date, "%Y%m%d")
+            except ValueError:
+                end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+        else:
+            end_dt = datetime.combine(end_date, datetime.min.time())
+
+        ex = exchange.upper()
+        # 选调用函数(复用单日逻辑)
+        async def _fetch_one(d_str: str):
+            try:
+                if ex == "DCE":
+                    kwargs = {"date": d_str}
+                    if vars_list:
+                        kwargs["vars_list"] = vars_list
+                    return await self._call("futures_dce_position_rank", **kwargs)
+                if ex == "GFEX":
+                    kwargs = {"date": d_str}
+                    if vars_list:
+                        kwargs["vars_list"] = vars_list
+                    return await self._call("futures_gfex_position_rank", **kwargs)
+                if ex == "SHFE":
+                    return await self._call("get_shfe_rank_table", date=d_str)
+                if ex == "INE":
+                    return await self._call("get_shfe_rank_table", date=d_str)
+                if ex == "CFFEX":
+                    return await self._call("get_cffex_rank_table", date=d_str)
+                if ex in ("CZCE", "CZC"):
+                    return await self._call("get_rank_table_czce", date=d_str)
+            except Exception as e:
+                self.logger.debug(f"持仓排名 {d_str} 拉取失败: {e}")
+                return None
+            return None
+
+        # 生成日期序列(从 end 倒推 lookback_days,周末跳过)
+        dates = []
+        cur = end_dt
+        for _ in range(lookback_days + 5):  # 多取 5 天应对周末
+            dates.append(cur.strftime("%Y%m%d"))
+            cur -= timedelta(days=1)
+            if len(dates) >= lookback_days:
+                break
+
+        # 并发拉取(每次单交易所 ~1-3s,30 天 ~30s 上限;akshare 自身有限速)
+        results = await asyncio.gather(
+            *[_fetch_one(d) for d in dates], return_exceptions=True
+        )
+
+        # 过滤异常 + 按合约合并
+        merged: Dict[str, List[pd.DataFrame]] = {}
+        valid_count = 0
+        for d_str, res in zip(dates, results):
+            if isinstance(res, BaseException) or res is None:
+                continue
+            if isinstance(res, dict):
+                # SHFE / DCE / GFEX / CFFEX 返回 Dict[contract, df]
+                for contract, df in res.items():
+                    if df is None or (isinstance(df, pd.DataFrame) and df.empty):
+                        continue
+                    df = df.copy()
+                    df["date"] = pd.to_datetime(d_str, format="%Y%m%d")
+                    merged.setdefault(contract, []).append(df)
+                    valid_count += 1
+            elif isinstance(res, pd.DataFrame) and not res.empty:
+                # 罕见:某些接口返回单 DataFrame,按 symbol 列分组合约
+                res = res.copy()
+                res["date"] = pd.to_datetime(d_str, format="%Y%m%d")
+                if "symbol" in res.columns:
+                    for contract, gdf in res.groupby("symbol"):
+                        merged.setdefault(str(contract), []).append(gdf.copy())
+                else:
+                    merged.setdefault(f"unknown_{d_str}", []).append(res)
+                valid_count += 1
+
+        if not merged:
+            self.logger.warning(
+                f"⚠️ get_position_rank_history({ex}, {end_dt.strftime('%Y%m%d')}, "
+                f"{lookback_days}d) 所有日期均无数据"
+            )
+            # 回退本地缓存
+            sym = symbol or (vars_list[0] if vars_list else None)
+            if sym:
+                try:
+                    from tradingagents.dataflows.providers.commodity.local_cache_adapter import (
+                        CommodityLocalCacheAdapter,
+                    )
+                    cache = CommodityLocalCacheAdapter()
+                    df = cache.read_positioning(sym)
+                    if df is not None and not df.empty:
+                        return df
+                except Exception:
+                    pass
+            return None
+
+        # 合并:每个合约一张按日期排序的 DataFrame
+        out: Dict[str, pd.DataFrame] = {}
+        for contract, dfs in merged.items():
+            combined = pd.concat(dfs, ignore_index=True)
+            if "date" in combined.columns:
+                combined = combined.drop_duplicates(subset=["date"], keep="last")
+                combined = combined.sort_values("date").reset_index(drop=True)
+            out[contract] = combined
+
+        self.logger.info(
+            f"✅ get_position_rank_history({ex}, {end_dt.strftime('%Y%m%d')}): "
+            f"{valid_count} 日有效数据 / {len(dates)} 天请求, {len(out)} 个合约"
+        )
+        return out
+
     async def get_registered_receipt(
         self,
         start_date: Union[str, date],
@@ -1469,20 +1611,40 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         else:
             date_str = str(date)
 
-        if ex == "SHFE":
-            return await self._call("futures_contract_info_shfe")
-        if ex == "INE":
-            return await self._call("futures_contract_info_ine")
-        if ex == "DCE":
-            return await self._call("futures_contract_info_dce")
-        if ex in ("CZCE", "CZC"):
-            return await self._call("futures_contract_info_czce")
-        if ex == "GFEX":
-            return await self._call("futures_contract_info_gfex")
-        if ex == "CFFEX":
-            return await self._call("futures_contract_info_cffex")
+        # 确定要调用的 AKShare 函数名和参数
+        func_map = {
+            "SHFE": ("futures_contract_info_shfe", True),
+            "INE": ("futures_contract_info_ine", True),
+            "DCE": ("futures_contract_info_dce", False),
+            "CZCE": ("futures_contract_info_czce", True),
+            "CZC": ("futures_contract_info_czce", True),
+            "GFEX": ("futures_contract_info_gfex", False),
+            "CFFEX": ("futures_contract_info_cffex", True),
+        }
+        entry = func_map.get(ex)
+        if not entry:
+            self.logger.warning(f"⚠️ 不支持的交易所: {exchange}")
+            return None
 
-        self.logger.warning(f"⚠️ 不支持的交易所: {exchange}")
+        func_name, needs_date = entry
+
+        # 尝试当前日期;若失败则逐个回退前几个交易日
+        candidates = [date_str]
+        if needs_date:
+            from datetime import timedelta
+            for back in range(1, 10):
+                d = (datetime.strptime(date_str, "%Y%m%d") - timedelta(days=back)).strftime("%Y%m%d")
+                candidates.append(d)
+
+        for d in candidates:
+            if needs_date:
+                result = await self._call(func_name, date=d)
+            else:
+                result = await self._call(func_name)
+            if result is not None and not (hasattr(result, 'empty') and result.empty):
+                return result
+
+        self.logger.warning(f"⚠️ 合约信息获取失败: {exchange}/{date_str}(尝试了 {len(candidates)} 个日期)")
         return None
 
     async def get_trading_calendar(
