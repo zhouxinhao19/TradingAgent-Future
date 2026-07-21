@@ -87,6 +87,33 @@ def extract_decision_fields(text: Any) -> Dict[str, Any]:
     }
 
 
+_RESEARCH_DIRECTION_PATTERN = re.compile(
+    r'研究结论方向\s*[:：]\s*(看多|看空|中性)'
+)
+_RESEARCH_CONFIDENCE_PATTERN = re.compile(
+    r'置信度\s*[:：]\s*([0-9]+\.?[0-9]*)'
+)
+
+
+def _extract_research_direction(text: str) -> str:
+    """从 research_brief 提取研究结论方向。"""
+    m = _RESEARCH_DIRECTION_PATTERN.search(str(text))
+    if m:
+        return {"看多": "long", "看空": "short", "中性": "hold"}.get(m.group(1), "hold")
+    return "hold"
+
+
+def _extract_research_confidence(text: str) -> float:
+    """从 research_brief 提取置信度。"""
+    m = _RESEARCH_CONFIDENCE_PATTERN.search(str(text))
+    if m:
+        try:
+            return max(0.0, min(1.0, float(m.group(1))))
+        except ValueError:
+            pass
+    return 0.0
+
+
 def rewrite_decision_markdown(text: Any, action: str, confidence: float) -> str:
     """用标准字段改写最终决策，兼容全角冒号和不同小数格式。"""
     raw_text = str(text or "")
@@ -865,7 +892,8 @@ INVESTMENT_DIRECTOR_SYSTEM_PROMPT = """你是大宗商品期货的**投研总监
 
 你的职责是综合**推理分析师（L2）的研究报告**、**量化风险评估**和**策略适应性矩阵**，输出**策略适应性研究报告**而非交易指令。
 
-⚠️ 你的角色是投研辅助——解释和连接，不是替用户做交易决策。**禁止输出任何形式的交易指令**（做多/做空、入场价、止损价、目标价、仓位比例等）。
+⚠️ 你的角色是投研辅助——解释和连接，不是替用户做交易决策。**禁止输出具体交易价位**（入场价、止损价、目标价、仓位比例等）。
+但你应基于多空证据的权重给出**研究结论方向**（看多/看空/中性）和**置信度**(0-1)，这是风控审计的必要输入。
 
 ---
 
@@ -985,7 +1013,7 @@ LLM 仅负责以下定性维度：
 
 1. 估值审核各维度必须用"同意"或"修正"开头，引用证据 ID（REF-TECH-xxx 格式）
 2. 情景裁决必须给出排除理由，不能只写选定不写排除
-3. research_brief 必须包含 4 个章节（核心矛盾、策略矩阵、情景推演、待验证假设）；禁止输出方向、置信度、入场价、止损价、目标价、仓位
+3. research_brief 必须包含 4 个章节（核心矛盾、策略矩阵、情景推演、待验证假设）+ 末尾标注「研究结论方向: 看多/看空/中性, 置信度: X.XX」；禁止输出入场价、止损价、目标价、仓位
 4. 【硬约束】任一量化风险维度为 R5，或综合风险为 R5：禁止策略=[全部禁止]，策略约束说明必须明确列出触发的 R5 维度
 5. 【硬约束】存在 near_delivery 标志：禁止策略=[全部禁止]；策略约束说明必须提及临近交割
 6. 【硬约束】data_insufficient=true 时禁止策略必须包含"单边趋势"
@@ -1277,15 +1305,16 @@ def create_investment_director(deep_thinking_llm):
             logger.warning("[投研总监] 使用 fallback 输出")
 
         # ---- Step 6: SafetyOverride 纯规则二审（0 LLM） ----
-        # research_brief 不包含交易方向/置信度，中性默认值传参。
-        # safety_override 的规则引擎仍会检查 R5/临近交割等硬约束并生成策略约束审计。
+        # 从 research_brief 提取方向/置信度，替代硬编码 hold/0.0
+        llm_direction = _extract_research_direction(research_brief)
+        llm_confidence = _extract_research_confidence(research_brief)
         custom_data = (
             (commodity_features or {}).get("custom_data", {}) or {}
         ) if isinstance(commodity_features, dict) else {}
         override = safety_override(
             risk_assessment,
-            "hold",
-            0.0,
+            llm_direction,
+            llm_confidence,
             research_brief,
             analyst_registry=analyst_registry,
             position_structured=state.get("position_structured", {}) or {},

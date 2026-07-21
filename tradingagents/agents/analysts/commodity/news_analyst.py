@@ -363,7 +363,8 @@ def create_news_analyst(llm):
             analyst_id = make_analyst_id("NEWS", full_symbol, trade_date)
             conclusion_id = make_conclusion_id("NEWS", 1)
             tagged_report = inject_analyst_id(report_md, analyst_id)
-            registry_entry = make_registry_entry(analyst_id, conclusion_id, "NEWS", "news", "news_report", "neutral", extract_first_sentence(report_md))
+            news_direction = _derive_news_direction(sentiment_ratio, positive_count, negative_count)
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "NEWS", "news", "news_report", news_direction, extract_first_sentence(report_md))
             return {
                 "news_report": tagged_report,
                 "messages": [msg_out],
@@ -393,7 +394,8 @@ def create_news_analyst(llm):
             analyst_id = make_analyst_id("NEWS", full_symbol, trade_date, seed="fallback")
             conclusion_id = make_conclusion_id("NEWS", 1)
             tagged_fallback = inject_analyst_id(fallback_md, analyst_id)
-            registry_entry = make_registry_entry(analyst_id, conclusion_id, "NEWS", "news", "news_report", "neutral", "(降级: LLM 不可用)", status="degraded")
+            fd = _derive_news_direction(sentiment_ratio, positive_count, negative_count)
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "NEWS", "news", "news_report", fd, "(降级: LLM 不可用)", status="degraded")
             return {
                 "news_report": tagged_fallback,
                 "messages": [],
@@ -405,3 +407,21 @@ def create_news_analyst(llm):
 
 
 __all__ = ["create_news_analyst"]
+
+
+def _derive_news_direction(
+    sentiment_ratio: Optional[float],
+    positive_count: int,
+    negative_count: int,
+) -> str:
+    """从情感比例推导新闻方向。"""
+    if sentiment_ratio is None:
+        total = positive_count + negative_count
+        if total == 0:
+            return "neutral"
+        sentiment_ratio = (positive_count - negative_count) / total
+    if sentiment_ratio > 0.25:
+        return "bullish"
+    elif sentiment_ratio < -0.25:
+        return "bearish"
+    return "neutral"

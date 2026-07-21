@@ -38,12 +38,15 @@ from tradingagents.agents.analysts.commodity import (
     create_position_analyst,
     create_technical_analyst,
 )
+from tradingagents.agents.researchers.bull_researcher import create_bull_researcher
+from tradingagents.agents.researchers.bear_researcher import create_bear_researcher
 from tradingagents.agents.managers.investment_director import (
     create_investment_director,
     extract_decision_fields,
     normalize_direction,
 )
 from tradingagents.agents.managers.research_manager import create_research_manager
+from tradingagents.agents.custom_data.engine import run_analysis_from_summaries
 
 from tradingagents.utils.logging_init import get_logger
 
@@ -196,6 +199,45 @@ def _compute_contract_expiry(full_symbol: str, trade_date_str: str) -> Dict[str,
     return {"days_to_expiry": days_to_expiry, "warning": warning, "delivery_date": delivery.isoformat()}
 
 
+def create_custom_data_analyst_node(llm):
+    """自定义数据分析师 Pre-processing 节点。
+
+    解析已上传的用户数据文件，生成可读的 Markdown 描述报告。
+    不做方向性判断 — 方向由领域分析师基于交叉验证判断。
+    无上传文件时此节点不会被路由到。
+    """
+    def custom_data_node(state: dict) -> dict:
+        features = state.get("commodity_features", {}) or {}
+        cd = features.get("custom_data", {}) or {}
+
+        if not cd.get("parsed") or cd.get("file_count", 0) == 0:
+            return {"custom_data_report": ""}
+
+        summaries = cd.get("raw_summaries", []) or []
+        skill_name = cd.get("skill_name", "general-analysis")
+        user_context = cd.get("user_context", "")
+
+        logger.info(f"[自定义数据分析师] 启动: {cd.get('file_count')} 文件, skill={skill_name}")
+
+        result = run_analysis_from_summaries(
+            summaries=summaries,
+            skill_name=skill_name,
+            llm=llm,
+            user_context=user_context,
+        )
+
+        report = result.report if result.success else (
+            f"## 自定义数据分析（降级）\n\n数据摘要已生成，但 LLM 分析不可用"
+            f"{': ' + result.error if result.error else ''}\n\n"
+            f"文件: {', '.join(cd.get('file_names', []))}\n"
+        )
+
+        logger.info(f"[自定义数据分析师] 完成: {len(report)} 字符, fallback={result.fallback}")
+        return {"custom_data_report": report}
+
+    return custom_data_node
+
+
 # === Propagator ===
 
 class CommodityPropagator(Propagator):
@@ -273,6 +315,7 @@ class CommodityPropagator(Propagator):
             "analyst_registry": {},
             "news_summary": news_summary,
             "contract_expiry_warning": contract_expiry_warning,
+            "custom_data_report": "",
         }
 
 
@@ -306,11 +349,18 @@ class CommodityGraphSetup:
         # === 创建 Checkpointer ===
         checkpointer = _create_checkpointer()
 
+        # === Pre-processing: 自定义数据分析师 ===
+        custom_data_node = create_custom_data_analyst_node(self.quick_thinking_llm)
+
         # === 4 个 commodity analyst 节点 ===
         tech_analyst = create_technical_analyst(self.quick_thinking_llm)
         fund_analyst = create_fundamental_analyst(self.quick_thinking_llm)
         pos_analyst = create_position_analyst(self.quick_thinking_llm)
         news_analyst = create_news_analyst(self.quick_thinking_llm)
+
+        # === 多空辩论节点 ===
+        bull_node = create_bull_researcher(self.quick_thinking_llm, self.invest_judge_memory)
+        bear_node = create_bear_researcher(self.quick_thinking_llm, self.invest_judge_memory)
 
         # === 决策链节点(commodity 化通过 state['asset_type']) ===
         rm_node = create_research_manager(self.deep_thinking_llm, self.invest_judge_memory)
@@ -321,31 +371,43 @@ class CommodityGraphSetup:
         # === 构造 StateGraph ===
         workflow = StateGraph(AgentState)
 
+        # 注册 Custom Data 节点
+        workflow.add_node("Custom Data Analyst", custom_data_node)
+
         # 注册 analyst 节点(命名跟 stock 一致,便于 SSE 兼容)
         workflow.add_node("Technical Analyst", tech_analyst)
         workflow.add_node("Fundamentals Analyst", fund_analyst)
-        workflow.add_node("Sentiment Analyst", pos_analyst)  # 持仓→情绪字段
+        workflow.add_node("Sentiment Analyst", pos_analyst)
         workflow.add_node("News Analyst", news_analyst)
+
+        # 注册多空辩论节点
+        workflow.add_node("Bull Researcher", bull_node)
+        workflow.add_node("Bear Researcher", bear_node)
 
         # 注册决策链节点
         workflow.add_node("Research Manager", rm_node)
 
-        # 注册投研总监（Phase 4，替代 L3-L5 共 5 节点 + 7 条边）
+        # 注册投研总监
         workflow.add_node("Investment Director", id_node)
 
-        # === 边(commodity 路径:4 个 L1 并行 fan-out + 汇聚到 Research Manager) ===
-        # Phase Agent 改造: 4 个 L1 analyst 从 START 直接 fan-out(无依赖,各自读 commodity_features)
-        workflow.add_edge(START, "Technical Analyst")
-        workflow.add_edge(START, "Fundamentals Analyst")
-        workflow.add_edge(START, "Sentiment Analyst")
-        workflow.add_edge(START, "News Analyst")
+        # === 边 ===
+        # Custom Data Analyst → 4 L1 (预处理, 无数据时 no-op)
+        workflow.add_edge(START, "Custom Data Analyst")
 
-        # 4 个 analyst 全部完成后汇聚到 Research Manager（推理分析师）
-        # LangGraph 的 fan-in 自动等待所有前驱节点完成，无需手动 barrier
-        workflow.add_edge("Technical Analyst", "Research Manager")
-        workflow.add_edge("Fundamentals Analyst", "Research Manager")
-        workflow.add_edge("Sentiment Analyst", "Research Manager")
-        workflow.add_edge("News Analyst", "Research Manager")
+        # 4 L1 并行 fan-out
+        workflow.add_edge("Custom Data Analyst", "Technical Analyst")
+        workflow.add_edge("Custom Data Analyst", "Fundamentals Analyst")
+        workflow.add_edge("Custom Data Analyst", "Sentiment Analyst")
+        workflow.add_edge("Custom Data Analyst", "News Analyst")
+
+        # 4 L1 → Bull → Bear → RM → ID → END
+        workflow.add_edge("Technical Analyst", "Bull Researcher")
+        workflow.add_edge("Fundamentals Analyst", "Bull Researcher")
+        workflow.add_edge("Sentiment Analyst", "Bull Researcher")
+        workflow.add_edge("News Analyst", "Bull Researcher")
+
+        workflow.add_edge("Bull Researcher", "Bear Researcher")
+        workflow.add_edge("Bear Researcher", "Research Manager")
         workflow.add_edge("Research Manager", "Investment Director")
         workflow.add_edge("Investment Director", END)
 
@@ -700,10 +762,13 @@ class CommodityTradingAgentsGraph(TradingAgentsGraph):
 
     # === 进度映射(覆盖父类,适配 commodity 节点名) ===
     _COMMODITY_NODE_MAPPING = {
+        "Custom Data Analyst": "自定义数据分析",
         "Technical Analyst": "技术分析师",
         "Fundamentals Analyst": "产业分析师",
         "Sentiment Analyst": "持仓情绪分析师",
         "News Analyst": "新闻分析师",
+        "Bull Researcher": "多头研究员",
+        "Bear Researcher": "空头研究员",
         "Research Manager": "推理分析师",
         "Investment Director": "投研总监",
     }
@@ -1041,6 +1106,24 @@ def build_evidence_chain(final_state: Dict[str, Any]) -> Dict[str, Any]:
                 "self_pctl_180d": _cd_snapshot.get("self_pctl_180d"),
             },
             "signals": _feature_dict.get("signals", [])[:3] if _feature_dict else [],
+        })
+
+    # Custom Data Analyst 报告（L0 预处理层）
+    custom_data_report = final_state.get("custom_data_report", "")
+    if custom_data_report:
+        L1_entries.append({
+            "id": "L0-CUSTOM-DATA",
+            "conclusion_id": "custom_data_report",
+            "name": "自定义数据分析",
+            "direction": "neutral",
+            "confidence": 0.0,
+            "calibrated_confidence": 0.0,
+            "status": "ok",
+            "summary": custom_data_report[:120] if custom_data_report else "(自定义数据报告)",
+            "key_metrics": {
+                "report_length": len(custom_data_report),
+            },
+            "signals": [],
         })
 
     # --- L2: investment_plan 解析 + contradiction_map ---
