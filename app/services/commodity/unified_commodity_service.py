@@ -6,12 +6,76 @@
 - Phase 3a:所有 provider 方法都有对应 service 包装,DataFrame → JSON safe dict/list
 """
 import asyncio
+import re
 from datetime import date, datetime
+from difflib import SequenceMatcher
 from typing import Any, Dict, List, Optional, Union
 
 from tradingagents.utils.logging_init import get_logger
 
 logger = get_logger("default")
+
+
+# ── 新闻去重辅助(读取端 A+B) ──
+
+def _news_fingerprint(title: str, n: int = 40) -> str:
+    """标题指纹:去标点/空白后取前 n 个字,用于精确指纹去重(A)。"""
+    return re.sub(r'[^\w\d一-鿿]', '', str(title or ''))[:n]
+
+
+def _title_similarity(a: str, b: str) -> float:
+    """两标题去标点后的相似度(0~1),用于近似去重(B)。"""
+    na = re.sub(r'[^\w\d一-鿿]', '', str(a or ''))
+    nb = re.sub(r'[^\w\d一-鿿]', '', str(b or ''))
+    if not na or not nb:
+        return 0.0
+    # 长度差过大直接判为不相似,省去无谓比对
+    if min(len(na), len(nb)) / max(len(na), len(nb)) < 0.5:
+        return 0.0
+    return SequenceMatcher(None, na, nb).ratio()
+
+
+def _dedup_news(items: List[Dict[str, Any]], sim_threshold: float = 0.82) -> List[Dict[str, Any]]:
+    """读取端新闻去重: 三层优先级。
+
+    0) event_key 语义指纹去重(LLM 标注产出, 治本, 能合并"换词不换意"的转载)
+    A) 标题指纹精确去重(去标点前 40 字)
+    B) 标题相似度合并(字面近似)
+
+    保留先出现的一条(调用方已按 annotated_at 倒序,即保留较新的)。
+    旧数据无 event_key 时自动回退到 A+B。
+    """
+    if not items:
+        return items
+    seen_event: set = set()
+    seen_fp: set = set()
+    kept: List[Dict[str, Any]] = []
+    kept_titles: List[str] = []
+    for it in items:
+        title = str(it.get("title", "") or "")
+        # 0: event_key 语义去重
+        ek = str(it.get("event_key", "") or "").strip()
+        if ek:
+            if ek in seen_event:
+                continue
+            seen_event.add(ek)
+        # A: 指纹精确去重
+        fp = _news_fingerprint(title)
+        if fp and fp in seen_fp:
+            continue
+        # B: 与已保留标题做相似度比对
+        is_dup = False
+        for kt in kept_titles:
+            if _title_similarity(title, kt) >= sim_threshold:
+                is_dup = True
+                break
+        if is_dup:
+            continue
+        if fp:
+            seen_fp.add(fp)
+        kept.append(it)
+        kept_titles.append(title)
+    return kept
 
 
 # DataFrame → JSON safe 辅助
@@ -588,8 +652,10 @@ class UnifiedCommodityService:
             if conditions:
                 query["$and"] = conditions
 
-            cursor = coll.find(query).sort("annotated_at", -1).limit(limit)
-            cached = await cursor.to_list(length=limit)
+            # 多取一些再去重,避免去重后不足 limit(相似新闻较多时尤其明显)
+            fetch_n = min(max(limit * 3, limit + 20), 500)
+            cursor = coll.find(query).sort("annotated_at", -1).limit(fetch_n)
+            cached = await cursor.to_list(length=fetch_n)
 
             if len(cached) >= limit // 2:
                 result = []
@@ -612,9 +678,12 @@ class UnifiedCommodityService:
                         "llm_sentiment_reasoning": doc.get("sentiment_reasoning", ""),
                         "llm_importance": doc.get("importance", "medium"),
                         "llm_summary": doc.get("summary", ""),
+                        "event_key": doc.get("event_key", ""),
                         "annotated_at": str(doc.get("annotated_at", "")),
                         "annotator_model": doc.get("annotator_model", ""),
                     })
+                # A+B 读取端去重(标题指纹 + 相似度合并)
+                result = _dedup_news(result)
                 return result[:limit]
         except Exception as e:
             logger.debug(f"MongoDB 查询已标注新闻失败: {e}")
@@ -656,9 +725,9 @@ class UnifiedCommodityService:
             filtered = [it for it in raw if any(
                 rv.upper() == v for rv in (it.get("relevant_varieties") or [])
             )]
-            return filtered[:limit] if filtered else []
+            return _dedup_news(filtered)[:limit] if filtered else []
 
-        return (raw or [])[:limit]
+        return _dedup_news(raw or [])[:limit]
 
     async def _get_quick_llm(self):
         """获取用于标注的快速 LLM(降级用)。"""
