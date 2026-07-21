@@ -905,7 +905,7 @@ class CommodityTradingAgentsGraph(TradingAgentsGraph):
                 if final_state is None:
                     final_state = init_state.copy()
                 for node_name, node_update in chunk.items():
-                    if not node_name.startswith("__"):
+                    if not node_name.startswith("__") and node_update is not None:
                         final_state.update(node_update)
             else:
                 trace.append(chunk)
