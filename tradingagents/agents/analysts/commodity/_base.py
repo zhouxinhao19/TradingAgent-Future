@@ -777,6 +777,38 @@ def build_fact_cards(
             "direction": feature_dict.get("_direction", "neutral"),
         })
 
+    # ---- 8. Cross-validation（用户上传数据与系统 features 定量对比） ----
+    for _cv_module in ("inventory", "basis", "positioning"):
+        _cv_block = features.get(_cv_module) if isinstance(features, dict) else None
+        if not isinstance(_cv_block, dict):
+            continue
+        _cv = _cv_block.get("cross_validation")
+        if not isinstance(_cv, dict):
+            continue
+        _cv_val = _cv.get("value")
+        if _cv_val is None:
+            continue
+        seq += 1
+        _cv_label = _cv.get("label") or "值"
+        _cv_as_of = _cv.get("as_of") or "未知"
+        _cv_files = ", ".join(_cv.get("file_names", []))
+        _cv_pctl = _cv.get("percentile")
+        _cv_pctl_str = f"，自身分位={float(_cv_pctl):.0f}%" if _cv_pctl is not None else ""
+        cards.append({
+            "id": f"FACT-CROSS-{seq:03d}",
+            "module": _cv_module,
+            "statement": (
+                f"用户上传 [{_cv_label}]={_cv_val}{_cv_pctl_str}"
+                f" (as_of={_cv_as_of}, 文件: {_cv_files})"
+            ),
+            "metric": f"cross_validation.{_cv_label}",
+            "value": _cv_val,
+            "unit": "",
+            "percentile": _cv_pctl,
+            "source": "features.custom_data",
+            "direction": _cv.get("direction", "neutral"),
+        })
+
     return cards
 
 
