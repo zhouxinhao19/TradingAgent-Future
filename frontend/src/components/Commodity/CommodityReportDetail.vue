@@ -51,8 +51,8 @@
       <!-- SafetyOverride 高亮（从 report 或 evidence_chain 中提取） -->
       <el-alert
         v-if="safetyOverride"
-        :title="safetyOverride.overridden ? '⚠️ SafetyOverride 风控硬约束已触发' : '✅ 风控未触发'"
-        :type="safetyOverride.overridden ? 'error' : 'success'"
+        :title="safetyOverrideTitle"
+        :type="safetyOverrideAlertType"
         show-icon
         :closable="false"
         class="safety-alert"
@@ -79,10 +79,23 @@
               <el-tag :type="directionTagType(safetyOverride.original_llm_direction)" size="small">
                 {{ directionLabel(safetyOverride.original_llm_direction) }}
               </el-tag>
-              → <strong>覆盖后:</strong>
-              <el-tag :type="directionTagType(safetyOverride.overridden_action)" size="small">
-                {{ directionLabel(safetyOverride.overridden_action) }}
+              <span v-if="safetyOverride.original_llm_confidence !== undefined">
+                （置信度 {{ formatConfidence(safetyOverride.original_llm_confidence) }}）
+              </span>
+              → <strong>最终裁定:</strong>
+              <el-tag :type="directionTagType(safetyOverride.overridden_action || safetyOverride.action)" size="small">
+                {{ directionLabel(safetyOverride.overridden_action || safetyOverride.action) }}
               </el-tag>
+              <span v-if="safetyOverride.overridden_confidence !== undefined">
+                （置信度 {{ formatConfidence(safetyOverride.overridden_confidence) }}）
+              </span>
+            </p>
+            <p v-if="hasPositionLimit">
+              <strong>仓位上限:</strong> {{ safetyOverride.max_position_pct }}%
+              <span v-if="Number(safetyOverride.max_position_pct) === 0">（禁止开仓）</span>
+            </p>
+            <p v-if="safetyOverride.r5_dimensions?.length">
+              <strong>R5 维度:</strong> {{ safetyOverride.r5_dimensions.join('、') }}
             </p>
           </div>
         </template>
@@ -645,6 +658,8 @@ const riskDimensions = computed(() => {
       tier: v.tier || 'unknown',
       interpretation: v.interpretation || '',
       available: v.available,
+      label: v.label,
+      sentimentValue: v.value,
     }))
 })
 
@@ -654,10 +669,32 @@ const riskFlags = computed(() => {
 
 // ---- SafetyOverride ----
 const safetyOverride = computed(() => {
-  return report.value?.evidence_chain?.layers?.L3?.safety_override
+  const so = report.value?.evidence_chain?.layers?.L3?.safety_override
     || report.value?.evidence_chain?.layers?.L3?.risk_card?.safety_override
     || report.value?.evidence_chain?.layers?.L3?.risk_assessment?.safety_override
-    || null
+  // 空对象（后端未写入数据/旧报告）返回 null，不触发 alert
+  if (!so || typeof so !== 'object' || !Object.keys(so).length || !so.executed) return null
+  return so
+})
+
+const hasPositionLimit = computed(() => {
+  const value = safetyOverride.value?.max_position_pct
+  return value !== undefined && value !== null
+})
+
+const safetyOverrideTitle = computed(() => {
+  const audit = safetyOverride.value
+  if (!audit) return ''
+  if (audit.overridden) return '⚠️ SafetyOverride 风控硬约束已覆盖原始决策'
+  if ((audit.override_rules_triggered || []).length) return '⚠️ SafetyOverride 风控规则已触发，原决策符合约束'
+  return '✅ SafetyOverride 已执行，未改变原始决策'
+})
+
+const safetyOverrideAlertType = computed(() => {
+  const audit = safetyOverride.value
+  if (!audit?.executed) return 'warning'
+  if (audit.overridden || (audit.override_rules_triggered || []).length) return 'warning'
+  return 'success'
 })
 
 // ---- 原始数据 ----
@@ -686,18 +723,19 @@ function directionLabel(action?: string): string {
   return map[action || ''] || action || '—'
 }
 
-function directionTagType(action?: string): string {
-  const map: Record<string, string> = {
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
+
+function directionTagType(action?: string): TagType {
+  const map: Record<string, TagType> = {
     long: 'success', short: 'danger', hold: 'info', flat: 'warning',
     bullish: 'success', bearish: 'danger', neutral: 'info', skip: 'info',
   }
   return map[action || ''] || 'info'
 }
 
-function confidenceColor(conf: number): string {
-  if (conf >= 0.7) return '#67c23a'
-  if (conf >= 0.4) return '#e6a23c'
-  return '#f56c6c'
+function formatConfidence(value: unknown): string {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? `${(parsed * 100).toFixed(0)}%` : '—'
 }
 
 function exchangeName(code: string): string {

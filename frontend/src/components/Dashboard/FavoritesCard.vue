@@ -82,6 +82,10 @@ const props = withDefaults(
   { compact: false, maxDisplay: 5, loadAssetType: 'all' },
 )
 
+const emit = defineEmits<{
+  select: [item: FavoriteItem]
+}>()
+
 const router = useRouter()
 const favoritesStore = useFavoritesStore()
 const favoriteItems = computed(() => favoritesStore.items)
@@ -118,7 +122,8 @@ function goToFavorites() {
 function viewFavoriteDetail(item: FavoriteItem) {
   if (item.asset_type === 'commodity') {
     if (props.compact) {
-      router.push(`/commodity/analysis?symbol=${item.full_symbol}`)
+      // compact 模式：通知父组件填入表单，不跳转页面
+      emit('select', item)
     } else {
       router.push(`/commodity/${item.full_symbol}`)
     }

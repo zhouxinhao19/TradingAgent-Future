@@ -7,6 +7,9 @@
         <el-button type="primary" size="small" @click="goToCommodityList">
           + 添加自选
         </el-button>
+        <el-button v-if="selectedIds.length > 0" type="primary" size="small" :loading="batchSubmitting" @click="handleBatchAnalyze">
+          批量分析 ({{ selectedIds.length }})
+        </el-button>
         <el-button v-if="selectedIds.length > 0" type="danger" size="small" @click="handleBatchRemove">
           批量删除 ({{ selectedIds.length }})
         </el-button>
@@ -14,6 +17,24 @@
           刷新行情
         </el-button>
       </div>
+    </div>
+
+    <!-- 批量分析结果提示 -->
+    <div v-if="batchResult" style="margin: 0 0 16px">
+      <el-alert
+        :title="batchResult.message"
+        :type="batchResult.failed > 0 ? 'warning' : 'success'"
+        :closable="true"
+        show-icon
+        @close="batchResult = null"
+      >
+        <template #default>
+          <div style="margin-top: 4px; font-size: 13px">
+            成功 {{ batchResult.created }}/{{ batchResult.total }}
+            <el-button text size="small" @click="goToTaskCenter">查看任务中心</el-button>
+          </div>
+        </template>
+      </el-alert>
     </div>
 
     <!-- 空状态 -->
@@ -99,6 +120,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useFavoritesStore } from '@/stores/favorites'
+import commodityApi from '@/api/commodity'
 import { formatDateTime } from '@/utils/datetime'
 
 const router = useRouter()
@@ -108,6 +130,15 @@ const selectedIds = ref<string[]>([])
 const loading = computed(() => favoritesStore.loading)
 
 const items = computed(() => favoritesStore.items)
+
+const batchSubmitting = ref(false)
+const batchResult = ref<{
+  batch_id?: string
+  total: number
+  created: number
+  failed: number
+  message: string
+} | null>(null)
 
 const formatTime = (time: string) => {
   return formatDateTime(time)
@@ -155,11 +186,61 @@ const handleBatchRemove = async () => {
 }
 
 const viewDetail = (row: any) => {
-  router.push(`/commodity/analysis?symbol=${row.full_symbol}`)
+  if (row.asset_type === 'commodity' && row.full_symbol) {
+    router.push(`/commodity/analysis?symbol=${row.full_symbol}`)
+  } else if (row.asset_type === 'stock' && row.stock_code) {
+    router.push(`/analysis/single?stock_code=${row.stock_code}`)
+  }
 }
 
 const goToCommodityList = () => {
   router.push('/commodity/list')
+}
+
+const goToTaskCenter = () => {
+  router.push('/tasks')
+}
+
+const handleBatchAnalyze = async () => {
+  // 仅取选中行的品种全代码（商品才有 full_symbol，股票本功能暂不支持）
+  const symbols = items.value
+    .filter(it => selectedIds.value.includes(it.id) && it.asset_type === 'commodity' && it.full_symbol)
+    .map(it => it.full_symbol as string)
+  if (symbols.length === 0) {
+    ElMessage.warning('请至少选择一个商品自选品种')
+    return
+  }
+  if (selectedIds.value.length > symbols.length) {
+    ElMessage.warning(`已忽略 ${selectedIds.value.length - symbols.length} 个股票项目（批量分析仅支持商品）`)
+  }
+  // 后端 max=50
+  const limited = symbols.slice(0, 50)
+  if (limited.length < symbols.length) {
+    ElMessage.warning(`批量分析最多 50 个品种，超出部分已忽略`)
+  }
+
+  batchSubmitting.value = true
+  batchResult.value = null
+  try {
+    const res = await commodityApi.submitBatchAnalysis({ symbols: limited })
+    if (res?.success && res.data) {
+      batchResult.value = {
+        batch_id: res.data.batch_id,
+        total: res.data.total,
+        created: res.data.created,
+        failed: res.data.failed,
+        message: res.message || `批量任务已入队`,
+      }
+      ElMessage.success(`批量提交成功: ${res.data.created}/${res.data.total}`)
+      selectedIds.value = []
+    } else {
+      ElMessage.error(res?.message || '批量提交失败')
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '批量提交异常')
+  } finally {
+    batchSubmitting.value = false
+  }
 }
 
 onMounted(async () => {

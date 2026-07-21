@@ -338,7 +338,7 @@ python tests/debug_docker.py
 
 按 [`docs/plans/stock-to-commodity.md`](docs/plans/stock-to-commodity.md) 推进 **"股票 → 大宗商品"改造**。
 
-### 实际状态(2026-07-19)
+### 实际状态(2026-07-21)
 
 | Phase | 范围 | 实际交付 | 未交付 |
 |---|---|---|---|
@@ -346,9 +346,10 @@ python tests/debug_docker.py
 | **Phase 1** | 数据闭环(行情) | ✅ 完成 | - |
 | **Phase 2** | 数据层完备 + 6 类新闻 | ✅ 完成 | - |
 | **Phase 3a** | 路由 + 前端补全 | ✅ 完成 | - |
-| **Phase 3b** | Features 层 + 4 分析师 + 四阶段决策链 | ✅ **全部完成** | - |
-| **Phase 3c** | 异步队列 + 批量任务 + 任务中心优化 | ✅ **完成** | - |
-| **Phase UI** | 前端 UI 全面梳理(2026-07-19) | ✅ **完成** | - |
+| **Phase 3b** | Features 层 + 4 分析师 + 四阶段决策链 | ✅ 完成 | - |
+| **Phase 3c** | 异步队列 + 批量任务 + 任务中心优化 | ✅ 完成 | - |
+| **Phase UI** | 前端 UI 全面梳理(2026-07-19) | ✅ 完成 | - |
+| **Phase Agent** | Agent 层 10 项改进 + 自定义数据分析师 + 前端重设计(2026-07-20) | ✅ 完成 | - |
 
 **Phase 3b 子阶段交付**:
 - **3b-i Features 层**:6 个纯规则模块(technical/basis/inventory/positioning/term_structure/news_sentiment),97 测试全过
@@ -374,6 +375,11 @@ python tests/debug_docker.py
 - **详情页新闻修复**:切换到新闻 tab 时自动触发加载
 - **商品分析图标**: Box→TrendCharts
 
+**Agent 层 10 项改进 + 自定义数据分析师(2026-07-20, commit `7269fedc`)**:
+- **Agent 层 10 项改造**:推理分析 tab 重构 + CIO 结构化展示 + 数据窗口修复(基差/展期 30d,持仓 30 天多日) + 详情页接口修复(库存/持仓支持连续合约,合约列表过滤已到期) + 持仓 UI 重设计(合并表格+前 10 多空对比图+净持仓派生) + 持仓集中度口径修正
+- **自定义数据分析师**:用户上传 Excel/CSV → 接入 commodity 分析链,修复全流程(响应格式/死重/噪音/符号必填/numpy 序列化/UTF-8 编码容错)
+- **前端重设计**:布局/侧边栏/设计 token/Dashboard 重构(commit `144fe2eb`)
+
 ### 关键约束
 - 开发期间**股票/商品并存**,每个 Phase 都能 `docker compose up` 跑通
 - **Feature Flag 渐进开启**:4 个 `FEATURE_COMMODITY_*` 渐进开启
@@ -393,14 +399,26 @@ python tests/debug_docker.py
 
 ### 当前进行中
 
-**分支 `feat/data-analysis-agent`** — 在 commodity 分析链中增加独立的数据分析 agent 节点:
+无活跃 feature 分支。所有已合并分支待清理（见下方"分支清理"）。
 
-- **目标**: 在现有 4 个 L1 analyst(technical/fundamental/position/news)之后,增加一个纯数据驱动的分析 agent,输入 feature 数据,输出独立的数据洞察报告
-- **起点**: 基于现有 analyst 模式(4 个 commodity analyst 的 prompt/schema 模式)
-- **状态**: 分支已创建,待设计实现
-- 详见记忆: [[phase-3b-progress]]
+### 分支清理(2026-07-21)
 
-### 关键教训(2026-07-13 → 2026-07-19)
+以下 8 个分支已全部合并到 `main`，可安全删除：
+
+```
+checkpoint/phase-3c-complete      (2026-07-19, 已合并)
+feat/agent-layer-improvements     (2026-07-19, 已合并)
+feat/commodity-cache-layer        (2026-07-19, 已合并)
+feat/data-analysis-agent          (2026-07-20, 已合并)
+feat/frontend-redesign-20260720   (2026-07-21, 已合并)
+feat/queue-and-stats              (2026-07-18, 已合并)
+feature/news-data-cleanup         (2026-07-18, 已合并)
+feature/news-improvements         (2026-07-18, 已合并)
+```
+
+删除命令：`git branch -d <branch>`（本地）；`git push origin --delete <branch>`（远程，如有）。
+
+### 关键教训(2026-07-13 → 2026-07-21)
 - **代码完成 ≠ 用户可演示**:Phase 1/2 后端能力齐备,但用户无法在浏览器看到任何商品页面 → Phase 3a 纠正
 - **文档必须反映实测**:夸大交付记录比不记录更糟;进度文档以"实测验证"为标准
 - **合约生命周期是结构性盲点**:Phase 3a 审计发现 get_historical_data 忽略 YYMM → 已修复(主力连续 fallback + 280 测试)
@@ -412,4 +430,4 @@ python tests/debug_docker.py
 
 ### 迁移说明
 - plan 原文已从 `~/.claude/plans/encapsulated-forging-hoare.md` 移到本仓库 `docs/plans/stock-to-commodity.md`,跨机器可用
-- plan v6 对应 2026-07-19 状态:Phase 3a-3c + UI 梳理完成,分支 `feat/data-analysis-agent` 已创建
+- plan v7 对应 2026-07-21 状态:Phase 0-3c + UI + Agent 全部完成,所有 feature 分支已合并,待清理

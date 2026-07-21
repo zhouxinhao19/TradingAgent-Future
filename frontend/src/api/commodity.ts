@@ -264,7 +264,7 @@ export const commodityApi = {
     )
   },
 
-  async getInventory(fullSymbol: string, params?: { start_date?: string; end_date?: string }) {
+  async getInventory(fullSymbol: string, params?: { start_date?: string; end_date?: string; no_cache?: boolean }) {
     return ApiClient.get<ApiEnvelope<InventoryResponse>>(
       `/api/commodity/${encodeURIComponent(fullSymbol)}/inventory`,
       params,
@@ -285,14 +285,15 @@ export const commodityApi = {
     )
   },
 
-  async getSpotPrice(date?: string) {
-    return ApiClient.get<ApiEnvelope<BasisResponse>>(`/api/commodity/spot-price`, date ? { date } : undefined)
+  async getSpotPrice(date?: string, noCache = false) {
+    return ApiClient.get<ApiEnvelope<BasisResponse>>(`/api/commodity/spot-price`,
+      { ...(date ? { date } : {}), no_cache: noCache })
   },
 
-  async getBasisHistory(varsList: string[], startDay: string, endDay: string) {
+  async getBasisHistory(varsList: string[], startDay: string, endDay: string, noCache = false) {
     return ApiClient.get<ApiEnvelope<BasisResponse>>(
       `/api/commodity/basis`,
-      { vars_list: varsList.join(','), start_day: startDay, end_day: endDay },
+      { vars_list: varsList.join(','), start_day: startDay, end_day: endDay, no_cache: noCache },
     )
   },
 
@@ -354,10 +355,10 @@ export const commodityApi = {
     return ApiClient.get<ApiEnvelope<DeliveryInfoResponse>>(`/api/commodity/${exchange}/delivery-info`, { date })
   },
 
-  async getHoldingPosition(fullSymbol: string, indicator: string = '成交量', date?: string) {
+  async getHoldingPosition(fullSymbol: string, indicator: string = '成交量', date?: string, noCache = false) {
     return ApiClient.get<ApiEnvelope<HoldingPositionResponse>>(
       `/api/commodity/${encodeURIComponent(fullSymbol)}/holding-position`,
-      { indicator, date },
+      { indicator, date, no_cache: noCache },
     )
   },
 

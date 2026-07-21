@@ -187,13 +187,14 @@ class UnifiedCommodityService:
         symbol: str,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        no_cache: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """库存数据(EM 60 天,99 长期)"""
         await self.initialize()
         provider = self._providers.get("akshare_futures")
         if not provider:
             return None
-        df = await provider.get_inventory(symbol, start_date, end_date)
+        df = await provider.get_inventory(symbol, start_date, end_date, no_cache=no_cache)
         records = _df_to_records(df)
         if records is None:
             return None
@@ -255,13 +256,14 @@ class UnifiedCommodityService:
     async def get_spot_price(
         self,
         date: str,
+        no_cache: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """当日现货价格 + 基差"""
         await self.initialize()
         provider = self._providers.get("akshare_futures")
         if not provider:
             return None
-        df = await provider.get_spot_price(date)
+        df = await provider.get_spot_price(date, no_cache=no_cache)
         records = _df_to_records(df)
         if records is None:
             return None
@@ -272,13 +274,14 @@ class UnifiedCommodityService:
         start_day: str,
         end_day: str,
         vars_list: List[str],
+        no_cache: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """历史基差"""
         await self.initialize()
         provider = self._providers.get("akshare_futures")
         if not provider:
             return None
-        df = await provider.get_basis_history(start_day, end_day, vars_list)
+        df = await provider.get_basis_history(start_day, end_day, vars_list, no_cache=no_cache)
         records = _df_to_records(df)
         if records is None:
             return None
@@ -514,13 +517,14 @@ class UnifiedCommodityService:
         symbol: str,
         indicator: str = "成交量",
         date: Optional[str] = None,
+        no_cache: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """期货成交持仓"""
         await self.initialize()
         provider = self._providers.get("akshare_futures")
         if not provider:
             return None
-        df = await provider.get_holding_position(symbol, indicator=indicator, date=date)
+        df = await provider.get_holding_position(symbol, indicator=indicator, date=date, no_cache=no_cache)
         records = _df_to_records(df)
         if records is None:
             return None

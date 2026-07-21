@@ -69,7 +69,7 @@
                 <el-descriptions-item
                   v-for="(val, mk) in entry.key_metrics"
                   :key="mk"
-                  :label="metricLabel(mk)"
+                  :label="metricLabel(String(mk))"
                 >
                   {{ formatMetric(val) }}
                 </el-descriptions-item>
@@ -218,9 +218,9 @@
 
       <!-- SafetyOverride 高亮 -->
       <el-alert
-        v-if="safetyOverride?.overridden"
-        :title="'⚠️ SafetyOverride 风控硬约束已触发'"
-        type="error"
+        v-if="safetyOverride?.executed || safetyOverride?.overridden"
+        :title="safetyOverrideTitle"
+        :type="safetyOverrideAlertType"
         show-icon
         style="margin-bottom: 12px"
       >
@@ -239,11 +239,21 @@
               </el-tag>
             </p>
             <p v-if="safetyOverride.original_llm_direction">
-              <strong>LLM 原始方向:</strong> {{ safetyOverride.original_llm_direction }}
-              → <strong>覆盖后:</strong> {{ safetyOverride.overridden_action }}
+              <strong>LLM 原始方向:</strong> {{ directionLabel(safetyOverride.original_llm_direction) }}
+              <span v-if="safetyOverride.original_llm_confidence !== undefined">
+                （置信度 {{ formatConfidence(safetyOverride.original_llm_confidence) }}）
+              </span>
+              → <strong>最终裁定:</strong> {{ directionLabel(safetyOverride.overridden_action || safetyOverride.action) }}
+              <span v-if="safetyOverride.overridden_confidence !== undefined">
+                （置信度 {{ formatConfidence(safetyOverride.overridden_confidence) }}）
+              </span>
             </p>
-            <p v-if="safetyOverride.max_position_pct">
+            <p v-if="hasPositionLimit">
               <strong>仓位上限:</strong> {{ safetyOverride.max_position_pct }}%
+              <span v-if="Number(safetyOverride.max_position_pct) === 0">（禁止开仓）</span>
+            </p>
+            <p v-if="safetyOverride.r5_dimensions?.length">
+              <strong>R5 维度:</strong> {{ safetyOverride.r5_dimensions.join('、') }}
             </p>
           </div>
         </template>
@@ -425,7 +435,7 @@ const l2ScenarioList = computed(() => {
   return list
 })
 
-const l2Conflict = computed(() => {
+const l2Conflict = computed<{ type: TagType; text: string } | null>(() => {
   const layers = props.data?.layers
   // 从 L2 原始数据尝试提取 L1_conflict_summary
   const raw = layers?.L2?.raw_summary || ''
@@ -461,8 +471,35 @@ const renderedFinalDecision = computed(() => {
 })
 
 const safetyOverride = computed(() => {
-  return props.data?.layers?.L3?.safety_override || null
+  const so = props.data?.layers?.L3?.safety_override
+  // 空对象（后端未写入数据/旧报告）返回 null，不触发 alert
+  if (!so || typeof so !== 'object' || !Object.keys(so).length || !so.executed) return null
+  return so
 })
+
+const hasPositionLimit = computed(() => {
+  const value = safetyOverride.value?.max_position_pct
+  return value !== undefined && value !== null
+})
+
+const safetyOverrideTitle = computed(() => {
+  const audit = safetyOverride.value
+  if (!audit) return ''
+  if (audit.overridden) return '⚠️ SafetyOverride 风控硬约束已覆盖原始决策'
+  if ((audit.override_rules_triggered || []).length) return '⚠️ SafetyOverride 风控规则已触发，原决策符合约束'
+  return '✅ SafetyOverride 已执行，未改变原始决策'
+})
+
+const safetyOverrideAlertType = computed(() => {
+  const audit = safetyOverride.value
+  if (audit?.overridden || (audit?.override_rules_triggered || []).length) return 'warning'
+  return 'success'
+})
+
+function formatConfidence(value: unknown): string {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? `${(parsed * 100).toFixed(0)}%` : '—'
+}
 
 // ---- CIO 结构化数据（从 L3 cio_memo 或从 final_decision_raw 中解析） ----
 function tryParseCIO(raw: string): Record<string, any> | null {
@@ -512,30 +549,26 @@ const cioRiskCard = computed(() => {
 })
 
 // ---- 辅助函数 ----
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
+
 function directionLabel(action?: string): string {
   const map: Record<string, string> = { long: '做多', short: '做空', hold: '持有', flat: '平仓', bullish: '看多', bearish: '看空', neutral: '中性', skip: '跳过' }
   return map[action || 'hold'] || action || 'hold'
 }
 
-function directionTagType(action?: string): string {
-  const map: Record<string, string> = { long: 'success', short: 'danger', hold: 'info', flat: 'warning', bullish: 'success', bearish: 'danger', neutral: 'info', skip: 'info' }
-  return map[action || 'hold']
+function directionTagType(action?: string): TagType {
+  const map: Record<string, TagType> = { long: 'success', short: 'danger', hold: 'info', flat: 'warning', bullish: 'success', bearish: 'danger', neutral: 'info', skip: 'info' }
+  return map[action || 'hold'] || 'info'
 }
 
-function statusTagType(status?: string): string {
-  const map: Record<string, string> = { degraded: 'warning', skipped: 'info' }
+function statusTagType(status?: string): TagType {
+  const map: Record<string, TagType> = { degraded: 'warning', skipped: 'info' }
   return map[status || ''] || 'info'
 }
 
 function statusLabel(status?: string): string {
   const map: Record<string, string> = { degraded: '降级', skipped: '跳过' }
   return map[status || ''] || status || ''
-}
-
-function confidenceColor(conf: number): string {
-  if (conf >= 0.7) return '#67c23a'
-  if (conf >= 0.4) return '#e6a23c'
-  return '#f56c6c'
 }
 
 function metricLabel(key: string): string {

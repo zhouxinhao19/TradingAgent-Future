@@ -227,13 +227,11 @@ def extract_first_sentence(text: str) -> str:
 
 
 def build_custom_data_context(features: dict) -> str:
-    """从 commodity_features 提取自定义数据上下文段落。
+    """提取用户数据摘要，并明确限制历史时序数据的可推断范围。
 
-    Args:
-        features: commodity_features dict
-
-    Returns:
-        str，格式化的自定义数据上下文段落，无自定义数据时返回空字符串
+    上传解析器当前只提供全量统计、时间范围和前几行样本；这些信息不能
+    证明当前时点的数值或趋势。只有未来 schema 同时提供 latest_observation
+    （或 current_value）与 as_of 时，才允许据此判断当前状态。
     """
     custom_data = features.get("custom_data", {})
     if not isinstance(custom_data, dict) or not custom_data.get("parsed"):
@@ -243,7 +241,55 @@ def build_custom_data_context(features: dict) -> str:
     if not summary_text:
         return ""
 
-    return f"{summary_text}\n"
+    raw_summaries = custom_data.get("raw_summaries")
+    has_verified_current = False
+    is_historical_series = False
+    if isinstance(raw_summaries, list):
+        for summary in raw_summaries:
+            if not isinstance(summary, dict):
+                continue
+            time_columns = summary.get("time_columns")
+            date_range = summary.get("date_range")
+            if (isinstance(time_columns, list) and time_columns) or (
+                isinstance(date_range, dict)
+                and (date_range.get("min") or date_range.get("max"))
+            ):
+                is_historical_series = True
+            has_current_value = (
+                _has_nonempty_value(summary.get("latest_observation"))
+                or _has_nonempty_value(summary.get("current_value"))
+            )
+            if has_current_value and _has_nonempty_value(summary.get("as_of")):
+                has_verified_current = True
+
+    if has_verified_current:
+        guardrail = (
+            "【用户上传数据使用约束】仅可把带 as_of 的 latest_observation/"
+            "current_value 视为对应时点观测；不得把全局统计或样本行冒充当前值。"
+        )
+    elif is_historical_series:
+        guardrail = (
+            "【用户上传数据使用约束】该文件是历史时间序列，但摘要只包含历史统计、"
+            "时间范围和前几行样本。无法获取当前时点数值，无法判断趋势。只能引用"
+            "历史均值、极值、分位数和样本区间；禁止据此声称当前去库/补库、当前上升/"
+            "下降或趋势将延续。"
+        )
+    else:
+        guardrail = (
+            "【用户上传数据使用约束】摘要未提供可验证的当前时点值及 as_of，"
+            "不得推断当前趋势；只能引用摘要中明确给出的统计特征。"
+        )
+
+    return f"{guardrail}\n{summary_text}\n"
+
+
+def _has_nonempty_value(value: Any) -> bool:
+    """判断结构化最新值字段是否真实存在，保留数值 0。"""
+    if value is None or value == "":
+        return False
+    if isinstance(value, (dict, list, tuple, set)):
+        return bool(value)
+    return True
 
 
 __all__ = [

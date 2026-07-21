@@ -802,6 +802,7 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         symbol: str,
         start_date: Optional[Union[str, date]] = None,
         end_date: Optional[Union[str, date]] = None,
+        no_cache: bool = False,
     ) -> Optional[pd.DataFrame]:
         """
         获取库存数据。
@@ -811,9 +812,20 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         Args:
             symbol: 品种代码,如 'A' / '豆一'
             start_date / end_date: 仅 99 期货网支持,em 接口固定返回近 60 个交易日
+            no_cache: True 时跳过磁盘 Parquet 和内存 TTL,直接从 AKShare 拉取
+
+        流程:
+          1. no_cache=True → 删磁盘 + 清内存 → 直接走 AKShare
+          2. 否则照旧走缓存
         """
-        # ── Layer 2+1: Parquet + 内存缓存 ──
-        if self._cache:
+        # ── Layer 2+1: Parquet + 内存缓存(no_cache 旁路) ──
+        if no_cache:
+            if self._cache:
+                # 清磁盘 + 内存,避免下次再读老数据
+                self._cache.delete_inventory(symbol)
+                self._cache.invalidate_mem(f"inventory:")
+            self.logger.info("🔄 get_inventory(%s) no_cache=True,跳过缓存", symbol)
+        elif self._cache:
             cached = self._cache.get_inventory(symbol)
             if cached is not None and not cached.empty:
                 self.logger.debug("📂 库存缓存命中: %s (%d 行)", symbol, len(cached))
@@ -1146,6 +1158,7 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         self,
         date: Union[str, date],
         symbol: Optional[str] = None,
+        no_cache: bool = False,
     ) -> Optional[pd.DataFrame]:
         """
         获取某交易日现货价格 + 基差。
@@ -1153,7 +1166,13 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         改用 futures_spot_price_daily (避开 100ppi.com) 避免超时。
         在 date 参数基础上取前后各 3 天窗口以增加命中率。
         在线失败时回退到本地缓存数据库 (CommodityLocalCacheAdapter)。
+
+        Args:
+            no_cache: True 时跳过缓存(主要用于前端主动刷新)
         """
+        if no_cache and self._cache:
+            self._cache.invalidate_mem(f"spot_price:")
+            self.logger.info("🔄 get_spot_price no_cache=True,清内存缓存")
         # 统一日期格式
         if hasattr(date, "strftime"):
             date_str = date.strftime("%Y%m%d")
@@ -1269,19 +1288,28 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         start_day: Union[str, date],
         end_day: Union[str, date],
         vars_list: List[str],
+        no_cache: bool = False,
     ) -> Optional[pd.DataFrame]:
         """
         获取某段时间的基差值(AKShare: futures_spot_price_daily)。
 
         AKShare 内部可能依赖 100ppi.com 导致超时,故 AKShare 调用设
         10 秒内部超时,超时后立即回退到本地缓存数据库 (CommodityLocalCacheAdapter)。
+
+        Args:
+            no_cache: True 时跳过缓存强制重拉
         """
         start = start_day.strftime("%Y%m%d") if hasattr(start_day, "strftime") else str(start_day)
         end = end_day.strftime("%Y%m%d") if hasattr(end_day, "strftime") else str(end_day)
 
-        # ── Layer 2+1: Parquet 缓存 ──
+        # ── Layer 2+1: Parquet 缓存(no_cache 旁路) ──
         _var = vars_list[0].upper() if vars_list else ""
-        if _var and self._cache:
+        if no_cache:
+            if self._cache and _var:
+                self._cache.delete_basis(_var, start, end)
+                self._cache.invalidate_mem(f"basis:{_var}:")
+            self.logger.info("🔄 get_basis_history(%s, %s~%s) no_cache=True,跳过缓存", _var, start, end)
+        elif _var and self._cache:
             cached = self._cache.get_basis(_var, start, end)
             if cached is not None and not cached.empty:
                 self.logger.debug("📂 基差历史缓存命中: %s [%s~%s]", _var, start, end)
@@ -1800,6 +1828,7 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         symbol: str,
         indicator: str = "成交量",
         date: Union[str, date] = None,
+        no_cache: bool = False,
     ) -> Optional[pd.DataFrame]:
         """
         获取期货成交持仓(AKShare: futures_hold_pos_sina)。
@@ -1808,7 +1837,12 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
             symbol: 商品期货合约, 如 'OI2501'
             indicator: "成交量" / "多单持仓" / "空单持仓"
             date: 交易日 YYYYMMDD
+            no_cache: True 时跳过内存 TTL 强制重拉(持仓目前没磁盘缓存,主要是清内存)
         """
+        if no_cache and self._cache:
+            self._cache.invalidate_mem(f"holding:{symbol}:")
+            self.logger.info("🔄 get_holding_position(%s, %s) no_cache=True,清内存缓存", symbol, indicator)
+
         if not await self._ensure_ak():
             return None
 
