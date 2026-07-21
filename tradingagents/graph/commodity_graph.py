@@ -352,69 +352,308 @@ class CommodityGraphSetup:
         return workflow.compile(checkpointer=checkpointer)
 
 
-def _effective_decision(final_state: Dict[str, Any]) -> Dict[str, Any]:
-    """统一解析最终决策，并对缺失 SafetyOverride 审计的硬风险 fail closed。"""
-    final_decision = final_state.get("final_decision", "")
-    parsed = extract_decision_fields(final_decision)
-    action = parsed["action"]
-    confidence = parsed["confidence"]
+def _effective_research_conclusion(final_state: Dict[str, Any]) -> Dict[str, Any]:
+    """从最终 state 提取研究结论，SafetyOverride 审计优先。
+
+    返回包含策略约束语义的新结构，同时保留 action/confidence 向后兼容。
+    """
+    research_brief = final_state.get("research_brief", "") or final_state.get("final_decision", "")
+    strategy_matrix = final_state.get("strategy_matrix", []) or []
+    fact_cards = final_state.get("fact_cards", []) or []
+    contradiction_map = final_state.get("contradiction_map", []) or []
 
     risk_card = final_state.get("risk_card", {}) or {}
     audit = risk_card.get("safety_override", {}) if isinstance(risk_card, dict) else {}
-    if isinstance(audit, dict) and audit.get("executed") is True:
-        action = normalize_direction(
-            audit.get("overridden_action", audit.get("action", action))
-        )
-        audit_confidence = audit.get(
-            "overridden_confidence", audit.get("confidence", confidence)
+    effective_audit = isinstance(audit, dict) and audit.get("executed") is True
+
+    # 从 SafetyOverride audit 读取策略约束（新语义）
+    risk_tier = audit.get("risk_tier", "?") if effective_audit else "?"
+    allowed = audit.get("allowed_strategies", []) if effective_audit else []
+    forbidden = audit.get("forbidden_strategies", []) if effective_audit else []
+
+    # 向后兼容：仍提取 action/confidence（旧 consumer 不崩溃）
+    from tradingagents.agents.managers.investment_director import extract_decision_fields
+    parsed = extract_decision_fields(research_brief)
+    compat_action = parsed["action"]
+    compat_confidence = parsed["confidence"]
+    if effective_audit:
+        compat_action = normalize_direction(
+            audit.get("overridden_action", audit.get("action", compat_action))
         )
         try:
-            audit_confidence = float(audit_confidence)
-            if 0.0 <= audit_confidence <= 1.0:
-                confidence = audit_confidence
-            else:
-                confidence = 0.0
+            compat_confidence = float(
+                audit.get("overridden_confidence", audit.get("confidence", compat_confidence))
+            )
+            if not 0.0 <= compat_confidence <= 1.0:
+                compat_confidence = 0.0
         except (TypeError, ValueError):
-            confidence = 0.0
-    else:
+            compat_confidence = 0.0
+
+    # 核心叙事：从 research_brief 提取第一段
+    core_narrative = ""
+    if research_brief:
+        lines = research_brief.split("\n")
+        for line in lines:
+            stripped = line.strip().strip("#").strip()
+            if stripped and len(stripped) > 10:
+                core_narrative = stripped[:200]
+                break
+
+    conclusion = {
+        "risk_tier": risk_tier,
+        "allowed_strategies": allowed,
+        "forbidden_strategies": forbidden,
+        "strategy_matrix": strategy_matrix,
+        "core_narrative": core_narrative,
+        "research_brief_raw": research_brief[:500] if research_brief else "",
+        "fact_cards": fact_cards,
+        "contradiction_map": contradiction_map,
+        # 向后兼容
+        "action": compat_action,
+        "confidence": compat_confidence,
+        "reasoning": core_narrative or research_brief[:200] if research_brief else "(CIO 未输出)",
+        "raw_text": research_brief[:500] if research_brief else "",
+    }
+
+    # Fail-closed：SafetyOverride 审计缺失时检测硬风险
+    if not effective_audit:
         risk_assessment = final_state.get("risk_assessment", {}) or {}
         dimensions = risk_assessment.get("dimensions", {})
         if not isinstance(dimensions, dict):
             dimensions = {}
-        has_r5_dimension = any(
-            isinstance(detail, dict) and detail.get("level") == 5
-            for detail in dimensions.values()
+        has_r5 = any(
+            isinstance(d, dict) and d.get("level") == 5
+            for d in dimensions.values()
         )
         composite = risk_assessment.get("composite_risk_level")
         flags = risk_assessment.get("flags", [])
         near_delivery = any(
-            isinstance(flag, dict) and flag.get("name") == "near_delivery"
-            for flag in (flags if isinstance(flags, list) else [])
+            isinstance(f, dict) and f.get("name") == "near_delivery"
+            for f in (flags if isinstance(flags, list) else [])
         )
-        if has_r5_dimension or composite in (5, "R5") or near_delivery:
+        if has_r5 or composite in (5, "R5") or near_delivery:
             logger.error(
                 "[CommodityTradingAgentsGraph|OVERRIDE] SafetyOverride 审计缺失，"
-                "检测到 R5/near_delivery，fail closed 为 flat/0"
+                "检测到 R5/near_delivery，fail closed"
             )
-            action, confidence = "flat", 0.0
+            conclusion.update({
+                "risk_tier": f"R{composite}" if isinstance(composite, int) else "R5",
+                "allowed_strategies": [],
+                "forbidden_strategies": ["单边趋势", "展期收益", "跨期套利", "波动率", "跨品种"],
+                "action": "flat",
+                "confidence": 0.0,
+            })
         elif risk_assessment.get("data_insufficient"):
-            logger.error(
-                "[CommodityTradingAgentsGraph|OVERRIDE] SafetyOverride 审计缺失，"
-                "检测到数据不足，fail closed 为 hold/0"
-            )
-            action, confidence = "hold", 0.0
-        else:
-            logger.error(
-                "[CommodityTradingAgentsGraph|OVERRIDE] commodity 最终 state 缺少 "
-                "safety_override.executed 审计元数据"
-            )
+            conclusion.update({
+                "risk_tier": "?",
+                "allowed_strategies": ["展期收益", "跨期套利", "波动率", "跨品种"],
+                "forbidden_strategies": ["单边趋势"],
+                "action": "hold",
+                "confidence": 0.0,
+            })
 
-    return {
-        "action": action,
-        "confidence": confidence,
-        "reasoning": final_decision or "(CIO 未输出决策)",
-        "raw_text": final_decision or "",
-    }
+    return conclusion
+
+
+# =============================================================================
+# 交易计划 / 最终交易决策派生（纯规则，零 LLM）
+#
+# commodity 决策链在 Phase 4 已简化为「4 分析师 → 推理经理 → 投研总监 → END」，
+# 删除了 stock 路径里写 trader_investment_plan / final_trade_decision 的
+# Trader / Risk Manager 节点。为避免报告出现永久空白模块，这里用投研总监已产出的
+# research_brief / strategy_matrix / risk_card.safety_override / risk_assessment
+# 派生出两份 Markdown（不新增任何 LLM 调用）。
+#
+# 注意：投研总监被 prompt 硬约束「禁止输出交易指令」，因此 final_trade_decision 的
+# 方向/置信度/仓位一律取自规则引擎 SafetyOverride 审计，而非 LLM 文本。
+# =============================================================================
+
+_DERIVED_DISCLAIMER = (
+    "> 本内容由规则引擎自投研总监的策略产出派生，非人工交易指令；"
+    "仅供研究与教学，不构成投资建议。"
+)
+
+_FITNESS_ICON = {
+    "推荐关注": "🟢 推荐关注",
+    "谨慎推荐": "🟡 谨慎推荐",
+    "不推荐": "🔴 不推荐",
+    "数据不足": "⚪ 数据不足",
+}
+
+
+def _get_safety_override(final_state: Dict[str, Any]) -> Dict[str, Any]:
+    """从 final_state 提取 SafetyOverride 审计（与 _effective_research_conclusion 同源）。"""
+    risk_card = final_state.get("risk_card", {}) or {}
+    if not isinstance(risk_card, dict):
+        return {}
+    audit = risk_card.get("safety_override", {})
+    return audit if isinstance(audit, dict) else {}
+
+
+def _render_strategy_matrix_table(strategy_matrix: List[Any]) -> str:
+    """把 5 策略适应性矩阵渲染成 Markdown 管道表格。"""
+    if not strategy_matrix or not isinstance(strategy_matrix, list):
+        return "（策略适应性矩阵数据不可用）"
+    lines = ["| 策略 | 适应性 | 核心判据 |", "| :--- | :--- | :--- |"]
+    for item in strategy_matrix:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("strategy", "?"))
+        fitness = str(item.get("fitness", "?"))
+        fitness_disp = _FITNESS_ICON.get(fitness, fitness)
+        rationale = str(item.get("rationale", "") or "")
+        conditions = item.get("key_conditions", []) or []
+        if isinstance(conditions, list) and conditions:
+            cond_text = "；".join(str(c) for c in conditions)
+            judge = f"{rationale}（{cond_text}）" if rationale else cond_text
+        else:
+            judge = rationale or "-"
+        # 单元格内换行/竖线会破坏表格，做转义
+        judge = judge.replace("\n", " ").replace("|", "/")
+        lines.append(f"| {name} | {fitness_disp} | {judge} |")
+    return "\n".join(lines)
+
+
+def _render_risk_dimensions_table(risk_assessment: Dict[str, Any]) -> str:
+    """把 6 维量化风险矩阵渲染成 Markdown 管道表格。"""
+    if not isinstance(risk_assessment, dict):
+        return ""
+    dimensions = risk_assessment.get("dimensions", {})
+    if not isinstance(dimensions, dict) or not dimensions:
+        return ""
+    lines = ["| 风险维度 | 等级 | 说明 |", "| :--- | :--- | :--- |"]
+    for dim_name, dim in dimensions.items():
+        if not isinstance(dim, dict):
+            continue
+        level = dim.get("level", "?")
+        desc = str(dim.get("reason", dim.get("desc", "")) or "-")
+        desc = desc.replace("\n", " ").replace("|", "/")
+        lines.append(f"| {dim_name} | R{level} | {desc} |")
+    return "\n".join(lines)
+
+
+def _first_narrative_paragraph(research_brief: str) -> str:
+    """取 research_brief 中第一段有效正文（跳过标题行），作为核心叙事。"""
+    if not research_brief:
+        return ""
+    for block in research_brief.split("\n"):
+        stripped = block.strip().lstrip("#").strip()
+        if stripped and len(stripped) > 10 and not stripped.startswith("|"):
+            return stripped[:300]
+    return ""
+
+
+def _compose_trader_plan(final_state: Dict[str, Any]) -> str:
+    """派生「交易计划」Markdown：策略适应性报告全文 + 策略矩阵表 + 风险维度表 + 投研结论摘要。"""
+    full_symbol = final_state.get("full_symbol", "") or "标的"
+    research_brief = final_state.get("research_brief", "") or final_state.get("final_decision", "")
+    strategy_matrix = final_state.get("strategy_matrix", []) or []
+    risk_assessment = final_state.get("risk_assessment", {}) or {}
+    investment_memo = final_state.get("investment_memo", {}) or {}
+
+    parts: List[str] = [f"# {full_symbol} 交易计划", "", _DERIVED_DISCLAIMER, ""]
+
+    # 主体：投研总监的策略适应性报告全文
+    if research_brief:
+        parts.append(research_brief.strip())
+    else:
+        parts.append("（投研总监未产出策略报告）")
+
+    # 附录 A：策略适应性矩阵表
+    parts.extend(["", "## 附录 A · 策略适应性矩阵", "", _render_strategy_matrix_table(strategy_matrix)])
+
+    # 附录 B：量化风险维度
+    risk_table = _render_risk_dimensions_table(risk_assessment)
+    if risk_table:
+        parts.extend(["", "## 附录 B · 量化风险维度", "", risk_table])
+
+    # 附录 C：投研结论摘要
+    conclusion = investment_memo.get("投研结论", {}) if isinstance(investment_memo, dict) else {}
+    if isinstance(conclusion, dict) and conclusion:
+        summary_lines: List[str] = []
+        core_view = conclusion.get("核心观点")
+        if core_view:
+            summary_lines.append(f"- **核心观点**：{core_view}")
+        for label, key in (("推荐关注策略", "推荐关注策略"), ("需规避策略", "需规避策略")):
+            val = conclusion.get(key)
+            if isinstance(val, list) and val:
+                summary_lines.append(f"- **{label}**：{'、'.join(str(v) for v in val)}")
+        signals = conclusion.get("风险信号")
+        if isinstance(signals, list) and signals:
+            summary_lines.append(f"- **风险信号**：{'；'.join(str(s) for s in signals)}")
+        if summary_lines:
+            parts.extend(["", "## 附录 C · 投研结论摘要", ""] + summary_lines)
+
+    return "\n".join(parts).strip()
+
+
+def _compose_final_decision(final_state: Dict[str, Any]) -> str:
+    """派生「最终交易决策」Markdown：方向/置信度/最大仓位/风险等级 + 核心叙事 + 风险点 + 策略约束。
+
+    方向/置信度/仓位一律取自规则引擎 SafetyOverride 审计（投研总监禁止输出交易指令）。
+    """
+    full_symbol = final_state.get("full_symbol", "") or "标的"
+    audit = _get_safety_override(final_state)
+    research_brief = final_state.get("research_brief", "") or final_state.get("final_decision", "")
+
+    # 方向：overridden_action 优先，退回 action
+    raw_action = audit.get("overridden_action", audit.get("action", "hold"))
+    direction = normalize_direction(raw_action)
+    direction_cn = {"long": "做多", "short": "做空", "hold": "持有", "flat": "平仓"}.get(direction, "持有")
+
+    # 置信度：overridden_confidence 优先，退回 confidence
+    try:
+        confidence = float(audit.get("overridden_confidence", audit.get("confidence", 0.0)))
+        if not 0.0 <= confidence <= 1.0:
+            confidence = 0.0
+    except (TypeError, ValueError):
+        confidence = 0.0
+
+    # 最大仓位
+    max_pos_pct = audit.get("max_position_pct")
+    if max_pos_pct is None:
+        mp = audit.get("max_position")
+        max_pos_pct = float(mp) * 100 if isinstance(mp, (int, float)) else None
+
+    risk_tier = audit.get("risk_tier", "?") or "?"
+    allowed = audit.get("allowed_strategies", []) or []
+    forbidden = audit.get("forbidden_strategies", []) or []
+    constraints = audit.get("strategy_constraints", "") or ""
+    rules = audit.get("override_rules_triggered", []) or []
+
+    parts: List[str] = [f"# {full_symbol} 最终交易决策", "", _DERIVED_DISCLAIMER, ""]
+
+    # 核心决策要点
+    parts.append("## 决策要点")
+    parts.append("")
+    parts.append(f"- **方向**：{direction_cn}")
+    parts.append(f"- **置信度**：{confidence:.2f}")
+    if max_pos_pct is not None:
+        parts.append(f"- **建议最大仓位**：{max_pos_pct:.0f}%")
+    parts.append(f"- **风险等级**：{risk_tier}")
+    if isinstance(allowed, list) and allowed:
+        parts.append(f"- **允许策略**：{'、'.join(str(s) for s in allowed)}")
+    if isinstance(forbidden, list) and forbidden:
+        parts.append(f"- **禁止策略**：{'、'.join(str(s) for s in forbidden)}")
+
+    # 核心叙事
+    narrative = _first_narrative_paragraph(research_brief)
+    if narrative:
+        parts.extend(["", "## 核心叙事", "", narrative])
+
+    # 触发的风险规则
+    if isinstance(rules, list) and rules:
+        parts.extend(["", "## 触发的风险规则", ""])
+        parts.extend(f"- {r}" for r in rules)
+
+    # 策略约束说明
+    if constraints and constraints not in ("无额外策略约束",):
+        parts.extend(["", "## 策略约束说明", "", str(constraints)])
+
+    if not audit:
+        parts.extend(["", "> ⚠️ 未获得 SafetyOverride 审计，以上为安全默认值（持有/0 仓位倾向）。"])
+
+    return "\n".join(parts).strip()
 
 
 # === 主类 ===
@@ -619,6 +858,15 @@ class CommodityTradingAgentsGraph(TradingAgentsGraph):
             logger.warning(f"⚠️ build_evidence_chain 失败: {e}")
             final_state["evidence_chain"] = {"summary": {}, "layers": {}, "error": str(e)}
 
+        # Step 10.5: 派生 交易计划 / 最终交易决策（纯规则，零 LLM）
+        # commodity 链路无 Trader/Risk Manager 节点，用投研总监策略产出派生这两份 Markdown，
+        # 避免报告出现永久空白模块。
+        try:
+            final_state["trader_investment_plan"] = _compose_trader_plan(final_state)
+            final_state["final_trade_decision"] = _compose_final_decision(final_state)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"⚠️ 派生 trader_plan/final_decision 失败: {e}")
+
         # 构造决策摘要(CIO 输出在 state['final_decision'])
         decision = self._extract_decision(final_state)
 
@@ -626,8 +874,8 @@ class CommodityTradingAgentsGraph(TradingAgentsGraph):
         return final_state, decision
 
     def _extract_decision(self, final_state: Dict[str, Any]) -> Dict[str, Any]:
-        """从最终 state 提取统一决策，SafetyOverride 审计优先于 Markdown。"""
-        return _effective_decision(final_state)
+        """从最终 state 提取研究结论，SafetyOverride 审计优先。"""
+        return _effective_research_conclusion(final_state)
 
 
 # =============================================================================
@@ -660,19 +908,26 @@ def build_evidence_chain(final_state: Dict[str, Any]) -> Dict[str, Any]:
     registry = final_state.get("analyst_registry", {}) or {}
     features = final_state.get("commodity_features", {}) or {}
     final_decision = final_state.get("final_decision", "")
+    research_brief = final_state.get("research_brief", "") or final_decision
     risk_assessment = final_state.get("risk_assessment", {}) or {}
+    strategy_matrix = final_state.get("strategy_matrix", []) or []
+    fact_cards = final_state.get("fact_cards", []) or []
+    contradiction_map = final_state.get("contradiction_map", []) or []
 
-    # --- 顶层摘要：与 API decision 共用同一安全解析 ---
-    effective = _effective_decision(final_state)
-    action = effective["action"]
-    confidence = effective["confidence"]
+    # --- 顶层摘要：使用新研究结论提取 ---
+    conclusion = _effective_research_conclusion(final_state)
 
     summary = {
         "symbol": symbol,
         "variety": variety,
         "date": trade_date,
-        "final_action": action,
-        "confidence": confidence,
+        "risk_tier": conclusion.get("risk_tier", "?"),
+        "allowed_strategies": conclusion.get("allowed_strategies", []),
+        "forbidden_strategies": conclusion.get("forbidden_strategies", []),
+        "core_narrative": conclusion.get("core_narrative", ""),
+        # 向后兼容
+        "final_action": conclusion.get("action", "hold"),
+        "confidence": conclusion.get("confidence", 0.0),
     }
 
     # --- L1: 4 个 analyst 结构化摘要 ---
@@ -768,22 +1023,29 @@ def build_evidence_chain(final_state: Dict[str, Any]) -> Dict[str, Any]:
         for entry in L1_entries:
             entry["key_metrics"]["data_source"] = "用户上传文件"
 
-    # --- L2: investment_plan 解析 ---
+    # --- L2: investment_plan 解析 + contradiction_map ---
     investment_plan = final_state.get("investment_plan", "")
     L2_data = {"raw": investment_plan[:500] if investment_plan else ""}
     if investment_plan:
         try:
-            parsed = json.loads(investment_plan)
+            # 剥离 markdown 代码块包裹
+            import re
+            plan_text = investment_plan
+            m = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", plan_text, re.DOTALL)
+            if m:
+                plan_text = m.group(1).strip()
+            parsed = json.loads(plan_text)
             L2_data = {
                 "valuation_matrix": parsed.get("估值驱动矩阵", parsed.get("valuation_matrix", [])),
                 "bull_bear_table": parsed.get("多空对照表", parsed.get("bull_bear_table", [])),
                 "scenarios": parsed.get("三种情景推演", parsed.get("scenarios", {})),
+                "contradiction_map": contradiction_map if isinstance(contradiction_map, list) else [],
             }
         except json.JSONDecodeError:
             # 不是标准 JSON（可能是 stock 路径的 Markdown），兜底
             L2_data = {"raw_summary": investment_plan[:300]}
 
-    # --- L3: risk_assessment + safety_override + final_decision + CIO memo ---
+    # --- L3: risk_assessment + safety_override + research_brief + CIO memo ---
     risk_card = final_state.get("risk_card", {})
     safety_override = risk_card.get("safety_override", {})
 
@@ -796,10 +1058,15 @@ def build_evidence_chain(final_state: Dict[str, Any]) -> Dict[str, Any]:
     L3_data = {
         "risk_assessment": risk_assessment if isinstance(risk_assessment, dict) else {},
         "risk_card": risk_card if isinstance(risk_card, dict) else {},
-        "final_decision_raw": final_decision[:500] if final_decision else "",
+        "research_brief_raw": research_brief[:1000] if research_brief else "",
         "safety_override": safety_override if isinstance(safety_override, dict) else {},
         "cio_memo": cio_memo,
         "cio_risk_card": cio_risk_card,
+        "strategy_matrix": strategy_matrix if isinstance(strategy_matrix, list) else [],
+        "fact_cards": fact_cards if isinstance(fact_cards, list) else [],
+        "contradiction_map": contradiction_map if isinstance(contradiction_map, list) else [],
+        # 向后兼容
+        "final_decision_raw": research_brief[:500] if research_brief else "",
     }
 
     return {

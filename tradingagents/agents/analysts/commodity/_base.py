@@ -9,7 +9,7 @@ _base.py — Commodity analyst 公共逻辑 (Phase 3b-ii)
 """
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import re
 
@@ -227,21 +227,84 @@ def extract_first_sentence(text: str) -> str:
 
 
 def build_custom_data_context(features: dict) -> str:
-    """提取用户数据摘要，并明确限制历史时序数据的可推断范围。
+    """提取用户数据摘要，按 feature_dict 是否有切换注入方式（低权重 + 交叉验证）。
 
-    上传解析器当前只提供全量统计、时间范围和前几行样本；这些信息不能
-    证明当前时点的数值或趋势。只有未来 schema 同时提供 latest_observation
-    （或 current_value）与 as_of 时，才允许据此判断当前状态。
+    三态分支:
+      ① parsed=False → ""
+      ② feature_dict 存在 → 新 prompt（"低权重参考 + 交叉验证 + [USER_DATA_CONFLICT] 标注"）
+      ③ 仅 raw_summaries 存在 → 老 guardrail（无结构化观测时的历史序列护栏）
     """
     custom_data = features.get("custom_data", {})
     if not isinstance(custom_data, dict) or not custom_data.get("parsed"):
         return ""
 
+    feature_dict = custom_data.get("feature_dict")
     summary_text = custom_data.get("summary_text", "")
-    if not summary_text:
-        return ""
-
     raw_summaries = custom_data.get("raw_summaries")
+
+    if feature_dict:
+        return _build_feature_dict_context(feature_dict, custom_data)
+    if raw_summaries or summary_text:
+        return _build_legacy_context(summary_text, raw_summaries, features)
+    return ""
+
+
+def _build_feature_dict_context(feature_dict: dict, custom_data: dict) -> str:
+    """feature_dict 存在时的 prompt 注入：低权重 + 交叉验证 + 矛盾标注。"""
+    latest = feature_dict.get("latest", {}) or {}
+    snapshot = feature_dict.get("snapshot", {}) or {}
+    quality = feature_dict.get("quality", {}) or {}
+    signals = feature_dict.get("signals", []) or []
+
+    header = (
+        "【用户上传数据 · 低权重参考】\n"
+        "本数据为用户提供，系统对来源/口径/时点不做保证。引用规则:\n"
+        "  1) 必须与系统 features 中至少 1 个模块交叉验证，方向一致才可引用；\n"
+        "  2) 不得单独作为决策依据；不得仅据此声称当前趋势；\n"
+        "  3) 若与系统数据方向冲突，需在结论中标注 [USER_DATA_CONFLICT]；\n"
+        "  4) 若无 as_of 或 LLM 解析失败，仅可作为背景描述。\n"
+    )
+
+    body_parts: List[str] = []
+    cv = snapshot.get("current_value")
+    if cv is not None:
+        label = snapshot.get("current_value_label") or "值"
+        as_of = snapshot.get("as_of") or "未知"
+        body_parts.append(f"用户提供当前观测 [{label}]={cv} (as_of={as_of})")
+    sp = snapshot.get("self_pctl_180d")
+    if sp is not None:
+        body_parts.append(f"自身历史分位(180d)={float(sp):.0f}%")
+    sm = snapshot.get("system_pctl_180d")
+    if sm is not None:
+        mm = snapshot.get("matched_module") or "?"
+        delta = snapshot.get("delta_pctl")
+        delta_text = f" (差={float(delta):.0f}%)" if delta is not None else ""
+        body_parts.append(
+            f"对应系统模块 [{mm}] 分位={float(sm):.0f}%{delta_text}"
+        )
+
+    body = "\n".join(f"- {line}" for line in body_parts) or "- (无可用观测)"
+
+    signal_text = ""
+    if signals:
+        signal_text = "\n系统解读:\n" + "\n".join(f"  · {s}" for s in signals[:3])
+
+    quality_text = ""
+    reason = quality.get("reason")
+    if reason:
+        quality_text = f"\n数据质量提示: {reason}"
+    if not quality.get("has_as_of", True):
+        quality_text += "\n⚠️ 缺少 as_of, 本数据仅可作背景, 不可作当前趋势依据。"
+
+    return f"{header}\n当前观测:\n{body}{signal_text}{quality_text}"
+
+
+def _build_legacy_context(
+    summary_text: str,
+    raw_summaries: Any,
+    features: dict,
+) -> str:
+    """老 guardrail 行为（无结构化观测，沿用历史时序护栏）。"""
     has_verified_current = False
     is_historical_series = False
     if isinstance(raw_summaries, list):
@@ -280,7 +343,12 @@ def build_custom_data_context(features: dict) -> str:
             "不得推断当前趋势；只能引用摘要中明确给出的统计特征。"
         )
 
-    return f"{guardrail}\n{summary_text}\n"
+    comparison_lines = _build_cross_market_comparison(features, raw_summaries)
+    comparison_text = (
+        "\n【跨市场比价】\n" + "\n".join(comparison_lines) + "\n"
+    ) if comparison_lines else ""
+
+    return f"{guardrail}\n{summary_text}\n{comparison_text}"
 
 
 def _has_nonempty_value(value: Any) -> bool:
@@ -290,6 +358,455 @@ def _has_nonempty_value(value: Any) -> bool:
     if isinstance(value, (dict, list, tuple, set)):
         return bool(value)
     return True
+
+
+# =============================================================================
+# 自定义数据跨市场对比（修改点 5）
+# =============================================================================
+
+
+def _match_system_module(summary: Dict[str, Any]) -> Optional[str]:
+    """根据上传文件列名/标签推断对应的系统模块。
+
+    返回: "inventory" / "basis" / "positioning" / None
+    """
+    label = str(summary.get("label", "")).lower()
+    columns = [str(c).lower() for c in summary.get("columns", [])]
+    text = f"{label} {' '.join(columns)}"
+    if any(kw in text for kw in ("库存", "inventory", "stock", "warehouse", "仓单")):
+        return "inventory"
+    if any(kw in text for kw in ("价格", "price", "现货", "spot", "基差", "basis")):
+        return "basis"
+    if any(kw in text for kw in ("持仓", "position", "oi", "open_interest", "净多", "净空")):
+        return "positioning"
+    return None
+
+
+def _estimate_percentile_from_summary(latest_obs: Any, summary: Dict[str, Any]) -> Optional[float]:
+    """从摘要的 min/max/mean 估算自定义数据当前值在自身历史中的分位。"""
+    try:
+        val = float(latest_obs)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    stats = summary.get("statistics", {}) if isinstance(summary.get("statistics"), dict) else {}
+    lo = stats.get("min")
+    hi = stats.get("max")
+    try:
+        lo_f = float(lo) if lo is not None else None
+        hi_f = float(hi) if hi is not None else None
+    except (TypeError, ValueError):
+        return None
+    if lo_f is not None and hi_f is not None and hi_f > lo_f:
+        return (val - lo_f) / (hi_f - lo_f) * 100
+    return None
+
+
+def _get_system_latest(features: Dict[str, Any], module: str) -> Any:
+    """从 features 中取系统模块的最新值（不做方向判断，只取原始数值）。"""
+    block = features.get(module, {})
+    if not isinstance(block, dict):
+        return None
+    snap = block.get("snapshot", {})
+    if not isinstance(snap, dict):
+        return None
+    if module == "inventory":
+        return snap.get("inventory_value")
+    if module == "basis":
+        return snap.get("near_basis_rate") or snap.get("basis_pctl_180d")
+    if module == "positioning":
+        return snap.get("crowding_pctl_180d")
+    return None
+
+
+def _get_system_percentile(features: Dict[str, Any], module: str) -> Optional[float]:
+    """从 features 中取系统模块的分位数（0-100）。"""
+    block = features.get(module, {})
+    if not isinstance(block, dict):
+        return None
+    snap = block.get("snapshot", {})
+    if not isinstance(snap, dict):
+        return None
+    if module == "inventory":
+        return snap.get("inventory_pctl_180d")
+    if module == "positioning":
+        return snap.get("crowding_pctl_180d")
+    if module == "basis":
+        return snap.get("basis_pctl_180d")
+    return None
+
+
+def _build_cross_market_comparison(
+    features: Dict[str, Any],
+    raw_summaries: List[Any],
+) -> List[str]:
+    """构建自定义数据与系统数据的跨市场比价行。"""
+    lines: List[str] = []
+    for summary in (raw_summaries or []):
+        if not isinstance(summary, dict):
+            continue
+        latest_obs = summary.get("latest_observation") or summary.get("current_value")
+        as_of = summary.get("as_of")
+        if not (_has_nonempty_value(latest_obs) and _has_nonempty_value(as_of)):
+            continue
+
+        matched = _match_system_module(summary)
+        if not matched:
+            continue
+
+        custom_pctl = _estimate_percentile_from_summary(latest_obs, summary)
+        sys_pctl = _get_system_percentile(features, matched)
+
+        label = summary.get("label") or summary.get("name", "自定义数据")
+        pct_str = ""
+        if custom_pctl is not None and sys_pctl is not None:
+            diff = custom_pctl - sys_pctl
+            relative = "高位" if diff > 20 else "低位" if diff < -20 else "一致"
+            pct_str = (
+                f"自身历史分位={custom_pctl:.0f}%, "
+                f"系统{matched}分位={sys_pctl:.0f}%, "
+                f"跨数据比价: 自定义数据处于相对{relative}"
+            )
+        elif custom_pctl is not None:
+            pct_str = f"自身历史分位={custom_pctl:.0f}% (无系统分位对比)"
+
+        line = (
+            f"[FACT-CUSTOM] {label} 最新值={latest_obs}"
+            f"({'  ' + pct_str if pct_str else '无可用分位'})"
+        )
+        lines.append(line)
+    return lines
+
+
+# =============================================================================
+# 事实卡片 — 从 features 提取关键数值事实
+# =============================================================================
+
+
+def _nested(obj: Any, *keys: str, default: Any = None) -> Any:
+    """安全嵌套取值，不存在返回 default。"""
+    for key in keys:
+        if not isinstance(obj, dict):
+            return default
+        obj = obj.get(key)
+        if obj is None:
+            return default
+    return obj
+
+
+def _fmt(val: Any, unit: str = "") -> str:
+    """格式化数值用于陈述。"""
+    if val is None:
+        return "N/A"
+    try:
+        f = float(val)
+        if abs(f) >= 1e4:
+            return f"{f:.0f}{unit}"
+        if abs(f) >= 1:
+            return f"{f:.2f}{unit}"
+        return f"{f:.4f}{unit}"
+    except (TypeError, ValueError):
+        return str(val)
+
+
+def build_fact_cards(
+    features: Dict[str, Any],
+    position_structured: Optional[Dict[str, Any]] = None,
+) -> List[Dict[str, Any]]:
+    """从 commodity_features 各模块中提取关键数值事实。
+
+    每个模块提取 1-3 个可验证的事实卡片，格式:
+    {
+        "id": "FACT-INV-001",
+        "module": "inventory",
+        "statement": "SHFE铜库存周降 8,758吨，处于 1.5% 历史分位",
+        "metric": "inventory_value",
+        "value": 89000,
+        "unit": "吨",
+        "percentile": 1.5,
+        "source": "AKShare",
+        "direction": "bullish",
+    }
+    """
+    cards: List[Dict[str, Any]] = []
+    counter: Dict[str, int] = {
+        "technical": 0, "basis": 0, "inventory": 0,
+        "positioning": 0, "term_structure": 0, "news_sentiment": 0,
+    }
+    seq = 0
+
+    if not isinstance(features, dict):
+        return cards
+
+    # ---- 1. Technical ----
+    tech = features.get("technical", {})
+    if isinstance(tech, dict):
+        snap = _nested(tech, "main_continuous", "daily", "snapshot")
+        combined = tech.get("combined", {})
+        if isinstance(snap, dict):
+            score = snap.get("composite_score")
+            trend = snap.get("trend")
+            if score is not None:
+                seq += 1
+                counter["technical"] += 1
+                cards.append({
+                    "id": f"FACT-TECH-{seq:03d}",
+                    "module": "technical",
+                    "statement": f"技术综合评分={_fmt(score)}，趋势={trend or '未知'}",
+                    "metric": "composite_score",
+                    "value": score,
+                    "unit": "",
+                    "source": "features.technical",
+                    "direction": "bullish" if isinstance(score, (int, float)) and score > 0 else "bearish" if isinstance(score, (int, float)) and score < 0 else "neutral",
+                })
+            vol = combined.get("volatility", {})
+            if isinstance(vol, dict):
+                atr = vol.get("atr_ratio_pctl180")
+                regime = vol.get("regime")
+                if atr is not None:
+                    seq += 1
+                    direction = ("bearish" if isinstance(regime, str) and regime.lower() == "high"
+                                  else "neutral")
+                    cards.append({
+                        "id": f"FACT-TECH-{seq:03d}",
+                        "module": "technical",
+                        "statement": f"ATR比率分位={_fmt(atr, '%')}，波动率区间={regime or '未知'}",
+                        "metric": "atr_ratio_pctl180",
+                        "value": atr,
+                        "unit": "%",
+                        "source": "features.technical",
+                        "direction": direction,
+                    })
+
+        oi_div = combined.get("oi_divergence")
+        if oi_div:
+            seq += 1
+            direction = "bullish" if oi_div == "confirm" else "bearish"
+            cards.append({
+                "id": f"FACT-TECH-{seq:03d}",
+                "module": "technical",
+                "statement": f"价仓关系={oi_div}",
+                "metric": "oi_divergence",
+                "value": oi_div,
+                "unit": "",
+                "source": "features.technical",
+                "direction": direction,
+            })
+
+    # ---- 2. Basis ----
+    basis = features.get("basis", {})
+    if isinstance(basis, dict):
+        latest = basis.get("latest", {})
+        if isinstance(latest, dict):
+            near_rate = latest.get("near_basis_rate")
+            if near_rate is not None:
+                seq += 1
+                direction = ("bullish" if isinstance(near_rate, (int, float)) and near_rate > 0
+                              else "bearish")
+                cards.append({
+                    "id": f"FACT-BASIS-{seq:03d}",
+                    "module": "basis",
+                    "statement": f"近月基差率={_fmt(near_rate)}",
+                    "metric": "near_basis_rate",
+                    "value": near_rate,
+                    "unit": "",
+                    "source": "features.basis",
+                    "direction": direction,
+                })
+            dom_rate = latest.get("dom_basis_rate")
+            if dom_rate is not None:
+                seq += 1
+                cards.append({
+                    "id": f"FACT-BASIS-{seq:03d}",
+                    "module": "basis",
+                    "statement": f"远月基差率={_fmt(dom_rate)}",
+                    "metric": "dom_basis_rate",
+                    "value": dom_rate,
+                    "unit": "",
+                    "source": "features.basis",
+                    "direction": "neutral",
+                })
+        snap = basis.get("snapshot", {})
+        if isinstance(snap, dict):
+            pctl = snap.get("basis_pctl_180d")
+            if pctl is not None:
+                seq += 1
+                direction = ("bullish" if isinstance(pctl, (int, float)) and pctl > 50
+                              else "bearish")
+                cards.append({
+                    "id": f"FACT-BASIS-{seq:03d}",
+                    "module": "basis",
+                    "statement": f"基差历史分位(180d)={_fmt(pctl, '%')}",
+                    "metric": "basis_pctl_180d",
+                    "value": pctl,
+                    "unit": "%",
+                    "source": "features.basis",
+                    "direction": direction,
+                })
+
+    # ---- 3. Inventory ----
+    inv = features.get("inventory", {})
+    if isinstance(inv, dict):
+        snap = inv.get("snapshot", {})
+        if isinstance(snap, dict):
+            value = snap.get("inventory_value")
+            change = snap.get("weekly_change")
+            pctl = snap.get("inventory_pctl_180d")
+            if value is not None:
+                seq += 1
+                direction = ("bullish" if isinstance(pctl, (int, float)) and pctl < 30
+                              else "bearish" if isinstance(pctl, (int, float)) and pctl > 70
+                              else "neutral")
+                change_text = f"，周变化={_fmt(change)}" if change is not None else ""
+                cards.append({
+                    "id": f"FACT-INV-{seq:03d}",
+                    "module": "inventory",
+                    "statement": f"库存={_fmt(value)}万{change_text}，分位={_fmt(pctl, '%') if pctl is not None else 'N/A'}",
+                    "metric": "inventory_value",
+                    "value": value,
+                    "unit": "万",
+                    "percentile": pctl,
+                    "source": "features.inventory",
+                    "direction": direction,
+                })
+
+    # ---- 4. Positioning ----
+    pos = features.get("positioning", {})
+    if isinstance(pos, dict):
+        snap = pos.get("snapshot", {})
+        top_positions = pos.get("top_positions", [])
+        if isinstance(snap, dict):
+            long_pct = snap.get("long_pct")
+            short_pct = snap.get("short_pct")
+            pctl = snap.get("crowding_pctl_180d")
+            if long_pct is not None and short_pct is not None:
+                seq += 1
+                long_f = float(long_pct)
+                short_f = float(short_pct)
+                direction = "bullish" if long_f > short_f else "bearish"
+                cards.append({
+                    "id": f"FACT-POSN-{seq:03d}",
+                    "module": "positioning",
+                    "statement": f"多空比={long_f:.1f}%/{short_f:.1f}%，拥挤分位={_fmt(pctl, '%') if pctl is not None else 'N/A'}",
+                    "metric": "long_pct",
+                    "value": long_f,
+                    "unit": "%",
+                    "percentile": pctl,
+                    "source": "features.positioning",
+                    "direction": direction,
+                })
+        if isinstance(top_positions, list) and top_positions:
+            seq += 1
+            top_str = "; ".join(
+                f"{p.get('rank','?')}:{p.get('long_pct',0):.0f}%" if isinstance(p, dict) else str(p)
+                for p in top_positions[:3]
+            )
+            cards.append({
+                "id": f"FACT-POSN-{seq:03d}",
+                "module": "positioning",
+                "statement": f"前{len(top_positions[:3])}席位: {top_str}",
+                "metric": "top_positions",
+                "value": top_positions[:3] if isinstance(top_positions, list) else [],
+                "unit": "",
+                "source": "features.positioning",
+                "direction": "neutral",
+            })
+
+    # ---- 5. Term Structure ----
+    ts = features.get("term_structure", {})
+    if isinstance(ts, dict):
+        snap = ts.get("snapshot", {})
+        if isinstance(snap, dict):
+            structure = snap.get("structure")
+            carry = snap.get("carry_score")
+            if structure:
+                seq += 1
+                direction = ("bullish" if isinstance(structure, str) and "backwardation" in structure.lower()
+                              else "bearish" if isinstance(structure, str) and "contango" in structure.lower()
+                              else "neutral")
+                cards.append({
+                    "id": f"FACT-TS-{seq:03d}",
+                    "module": "term_structure",
+                    "statement": f"期限结构={structure}，carry_score={_fmt(carry) if carry is not None else 'N/A'}",
+                    "metric": "structure",
+                    "value": structure,
+                    "unit": "",
+                    "source": "features.term_structure",
+                    "direction": direction,
+                })
+
+    # ---- 6. News Sentiment ----
+    ns = features.get("news_sentiment", {})
+    if isinstance(ns, dict):
+        composite_score = ns.get("composite_score")
+        if composite_score is not None:
+            seq += 1
+            direction = ("bullish" if isinstance(composite_score, (int, float)) and composite_score > 0
+                          else "bearish" if isinstance(composite_score, (int, float)) and composite_score < 0
+                          else "neutral")
+            cards.append({
+                "id": f"FACT-NEWS-{seq:03d}",
+                "module": "news_sentiment",
+                "statement": f"新闻情感综合评分={_fmt(composite_score)}",
+                "metric": "composite_score",
+                "value": composite_score,
+                "unit": "",
+                "source": "features.news_sentiment",
+                "direction": direction,
+            })
+
+    # ---- 7. Custom Data（用户上传数据，低权重参考） ----
+    custom_data = features.get("custom_data", {}) if isinstance(features, dict) else {}
+    feature_dict = custom_data.get("feature_dict") if isinstance(custom_data, dict) else None
+    if isinstance(feature_dict, dict):
+        seq += 1
+        snapshot = feature_dict.get("snapshot", {}) or {}
+        cards.append({
+            "id": f"FACT-CUSTOM-{seq:03d}",
+            "module": "custom_data",
+            "statement": (
+                f"用户上传数据 [{snapshot.get('current_value_label', '值')}]"
+                f"={snapshot.get('current_value', 'N/A')}, "
+                f"as_of={snapshot.get('as_of', '未知')}, "
+                f"自身分位={snapshot.get('self_pctl_180d', 'N/A')}%"
+            ),
+            "metric": "current_value",
+            "value": snapshot.get("current_value"),
+            "unit": "",
+            "percentile": snapshot.get("self_pctl_180d"),
+            "source": "features.custom_data",
+            "direction": feature_dict.get("_direction", "neutral"),
+        })
+
+    return cards
+
+
+def _build_contradiction_map(
+    fact_cards: List[Dict[str, Any]],
+) -> List[Dict[str, str]]:
+    """基于事实卡片的方向对立关系自动构建矛盾地图。
+
+    规则：只有同属不同模块、方向相反（bullish vs bearish）的事实卡片对才构成矛盾。
+    至少需要矛盾双方各有 ≥1 个事实。
+    """
+    bullish = [c for c in fact_cards if c.get("direction") == "bullish"]
+    bearish = [c for c in fact_cards if c.get("direction") == "bearish"]
+
+    contradictions: List[Dict[str, str]] = []
+    seen_pairs: set = set()
+    for b_card in bullish:
+        for br_card in bearish:
+            if b_card["module"] == br_card["module"]:
+                continue
+            pair_key = f"{b_card['module']}|{br_card['module']}"
+            if pair_key in seen_pairs:
+                continue
+            seen_pairs.add(pair_key)
+            contradictions.append({
+                "利多": f"{b_card['id']}: {b_card['statement']} [{b_card['module']}]",
+                "利空": f"{br_card['id']}: {br_card['statement']} [{br_card['module']}]",
+                "矛盾": f"{br_card['module']}偏空 vs {b_card['module']}偏多",
+            })
+    return contradictions[:6]
 
 
 __all__ = [
@@ -306,6 +823,8 @@ __all__ = [
     "inject_analyst_id",
     "extract_first_sentence",
     "build_custom_data_context",
+    "build_fact_cards",
+    "_build_contradiction_map",
     "ANALYST_PREFIXES",
     "ANALYST_CN_NAMES",
 ]

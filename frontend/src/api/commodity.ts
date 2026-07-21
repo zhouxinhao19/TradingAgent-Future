@@ -126,9 +126,10 @@ export interface RowsResponse<T = Record<string, unknown>> {
   count: number
   // 仓单/持仓排名可能按品种分组
   by_variety?: Record<string, T[]>
-  // 持仓排名(前端合并)增加 symbol + totals 字段
+  // 持仓排名(前端合并)增加 symbol + totals + date 字段
   symbol?: string
   totals?: Record<string, number>
+  date?: string
 }
 
 export interface InventoryResponse extends RowsResponse {

@@ -1,10 +1,12 @@
 # 商品期货多智能体分析链路 — 完整实施文档
 
-> 版本: v2 (2026-07-21)
+> 版本: v2.1 (2026-07-21)
 >
 > 范围: `TradingAgent-CN` 项目从股票向大宗商品期货改造所实现的端到端多智能体分析链路,覆盖 **数据层 → 特征层 → L1 分析师 → L2 推理分析师 → L3 CIO → SafetyOverride 风控二审**。
 >
 > 代码基线: Phase 0–3b + Phase UI + Phase Agent 全部已合并(`fix/agent-data-layer-optimization` 分支,合并日期 2026-07-21)。
+>
+> **v2.1 变更**: 拆分 §4 为"两条平行路径"(Adapter 注入决策链 vs Engine 独立分析页),补全 `custom_data_adapter.py` 说明;新增"当前实现局限"实测记录(COMEX 库存案例 4 个 LLM 全部忽略上传数据),标注 🚧 待重构项,指向实施计划。
 
 ---
 
@@ -434,7 +436,20 @@ from tradingagents.features.commodity import (
 
 ## 4. 自定义数据分析师 (用户上传 Excel/CSV)
 
-文件目录: `tradingagents/agents/custom_data/`
+文件目录: `tradingagents/agents/custom_data/` + `tradingagents/features/custom_data_adapter.py`
+
+### 4.0 两条平行路径（重要）
+
+用户上传的数据有 **两条独立的处理路径**，容易被混淆：
+
+| 路径 | 入口 | 是否有 LLM | 消费方 | 文件 |
+|---|---|---|---|---|
+| **A. Adapter 路径（决策链）** | `_run_commodity_analysis` 内部调用 | ❌ 同步解析，0 LLM | 4 个 L1 分析师 + L2 + L3 | `tradingagents/features/custom_data_adapter.py` |
+| **B. Engine 路径（独立分析页）** | `/api/commodity/custom-data/analyze` | ✅ 调 LLM 生成独立报告 | `CustomDataAnalysis.vue` 单页渲染 | `tradingagents/agents/custom_data/engine.py` |
+
+路径 A 是 Phase Agent 改造引入的，目的是把用户私有数据自动接入决策链；路径 B 是早期为"自定义数据分析师"独立页面保留的，仍在用。**当前只有路径 B 调用 LLM**，路径 A 仅做结构化摘要。
+
+---
 
 ### 4.1 模块分层 (模态无关架构)
 
@@ -448,9 +463,10 @@ from tradingagents.features.commodity import (
 | `summarizers/tabular_summarizer.py` | `TabularSummarizer.summarize() → {type, source, overview{rows, columns, missing_cells, missing_ratio}, columns[{name, dtype, missing}], statistics{p5/p25/p50/p75/p95/mean/std/min/max}, time_columns, date_range, sample: 前 5 行, warnings}` |
 | `skills/registry.py` | `SkillsRegistry` 从 `definitions/*.md` 加载所有 skill, 按 `__index__.json` 顺序 |
 | `skills/loader.py` | `load_skill_from_md(path)` (解析 YAML frontmatter + body prompt 模板, 支持 `{data_summary} / {user_context} / {content_types} / {skill_name} / {title}` 占位符) |
-| `engine.py` | 入口 `run_analysis(file_paths, skill_name, llm, ...)` + `AnalysisResult{success, skill_name, file_count, content_types, data_summary, report, fallback, error}` |
+| `engine.py` | **路径 B 入口** `run_analysis(file_paths, skill_name, llm, ...)` + `AnalysisResult{success, skill_name, file_count, content_types, data_summary, report, fallback, error}` |
+| `features/custom_data_adapter.py` | **路径 A 入口** `parse_custom_data(file_paths, skill_name, user_context) → {parsed, summary_text, raw_summaries, file_count, file_names, content_type, skill_name, user_context, error}` (同步、**无 LLM**) |
 
-### 4.2 五步接入流程 (`engine.run_analysis`)
+### 4.2 五步接入流程（路径 B — `engine.run_analysis`）
 
 1. **Reader 派发**: 按文件扩展名查 `ReaderRegistry._readers` → `reader.read(path)` → 失败累积到 `errors` → `contents` 为空返回 `success=False`
 2. **Summarizer 派发**: 每个 Content 调 `SummarizerRegistry.summarize(c)` → 输出 JSON 摘要
@@ -458,11 +474,24 @@ from tradingagents.features.commodity import (
 4. **Prompt 构造**: `skill.render(data_summary=json.dumps(summaries), user_context, content_types)`; `max_summary_chars=20000` 自动截断到前 N 个文件 (默认 3)
 5. **LLM 调用与降级**: `llm.invoke([HumanMessage])` → JSON 解析; 失败 → `_fallback_report` (纯数据概览 + "_LLM 可用后可重新提交_") → `fallback=True`; `llm=None` 直接走兜底
 
-### 4.3 接入 L1 分析师的桥梁
+### 4.3 接入 L1 分析师的桥梁（路径 A — `parse_custom_data`）
 
-`build_custom_data_context(features)` (`_base.py`) 从 `features['custom_data']` 提取 `summary_text`, 在每个 L1 分析师 prompt 的 `## 用户上传数据参考\n{custom_data_context}` 段落注入。Propagator 在 `auto_features` 阶段把用户的 Excel/CSV 经过 `run_analysis` 跑出 `data_summary`, 再以 `summary_text` 形式挂到 `commodity_features.custom_data`, **4 个 commodity 分析师 + research_manager + investment_director 都消费这个字段**, 把"用户私有数据"和"产业链 features"在同一 prompt 里并置。
+`build_custom_data_context(features)` (`tradingagents/agents/analysts/commodity/_base.py`) 从 `features['custom_data']` 提取 `summary_text`, 在每个 L1 分析师 prompt 的 `## 用户上传数据参考\n{custom_data_context}` 段落注入。
 
-**扩展新模态 (PDF/图片)**: 写 `content/pdf.py` 继承 `Content` + `readers/pdf_reader.py` 实现 `read()` + `summarizers/pdf_summarizer.py` + `ReaderRegistry.register(".pdf", PdfReader)` 即可, 引擎零修改。
+**调用链**：`_run_commodity_analysis` (`app/routers/commodity/analysis.py:440-458`) → `parse_custom_data()` → `commodity_features["custom_data"]` → `CommodityTradingAgentsGraph.propagate` → 4 个 L1 分析师 + `research_manager` + `investment_director` 都调 `build_custom_data_context` 注入。
+
+**当前实现局限**（2026-07-21 实测，CU.SHF + COMEX 库存历史案例）：`parse_custom_data` 仅产出纯文本统计摘要（行数/列名/均值/标准差/最大最小/p5-p95 分位），**不提取"最后一行"作为当前观测值**。`_base.py::build_custom_data_context` 因此判定 `is_historical_series=True`，触发"无法获取当前时点数值，禁止据此声称当前趋势"的 guardrail。**4 个 L1 分析师全部在 prompt 里明确写"未纳入当前分析"**，用户上传的数据实际上**未参与决策**。
+
+> **🚧 待重构**：设计目标是把自定义数据提升为决策链的**一等 feature 模块**（同 inventory / basis 级别）：
+> - 自动识别模块类型（inventory / basis / price / positioning）
+> - 提取最后一行作为 `latest.value` + `as_of`
+> - 计算自身历史分位（own_percentile_180d）
+> - 与对应系统模块做跨市场对比（cross_market）
+> - 输出标准 `{latest, stats, signals, snapshot, quality}` schema
+> - 无需用户填 `skill_name` / `user_context`
+> 详见 `~/.claude/plans/shiny-stirring-leaf.md`（实施待启动）。
+
+**扩展新模态 (PDF/图片)**: 写 `content/pdf.py` 继承 `Content` + `readers/pdf_reader.py` 实现 `read()` + `summarizers/pdf_summarizer.py` + `ReaderRegistry.register(".pdf", PdfReader)` 即可, **路径 B 引擎零修改**；路径 A 需额外扩展 `custom_data_adapter.py::parse_custom_data` 的解析分支。
 
 ---
 

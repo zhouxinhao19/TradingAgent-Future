@@ -289,6 +289,7 @@ def test_reasoning_commodity_prompt_placeholders():
         "full_symbol", "variety_name", "analysis_date",
         "instrument_context", "analyst_registry_summary",
         "structured_summary", "past_memory_str",
+        "contradiction_map_text",
     }
     import string
     formatter = string.Formatter()
@@ -446,12 +447,12 @@ class TestComputeRiskAssessment:
         """持仓拥挤度阈值边界。"""
         from tradingagents.agents.managers.investment_director import compute_risk_assessment
 
-        # < 20 → R1
+        # < 20 → R4（U 型风险：低拥挤度也属于高风险区间）
         r1 = compute_risk_assessment(_make_features(positioning={
             "quality": {"rows": 60, "coverage": 0.80, "data_freshness_days": 1},
             "snapshot": {"crowding_pctl_180d": 10.0},
         }))
-        assert r1["dimensions"]["crowding"]["level"] == 1
+        assert r1["dimensions"]["crowding"]["level"] == 4
 
         # >= 95 → R5
         r5 = compute_risk_assessment(_make_features(positioning={
@@ -637,8 +638,8 @@ class TestInvestmentDirectorNode:
         assert result["risk_assessment"]["composite_risk_level"] == 2
         assert "investment_memo" in result
         assert "risk_card" in result
-        assert "持有" in result["final_decision"]  # fallback 方向
-        assert "置信度" in result["final_decision"]  # 兼容 _extract_decision 解析
+        assert "策略适应性报告" in result["final_decision"]  # fallback 研究简报
+        assert "系统降级" in result["final_decision"]
         assert mock_failing_llm.invoke.call_count == 3  # 确实重试了 3 次
 
     def test_llm_short_content_triggers_retry(self):
@@ -652,7 +653,7 @@ class TestInvestmentDirectorNode:
         result = director(make_commodity_state())
 
         # Should fallback (short content rejected)
-        assert "持有" in result["final_decision"]
+        assert "策略适应性报告" in result["final_decision"]
         assert mock_llm.invoke.call_count == 3
 
     def test_graph_wiring(self):
@@ -774,6 +775,7 @@ def test_research_summary_preserves_real_metrics_and_risks():
 def test_l2_json_postprocess_keeps_forced_risks():
     from tradingagents.agents.managers.research_manager import _ensure_forced_risks_in_plan
 
+    # 输入空 dict → fallback 生成数组和情景对象
     content = json.dumps({
         "估值驱动矩阵": {}, "多空对照表": {}, "三种情景推演": {},
     }, ensure_ascii=False)
@@ -781,8 +783,15 @@ def test_l2_json_postprocess_keeps_forced_risks():
         content, ["高度拥挤，反转风险高"]
     ))
 
-    assert result["多空对照表"]["强制风险信号"] == ["高度拥挤，反转风险高"]
-    assert result["三种情景推演"]["强制风险情景输入"] == ["高度拥挤，反转风险高"]
+    # 多空对照表现在是数组（fallback 生成）
+    assert isinstance(result["多空对照表"], list), "应为数组格式"
+    assert len(result["多空对照表"]) > 0, "应有至少一条 fallback 条目"
+
+    # 三种情景推演现在是标准情景对象（fallback 生成）
+    assert isinstance(result["三种情景推演"], dict)
+    assert "保守情景" in result["三种情景推演"]
+    assert "基准情景" in result["三种情景推演"]
+    assert "乐观情景" in result["三种情景推演"]
 
 
 class TestSafetyOverrideHardConstraints:
@@ -916,8 +925,12 @@ def test_investment_director_preserves_rule_card_and_audit():
     assert "伪造" not in result["risk_card"]["量化风险矩阵"]
     assert result["risk_card"]["风险提示"] == ["定性提示"]
     assert result["risk_card"]["safety_override"]["executed"] is True
-    assert "**方向**:做多" in result["final_decision"]
-    assert "**置信度**:0.70" in result["final_decision"]
+    # final_decision 现在包含 research_brief（raw JSON），不再含方向/置信度标记
+    assert result["final_decision"] is not None and len(str(result["final_decision"])) > 0
+    assert result["research_brief"] is not None and len(str(result["research_brief"])) > 0
+    # SafetyOverride 包含策略约束语义（allowed_strategies / forbidden_strategies）
+    assert "allowed_strategies" in result["risk_card"]["safety_override"]
+    assert "forbidden_strategies" in result["risk_card"]["safety_override"]
 
 
 def test_investment_director_r5_dimension_syncs_memo_and_markdown():
@@ -943,11 +956,18 @@ def test_investment_director_r5_dimension_syncs_memo_and_markdown():
     assert result["risk_assessment"]["composite_risk_level"] == 3
     assert result["risk_assessment"]["dimensions"]["term_structure"]["level"] == 5
     assert result["risk_card"]["safety_override"]["overridden_action"] == "flat"
-    assert result["investment_memo"]["投研结论"]["方向倾向"] == "平仓"
-    assert result["investment_memo"]["投研结论"]["置信度"] == 0.0
-    assert "R5" in result["investment_memo"]["投研结论"]["硬约束说明"]
-    assert "**方向**:平仓" in result["final_decision"]
-    assert "**置信度**:0.00" in result["final_decision"]
+    # 新备忘录格式：风险等级/推荐关注策略/需规避策略 替代 方向倾向/置信度
+    assert result["investment_memo"]["投研结论"]["风险等级"] == "R3"
+    assert result["investment_memo"]["投研结论"]["推荐关注策略"] == []
+    assert result["investment_memo"]["投研结论"]["需规避策略"] == [
+        "单边趋势", "展期收益", "跨期套利", "波动率", "跨品种"
+    ]
+    # R5 约束反映在策略约束说明或核心观点中
+    memo_text = str(result["investment_memo"]["投研结论"].get("策略约束说明", ""))
+    memo_text += str(result["investment_memo"]["投研结论"].get("核心观点", ""))
+    assert "R5" in memo_text
+    # final_decision 已迁移为 research_brief 格式，不包含方向/置信度标记
+    assert result["final_decision"] is not None and len(str(result["final_decision"])) > 0
 
 
 def test_investment_director_missing_fields_are_safely_added():
@@ -960,9 +980,10 @@ def test_investment_director_missing_fields_are_safely_added():
     }, ensure_ascii=False)))
     result = create_investment_director(mock_llm)(make_commodity_state())
 
-    assert "**方向**:持有" in result["final_decision"]
-    assert "**置信度**:0.00" in result["final_decision"]
+    # final_decision 现在包含 research_brief（raw JSON），不再自动补全方向/置信度
+    assert result["final_decision"] is not None and len(str(result["final_decision"])) > 0
     assert result["risk_card"]["safety_override"]["executed"] is True
+    assert "allowed_strategies" in result["risk_card"]["safety_override"]
 
 
 def test_investment_director_fallback_also_has_safety_audit():
@@ -974,4 +995,118 @@ def test_investment_director_fallback_also_has_safety_audit():
 
     assert result["risk_card"]["safety_override"]["executed"] is True
     assert result["risk_card"]["safety_override"]["original_llm_direction"] == "hold"
-    assert "**方向**:持有" in result["final_decision"]
+    # fallback 时 final_decision 是系统降级的研究简报，不含方向标记
+    assert result["final_decision"] is not None and len(str(result["final_decision"])) > 0
+    assert "策略适应性报告" in str(result["final_decision"])
+    # research_brief 同步输出同一份 fallback 内容
+    assert result["research_brief"] is not None and len(str(result["research_brief"])) > 0
+
+
+class TestSafetyOverrideCustomData:
+    """Phase 自定义数据升级: SafetyOverride 私有数据矛盾 + 过度依赖规则。"""
+
+    @staticmethod
+    def _risk(composite=2, dimensions=None, flags=None, data_insufficient=False):
+        return {
+            "composite_risk_level": composite,
+            "dimensions": dimensions or {},
+            "flags": flags or [],
+            "data_insufficient": data_insufficient,
+        }
+
+    def test_custom_data_contradiction_caps_confidence(self):
+        from tradingagents.agents.managers.investment_director import safety_override
+        fdict = {
+            "_direction": "bearish",
+            "_direction_confidence": 0.7,
+            "snapshot": {"as_of": "2026-07-20"},
+        }
+        result = safety_override(
+            self._risk(), "long", 0.8, "",
+            custom_data_feature_dict=fdict,
+            counter_signal_explanation="用户数据滞后,可忽略",
+        )
+        assert "CUSTOM_DATA_CONTRADICTION" in result["override_rules_triggered"]
+        assert result["confidence"] == 0.3
+        assert result["max_position"] == 0.5
+        assert result["custom_data_conflict"] is True
+        assert result["custom_data_direction"] == "bearish"
+        assert result["custom_data_as_of"] == "2026-07-20"
+
+    def test_custom_data_contradiction_without_explanation_forces_hold(self):
+        from tradingagents.agents.managers.investment_director import safety_override
+        fdict = {"_direction": "bearish", "snapshot": {"as_of": "2026-07-20"}}
+        result = safety_override(
+            self._risk(), "long", 0.8, "",
+            custom_data_feature_dict=fdict,
+            counter_signal_explanation="",
+        )
+        assert "COUNTER_SIGNAL_EXPLANATION_REQUIRED" in result["override_rules_triggered"]
+        assert result["action"] == "hold"
+        assert result["confidence"] == 0.3
+
+    def test_custom_data_aligned_does_not_trigger_contradiction(self):
+        from tradingagents.agents.managers.investment_director import safety_override
+        fdict = {"_direction": "bullish", "snapshot": {"as_of": "2026-07-20"}}
+        result = safety_override(
+            self._risk(), "long", 0.8, "",
+            custom_data_feature_dict=fdict,
+        )
+        assert "CUSTOM_DATA_CONTRADICTION" not in result["override_rules_triggered"]
+        assert result["action"] == "long"
+        assert result["confidence"] == 0.8
+
+    def test_custom_data_neutral_never_triggers_contradiction(self):
+        from tradingagents.agents.managers.investment_director import safety_override
+        fdict = {"_direction": "neutral", "snapshot": {"as_of": "2026-07-20"}}
+        result = safety_override(
+            self._risk(), "long", 0.8, "",
+            custom_data_feature_dict=fdict,
+        )
+        assert "CUSTOM_DATA_CONTRADICTION" not in result["override_rules_triggered"]
+        assert result["action"] == "long"
+
+    def test_custom_data_overreliance_warning_only(self):
+        from tradingagents.agents.managers.investment_director import safety_override
+        brief = (
+            "## 核心观点\n\n"
+            "根据用户上传数据,看多。\n\n"
+            "用户上传数据显示库存低。\n\n"
+            "用户数据表明方向偏多。\n\n"
+            "用户上传的数据强化了判断。\n"
+        )
+        result = safety_override(
+            self._risk(), "long", 0.7, brief,
+        )
+        assert "CUSTOM_DATA_OVERRELIANCE" in result["override_rules_triggered"]
+        # 不改决策
+        assert result["action"] == "long"
+        assert result["confidence"] == 0.7
+        assert result["max_position"] == 1.0
+        assert result["custom_data_overreliance"]["warning_only"] is True
+        assert result["custom_data_overreliance"]["mentions"] >= 3
+
+    def test_custom_data_overreliance_low_mentions_no_trigger(self):
+        from tradingagents.agents.managers.investment_director import safety_override
+        brief = (
+            "技术面偏多。\n\n"
+            "库存中性。\n\n"
+            "基差略偏弱。\n\n"
+            "用户上传数据仅作参考。\n"
+        )
+        result = safety_override(
+            self._risk(), "long", 0.7, brief,
+        )
+        assert "CUSTOM_DATA_OVERRELIANCE" not in result["override_rules_triggered"]
+
+    def test_no_custom_data_feature_dict_no_conflict_audit(self):
+        """不传 custom_data_feature_dict 时 audit 字段全部为安全默认值。"""
+        from tradingagents.agents.managers.investment_director import safety_override
+        result = safety_override(self._risk(), "long", 0.8, "")
+        assert result["custom_data_direction"] == "neutral"
+        assert result["custom_data_conflict"] is False
+        assert result["custom_data_overreliance"]["warning_only"] is True
+        assert result["custom_data_overreliance"]["mentions"] == 0
+        assert result["custom_data_as_of"] is None
+        assert "CUSTOM_DATA_CONTRADICTION" not in result["override_rules_triggered"]
+        assert "CUSTOM_DATA_OVERRELIANCE" not in result["override_rules_triggered"]

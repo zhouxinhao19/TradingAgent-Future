@@ -232,6 +232,9 @@
                 <el-tag size="small" type="primary" effect="plain">
                   主力 {{ (store.holdingPosition?.symbol || '').toUpperCase() }}
                 </el-tag>
+                <el-tag v-if="store.holdingPosition?.date" size="small" type="info" effect="plain">
+                  数据日期 {{ formatTradeDate(store.holdingPosition.date) }}
+                </el-tag>
                 <el-tag size="small" effect="plain">
                   共 {{ store.holdingPosition?.count || 0 }} 家会员
                 </el-tag>
@@ -1173,12 +1176,16 @@ const inventoryDaysAgo = computed(() => {
   return Math.max(0, Math.round((today.getTime() - latest.getTime()) / 86400000))
 })
 
-// 持仓空数据友好提示:周六周日 + 节假日
+// 持仓空数据友好提示:周六周日 + 节假日 + 数据源异常
 const holdingEmptyHint = computed(() => {
-  if ((store.holdingPosition as any)?.rows?.length) return '暂无持仓数据'
+  if ((store.holdingPosition as any)?.rows?.length) return ''
+  // 已加载过但为空 → 数据源异常
+  if ((store.holdingPosition as any)?.symbol) {
+    return '成交持仓数据暂不可用。底层数据源(新浪财经)已停止提供此接口，正在寻找替代数据源。'
+  }
   const weekday = new Date().getDay()
   if (weekday === 0 || weekday === 6) return '今天是非交易日(周末),无成交持仓数据。点击右上"刷新"按钮可重试。'
-  return '今日暂无成交持仓数据(已自动跳过缓存重拉)。点"刷新"按钮可再次重试。'
+  return '暂无成交持仓数据。点击"刷新"按钮可重试。'
 })
 function exchangeTagType(code: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' {
   const map: Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = {
@@ -1188,6 +1195,13 @@ function exchangeTagType(code: string): 'primary' | 'success' | 'warning' | 'inf
 }
 function categoryName(code: string): string {
   return store.categories.find((c) => c.code === code)?.name || code
+}
+function formatTradeDate(d: string): string {
+  if (!d) return ''
+  // YYYYMMDD → YYYY-MM-DD
+  const s = d.replace(/[^0-9]/g, '')
+  if (s.length === 8) return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`
+  return d
 }
 function sentimentType(sent: string): 'success' | 'danger' | 'info' {
   if (sent === 'positive') return 'success'

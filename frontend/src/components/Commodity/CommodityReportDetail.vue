@@ -38,12 +38,22 @@
             </el-space>
           </el-col>
           <el-col :span="6" style="text-align: right">
-            <el-tag v-if="decisionAction" :type="decisionTagType as any" size="large" effect="dark">
-              {{ decisionLabel }}
-            </el-tag>
-            <span v-if="decisionConfidence !== null" style="margin-left: 8px; font-weight: 600; font-size: 14px;">
-              {{ (decisionConfidence * 100).toFixed(0) }}%
-            </span>
+            <el-space>
+              <el-tag v-if="riskTierDisplay" :type="riskTierTagType(riskTierDisplay)" size="large" effect="dark">
+                {{ riskTierDisplay }}
+              </el-tag>
+              <div v-if="strategyTags.length" style="display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end;">
+                <el-tag
+                  v-for="s in strategyTags"
+                  :key="s.name"
+                  :type="s.type"
+                  size="small"
+                  effect="plain"
+                >
+                  {{ s.name }}
+                </el-tag>
+              </div>
+            </el-space>
           </el-col>
         </el-row>
       </el-card>
@@ -74,21 +84,38 @@
                 {{ rule }}
               </el-tag>
             </p>
-            <p v-if="safetyOverride.original_llm_direction">
-              <strong>LLM 原始方向:</strong>
-              <el-tag :type="directionTagType(safetyOverride.original_llm_direction)" size="small">
-                {{ directionLabel(safetyOverride.original_llm_direction) }}
+            <p v-if="safetyOverride.risk_tier">
+              <strong>风险等级:</strong>
+              <el-tag :type="riskTierTagType(safetyOverride.risk_tier)" size="small">
+                {{ safetyOverride.risk_tier }}
               </el-tag>
-              <span v-if="safetyOverride.original_llm_confidence !== undefined">
-                （置信度 {{ formatConfidence(safetyOverride.original_llm_confidence) }}）
-              </span>
-              → <strong>最终裁定:</strong>
-              <el-tag :type="directionTagType(safetyOverride.overridden_action || safetyOverride.action)" size="small">
-                {{ directionLabel(safetyOverride.overridden_action || safetyOverride.action) }}
+            </p>
+            <p v-if="safetyOverride.allowed_strategies?.length">
+              <strong>允许策略:</strong>
+              <el-tag
+                v-for="(s, si) in safetyOverride.allowed_strategies"
+                :key="si"
+                type="success"
+                size="small"
+                style="margin-right: 4px"
+              >
+                {{ s }}
               </el-tag>
-              <span v-if="safetyOverride.overridden_confidence !== undefined">
-                （置信度 {{ formatConfidence(safetyOverride.overridden_confidence) }}）
-              </span>
+            </p>
+            <p v-if="safetyOverride.forbidden_strategies?.length">
+              <strong>禁止策略:</strong>
+              <el-tag
+                v-for="(s, si) in safetyOverride.forbidden_strategies"
+                :key="si"
+                type="danger"
+                size="small"
+                style="margin-right: 4px"
+              >
+                {{ s }}
+              </el-tag>
+            </p>
+            <p v-if="safetyOverride.strategy_constraints">
+              <strong>策略约束说明:</strong> {{ safetyOverride.strategy_constraints }}
             </p>
             <p v-if="hasPositionLimit">
               <strong>仓位上限:</strong> {{ safetyOverride.max_position_pct }}%
@@ -212,27 +239,33 @@
               </el-card>
 
               <!-- 投研结论 -->
-              <el-card v-if="cioMemo['投研结论']" shadow="never" class="plan-section">
+              <el-card v-if="cioConclusion" shadow="never" class="plan-section">
                 <template #header><b>投研结论</b></template>
                 <el-descriptions :column="2" border size="small">
-                  <el-descriptions-item label="方向倾向">
-                    <el-tag :type="cioConclusionDirType" size="small">
-                      {{ cioMemo['投研结论']['方向倾向'] || '—' }}
+                  <!-- 方向倾向（LLM 实际输出字段） -->
+                  <el-descriptions-item v-if="cioConclusion['方向倾向']" label="方向倾向">
+                    <el-tag :type="cioConclusionDirTagType(cioConclusion['方向倾向'])" size="small">
+                      {{ cioConclusion['方向倾向'] }}
                     </el-tag>
                   </el-descriptions-item>
-                  <el-descriptions-item label="置信度">
-                    <el-progress
-                      :percentage="Math.round((cioMemo['投研结论']['置信度'] || 0) * 100)"
-                      :stroke-width="16"
-                      style="width: 120px"
-                    />
+                  <!-- 置信度（LLM 实际输出字段） -->
+                  <el-descriptions-item v-if="cioConclusion['置信度'] !== undefined" label="置信度">
+                    {{ formatConfidence(cioConclusion['置信度']) }}
                   </el-descriptions-item>
-                  <el-descriptions-item label="核心逻辑" :span="2">
-                    {{ cioMemo['投研结论']['核心逻辑'] || '—' }}
+                  <!-- 风险等级（prompt 期望字段） -->
+                  <el-descriptions-item v-if="cioConclusion['风险等级']" label="风险等级">
+                    <el-tag :type="riskTierTagType(cioConclusion['风险等级'] || '')" size="small">
+                      {{ cioConclusion['风险等级'] }}
+                    </el-tag>
                   </el-descriptions-item>
-                  <el-descriptions-item v-if="cioMemo['投研结论']['反向信号']?.length" label="反向信号" :span="2">
+                  <!-- 核心观点（prompt 期望）/ 核心逻辑（LLM 实际输出） -->
+                  <el-descriptions-item label="核心观点" :span="2">
+                    {{ cioConclusion['核心观点'] || cioConclusion['核心逻辑'] || '—' }}
+                  </el-descriptions-item>
+                  <!-- 风险信号（prompt 期望）/ 反向信号（LLM 实际输出） -->
+                  <el-descriptions-item v-if="cioConclusionRiskSignals.length" label="风险信号" :span="2">
                     <el-tag
-                      v-for="(sig, si) in cioMemo['投研结论']['反向信号']"
+                      v-for="(sig, si) in cioConclusionRiskSignals"
                       :key="si"
                       type="danger"
                       size="small"
@@ -240,6 +273,42 @@
                     >
                       {{ sig }}
                     </el-tag>
+                  </el-descriptions-item>
+                  <!-- 逆向信号处理（LLM 实际输出） -->
+                  <el-descriptions-item v-if="cioConclusion['逆向信号处理']" label="逆向信号处理" :span="2">
+                    {{ cioConclusion['逆向信号处理'] }}
+                  </el-descriptions-item>
+                  <el-descriptions-item label="推荐关注策略">
+                    <span v-if="cioConclusion['推荐关注策略']?.length">
+                      <el-tag
+                        v-for="(s, si) in cioConclusion['推荐关注策略']"
+                        :key="si"
+                        type="success"
+                        size="small"
+                        style="margin-right: 4px"
+                      >
+                        {{ s }}
+                      </el-tag>
+                    </span>
+                    <span v-else>—</span>
+                  </el-descriptions-item>
+                  <el-descriptions-item label="需规避策略">
+                    <span v-if="cioConclusion['需规避策略']?.length">
+                      <el-tag
+                        v-for="(s, si) in cioConclusion['需规避策略']"
+                        :key="si"
+                        type="danger"
+                        size="small"
+                        style="margin-right: 4px"
+                      >
+                        {{ s }}
+                      </el-tag>
+                    </span>
+                    <span v-else>—</span>
+                  </el-descriptions-item>
+                  <!-- 硬约束说明（LLM 实际输出） -->
+                  <el-descriptions-item v-if="cioConclusion['硬约束说明']" label="硬约束说明" :span="2">
+                    <el-tag type="warning" size="small" effect="dark">{{ cioConclusion['硬约束说明'] }}</el-tag>
                   </el-descriptions-item>
                 </el-descriptions>
               </el-card>
@@ -263,11 +332,49 @@
                     </el-col>
                   </el-row>
 
-                  <el-descriptions v-if="cioRiskCard['风险裁定']" :column="2" border size="small" style="margin-top: 12px">
-                    <el-descriptions-item v-for="(val, key) in cioRiskCard['风险裁定']" :key="String(key)" :label="String(key)">
-                      {{ val }}
-                    </el-descriptions-item>
-                  </el-descriptions>
+                  <el-card v-if="cioRiskCard['风险裁定']" shadow="never" style="margin-top: 12px">
+                    <template #header><b>风险裁定</b></template>
+                    <el-row :gutter="12">
+                      <el-col :span="12">
+                        <div class="verdict-item">
+                          <span class="verdict-label">总体风险等级</span>
+                          <el-tag :type="riskTierTagType(cioRiskCard['风险裁定']['总体风险等级'] || '')" size="large" effect="dark">
+                            {{ cioRiskCard['风险裁定']['总体风险等级'] || '—' }}
+                          </el-tag>
+                        </div>
+                      </el-col>
+                      <el-col :span="12">
+                        <div class="verdict-item">
+                          <span class="verdict-label">数据充分</span>
+                          <el-tag :type="cioRiskCard['风险裁定']['数据充分'] ? 'success' : 'danger'" size="large">
+                            {{ cioRiskCard['风险裁定']['数据充分'] ? '✓ 充分' : '✗ 不足' }}
+                          </el-tag>
+                        </div>
+                      </el-col>
+                    </el-row>
+                    <!-- 数据质量摘要 -->
+                    <el-row v-if="cioRiskCard['风险裁定']['数据质量']" :gutter="12" style="margin-top: 12px">
+                      <el-col :span="24">
+                        <el-card shadow="never" class="dq-summary-card">
+                          <template #header><b>数据质量</b></template>
+                          <el-row :gutter="8">
+                            <el-col v-for="(mod, mk) in cioRiskCard['风险裁定']['数据质量']?.details" :key="String(mk)" :span="8" style="margin-bottom: 8px">
+                              <div class="dq-item">
+                                <span class="dq-name">{{ moduleName(String(mk)) }}</span>
+                                <el-progress
+                                  :percentage="Math.round((mod.coverage || 0) * 100)"
+                                  :stroke-width="14"
+                                  :status="mod.available ? 'success' : 'exception'"
+                                  :text-inside="true"
+                                  style="width: 100px"
+                                />
+                                <span class="dq-meta">{{ mod.rows }}行 · {{ freshnessLabel(mod.freshness_days) }}</span>
+                              </div>
+                            </el-col>
+                          </el-row>
+                        </el-card>
+                      </el-col>
+                    </el-row>
 
                   <div v-if="cioRiskCard['风险提示']?.length" style="margin-top: 12px">
                     <strong>风险提示:</strong>
@@ -282,6 +389,7 @@
                     />
                   </div>
                 </el-card>
+              </el-card>
               </template>
             </div>
           </template>
@@ -406,6 +514,25 @@
           <el-empty v-else description="暂无推理分析" :image-size="60" />
         </el-tab-pane>
 
+        <!-- 交易计划（由投研总监策略产出规则派生） -->
+        <el-tab-pane label="交易计划" name="trade">
+          <div v-if="report.final_trade_decision || report.trader_investment_plan" class="trade-container">
+            <el-card
+              v-if="report.final_trade_decision"
+              shadow="never"
+              class="plan-section trade-decision-card"
+            >
+              <template #header><b>最终交易决策</b></template>
+              <div class="md-render" v-html="renderMarkdown(report.final_trade_decision)" />
+            </el-card>
+            <el-card v-if="report.trader_investment_plan" shadow="never" class="plan-section">
+              <template #header><b>交易计划</b></template>
+              <div class="md-render" v-html="renderMarkdown(report.trader_investment_plan)" />
+            </el-card>
+          </div>
+          <el-empty v-else description="暂无交易计划" :image-size="60" />
+        </el-tab-pane>
+
         <!-- 风控评估 -->
         <el-tab-pane label="风控评估" name="risk">
           <div v-if="riskAssessment" class="risk-container">
@@ -431,13 +558,14 @@
                     >
                       <div class="dq-item">
                         <span class="dq-name">{{ moduleName(String(mk)) }}</span>
-                        <el-tag
-                          :type="mod.available ? 'success' : 'danger'"
-                          size="small"
-                        >
-                          {{ mod.available ? '有数据' : '缺失' }}
-                        </el-tag>
-                        <span class="dq-rows">{{ mod.rows }} 行</span>
+                        <el-progress
+                          :percentage="Math.round((mod.coverage || 0) * 100)"
+                          :stroke-width="14"
+                          :status="mod.available ? 'success' : 'exception'"
+                          :text-inside="true"
+                          style="width: 100px"
+                        />
+                        <span class="dq-meta">{{ mod.rows }}行 · {{ freshnessLabel(mod.freshness_days) }}</span>
                       </div>
                     </el-col>
                   </el-row>
@@ -515,18 +643,31 @@ watch(() => props.data, () => {
 // ---- 计算属性 ----
 const report = computed(() => props.data || null)
 
-/** 从 report.decision 或 evidence_chain 提取方向标签 */
-const decisionAction = computed(() => {
-  if (report.value?.decision?.action) return report.value?.decision?.action
-  // 从 evidence_chain summary 提取
-  return report.value?.evidence_chain?.summary?.final_action || null
+/** 从 report.decision 或 evidence_chain 提取风险等级 */
+const riskTierDisplay = computed(() => {
+  // 优先 evidence_chain summary
+  const ec_summary = report.value?.evidence_chain?.summary
+  if (ec_summary?.risk_tier) return ec_summary.risk_tier
+  // fallback: report.decision
+  return report.value?.decision?.risk_tier || null
 })
-const decisionConfidence = computed(() => {
-  if (report.value?.decision?.confidence !== undefined) return report.value?.decision?.confidence
-  return report.value?.evidence_chain?.summary?.final_confidence ?? null
+
+/** 从 evidence_chain summary 提取策略标签 */
+const strategyTags = computed(() => {
+  const ec_summary = report.value?.evidence_chain?.summary
+  const tags: Array<{ name: string; type: string }> = []
+  if (ec_summary?.allowed_strategies?.length) {
+    for (const s of ec_summary.allowed_strategies) {
+      tags.push({ name: s, type: 'success' })
+    }
+  }
+  if (ec_summary?.forbidden_strategies?.length) {
+    for (const s of ec_summary.forbidden_strategies) {
+      tags.push({ name: `禁:${s}`, type: 'danger' })
+    }
+  }
+  return tags
 })
-const decisionLabel = computed(() => directionLabel(decisionAction.value || ''))
-const decisionTagType = computed(() => directionTagType(decisionAction.value || ''))
 
 /** 品种显示: 品种代码 + 中文名，不要主力合约名 */
 const varietyDisplay = computed(() => {
@@ -575,7 +716,7 @@ const analystSections = computed<AnalystSection[]>(() => {
     { key: 'fundamentals_report', title: '基本面分析（估值+驱动）', field: 'fundamentals_report' },
     { key: 'position_report', title: '持仓分析', field: 'position_report' },
     { key: 'news_report', title: '新闻分析', field: 'news_report' },
-    { key: 'final_decision', title: '总结', field: 'final_decision' },
+    { key: 'research_brief', title: '总结', field: 'research_brief' },
   ]
 
   return sections.map(s => {
@@ -583,11 +724,15 @@ const analystSections = computed<AnalystSection[]>(() => {
     if (s.field.includes('.')) {
       const [parent, child] = s.field.split('.')
       content = (r as any)[parent]?.[child] || ''
+    } else if (s.field === 'research_brief') {
+      content = (r as any)['research_brief'] || (r as any)['final_decision'] || ''
     } else {
       content = (r as any)[s.field] || ''
     }
-    const direction = s.key === 'final_decision'
-      ? directionTagType(r.decision?.action)
+    const direction = s.key === 'research_brief'
+      ? (r?.evidence_chain?.summary?.final_action
+        ? directionTagType(r.evidence_chain.summary.final_action)
+        : 'info')
       : extractDirection(content)
     return {
       key: s.key,
@@ -601,20 +746,49 @@ const analystSections = computed<AnalystSection[]>(() => {
 })
 
 // ---- 投资计划 ----
+/** 从可能含多余文字的字符串中尽力提取 JSON */
+function extractJsonSafe(raw: string): Record<string, any> | null {
+  // 直接解析
+  try { return JSON.parse(raw) } catch { /* 继续 */ }
+
+  // 找 {…} 片段
+  const braceStart = raw.indexOf('{')
+  if (braceStart >= 0) {
+    const braceEnd = raw.lastIndexOf('}')
+    if (braceEnd > braceStart) {
+      try { return JSON.parse(raw.slice(braceStart, braceEnd + 1)) } catch { /* 继续 */ }
+    }
+  }
+
+  // 找 […] 片段
+  const bracketStart = raw.indexOf('[')
+  if (bracketStart >= 0) {
+    const bracketEnd = raw.lastIndexOf(']')
+    if (bracketEnd > bracketStart) {
+      try { return JSON.parse(raw.slice(bracketStart, bracketEnd + 1)) } catch { /* 继续 */ }
+    }
+  }
+
+  return null
+}
+
 const parsedPlan = computed(() => {
   const raw = report.value?.investment_plan
   if (!raw) return null
   if (typeof raw === 'object') return raw  // 已是对象
-  try {
-    return JSON.parse(raw)
-  } catch {
-    return null
-  }
+  return extractJsonSafe(raw)
 })
 
 // ---- CIO 新结构 (投研备忘录 + 风险评估卡) ----
 const cioMemo = computed(() => {
-  return parsedPlan.value?.['投研备忘录'] || null
+  // 优先从 investment_plan 读取（L2 旧格式兼容）
+  if (parsedPlan.value?.['投研备忘录']) return parsedPlan.value['投研备忘录']
+  // 回退到 evidence_chain.L3.cio_memo（新格式）
+  const l3 = report.value?.evidence_chain?.layers?.L3
+  if (l3?.cio_memo && typeof l3.cio_memo === 'object' && Object.keys(l3.cio_memo).length) {
+    return l3.cio_memo as Record<string, any>
+  }
+  return null
 })
 
 const cioValuationRows = computed(() => {
@@ -629,7 +803,14 @@ const cioValuationRows = computed(() => {
 })
 
 const cioRiskCard = computed(() => {
-  return parsedPlan.value?.['风险评估卡'] || null
+  // 优先从 investment_plan 读取（L2 旧格式兼容）
+  if (parsedPlan.value?.['风险评估卡']) return parsedPlan.value['风险评估卡']
+  // 回退到 evidence_chain.L3.cio_risk_card（新格式）
+  const l3 = report.value?.evidence_chain?.layers?.L3
+  if (l3?.cio_risk_card && typeof l3.cio_risk_card === 'object' && Object.keys(l3.cio_risk_card).length) {
+    return l3.cio_risk_card as Record<string, any>
+  }
+  return null
 })
 
 const cioConclusionDirType = computed(() => {
@@ -638,6 +819,28 @@ const cioConclusionDirType = computed(() => {
   if (dir.includes('做空')) return 'danger'
   return 'info'
 })
+
+/**
+ * 归一化投研结论，兼容 prompt 期望字段名和 LLM 实际输出字段名
+ */
+const cioConclusion = computed(() => {
+  return cioMemo.value?.['投研结论'] || null
+})
+
+/** 风险信号：兼容风险信号（prompt 期望）和反向信号（LLM 实际输出） */
+const cioConclusionRiskSignals = computed(() => {
+  const raw = cioConclusion.value
+  if (!raw) return []
+  return raw['风险信号'] || raw['反向信号'] || []
+})
+
+/** 映射方向倾向到 el-tag type */
+function cioConclusionDirTagType(dir: string): string {
+  if (dir.includes('做多') || dir.includes('long') || dir.includes('看多')) return 'success'
+  if (dir.includes('做空') || dir.includes('short') || dir.includes('看空')) return 'danger'
+  if (dir.includes('平仓') || dir.includes('flat')) return 'warning'
+  return 'info'
+}
 
 // ---- 风控评估 ----
 const riskAssessment = computed(() => {
@@ -755,6 +958,14 @@ function moduleName(key: string): string {
   return map[key] || key
 }
 
+function freshnessLabel(days: number | null | undefined): string {
+  if (days === null || days === undefined) return '—'
+  if (days <= 1) return '今日'
+  if (days <= 3) return `${days}天前`
+  if (days <= 7) return `${days}天前`
+  return `${days}天前 (较旧)`
+}
+
 function dimLabel(key: string): string {
   const map: Record<string, string> = {
     volatility: '波动率', basis: '基差', crowding: '拥挤度',
@@ -762,6 +973,11 @@ function dimLabel(key: string): string {
     news_sentiment: '新闻',
   }
   return map[key] || key
+}
+
+function riskTierTagType(tier: string): TagType {
+  const map: Record<string, TagType> = { R1: 'success', R2: 'success', R3: 'warning', R4: 'danger', R5: 'danger' }
+  return map[tier] || 'info'
 }
 
 </script>
@@ -924,6 +1140,28 @@ function dimLabel(key: string): string {
   margin-bottom: 16px;
 }
 
+/* 交易计划 tab */
+.trade-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.trade-decision-card {
+  border-left: 4px solid var(--el-color-primary, #409eff);
+  background: var(--el-fill-color-lighter, #f5f7fa);
+}
+
+.trade-decision-card .el-card__header {
+  background: var(--el-color-primary-light-9, #ecf5ff);
+  border-bottom: 1px solid var(--el-color-primary-light-7, #d9ecff);
+}
+
+.trade-decision-card b {
+  color: var(--el-color-primary, #409eff);
+  font-size: 15px;
+}
+
 .cio-scenario {
   .cio-field {
     margin-top: 8px;
@@ -1050,6 +1288,31 @@ function dimLabel(key: string): string {
 .dq-rows {
   font-size: 11px;
   color: #c0c4cc;
+}
+
+.dq-meta {
+  font-size: 11px;
+  color: #909399;
+  white-space: nowrap;
+}
+
+/* 风险裁定 */
+.verdict-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.verdict-label {
+  font-size: 12px;
+  color: #909399;
+}
+.verdict-value {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 32px;
+}
+.dq-summary-card {
+  font-size: 13px;
 }
 
 .risk-dim-card {

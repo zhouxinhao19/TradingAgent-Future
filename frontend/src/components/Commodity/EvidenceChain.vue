@@ -15,73 +15,36 @@
             <span class="summary-value">{{ data.summary.date }}</span>
           </div>
         </el-col>
-      </el-row>
-    </div>
-
-    <!-- 时间线：分析师报告 -->
-    <div class="chain-layer">
-      <h3 class="layer-title">
-        <el-icon><TrendCharts /></el-icon>
-        分析师报告
-      </h3>
-      <el-timeline>
-        <el-timeline-item
-          v-for="entry in l1Entries"
-          :key="entry.id"
-          :timestamp="entry.name"
-          :type="entry.direction === 'bullish' || entry.direction === 'long' ? 'success'
-                 : entry.direction === 'bearish' || entry.direction === 'short' ? 'danger'
-                 : entry.direction === 'skip' ? 'info' : 'warning'"
-          placement="top"
-        >
-          <div class="l1-card">
-            <div class="l1-header">
+        <el-col :span="6">
+          <div class="summary-item">
+            <span class="summary-label">风控等级</span>
+            <span class="summary-value">
               <el-tag
-                :type="directionTagType(entry.direction)"
+                v-if="data.summary.risk_tier"
+                :type="riskTierTagType(data.summary.risk_tier)"
                 size="small"
-                effect="dark"
               >
-                {{ entry.direction === 'skip' ? '跳过' : directionLabel(entry.direction) }}
+                {{ data.summary.risk_tier }}
               </el-tag>
-              <el-tag v-if="entry.status !== 'ok'" :type="statusTagType(entry.status)" size="small">
-                {{ statusLabel(entry.status) }}
-              </el-tag>
-              <span class="confidence-bar">
-                置信度: {{ (entry.confidence * 100).toFixed(0) }}%
-                <span v-if="entry.calibrated_confidence !== entry.confidence" class="calibrated">
-                  (校准后: {{ (entry.calibrated_confidence * 100).toFixed(0) }}%)
-                </span>
-              </span>
-            </div>
-            <div v-if="entry.summary" class="l1-summary">{{ entry.summary }}</div>
-            <div v-if="entry.signals?.length" class="l1-signals">
-              <el-tag
-                v-for="(sig, si) in entry.signals"
-                :key="si"
-                size="small"
-                style="margin-right: 4px; margin-bottom: 4px"
-              >
-                {{ sig }}
-              </el-tag>
-            </div>
-            <div v-if="Object.keys(entry.key_metrics || {}).length" class="l1-metrics">
-              <el-descriptions :column="3" size="small" border>
-                <el-descriptions-item
-                  v-for="(val, mk) in entry.key_metrics"
-                  :key="mk"
-                  :label="metricLabel(String(mk))"
-                >
-                  {{ formatMetric(val) }}
-                </el-descriptions-item>
-              </el-descriptions>
-            </div>
-            <div class="l1-id">
-              <code>{{ shortenRefId(entry.id) }}</code>
-              <span v-if="entry.conclusion_id" class="conclusion-id"> / {{ entry.conclusion_id }}</span>
-            </div>
+              <span v-else>-</span>
+            </span>
           </div>
-        </el-timeline-item>
-      </el-timeline>
+        </el-col>
+        <el-col :span="6">
+          <div class="summary-item">
+            <span class="summary-label">策略约束</span>
+            <span class="summary-value" style="font-size:13px">
+              <template v-if="data.summary.forbidden_strategies?.length">
+                禁止: <el-tag v-for="s in data.summary.forbidden_strategies" :key="s" type="danger" size="small" style="margin-right:2px">{{ s }}</el-tag>
+              </template>
+              <template v-else-if="data.summary.allowed_strategies?.length">
+                <el-tag v-for="s in data.summary.allowed_strategies" :key="s" type="success" size="small" style="margin-right:2px">{{ s }}</el-tag>
+              </template>
+              <span v-else class="summary-muted">无</span>
+            </span>
+          </div>
+        </el-col>
+      </el-row>
     </div>
 
     <!-- 推理分析 + 情景推演 -->
@@ -155,7 +118,7 @@
         </el-collapse-item>
 
         <!-- 情景推演 -->
-        <el-collapse-item v-if="l2Scenarios" title="情景推演" name="scenarios">
+        <el-collapse-item v-if="l2ScenarioList.length" title="情景推演" name="scenarios">
           <el-row :gutter="12">
             <el-col
               v-for="(sc, si) in l2ScenarioList"
@@ -206,6 +169,30 @@
             </el-col>
           </el-row>
         </el-collapse-item>
+
+        <!-- 矛盾地图 -->
+        <el-collapse-item v-if="contradictionMap.length" title="矛盾地图" name="contradictions">
+          <el-alert
+            v-for="(item, ci) in contradictionMap"
+            :key="ci"
+            type="warning"
+            :closable="false"
+            show-icon
+            style="margin-bottom: 8px"
+          >
+            <template #title>
+              {{ item['矛盾'] }}
+            </template>
+            <div style="display:flex; gap: 16px; margin-top: 8px">
+              <div style="flex:1; border-left:3px solid #67c23a; padding-left:8px">
+                <strong>▲ 利多:</strong> {{ item['利多'] }}
+              </div>
+              <div style="flex:1; border-left:3px solid #f56c6c; padding-left:8px">
+                <strong>▼ 利空:</strong> {{ item['利空'] }}
+              </div>
+            </div>
+          </el-alert>
+        </el-collapse-item>
       </el-collapse>
     </div>
 
@@ -238,15 +225,38 @@
                 {{ rule }}
               </el-tag>
             </p>
-            <p v-if="safetyOverride.original_llm_direction">
-              <strong>LLM 原始方向:</strong> {{ directionLabel(safetyOverride.original_llm_direction) }}
-              <span v-if="safetyOverride.original_llm_confidence !== undefined">
-                （置信度 {{ formatConfidence(safetyOverride.original_llm_confidence) }}）
-              </span>
-              → <strong>最终裁定:</strong> {{ directionLabel(safetyOverride.overridden_action || safetyOverride.action) }}
-              <span v-if="safetyOverride.overridden_confidence !== undefined">
-                （置信度 {{ formatConfidence(safetyOverride.overridden_confidence) }}）
-              </span>
+            <p v-if="safetyOverride.risk_tier">
+              <strong>风险等级:</strong>
+              <el-tag :type="riskTierTagType(safetyOverride.risk_tier)" size="small">
+                {{ safetyOverride.risk_tier }}
+              </el-tag>
+            </p>
+            <p v-if="safetyOverride.allowed_strategies?.length">
+              <strong>允许策略:</strong>
+              <el-tag
+                v-for="(s, si) in safetyOverride.allowed_strategies"
+                :key="si"
+                type="success"
+                size="small"
+                style="margin-right: 4px"
+              >
+                {{ s }}
+              </el-tag>
+            </p>
+            <p v-if="safetyOverride.forbidden_strategies?.length">
+              <strong>禁止策略:</strong>
+              <el-tag
+                v-for="(s, si) in safetyOverride.forbidden_strategies"
+                :key="si"
+                type="danger"
+                size="small"
+                style="margin-right: 4px"
+              >
+                {{ s }}
+              </el-tag>
+            </p>
+            <p v-if="safetyOverride.strategy_constraints">
+              <strong>策略约束说明:</strong> {{ safetyOverride.strategy_constraints }}
             </p>
             <p v-if="hasPositionLimit">
               <strong>仓位上限:</strong> {{ safetyOverride.max_position_pct }}%
@@ -259,7 +269,32 @@
         </template>
       </el-alert>
 
-      <!-- CIO 投研备忘录：估值审核 -->
+      <!-- 策略适应性矩阵 -->
+      <el-card v-if="strategyMatrix.length" shadow="never" style="margin-bottom: 12px">
+        <template #header><b>策略适应性矩阵（量化规则）</b></template>
+        <el-table :data="strategyMatrix" stripe size="small" border>
+          <el-table-column prop="strategy" label="策略" width="110" />
+          <el-table-column prop="fitness" label="适应性" width="100">
+            <template #default="{ row }">
+              <el-tag :type="fitnessTagType(row.fitness)" size="small">
+                {{ row.fitness }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="rationale" label="核心判据" min-width="240" />
+          <el-table-column label="关键条件" min-width="180">
+            <template #default="{ row }">
+              <div
+                v-for="(cond, ci) in (row.key_conditions || [])"
+                :key="ci"
+                :style="{ color: cond.includes('✗') ? '#f56c6c' : cond.includes('⚠') ? '#e6a23c' : '#67c23a', fontSize: '12px' }"
+              >
+                {{ cond }}
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-card>
       <el-card v-if="cioMemo && cioValuationRows.length" shadow="never" style="margin-bottom: 12px">
         <template #header><b>估值审核</b></template>
         <el-table :data="cioValuationRows" stripe size="small" border>
@@ -317,11 +352,83 @@
       <!-- CIO 风险裁定+提示 -->
       <el-card v-if="cioRiskCard?.['风险裁定'] || cioRiskCard?.['风险提示']?.length" shadow="never" style="margin-bottom: 12px">
         <template #header><b>风险裁定</b></template>
-        <el-descriptions v-if="cioRiskCard['风险裁定']" :column="2" border size="small">
-          <el-descriptions-item v-for="(val, key) in cioRiskCard['风险裁定']" :key="String(key)" :label="String(key)">
-            {{ val }}
-          </el-descriptions-item>
-        </el-descriptions>
+        <template v-if="cioRiskCard['风险裁定']">
+          <el-row :gutter="12" style="margin-bottom: 12px">
+            <el-col :span="6">
+              <div class="verdict-item">
+                <span class="verdict-label">总体风险等级</span>
+                <el-tag :type="riskTierTagType(cioRiskCard['风险裁定']['总体风险等级'] || '')" size="large" effect="dark">
+                  {{ cioRiskCard['风险裁定']['总体风险等级'] || '—' }}
+                </el-tag>
+              </div>
+            </el-col>
+            <el-col :span="4">
+              <div class="verdict-item">
+                <span class="verdict-label">数据充分</span>
+                <el-tag :type="cioRiskCard['风险裁定']['数据充分'] ? 'success' : 'danger'" size="large">
+                  {{ cioRiskCard['风险裁定']['数据充分'] ? '✓ 充分' : '✗ 不足' }}
+                </el-tag>
+              </div>
+            </el-col>
+            <el-col :span="4">
+              <div class="verdict-item">
+                <span class="verdict-label">建议动作</span>
+                <el-tag :type="cioRiskCard['风险裁定']['建议动作'] === '平仓' ? 'warning' : 'success'" size="large">
+                  {{ cioRiskCard['风险裁定']['建议动作'] || '—' }}
+                </el-tag>
+              </div>
+            </el-col>
+            <el-col :span="5">
+              <div class="verdict-item">
+                <span class="verdict-label">仓位上限</span>
+                <span class="verdict-value">{{ cioRiskCard['风险裁定']['仓位上限'] ?? '—' }}%</span>
+              </div>
+            </el-col>
+            <el-col :span="5">
+              <div class="verdict-item">
+                <span class="verdict-label">杠杆上限</span>
+                <span class="verdict-value">{{ cioRiskCard['风险裁定']['杠杆上限'] ?? '—' }}x</span>
+              </div>
+            </el-col>
+          </el-row>
+          <!-- 数据质量摘要 -->
+          <el-row v-if="cioRiskCard['风险裁定']['数据质量']" :gutter="12" style="margin-bottom: 12px">
+            <el-col :span="24">
+              <el-card shadow="never" class="dq-summary-card">
+                <template #header><b>数据质量</b></template>
+                <el-row :gutter="8">
+                  <el-col v-for="(mod, mk) in dqDetails" :key="String(mk)" :span="8" style="margin-bottom: 8px">
+                    <div class="dq-item">
+                      <span class="dq-name">{{ moduleName(String(mk)) }}</span>
+                      <el-progress
+                        :percentage="Math.round((mod.coverage || 0) * 100)"
+                        :stroke-width="14"
+                        :status="mod.available ? 'success' : 'exception'"
+                        :text-inside="true"
+                        style="width: 100px"
+                      />
+                      <span class="dq-meta">{{ mod.rows }}行 · {{ freshnessLabel(mod.freshness_days) }}</span>
+                    </div>
+                  </el-col>
+                </el-row>
+              </el-card>
+            </el-col>
+          </el-row>
+          <!-- 允许/禁止策略 -->
+          <el-row v-if="cioRiskCard['风险裁定']['允许策略']?.length || cioRiskCard['风险裁定']['禁止策略']?.length" :gutter="12" style="margin-bottom: 12px">
+            <el-col v-if="cioRiskCard['风险裁定']['允许策略']?.length" :span="12">
+              <strong>允许策略:</strong>
+              <el-tag v-for="s in cioRiskCard['风险裁定']['允许策略']" :key="s" type="success" size="small" style="margin-right: 4px">{{ s }}</el-tag>
+            </el-col>
+            <el-col v-if="cioRiskCard['风险裁定']['禁止策略']?.length" :span="12">
+              <strong>禁止策略:</strong>
+              <el-tag v-for="s in cioRiskCard['风险裁定']['禁止策略']" :key="s" type="danger" size="small" style="margin-right: 4px">{{ s }}</el-tag>
+            </el-col>
+          </el-row>
+          <div v-if="cioRiskCard['风险裁定']['策略约束说明']" class="verdict-constraint">
+            <el-alert :title="cioRiskCard['风险裁定']['策略约束说明']" type="warning" :closable="false" show-icon />
+          </div>
+        </template>
         <div v-if="cioRiskCard['风险提示']?.length" style="margin-top: 8px">
           <strong>风险提示:</strong>
           <el-alert v-for="(tip, ti) in cioRiskCard['风险提示']" :key="ti" :title="tip" type="warning" :closable="false" show-icon style="margin-top: 8px" />
@@ -339,13 +446,18 @@
         </el-col>
       </el-row>
 
-      <!-- 最终决策文本 -->
+      <!-- 策略适应性报告（替代最终决策） -->
       <el-card v-if="l3FinalText" shadow="never">
         <template #header>
           <span>
-            <b>最终决策</b>
-            <el-tag v-if="data?.summary?.final_action" :type="directionTagType(data.summary.final_action)" size="small" style="margin-left: 8px">
-              {{ directionLabel(data.summary.final_action) }}
+            <b>策略适应性报告</b>
+            <el-tag
+              v-if="data?.summary?.risk_tier"
+              :type="riskTierTagType(data.summary.risk_tier)"
+              size="small"
+              style="margin-left: 8px"
+            >
+              {{ data.summary.risk_tier }}
             </el-tag>
           </span>
         </template>
@@ -357,21 +469,13 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { TrendCharts, DataAnalysis, SetUp } from '@element-plus/icons-vue'
+import { DataAnalysis, SetUp } from '@element-plus/icons-vue'
 import { renderMarkdown } from '@/utils/markdown'
 
 const props = defineProps<{
   data: Record<string, any> | null
 }>()
 
-// ---- L1 computed ----
-const l1Entries = computed(() => {
-  const layers = props.data?.layers
-  if (!layers?.L1) return []
-  return layers.L1
-})
-
-/** 品种显示: 品种代码（中文名），不要合约名 */
 const summaryVarietyDisplay = computed(() => {
   const s = props.data?.summary
   if (!s) return ''
@@ -386,21 +490,19 @@ function shortenRefId(id: string): string {
   if (!id || !id.includes('-')) return id || ''
   const parts = id.split('-')
   if (parts.length >= 3) {
-    // REF-TECH-a1b2c3d4 → TECH-a1b2c3d4
     return parts.slice(1).join('-')
   }
   return id
 }
 
-/** 统一字段为数组（LLM 有时输出字符串，避免 v-for 逐字渲染） */
+/** 统一字段为数组 */
 function toList(val: unknown): string[] {
   if (Array.isArray(val)) return val.filter((v): v is string => typeof v === 'string')
   if (typeof val === 'string') return [val]
   return []
 }
 
-// ---- L2 computed ----
-const activeL2Panels = ref(['valuation', 'bullbear', 'scenarios'])
+const activeL2Panels = ref(['valuation', 'bullbear', 'scenarios', 'contradictions'])
 
 const l2Valuation = computed(() => {
   return props.data?.layers?.L2?.valuation_matrix || []
@@ -416,27 +518,37 @@ const l2Scenarios = computed(() => {
 
 const l2ScenarioList = computed(() => {
   const s = l2Scenarios.value
-  if (Array.isArray(s)) return s
+  if (Array.isArray(s)) return s.filter(isScenarioObject)
   // 可能是对象 keyed by "保守/基准/乐观"
   const keys = ['保守', '基准', '乐观']
   const list = []
   if (typeof s === 'object' && s !== null) {
     for (const k of keys) {
       if (s[k]) list.push({ ...s[k], _label: k })
-      // also try pinyin keys
     }
-    // fallback: 取所有 value
+    // fallback: 取所有 value，过滤掉非情景对象（如数组、字符串）
     if (!list.length) {
       for (const v of Object.values(s)) {
-        if (typeof v === 'object' && v !== null) list.push(v)
+        if (isScenarioObject(v)) list.push(v)
       }
     }
   }
   return list
 })
 
+/** 判断是否为有效的情景对象（有推演方向或情景名称等字段） */
+function isScenarioObject(v: unknown): v is Record<string, any> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v) &&
+    (typeof (v as any)['推演方向'] === 'string' || typeof (v as any)['情景名称'] === 'string')
+}
+
 const l2Conflict = computed<{ type: TagType; text: string } | null>(() => {
   const layers = props.data?.layers
+  // 从 contradiction_map 判断是否存在矛盾
+  const cm = layers?.L2?.contradiction_map
+  if (Array.isArray(cm) && cm.length) {
+    return { type: 'warning', text: `存在 ${cm.length} 组矛盾信号` }
+  }
   // 从 L2 原始数据尝试提取 L1_conflict_summary
   const raw = layers?.L2?.raw_summary || ''
   const m = raw.match(/L1 冲突.*?看多=(\d+).*?看空=(\d+)/)
@@ -450,6 +562,15 @@ const l2Conflict = computed<{ type: TagType; text: string } | null>(() => {
   return null
 })
 
+// ---- 策略矩阵 + 矛盾地图 computed ----
+const strategyMatrix = computed(() => {
+  return props.data?.layers?.L3?.strategy_matrix || []
+})
+
+const contradictionMap = computed(() => {
+  return props.data?.layers?.L2?.contradiction_map || props.data?.layers?.L3?.contradiction_map || []
+})
+
 // ---- L3 computed ----
 const riskAssessment = computed(() => {
   return props.data?.layers?.L3?.risk_assessment || {}
@@ -460,10 +581,10 @@ const l3RiskKeys = computed(() => {
 })
 
 const l3FinalText = computed(() => {
-  const raw = props.data?.layers?.L3?.final_decision_raw || ''
+  const raw = props.data?.layers?.L3?.research_brief_raw || props.data?.layers?.L3?.final_decision_raw || ''
   // 如果已经是结构化 CIO 数据（含 JSON），不显示原始文本
   if (cioParsed.value) return ''
-  return raw.substring(0, 1000)
+  return raw.substring(0, 2000)
 })
 
 const renderedFinalDecision = computed(() => {
@@ -548,46 +669,35 @@ const cioRiskCard = computed(() => {
     || null
 })
 
+// ---- 数据质量辅助 ----
+const dqDetails = computed(() => {
+  const dq = cioRiskCard.value?.['风险裁定']?.['数据质量']?.details
+  if (!dq || typeof dq !== 'object') return {}
+  return dq
+})
+
+function moduleName(key: string): string {
+  const names: Record<string, string> = {
+    technical: '技术分析',
+    basis: '基差分析',
+    inventory: '库存分析',
+    positioning: '持仓分析',
+    term_structure: '期限结构',
+    news_sentiment: '新闻情绪',
+  }
+  return names[key] || key
+}
+
+function freshnessLabel(days: number | null | undefined): string {
+  if (days === null || days === undefined) return '—'
+  if (days <= 1) return '今日'
+  if (days <= 3) return `${days}天前`
+  if (days <= 7) return `${days}天前`
+  return `${days}天前 (较旧)`
+}
+
 // ---- 辅助函数 ----
 type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
-
-function directionLabel(action?: string): string {
-  const map: Record<string, string> = { long: '做多', short: '做空', hold: '持有', flat: '平仓', bullish: '看多', bearish: '看空', neutral: '中性', skip: '跳过' }
-  return map[action || 'hold'] || action || 'hold'
-}
-
-function directionTagType(action?: string): TagType {
-  const map: Record<string, TagType> = { long: 'success', short: 'danger', hold: 'info', flat: 'warning', bullish: 'success', bearish: 'danger', neutral: 'info', skip: 'info' }
-  return map[action || 'hold'] || 'info'
-}
-
-function statusTagType(status?: string): TagType {
-  const map: Record<string, TagType> = { degraded: 'warning', skipped: 'info' }
-  return map[status || ''] || 'info'
-}
-
-function statusLabel(status?: string): string {
-  const map: Record<string, string> = { degraded: '降级', skipped: '跳过' }
-  return map[status || ''] || status || ''
-}
-
-function metricLabel(key: string): string {
-  const map: Record<string, string> = {
-    composite_score: '综合评分', oi_divergence: '量价背离', volatility: '波动率',
-    boll_low: '布林下轨', boll_up: '布林上轨',
-    basis: '基差', basis_zscore: '基差Z值', inventory_wow: '库存周环比',
-    term_structure: '期限结构', roll_yield: '展期收益',
-    net_long_change_5d: '净多变化5日', long_short_ratio: '多空比', crowding: '拥挤度',
-    sentiment_score: '情感评分', event_count: '事件数',
-  }
-  return map[key] || key
-}
-
-function formatMetric(val: unknown): string {
-  if (val === null || val === undefined) return '-'
-  if (typeof val === 'number') return val.toFixed(2)
-  return String(val)
-}
 
 function riskLabel(key: string): string {
   const map: Record<string, string> = { R1: '估值', R2: '库存', R3: '基差', R4: '技术', R5: '宏观' }
@@ -625,6 +735,16 @@ function scenarioLabel(sc: Record<string, any>): string {
   // try 推演方向
   const dir = sc['推演方向'] || sc.direction || ''
   return `情景: ${dir}`
+}
+
+function riskTierTagType(tier: string): TagType {
+  const map: Record<string, TagType> = { R1: 'success', R2: 'success', R3: 'warning', R4: 'danger', R5: 'danger' }
+  return map[tier] || 'info'
+}
+
+function fitnessTagType(fitness: string): TagType {
+  const map: Record<string, TagType> = { '推荐关注': 'success', '谨慎推荐': 'warning', '不推荐': 'danger', '数据不足': 'info' }
+  return map[fitness] || 'info'
 }
 
 function scrollToL1(refId: string) {
@@ -672,51 +792,7 @@ function scrollToL1(refId: string) {
   border-bottom: 2px solid #e4e7ed;
 }
 
-.l1-card {
-  padding: 8px 0;
-}
-
-.l1-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-}
-
-.confidence-bar {
-  font-size: 12px;
-  color: #606266;
-}
-
-.calibrated {
-  color: #e6a23c;
-  margin-left: 4px;
-}
-
-.l1-summary {
-  color: #303133;
-  margin-bottom: 6px;
-}
-
-.l1-signals {
-  margin-bottom: 6px;
-}
-
-.l1-metrics {
-  margin-bottom: 6px;
-}
-
-.l1-id {
-  font-size: 11px;
-  color: #c0c4cc;
-}
-
-.conclusion-id {
-  color: #909399;
-}
-
-.ref-link {
+  .ref-link {
   cursor: pointer;
   color: #409eff;
   margin-right: 4px;
@@ -804,5 +880,42 @@ function scrollToL1(refId: string) {
   overflow-y: auto;
   font-size: 13px;
   line-height: 1.7;
+}
+
+/* 风险裁定 */
+.verdict-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.verdict-label {
+  font-size: 12px;
+  color: #909399;
+}
+.verdict-value {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 32px;
+}
+.verdict-constraint {
+  margin-top: 8px;
+}
+.dq-summary-card {
+  font-size: 13px;
+}
+.dq-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dq-name {
+  min-width: 60px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.dq-meta {
+  font-size: 11px;
+  color: #909399;
+  white-space: nowrap;
 }
 </style>
