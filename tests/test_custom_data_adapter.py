@@ -150,7 +150,7 @@ class TestBuildCustomDataContext:
         assert text == ""
 
     def test_with_summary(self):
-        """有摘要时返回摘要文本（不含标题，标题由 prompt 模板提供）"""
+        """旧摘要无结构化当前值时保留摘要并追加未知时点护栏。"""
         from tradingagents.agents.analysts.commodity._base import build_custom_data_context
         text = build_custom_data_context({
             "custom_data": {
@@ -159,4 +159,59 @@ class TestBuildCustomDataContext:
             }
         })
         assert "这是一个测试摘要" in text
+        assert "摘要未提供可验证的当前时点值" in text
+        assert "不得推断当前趋势" in text
         assert text.endswith("\n")
+
+    def test_historical_series_forbids_current_trend_inference(self):
+        from tradingagents.agents.analysts.commodity._base import build_custom_data_context
+
+        text = build_custom_data_context({
+            "custom_data": {
+                "parsed": True,
+                "summary_text": "库存均值=100，最大值=160",
+                "raw_summaries": [{
+                    "time_columns": ["date"],
+                    "date_range": {"min": "2020-01-01", "max": "2024-12-31"},
+                    "statistics": {"inventory": {"mean": 100, "max": 160}},
+                    "sample": [{"date": "2020-01-01", "inventory": 120}],
+                }],
+            }
+        })
+
+        assert "无法获取当前时点数值，无法判断趋势" in text
+        assert "只能引用历史均值、极值、分位数和样本区间" in text
+        assert "禁止据此声称当前去库/补库" in text
+        assert "库存均值=100" in text
+
+    def test_non_temporal_summary_does_not_claim_current_value(self):
+        from tradingagents.agents.analysts.commodity._base import build_custom_data_context
+
+        text = build_custom_data_context({
+            "custom_data": {
+                "parsed": True,
+                "summary_text": "品类分布统计",
+                "raw_summaries": [{"statistics": {"count": {"mean": 3}}}],
+            }
+        })
+
+        assert "摘要未提供可验证的当前时点值" in text
+        assert "品类分布统计" in text
+
+    def test_verified_current_observation_allows_only_as_of_value(self):
+        from tradingagents.agents.analysts.commodity._base import build_custom_data_context
+
+        text = build_custom_data_context({
+            "custom_data": {
+                "parsed": True,
+                "summary_text": "当前观测库存=88",
+                "raw_summaries": [{
+                    "time_columns": ["date"],
+                    "latest_observation": {"inventory": 88},
+                    "as_of": "2026-07-20",
+                }],
+            }
+        })
+
+        assert "带 as_of 的 latest_observation/current_value" in text
+        assert "不得把全局统计或样本行冒充当前值" in text

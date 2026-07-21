@@ -143,6 +143,18 @@ class ParquetFileCache:
     def save_basis(self, var: str, start_day: str, end_day: str, df: pd.DataFrame) -> None:
         self._write_parquet(self._basis_path(var, start_day, end_day), df)
 
+    def delete_basis(self, var: str, start_day: str, end_day: str) -> bool:
+        """删除 Parquet 文件级基差缓存(no_cache 旁路用)。"""
+        path = self._basis_path(var, start_day, end_day)
+        if path.exists():
+            try:
+                path.unlink()
+                return True
+            except OSError as e:
+                logger.debug("Parquet 缓存删除失败 %s: %s", path, e)
+                return False
+        return False
+
     def _basis_path(self, var: str, start_day: str, end_day: str) -> Path:
         vdir = self._root / "basis" / var.upper()
         vdir.mkdir(parents=True, exist_ok=True)
@@ -155,6 +167,18 @@ class ParquetFileCache:
 
     def save_inventory(self, symbol: str, df: pd.DataFrame) -> None:
         self._write_parquet(self._inventory_path(symbol), df)
+
+    def delete_inventory(self, symbol: str) -> bool:
+        """删除 Parquet 文件级库存缓存(no_cache 旁路用)。"""
+        path = self._inventory_path(symbol)
+        if path.exists():
+            try:
+                path.unlink()
+                return True
+            except OSError as e:
+                logger.debug("Parquet 缓存删除失败 %s: %s", path, e)
+                return False
+        return False
 
     def _inventory_path(self, symbol: str) -> Path:
         return self._root / "inventory" / f"{symbol.upper()}_inventory.parquet"
@@ -286,11 +310,15 @@ class CommodityCacheManager:
         return self._file.get_inventory(*args, **kwargs)
     def save_inventory(self, *args, **kwargs):
         self._file.save_inventory(*args, **kwargs)
+    def delete_inventory(self, *args, **kwargs):
+        return self._file.delete_inventory(*args, **kwargs)
 
     def get_basis(self, *args, **kwargs):
         return self._file.get_basis(*args, **kwargs)
     def save_basis(self, *args, **kwargs):
         self._file.save_basis(*args, **kwargs)
+    def delete_basis(self, *args, **kwargs):
+        return self._file.delete_basis(*args, **kwargs)
 
     def get_positioning(self, *args, **kwargs):
         return self._file.get_positioning(*args, **kwargs)

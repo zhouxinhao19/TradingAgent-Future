@@ -86,15 +86,17 @@ async def get_inventory(
     full_symbol: str,
     start_date: Optional[str] = Query(None, description="开始日期 YYYY-MM-DD"),
     end_date: Optional[str] = Query(None, description="结束日期 YYYY-MM-DD"),
+    no_cache: bool = Query(False, description="跳过缓存强制重拉(AKShare 在线)"),
 ):
     """
     库存(Eastern Wealth 近 60 个交易日 + 99 期货长期)。
 
     Path: GET /api/commodity/A.DCE/inventory
+    Path: GET /api/commodity/A.DCE/inventory?no_cache=true
     """
     symbol = full_symbol.split(".")[0]
     symbol = re.sub(r'\d+$', '', symbol)  # CU2501 → CU
-    data = await service.get_inventory(symbol=symbol, start_date=start_date, end_date=end_date)
+    data = await service.get_inventory(symbol=symbol, start_date=start_date, end_date=end_date, no_cache=no_cache)
     if not data:
         return ok(data={"symbol": symbol, "rows": [], "count": 0},
                   message="库存数据暂不可用,该品种可能不支持库存接口")
@@ -152,14 +154,16 @@ async def get_position_rank(
 @router.get("/spot-price", response_model=dict, summary="当日现货价格 + 基差(全品种)")
 async def get_spot_price(
     date: Optional[str] = Query(None, description="交易日 YYYY-MM-DD,默认今天"),
+    no_cache: bool = Query(False, description="跳过缓存强制重拉"),
 ):
     """
     51 行当日现货价格 + 基差(全品种一次返回)。
 
     Path: GET /api/commodity/spot-price?date=2025-07-10
+    Path: GET /api/commodity/spot-price?date=2025-07-10&no_cache=true
     """
     d = _parse_date(date or _today())
-    data = await service.get_spot_price(str(d))
+    data = await service.get_spot_price(str(d), no_cache=no_cache)
     if not data:
         return ok(data={"date": str(d), "rows": [], "count": 0},
                   message="现货价格暂不可用")
@@ -171,16 +175,18 @@ async def get_basis_history(
     vars_list: str = Query(..., description="品种列表,逗号分隔,如 'CU,AL'"),
     start_day: Optional[str] = Query(None, description="起始日期 YYYY-MM-DD"),
     end_day: Optional[str] = Query(None, description="结束日期 YYYY-MM-DD,默认今天"),
+    no_cache: bool = Query(False, description="跳过缓存强制重拉"),
 ):
     """
     历史基差值(AKShare: futures_spot_price_daily)。
 
     Path: GET /api/commodity/basis?vars_list=CU,AL&start_day=2025-06-01
+    Path: GET /api/commodity/basis?vars_list=CU,AL&start_day=2025-06-01&no_cache=true
     """
     sd = _parse_date(start_day or (_today()))
     ed = _parse_date(end_day or (_today()))
     vars_parsed = [v.strip() for v in vars_list.split(",") if v.strip()]
-    data = await service.get_basis_history(str(sd), str(ed), vars_parsed)
+    data = await service.get_basis_history(str(sd), str(ed), vars_parsed, no_cache=no_cache)
     if not data:
         return ok(data={"vars_list": vars_parsed, "rows": [], "count": 0},
                   message="基差数据暂不可用")
@@ -392,11 +398,13 @@ async def get_holding_position(
     full_symbol: str,
     indicator: str = Query("成交量", description="指标:成交量 / 多单持仓 / 空单持仓"),
     date: Optional[str] = Query(None, description="交易日 YYYYMMDD,默认今天"),
+    no_cache: bool = Query(False, description="跳过缓存强制重拉"),
 ):
     """
     期货成交持仓(AKShare: futures_hold_pos_sina)。
 
     Path: GET /api/commodity/OI2501.CZC/holding-position?indicator=成交量
+    Path: GET /api/commodity/OI2501.CZC/holding-position?indicator=成交量&no_cache=true
 
     注意:full_symbol 中的合约代码应是**主力合约**而不是主力连续。
     """
@@ -419,7 +427,7 @@ async def get_holding_position(
         except Exception:
             pass  # 解析失败则用原始 symbol
 
-    data = await service.get_holding_position(symbol=symbol, indicator=indicator, date=date)
+    data = await service.get_holding_position(symbol=symbol, indicator=indicator, date=date, no_cache=no_cache)
     if not data:
         return ok(data={"symbol": symbol, "indicator": indicator, "rows": [], "count": 0},
                   message="成交持仓暂不可用")

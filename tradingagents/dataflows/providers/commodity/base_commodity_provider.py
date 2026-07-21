@@ -106,11 +106,15 @@ class BaseCommodityDataProvider(ABC):
         symbol: str,
         start_date: Optional[Union[str, date]] = None,
         end_date: Optional[Union[str, date]] = None,
+        no_cache: bool = False,
     ) -> Optional[pd.DataFrame]:
         """
         获取库存数据(AKShare: futures_inventory_99 / futures_inventory_em /
         futures_stock_shfe_js)。
         返回 DataFrame,列应包含 [date, inventory, change_pct]。
+
+        Args:
+            no_cache: True 时跳过所有缓存(磁盘 Parquet + 内存 TTL),直接从数据源拉取
         """
         raise NotImplementedError(
             f"{self.provider_name} 未实现 get_inventory"
@@ -217,11 +221,15 @@ class BaseCommodityDataProvider(ABC):
     async def get_spot_price(
         self,
         date: Union[str, date],
+        no_cache: bool = False,
     ) -> Optional[pd.DataFrame]:
         """
         获取某交易日现货价格 + 基差(AKShare: futures_spot_price)。
         列应包含 symbol / spot_price / near_contract / near_basis /
         dom_contract / dom_basis / near_basis_rate / dom_basis_rate。
+
+        Args:
+            no_cache: True 时跳过所有缓存强制重拉
         """
         raise NotImplementedError(
             f"{self.provider_name} 未实现 get_spot_price"
@@ -232,9 +240,13 @@ class BaseCommodityDataProvider(ABC):
         start_day: Union[str, date],
         end_day: Union[str, date],
         vars_list: List[str],
+        no_cache: bool = False,
     ) -> Optional[pd.DataFrame]:
         """
         获取历史基差数据(AKShare: futures_spot_price_daily)。
+
+        Args:
+            no_cache: True 时跳过所有缓存
         """
         raise NotImplementedError(
             f"{self.provider_name} 未实现 get_basis_history"
@@ -347,11 +359,15 @@ class BaseCommodityDataProvider(ABC):
         symbol: str,
         indicator: str = "成交量",
         date: Union[str, date] = None,
+        no_cache: bool = False,
     ) -> Optional[pd.DataFrame]:
         """
         获取期货成交持仓(AKShare: futures_hold_pos_sina)。
 
         indicator 取值: "成交量" / "多单持仓" / "空单持仓"
+
+        Args:
+            no_cache: True 时跳过所有缓存
         """
         raise NotImplementedError(
             f"{self.provider_name} 未实现 get_holding_position"

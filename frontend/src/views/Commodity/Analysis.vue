@@ -107,6 +107,21 @@
                     >
                       {{ f.original_name }}
                     </el-tag>
+                    <el-form-item label="分析技能" style="margin-top: 8px">
+                      <el-select
+                        v-model="skillName"
+                        placeholder="选择分析技能"
+                        style="width: 100%"
+                        size="small"
+                      >
+                        <el-option
+                          v-for="s in skillOptions"
+                          :key="s.name"
+                          :label="`${s.title} — ${s.description}`"
+                          :value="s.name"
+                        />
+                      </el-select>
+                    </el-form-item>
                     <el-form-item label="数据描述（可选）" style="margin-top: 8px">
                       <el-input
                         v-model="userContext"
@@ -194,7 +209,7 @@
 
         <!-- 无结果时显示自选品种 + 最近分析（与 Dashboard 共享组件） -->
         <template v-if="!latestResult">
-          <FavoritesCard compact />
+          <FavoritesCard compact @select="onFavoriteSelect" />
           <div style="margin-top: 16px;"></div>
           <RecentAnalysesCard compact />
         </template>
@@ -209,6 +224,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { commodityApi, type VarietyItem } from '@/api/commodity'
+import type { FavoriteItem } from '@/api/favorites'
 import CommodityReportDetail from '@/components/Commodity/CommodityReportDetail.vue'
 import FavoritesCard from '@/components/Dashboard/FavoritesCard.vue'
 import RecentAnalysesCard from '@/components/Dashboard/RecentAnalysesCard.vue'
@@ -249,6 +265,8 @@ const batchResult = ref<Record<string, any> | null>(null)
 const uploadRef = ref<any>(null)
 const uploadedFiles = ref<Array<{ file_id: string; original_name: string }>>([])
 const userContext = ref('')
+const skillName = ref('general-analysis')
+const skillOptions = ref<Array<{ name: string; title: string; description: string; content_types: string[] }>>([])
 
 // 品种级联
 const loadingVarieties = ref(false)
@@ -256,6 +274,15 @@ const varietyOptions = ref<VarietyItem[]>([])
 const selectedVarietyName = ref('')
 
 // ---- 文件上传 ----
+async function loadSkills() {
+  try {
+    const res = await commodityApi.listCustomSkills()
+    if (res?.data && Array.isArray(res.data)) {
+      skillOptions.value = res.data
+    }
+  } catch { /* ignore */ }
+}
+
 async function handleFileUpload(options: any) {
   const { file, onSuccess, onError } = options
   try {
@@ -305,6 +332,36 @@ async function onVarietyChange() {
   if (!form.value.variety_symbol) return
   const found = varietyOptions.value.find(v => v.symbol === form.value.variety_symbol)
   selectedVarietyName.value = found?.name || found?.name_cn || form.value.variety_symbol
+}
+
+// 自选品种点击 → 填入表单（不跳转）
+const EXCHANGE_SUFFIX_TO_KEY: Record<string, string> = {
+  '.SHF': 'SHFE', '.DCE': 'DCE', '.ZCE': 'CZCE',
+  '.INE': 'INE', '.GFEX': 'GFEX', '.CFX': 'CFFEX',
+}
+
+async function onFavoriteSelect(item: FavoriteItem) {
+  if (item.asset_type !== 'commodity' || !item.full_symbol) return
+  const dotIdx = item.full_symbol.lastIndexOf('.')
+  if (dotIdx < 0) return
+  const variety = item.full_symbol.slice(0, dotIdx).replace(/\d+$/, '')
+  const suffix = item.full_symbol.slice(dotIdx)
+  const exchange = EXCHANGE_SUFFIX_TO_KEY[suffix] || item.exchange || ''
+  if (!exchange) { ElMessage.warning(`无法识别交易所后缀: ${suffix}`); return }
+
+  latestResult.value = null
+  form.value.exchange = exchange
+  form.value.variety_symbol = ''
+  selectedVarietyName.value = item.commodity_name || ''
+
+  await onExchangeChange()
+  form.value.variety_symbol = variety
+  if (varietyOptions.value.length && !varietyOptions.value.find(v => v.symbol === variety)) {
+    // 自选里的品种在交易所列表中找不到（已退市），提示但保留表单
+    ElMessage.warning(`品种 ${variety} 不在 ${exchange} 当前列表中，可能已退市`)
+  }
+  await onVarietyChange()
+  ElMessage.success(`已填入: ${variety} (${exchange})`)
 }
 
 // 轮询
@@ -372,6 +429,7 @@ async function submitAnalysis() {
     if (uploadedFiles.value.length) {
       params.file_ids = uploadedFiles.value.map(f => f.file_id)
       params.user_context = userContext.value || ''
+      params.skill_name = skillName.value || 'general-analysis'
     }
     const res = await commodityApi.submitAnalysis(fullSymbol, params)
     if (res?.success) {
@@ -380,6 +438,10 @@ async function submitAnalysis() {
       progressMessage.value = '任务已提交,后台分析中...'
       pollingActive.value = true
       submitting.value = false
+      // 任务成功入队 → 重置附加数据 + skill 上下文,品种/交易所不变
+      uploadedFiles.value = []
+      userContext.value = ''
+      skillName.value = 'general-analysis'
       startPolling(tid)
     } else {
       ElMessage.error(res?.message || '提交失败')
@@ -424,9 +486,11 @@ function clearForm() {
   varietyOptions.value = []
   uploadedFiles.value = []
   userContext.value = ''
+  skillName.value = 'general-analysis'
 }
 
 onMounted(() => {
+  loadSkills()
   const params = new URLSearchParams(window.location.search)
   const symbol = params.get('symbol')
   if (symbol) {

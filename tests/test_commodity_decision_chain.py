@@ -691,3 +691,287 @@ class TestInvestmentDirectorNode:
         edges = [(e.source, e.target) for e in graph.edges]
         assert ("Research Manager", "Investment Director") in edges
         assert ("Investment Director", "__end__") in edges
+
+
+# =============================================================================
+# 系统性逻辑修复回归测试
+# =============================================================================
+
+
+def test_research_summary_preserves_real_metrics_and_risks():
+    from tradingagents.agents.managers.research_manager import _build_analyst_summary
+
+    features = {
+        "technical": {
+            "main_continuous": {"daily": {"snapshot": {
+                "composite_score": 0.62, "boll_low": 3400, "boll_up": 3650,
+            }}},
+            "combined": {
+                "direction": "short", "oi_divergence": "conflict",
+                "volatility": {"regime": "high", "atr_ratio_pctl180": 91},
+                "signals": ["价仓背离，警惕趋势反转"],
+            },
+        },
+        "basis": {
+            "latest": {"spot_price": 3600, "near_basis": 80, "dom_basis_rate": 0.023},
+            "stats": {"zscore_180d": {"dom_basis_rate": 92}},
+            "signals": ["基差进入高分位，警惕均值回归"],
+        },
+        "inventory": {
+            "latest": {"value": 88},
+            "snapshot": {"wow_change": -5, "mom_change": -12, "jump_flag": False},
+            "signals": ["库存历史低位"],
+        },
+        "term_structure": {
+            "latest": {"metric": "spread"},
+            "snapshot": {"structure": "contango", "carry_score": -0.7},
+            "signals": ["期限结构极端，展期风险高"],
+        },
+        "positioning": {
+            "snapshot": {
+                "net_long_change_5d": 0.08, "long_short_ratio": 1.3,
+                "crowding_pctl_180d": 98, "price_oi_regime": "多头强势(价涨仓增)",
+                "cross_contract_consistency": "分化", "rollover_detected": True,
+            },
+            "signals": ["拥挤度处高分位，警惕反转风险"],
+        },
+        "news_sentiment": {
+            "snapshot": {"sentiment": {"bullish": 2, "bearish": 4, "ratio": -0.33}},
+            "signals": ["高重要度政策风险提示"],
+        },
+    }
+    registry = {
+        "REF-TECH-1": {"analyst": "technical", "direction": "bearish", "status": "ok"},
+        "REF-FUND-1": {"analyst": "fundamental", "direction": "向下", "status": "ok"},
+        "REF-POSN-1": {"analyst": "position", "direction": "看多(注意拥挤反向风险)", "status": "ok"},
+        "REF-NEWS-1": {"analyst": "news", "direction": "neutral", "status": "ok"},
+    }
+    summary = _build_analyst_summary(
+        features,
+        registry,
+        position_structured={
+            "direction": {"confidence": 0.72},
+            "concentration": {"crowding_status": "拥挤", "reversal_risk": True},
+            "risk_flags": ["高度拥挤，反转风险高"],
+        },
+        fundamentals_structured={"risk_flags": ["需求下行警告"]},
+        latest_news=[{"title": "限产政策变化", "llm_importance": "high", "llm_sentiment": "negative"}],
+        reports=["## 风险提示\n- 拥挤度极高分位，反转风险高"],
+    )
+
+    for expected in (
+        "composite_score=0.62", "oi_divergence=conflict", "spot_price=3600",
+        "value=88", "carry_score=-0.7", "crowding_pctl_180d=98",
+        "高重要度事件: 限产政策变化", "强制保留风险信号",
+        "高度拥挤，反转风险高", "需求下行警告",
+        "拥挤度极高分位，反转风险高", "L1 冲突: 看多=1, 看空=2",
+    ):
+        assert expected in summary
+    assert "原始置信度 0.0" not in summary
+    assert "技术面: 整体不可用（数据缺失）" not in summary
+
+
+def test_l2_json_postprocess_keeps_forced_risks():
+    from tradingagents.agents.managers.research_manager import _ensure_forced_risks_in_plan
+
+    content = json.dumps({
+        "估值驱动矩阵": {}, "多空对照表": {}, "三种情景推演": {},
+    }, ensure_ascii=False)
+    result = json.loads(_ensure_forced_risks_in_plan(
+        content, ["高度拥挤，反转风险高"]
+    ))
+
+    assert result["多空对照表"]["强制风险信号"] == ["高度拥挤，反转风险高"]
+    assert result["三种情景推演"]["强制风险情景输入"] == ["高度拥挤，反转风险高"]
+
+
+class TestSafetyOverrideHardConstraints:
+    @staticmethod
+    def _risk(composite=2, dimensions=None, flags=None, data_insufficient=False):
+        return {
+            "composite_risk_level": composite,
+            "dimensions": dimensions or {},
+            "flags": flags or [],
+            "data_insufficient": data_insufficient,
+        }
+
+    def test_any_r5_dimension_forces_flat(self):
+        from tradingagents.agents.managers.investment_director import safety_override
+
+        result = safety_override(
+            self._risk(composite=3, dimensions={"term_structure": {"level": 5}}),
+            "long", 0.7,
+        )
+        assert result["action"] == "flat"
+        assert result["confidence"] == 0.0
+        assert result["max_position"] == 0.0
+        assert result["r5_dimensions"] == ["term_structure"]
+        assert "R5_REJECT" in result["override_rules_triggered"]
+
+    @pytest.mark.parametrize("condition", ["composite", "delivery"])
+    def test_composite_r5_and_near_delivery_force_flat(self, condition):
+        from tradingagents.agents.managers.investment_director import safety_override
+
+        risk = self._risk(
+            composite=5 if condition == "composite" else 4,
+            flags=[{"name": "near_delivery", "severity": "high"}]
+            if condition == "delivery" else [],
+        )
+        result = safety_override(risk, "short", 0.8)
+        assert (result["action"], result["confidence"], result["max_position"]) == ("flat", 0.0, 0.0)
+
+    def test_data_insufficient_caps_direction_and_existing_hold(self):
+        from tradingagents.agents.managers.investment_director import safety_override
+
+        directional = safety_override(
+            self._risk(composite="UNKNOWN", data_insufficient=True), "long", 0.8,
+        )
+        assert directional["action"] == "hold"
+        assert directional["confidence"] == 0.2
+        assert directional["max_position"] == 0.3
+
+        existing_hold = safety_override(
+            self._risk(composite="UNKNOWN", data_insufficient=True), "hold", 0.8,
+        )
+        assert existing_hold["action"] == "hold"
+        assert existing_hold["confidence"] == 0.2
+        assert existing_hold["overridden"] is True
+
+    def test_no_l1_support_requires_explanation(self):
+        from tradingagents.agents.managers.investment_director import safety_override
+
+        registry = {"REF-TECH-1": {"direction": "bearish", "status": "ok"}}
+        no_explanation = safety_override(
+            self._risk(), "long", 0.8, analyst_registry=registry,
+        )
+        assert no_explanation["action"] == "hold"
+        assert no_explanation["confidence"] == 0.3
+        assert "COUNTER_SIGNAL_EXPLANATION_REQUIRED" in no_explanation["override_rules_triggered"]
+
+        explained = safety_override(
+            self._risk(), "long", 0.8, analyst_registry=registry,
+            counter_signal_explanation="技术偏空，但库存与基差共振更强，故仅低置信度做多",
+        )
+        assert explained["action"] == "long"
+        assert explained["confidence"] == 0.3
+
+    def test_position_reversal_risk_caps_confidence(self):
+        from tradingagents.agents.managers.investment_director import safety_override
+
+        result = safety_override(
+            self._risk(), "long", 0.7,
+            analyst_registry={"REF-POSN-1": {"direction": "bullish", "status": "ok"}},
+            position_structured={
+                "concentration": {"reversal_risk": True},
+                "risk_flags": ["高度拥挤，反转风险高"],
+            },
+            counter_signal_explanation="已识别拥挤风险，因此置信度降至 0.3",
+        )
+        assert result["action"] == "long"
+        assert result["confidence"] == 0.3
+        assert "POSITION_REVERSAL_RISK" in result["override_rules_triggered"]
+
+    def test_r4_position_cap_counts_as_override(self):
+        from tradingagents.agents.managers.investment_director import safety_override
+
+        result = safety_override(
+            self._risk(composite=4, flags=[{"name": "risk", "severity": "high"}]),
+            "long", 0.6,
+        )
+        assert result["action"] == "long"
+        assert result["max_position"] == 0.5
+        assert result["overridden"] is True
+
+    def test_already_flat_still_records_execution_and_rule(self, caplog):
+        from tradingagents.agents.managers.investment_director import safety_override
+
+        with caplog.at_level("INFO"):
+            result = safety_override(
+                self._risk(composite=5), "flat", 0.0,
+            )
+        assert result["executed"] is True
+        assert result["action"] == "flat"
+        assert "R5_REJECT" in result["override_rules_triggered"]
+        assert any("[投研总监|OVERRIDE] executed=True" in record.message for record in caplog.records)
+
+
+def test_investment_director_preserves_rule_card_and_audit():
+    from tradingagents.agents.managers.investment_director import create_investment_director
+
+    mock_llm = MagicMock()
+    mock_llm.invoke = MagicMock(return_value=MagicMock(content=json.dumps({
+        "投研备忘录": {"投研结论": {
+            "方向倾向": "做多", "置信度": 0.7, "逆向信号处理": "无",
+        }},
+        "风险评估卡": {
+            "量化风险矩阵": {"伪造": "应被忽略"},
+            "风险裁定": {"建议动作": "开仓", "仓位上限": "账户30%"},
+            "风险提示": ["定性提示"],
+        },
+        "final_decision_markdown": "- **方向**：做多\n- **置信度**：0.7",
+    }, ensure_ascii=False)))
+    result = create_investment_director(mock_llm)(make_commodity_state())
+
+    assert "波动率" in result["risk_card"]["量化风险矩阵"]
+    assert "伪造" not in result["risk_card"]["量化风险矩阵"]
+    assert result["risk_card"]["风险提示"] == ["定性提示"]
+    assert result["risk_card"]["safety_override"]["executed"] is True
+    assert "**方向**:做多" in result["final_decision"]
+    assert "**置信度**:0.70" in result["final_decision"]
+
+
+def test_investment_director_r5_dimension_syncs_memo_and_markdown():
+    from tradingagents.agents.managers.investment_director import create_investment_director
+
+    mock_llm = MagicMock()
+    mock_llm.invoke = MagicMock(return_value=MagicMock(content=json.dumps({
+        "投研备忘录": {"投研结论": {
+            "方向倾向": "做多", "置信度": 0.7,
+            "核心逻辑": "需求改善", "逆向信号处理": "已评估反向信号",
+        }},
+        "风险评估卡": {"风险裁定": {"建议动作": "开仓"}},
+        "final_decision_markdown": "- **方向**:做多\n- **置信度**:0.70",
+    }, ensure_ascii=False)))
+    state = make_commodity_state({
+        "commodity_features": _make_features(term_structure={
+            "quality": {"rows": 50, "coverage": 0.75, "data_freshness_days": 1},
+            "snapshot": {"carry_score": -0.7, "structure": "contango"},
+        }),
+    })
+    result = create_investment_director(mock_llm)(state)
+
+    assert result["risk_assessment"]["composite_risk_level"] == 3
+    assert result["risk_assessment"]["dimensions"]["term_structure"]["level"] == 5
+    assert result["risk_card"]["safety_override"]["overridden_action"] == "flat"
+    assert result["investment_memo"]["投研结论"]["方向倾向"] == "平仓"
+    assert result["investment_memo"]["投研结论"]["置信度"] == 0.0
+    assert "R5" in result["investment_memo"]["投研结论"]["硬约束说明"]
+    assert "**方向**:平仓" in result["final_decision"]
+    assert "**置信度**:0.00" in result["final_decision"]
+
+
+def test_investment_director_missing_fields_are_safely_added():
+    from tradingagents.agents.managers.investment_director import create_investment_director
+
+    mock_llm = MagicMock()
+    mock_llm.invoke = MagicMock(return_value=MagicMock(content=json.dumps({
+        "投研备忘录": {}, "风险评估卡": {},
+        "final_decision_markdown": "这段内容缺少标准方向和置信度字段，但长度足够触发正常解析。",
+    }, ensure_ascii=False)))
+    result = create_investment_director(mock_llm)(make_commodity_state())
+
+    assert "**方向**:持有" in result["final_decision"]
+    assert "**置信度**:0.00" in result["final_decision"]
+    assert result["risk_card"]["safety_override"]["executed"] is True
+
+
+def test_investment_director_fallback_also_has_safety_audit():
+    from tradingagents.agents.managers.investment_director import create_investment_director
+
+    mock_llm = MagicMock()
+    mock_llm.invoke = MagicMock(side_effect=RuntimeError("LLM 不可用"))
+    result = create_investment_director(mock_llm)(make_commodity_state())
+
+    assert result["risk_card"]["safety_override"]["executed"] is True
+    assert result["risk_card"]["safety_override"]["original_llm_direction"] == "hold"
+    assert "**方向**:持有" in result["final_decision"]

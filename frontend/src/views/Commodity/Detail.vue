@@ -160,7 +160,15 @@
           <template #header>
             <div style="display:flex; align-items:center; justify-content:space-between">
               <b>库存数据</b>
-              <el-tag size="small">东方财富(近 60 交易日) / 99 期货(长期)</el-tag>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <el-tag size="small">东方财富(近 60 交易日) / 99 期货(长期)</el-tag>
+                <el-tag v-if="inventoryLatestDate" size="small" type="info" effect="plain">
+                  最新 {{ inventoryLatestDate }} · 距今 {{ inventoryDaysAgo }} 天
+                </el-tag>
+                <el-button size="small" :loading="store.loading(`inventory:${fullSymbol}`)" @click="reloadInventory(true)">
+                  <el-icon><Refresh /></el-icon> 刷新
+                </el-button>
+              </div>
             </div>
           </template>
           <div ref="inventoryChartRef" class="kline-chart"></div>
@@ -187,7 +195,9 @@
           <template #header>
             <div style="display:flex; align-items:center; justify-content:space-between">
               <b>基差({{ extractUnderlying(fullSymbol) }} 近 30 日)</b>
-              <el-button size="small" @click="reloadBasis">刷新</el-button>
+              <el-button size="small" :loading="store.loading('basis')" @click="reloadBasis(true)">
+                <el-icon><Refresh /></el-icon> 刷新
+              </el-button>
             </div>
           </template>
           <div ref="basisChartRef" class="kline-chart" style="height: 360px;"></div>
@@ -225,6 +235,9 @@
                 <el-tag size="small" effect="plain">
                   共 {{ store.holdingPosition?.count || 0 }} 家会员
                 </el-tag>
+                <el-button size="small" :loading="store.loading(`holding:${fullSymbol}:all`)" @click="reloadHolding(true)">
+                  <el-icon><Refresh /></el-icon> 刷新
+                </el-button>
               </div>
             </div>
           </template>
@@ -262,7 +275,7 @@
             </el-col>
           </el-row>
 
-          <el-empty v-if="!store.holdingPosition?.rows?.length" description="暂无持仓数据" />
+          <el-empty v-if="!store.holdingPosition?.rows?.length" :description="holdingEmptyHint" />
 
           <!-- 前 10 名会员多空对比图 -->
           <div v-if="store.holdingPosition?.rows?.length" style="margin: 16px 0;">
@@ -816,6 +829,7 @@ function renderBasis() {
   if (!basisChartRef.value) return
   if (!basisChart) basisChart = echarts.init(basisChartRef.value)
   const rows = (store.basis?.rows || []) as Record<string, unknown>[]
+  console.log('[basis] renderBasis called, rows:', rows.length, 'symbol:', store.basis?.symbol)
   if (!rows.length) {
     basisChart.clear()
     return
@@ -856,6 +870,7 @@ function renderHolding() {
   if (!holdingChartRef.value) return
   if (!holdingChart) holdingChart = echarts.init(holdingChartRef.value)
   const rows = ((store.holdingPosition as any)?.rows || []) as Record<string, any>[]
+  console.log('[position] renderHolding called, rows:', rows.length, 'symbol:', store.holdingPosition?.symbol)
   if (!rows.length) {
     holdingChart.clear()
     return
@@ -1022,14 +1037,29 @@ function renderSpotPriceLine() {
   klineChart.resize()
 }
 
-async function reloadBasis() {
+async function reloadBasis(force = false) {
   const endDate = new Date().toISOString().slice(0, 10)
   const startDate = new Date()
   startDate.setDate(startDate.getDate() - 30)
   const startStr = startDate.toISOString().slice(0, 10)
   const underlying = extractUnderlying(fullSymbol.value)
-  await store.loadBasisForVars([underlying], startStr, endDate)
-  nextTick(renderBasis)
+  console.log('[basis] reloadBasis called, force=', force, 'symbol=', underlying, 'range=', startStr, endDate)
+  await store.loadBasisForVars([underlying], startStr, endDate, force)
+  console.log('[basis] reloadBasis resolved, store.basis.rows=', store.basis?.rows?.length)
+  nextTick(() => {
+    console.log('[basis] nextTick fired, activeTab=', activeTab.value)
+    renderBasis()
+  })
+}
+
+async function reloadInventory(force = false) {
+  await store.loadInventory(fullSymbol.value, force)
+  nextTick(renderInventory)
+}
+
+async function reloadHolding(force = false) {
+  await store.loadHoldingPositionAll(fullSymbol.value, force)
+  nextTick(renderHolding)
 }
 
 // ---- 路由/生命周期 ----
@@ -1050,16 +1080,32 @@ onUnmounted(() => {
   holdingChart?.dispose()
 })
 
-watch(activeTab, () => {
+watch(activeTab, (newTab, oldTab) => {
   nextTick(() => {
-    if (activeTab.value === 'kline') {
+    if (newTab === 'kline') {
       if (klineMode.value === 'kline') renderKline()
       else renderSpotPriceLine()
     }
-    if (activeTab.value === 'inventory') renderInventory()
-    if (activeTab.value === 'basis') renderBasis()
-    if (activeTab.value === 'position') renderHolding()
-    if (activeTab.value === 'news') reloadNews()
+    // 库存/基差/持仓：旧 tab 里有数据 → 仅 render；无数据 → 触发 fetch（解决首次切换看不到数据）
+    if (newTab === 'inventory') {
+      if (store.inventory?.rows?.length) renderInventory()
+      else if (fullSymbol.value) store.loadInventory(fullSymbol.value)
+    }
+    if (newTab === 'basis') {
+      if (store.basis?.rows?.length) renderBasis()
+      else if (fullSymbol.value) {
+        const endDate = new Date().toISOString().slice(0, 10)
+        const startDate = new Date()
+        startDate.setDate(startDate.getDate() - 30)
+        const u = extractUnderlying(fullSymbol.value)
+        store.loadBasisForVars([u], startDate.toISOString().slice(0, 10), endDate)
+      }
+    }
+    if (newTab === 'position') {
+      if (store.holdingPosition?.rows?.length) renderHolding()
+      else if (fullSymbol.value) store.loadHoldingPositionAll(fullSymbol.value)
+    }
+    if (newTab === 'news') reloadNews()
   })
 })
 
@@ -1112,6 +1158,28 @@ const changeClass = computed(() => {
   const c = store.quotes?.change ?? 0
   return c > 0 ? 'up' : c < 0 ? 'down' : ''
 })
+
+// 库存数据的最新日期与今天差(用户明确知道的"数据不新"提示)
+const inventoryLatestDate = computed(() => {
+  const rows = (store.inventory?.rows || []) as Array<Record<string, unknown>>
+  if (!rows.length) return ''
+  // 行已经按日期排序,首行日期即最新
+  return String(rows[0]['日期'] || rows[0]['date'] || '').slice(0, 10)
+})
+const inventoryDaysAgo = computed(() => {
+  if (!inventoryLatestDate.value) return 0
+  const latest = new Date(inventoryLatestDate.value + 'T00:00:00')
+  const today = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00')
+  return Math.max(0, Math.round((today.getTime() - latest.getTime()) / 86400000))
+})
+
+// 持仓空数据友好提示:周六周日 + 节假日
+const holdingEmptyHint = computed(() => {
+  if ((store.holdingPosition as any)?.rows?.length) return '暂无持仓数据'
+  const weekday = new Date().getDay()
+  if (weekday === 0 || weekday === 6) return '今天是非交易日(周末),无成交持仓数据。点击右上"刷新"按钮可重试。'
+  return '今日暂无成交持仓数据(已自动跳过缓存重拉)。点"刷新"按钮可再次重试。'
+})
 function exchangeTagType(code: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' {
   const map: Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = {
     SHFE: 'primary', DCE: 'success', CZCE: 'warning', INE: 'info', GFEX: 'danger', CFFEX: 'info',
@@ -1150,8 +1218,8 @@ function stripFuturesSuffix(name: string): string {
 .quote-area .change.down { color: #14b143; }
 .quote-area .pct { font-size: 12px; margin-left: 4px; }
 .actions { display: flex; gap: 8px; }
-.detail-tabs { background: #fff; border-radius: 4px; padding: 12px; }
-.kline-chart { width: 100%; min-width: 900px; height: 460px; }
+.detail-tabs { background: #fff; border-radius: 4px; padding: 12px; overflow-x: auto; }
+.kline-chart { width: 100%; height: 460px; min-width: 0; }
 .news-list { padding: 0; margin: 0; list-style: none; }
 .news-item { padding: 12px 0; border-bottom: 1px solid var(--el-border-color-lighter); }
 .news-item.news-high { background-color: var(--el-color-warning-light-9); margin: 0 -8px; padding: 12px 8px; border-radius: 4px; }

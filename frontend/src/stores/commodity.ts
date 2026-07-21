@@ -181,11 +181,11 @@ export const useCommodityStore = defineStore('commodity', {
     },
 
     // ---------- 库存 ----------
-    async loadInventory(fullSymbol: string) {
+    async loadInventory(fullSymbol: string, force = false) {
       const key = `inventory:${fullSymbol}`
       this._setLoading(key, true)
       try {
-        const r = await commodityApi.getInventory(fullSymbol)
+        const r = await commodityApi.getInventory(fullSymbol, { no_cache: force })
         // /api/commodity/{symbol}/inventory 返回 {success, data: InventoryResponse, message}
         this.inventory = (r as any)?.data ?? null
       } catch (e) {
@@ -196,14 +196,14 @@ export const useCommodityStore = defineStore('commodity', {
     },
 
     // ---------- 基差(用 spot-price 全市场汇总,前端按品种过滤展示) ----------
-    async loadBasis(daysBack = 30) {
+    async loadBasis(daysBack = 30, force = false) {
       this._setLoading('basis', true)
       try {
         const endDate = new Date().toISOString().slice(0, 10)
         const startDate = new Date()
         startDate.setDate(startDate.getDate() - daysBack)
         // AKShare futures_spot_price_daily 需要 vars_list;详情页可调 getBasisHistory
-        const r = await commodityApi.getSpotPrice(endDate)
+        const r = await commodityApi.getSpotPrice(endDate, force)
         // /api/commodity/spot-price 返回 {success, data: BasisResponse, message}
         this.spotPrice = (r as any)?.data ?? null
         this.basis = (r as any)?.data ?? null
@@ -214,11 +214,11 @@ export const useCommodityStore = defineStore('commodity', {
       }
     },
 
-    async loadBasisForVars(vars: string[], startDay: string, endDay: string) {
+    async loadBasisForVars(vars: string[], startDay: string, endDay: string, force = false) {
       const key = `basis:${vars.join(',')}:${startDay}:${endDay}`
       this._setLoading(key, true)
       try {
-        const r = await commodityApi.getBasisHistory(vars, startDay, endDay)
+        const r = await commodityApi.getBasisHistory(vars, startDay, endDay, force)
         // /api/commodity/basis 返回 {success, data: BasisResponse, message}
         this.basis = (r as any)?.data ?? null
       } catch (e) {
@@ -229,11 +229,11 @@ export const useCommodityStore = defineStore('commodity', {
     },
 
     // ---------- 持仓 ----------
-    async loadHoldingPosition(fullSymbol: string, indicator = '成交量') {
+    async loadHoldingPosition(fullSymbol: string, indicator = '成交量', force = false) {
       const key = `holding:${fullSymbol}:${indicator}`
       this._setLoading(key, true)
       try {
-        const r = await commodityApi.getHoldingPosition(fullSymbol, indicator)
+        const r = await commodityApi.getHoldingPosition(fullSymbol, indicator, undefined, force)
         // /api/commodity/{symbol}/holding-position 返回 {success, data: RowsResponse, message}
         this.holdingPosition = (r as any)?.data ?? null
       } catch (e) {
@@ -248,13 +248,13 @@ export const useCommodityStore = defineStore('commodity', {
      * - 总成交量/总多单/总空单（合计统计）
      * - 每会员:成交、多单、空单、净持仓(多-空)、多空比
      */
-    async loadHoldingPositionAll(fullSymbol: string) {
+    async loadHoldingPositionAll(fullSymbol: string, force = false) {
       const key = `holding:${fullSymbol}:all`
       this._setLoading(key, true)
       try {
         const indicators = ['成交量', '多单持仓', '空单持仓'] as const
         const responses = await Promise.all(
-          indicators.map((ind) => commodityApi.getHoldingPosition(fullSymbol, ind)),
+          indicators.map((ind) => commodityApi.getHoldingPosition(fullSymbol, ind, undefined, force)),
         )
 
         // 三个指标的 raw rows 收集

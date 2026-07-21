@@ -38,7 +38,11 @@ from tradingagents.agents.analysts.commodity import (
     create_position_analyst,
     create_technical_analyst,
 )
-from tradingagents.agents.managers.investment_director import create_investment_director
+from tradingagents.agents.managers.investment_director import (
+    create_investment_director,
+    extract_decision_fields,
+    normalize_direction,
+)
 from tradingagents.agents.managers.research_manager import create_research_manager
 
 from tradingagents.utils.logging_init import get_logger
@@ -348,6 +352,71 @@ class CommodityGraphSetup:
         return workflow.compile(checkpointer=checkpointer)
 
 
+def _effective_decision(final_state: Dict[str, Any]) -> Dict[str, Any]:
+    """统一解析最终决策，并对缺失 SafetyOverride 审计的硬风险 fail closed。"""
+    final_decision = final_state.get("final_decision", "")
+    parsed = extract_decision_fields(final_decision)
+    action = parsed["action"]
+    confidence = parsed["confidence"]
+
+    risk_card = final_state.get("risk_card", {}) or {}
+    audit = risk_card.get("safety_override", {}) if isinstance(risk_card, dict) else {}
+    if isinstance(audit, dict) and audit.get("executed") is True:
+        action = normalize_direction(
+            audit.get("overridden_action", audit.get("action", action))
+        )
+        audit_confidence = audit.get(
+            "overridden_confidence", audit.get("confidence", confidence)
+        )
+        try:
+            audit_confidence = float(audit_confidence)
+            if 0.0 <= audit_confidence <= 1.0:
+                confidence = audit_confidence
+            else:
+                confidence = 0.0
+        except (TypeError, ValueError):
+            confidence = 0.0
+    else:
+        risk_assessment = final_state.get("risk_assessment", {}) or {}
+        dimensions = risk_assessment.get("dimensions", {})
+        if not isinstance(dimensions, dict):
+            dimensions = {}
+        has_r5_dimension = any(
+            isinstance(detail, dict) and detail.get("level") == 5
+            for detail in dimensions.values()
+        )
+        composite = risk_assessment.get("composite_risk_level")
+        flags = risk_assessment.get("flags", [])
+        near_delivery = any(
+            isinstance(flag, dict) and flag.get("name") == "near_delivery"
+            for flag in (flags if isinstance(flags, list) else [])
+        )
+        if has_r5_dimension or composite in (5, "R5") or near_delivery:
+            logger.error(
+                "[CommodityTradingAgentsGraph|OVERRIDE] SafetyOverride 审计缺失，"
+                "检测到 R5/near_delivery，fail closed 为 flat/0"
+            )
+            action, confidence = "flat", 0.0
+        elif risk_assessment.get("data_insufficient"):
+            logger.error(
+                "[CommodityTradingAgentsGraph|OVERRIDE] SafetyOverride 审计缺失，"
+                "检测到数据不足，fail closed 为 hold/0"
+            )
+            action, confidence = "hold", 0.0
+        else:
+            logger.error(
+                "[CommodityTradingAgentsGraph|OVERRIDE] commodity 最终 state 缺少 "
+                "safety_override.executed 审计元数据"
+            )
+
+    return {
+        "action": action,
+        "confidence": confidence,
+        "reasoning": final_decision or "(CIO 未输出决策)",
+        "raw_text": final_decision or "",
+    }
+
+
 # === 主类 ===
 
 class CommodityTradingAgentsGraph(TradingAgentsGraph):
@@ -557,70 +626,8 @@ class CommodityTradingAgentsGraph(TradingAgentsGraph):
         return final_state, decision
 
     def _extract_decision(self, final_state: Dict[str, Any]) -> Dict[str, Any]:
-        """从 CIO 输出提取结构化决策。
-
-        解析 CIO final_decision Markdown 中的结构化字段:
-          - **方向**:做多/做空/持有/平仓
-          - **置信度**:0.75
-
-        Bug 修复(2026-07-16):
-          - 旧逻辑: 全文搜索"做多"→"做空",但 CIO 文本同时包含两者时永远返回"long"
-          - 新逻辑: 用正则精确匹配"**方向**:做多/做空"字段行,消除歧义
-          - 旧逻辑: confidence 硬编码 0.5
-          - 新逻辑: 解析"**置信度**:0.75"字段,精确提取数值
-        """
-        import re
-
-        final_decision = final_state.get("final_decision", "")
-        if not final_decision:
-            return {
-                "action": "hold",
-                "confidence": 0.0,
-                "reasoning": "(CIO 未输出决策)",
-                "raw_text": "",
-            }
-
-        text = final_decision
-        action = "hold"
-        confidence = 0.5
-
-        # 1. 解析方向 — 精确匹配"**方向**:做多/做空/买入/卖出/持有/平仓"字段
-        #    CIO 输出格式: "- **方向**:做空" 或 "**方向**:做多"
-        dir_match = re.search(
-            r'\*{0,2}方向\*{0,2}\s*[:：]\s*(做多|做空|买入|卖出|持有|平仓)',
-            text,
-        )
-        if dir_match:
-            raw = dir_match.group(1)
-            if raw in ("做多", "买入"):
-                action = "long"
-            elif raw in ("做空", "卖出"):
-                action = "short"
-            elif raw == "平仓":
-                action = "flat"
-            elif raw == "持有":
-                action = "hold"
-
-        # 2. 解析置信度 — 精确匹配"**置信度**:0.75"字段
-        #    CIO 输出格式: "- **置信度**:0.75" 或 "**置信度**:0.75"
-        conf_match = re.search(
-            r'\*{0,2}置信度\*{0,2}\s*[:：]\s*([0-9]+\.?[0-9]*)',
-            text,
-        )
-        if conf_match:
-            try:
-                parsed = float(conf_match.group(1))
-                if 0.0 <= parsed <= 1.0:
-                    confidence = parsed
-            except ValueError:
-                pass
-
-        return {
-            "action": action,
-            "confidence": confidence,
-            "reasoning": text,
-            "raw_text": text,
-        }
+        """从最终 state 提取统一决策，SafetyOverride 审计优先于 Markdown。"""
+        return _effective_decision(final_state)
 
 
 # =============================================================================
@@ -655,23 +662,10 @@ def build_evidence_chain(final_state: Dict[str, Any]) -> Dict[str, Any]:
     final_decision = final_state.get("final_decision", "")
     risk_assessment = final_state.get("risk_assessment", {}) or {}
 
-    # --- 顶层摘要 ---
-    action = "hold"
-    confidence = 0.0
-    if final_decision:
-        dr = re.search(r'\*{0,2}方向\*{0,2}\s*[:：]\s*(做多|做空|买入|卖出|持有|平仓)', final_decision)
-        if dr:
-            raw = dr.group(1)
-            action = {"做多": "long", "买入": "long", "做空": "short", "卖出": "short",
-                      "平仓": "flat", "持有": "hold"}.get(raw, "hold")
-        cr = re.search(r'\*{0,2}置信度\*{0,2}\s*[:：]\s*([0-9]+\.?[0-9]*)', final_decision)
-        if cr:
-            try:
-                p = float(cr.group(1))
-                if 0.0 <= p <= 1.0:
-                    confidence = p
-            except ValueError:
-                pass
+    # --- 顶层摘要：与 API decision 共用同一安全解析 ---
+    effective = _effective_decision(final_state)
+    action = effective["action"]
+    confidence = effective["confidence"]
 
     summary = {
         "symbol": symbol,
@@ -793,22 +787,11 @@ def build_evidence_chain(final_state: Dict[str, Any]) -> Dict[str, Any]:
     risk_card = final_state.get("risk_card", {})
     safety_override = risk_card.get("safety_override", {})
 
-    # 尝试从 investment_plan 解析 CIO 结构化输出（投研备忘录 + 风险评估卡）
-    cio_memo = {}
-    cio_risk_card = {}
-    _investment_plan_raw = final_state.get("investment_plan", "")
-    if _investment_plan_raw:
-        try:
-            _cio_parsed = json.loads(_investment_plan_raw)
-            if isinstance(_cio_parsed, dict):
-                _memo = _cio_parsed.get("投研备忘录")
-                if isinstance(_memo, dict):
-                    cio_memo = _memo
-                _rc = _cio_parsed.get("风险评估卡")
-                if isinstance(_rc, dict):
-                    cio_risk_card = _rc
-        except (json.JSONDecodeError, TypeError):
-            pass
+    # CIO 结构化输出已经由 Investment Director 写入最终 state。
+    cio_memo = final_state.get("investment_memo", {}) or {}
+    if not isinstance(cio_memo, dict):
+        cio_memo = {}
+    cio_risk_card = risk_card if isinstance(risk_card, dict) else {}
 
     L3_data = {
         "risk_assessment": risk_assessment if isinstance(risk_assessment, dict) else {},

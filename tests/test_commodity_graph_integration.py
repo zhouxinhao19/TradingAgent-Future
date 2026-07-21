@@ -118,7 +118,10 @@ class TestGraphCompilation:
 
         final_state = None
         completed_nodes = []
-        for chunk in graph.stream(initial):
+        for chunk in graph.stream(
+            initial,
+            config={"configurable": {"thread_id": "test_graph_stream_nodes"}},
+        ):
             for node_name, node_update in chunk.items():
                 if node_name == "__end__":
                     continue
@@ -159,3 +162,99 @@ class TestGraphCompilation:
         # 验证投研总监输出了 final_decision
         assert final_state.get("final_decision"), "final_decision 为空"
         assert final_state.get("risk_assessment"), "risk_assessment 为空"
+
+
+class TestEffectiveDecisionSafety:
+    def test_audit_overrides_conflicting_markdown_and_evidence(self):
+        from tradingagents.graph.commodity_graph import _effective_decision, build_evidence_chain
+
+        state = {
+            "asset_type": "commodity",
+            "full_symbol": "CU2508.SHF",
+            "variety_name": "铜",
+            "trade_date": "2026-07-21",
+            "final_decision": "- **方向**:做多\n- **置信度**:0.80",
+            "investment_memo": {"投研结论": {
+                "方向倾向": "平仓", "置信度": 0.0, "硬约束说明": "期限结构 R5",
+            }},
+            "risk_assessment": {
+                "composite_risk_level": 3,
+                "dimensions": {"term_structure": {"level": 5}},
+                "flags": [],
+            },
+            "risk_card": {"safety_override": {
+                "executed": True,
+                "action": "flat",
+                "confidence": 0.0,
+                "overridden_action": "flat",
+                "overridden_confidence": 0.0,
+                "override_rules_triggered": ["R5_REJECT"],
+            }},
+            "analyst_registry": {},
+            "commodity_features": {},
+            "investment_plan": "",
+        }
+
+        decision = _effective_decision(state)
+        evidence = build_evidence_chain(state)
+        assert decision["action"] == "flat"
+        assert decision["confidence"] == 0.0
+        assert evidence["summary"]["final_action"] == "flat"
+        assert evidence["summary"]["confidence"] == 0.0
+        assert evidence["layers"]["L3"]["safety_override"]["executed"] is True
+        assert evidence["layers"]["L3"]["cio_memo"]["投研结论"]["方向倾向"] == "平仓"
+        assert evidence["layers"]["L3"]["cio_memo"]["投研结论"]["硬约束说明"] == "期限结构 R5"
+
+    def test_missing_audit_with_r5_fails_closed(self, caplog):
+        from tradingagents.graph.commodity_graph import _effective_decision
+
+        state = {
+            "asset_type": "commodity",
+            "final_decision": "- **方向**:做多\n- **置信度**:0.80",
+            "risk_assessment": {
+                "composite_risk_level": 3,
+                "dimensions": {"term_structure": {"level": 5}},
+                "flags": [],
+            },
+            "risk_card": {},
+        }
+        with caplog.at_level("ERROR"):
+            decision = _effective_decision(state)
+        assert decision["action"] == "flat"
+        assert decision["confidence"] == 0.0
+        assert any("fail closed 为 flat/0" in record.message for record in caplog.records)
+
+    def test_missing_audit_with_insufficient_data_holds(self):
+        from tradingagents.graph.commodity_graph import _effective_decision
+
+        decision = _effective_decision({
+            "asset_type": "commodity",
+            "final_decision": "- **方向**:做空\n- **置信度**:0.90",
+            "risk_assessment": {
+                "composite_risk_level": "UNKNOWN",
+                "data_insufficient": True,
+                "dimensions": {},
+                "flags": [],
+            },
+            "risk_card": {},
+        })
+        assert decision["action"] == "hold"
+        assert decision["confidence"] == 0.0
+
+    def test_normal_audit_preserves_markdown_decision(self):
+        from tradingagents.graph.commodity_graph import _effective_decision
+
+        decision = _effective_decision({
+            "asset_type": "commodity",
+            "final_decision": "- **方向**:做空\n- **置信度**:0.65",
+            "risk_assessment": {"dimensions": {}, "flags": []},
+            "risk_card": {"safety_override": {
+                "executed": True,
+                "action": "short",
+                "confidence": 0.65,
+                "overridden_action": "short",
+                "overridden_confidence": 0.65,
+            }},
+        })
+        assert decision["action"] == "short"
+        assert decision["confidence"] == 0.65
