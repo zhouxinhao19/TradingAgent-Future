@@ -16,6 +16,7 @@ import hashlib
 import json
 import logging
 import random
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
@@ -100,6 +101,7 @@ class NewsAnnotation:
     summary: str                      # ≤40 字
     annotator_model: str              # 标注使用的模型
     annotated_at: str = ""              # ISO 格式北京时间字符串, 避免 MongoDB datetime 时区丢失
+    event_key: str = ""               # 归一化事件指纹, 用于语义级跨源去重
     title: str = ""                   # 原标题(前端展示用)
     content: str = ""                 # 原内容(前端展示用)
     published_at: str = ""            # 原始发布时间
@@ -124,6 +126,7 @@ class NewsAnnotation:
             "source": self.source,
             "url": self.url,
             "annotated_at": self.annotated_at,
+            "event_key": self.event_key,
             "annotator_model": self.annotator_model,
             "_review_flag": self._review_flag,
             "_keyword_conflict": self._keyword_conflict,
@@ -145,6 +148,7 @@ class NewsAnnotation:
             summary=doc.get("summary", ""),
             annotator_model=doc.get("annotator_model", ""),
             annotated_at=ann_at,
+            event_key=doc.get("event_key", ""),
             title=doc.get("title", ""),
             content=doc.get("content", ""),
             published_at=doc.get("published_at", ""),
@@ -175,6 +179,15 @@ _ANNOTATION_PROMPT = """你是大宗商品期货新闻标注助手。为以下 {
   此时选主要受影响品种的方向
 - sentiment_reasoning 必填且至少 10 字
 - summary 不超过 40 字
+- event_key 必填:该新闻所述【核心事件】的归一化英文标识,用于识别"同一事件的不同措辞"。
+  规则:全小写英文,下划线连接,由 [主体]_[动作/事件]_[关键对象] 组成,不含日期/来源/数字修饰。
+  同一件事无论如何改写,event_key 必须一致。
+  例:
+    "特朗普重申无意与伊朗会面,中东局势支撑油价和贵金属"  → trump_refuse_meet_iran
+    "特朗普拒绝与伊朗会晤,地缘风险升温利好原油和贵金属"  → trump_refuse_meet_iran
+    "央行宣布降准0.5个百分点"                             → pboc_cut_rrr
+    "沪铜库存连续三周下降"                                 → cu_inventory_decline
+  只对事件本身编码,不要把"利好/利空/涨跌"等解读或具体品种塞进 event_key。
 
 新闻列表:
 {items_json}
@@ -217,6 +230,7 @@ class NewsAnnotator:
                 await self._cache.create_index("annotated_at", expireAfterSeconds=604800)
                 await self._cache.create_index([("relevant_varieties", 1), ("annotated_at", -1)])
                 await self._cache.create_index("sentiment")
+                await self._cache.create_index("event_key")
         except Exception as exc:
             logger.warning(f"创建索引失败: {exc}")
 
@@ -311,6 +325,7 @@ class NewsAnnotator:
                     "llm_sentiment_reasoning": ann.sentiment_reasoning,
                     "llm_importance": ann.importance,
                     "llm_summary": ann.summary,
+                    "event_key": ann.event_key,
                     "annotated_at": ann.annotated_at or "",
                     "annotator_model": ann.annotator_model,
                     "_review_flag": ann._review_flag,
@@ -415,6 +430,11 @@ class NewsAnnotator:
 
             summary = str(entry.get("summary", "") or "")[:40]
 
+            # event_key 归一化: 仅保留小写字母/数字/下划线, 供语义级去重
+            event_key = str(entry.get("event_key", "") or "").strip().lower()
+            event_key = re.sub(r'[^a-z0-9_]', '', event_key.replace(" ", "_").replace("-", "_"))
+            event_key = re.sub(r'_+', '_', event_key).strip('_')[:80]
+
             confidence = float(entry.get("sentiment_confidence", 0.5))
             confidence = max(0.0, min(1.0, confidence))
 
@@ -432,6 +452,7 @@ class NewsAnnotator:
                 source=str(item.get("source", "") or ""),
                 url=str(item.get("url", "") or ""),
                 annotated_at=now_str,
+                event_key=event_key,
                 annotator_model=self.annotator_model,
             )
 
