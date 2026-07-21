@@ -25,6 +25,9 @@ from .commodity.inventory import compute_inventory_metrics
 from .commodity.positioning import compute_positioning_metrics
 from .commodity.term_structure import compute_term_structure_metrics
 from .commodity.news_sentiment import compute_news_sentiment_metrics
+from .commodity.module_agreement import compute_module_agreement
+from .commodity.signal_convergence import detect_signal_convergence
+from .commodity.data_freshness import compute_data_freshness
 
 
 def _safe(callable_, fallback_reason: str, errors: Dict[str, str], key: str):
@@ -259,6 +262,28 @@ async def compute_all_features_from_provider(
         "news_sentiment",
     )
 
+    # ---- 3 个派生模块:消费 6 基础模块的输出,纯规则,零新数据 ----
+    try:
+        features["module_agreement"] = compute_module_agreement(features)
+    except Exception as e:
+        errors["module_agreement"] = repr(e)
+        features["module_agreement"] = {}
+
+    try:
+        features["signal_convergence"] = detect_signal_convergence(
+            features,
+            contract_warning=None,
+        )
+    except Exception as e:
+        errors["signal_convergence"] = repr(e)
+        features["signal_convergence"] = {}
+
+    try:
+        features["data_freshness"] = compute_data_freshness(features)
+    except Exception as e:
+        errors["data_freshness"] = repr(e)
+        features["data_freshness"] = {}
+
     # success 标记:6 模块中是否有任一报错
     module_errors = {k: v for k, v in errors.items() if k in {
         "technical", "basis", "inventory", "positioning",
@@ -278,5 +303,8 @@ __all__ = [
     "compute_positioning_metrics",
     "compute_term_structure_metrics",
     "compute_news_sentiment_metrics",
+    "compute_module_agreement",
+    "detect_signal_convergence",
+    "compute_data_freshness",
     "compute_all_features_from_provider",
 ]

@@ -173,6 +173,115 @@ def run_analysis(
         )
 
 
+def run_analysis_from_summaries(
+    summaries: List[Dict[str, Any]],
+    skill_name: str = "general-analysis",
+    llm: Any = None,
+    skills_dir: Optional[Path] = None,
+    user_context: str = "",
+    max_summary_chars: int = 20000,
+) -> AnalysisResult:
+    """使用已有 summaries 运行 LLM 分析，跳过文件读取步骤。
+
+    用于 graph 节点：后端已通过 parse_custom_data() 完成文件解析和摘要，
+    graph 节点直接调用此函数生成可读的 Markdown 报告。
+
+    Args:
+        summaries: parse_custom_data() 产出的 raw_summaries 列表
+        skill_name: 技能名称，默认兜底 "general-analysis"
+        llm: LangChain 兼容的 LLM 实例。None 时走降级路径
+        skills_dir: Skill .md 文件所在目录
+        user_context: 用户额外上下文描述
+        max_summary_chars: summary JSON 截断字符数
+
+    Returns:
+        AnalysisResult
+    """
+    if not summaries:
+        return AnalysisResult(
+            success=False,
+            error="无数据摘要",
+        )
+
+    # 加载 Skill
+    skill = SkillsRegistry(skills_dir=skills_dir).load(skill_name)
+    if skill is None:
+        skill = SkillsRegistry(skills_dir=skills_dir).load("general-analysis")
+
+    # 构造 prompt
+    data_summary_json = json.dumps(summaries, ensure_ascii=False, indent=2)
+    if len(data_summary_json) > max_summary_chars:
+        n = min(3, len(summaries))
+        truncated = json.dumps(summaries[:n], ensure_ascii=False, indent=2)
+        data_summary_json = truncated[:max_summary_chars] + "\n...(截断)"
+
+    content_types = [s.get("type", "tabular") for s in summaries]
+
+    if skill:
+        prompt_text = skill.render(
+            data_summary=data_summary_json,
+            user_context=user_context,
+            content_types=content_types,
+        )
+    else:
+        prompt_text = _fallback_prompt(data_summary_json)
+
+    # 调 LLM 或降级
+    if llm:
+        try:
+            result = llm.invoke([("human", prompt_text)])
+            if hasattr(result, "content"):
+                report = result.content
+                if not isinstance(report, str):
+                    report = str(report) if report is not None else ""
+            else:
+                report = str(result) if result is not None else ""
+
+            if not report.strip():
+                report = _fallback_report(data_summary_json)
+                return AnalysisResult(
+                    skill_name=skill_name,
+                    file_count=len(summaries),
+                    content_types=content_types,
+                    data_summary=data_summary_json,
+                    report=report,
+                    fallback=True,
+                    error="LLM 返回空内容",
+                )
+
+            return AnalysisResult(
+                skill_name=skill_name,
+                file_count=len(summaries),
+                content_types=content_types,
+                data_summary=data_summary_json,
+                report=report,
+                fallback=False,
+            )
+        except Exception as e:
+            logger.error(f"engine: run_analysis_from_summaries LLM 失败: {e}")
+            report = _fallback_report(data_summary_json)
+            return AnalysisResult(
+                skill_name=skill_name,
+                file_count=len(summaries),
+                content_types=content_types,
+                data_summary=data_summary_json,
+                report=report,
+                fallback=True,
+                error=f"LLM 异常: {e}",
+            )
+
+    # 无 LLM：纯降级
+    report = _fallback_report(data_summary_json)
+    return AnalysisResult(
+        skill_name=skill_name,
+        file_count=len(summaries),
+        content_types=content_types,
+        data_summary=data_summary_json,
+        report=report,
+        fallback=True,
+    )
+
+
 def _fallback_prompt(data_summary: str) -> str:
     """无 skill 文件时的兜底 prompt。"""
     return (
@@ -220,4 +329,4 @@ def _fallback_report(data_summary: str) -> str:
     )
 
 
-__all__ = ["run_analysis", "AnalysisResult"]
+__all__ = ["run_analysis", "run_analysis_from_summaries", "AnalysisResult"]

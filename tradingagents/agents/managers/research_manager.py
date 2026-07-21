@@ -555,6 +555,15 @@ COMMODITY_REASONING_PROMPT = """你是期货推理分析师。在单次分析中
 ## 历史经验教训
 {past_memory_str}
 
+## 多空辩论历史
+{debate_history}
+
+## 模块方向投票
+{module_agreement}
+
+## 信号共振/背离
+{signal_convergence}
+
 ## 矛盾地图
 
 系统基于各模块数据提取了以下矛盾信号对。在"多空对照表"中必须逐对讨论——"哪种逻辑在当前时点更有说服力"并陈述理由：
@@ -747,6 +756,16 @@ def create_research_manager(llm, memory):
                 contradiction_map, ensure_ascii=False, indent=2
             ) if contradiction_map else "（无显著矛盾信号）"
 
+            # ---- 辩论历史 + 派生 feature 注入 ----
+            debate_state = state.get("investment_debate_state", {}) or {}
+            debate_history = debate_state.get("history", "") or "（无辩论历史）"
+            module_agreement = json.dumps(
+                features.get("module_agreement", {}), ensure_ascii=False, indent=2
+            )
+            signal_convergence = json.dumps(
+                features.get("signal_convergence", {}), ensure_ascii=False, indent=2
+            )
+
             prompt = COMMODITY_REASONING_PROMPT.format(
                 full_symbol=full_symbol,
                 variety_name=variety_name,
@@ -754,6 +773,9 @@ def create_research_manager(llm, memory):
                 instrument_context=instrument_context,
                 structured_summary=structured_summary,
                 analyst_registry_summary=analyst_registry_summary,
+                debate_history=debate_history,
+                module_agreement=module_agreement,
+                signal_convergence=signal_convergence,
                 contradiction_map_text=contradiction_map_text,
                 past_memory_str=past_memory_str,
             )
@@ -764,12 +786,16 @@ def create_research_manager(llm, memory):
             content = _strip_markdown_fence(content)
             content = _ensure_forced_risks_in_plan(content, forced_risks)
 
-            # 写入：简化 investment_debate_state（无辩论历史）
+            # 写入：保留辩论历史（修复覆写 bug）
+            debate_state = state.get("investment_debate_state", {}) or {}
             return {
                 "investment_debate_state": {
                     "judge_decision": content,
-                    "history": "",
-                    "count": 0,
+                    "history": debate_state.get("history", ""),
+                    "bull_history": debate_state.get("bull_history", ""),
+                    "bear_history": debate_state.get("bear_history", ""),
+                    "current_response": debate_state.get("current_response", ""),
+                    "count": debate_state.get("count", 0),
                 },
                 "investment_plan": content,
                 "fact_cards": fact_cards,

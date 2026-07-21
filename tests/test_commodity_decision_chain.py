@@ -290,6 +290,7 @@ def test_reasoning_commodity_prompt_placeholders():
         "instrument_context", "analyst_registry_summary",
         "structured_summary", "past_memory_str",
         "contradiction_map_text",
+        "debate_history", "module_agreement", "signal_convergence",
     }
     import string
     formatter = string.Formatter()

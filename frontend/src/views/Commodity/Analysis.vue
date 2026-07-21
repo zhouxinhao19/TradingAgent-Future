@@ -2,7 +2,7 @@
   <div class="commodity-analysis">
     <div class="page-header">
       <h2>大宗商品分析</h2>
-      <p class="text-secondary">多智能体决策链 — 技术分析师 → 产业分析师 → 持仓情绪分析师 → 新闻分析师 → 推理分析师 → 总结</p>
+      <p class="text-secondary">多智能体决策链 — 自定义数据分析 → 技术分析师 → 产业分析师 → 持仓情绪分析师 → 新闻分析师 → 多头研究员 → 空头研究员 → 推理分析师 → 投研总监</p>
     </div>
 
     <el-row :gutter="24">
