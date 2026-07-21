@@ -47,7 +47,51 @@
       </el-row>
     </div>
 
-    <!-- 推理分析 + 情景推演 -->
+    <!-- L1 分析师信号 -->
+    <div v-if="l1Entries.length" class="chain-layer">
+      <h3 class="layer-title">
+        <el-icon><DataAnalysis /></el-icon>
+        分析师信号
+        <span class="layer-meta">{{ l1ActiveCount }}/{{ l1Entries.length }}</span>
+      </h3>
+      <div class="l1-cards-row">
+        <div
+          v-for="item in l1Entries"
+          :key="item.id"
+          :data-ref-id="item.id"
+          class="l1-card"
+        >
+          <div class="l1-card-head">
+            <span class="l1-name">{{ item.name }}</span>
+            <el-tag :type="l1DirTagType(item.direction)" size="small" effect="dark">
+              {{ l1DirLabel(item.direction) }}
+            </el-tag>
+          </div>
+          <el-progress
+            :percentage="Math.round((item.calibrated_confidence || 0) * 100)"
+            :stroke-width="4"
+            :show-text="false"
+            :color="l1ConfColor(item.calibrated_confidence)"
+            class="l1-conf-bar"
+          />
+          <div class="l1-card-foot">
+            <template v-if="item.status === 'degraded'">
+              <span class="l1-status l1-degraded">降级</span>
+            </template>
+            <template v-else-if="item.status === 'skipped'">
+              <span class="l1-status l1-skipped">跳过</span>
+            </template>
+            <span
+              v-for="(v, k) in firstMetrics(item.key_metrics, 2)"
+              :key="k"
+              class="l1-metric"
+            >{{ shortMetricName(k) }} {{ formatMetricValue(v) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- L2 推理分析 -->
     <div class="chain-layer">
       <h3 class="layer-title">
         <el-icon><DataAnalysis /></el-icon>
@@ -265,6 +309,38 @@
             <p v-if="safetyOverride.r5_dimensions?.length">
               <strong>R5 维度:</strong> {{ safetyOverride.r5_dimensions.join('、') }}
             </p>
+            <p v-if="hasOriginalOverride" class="override-comparison">
+              <strong>原始决策 → 规则覆盖:</strong>
+              <span class="override-arrow">
+                {{ directionLabel(safetyOverride.original_llm_direction) }}
+                / {{ formatConfidence(safetyOverride.original_llm_confidence) }}
+                →
+                <strong>{{ directionLabel(safetyOverride.overridden_action) }}</strong>
+                / {{ formatConfidence(safetyOverride.overridden_confidence) }}
+              </span>
+            </p>
+            <p v-if="safetyOverride.custom_data_conflict || safetyOverride.custom_data_overreliance?.ratio > 0.5" class="override-custom-data">
+              <strong>自定义数据审计:</strong>
+              <el-tag
+                v-if="safetyOverride.custom_data_conflict"
+                type="danger"
+                size="small"
+                style="margin-right: 4px"
+              >
+                私有数据方向冲突 (私有={{ safetyOverride.custom_data_direction || '中性' }})
+              </el-tag>
+              <el-tag
+                v-if="safetyOverride.custom_data_overreliance?.ratio > 0.5"
+                type="warning"
+                size="small"
+                style="margin-right: 4px"
+              >
+                CIO 过度依赖用户数据 ({{ Math.round((safetyOverride.custom_data_overreliance?.ratio || 0) * 100) }}%)
+              </el-tag>
+              <span v-if="safetyOverride.custom_data_as_of" class="custom-data-asof">
+                数据截至: {{ safetyOverride.custom_data_as_of }}
+              </span>
+            </p>
           </div>
         </template>
       </el-alert>
@@ -446,6 +522,25 @@
         </el-col>
       </el-row>
 
+      <!-- 事实卡片: 从各模块提取的关键数值锚点 -->
+      <el-card v-if="factCards.length" shadow="never" style="margin-bottom: 12px">
+        <template #header>
+          <b>事实卡片</b>
+          <span class="layer-meta" style="margin-left: 8px">{{ factCards.length }} 条</span>
+        </template>
+        <div class="fact-cards-grid">
+          <div
+            v-for="fc in factCards"
+            :key="fc.id"
+            class="fact-card-item"
+            :class="'fact-' + (fc.direction || 'neutral')"
+          >
+            <span class="fact-module">{{ moduleName(fc.module) }}</span>
+            <span class="fact-statement">{{ fc.statement }}</span>
+          </div>
+        </div>
+      </el-card>
+
       <!-- 策略适应性报告（替代最终决策） -->
       <el-card v-if="l3FinalText" shadow="never">
         <template #header>
@@ -503,6 +598,70 @@ function toList(val: unknown): string[] {
 }
 
 const activeL2Panels = ref(['valuation', 'bullbear', 'scenarios', 'contradictions'])
+
+// ---- L1 分析师信号 ----
+const l1Entries = computed(() => {
+  return props.data?.layers?.L1 || []
+})
+
+const l1ActiveCount = computed(() => {
+  return l1Entries.value.filter((e: any) => e.status !== 'skipped').length
+})
+
+function l1DirLabel(dir: string): string {
+  const map: Record<string, string> = {
+    long: '↑', short: '↓', hold: '→', neutral: '→', flat: '⊗', skip: '—',
+    bullish: '↑', bearish: '↓',
+  }
+  return map[dir] || dir || '?'
+}
+
+function l1DirTagType(dir: string): TagType {
+  const map: Record<string, TagType> = {
+    long: 'success', short: 'danger', hold: 'info', neutral: 'info', flat: 'warning', skip: 'info',
+    bullish: 'success', bearish: 'danger',
+  }
+  return map[dir] || 'info'
+}
+
+function l1ConfColor(conf: number): string {
+  if (conf >= 0.7) return '#67c23a'
+  if (conf >= 0.4) return '#e6a23c'
+  return '#c0c4cc'
+}
+
+function firstMetrics(obj: Record<string, unknown> | undefined, n: number): Record<string, unknown> {
+  if (!obj || typeof obj !== 'object') return {}
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v != null).slice(0, n))
+}
+
+function shortMetricName(key: string): string {
+  const map: Record<string, string> = {
+    composite_score: '综合', oi_divergence: '价仓', volatility: '波动',
+    basis: '基差', basis_zscore: '基差z', inventory_wow: '库存周变',
+    term_structure: '期限', roll_yield: '展期',
+    net_long_change_5d: '净多5d', long_short_ratio: '多空比', crowding: '拥挤',
+    sentiment_score: '情感', event_count: '事件',
+    matched_module: '匹配', file_count: '文件', current_value: '当前值',
+  }
+  return map[key] || key.replace(/_/g, ' ')
+}
+
+function formatMetricValue(v: unknown): string {
+  if (v == null) return '—'
+  if (typeof v === 'number') {
+    if (Math.abs(v) >= 10000) return (v / 10000).toFixed(1) + '万'
+    if (Math.abs(v) < 10) return v.toFixed(2)
+    return v.toFixed(0)
+  }
+  const s = String(v)
+  return s.length > 10 ? s.slice(0, 10) + '…' : s
+}
+
+// ---- 事实卡片 ----
+const factCards = computed(() => {
+  return props.data?.layers?.L3?.fact_cards || []
+})
 
 const l2Valuation = computed(() => {
   return props.data?.layers?.L2?.valuation_matrix || []
@@ -617,9 +776,27 @@ const safetyOverrideAlertType = computed(() => {
   return 'success'
 })
 
+const hasOriginalOverride = computed(() => {
+  const so = safetyOverride.value
+  if (!so) return false
+  return Boolean(
+    so.original_llm_direction !== undefined
+    && so.overridden_action !== undefined
+    && so.original_llm_direction !== so.overridden_action
+  )
+})
+
 function formatConfidence(value: unknown): string {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? `${(parsed * 100).toFixed(0)}%` : '—'
+}
+
+function directionLabel(action?: string): string {
+  const map: Record<string, string> = {
+    long: '做多', short: '做空', hold: '持有', flat: '平仓',
+    bullish: '看多', bearish: '看空', neutral: '中性', skip: '跳过',
+  }
+  return map[action || ''] || action || '—'
 }
 
 // ---- CIO 结构化数据（从 L3 cio_memo 或从 final_decision_raw 中解析） ----
@@ -748,9 +925,14 @@ function fitnessTagType(fitness: string): TagType {
 }
 
 function scrollToL1(refId: string) {
-  // 简单的滚动到 L1 区域 — 高亮引用 ID
+  // 查找带 data-ref-id 的 L1 卡片
   const el = document.querySelector(`[data-ref-id="${refId}"]`)
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    // 高亮闪烁效果
+    el.classList.add('l1-highlight')
+    setTimeout(() => el.classList.remove('l1-highlight'), 1500)
+  }
 }
 </script>
 
@@ -812,6 +994,28 @@ function scrollToL1(refId: string) {
 
 .override-detail p {
   margin: 4px 0;
+}
+
+.override-comparison {
+  background: #fdf6ec;
+  padding: 6px 10px;
+  border-radius: 4px;
+  border-left: 3px solid #e6a23c;
+}
+
+.override-arrow {
+  font-family: 'SF Mono', Consolas, monospace;
+  margin-left: 4px;
+}
+
+.override-custom-data {
+  font-size: 13px;
+}
+
+.custom-data-asof {
+  color: #909399;
+  font-size: 11px;
+  margin-left: 4px;
 }
 
 .risk-card {
@@ -917,5 +1121,115 @@ function scrollToL1(refId: string) {
   font-size: 11px;
   color: #909399;
   white-space: nowrap;
+}
+
+/* L1 分析师信号卡片 */
+.l1-cards-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.l1-card {
+  flex: 1 1 160px;
+  min-width: 150px;
+  max-width: 220px;
+  background: #fafbfc;
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  padding: 10px 12px;
+  cursor: default;
+  transition: box-shadow 0.2s;
+}
+
+.l1-card:hover {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.l1-card.l1-highlight {
+  box-shadow: 0 0 0 2px var(--el-color-primary, #409eff);
+  transition: box-shadow 0.3s;
+}
+
+.l1-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.l1-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.l1-conf-bar {
+  margin-bottom: 4px;
+}
+
+.l1-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 11px;
+  color: #909399;
+  min-height: 18px;
+}
+
+.l1-status {
+  font-size: 10px;
+  padding: 0 4px;
+  border-radius: 2px;
+}
+.l1-degraded { background: #fdf6ec; color: #e6a23c; }
+.l1-skipped { background: #fef0f0; color: #f56c6c; }
+
+.l1-metric {
+  background: #f0f2f5;
+  padding: 0 4px;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+/* 事实卡片 */
+.fact-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 8px;
+}
+
+.fact-card-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  background: #fafbfc;
+  border-left: 3px solid #dcdfe6;
+}
+
+.fact-card-item.fact-bullish { border-left-color: #67c23a; background: #f0f9eb; }
+.fact-card-item.fact-bearish { border-left-color: #f56c6c; background: #fef0f0; }
+
+.fact-module {
+  font-size: 11px;
+  color: #909399;
+  white-space: nowrap;
+  min-width: 36px;
+  padding-top: 1px;
+}
+
+.fact-statement {
+  color: #303133;
+  line-height: 1.5;
+}
+
+.layer-meta {
+  font-size: 12px;
+  font-weight: 400;
+  color: #c0c4cc;
+  margin-left: 6px;
 }
 </style>

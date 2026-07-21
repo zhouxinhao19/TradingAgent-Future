@@ -104,7 +104,10 @@ class TabularSummarizer:
 
         # ---- 样本数据（前 5 行） ----
         sample = df.head(5)
-        result["sample"] = sample.to_dict(orient="records") if not sample.empty else []
+        result["sample"] = (
+            [_json_safe_record(rec) for rec in sample.to_dict(orient="records")]
+            if not sample.empty else []
+        )
 
         # ---- 警告 ----
         warnings = []
@@ -131,6 +134,38 @@ def _safe_float(v: Any) -> float | None:
         return round(f, 4)
     except (TypeError, ValueError):
         return None
+
+
+def _json_safe_record(rec: Dict[str, Any]) -> Dict[str, Any]:
+    """把一行记录转成 JSON 安全的值。
+
+    pandas 的 Timestamp / Timedelta / numpy 标量 / NaN 等无法直接 json.dumps，
+    统一转成字符串 / Python 原生数值 / None。
+    """
+    safe: Dict[str, Any] = {}
+    for k, v in rec.items():
+        key = str(k)
+        # NaN / NaT
+        try:
+            if v is None or (pd.isna(v) if not isinstance(v, (list, tuple, dict)) else False):
+                safe[key] = None
+                continue
+        except (TypeError, ValueError):
+            pass
+        if isinstance(v, (pd.Timestamp,)):
+            safe[key] = v.isoformat()
+        elif isinstance(v, pd.Timedelta):
+            safe[key] = str(v)
+        elif isinstance(v, (bool, int, float, str)):
+            safe[key] = v
+        elif hasattr(v, "item"):  # numpy 标量
+            try:
+                safe[key] = v.item()
+            except (ValueError, TypeError):
+                safe[key] = str(v)
+        else:
+            safe[key] = str(v)
+    return safe
 
 
 __all__ = ["TabularSummarizer"]

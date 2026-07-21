@@ -99,11 +99,11 @@ def run_analysis(
         skill = SkillsRegistry(skills_dir=skills_dir).load("general-analysis")
 
     # ---- 4. 构造 prompt ----
-    data_summary_json = json.dumps(summaries, ensure_ascii=False, indent=2)
+    data_summary_json = json.dumps(summaries, ensure_ascii=False, indent=2, default=str)
     if len(data_summary_json) > max_summary_chars:
         logger.warning(f"engine: summary 过长 ({len(data_summary_json)} 字符)，截断至 {max_summary_chars}")
         n = min(3, len(summaries))
-        truncated = json.dumps(summaries[:n], ensure_ascii=False, indent=2)
+        truncated = json.dumps(summaries[:n], ensure_ascii=False, indent=2, default=str)
         truncated = truncated[:max_summary_chars] + "\n...(截断)"
         data_summary_json = truncated
 
@@ -209,10 +209,10 @@ def run_analysis_from_summaries(
         skill = SkillsRegistry(skills_dir=skills_dir).load("general-analysis")
 
     # 构造 prompt
-    data_summary_json = json.dumps(summaries, ensure_ascii=False, indent=2)
+    data_summary_json = json.dumps(summaries, ensure_ascii=False, indent=2, default=str)
     if len(data_summary_json) > max_summary_chars:
         n = min(3, len(summaries))
-        truncated = json.dumps(summaries[:n], ensure_ascii=False, indent=2)
+        truncated = json.dumps(summaries[:n], ensure_ascii=False, indent=2, default=str)
         data_summary_json = truncated[:max_summary_chars] + "\n...(截断)"
 
     content_types = [s.get("type", "tabular") for s in summaries]
