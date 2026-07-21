@@ -19,7 +19,9 @@ Phase 3b-ii:商品期货分析师节点(技术/产业/持仓/新闻)
 """
 from ._base import (
     ANALYST_PREFIXES,
+    _build_contradiction_map,
     build_custom_data_context,
+    build_fact_cards,
     extract_first_sentence,
     inject_analyst_id,
     make_analyst_id,
@@ -45,6 +47,8 @@ __all__ = [
     "inject_analyst_id",
     "extract_first_sentence",
     "build_custom_data_context",
+    "build_fact_cards",
+    "_build_contradiction_map",
     "ANALYST_PREFIXES",
     "AnalystSignal",
     "TechnicalReport",

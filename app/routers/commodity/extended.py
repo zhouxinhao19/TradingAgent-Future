@@ -416,7 +416,7 @@ async def get_holding_position(
     symbol = full_symbol.split(".")[0]
 
     # 连续合约(如 CU0) → 自动解析主力合约
-    if re.match(r'^[A-Z]+\d$', symbol.upper()):
+    if re.match(r'^[A-Z]+0$', symbol.upper()):
         try:
             contracts_data = await service.get_contracts_list(full_symbol)
             if contracts_data and contracts_data.get("contracts"):

@@ -6,7 +6,11 @@ from typing import Any, Dict, List, Optional
 # 导入统一日志系统
 from tradingagents.utils.logging_init import get_logger
 from tradingagents.agents.utils.instrument_utils import build_instrument_context
-from tradingagents.agents.analysts.commodity import build_custom_data_context
+from tradingagents.agents.analysts.commodity import (
+    build_custom_data_context,
+    build_fact_cards,
+    _build_contradiction_map,
+)
 logger = get_logger("default")
 
 
@@ -300,33 +304,208 @@ def _find_registry_entry(registry: Dict[str, Any], analyst_key: str) -> Dict[str
     return {}
 
 
+def _extract_json_safe(text: str) -> Optional[str]:
+    """从 LLM 输出中尽力提取 JSON 字符串。
+
+    依次尝试:
+    1. 直接 json.loads
+    2. 剥离 ```json/fence 包裹后 json.loads
+    3. 寻找第一个 { 和最后一个 } 截取后 json.loads
+    4. 寻找第一个 [ 和最后一个 ] 截取后 json.loads
+    返回可解析的 JSON 字符串，或 None。
+    """
+    import re
+    if not text:
+        return None
+
+    candidates = [text]
+
+    # 剥离 markdown fence
+    m = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
+    if m:
+        candidates.append(m.group(1).strip())
+
+    # 尝试找 {…} 片段
+    brace_start = text.find("{")
+    if brace_start >= 0:
+        brace_end = text.rfind("}")
+        if brace_end > brace_start:
+            candidates.append(text[brace_start:brace_end + 1].strip())
+
+    # 尝试找 […] 片段
+    bracket_start = text.find("[")
+    if bracket_start >= 0:
+        bracket_end = text.rfind("]")
+        if bracket_end > bracket_start:
+            candidates.append(text[bracket_start:bracket_end + 1].strip())
+
+    for candidate in candidates:
+        try:
+            json.loads(candidate)
+            return candidate
+        except (json.JSONDecodeError, TypeError):
+            continue
+    return None
+
+
 def _ensure_forced_risks_in_plan(content: str, forced_risks: List[str]) -> str:
-    """对合法 L2 JSON 做确定性保底，避免 LLM 再次遗漏 L1 明示风险。"""
+    """对合法 L2 JSON 做确定性保底，避免 LLM 再次遗漏 L1 明示风险。
+
+    当 LLM 未生成合理的「多空对照表」数组或「三种情景推演」对象时，
+    基于 forced_risks 自动生成 fallback 条目，确保前端有内容展示。
+    """
     if not forced_risks:
         return content
+    safe_json = _extract_json_safe(content)
+    if safe_json is None:
+        return content
     try:
-        parsed = json.loads(content)
+        parsed = json.loads(safe_json)
+    except (json.JSONDecodeError, TypeError):
+        return content
     except (json.JSONDecodeError, TypeError):
         return content
     if not isinstance(parsed, dict):
         return content
 
-    bull_bear = parsed.get("多空对照表")
-    if not isinstance(bull_bear, dict):
-        bull_bear = {}
-        parsed["多空对照表"] = bull_bear
-    existing = _string_list(bull_bear.get("强制风险信号"))
-    bull_bear["强制风险信号"] = list(dict.fromkeys(existing + forced_risks))
+    forced_deduped = list(dict.fromkeys(forced_risks))
 
+    # ---- 多空对照表 ----
+    bull_bear = parsed.get("多空对照表")
+    if isinstance(bull_bear, dict):
+        # 只有强制风险信号 key → LLM 未生成实际内容，fallback
+        non_forced_keys = [k for k in bull_bear if k != "强制风险信号"]
+        if not non_forced_keys:
+            parsed["多空对照表"] = _generate_fallback_bull_bear(forced_deduped)
+        else:
+            existing = _string_list(bull_bear.get("强制风险信号"))
+            parsed["多空对照表"]["强制风险信号"] = list(dict.fromkeys(existing + forced_deduped))
+    elif isinstance(bull_bear, list):
+        bull_bear.append({
+            "分歧点": "系统强制风险信号",
+            "看跌逻辑": "；".join(forced_deduped),
+            "看涨逻辑": "（无——系统标记的不可忽视风险）",
+            "数据来源": ["系统"],
+        })
+    else:
+        # 缺失或格式异常 → fallback
+        parsed["多空对照表"] = _generate_fallback_bull_bear(forced_deduped)
+
+    # ---- 三种情景推演 ----
     scenarios = parsed.get("三种情景推演")
-    if not isinstance(scenarios, dict):
-        scenarios = {}
-        parsed["三种情景推演"] = scenarios
-    scenario_existing = _string_list(scenarios.get("强制风险情景输入"))
-    scenarios["强制风险情景输入"] = list(
-        dict.fromkeys(scenario_existing + forced_risks)
-    )
+    if isinstance(scenarios, dict):
+        scenario_keys = {"保守情景", "基准情景", "乐观情景"}
+        if not scenario_keys.intersection(scenarios.keys()):
+            # LLM 未生成实际情景 → fallback
+            parsed["三种情景推演"] = _generate_fallback_scenarios(forced_deduped)
+        else:
+            scenarios["强制风险情景输入"] = _string_list(
+                dict.fromkeys(
+                    _string_list(scenarios.get("强制风险情景输入")) + forced_deduped
+                )
+            )
+    elif isinstance(scenarios, list):
+        # LLM 把情景推演也输出成了数组 → 转为对象 + fallback
+        parsed["三种情景推演"] = _generate_fallback_scenarios(forced_deduped)
+    else:
+        # 缺失 → fallback
+        parsed["三种情景推演"] = _generate_fallback_scenarios(forced_deduped)
+
     return json.dumps(parsed, ensure_ascii=False)
+
+
+# =============================================================================
+# Fallback 生成：当 LLM 未产生合理内容时，由规则引擎兜底
+# =============================================================================
+
+_BB_CATEGORIES = [
+    ("crowding", "拥挤度", "拥挤度"),
+    ("carry", "期限结构", "carry"),
+    ("inventory", "库存", "库存"),
+    ("basis", "基差", "基差"),
+    ("position", "持仓", "持仓|净多|空头"),
+    ("roll", "换月", "换月|移仓"),
+    ("volatility", "波动率", "波动率|ATR"),
+    ("signal", "信号冲突", "矛盾|冲突|分歧"),
+]
+
+
+def _categorize_risk(risk: str) -> str:
+    """将风险信号归类到主题。"""
+    for cat_name, cat_label, keywords in _BB_CATEGORIES:
+        import re
+        if re.search(keywords, risk, re.IGNORECASE):
+            return cat_label
+    return "其他"
+
+
+def _generate_fallback_bull_bear(forced_risks: List[str]) -> List[Dict[str, Any]]:
+    """从强制风险信号自动生成多空对照表条目。"""
+    # 按类别分组
+    groups: Dict[str, List[str]] = {}
+    for r in forced_risks:
+        cat = _categorize_risk(r)
+        groups.setdefault(cat, []).append(r)
+
+    entries: List[Dict[str, Any]] = []
+    for cat, risks in groups.items():
+        entries.append({
+            "分歧点": f"{cat}相关的多空分歧",
+            "看涨逻辑": "（系统标记）市场存在支撑因素，但需结合具体维度数据评估",
+            "看跌逻辑": "；".join(risks[:3]),
+            "数据来源": ["系统"],
+        })
+
+    if not entries:
+        entries.append({
+            "分歧点": "多空分歧",
+            "看涨逻辑": "（系统标记）暂无明确利空信号",
+            "看跌逻辑": "；".join(forced_risks[:3]),
+            "数据来源": ["系统"],
+        })
+
+    return entries
+
+
+def _generate_fallback_scenarios(forced_risks: List[str]) -> Dict[str, Any]:
+    """从强制风险信号自动生成三种情景推演。"""
+    # 分类风险类型
+    bullish_risks = [r for r in forced_risks if any(kw in r for kw in ("库存去化", "贴水", "偏多", "利多", "供需"))]
+    bearish_risks = [r for r in forced_risks if any(kw in r for kw in ("拥挤", "反转", "carry", "空头", "净多减少", "净空"))]
+    neutral_risks = [r for r in forced_risks if r not in bullish_risks and r not in bearish_risks]
+    # 如果分类不充分，混合使用
+    if not bearish_risks:
+        bearish_risks = forced_risks[:3]
+    if not bullish_risks:
+        bullish_risks = forced_risks[-2:] if len(forced_risks) >= 2 else forced_risks
+
+    return {
+        "保守情景": {
+            "推演方向": "中性偏空",
+            "触发条件": bearish_risks[:3],
+            "关注焦点": "风险信号是否兑现",
+            "风险节点": "；".join(bearish_risks[:3]),
+            "置信度": 0.6,
+            "数据来源": ["系统"],
+        },
+        "基准情景": {
+            "推演方向": "中性",
+            "触发条件": ["市场按当前逻辑运行"],
+            "关注焦点": "多空力量对比变化",
+            "风险节点": "；".join(neutral_risks[:2]) if neutral_risks else "等待新催化剂",
+            "置信度": 0.5,
+            "数据来源": ["系统"],
+        },
+        "乐观情景": {
+            "推演方向": "偏多",
+            "触发条件": bullish_risks[:3],
+            "关注焦点": "利多因素能否持续",
+            "风险节点": "；".join(bearish_risks[:2]),
+            "置信度": 0.4,
+            "数据来源": ["系统"],
+        },
+        "综合情景判断": "多空信号交织，建议等待方向性突破确认",
+    }
 
 
 def _data_quality_weight(status: str) -> float:
@@ -337,6 +516,18 @@ def _data_quality_weight(status: str) -> float:
         "skipped": 0.3,
         "": 0.5,
     }.get(status, 0.5)
+
+
+def _strip_markdown_fence(text: str) -> str:
+    """剥离 LLM 输出中可能的 markdown 代码块包裹（```json ... ``` 或 ``` ... ```）。"""
+    import re
+    if not text:
+        return text
+    # ```json ... ``` 或 ``` ... ```
+    m = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
+    if m:
+        return m.group(1).strip()
+    return text
 
 
 # =============================================================================
@@ -363,6 +554,12 @@ COMMODITY_REASONING_PROMPT = """你是期货推理分析师。在单次分析中
 
 ## 历史经验教训
 {past_memory_str}
+
+## 矛盾地图
+
+系统基于各模块数据提取了以下矛盾信号对。在"多空对照表"中必须逐对讨论——"哪种逻辑在当前时点更有说服力"并陈述理由：
+
+{contradiction_map_text}
 
 ---
 
@@ -393,18 +590,51 @@ COMMODITY_REASONING_PROMPT = """你是期货推理分析师。在单次分析中
 
 ### 多空对照表
 
-每个关键分歧包含看涨/看跌双方逻辑，每个逻辑后标注引用 ID。
-如果输入包含“强制保留风险信号”，必须逐条纳入看跌逻辑或风险逻辑，不得删减、弱化或改写为“数据缺失”。
+输出数组，每个元素代表一个关键分歧：
+
+- “分歧点”: 多空矛盾的焦点描述
+- “看涨逻辑”: 多头方论据，末尾标注引用 ID
+- “看跌逻辑”: 空头方论据，末尾标注引用 ID
+- “数据来源”: [引用至少 2 个不同分析师报告 ID]
+
+必须识别 ≥1 个分歧。如果矛盾地图中有信号对，必须逐对讨论。
+
+示例（仅作格式参考，不要照抄内容）：
+```
+[
+  {{
+    “分歧点”: “库存去化 vs 拥挤度高位”,
+    “看涨逻辑”: “库存周环比-8758吨，处于0.01分位极低水平【REF-FUND-xxx】”,
+    “看跌逻辑”: “拥挤度95.24%分位，一致性过强易反转【REF-POSN-xxx】”,
+    “数据来源”: [“REF-FUND-xxx”, “REF-POSN-xxx”]
+  }}
+]
+```
 
 ### 三种情景推演
 
-三种情景（保守/基准/乐观），每个包含：
-- "推演方向": 做多/做空/中性
-- "触发条件": 可观测的市场信号列表
-- "关注焦点": 应关注的关键变量
-- "风险节点": 情景失效条件；必须覆盖输入中的“强制保留风险信号”
-- "置信度": 0~1 浮点数
-- "数据来源": [引用至少 2 个不同分析师报告 ID]
+输出对象，key 为”保守情景”、”基准情景”、”乐观情景”，每个 value 包含：
+
+- “推演方向”: 做多/做空/中性
+- “触发条件”: 可观测的市场信号列表
+- “关注焦点”: 应关注的关键变量
+- “风险节点”: 情景失效条件；必须覆盖输入中的”强制保留风险信号”
+- “置信度”: 0~1 浮点数
+- “数据来源”: [引用至少 2 个不同分析师报告 ID]
+
+示例（仅作格式参考，不要照抄内容）：
+```
+{{
+  “保守情景”: {{
+    “推演方向”: “中性”,
+    “触发条件”: [“库存缓慢去化”],
+    “关注焦点”: “远月合约期限结构”,
+    “风险节点”: “拥挤度反转风险”,
+    “置信度”: 0.70,
+    “数据来源”: [“REF-FUND-xxx”, “REF-POSN-xxx”]
+  }}
+}}
+```
 
 已给出具体数值或明确状态的维度不得被标为“数据缺失”；无法压缩时保留关键数值和状态原文。
 
@@ -510,6 +740,13 @@ def create_research_manager(llm, memory):
             else:
                 analyst_registry_summary = "(暂无分析师报告索引)"
 
+            # ---- 事实卡片 + 矛盾地图 ----
+            fact_cards = build_fact_cards(features, position_structured)
+            contradiction_map = _build_contradiction_map(fact_cards)
+            contradiction_map_text = json.dumps(
+                contradiction_map, ensure_ascii=False, indent=2
+            ) if contradiction_map else "（无显著矛盾信号）"
+
             prompt = COMMODITY_REASONING_PROMPT.format(
                 full_symbol=full_symbol,
                 variety_name=variety_name,
@@ -517,11 +754,14 @@ def create_research_manager(llm, memory):
                 instrument_context=instrument_context,
                 structured_summary=structured_summary,
                 analyst_registry_summary=analyst_registry_summary,
+                contradiction_map_text=contradiction_map_text,
                 past_memory_str=past_memory_str,
             )
             # 直接调用 llm（不做 chain）
             response = llm.invoke(prompt)
             content = response.content if hasattr(response, "content") else str(response)
+            # 剥离 markdown 代码块包裹，避免 json.loads 失败
+            content = _strip_markdown_fence(content)
             content = _ensure_forced_risks_in_plan(content, forced_risks)
 
             # 写入：简化 investment_debate_state（无辩论历史）
@@ -532,6 +772,8 @@ def create_research_manager(llm, memory):
                     "count": 0,
                 },
                 "investment_plan": content,
+                "fact_cards": fact_cards,
+                "contradiction_map": contradiction_map,
             }
         else:
             history = state["investment_debate_state"].get("history", "")

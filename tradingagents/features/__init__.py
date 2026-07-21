@@ -14,6 +14,7 @@ from typing import Any, Dict, Optional
 
 from .commodity import _helpers  # noqa: F401  供内层模块 cross-import
 from . import commodity as _commodity  # noqa: F401
+from .commodity import _helpers as helpers  # noqa: F401  供 custom_data_adapter 等外部模块复用 zscore/slope/percentile_rank/data_quality/empty_result
 from tradingagents.dataflows.providers.commodity.commodity_metadata import normalize_exchange_code
 from tradingagents.utils.commodity_utils import CommodityUtils
 

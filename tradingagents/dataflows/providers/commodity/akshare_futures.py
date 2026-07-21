@@ -10,7 +10,7 @@ Phase 2 起新增:手续费 / 保证金 / 库存 / 仓单 / 持仓 / 基差 / �
 """
 import asyncio
 from datetime import datetime, date
-from typing import Optional, Dict, Any, List, Union
+from typing import Optional, Dict, Any, List, Union, Tuple
 
 import pandas as pd
 
@@ -1829,15 +1829,13 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         indicator: str = "成交量",
         date: Union[str, date] = None,
         no_cache: bool = False,
-    ) -> Optional[pd.DataFrame]:
+    ) -> Optional[Tuple[pd.DataFrame, str]]:
         """
         获取期货成交持仓(AKShare: futures_hold_pos_sina)。
 
-        Args:
-            symbol: 商品期货合约, 如 'OI2501'
-            indicator: "成交量" / "多单持仓" / "空单持仓"
-            date: 交易日 YYYYMMDD
-            no_cache: True 时跳过内存 TTL 强制重拉(持仓目前没磁盘缓存,主要是清内存)
+        Returns:
+            (DataFrame, actual_date_str) 或 None
+            actual_date_str 是实际有数据的交易日(回退后),格式 YYYYMMDD
         """
         if no_cache and self._cache:
             self._cache.invalidate_mem(f"holding:{symbol}:")
@@ -1853,9 +1851,24 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         else:
             date_str = str(date)
 
-        return await self._call(
+        # 尝试当天,若数据为空则回退前几个交易日(市场未收盘时数据尚未发布)
+        from datetime import timedelta
+        orig = datetime.strptime(date_str, "%Y%m%d") if date_str else datetime.utcnow()
+        for days_back in (0, 1, 2, 3, 5, 7):
+            d = (orig - timedelta(days=days_back)).strftime("%Y%m%d")
+            result = await self._call(
+                "futures_hold_pos_sina", symbol=indicator, contract=symbol, date=d,
+            )
+            if result is not None and not result.empty:
+                if days_back > 0:
+                    self.logger.info("ℹ️ get_holding_position 回退到 %s (原 %s)", d, date_str)
+                return (result, d)
+        # 所有日期都失败,返回原始结果(至少能让调用方知道有尝试)
+        self.logger.warning("⚠️ get_holding_position(%s, %s) 所有日期均无数据", symbol, indicator)
+        result = await self._call(
             "futures_hold_pos_sina", symbol=indicator, contract=symbol, date=date_str,
         )
+        return (result, date_str)
 
     async def get_futures_news(
         self,

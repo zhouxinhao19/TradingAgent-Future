@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional
 from tradingagents.utils.logging_init import get_logger
 
 from tradingagents.agents.analysts.commodity import build_custom_data_context
+from tradingagents.agents.managers.strategy_fitness import evaluate_strategy_fitness
 
 logger = get_logger("default")
 
@@ -106,7 +107,10 @@ def rewrite_decision_markdown(text: Any, action: str, confidence: float) -> str:
 
 
 def _merge_llm_risk_card(rule_card: Dict[str, Any], llm_card: Any) -> Dict[str, Any]:
-    """只合并 LLM 定性字段，纯规则矩阵和数据质量永不被覆盖。"""
+    """只合并 LLM 定性字段，纯规则矩阵和数据质量永不被覆盖。
+
+    风险裁定字段从 LLM 获取策略约束语义（允许策略/禁止策略/约束说明）。
+    """
     merged = dict(rule_card)
     if not isinstance(llm_card, dict):
         return merged
@@ -116,7 +120,7 @@ def _merge_llm_risk_card(rule_card: Dict[str, Any], llm_card: Any) -> Dict[str, 
     llm_verdict = llm_card.get("风险裁定")
     if isinstance(llm_verdict, dict):
         verdict = dict(merged.get("风险裁定", {}))
-        for key in ("建议动作", "仓位上限", "杠杆上限"):
+        for key in ("允许策略", "禁止策略", "策略约束说明"):
             if key in llm_verdict:
                 verdict[key] = llm_verdict[key]
         merged["风险裁定"] = verdict
@@ -158,18 +162,69 @@ def _apply_override_to_memo(
     memo = dict(investment_memo) if isinstance(investment_memo, dict) else {}
     conclusion = memo.get("投研结论")
     conclusion = dict(conclusion) if isinstance(conclusion, dict) else {}
-    action = normalize_direction(override.get("action"))
-    conclusion["方向倾向"] = _DIRECTION_CANONICAL_TO_CN[action]
-    conclusion["置信度"] = override.get("confidence", 0.0)
     rules = override.get("override_rules_triggered", [])
-    if rules:
-        conclusion["硬约束说明"] = override.get("override_reason", "")
+    conclusion["风险等级"] = override.get("risk_tier", "?")
+    conclusion["推荐关注策略"] = override.get("allowed_strategies", [])
+    conclusion["需规避策略"] = override.get("forbidden_strategies", [])
+    conclusion["策略约束说明"] = override.get("strategy_constraints", "")
     if any(rule in ("R5_REJECT", "NEAR_DELIVERY_REJECT") for rule in rules):
-        conclusion["核心逻辑"] = (
+        conclusion["核心观点"] = (
             "安全硬约束已触发：" + str(override.get("override_reason", ""))
         )
     memo["投研结论"] = conclusion
     return memo
+
+
+def _sum_fitness(matrix: List[Dict[str, Any]], value: str) -> str:
+    """从策略矩阵统计某 fitness 的策略名列表。"""
+    names = [m["strategy"] for m in matrix if m.get("fitness") == value]
+    return ", ".join(names)
+
+
+_ALL_STRATEGIES = ["单边趋势", "展期收益", "跨期套利", "波动率", "跨品种"]
+
+
+def _constraint_allowed(action: str, triggered: List[str]) -> List[str]:
+    """根据规则引擎状态计算允许的策略列表。"""
+    if action == "flat":
+        return []
+    if "DATA_INSUFFICIENT" in triggered:
+        return [s for s in _ALL_STRATEGIES if s != "单边趋势"]
+    if any(r in triggered for r in ("R5_REJECT", "NEAR_DELIVERY_REJECT")):
+        return []
+    # 允许所有未被禁止的策略
+    forbidden = _constraint_forbidden(action, triggered)
+    return [s for s in _ALL_STRATEGIES if s not in forbidden]
+
+
+def _constraint_forbidden(action: str, triggered: List[str]) -> List[str]:
+    """根据规则引擎状态计算禁止的策略列表。"""
+    if action == "flat":
+        return list(_ALL_STRATEGIES)
+    forbidden = []
+    if "DATA_INSUFFICIENT" in triggered:
+        forbidden.append("单边趋势")
+    if any(r in triggered for r in (
+        "CROWDING_REVERSAL_RISK", "STRONG_REVERSE_FLAG",
+        "POSITION_REVERSAL_RISK", "CARRY_COST_CONFLICT_LONG",
+        "COUNTER_SIGNAL_EXPLANATION_REQUIRED", "NO_L1_DIRECTION_SUPPORT",
+    )):
+        if "单边趋势" not in forbidden:
+            forbidden.append("单边趋势")
+    return forbidden
+
+
+def _constraint_text(action: str, triggered: List[str], reason: str) -> str:
+    """生成人类可读的策略约束说明。"""
+    if action == "flat":
+        return f"硬约束触发，禁止所有策略。{reason}"
+    if "DATA_INSUFFICIENT" in triggered:
+        return f"数据不足，不能支持单边趋势判断。{reason}"
+    if any(r in triggered for r in (
+        "CROWDING_REVERSAL_RISK", "STRONG_REVERSE_FLAG",
+    )):
+        return f"存在强反向风险信号，不适合单边趋势策略。{reason}"
+    return reason or "无额外策略约束"
 
 
 # =============================================================================
@@ -212,6 +267,20 @@ def _rate_percentile(pctl: float, thresholds) -> int:
         if pctl < upper:
             return level
     return 5
+
+
+def _rate_crowding(pctl: float) -> int:
+    """拥挤度双向风险映射：过高（踩踏）和过低（流动性枯竭）均极端。
+
+    pctl 是 0-100 的百分位值。
+    """
+    if pctl > 90 or pctl < 10:
+        return 5  # R5 极端拥挤/冷清
+    if pctl > 80 or pctl < 20:
+        return 4  # R4 高拥挤/冷清
+    if pctl > 65 or pctl < 35:
+        return 3  # R3 略偏离均衡
+    return 2         # R2 正常
 
 
 def compute_risk_assessment(commodity_features: Dict[str, Any]) -> Dict[str, Any]:
@@ -334,28 +403,22 @@ def compute_risk_assessment(commodity_features: Dict[str, Any]) -> Dict[str, Any
     else:
         dimensions["basis"] = {"level": 0, "tier": "unknown", "available": False}
 
-    # 3. 持仓拥挤度
+    # 3. 持仓拥挤度（双向风险：过高和过低均极端）
     crowding = _extract_safe(
         commodity_features, "positioning", "snapshot", "crowding_pctl_180d"
     )
     if isinstance(crowding, (int, float)) and data_quality["positioning"]["available"]:
-        crowd_level = _rate_percentile(float(crowding), [
-            (20, 1),
-            (50, 2),
-            (80, 3),
-            (95, 4),
-        ])
+        crowd_level = _rate_crowding(float(crowding))
         dimensions["crowding"] = {
             "value": float(crowding),
             "level": crowd_level,
             "tier": RISK_LEVEL_LABELS[crowd_level],
             "source": "positioning.snapshot.crowding_pctl_180d",
             "interpretation": {
-                1: "持仓冷清，市场关注度低",
-                2: "持仓正常，多空相对均衡",
-                3: "持仓略拥挤，需关注反转风险",
-                4: "持仓拥挤，反转概率显著升高",
-                5: "持仓极度拥挤，警惕踩踏风险",
+                2: "持仓分布正常，多空相对均衡",
+                3: "持仓略偏离均衡",
+                4: "持仓处于高拥挤区间，一致性预期过强，反转风险显著",
+                5: "市场一致性预期极端，存在极高的反向踩踏风险",
             }[crowd_level],
         }
     else:
@@ -573,8 +636,14 @@ def safety_override(
     analyst_registry: Optional[Dict[str, Any]] = None,
     position_structured: Optional[Dict[str, Any]] = None,
     counter_signal_explanation: str = "",
+    custom_data_feature_dict: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """在 LLM 输出后执行不可协商的纯规则二审，并返回完整审计记录。"""
+    """在 LLM 输出后执行不可协商的纯规则二审,并返回完整审计记录。
+
+    Args:
+        custom_data_feature_dict: 商品 features 中 custom_data.feature_dict(可选),
+            用于私有数据矛盾检测(与 LLM 方向相反时压制置信度)。
+    """
     composite = risk_assessment.get("composite_risk_level", "UNKNOWN")
     flags = risk_assessment.get("flags", [])
     if not isinstance(flags, list):
@@ -659,6 +728,15 @@ def safety_override(
         if reversal_risk:
             contradiction_rules.append("POSITION_REVERSAL_RISK")
 
+        # ---- 私有数据矛盾检测:custom_data.direction 与 LLM 方向相反 ----
+        fdict = custom_data_feature_dict or {}
+        if isinstance(fdict, dict):
+            custom_dir = fdict.get("_direction", "neutral")
+            if custom_dir in ("bullish", "bearish"):
+                llm_dir_norm = "bullish" if original_action == "long" else "bearish"
+                if custom_dir != llm_dir_norm:
+                    contradiction_rules.append("CUSTOM_DATA_CONTRADICTION")
+
     for rule in contradiction_rules:
         if rule not in triggered:
             triggered.append(rule)
@@ -711,16 +789,35 @@ def safety_override(
         "R4_FLAG_HALF_POSITION": "综合 R4 且存在高风险标志，仓位上限减半",
         "R4_WARN_ONLY": "综合 R4，仅记录风险警告",
         "R4_PLUS_HIGH_VOL": "高波动与综合高风险并存，仓位上限减半",
+        "CUSTOM_DATA_CONTRADICTION": "私有数据方向与 LLM 决策方向相反，需解释",
+        "CUSTOM_DATA_OVERRELIANCE": "CIO 论点过度依赖用户上传数据(>50%)，仅记录审计",
     }
     override_reason = "；".join(
         rule_descriptions.get(rule, rule) for rule in triggered
     )
 
+    # ---- 私有数据过度依赖检测(仅 audit warning,不改决策) ----
+    _OVERRELIANCE_KEYWORDS = (
+        "用户上传", "自定义数据", "用户提供", "用户数据",
+        "user-uploaded", "user data", "用户文件",
+    )
+    _llm_raw = llm_raw or ""
+    user_data_mentions = sum(_llm_raw.count(kw) for kw in _OVERRELIANCE_KEYWORDS)
+    total_paragraphs = max(
+        1,
+        len([p for p in _llm_raw.split("\n\n") if p.strip()]),
+    )
+    overreliance_ratio = user_data_mentions / total_paragraphs
+    if overreliance_ratio > 0.5 and user_data_mentions >= 3:
+        triggered.append("CUSTOM_DATA_OVERRELIANCE")
+
     audit = {
         "executed": True,
+        # 内部保留决策语义供 rule engine 使用
         "action": action,
         "confidence": confidence,
         "max_position": max_position,
+        # 审计字段
         "overridden": overridden,
         "override_reason": override_reason,
         "override_rules_triggered": triggered,
@@ -729,13 +826,29 @@ def safety_override(
         "overridden_action": action,
         "overridden_confidence": confidence,
         "r5_dimensions": r5_dimensions,
+        # 策略约束语义（对外输出）
+        "risk_tier": f"R{composite}" if isinstance(composite, int) else str(composite),
+        "allowed_strategies": _constraint_allowed(action, triggered),
+        "forbidden_strategies": _constraint_forbidden(action, triggered),
+        "strategy_constraints": _constraint_text(action, triggered, override_reason),
+        # ---- 私有数据审计字段(Phase 自定义数据升级) ----
+        "custom_data_direction": (custom_data_feature_dict or {}).get("_direction", "neutral"),
+        "custom_data_conflict": "CUSTOM_DATA_CONTRADICTION" in triggered,
+        "custom_data_overreliance": {
+            "ratio": round(overreliance_ratio, 2),
+            "mentions": user_data_mentions,
+            "total_paragraphs": total_paragraphs,
+            "warning_only": True,
+        },
+        "custom_data_as_of": (custom_data_feature_dict or {}).get("snapshot", {}).get("as_of"),
     }
     log_message = (
         "[投研总监|OVERRIDE] executed=True "
         f"input={original_action}/{original_confidence:.2f} composite={composite} "
         f"r5_dimensions={r5_dimensions} rules={triggered} "
         f"final={action}/{confidence:.2f} max_position={max_position:.2f} "
-        f"overridden={overridden}"
+        f"overridden={overridden} "
+        f"forbidden={audit['forbidden_strategies']}"
     )
     if overridden:
         logger.warning(log_message)
@@ -750,7 +863,9 @@ def safety_override(
 
 INVESTMENT_DIRECTOR_SYSTEM_PROMPT = """你是大宗商品期货的**投研总监**。
 
-你的职责是综合**推理分析师（L2）的研究报告**和**量化风险评估**，形成最终投资决策。
+你的职责是综合**推理分析师（L2）的研究报告**、**量化风险评估**和**策略适应性矩阵**，输出**策略适应性研究报告**而非交易指令。
+
+⚠️ 你的角色是投研辅助——解释和连接，不是替用户做交易决策。**禁止输出任何形式的交易指令**（做多/做空、入场价、止损价、目标价、仓位比例等）。
 
 ---
 
@@ -759,10 +874,7 @@ INVESTMENT_DIRECTOR_SYSTEM_PROMPT = """你是大宗商品期货的**投研总监
 ### 1. 推理分析师报告（L2）
 {investment_plan}
 
-推理分析师的 investment_plan 是三模块结构化 JSON：
-- 估值驱动矩阵：按维度（基差/库存/期限结构/持仓/技术面/新闻）的状态/判断/驱动
-- 多空对照表：看涨/看跌核心逻辑、证据强度、关键分歧
-- 三种情景推演：保守/基准/乐观，含触发条件和置信度
+推理分析师的 investment_plan 是结构化 JSON，包含估值矩阵、多空对照表和情景推演。
 
 ### 2. 量化风险评估
 {risk_assessment_json}
@@ -772,17 +884,23 @@ INVESTMENT_DIRECTOR_SYSTEM_PROMPT = """你是大宗商品期货的**投研总监
 - 硬拦截标志：跨维度交叉风险
 - 数据质量：各模块数据可用性
 
-### 3. L1 分析师注册表
+### 3. 策略适应性矩阵（量化规则）
+{strategy_matrix_json}
+
+纯规则引擎输出（0 LLM），5 类策略的适应性评估结果（推荐关注/谨慎推荐/不推荐）。
+**引用时不得改变 fitness 等级**，但可补充上下文解释。
+
+### 4. L1 分析师注册表
 {analyst_registry_summary}
 
-### 4. 标的信息
+### 5. 标的信息
 - 合约: {full_symbol}
 - 品种: {variety_name}
 - 交易所: {exchange}
 - 报价单位: {quote_unit}
 - 交易日期: {trade_date}
 
-### 5. 用户上传数据参考
+### 6. 用户上传数据参考
 {custom_data_context}
 
 ---
@@ -797,7 +915,7 @@ INVESTMENT_DIRECTOR_SYSTEM_PROMPT = """你是大宗商品期货的**投研总监
 
 1. **投研备忘录** (dict) — 对 L2 报告的审核与裁决
 2. **风险评估卡** (dict) — 综合量化 + 定性风险评估
-3. **final_decision_markdown** (str) — 兼容现有决策解析格式的 Markdown
+3. **research_brief** (str) — 策略适应性研究报告 Markdown
 
 ### key 1: 投研备忘录 的详细结构
 
@@ -815,11 +933,11 @@ INVESTMENT_DIRECTOR_SYSTEM_PROMPT = """你是大宗商品期货的**投研总监
   - "核心分歧处理": "对 L2 主要分歧的裁决"
 
 - 投研结论 (dict):
-  - "方向倾向": "做多/做空/持有/平仓"
-  - "置信度": 0.0-1.0 之间的数值
-  - "核心逻辑": "1-2 句话"
-  - "反向信号": ["信号1", "信号2"]
-  - "逆向信号处理": "若最终做多/做空，必须逐条解释为何不采纳 L1 反向信号、拥挤/反转风险；无反向信号时写无"
+  - "风险等级": "引用量化综合风险等级 R1-R5"
+  - "核心观点": "2-3 句话概括多空核心矛盾和关键数据信号"
+  - "风险信号": ["信号1", "信号2"]  — 客观罗列风险信号，不做方向性推荐
+  - "推荐关注策略": []  — 从策略适应性矩阵中选 1-2 个推荐关注的策略
+  - "需规避策略": []  — 从策略适应性矩阵中选不推荐的策略
 
 ### key 2: 风险评估卡 的详细结构
 
@@ -827,25 +945,39 @@ INVESTMENT_DIRECTOR_SYSTEM_PROMPT = """你是大宗商品期货的**投研总监
 LLM 仅负责以下定性维度：
 
 - 三方视角 (dict):
-	- 三方视角 (dict):
-	  - "激进": {{"概率权重": 0.3, "条件": "..."}}
-	  - "保守": {{"概率权重": 0.2, "条件": "..."}}
-	  - "中性": {{"概率权重": 0.5, "条件": "..."}}
+  - "激进": {{"概率权重": 0.3, "条件": "..."}}
+  - "保守": {{"概率权重": 0.2, "条件": "..."}}
+  - "中性": {{"概率权重": 0.5, "条件": "..."}}
 
 - 风险裁定 (dict):
-  - "建议动作": "开仓" | "观望" | "减仓" | "平仓"
-  - "仓位上限": "账户30%"
-  - "杠杆上限": "3倍"
+  - "允许策略": []  — 量化和情景维度均允许的策略列表
+  - "禁止策略": []  — 约束条件明确禁止的策略列表
+  - "策略约束说明": "..."  — 人类可读的策略约束解释
 
 - 风险提示 (list): 2-3 条主要风险
 
-### key 3: final_decision_markdown
+### key 3: research_brief（替代 final_decision_markdown）
 
-必须包含以下 Markdown 字段（兼容现有 _extract_decision() 解析）：
+必须包含以下 Markdown 章节：
 
-- **方向**: 做多/做空/持有/平仓
-- **置信度**: 0.75（数值）
-- 可选：合约、入场、止损、目标、持仓、持有周期、风险敞口
+```
+# {full_symbol} 策略适应性报告
+
+## 核心矛盾与叙事
+（2-3 句话概括当前的多空逻辑冲突点 + 关键数据信号）
+
+## 策略适应性矩阵
+| 策略 | 适应性 | 核心判据 |
+| ... | ... | ... |
+
+（从量化策略矩阵引用数据，不可改变适应性评级）
+
+## 三方情景推演
+（保留情景描述、触发条件、关注焦点，每项增加"推荐策略"）
+
+## 关键待验证假设
+- [ ] 待验证假设列表（可观察、可量化的数据信号）
+```
 
 ---
 
@@ -853,13 +985,13 @@ LLM 仅负责以下定性维度：
 
 1. 估值审核各维度必须用"同意"或"修正"开头，引用证据 ID（REF-TECH-xxx 格式）
 2. 情景裁决必须给出排除理由，不能只写选定不写排除
-3. 建议动作必须是"开仓"|"观望"|"减仓"|"平仓"之一，仓位上限仅在"开仓"时给出
-4. final_decision_markdown 必须包含 **方向** 和 **置信度** 字段
-5. 【硬约束】任一量化风险维度为 R5，或综合风险为 R5：方向必须为"平仓"，置信度必须为 0，仓位上限为 0；投研结论必须说明触发的 R5 维度
-6. 【硬约束】存在 near_delivery 标志：方向必须为"平仓"、置信度为 0、仓位上限为 0
-7. 【硬约束】data_insufficient=true 时禁止做多/做空，必须持有或平仓
-8. 若没有任何 L1 分析师明确支持最终做多/做空，或存在高拥挤、反转、踩踏、价仓背离、multi_extreme 等强反向风险：置信度不得超过 0.3，并必须在"逆向信号处理"中逐条解释；缺少解释时不得输出做多/做空
-9. 用户上传的历史时间序列若明确提示无法获取当前值，禁止将其写成当前去库/补库或当前趋势依据
+3. research_brief 必须包含 4 个章节（核心矛盾、策略矩阵、情景推演、待验证假设）；禁止输出方向、置信度、入场价、止损价、目标价、仓位
+4. 【硬约束】任一量化风险维度为 R5，或综合风险为 R5：禁止策略=[全部禁止]，策略约束说明必须明确列出触发的 R5 维度
+5. 【硬约束】存在 near_delivery 标志：禁止策略=[全部禁止]；策略约束说明必须提及临近交割
+6. 【硬约束】data_insufficient=true 时禁止策略必须包含"单边趋势"
+7. 策略适应性矩阵中 fitness="不推荐"的策略必须出现在"禁止策略"中；fitness="推荐关注"的策略不得出现在"禁止策略"中
+8. 策略矩阵的适应性评级（推荐关注/谨慎推荐/不推荐）不得改变，只可补充解释
+9. 用户上传的历史时间序列若明确提示无法获取当前值，禁止将其写成当前趋势依据
 10. 【硬约束】输出纯 JSON，禁止使用 ```json 代码块包裹，否则解析失败将视为系统降级。直接以 `{{` 开头，`}}` 结尾
 11. 全文中文
 """
@@ -914,22 +1046,24 @@ def _build_risk_card(risk_assessment: Dict[str, Any]) -> Dict[str, Any]:
 def _build_fallback_memo(risk_assessment: Dict[str, Any]) -> Dict[str, Any]:
     """LLM 不可用时的 fallback 备忘录。"""
     composite = risk_assessment.get("composite_risk_level", "UNKNOWN")
+    composite_str = f"R{composite}" if isinstance(composite, int) else str(composite)
     return {
         "估值审核": (
             "（LLM 不可用，量化检查器已完成维度评级，详见风险评估卡）"
         ),
         "情景裁决": "（LLM 不可用，无法裁决）",
         "投研结论": {
-            "方向倾向": "持有",
-            "置信度": 0.0,
-            "核心逻辑": f"系统降级：LLM 不可用，量化风险等级 {composite}，默认持有",
-            "反向信号": [f"系统降级：量化风险 {composite}"],
+            "风险等级": composite_str,
+            "核心观点": f"系统降级：LLM 不可用，量化风险等级 {composite_str}，无法生成策略建议",
+            "风险信号": [f"系统降级：量化风险 {composite_str}"],
+            "推荐关注策略": [],
+            "需规避策略": ["单边趋势", "展期收益", "跨期套利", "波动率", "跨品种"],
         },
     }
 
 
-def _build_fallback_decision(full_symbol: str, risk_assessment: Dict[str, Any]) -> str:
-    """LLM 不可用时的 fallback 决策 markdown。"""
+def _build_fallback_research_brief(full_symbol: str, risk_assessment: Dict[str, Any]) -> str:
+    """LLM 不可用时的 fallback 研究简报。"""
     composite = risk_assessment.get("composite_risk_level", "UNKNOWN")
     risk_label = (
         RISK_LEVEL_LABELS.get(composite, f"等级{composite}")
@@ -943,25 +1077,17 @@ def _build_fallback_decision(full_symbol: str, risk_assessment: Dict[str, Any]) 
     flag_section = f"\n## 量化风险提示\n{flag_lines}\n" if flag_lines else ""
 
     return (
-        f"# {full_symbol} 投研总监决策（系统降级）\n\n"
-        f"## 决策摘要\n"
-        f"- **方向**:持有\n"
-        f"- **合约**:—\n"
-        f"- **入场**:—\n"
-        f"- **止损**:—\n"
-        f"- **目标**:—\n"
-        f"- **持仓**:0 手\n"
-        f"- **持有周期**:—\n"
-        f"- **置信度**:0.00\n"
-        f"- **风险敞口**:0%\n\n"
-        f"## 决策理由\n"
+        f"# {full_symbol} 策略适应性报告（系统降级）\n\n"
+        f"## 核心矛盾与叙事\n"
         f"系统降级：LLM 不可用，量化风险等级 {risk_label}。"
-        f"基于风险控制原则默认持有不建仓。\n"
+        f"无法进行深度多空逻辑判断，以下信息仅供参考。\n"
         f"{flag_section}\n"
-        f"## 风险提示\n"
-        f"1. 系统降级状态，所有决策参考价值有限\n"
-        f"2. 量化风险等级仅供参考\n"
-        f"3. 建议等待 LLM 服务恢复后重新生成完整决策\n"
+        f"## 策略适应性矩阵\n"
+        f"（LLM 不可用，无法生成）\n\n"
+        f"## 三方情景推演\n"
+        f"（LLM 不可用，无法裁决）\n\n"
+        f"## 关键待验证假设\n"
+        f"- [ ] 等待 LLM 服务恢复后重新生成完整分析\n"
     )
 
 
@@ -1034,6 +1160,18 @@ def create_investment_director(deep_thinking_llm):
         rule_risk_card = _build_risk_card(risk_assessment)
         risk_card = dict(rule_risk_card)
 
+        # ---- Step 2.5: 策略适应性评估（纯规则，0 LLM） ----
+        strategy_matrix = evaluate_strategy_fitness(commodity_features, risk_assessment)
+        strategy_matrix_json = json.dumps(
+            strategy_matrix, ensure_ascii=False, indent=2, default=str
+        )
+        logger.info(
+            f"[投研总监] 策略矩阵: {len(strategy_matrix)} 项, "
+            f"推荐=[{_sum_fitness(strategy_matrix, '推荐关注')}], "
+            f"谨慎=[{_sum_fitness(strategy_matrix, '谨慎推荐')}], "
+            f"不推荐=[{_sum_fitness(strategy_matrix, '不推荐')}]"
+        )
+
         # ---- Step 3: 准备 LLM prompt ----
         investment_plan = state.get("investment_plan", "{}")
         analyst_registry = state.get("analyst_registry", {})
@@ -1067,6 +1205,7 @@ def create_investment_director(deep_thinking_llm):
             trade_date=trade_date,
             investment_plan=investment_plan,
             risk_assessment_json=risk_assessment_json,
+            strategy_matrix_json=strategy_matrix_json,
             analyst_registry_summary=analyst_registry_summary,
             custom_data_context=build_custom_data_context(commodity_features),
         )
@@ -1114,7 +1253,7 @@ def create_investment_director(deep_thinking_llm):
         # ---- Step 5: 解析 LLM 输出或 fallback ----
         if content:
             investment_memo: Any = {}
-            final_decision = content
+            research_brief = content
             try:
                 parsed = json.loads(content)
                 if isinstance(parsed, dict):
@@ -1123,44 +1262,39 @@ def create_investment_director(deep_thinking_llm):
                         investment_memo = llm_memo
                     llm_risk = parsed.get("风险评估卡")
                     risk_card = _merge_llm_risk_card(rule_risk_card, llm_risk)
-                    llm_fd = parsed.get("final_decision_markdown")
-                    if isinstance(llm_fd, str) and len(llm_fd) > 20:
-                        final_decision = llm_fd
+                    llm_brief = parsed.get("research_brief")
+                    if isinstance(llm_brief, str) and len(llm_brief) > 20:
+                        research_brief = llm_brief
             except (json.JSONDecodeError, TypeError):
                 logger.warning("[投研总监] LLM 输出非 JSON，使用 raw 文本")
                 investment_memo = {}
 
-            msg_out = AIMessage(content=final_decision)
+            msg_out = AIMessage(content=research_brief)
         else:
             investment_memo = _build_fallback_memo(risk_assessment)
-            final_decision = _build_fallback_decision(full_symbol, risk_assessment)
+            research_brief = _build_fallback_research_brief(full_symbol, risk_assessment)
             msg_out = AIMessage(content="(系统降级)")
             logger.warning("[投研总监] 使用 fallback 输出")
 
         # ---- Step 6: SafetyOverride 纯规则二审（0 LLM） ----
-        # 无论 LLM / fallback / 字段解析是否成功，都必须执行并记录审计。
-        decision_fields = extract_decision_fields(final_decision)
-        llm_direction = decision_fields["action"]
-        llm_confidence = decision_fields["confidence"]
-        counter_signal_explanation = _extract_counter_signal_explanation(investment_memo)
+        # research_brief 不包含交易方向/置信度，中性默认值传参。
+        # safety_override 的规则引擎仍会检查 R5/临近交割等硬约束并生成策略约束审计。
+        custom_data = (
+            (commodity_features or {}).get("custom_data", {}) or {}
+        ) if isinstance(commodity_features, dict) else {}
         override = safety_override(
             risk_assessment,
-            llm_direction,
-            llm_confidence,
-            final_decision,
+            "hold",
+            0.0,
+            research_brief,
             analyst_registry=analyst_registry,
             position_structured=state.get("position_structured", {}) or {},
-            counter_signal_explanation=counter_signal_explanation,
+            counter_signal_explanation="",
+            custom_data_feature_dict=custom_data.get("feature_dict"),
         )
 
-        # 始终规范化字段；硬约束与置信度/仓位限制不会因文本格式而丢失。
         investment_memo = _apply_override_to_memo(investment_memo, override)
-        final_decision = rewrite_decision_markdown(
-            final_decision,
-            override["action"],
-            override["confidence"],
-        )
-        msg_out = AIMessage(content=final_decision)
+        msg_out = AIMessage(content=research_brief)
         risk_card["safety_override"] = {
             **override,
             "max_position_pct": override["max_position"] * 100,
@@ -1170,7 +1304,9 @@ def create_investment_director(deep_thinking_llm):
             "investment_memo": investment_memo,
             "risk_card": risk_card,
             "risk_assessment": risk_assessment,
-            "final_decision": final_decision,
+            "final_decision": research_brief,
+            "research_brief": research_brief,
+            "strategy_matrix": strategy_matrix,
             "messages": [msg_out],
             "cio_decision_timestamp": "now",
         }

@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -440,21 +441,35 @@ async def _run_commodity_analysis(
             # ---- 自定义数据文件解析：注入 features["custom_data"] ----
             if custom_data_file_paths:
                 try:
-                    from tradingagents.features.custom_data_adapter import parse_custom_data
-                    custom_data_result = parse_custom_data(
+                    from tradingagents.features.custom_data_adapter import parse_custom_data_async
+                    from tradingagents.graph.trading_graph import create_llm_by_provider
+                    # 创建一个轻量 quick-thinking LLM 用于自定义数据解析。
+                    # 此 LLM 只做"识别表格类型 + 提取当前观测"的简单 JSON 输出任务，
+                    # 低温度(0)保证输出稳定，高 timeout(30s)容忍慢响应。
+                    _cd_llm = create_llm_by_provider(
+                        provider=os.getenv("COMMODITY_LLM_PROVIDER", "deepseek"),
+                        model=os.getenv("COMMODITY_QUICK_LLM", "deepseek-chat"),
+                        backend_url=os.getenv("COMMODITY_LLM_BASE_URL", ""),
+                        temperature=0.0,
+                        max_tokens=512,
+                        timeout=30,
+                    )
+                    custom_data_result = await parse_custom_data_async(
                         file_paths=custom_data_file_paths,
+                        llm=_cd_llm,
                         skill_name=custom_data_skill_name or "general-analysis",
                         user_context=custom_data_user_context or "",
                     )
                     commodity_features["custom_data"] = custom_data_result
                     logger.info(
                         f"✅ 自定义数据注入 features: {len(custom_data_file_paths)} 文件, "
-                        f"parsed={custom_data_result.get('parsed')}"
+                        f"parsed={custom_data_result.get('parsed')}, "
+                        f"feature_dict={'有' if custom_data_result.get('feature_dict') else '无'}"
                     )
                 except Exception as e:
                     logger.warning(f"⚠️ 自定义数据解析失败: {e}")
                     commodity_features["custom_data"] = {
-                        "parsed": False, "error": str(e),
+                        "parsed": False, "error": str(e), "feature_dict": None,
                     }
 
             try:

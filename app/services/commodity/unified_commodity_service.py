@@ -525,10 +525,14 @@ class UnifiedCommodityService:
         if not provider:
             return None
         df = await provider.get_holding_position(symbol, indicator=indicator, date=date, no_cache=no_cache)
+        if isinstance(df, tuple):
+            df, actual_date = df
+        else:
+            actual_date = date or ""
         records = _df_to_records(df)
         if records is None:
             return None
-        return {"symbol": symbol, "indicator": indicator, "date": date or "",
+        return {"symbol": symbol, "indicator": indicator, "date": actual_date or date or "",
                 "rows": records, "count": len(records)}
 
     async def get_futures_news(

@@ -306,10 +306,16 @@ export const useCommodityStore = defineStore('commodity', {
         // 默认按 成交量 降序
         rows.sort((a, b) => Number((b as any)['成交量'] || 0) - Number((a as any)['成交量'] || 0))
 
+        // 提取实际数据日期(从第一个有日期的响应中取)
+        const actualDate = responses
+          .map((r: any) => r?.data?.date)
+          .find((d: string) => d && d.length >= 8) || ''
+
         this.holdingPosition = {
           symbol: fullSymbol,
           rows,
           count: rows.length,
+          date: actualDate,
           totals: {
             成交量: totalVol,
             多单持仓: totalLong,
