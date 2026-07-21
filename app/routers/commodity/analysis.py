@@ -461,6 +461,32 @@ async def _run_commodity_analysis(
                         user_context=custom_data_user_context or "",
                     )
                     commodity_features["custom_data"] = custom_data_result
+
+                    # F3: 自定义数据注入对应 features 模块做定量交叉验证
+                    _cd_fd = custom_data_result.get("feature_dict") if isinstance(custom_data_result.get("feature_dict"), dict) else None
+                    if _cd_fd:
+                        _matched = _cd_fd.get("_matched_module")
+                        if _matched in ("inventory", "basis", "positioning") and _matched in commodity_features:
+                            _snap = _cd_fd.get("snapshot", {}) or {}
+                            _qual = _cd_fd.get("quality", {}) or {}
+                            _val = _snap.get("current_value")
+                            _pctl = _snap.get("self_pctl_180d")
+                            if _val is not None:
+                                _cv_entry = {
+                                    "source": "user_upload",
+                                    "value": _val,
+                                    "label": _snap.get("current_value_label"),
+                                    "as_of": _snap.get("as_of"),
+                                    "percentile": _pctl,
+                                    "direction": _cd_fd.get("_direction", "neutral"),
+                                    "direction_confidence": _cd_fd.get("_direction_confidence", 0.0),
+                                    "file_names": custom_data_result.get("file_names", []),
+                                    "quality_reason": _qual.get("reason", ""),
+                                }
+                                _existing = commodity_features[_matched]
+                                if isinstance(_existing, dict):
+                                    _existing["cross_validation"] = _cv_entry
+
                     logger.info(
                         f"✅ 自定义数据注入 features: {len(custom_data_file_paths)} 文件, "
                         f"parsed={custom_data_result.get('parsed')}, "

@@ -1017,11 +1017,31 @@ def build_evidence_chain(final_state: Dict[str, Any]) -> Dict[str, Any]:
             "signals": entry.get("signals", [])[:3],
         })
 
-    # 如果有自定义数据，在所有 L1 entry 的 key_metrics 中标注数据来源
+    # 自定义数据来源标注：追加独立条目而非污染系统分析师（F1）
     custom_data = features.get("custom_data", {})
     if isinstance(custom_data, dict) and custom_data.get("parsed"):
-        for entry in L1_entries:
-            entry["key_metrics"]["data_source"] = "用户上传文件"
+        _feature_dict = custom_data.get("feature_dict") if isinstance(custom_data.get("feature_dict"), dict) else None
+        _cd_snapshot = _feature_dict.get("snapshot", {}) if _feature_dict else {}
+        L1_entries.append({
+            "id": "REF-CUSTOM-uploaded",
+            "conclusion_id": "custom_conc_1",
+            "name": "自定义数据",
+            "direction": "neutral",
+            "confidence": 0.0,
+            "calibrated_confidence": 0.0,
+            "status": "ok",
+            "summary": custom_data.get("summary_text", "(用户上传数据)")[:80],
+            "key_metrics": {
+                "data_source": "用户上传文件",
+                "file_count": custom_data.get("file_count", 0),
+                "file_names": ", ".join(custom_data.get("file_names", [])),
+                "matched_module": _feature_dict.get("_matched_module") if _feature_dict else None,
+                "current_value": _cd_snapshot.get("current_value"),
+                "as_of": _cd_snapshot.get("as_of"),
+                "self_pctl_180d": _cd_snapshot.get("self_pctl_180d"),
+            },
+            "signals": _feature_dict.get("signals", [])[:3] if _feature_dict else [],
+        })
 
     # --- L2: investment_plan 解析 + contradiction_map ---
     investment_plan = final_state.get("investment_plan", "")

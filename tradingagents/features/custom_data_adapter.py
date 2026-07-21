@@ -475,6 +475,24 @@ def _build_feature_dict(
                 snapshot["current_value"] = last_val
                 snapshot["current_value_label"] = value_col
 
+    # F2: as_of fallback — LLM 未提取出 as_of 时从摘要的 date_range.max 推断
+    if not as_of and summaries:
+        _first = summaries[0]
+        if isinstance(_first, dict):
+            _dr = _first.get("date_range") or {}
+            _max = _dr.get("max") if isinstance(_dr, dict) else None
+            if _max:
+                as_of = str(_max)
+                quality["has_as_of"] = True
+                quality["reason"] = "as_of 从时间范围最大值推断"
+                # 尝试计算 data_freshness_days
+                import datetime as _dt  # noqa: PLC0415
+                try:
+                    _asof = _dt.date.fromisoformat(as_of)
+                    quality["data_freshness_days"] = (_dt.date.today() - _asof).days
+                except (ValueError, TypeError):
+                    pass
+
     if as_of:
         snapshot["as_of"] = str(as_of)
     snapshot["matched_module"] = matched_module
