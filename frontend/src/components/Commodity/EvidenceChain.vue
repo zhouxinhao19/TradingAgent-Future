@@ -1,5 +1,55 @@
 <template>
   <div class="evidence-chain">
+    <!-- 决策摘要卡（总览仪表盘核心） -->
+    <el-card v-if="hasDecisionSummary" shadow="never" class="ds-card">
+      <el-row :gutter="16" align="middle">
+        <el-col :span="7">
+          <div class="ds-label">最终决策</div>
+          <div class="ds-direction-row">
+            <el-tag :type="dsDirectionType" size="large" effect="dark" class="ds-dir-tag">
+              {{ dsDirectionLabel }}
+            </el-tag>
+            <span class="ds-conf-text">{{ dsConfidencePct }}%</span>
+          </div>
+        </el-col>
+        <el-col :span="5">
+          <div class="ds-label">置信度</div>
+          <el-progress
+            :percentage="dsConfidencePct"
+            :stroke-width="14"
+            color="#409eff"
+          />
+        </el-col>
+        <el-col :span="5">
+          <div class="ds-label">风险等级</div>
+          <el-tag v-if="dsRiskTier" :type="riskTierTagType(dsRiskTier)" size="large">{{ dsRiskTier }}</el-tag>
+          <span v-else class="ds-na">—</span>
+        </el-col>
+        <el-col :span="7">
+          <div class="ds-label">分析师信号</div>
+          <div class="ds-consensus">
+            <span class="ds-bull">▲ {{ dsBullCount }} 看多</span>
+            <span class="ds-bear">▼ {{ dsBearCount }} 看空</span>
+            <span class="ds-neutral">→ {{ dsNeutralCount }} 中性</span>
+          </div>
+        </el-col>
+      </el-row>
+      <el-row v-if="dsHasConstraints" :gutter="16" class="ds-second-row">
+        <el-col :span="7">
+          <span class="ds-meta-label">仓位上限: <strong>{{ dsPositionLimit ?? '—' }}</strong></span>
+        </el-col>
+        <el-col :span="5">
+          <span class="ds-meta-label">杠杆上限: <strong>{{ dsLeverageLimit ?? '—' }}</strong></span>
+        </el-col>
+        <el-col :span="12">
+          <span class="ds-meta-label">约束:
+            <el-tag v-for="s in strategyTags" :key="s.name" :type="s.type" size="small" style="margin-right:4px">{{ s.name }}</el-tag>
+            <span v-if="!strategyTags.length" class="ds-na">无</span>
+          </span>
+        </el-col>
+      </el-row>
+    </el-card>
+
     <!-- 顶层摘要 -->
     <div v-if="data?.summary" class="chain-summary">
       <el-row :gutter="16">
@@ -125,7 +175,7 @@
                   v-for="(src, si) in (row['数据来源'] || [])"
                   :key="si"
                   class="ref-link"
-                  @click="scrollToL1(src)"
+                  @click="emit('navigate-ref', src)"
                 >
                   {{ shortenRefId(src) }}
                 </code>
@@ -170,14 +220,14 @@
               :span="Math.min(8, 24 / l2ScenarioList.length)"
             >
               <el-card
-                :shadow="sc['推演方向'] === '做多' ? 'always' : 'never'"
-                :class="'scenario-card scenario-' + (sc['推演方向'] === '做多' ? 'bull' : sc['推演方向'] === '做空' ? 'bear' : 'neutral')"
+                :shadow="isBullish(sc['推演方向']) ? 'always' : 'never'"
+                :class="'scenario-card scenario-' + (isBullish(sc['推演方向']) ? 'bull' : isBearish(sc['推演方向']) ? 'bear' : 'neutral')"
               >
                 <template #header>
                   <span>
                     {{ scenarioLabel(sc) }}
                     <el-tag
-                      :type="sc['推演方向'] === '做多' ? 'success' : sc['推演方向'] === '做空' ? 'danger' : 'info'"
+                      :type="isBullish(sc['推演方向']) ? 'success' : isBearish(sc['推演方向']) ? 'danger' : 'info'"
                       size="small"
                     >
                       {{ sc['推演方向'] }}
@@ -247,104 +297,6 @@
         总结
       </h3>
 
-      <!-- SafetyOverride 高亮 -->
-      <el-alert
-        v-if="safetyOverride?.executed || safetyOverride?.overridden"
-        :title="safetyOverrideTitle"
-        :type="safetyOverrideAlertType"
-        show-icon
-        style="margin-bottom: 12px"
-      >
-        <template #default>
-          <div class="override-detail">
-            <p><strong>原因:</strong> {{ safetyOverride.override_reason }}</p>
-            <p><strong>触发的规则:</strong>
-              <el-tag
-                v-for="(rule, ri) in (safetyOverride.override_rules_triggered || [])"
-                :key="ri"
-                type="danger"
-                size="small"
-                style="margin-right: 4px"
-              >
-                {{ rule }}
-              </el-tag>
-            </p>
-            <p v-if="safetyOverride.risk_tier">
-              <strong>风险等级:</strong>
-              <el-tag :type="riskTierTagType(safetyOverride.risk_tier)" size="small">
-                {{ safetyOverride.risk_tier }}
-              </el-tag>
-            </p>
-            <p v-if="safetyOverride.allowed_strategies?.length">
-              <strong>允许策略:</strong>
-              <el-tag
-                v-for="(s, si) in safetyOverride.allowed_strategies"
-                :key="si"
-                type="success"
-                size="small"
-                style="margin-right: 4px"
-              >
-                {{ s }}
-              </el-tag>
-            </p>
-            <p v-if="safetyOverride.forbidden_strategies?.length">
-              <strong>禁止策略:</strong>
-              <el-tag
-                v-for="(s, si) in safetyOverride.forbidden_strategies"
-                :key="si"
-                type="danger"
-                size="small"
-                style="margin-right: 4px"
-              >
-                {{ s }}
-              </el-tag>
-            </p>
-            <p v-if="safetyOverride.strategy_constraints">
-              <strong>策略约束说明:</strong> {{ safetyOverride.strategy_constraints }}
-            </p>
-            <p v-if="hasPositionLimit">
-              <strong>仓位上限:</strong> {{ safetyOverride.max_position_pct }}%
-              <span v-if="Number(safetyOverride.max_position_pct) === 0">（禁止开仓）</span>
-            </p>
-            <p v-if="safetyOverride.r5_dimensions?.length">
-              <strong>R5 维度:</strong> {{ safetyOverride.r5_dimensions.join('、') }}
-            </p>
-            <p v-if="hasOriginalOverride" class="override-comparison">
-              <strong>原始决策 → 规则覆盖:</strong>
-              <span class="override-arrow">
-                {{ directionLabel(safetyOverride.original_llm_direction) }}
-                / {{ formatConfidence(safetyOverride.original_llm_confidence) }}
-                →
-                <strong>{{ directionLabel(safetyOverride.overridden_action) }}</strong>
-                / {{ formatConfidence(safetyOverride.overridden_confidence) }}
-              </span>
-            </p>
-            <p v-if="safetyOverride.custom_data_conflict || safetyOverride.custom_data_overreliance?.ratio > 0.5" class="override-custom-data">
-              <strong>自定义数据审计:</strong>
-              <el-tag
-                v-if="safetyOverride.custom_data_conflict"
-                type="danger"
-                size="small"
-                style="margin-right: 4px"
-              >
-                私有数据方向冲突 (私有={{ safetyOverride.custom_data_direction || '中性' }})
-              </el-tag>
-              <el-tag
-                v-if="safetyOverride.custom_data_overreliance?.ratio > 0.5"
-                type="warning"
-                size="small"
-                style="margin-right: 4px"
-              >
-                CIO 过度依赖用户数据 ({{ Math.round((safetyOverride.custom_data_overreliance?.ratio || 0) * 100) }}%)
-              </el-tag>
-              <span v-if="safetyOverride.custom_data_as_of" class="custom-data-asof">
-                数据截至: {{ safetyOverride.custom_data_as_of }}
-              </span>
-            </p>
-          </div>
-        </template>
-      </el-alert>
-
       <!-- 策略适应性矩阵 -->
       <el-card v-if="strategyMatrix.length" shadow="never" style="margin-bottom: 12px">
         <template #header><b>策略适应性矩阵（量化规则）</b></template>
@@ -386,9 +338,19 @@
             </template>
           </el-table-column>
           <el-table-column prop="reason" label="理由" min-width="240" show-overflow-tooltip />
-          <el-table-column prop="refId" label="引用" width="100">
+          <el-table-column label="引用" min-width="160">
             <template #default="{ row }">
-              <code v-if="row.refId" class="ref-link" @click="scrollToL1(row.refId)">{{ shortenRefId(row.refId) }}</code>
+              <template v-if="row.refId">
+                <code
+                  v-for="(ref, ri) in parseRefIds(row.refId)"
+                  :key="ri"
+                  class="ref-link"
+                  style="margin-right: 6px"
+                  @click="emit('navigate-ref', ref)"
+                >
+                  {{ shortenRefId(ref) }}
+                </code>
+              </template>
             </template>
           </el-table-column>
         </el-table>
@@ -522,6 +484,50 @@
         </el-col>
       </el-row>
 
+      <!-- 数据新鲜度（dimensions.data_quality） -->
+      <el-row v-if="dataQualityDim" :gutter="12" style="margin-bottom: 12px">
+        <el-col :span="24">
+          <el-card shadow="never" :class="'risk-card risk-' + dqLevelClass">
+            <template #header>
+              <b>数据新鲜度</b>
+              <el-tag
+                :type="dqTagType"
+                size="small"
+                style="margin-left: 8px"
+              >{{ dqTier }}</el-tag>
+            </template>
+            <el-row :gutter="16">
+              <el-col :span="6">
+                <div class="dq-dim-label">状态</div>
+                <div class="dq-dim-value">{{ dqValueLabel }}</div>
+              </el-col>
+              <el-col :span="6">
+                <div class="dq-dim-label">最旧模块</div>
+                <div class="dq-dim-value">{{ dqStalestModule }}</div>
+              </el-col>
+              <el-col :span="6">
+                <div class="dq-dim-label">最旧天数</div>
+                <div class="dq-dim-value">{{ dqStalestDays }} 交易日</div>
+              </el-col>
+              <el-col :span="6">
+                <div class="dq-dim-label">数据充分模块</div>
+                <div class="dq-dim-value">{{ dqAvailableCount }}/6</div>
+              </el-col>
+            </el-row>
+            <div v-if="dataQualityDim.interpretation" style="margin-top: 8px; color: #909399; font-size: 13px">
+              {{ dataQualityDim.interpretation }}
+            </div>
+            <!-- data_stale 标记 -->
+            <el-tag
+              v-for="(f, fi) in dataStaleFlags"
+              :key="fi"
+              :type="f.severity === 'high' ? 'danger' : 'warning'"
+              style="margin-top: 8px; margin-right: 4px"
+            >{{ flagLabel(f) }}</el-tag>
+          </el-card>
+        </el-col>
+      </el-row>
+
       <!-- 事实卡片: 从各模块提取的关键数值锚点 -->
       <el-card v-if="factCards.length" shadow="never" style="margin-bottom: 12px">
         <template #header>
@@ -571,6 +577,10 @@ const props = defineProps<{
   data: Record<string, any> | null
 }>()
 
+const emit = defineEmits<{
+  (e: 'navigate-ref', refId: string): void
+}>()
+
 const summaryVarietyDisplay = computed(() => {
   const s = props.data?.summary
   if (!s) return ''
@@ -590,6 +600,12 @@ function shortenRefId(id: string): string {
   return id
 }
 
+/** 解析可能逗号分隔的多个 REF-ID（如 "FUND-16d0b241, REF-TECH-8b8df9ae"）*/
+function parseRefIds(val: string): string[] {
+  if (!val) return []
+  return val.split(',').map(s => s.trim()).filter(Boolean)
+}
+
 /** 统一字段为数组 */
 function toList(val: unknown): string[] {
   if (Array.isArray(val)) return val.filter((v): v is string => typeof v === 'string')
@@ -597,7 +613,7 @@ function toList(val: unknown): string[] {
   return []
 }
 
-const activeL2Panels = ref(['valuation', 'bullbear', 'scenarios', 'contradictions'])
+const activeL2Panels = ref(['valuation'])
 
 // ---- L1 分析师信号 ----
 const l1Entries = computed(() => {
@@ -678,17 +694,17 @@ const l2Scenarios = computed(() => {
 const l2ScenarioList = computed(() => {
   const s = l2Scenarios.value
   if (Array.isArray(s)) return s.filter(isScenarioObject)
-  // 可能是对象 keyed by "保守/基准/乐观"
-  const keys = ['保守', '基准', '乐观']
+  // 标准格式: key 为"保守情景"/"基准情景"/"乐观情景"
+  const keys = ['保守情景', '基准情景', '乐观情景']
   const list = []
   if (typeof s === 'object' && s !== null) {
     for (const k of keys) {
-      if (s[k]) list.push({ ...s[k], _label: k })
+      if (s[k]) list.push({ ...s[k], _label: k.replace('情景', '') })
     }
-    // fallback: 取所有 value，过滤掉非情景对象（如数组、字符串）
+    // fallback: 取所有是一个情景对象的 value
     if (!list.length) {
-      for (const v of Object.values(s)) {
-        if (isScenarioObject(v)) list.push(v)
+      for (const [k, v] of Object.entries(s)) {
+        if (isScenarioObject(v)) list.push({ ...v, _label: k })
       }
     }
   }
@@ -699,6 +715,15 @@ const l2ScenarioList = computed(() => {
 function isScenarioObject(v: unknown): v is Record<string, any> {
   return typeof v === 'object' && v !== null && !Array.isArray(v) &&
     (typeof (v as any)['推演方向'] === 'string' || typeof (v as any)['情景名称'] === 'string')
+}
+
+/** 方向是否偏多 */
+function isBullish(dir: string): boolean {
+  return ['做多', '偏多', '看多', 'bullish', 'long'].includes(dir)
+}
+/** 方向是否偏空 */
+function isBearish(dir: string): boolean {
+  return ['做空', '偏空', '看空', 'bearish', 'short', '中性偏空'].includes(dir)
 }
 
 const l2Conflict = computed<{ type: TagType; text: string } | null>(() => {
@@ -750,55 +775,6 @@ const renderedFinalDecision = computed(() => {
   return renderMarkdown(l3FinalText.value)
 })
 
-const safetyOverride = computed(() => {
-  const so = props.data?.layers?.L3?.safety_override
-  // 空对象（后端未写入数据/旧报告）返回 null，不触发 alert
-  if (!so || typeof so !== 'object' || !Object.keys(so).length || !so.executed) return null
-  return so
-})
-
-const hasPositionLimit = computed(() => {
-  const value = safetyOverride.value?.max_position_pct
-  return value !== undefined && value !== null
-})
-
-const safetyOverrideTitle = computed(() => {
-  const audit = safetyOverride.value
-  if (!audit) return ''
-  if (audit.overridden) return '⚠️ SafetyOverride 风控硬约束已覆盖原始决策'
-  if ((audit.override_rules_triggered || []).length) return '⚠️ SafetyOverride 风控规则已触发，原决策符合约束'
-  return '✅ SafetyOverride 已执行，未改变原始决策'
-})
-
-const safetyOverrideAlertType = computed(() => {
-  const audit = safetyOverride.value
-  if (audit?.overridden || (audit?.override_rules_triggered || []).length) return 'warning'
-  return 'success'
-})
-
-const hasOriginalOverride = computed(() => {
-  const so = safetyOverride.value
-  if (!so) return false
-  return Boolean(
-    so.original_llm_direction !== undefined
-    && so.overridden_action !== undefined
-    && so.original_llm_direction !== so.overridden_action
-  )
-})
-
-function formatConfidence(value: unknown): string {
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? `${(parsed * 100).toFixed(0)}%` : '—'
-}
-
-function directionLabel(action?: string): string {
-  const map: Record<string, string> = {
-    long: '做多', short: '做空', hold: '持有', flat: '平仓',
-    bullish: '看多', bearish: '看空', neutral: '中性', skip: '跳过',
-  }
-  return map[action || ''] || action || '—'
-}
-
 // ---- CIO 结构化数据（从 L3 cio_memo 或从 final_decision_raw 中解析） ----
 function tryParseCIO(raw: string): Record<string, any> | null {
   if (!raw) return null
@@ -846,12 +822,151 @@ const cioRiskCard = computed(() => {
     || null
 })
 
+// ---- Decision Summary Card computed ----
+const dsFinalAction = computed(() => {
+  const s = props.data?.summary || {}
+  const riskCard = cioRiskCard.value?.['风险裁定'] || {}
+  return s.final_action || riskCard['建议动作'] || ''
+})
+
+const dsFinalConfidence = computed(() => {
+  const s = props.data?.summary || {}
+  return s.final_confidence ?? null
+})
+
+const dsDirectionType = computed(() => {
+  const map: Record<string, TagType> = {
+    long: 'success', short: 'danger', hold: 'info', flat: 'warning',
+    bullish: 'success', bearish: 'danger', neutral: 'info',
+  }
+  return map[dsFinalAction.value] || 'info'
+})
+
+const dsDirectionLabel = computed(() => {
+  const map: Record<string, string> = {
+    long: '做多', short: '做空', hold: '持有', flat: '平仓',
+    bullish: '看多', bearish: '看空', neutral: '中性',
+  }
+  return map[dsFinalAction.value] || dsFinalAction.value || '—'
+})
+
+const dsConfidencePct = computed(() => {
+  const c = dsFinalConfidence.value
+  if (c == null) return 0
+  return Math.round(Number(c) * 100)
+})
+
+const dsRiskTier = computed(() => props.data?.summary?.risk_tier || '')
+
+const dsPositionLimit = computed(() => {
+  return cioRiskCard.value?.['风险裁定']?.['仓位上限'] ?? props.data?.summary?.max_position_pct ?? null
+})
+
+const dsLeverageLimit = computed(() => {
+  return cioRiskCard.value?.['风险裁定']?.['杠杆上限'] ?? null
+})
+
+const dsBullCount = computed(() => {
+  return (props.data?.layers?.L1 || []).filter(
+    (e: any) => e.status !== 'skipped' && ['long', 'bullish'].includes(e.direction),
+  ).length
+})
+
+const dsBearCount = computed(() => {
+  return (props.data?.layers?.L1 || []).filter(
+    (e: any) => e.status !== 'skipped' && ['short', 'bearish'].includes(e.direction),
+  ).length
+})
+
+const dsNeutralCount = computed(() => {
+  return (props.data?.layers?.L1 || []).filter(
+    (e: any) => e.status !== 'skipped' && ['hold', 'neutral', 'flat', ''].includes(e.direction || ''),
+  ).length
+})
+
+const hasDecisionSummary = computed(() => {
+  return dsFinalAction.value || dsRiskTier.value || dsBullCount.value + dsBearCount.value + dsNeutralCount.value > 0
+})
+
+const dsHasConstraints = computed(() => {
+  return dsPositionLimit.value != null || dsLeverageLimit.value != null || strategyTags.value.length > 0
+})
+
+const strategyTags = computed(() => {
+  const ec_summary = props.data?.summary
+  const tags: Array<{ name: string; type: TagType }> = []
+  if (ec_summary?.allowed_strategies?.length) {
+    for (const s of ec_summary.allowed_strategies) {
+      tags.push({ name: s, type: 'success' })
+    }
+  }
+  if (ec_summary?.forbidden_strategies?.length) {
+    for (const s of ec_summary.forbidden_strategies) {
+      tags.push({ name: `禁:${s}`, type: 'danger' })
+    }
+  }
+  return tags
+})
+
 // ---- 数据质量辅助 ----
 const dqDetails = computed(() => {
   const dq = cioRiskCard.value?.['风险裁定']?.['数据质量']?.details
   if (!dq || typeof dq !== 'object') return {}
   return dq
 })
+
+// ---- dimensions.data_quality (规则引擎输出) ----
+const dataQualityDim = computed(() => {
+  return riskAssessment.value?.dimensions?.data_quality || null
+})
+
+const dqValueLabel = computed(() => {
+  const map: Record<string, string> = {
+    fresh: '新鲜', acceptable: '可接受', degraded: '陈旧', stale: '极旧', unknown: '未知',
+  }
+  return map[dataQualityDim.value?.value] || dataQualityDim.value?.value || '—'
+})
+
+const dqTagType = computed(() => {
+  const lv = dataQualityDim.value?.level ?? 0
+  if (lv <= 1) return 'success'
+  if (lv === 2) return 'success'
+  if (lv === 3) return 'warning'
+  if (lv >= 4) return 'danger'
+  return 'info'
+})
+
+const dqTier = computed(() => dataQualityDim.value?.tier || '—')
+const dqStalestModule = computed(() => dataQualityDim.value?.stalest_module || '—')
+const dqStalestDays = computed(() => dataQualityDim.value?.stalest_days ?? '—')
+
+const dqAvailableCount = computed(() => {
+  const dims = riskAssessment.value?.dimensions
+  if (!dims || typeof dims !== 'object') return 0
+  // 维度条目无 available:true，但有 available:false 表示不可用
+  // 所以统计不含 available:false 的维度（data_quality 排除）
+  return Object.entries(dims)
+    .filter(([k, v]: [string, any]) =>
+      k !== 'data_quality' && v?.available !== false
+    ).length
+})
+
+const dqLevelClass = computed(() => {
+  const lv = dataQualityDim.value?.level ?? 0
+  if (lv >= 4) return 'high'
+  if (lv >= 2) return 'mid'
+  return 'low'
+})
+
+const dataStaleFlags = computed(() => {
+  const flags = riskAssessment.value?.flags
+  if (!Array.isArray(flags)) return []
+  return flags.filter((f: any) => f?.name === 'data_stale')
+})
+
+function flagLabel(f: any): string {
+  return f?.flag || f?.name || ''
+}
 
 function moduleName(key: string): string {
   const names: Record<string, string> = {
@@ -924,16 +1039,6 @@ function fitnessTagType(fitness: string): TagType {
   return map[fitness] || 'info'
 }
 
-function scrollToL1(refId: string) {
-  // 查找带 data-ref-id 的 L1 卡片
-  const el = document.querySelector(`[data-ref-id="${refId}"]`)
-  if (el) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    // 高亮闪烁效果
-    el.classList.add('l1-highlight')
-    setTimeout(() => el.classList.remove('l1-highlight'), 1500)
-  }
-}
 </script>
 
 <style scoped>
@@ -1232,4 +1337,61 @@ function scrollToL1(refId: string) {
   color: #c0c4cc;
   margin-left: 6px;
 }
+
+/* 决策摘要卡（总览仪表盘） */
+.ds-card {
+  margin-bottom: 16px;
+  border: 1px solid var(--el-border-color-light, #e4e7ed);
+  background: linear-gradient(135deg, #f5f7fa 0%, #fff 100%);
+}
+
+.ds-card .ds-label {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 6px;
+}
+
+.ds-direction-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ds-dir-tag {
+  font-size: 18px !important;
+  padding: 8px 20px !important;
+}
+
+.ds-conf-text {
+  font-size: 26px;
+  font-weight: 700;
+  color: #303133;
+}
+
+.ds-consensus {
+  display: flex;
+  gap: 14px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ds-bull { color: #67c23a; }
+.ds-bear { color: #f56c6c; }
+.ds-neutral { color: #909399; }
+
+.ds-second-row {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--el-border-color-lighter, #e4e7ed);
+}
+
+.ds-meta-label {
+  font-size: 13px;
+  color: #606266;
+}
+
+.ds-na {
+  color: #c0c4cc;
+}
+
 </style>
