@@ -372,14 +372,14 @@ def create_fundamental_analyst(llm):
                 "analyst_registry": registry_entry,
             }
 
-        # --- 数据稀疏判断(三个模块加起来 rows < 30) ---
+        # --- 数据稀疏判断(三个模块加起来 rows < 15) ---
         total_rows = sum(
             int((b or {}).get("quality", {}).get("rows", 0) or 0)
             for b in [basis_block, inventory_block, term_block]
             if isinstance(b, dict)
         )
-        if total_rows < 30:
-            reason = f"三因子数据稀疏(total_rows={total_rows} < 30)"
+        if total_rows < 15:
+            reason = f"三因子数据稀疏(total_rows={total_rows} < 15)"
             report_md = empty_report("neutral", reason, custom_data_context=custom_data_context)
             analyst_id = make_analyst_id("FUND", full_symbol, trade_date, seed="sparse")
             conclusion_id = make_conclusion_id("FUND", 1)

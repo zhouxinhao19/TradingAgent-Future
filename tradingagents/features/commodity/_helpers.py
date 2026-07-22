@@ -38,8 +38,8 @@ COLUMN_ALIASES: Dict[str, List[str]] = {
     "dom_basis": ["dom_basis", "主力基差"],
     "near_basis_rate": ["near_basis_rate", "近月基差率"],
     "dom_basis_rate": ["dom_basis_rate", "主力基差率", "basis_rate"],
-    "long_top20": ["long_top20", "long_open_interest_top20", "long_open_interest", "前20多头"],
-    "short_top20": ["short_top20", "short_open_interest_top20", "short_open_interest", "前20空头"],
+    "long_top20": ["long_top20", "long_open_interest_top20", "long_open_interest", "前20多头", "多单持仓"],
+    "short_top20": ["short_top20", "short_open_interest_top20", "short_open_interest", "前20空头", "空单持仓"],
     "total_oi": ["total_oi", "total_open_interest", "总持仓"],
     "net_long_top20": ["net_long_top20", "前20净多"],
     "roll_yield": ["roll_yield", "rollYield", "roll", "yield", "展期收益率"],
@@ -68,6 +68,8 @@ CHINESE_TO_CANONICAL: Dict[str, str] = {
     "published_at": "date",
     "内容": "content",
     "标题": "content",
+    "多单持仓": "long_top20",
+    "空单持仓": "short_top20",
 }
 
 
@@ -260,10 +262,11 @@ def data_quality(df: pd.DataFrame, value_col: str = "value") -> Dict[str, Any]:
         try:
             last_date = df["date"].iloc[-1]
             if pd.notna(last_date):
-                today = pd.Timestamp(datetime.now().date())
                 if not isinstance(last_date, pd.Timestamp):
                     last_date = pd.Timestamp(last_date)
-                freshness = int((today - last_date).days)
+                # 用交易日历替代日历日,避免周一开盘被算成 3 天
+                from app.utils.commodity_trading_calendar import freshness_in_trading_days
+                freshness = freshness_in_trading_days(last_date.date())
         except Exception:
             freshness = None
     return {"rows": rows, "coverage": round(coverage, 3), "data_freshness_days": freshness}

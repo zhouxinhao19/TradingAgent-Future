@@ -259,6 +259,59 @@ def _now_iso() -> str:
     return datetime.utcnow().isoformat()
 
 
+def _filter_news_by_end_day(
+    items: List[Dict[str, Any]],
+    end_day: Optional[str],
+) -> List[Dict[str, Any]]:
+    """按 end_day (YYYY-MM-DD) 后置过滤新闻 published_at。
+
+    历史回测时只保留 <= end_day 的事件,避免取到当前未发生的资讯。
+    无 end_day / 解析失败 / 无 published_at 的项保留(避免误删)。
+
+    Args:
+        items: 新闻项列表
+        end_day: YYYY-MM-DD 截止日期;None 或空字符串表示不过滤
+
+    Returns:
+        过滤后的列表(原顺序)
+    """
+    if not end_day or not items:
+        return items
+    try:
+        import pandas as _pd
+        # cutoff = end_day 次日 00:00 (含等号语义: end_day=2026-07-22 表示含 7-22 全天)
+        # 统一转 UTC 后比较,避免 tz-naive/aware 不一致导致误判
+        cutoff = (_pd.Timestamp(end_day) + _pd.Timedelta(days=1)).tz_localize("UTC")
+    except Exception:
+        return items
+
+    def _to_utc(ts):
+        """统一转 tz-aware UTC,无法解析的返回 None(调用方保留该项)。"""
+        if ts is None or ts == "":
+            return None
+        try:
+            t = _pd.Timestamp(str(ts))
+        except Exception:
+            return None
+        if t is _pd.NaT:
+            return None
+        if t.tz is None:
+            t = t.tz_localize("UTC")
+        else:
+            t = t.tz_convert("UTC")
+        return t
+
+    cutoff_utc = cutoff
+
+    def _ok(it: Dict[str, Any]) -> bool:
+        parsed = _to_utc(it.get("published_at"))
+        if parsed is None or cutoff_utc is None:
+            return True
+        return parsed <= cutoff_utc
+
+    return [it for it in items if _ok(it)]
+
+
 class AkshareFuturesProvider(BaseCommodityDataProvider):
     """AKShare 国内期货数据源(行情 + 手续费/库存/基差/持仓/合约信息)"""
 
@@ -842,36 +895,62 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         if not await self._ensure_ak():
             return None
 
-        # 1. 东方财富(支持代码或中文名;先代码后中文)
-        df = await self._call("futures_inventory_em", symbol=symbol)
+        # 1. 东方财富(先中文名再英文,避免英文代码在 AKShare 中因不接受而浪费一次调用)
+        cn = self._symbol_to_chinese(symbol) or symbol
+        df = await self._call("futures_inventory_em", symbol=cn)
         if df is not None and not df.empty:
-            # ── 写入缓存 ──
             if self._cache:
                 self._cache.save_inventory(symbol, df)
             return df
 
-        # 2. 东方财富(中文名,部分品种代码不识别)
-        cn = self._symbol_to_chinese(symbol) or symbol
-        if cn != symbol:
-            df = await self._call("futures_inventory_em", symbol=cn)
+        # 1b. 东方财富(纯品种名,不带交易所前缀,如"铜"而非"沪铜")
+        try:
+            from tradingagents.dataflows.providers.commodity.commodity_metadata import get_variety
+            v = get_variety(symbol)
+            v_cn = v.get("name_cn") if v else None
+            if v_cn and v_cn != cn:
+                df = await self._call("futures_inventory_em", symbol=v_cn)
+                if df is not None and not df.empty:
+                    if self._cache:
+                        self._cache.save_inventory(symbol, df)
+                    return df
+        except Exception:
+            pass
+
+        # 1c. 东方财富(直接传代码,部分品种兼容)
+        if symbol != cn:
+            df = await self._call("futures_inventory_em", symbol=symbol)
             if df is not None and not df.empty:
                 if self._cache:
                     self._cache.save_inventory(symbol, df)
                 return df
 
-        # 3. 99 期货(需精确中文名,已备 99qh 映射表兜底)
+        # 2. 99 期货(需精确中文名,已备 99qh 映射表兜底)
         df = await self._call("futures_inventory_99", symbol=cn)
         if df is not None and not df.empty:
             if self._cache:
                 self._cache.save_inventory(symbol, df)
             return df
 
-        # 4. 尝试原始传入的符号(兼容已传入中文名)
+        # 2b. 尝试原始传入的符号(兼容已传入中文名)
         if cn != symbol:
             df = await self._call("futures_inventory_99", symbol=symbol)
             if df is not None and not df.empty and self._cache:
                 self._cache.save_inventory(symbol, df)
             return df
+
+        # 2c. 99 期货(纯品种名)
+        try:
+            from tradingagents.dataflows.providers.commodity.commodity_metadata import get_variety
+            v = get_variety(symbol)
+            v_cn = v.get("name_cn") if v else None
+            if v_cn and v_cn not in (cn, symbol):
+                df = await self._call("futures_inventory_99", symbol=v_cn)
+                if df is not None and not df.empty and self._cache:
+                    self._cache.save_inventory(symbol, df)
+                return df
+        except Exception:
+            pass
 
         return None
 
@@ -1210,7 +1289,7 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
                     "futures_spot_price_daily",
                     start_day=start_win, end_day=end_win, vars_list=vars_param,
                 ),
-                timeout=10,
+                timeout=25,
             )
         except (asyncio.TimeoutError, Exception):
             pass
@@ -1317,7 +1396,7 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
 
         if not await self._ensure_ak():
             return None
-        # AKShare 在线调用(最多等 10 秒)
+        # AKShare 在线调用(100ppi.com 对端慢,需耐心;实测 10s 不足)
         result = None
         try:
             result = await asyncio.wait_for(
@@ -1325,7 +1404,7 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
                     "futures_spot_price_daily",
                     start_day=start, end_day=end, vars_list=vars_list,
                 ),
-                timeout=10,
+                timeout=25,
             )
         except (asyncio.TimeoutError, Exception):
             pass
@@ -1355,6 +1434,11 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
                     })
                     df_99qh["symbol"] = sym_99qh
                     df_99qh["near_contract_price"] = df_99qh["dominant_contract_price"]
+                    # 本地计算基差和基差率(99qh 不直接提供这些列)
+                    df_99qh["near_basis"] = df_99qh["spot_price"] - df_99qh["near_contract_price"]
+                    df_99qh["dom_basis"] = df_99qh["spot_price"] - df_99qh["dominant_contract_price"]
+                    df_99qh["near_basis_rate"] = df_99qh["near_basis"] / df_99qh["spot_price"].replace(0, pd.NA)
+                    df_99qh["dom_basis_rate"] = df_99qh["dom_basis"] / df_99qh["spot_price"].replace(0, pd.NA)
                     if "date" in df_99qh.columns:
                         df_99qh["date"] = pd.to_datetime(df_99qh["date"], errors="coerce")
                     # 按日期过滤
@@ -1874,6 +1958,7 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         self,
         category: str = "all",
         limit: int = 50,
+        end_day: Optional[str] = None,
     ) -> Optional[List[Dict[str, Any]]]:
         """
         获取期货市场资讯。
@@ -1888,6 +1973,8 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
         Args:
             category: 资讯分类
             limit: 最多返回条数(shmet 接口 ~1000 条)
+            end_day: YYYY-MM-DD,可选。历史回测时只保留 published_at <= end_day 的新闻,
+                     防止历史分析取到当前未发生的事件。
 
         Returns:
             [
@@ -1944,7 +2031,7 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
 
                 if limit and len(items) >= limit:
                     break
-            return items
+            return _filter_news_by_end_day(items, end_day)
 
         # ===== 路径 B:宏观合成卡片 =====
         generator = _NEWS_GENERATORS.get(key)
@@ -1960,7 +2047,7 @@ class AkshareFuturesProvider(BaseCommodityDataProvider):
             for it in items:
                 it["category"] = key
                 it["metal"] = label
-            return items
+            return _filter_news_by_end_day(items, end_day)
 
         # ===== 路径 C:未识别分类 =====
         self.logger.warning(

@@ -259,6 +259,20 @@ class TestNormalizeColumns:
         out = tech_mod.normalize_columns(df)
         assert out.empty
 
+    def test_chinese_position_columns(self, helpers_mod):
+        df = pd.DataFrame({
+            "日期": [date(2025, 1, 1), date(2025, 1, 2)],
+            "多单持仓": [1000, 1200],
+            "空单持仓": [800, 900],
+            "总持仓": [1800, 2100],
+        })
+        out = helpers_mod.normalize_columns(df)
+        assert "long_top20" in out.columns
+        assert "short_top20" in out.columns
+        assert "total_oi" in out.columns or "total_open_interest" in out.columns
+        assert out["long_top20"].iloc[-1] == 1200
+        assert out["short_top20"].iloc[-1] == 900
+
 
 # =============================================================================
 # 2. compute_technical_metrics 主入口 — 基本结构

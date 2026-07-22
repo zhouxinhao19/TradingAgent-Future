@@ -39,6 +39,10 @@ export function renderMarkdown(text: string): string {
     // ## 标题
     .replace(/^## (.+)$/gm, '<h4 class="md-h4">$1</h4>')
     .replace(/^### (.+)$/gm, '<h5 class="md-h5">$1</h5>')
+    // REF-ID 引用链接（如 REF-TECH-a1b2c3d4 或 REF-TECH → 可点击锚点）
+    .replace(/\b(REF-\w+(?:-\w+)?)\b/g, '<a href="#$1" class="ref-anchor">$1</a>')
+    // 兼容 LLM 可能输出的无 REF- 前缀格式（如 [TECH-a1b2c3d4]）
+    .replace(/\[(\w+-\w+)\]/g, '<a href="#$1" class="ref-anchor">$1</a>')
     // | pipe 表格
     .replace(/^\|(.+)\|$/gm, (line) => {
       const cells = line.split('|').filter(c => c.trim()).map(c => c.trim())

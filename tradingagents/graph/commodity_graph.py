@@ -467,14 +467,14 @@ def _effective_research_conclusion(final_state: Dict[str, Any]) -> Dict[str, Any
         "forbidden_strategies": forbidden,
         "strategy_matrix": strategy_matrix,
         "core_narrative": core_narrative,
-        "research_brief_raw": research_brief[:500] if research_brief else "",
+        "research_brief_raw": research_brief[:3000] if research_brief else "",
         "fact_cards": fact_cards,
         "contradiction_map": contradiction_map,
         # 向后兼容
         "action": compat_action,
         "confidence": compat_confidence,
-        "reasoning": core_narrative or research_brief[:200] if research_brief else "(CIO 未输出)",
-        "raw_text": research_brief[:500] if research_brief else "",
+        "reasoning": core_narrative or research_brief[:3000] if research_brief else "(CIO 未输出)",
+        "raw_text": research_brief[:3000] if research_brief else "",
     }
 
     # Fail-closed：SafetyOverride 审计缺失时检测硬风险
@@ -1128,7 +1128,7 @@ def build_evidence_chain(final_state: Dict[str, Any]) -> Dict[str, Any]:
 
     # --- L2: investment_plan 解析 + contradiction_map ---
     investment_plan = final_state.get("investment_plan", "")
-    L2_data = {"raw": investment_plan[:500] if investment_plan else ""}
+    L2_data = {"raw": investment_plan[:1000] if investment_plan else ""}
     if investment_plan:
         try:
             # 剥离 markdown 代码块包裹
@@ -1146,7 +1146,7 @@ def build_evidence_chain(final_state: Dict[str, Any]) -> Dict[str, Any]:
             }
         except json.JSONDecodeError:
             # 不是标准 JSON（可能是 stock 路径的 Markdown），兜底
-            L2_data = {"raw_summary": investment_plan[:300]}
+            L2_data = {"raw_summary": investment_plan[:600]}
 
     # --- L3: risk_assessment + safety_override + research_brief + CIO memo ---
     risk_card = final_state.get("risk_card", {})
@@ -1161,7 +1161,7 @@ def build_evidence_chain(final_state: Dict[str, Any]) -> Dict[str, Any]:
     L3_data = {
         "risk_assessment": risk_assessment if isinstance(risk_assessment, dict) else {},
         "risk_card": risk_card if isinstance(risk_card, dict) else {},
-        "research_brief_raw": research_brief[:1000] if research_brief else "",
+        "research_brief_raw": research_brief[:3000] if research_brief else "",
         "safety_override": safety_override if isinstance(safety_override, dict) else {},
         "cio_memo": cio_memo,
         "cio_risk_card": cio_risk_card,
@@ -1169,7 +1169,7 @@ def build_evidence_chain(final_state: Dict[str, Any]) -> Dict[str, Any]:
         "fact_cards": fact_cards if isinstance(fact_cards, list) else [],
         "contradiction_map": contradiction_map if isinstance(contradiction_map, list) else [],
         # 向后兼容
-        "final_decision_raw": research_brief[:500] if research_brief else "",
+        "final_decision_raw": research_brief[:3000] if research_brief else "",
     }
 
     return {

@@ -54,21 +54,33 @@ async def _call_provider(provider, method_name, *args, **kwargs):
 async def _call_provider_with_timeout(
     provider, method_name: str, timeout: float, *args, **kwargs
 ):
-    """安全调用 provider 异步方法,带单调用超时。
+    """安全调用 provider 异步方法,带单调用超时 + 自动重试。
 
-    超时后返回 None(不抛异常),保证一个慢调用不阻塞整个 features 流程。
+    1. 首次超时/异常后自动重试一次(跳过缓存以应对 Parquet 脏数据)。
+    2. 重试时若 provider 方法支持 ``no_cache=True`` 则自动传入。
+    3. 两次均失败后返回 None(不抛异常)。
+
+    保证一个慢调用不阻塞整个 features 流程。
     """
     import asyncio as _asyncio
 
-    try:
-        method = getattr(provider, method_name, None)
-        if method is None:
-            return None
-        return await _asyncio.wait_for(
-            method(*args, **kwargs), timeout=timeout,
-        )
-    except (_asyncio.TimeoutError, Exception):
+    method = getattr(provider, method_name, None)
+    if method is None:
         return None
+
+    for attempt in range(2):
+        try:
+            call_kwargs = dict(kwargs)
+            # 重试时旁路缓存
+            if attempt == 1:
+                call_kwargs["no_cache"] = True
+            return await _asyncio.wait_for(
+                method(*args, **call_kwargs), timeout=timeout,
+            )
+        except (_asyncio.TimeoutError, Exception):
+            if attempt == 0:
+                continue  # 重试一次
+            return None
 
 
 def _resolve_technical_symbols(full_symbol: str, underlying: str) -> Dict[str, Optional[str]]:
@@ -133,19 +145,17 @@ async def compute_all_features_from_provider(
         normalize_exchange_code(full_symbol.split(".")[-1])
         if "." in full_symbol else "SHFE"
     )
-    date_compact = trade_date.replace("-", "")[:8] if trade_date else "20260715"
+    # 派生"今天"参考日期:有 trade_date 用 trade_date,否则用系统当天。
+    # 替代原硬编码 "20260715" / "2026-07-16" / "2026-07-15"。
+    _today_iso = trade_date or datetime.now().strftime("%Y-%m-%d")
+    date_compact = _today_iso.replace("-", "")[:8]
 
-    # AKShare 部分接口(futures_spot_price_daily / get_roll_yield)对超过
-    # ~45 天的查询窗口直接返回空(实测 60d / 18m 均为 0;30d / 15d / 7d 正常)。
-    # 详情页用 6d 窗口能拿到数据。把这两个查询限制在 30d 内。
+    # futures_spot_price_daily 对 CU 实测:30d=22 行, 60d=42 行, 90d=61 行。
+    # 用 60d 窗口获取更多基差样本，使 180d 分位计算更稳健。
     _basis_start = (
-        (datetime.strptime(trade_date, "%Y-%m-%d") - timedelta(days=30)).strftime("%Y-%m-%d")
-        if trade_date else "2026-06-20"
+        (datetime.strptime(_today_iso, "%Y-%m-%d") - timedelta(days=60)).strftime("%Y-%m-%d")
     )
-    _roll_start = (
-        (datetime.strptime(trade_date, "%Y-%m-%d") - timedelta(days=30)).strftime("%Y-%m-%d")
-        if trade_date else "2026-06-20"
-    )
+    _roll_start = _basis_start
 
     import asyncio as _asyncio
 
@@ -153,26 +163,27 @@ async def compute_all_features_from_provider(
         # 历史 K 线
         _call_provider_with_timeout(
             provider, "get_historical_data", 20,
-            full_symbol, start_date="2025-01-01", end_date=trade_date or "2026-07-16",
+            full_symbol, start_date="2025-01-01", end_date=_today_iso,
         ),
         # 指数合约数据
         _call_provider_with_timeout(
             provider, "get_historical_data_for_index", 20,
-            underlying, start_date="2025-01-01", end_date=trade_date or "2026-07-16",
+            underlying, start_date="2025-01-01", end_date=_today_iso,
         ),
-        # 基差历史
+        # 基差历史(100ppi.com 慢,provider 内部已提至 25s,外层留余量)
         _call_provider_with_timeout(
-            provider, "get_basis_history", 20,
-            _basis_start, trade_date or "2026-07-16", [underlying],
+            provider, "get_basis_history", 35,
+            _basis_start, _today_iso, [underlying],
         ),
-        # 现货价格(可能调 100ppi.com,单独超时)
+        # 现货价格(100ppi.com 慢,provider 内部已提至 25s)
         _call_provider_with_timeout(
-            provider, "get_spot_price", 15,
-            trade_date or "2026-07-15", underlying,
+            provider, "get_spot_price", 30,
+            _today_iso, underlying,
         ),
         # 库存
         _call_provider_with_timeout(
             provider, "get_inventory", 15, underlying,
+            end_date=(trade_date or None),
         ),
         # 持仓排名(30 天历史,供 positioning 5d/60d 指标计算)
         _call_provider_with_timeout(
@@ -184,9 +195,9 @@ async def compute_all_features_from_provider(
             provider, "get_roll_yield", 60,
             "date", var=underlying, start_day=_roll_start, end_day=date_compact,
         ),
-        # 新闻
+        # 新闻(传 end_day 让 provider 后置过滤,避免历史回测取到未来事件)
         _call_provider_with_timeout(
-            provider, "get_futures_news", 15, "all", 100,
+            provider, "get_futures_news", 15, "all", 100, trade_date or None,
         ),
         return_exceptions=True,
     )
@@ -273,6 +284,7 @@ async def compute_all_features_from_provider(
         features["signal_convergence"] = detect_signal_convergence(
             features,
             contract_warning=None,
+            data_staleness=features.get("data_freshness", {}).get("per_module", {}),
         )
     except Exception as e:
         errors["signal_convergence"] = repr(e)

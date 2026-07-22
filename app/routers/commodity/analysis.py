@@ -25,9 +25,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.routers.auth_db import get_current_user
+from app.schemas.commodity_validators import validate_trade_date
 from app.services.websocket_manager import get_websocket_manager
 
 logger = logging.getLogger("webapi")
@@ -79,6 +80,11 @@ class AnalysisRequest(BaseModel):
     skill_name: str = Field("general-analysis", description="自定义数据分析技能")
     user_context: str = Field("", description="用户上下文描述")
 
+    @field_validator("trade_date", mode="before")
+    @classmethod
+    def _validate_trade_date(cls, v):
+        return validate_trade_date(v)
+
 
 class AnalysisTaskResponse(BaseModel):
     """分析任务响应"""
@@ -105,11 +111,77 @@ class BatchAnalysisRequest(BaseModel):
     max_debate_rounds: int = Field(1, ge=0, le=3, description="多空辩论轮次")
     max_risk_discuss_rounds: int = Field(1, ge=0, le=3, description="风控辩论轮次")
 
+    @field_validator("trade_date", mode="before")
+    @classmethod
+    def _validate_trade_date(cls, v):
+        return validate_trade_date(v)
+
 
 # ==================== 服务辅助函数 ====================
 
 def _today() -> str:
     return datetime.now().strftime("%Y-%m-%d")
+
+
+# 核心模块至少行数(防御 features 全空仍跑 graph 的烧钱场景)
+_SUFFICIENT_COVERAGE_MIN_ROWS = 30
+_CORE_MODULES_FOR_COVERAGE = ("technical", "positioning", "basis", "inventory")
+
+
+def _has_sufficient_coverage(features: Dict[str, Any]) -> bool:
+    """判断 features 是否含足够数据跑 graph:至少 1 个核心模块行数 >= 30。
+
+    防御场景:AKShare 全部失败时 features 全空,继续跑 graph 会触发 13 次 LLM
+    调用(~280s)+ 数据全空 → 纯烧 token + 给出垃圾决策。
+    """
+    for key in _CORE_MODULES_FOR_COVERAGE:
+        mod = features.get(key, {})
+        if not isinstance(mod, dict):
+            continue
+        quality = mod.get("quality", {})
+        if not isinstance(quality, dict):
+            continue
+        rows = quality.get("rows", 0)
+        if isinstance(rows, (int, float)) and rows >= _SUFFICIENT_COVERAGE_MIN_ROWS:
+            return True
+    return False
+
+
+def _short_circuit_result(
+    full_symbol: str,
+    trade_date: str,
+    reason: str,
+    commodity_features: Dict[str, Any],
+) -> Dict[str, Any]:
+    """features 短路返回的统一结构(避免 graph.propagate 调用)。"""
+    logger.warning(
+        f"⛔ 数据不足短路 graph: full_symbol={full_symbol}, "
+        f"reason={reason}, modules={list(commodity_features.keys())}"
+    )
+    return {
+        "full_symbol": full_symbol,
+        "trade_date": trade_date,
+        "error": "DATA_UNAVAILABLE",
+        "message": reason,
+        "market_report": f"(数据不可用,跳过分析:{reason})",
+        "fundamentals_report": "",
+        "fundamentals_structured": {},
+        "position_report": "",
+        "news_report": "",
+        "custom_data_report": "",
+        "investment_plan": "",
+        "trader_investment_plan": "",
+        "final_trade_decision": "",
+        "final_decision": "",
+        "evidence_chain": {},
+        "safety_override": {
+            "hard_constraints": [],
+            "applied": False,
+            "reason": "data_short_circuit",
+        },
+        "analyst_registry": {},
+        "decision": {"action": "neutral", "confidence": 0.0, "reason": reason},
+    }
 
 
 def _resolve_input_symbol(raw: str) -> Optional[Dict[str, str]]:
@@ -506,17 +578,35 @@ async def _run_commodity_analysis(
                 # 从 full_symbol 提取品种代码(如 CU2501.SHF → CU)
                 _underlying = full_symbol.split(".")[0] if "." in full_symbol else full_symbol
                 _pure = re.sub(r"\d+$", "", _underlying) if _underlying else _underlying
+                # P3: 历史回测时过滤 annotated_at <= trade_date,防止取到未来标注。
+                # trade_date 为 None 或空时不过滤(默认实时模式)。
+                _date_filter: Dict[str, Any] = {}
+                if trade_date:
+                    try:
+                        import datetime as _dt
+                        # 截止 = trade_date 次日 00:00 UTC(等价于 end_day 含等号语义)
+                        _cutoff = _dt.datetime.combine(
+                            _dt.date.fromisoformat(trade_date) + _dt.timedelta(days=1),
+                            _dt.time.min,
+                        )
+                        _date_filter = {"annotated_at": {"$lte": _cutoff}}
+                    except ValueError:
+                        _date_filter = {}
                 # 路径 1:品种相关新闻
-                _variety_cursor = coll.find(
-                    {"relevant_varieties": {"$in": [_pure.upper(), _underlying.upper()]}}
-                ).sort("annotated_at", -1).limit(80)
+                _variety_query = {
+                    "relevant_varieties": {"$in": [_pure.upper(), _underlying.upper()]},
+                    **_date_filter,
+                }
+                _variety_cursor = coll.find(_variety_query).sort("annotated_at", -1).limit(80)
                 _variety_items = await _variety_cursor.to_list(length=80)
                 # 路径 2:宏观背景新闻(relevant_varieties=[] 的非 shmet 新闻)
-                _macro_cursor = coll.find({
+                _macro_query = {
                     "relevant_varieties": {"$size": 0},
                     "source": {"$ne": "shmet"},
-                    "importance": "high",
-                }).sort("annotated_at", -1).limit(20)
+                    "importance": {"$in": ["high", "medium"]},
+                    **_date_filter,
+                }
+                _macro_cursor = coll.find(_macro_query).sort("annotated_at", -1).limit(20)
                 _macro_items = await _macro_cursor.to_list(length=20)
 
                 _all_cached = _variety_items + _macro_items
@@ -524,9 +614,9 @@ async def _run_commodity_analysis(
                     latest_news = []
                     for _doc in _all_cached:
                         latest_news.append({
-                            "published_at": str(_doc.get("annotated_at", "")),
-                            "title": _doc.get("summary", ""),
-                            "content": _doc.get("sentiment_reasoning", ""),
+                            "published_at": str(_doc.get("published_at", "") or _doc.get("annotated_at", "")),
+                            "title": _doc.get("title", "") or _doc.get("summary", ""),
+                            "content": _doc.get("content", "") or _doc.get("sentiment_reasoning", ""),
                             "source": "llm_annotated",
                             "category": "all",
                             "sentiment": _doc.get("sentiment", "neutral"),
@@ -560,6 +650,15 @@ async def _run_commodity_analysis(
             logger.warning("⚠️ 商品 provider 连接失败,将使用空特征")
     except Exception as e:
         logger.warning(f"⚠️ 商品 provider 初始化/features 计算失败,将使用空特征: {e}")
+
+    # ---- P0-2: 数据不足短路(防御 features 全空仍跑 graph 的烧钱场景) ----
+    if not _has_sufficient_coverage(commodity_features):
+        return _short_circuit_result(
+            full_symbol=full_symbol,
+            trade_date=trade_date,
+            reason="数据获取失败或核心模块行数不足(technical/positioning/basis/inventory 至少 1 个 >= 30 行)",
+            commodity_features=commodity_features,
+        )
 
     cfg = _build_config()
     if config_override:
@@ -606,10 +705,17 @@ async def _run_commodity_analysis(
 
 
 def _save_report(full_symbol: str, trade_date: str, result: Dict[str, Any]) -> tuple[str, str]:
-    """保存分析报告到 JSON 文件,返回 (report_id, report_rel_path)。"""
+    """保存分析报告到 JSON 文件,返回 (report_id, report_rel_path)。
+
+    防御路径遍历:Pydantic 已校验 trade_date 格式,但此处再加 .resolve() +
+    startswith 防御(`trade_date` 在历史/重构中可能变为拼接路径的一部分)。
+    """
     safe_sym = _safe_symbol(full_symbol)
     report_id = f"{safe_sym}_{trade_date}_{uuid.uuid4().hex[:8]}"
-    report_dir = _REPORTS_BASE / safe_sym / trade_date
+    base_resolved = _REPORTS_BASE.resolve()
+    report_dir = (base_resolved / safe_sym / trade_date).resolve()
+    if not str(report_dir).startswith(str(base_resolved)):
+        raise HTTPException(status_code=500, detail="报告路径越界,拒绝写入")
     report_dir.mkdir(parents=True, exist_ok=True)
 
     report_path = report_dir / f"{report_id}.json"

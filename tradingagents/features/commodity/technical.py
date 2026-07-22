@@ -821,7 +821,7 @@ def _snapshot(df_ind: pd.DataFrame) -> Dict[str, Any]:
 
 
 def _quality(df: pd.DataFrame, lookback: Optional[int] = None) -> Dict[str, Any]:
-    """数据质量:行数、缺失率、新鲜度(距今天的天数)。"""
+    """数据质量:行数、缺失率、新鲜度(距今天的交易日天数)。"""
     if df is None or df.empty or "date" not in df.columns:
         return {"rows": 0, "coverage": 0.0, "data_freshness_days": None}
     rows = int(len(df))
@@ -830,11 +830,11 @@ def _quality(df: pd.DataFrame, lookback: Optional[int] = None) -> Dict[str, Any]
     freshness = None
     try:
         if pd.notna(last_date):
-            today = pd.Timestamp(datetime.now().date())
-            if isinstance(last_date, pd.Timestamp):
-                freshness = int((today - last_date).days)
-            else:
-                freshness = int((today - pd.Timestamp(last_date)).days)
+            if not isinstance(last_date, pd.Timestamp):
+                last_date = pd.Timestamp(last_date)
+            # 用交易日历替代日历日,避免周一开盘被算成 3 天
+            from app.utils.commodity_trading_calendar import freshness_in_trading_days
+            freshness = freshness_in_trading_days(last_date.date())
     except Exception:
         freshness = None
     return {"rows": rows, "coverage": round(coverage, 3), "data_freshness_days": freshness}

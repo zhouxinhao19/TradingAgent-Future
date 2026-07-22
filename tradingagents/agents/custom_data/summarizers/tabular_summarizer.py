@@ -102,11 +102,13 @@ class TabularSummarizer:
             except Exception:
                 pass
 
-        # ---- 样本数据（前 5 行） ----
-        sample = df.head(5)
+        # ---- 样本数据（头 3 行 + 尾 3 行） ----
+        # 仅取 head 会导致上传数据的 LLM 解读只看得到最早的行，
+        # 对于 20 年历史数据(如 COMEX 铜库存)会误判数据新鲜度。
+        head_tail = pd.concat([df.head(3), df.tail(3)]).drop_duplicates().reset_index(drop=True)
         result["sample"] = (
-            [_json_safe_record(rec) for rec in sample.to_dict(orient="records")]
-            if not sample.empty else []
+            [_json_safe_record(rec) for rec in head_tail.to_dict(orient="records")]
+            if not head_tail.empty else []
         )
 
         # ---- 警告 ----
