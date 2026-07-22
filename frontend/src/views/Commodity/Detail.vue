@@ -601,9 +601,7 @@ async function reload() {
   ])
   await nextTick()
   renderKline()
-  renderInventory()
-  renderBasis()
-  renderHolding()
+  // 非激活 tab 的渲染由 watch(activeTab) 触发,避免 ECharts 在隐藏容器初始化失败
 }
 
 function reloadKline() {

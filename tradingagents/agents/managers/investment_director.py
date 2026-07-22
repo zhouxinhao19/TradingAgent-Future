@@ -284,12 +284,14 @@ def _rate_percentile(pctl: float, thresholds) -> int:
     """将百分位值映射到 R1-R5 等级。
 
     Args:
-        pctl: 百分位值 0-100
+        pctl: 百分位值 0-100（自动归一化：若 ≤1 则视为 0-1 比例并 ×100）
         thresholds: 边界值列表 [(upper, level), ...]，第一个匹配的返回对应 level
 
     Returns:
         int: 1-5 风险等级
     """
+    if pctl is not None and pctl <= 1:
+        pctl *= 100
     for upper, level in thresholds:
         if pctl < upper:
             return level
@@ -299,8 +301,10 @@ def _rate_percentile(pctl: float, thresholds) -> int:
 def _rate_crowding(pctl: float) -> int:
     """拥挤度双向风险映射：过高（踩踏）和过低（流动性枯竭）均极端。
 
-    pctl 是 0-100 的百分位值。
+    pctl 是 0-100 的百分位值（自动归一化：若 ≤1 则视为 0-1 比例并 ×100）。
     """
+    if pctl <= 1:
+        pctl *= 100
     if pctl > 90 or pctl < 10:
         return 5  # R5 极端拥挤/冷清
     if pctl > 80 or pctl < 20:
@@ -375,6 +379,35 @@ def compute_risk_assessment(commodity_features: Dict[str, Any]) -> Dict[str, Any
     # ---- 单维度评级 ----
     dimensions: Dict[str, Any] = {}
     flags: list = []
+
+    # 0. 数据新鲜度(基于 features.data_freshness.overall,陈旧数据折扣置信度)
+    overall_fresh = _extract_safe(commodity_features, "data_freshness", "overall")
+    # freshness → risk level 映射:fresh=1, acceptable=2, degraded=3, stale=4, unknown=0
+    _FRESH_LEVEL = {"fresh": 1, "acceptable": 2, "degraded": 3, "stale": 4, "unknown": 0}
+    fresh_level = _FRESH_LEVEL.get(overall_fresh, 0) if isinstance(overall_fresh, str) else 0
+    stalest_module = _extract_safe(commodity_features, "data_freshness", "stalest_module")
+    stalest_days = _extract_safe(commodity_features, "data_freshness", "stalest_days")
+    dimensions["data_quality"] = {
+        "value": overall_fresh if overall_fresh is not None else "unknown",
+        "level": fresh_level,
+        "tier": RISK_LEVEL_LABELS.get(fresh_level, "未知"),
+        "source": "data_freshness.overall",
+        "stalest_module": stalest_module,
+        "stalest_days": stalest_days,
+        "interpretation": {
+            0: "数据新鲜度未知",
+            1: "数据新鲜",
+            2: "数据可接受",
+            3: "数据略陈旧,部分信号折扣",
+            4: "数据陈旧,所有信号需谨慎",
+        }.get(fresh_level, "数据新鲜度未知"),
+    }
+    if fresh_level >= 3:
+        flags.append({
+            "name": "data_stale",
+            "flag": f"数据整体{overall_fresh},置信度折扣(stalest={stalest_module}, {stalest_days}d)",
+            "severity": "medium" if fresh_level == 3 else "high",
+        })
 
     # 1. 波动率
     vol_pctl = _extract_safe(
@@ -542,9 +575,9 @@ def compute_risk_assessment(commodity_features: Dict[str, Any]) -> Dict[str, Any
     )
     if isinstance(sentiment_ratio, (int, float)) and data_quality["news_sentiment"]["available"]:
         sent_val = float(sentiment_ratio)
-        if sent_val > 0.6:
+        if sent_val > 0.25:
             sent_label = "偏多"
-        elif sent_val >= 0.4:
+        elif sent_val >= -0.25:
             sent_label = "中性"
         else:
             sent_label = "偏空"
@@ -939,11 +972,11 @@ INVESTMENT_DIRECTOR_SYSTEM_PROMPT = """你是大宗商品期货的**投研总监
 
 ### 顶层结构
 
-你必须输出包含以下三个顶级 key 的 JSON：
+你必须输出包含以下三个顶级 key 的 JSON（三个 key 一个都不能少，缺失任一 key 视为无效输出）：
 
 1. **投研备忘录** (dict) — 对 L2 报告的审核与裁决
 2. **风险评估卡** (dict) — 综合量化 + 定性风险评估
-3. **research_brief** (str) — 策略适应性研究报告 Markdown
+3. **research_brief** (str) — 策略适应性研究报告 Markdown，见 key 3 说明
 
 ### key 1: 投研备忘录 的详细结构
 
@@ -1013,7 +1046,7 @@ LLM 仅负责以下定性维度：
 
 1. 估值审核各维度必须用"同意"或"修正"开头，引用证据 ID（REF-TECH-xxx 格式）
 2. 情景裁决必须给出排除理由，不能只写选定不写排除
-3. research_brief 必须包含 4 个章节（核心矛盾、策略矩阵、情景推演、待验证假设）+ 末尾标注「研究结论方向: 看多/看空/中性, 置信度: X.XX」；禁止输出入场价、止损价、目标价、仓位
+3. 【必须】research_brief 是必需的顶级 key，取值必须是 Markdown 字符串（非 JSON 对象），控制在 1500 字以内。必须包含 4 个章节（核心矛盾、策略矩阵、情景推演、待验证假设）+ 末尾标注「研究结论方向: 看多/看空/中性, 置信度: X.XX」；禁止输出入场价、止损价、目标价、仓位。如果 research_brief 缺失、为空或非字符串，系统将自动从"投研备忘录"截取摘要，但你输出的原始内容将不会被保留，会造成信息丢失。
 4. 【硬约束】任一量化风险维度为 R5，或综合风险为 R5：禁止策略=[全部禁止]，策略约束说明必须明确列出触发的 R5 维度
 5. 【硬约束】存在 near_delivery 标志：禁止策略=[全部禁止]；策略约束说明必须提及临近交割
 6. 【硬约束】data_insufficient=true 时禁止策略必须包含"单边趋势"
@@ -1293,6 +1326,25 @@ def create_investment_director(deep_thinking_llm):
                     llm_brief = parsed.get("research_brief")
                     if isinstance(llm_brief, str) and len(llm_brief) > 20:
                         research_brief = llm_brief
+                    elif isinstance(llm_memo, dict):
+                        # 兜底:从投研备忘录提取核心观点组装 Markdown
+                        conclusion = llm_memo.get("投研结论", {}) or {}
+                        core_view = conclusion.get("核心观点", "") if isinstance(conclusion, dict) else ""
+                        scenario = llm_memo.get("情景裁决", {}) or {}
+                        selected = scenario.get("选定情景", "") if isinstance(scenario, dict) else ""
+                        divergence = scenario.get("核心分歧处理", "") if isinstance(scenario, dict) else ""
+                        brief_parts = []
+                        if core_view:
+                            brief_parts.append(f"## 核心矛盾与叙事\n\n{core_view}")
+                        if divergence:
+                            brief_parts.append(f"## 核心分歧处理\n\n{divergence}")
+                        if selected:
+                            brief_parts.append(f"## 情景裁决\n\n选定情景：{selected}")
+                        if brief_parts:
+                            research_brief = "\n\n".join(brief_parts)
+                            logger.info("[投研总监] LLM 未输出 research_brief，从备忘录自动组装")
+                        else:
+                            logger.warning("[投研总监] LLM 未输出 research_brief，且备忘录无可提取内容")
             except (json.JSONDecodeError, TypeError):
                 logger.warning("[投研总监] LLM 输出非 JSON，使用 raw 文本")
                 investment_memo = {}

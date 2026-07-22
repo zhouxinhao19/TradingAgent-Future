@@ -197,8 +197,11 @@
       <!-- 主内容: 标签页切换 -->
       <el-tabs v-model="activeTab" type="border-card" class="report-tabs">
         <!-- 证据链: L1→L2→L3 + 风险 + 事实卡片, 完整结构化推理 -->
-        <el-tab-pane label="证据链" name="evidence">
-          <EvidenceChain :data="report.evidence_chain || null" />
+        <el-tab-pane label="总览" name="evidence">
+          <EvidenceChain
+            :data="report.evidence_chain || null"
+            @navigate-ref="handleNavigateRef"
+          />
         </el-tab-pane>
 
         <!-- 分析报告: 分析师 markdown + 策略报告 markdown, 完整文字叙述 -->
@@ -222,6 +225,7 @@
               </template>
               <div
                 v-if="section.content"
+                :data-ref-id="section.refId || undefined"
                 class="md-render"
                 v-html="section.rendered"
               />
@@ -276,8 +280,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { Calendar, Clock, OfficeBuilding } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import EvidenceChain from '@/components/Commodity/EvidenceChain.vue'
 import { renderMarkdown } from '@/utils/markdown'
 
@@ -350,6 +355,7 @@ interface AnalystSection {
   direction: string
   charCount: number
   rendered: string
+  refId: string
 }
 
 const analystSections = computed<AnalystSection[]>(() => {
@@ -391,13 +397,21 @@ const analystSections = computed<AnalystSection[]>(() => {
         ? directionTagType(r.evidence_chain.summary.final_action)
         : 'info')
       : extractDirection(content)
+
+    // 从内容头部提取 ANALYST-ID 标记，用作锚点 data-ref-id
+    const refMatch = content.match(/<!-- ANALYST-ID:\s*(REF-\w+-\w+)\s*-->/)
+    const refId = refMatch?.[1] || ''
+    // 剥离 ANALYST-ID 注释后再渲染，避免展示给用户
+    const cleanContent = refId ? content.replace(/<!-- ANALYST-ID:\s*REF-\w+-\w+\s*-->\s*\n*/g, '') : content
+
     return {
       key: s.key,
       title: s.title,
-      content,
+      content: cleanContent,
       direction,
-      charCount: content.length,
-      rendered: renderMarkdown(content),
+      charCount: cleanContent.length,
+      rendered: renderMarkdown(cleanContent),
+      refId,
     }
   }).filter(s => s.content || true) // 保留全部，空内容会显示占位
 })
@@ -541,6 +555,88 @@ function riskTierTagType(tier: string): TagType {
   const map: Record<string, TagType> = { R1: 'success', R2: 'success', R3: 'warning', R4: 'danger', R5: 'danger' }
   return map[tier] || 'info'
 }
+
+/** 导航到 REF 引用的分析师报告 section */
+function navigateToRef(refId: string) {
+  if (!refId) return
+  // 1. 切换到分析报告 tab
+  activeTab.value = 'reports'
+  // 2. 展开所有 collapse section
+  expandedSections.value = ALL_SECTION_KEYS
+  // 3. 等 Vue 渲染 + tab 切换后定位元素
+  nextTick(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = _findRefElement(refId)
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          el.classList.add('l1-highlight')
+          setTimeout(() => el.classList.remove('l1-highlight'), 2000)
+        } else {
+          ElMessage.warning(`未找到引用的分析报告: ${refId}`)
+        }
+      })
+    })
+  })
+}
+
+/** 查找 refId 对应的 DOM 元素（带模糊匹配），限定在当前可见 tab pane 内，避免误匹配隐藏 tab（如证据链）里的元素 */
+function _findRefElement(refId: string): HTMLElement | null {
+  if (!refId) return null
+  // 只在当前可见 tab pane 范围内查找，避开隐藏 tab 中的 L1 卡片等元素
+  const root = document.querySelector<HTMLElement>('[role="tabpanel"]:not([aria-hidden="true"])') || document
+  const qs = (sel: string) => root.querySelector(sel)
+  // 1. 精确匹配
+  let el = qs(`[data-ref-id="${refId}"]`)
+  if (el) return el as HTMLElement
+  // 2. 在 section div 中尝试前缀匹配（LLM 可能省略末尾 hash）
+  const prefix = refId.replace(/-[^-]+$/, '') // REF-TECH-xxx → REF-TECH
+  if (prefix && prefix !== refId) {
+    // 找前缀相同的第一个元素
+    el = qs(`[data-ref-id^="${prefix}-"]`)
+    if (el) return el as HTMLElement
+  }
+  // 3. 如果 refId 以 REF- 开头,试试去掉 REF- 前缀
+  if (refId.startsWith('REF-')) {
+    const shortId = refId.replace(/^REF-/, '')
+    el = qs(`[data-ref-id$="${shortId}"]`)
+    if (el) return el as HTMLElement
+  }
+  // 4. 如果 refId 没有 REF- 前缀,加上试试
+  if (!refId.startsWith('REF-')) {
+    el = qs(`[data-ref-id="${'REF-' + refId}"]`)
+    if (el) return el as HTMLElement
+  }
+  // 5. 最后看有没有 L1 卡片匹配
+  el = qs(`[data-ref-id="${refId}"].l1-card`)
+  if (el) return el as HTMLElement
+  return null
+}
+
+const ALL_SECTION_KEYS = ['market_report', 'fundamentals_report', 'position_report', 'news_report', 'research_brief']
+
+/** 从 EvidenceChain 接收 navigate-ref 事件 */
+function handleNavigateRef(refId: string) {
+  navigateToRef(refId)
+}
+
+/** 点击 REF 锚点链接（markdown 中渲染的 .ref-anchor） */
+function handleRefClick(e: MouseEvent) {
+  const anchor = (e.target as HTMLElement).closest?.('.ref-anchor')
+  if (!anchor) return
+  e.preventDefault()
+  const refId = anchor.textContent?.trim() || ''
+  if (!refId) return
+  navigateToRef(refId)
+}
+
+// 在 DOM 挂载后监听 ref-anchor 点击
+onMounted(() => {
+  document.addEventListener('click', handleRefClick)
+})
+onUnmounted(() => {
+  document.removeEventListener('click', handleRefClick)
+})
 
 </script>
 
@@ -955,5 +1051,26 @@ function riskTierTagType(tier: string): TagType {
   overflow-x: auto;
   white-space: pre-wrap;
   word-break: break-all;
+}
+
+/* REF 锚点高亮闪烁（当从证据链跳转过来） */
+:deep(.md-render.l1-highlight) {
+  box-shadow: 0 0 0 2px var(--el-color-primary, #409eff);
+  border-radius: 4px;
+  transition: box-shadow 0.3s;
+  padding: 4px;
+}
+</style>
+
+<!-- 全局样式: markdown 中的 REF 引用链接 -->
+<style lang="scss">
+.ref-anchor {
+  cursor: pointer;
+  color: var(--el-color-primary, #409eff);
+  text-decoration: none;
+  border-bottom: 1px dashed var(--el-color-primary, #409eff);
+}
+.ref-anchor:hover {
+  text-decoration: underline;
 }
 </style>

@@ -33,6 +33,7 @@ import numpy as np
 import pandas as pd
 
 from tradingagents.features.commodity import _helpers as h
+from app.utils.commodity_trading_calendar import freshness_in_trading_days
 
 
 # 期货多空情感关键词词典(可扩展)
@@ -218,7 +219,9 @@ def compute_news_sentiment_metrics(
     quality = {
         "rows": n_total,
         "coverage": 1.0 if n_total > 0 else 0.0,
-        "data_freshness_days": int((today - now).days) if pd.notna(now) else None,
+        "data_freshness_days": (
+            freshness_in_trading_days(now.date()) if pd.notna(now) else None
+        ),
         "sources": [source] if source else [],
         "first_date": str(data["date"].min()),
         "last_date": str(now),

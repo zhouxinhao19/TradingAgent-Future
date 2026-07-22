@@ -23,7 +23,8 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from app.routers.auth_db import get_current_user
-from pydantic import BaseModel, Field
+from app.schemas.commodity_validators import validate_trade_date
+from pydantic import BaseModel, Field, field_validator
 
 from tradingagents.agents.custom_data.skills.registry import SkillsRegistry
 from tradingagents.utils.logging_init import get_logger
@@ -60,6 +61,11 @@ class CustomDataAnalysisRequest(BaseModel):
     user_context: str = Field("", description="用户上下文描述")
     full_symbol: str = Field(..., description="关联的合约代码,如 CU.SHF")
     trade_date: Optional[str] = Field(None, description="交易日期 YYYY-MM-DD")
+
+    @field_validator("trade_date", mode="before")
+    @classmethod
+    def _validate_trade_date(cls, v):
+        return validate_trade_date(v)
 
 
 def _validate_file_id(file_id: str) -> None:

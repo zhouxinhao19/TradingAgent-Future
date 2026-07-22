@@ -329,7 +329,7 @@ def _make_features(**overrides):
         "technical": {
             "quality": {"rows": 100, "coverage": 0.95, "data_freshness_days": 0},
             "combined": {
-                "volatility": {"atr_ratio_pctl180": 35.0},
+                "volatility": {"atr_ratio_pctl180": 0.35},
                 "oi_divergence": "confirm",
             },
         },
@@ -344,7 +344,7 @@ def _make_features(**overrides):
         },
         "positioning": {
             "quality": {"rows": 60, "coverage": 0.80, "data_freshness_days": 1},
-            "snapshot": {"crowding_pctl_180d": 45.0},
+            "snapshot": {"crowding_pctl_180d": 0.45},
         },
         "term_structure": {
             "quality": {"rows": 50, "coverage": 0.75, "data_freshness_days": 1},
@@ -393,28 +393,28 @@ class TestComputeRiskAssessment:
         # R1: < 20
         r1 = compute_risk_assessment(_make_features(technical={
             "quality": {"rows": 100, "coverage": 0.95, "data_freshness_days": 0},
-            "combined": {"volatility": {"atr_ratio_pctl180": 15.0}, "oi_divergence": "confirm"},
+            "combined": {"volatility": {"atr_ratio_pctl180": 0.15}, "oi_divergence": "confirm"},
         }))
         assert r1["dimensions"]["volatility"]["level"] == 1
 
         # R3 boundary: exactly 50 → < 50 is R2, >= 50 is R3
         r3 = compute_risk_assessment(_make_features(technical={
             "quality": {"rows": 100, "coverage": 0.95, "data_freshness_days": 0},
-            "combined": {"volatility": {"atr_ratio_pctl180": 50.0}, "oi_divergence": "confirm"},
+            "combined": {"volatility": {"atr_ratio_pctl180": 0.50}, "oi_divergence": "confirm"},
         }))
         assert r3["dimensions"]["volatility"]["level"] == 3  # >= 50 → R3
 
         # R4: 80-95
         r4 = compute_risk_assessment(_make_features(technical={
             "quality": {"rows": 100, "coverage": 0.95, "data_freshness_days": 0},
-            "combined": {"volatility": {"atr_ratio_pctl180": 85.0}, "oi_divergence": "confirm"},
+            "combined": {"volatility": {"atr_ratio_pctl180": 0.85}, "oi_divergence": "confirm"},
         }))
         assert r4["dimensions"]["volatility"]["level"] == 4
 
         # R5: >= 95
         r5 = compute_risk_assessment(_make_features(technical={
             "quality": {"rows": 100, "coverage": 0.95, "data_freshness_days": 0},
-            "combined": {"volatility": {"atr_ratio_pctl180": 99.0}, "oi_divergence": "confirm"},
+            "combined": {"volatility": {"atr_ratio_pctl180": 0.99}, "oi_divergence": "confirm"},
         }))
         assert r5["dimensions"]["volatility"]["level"] == 5
 
@@ -451,14 +451,14 @@ class TestComputeRiskAssessment:
         # < 20 → R4（U 型风险：低拥挤度也属于高风险区间）
         r1 = compute_risk_assessment(_make_features(positioning={
             "quality": {"rows": 60, "coverage": 0.80, "data_freshness_days": 1},
-            "snapshot": {"crowding_pctl_180d": 10.0},
+            "snapshot": {"crowding_pctl_180d": 0.10},
         }))
         assert r1["dimensions"]["crowding"]["level"] == 4
 
         # >= 95 → R5
         r5 = compute_risk_assessment(_make_features(positioning={
             "quality": {"rows": 60, "coverage": 0.80, "data_freshness_days": 1},
-            "snapshot": {"crowding_pctl_180d": 98.0},
+            "snapshot": {"crowding_pctl_180d": 0.98},
         }))
         assert r5["dimensions"]["crowding"]["level"] == 5
 
@@ -469,11 +469,11 @@ class TestComputeRiskAssessment:
         features = _make_features(
             technical={
                 "quality": {"rows": 100, "coverage": 0.95, "data_freshness_days": 0},
-                "combined": {"volatility": {"atr_ratio_pctl180": 90.0}, "oi_divergence": "confirm"},
+                "combined": {"volatility": {"atr_ratio_pctl180": 0.90}, "oi_divergence": "confirm"},
             },
             positioning={
                 "quality": {"rows": 60, "coverage": 0.80, "data_freshness_days": 1},
-                "snapshot": {"crowding_pctl_180d": 90.0},
+                "snapshot": {"crowding_pctl_180d": 0.90},
             },
         )
         result = compute_risk_assessment(features)
@@ -486,7 +486,7 @@ class TestComputeRiskAssessment:
         features = _make_features(
             technical={
                 "quality": {"rows": 100, "coverage": 0.95, "data_freshness_days": 0},
-                "combined": {"volatility": {"atr_ratio_pctl180": 90.0}, "oi_divergence": "confirm"},
+                "combined": {"volatility": {"atr_ratio_pctl180": 0.90}, "oi_divergence": "confirm"},
             },
             basis={
                 "quality": {"rows": 100, "coverage": 0.90, "data_freshness_days": 0},
@@ -494,7 +494,7 @@ class TestComputeRiskAssessment:
             },
             positioning={
                 "quality": {"rows": 60, "coverage": 0.80, "data_freshness_days": 1},
-                "snapshot": {"crowding_pctl_180d": 90.0},
+                "snapshot": {"crowding_pctl_180d": 0.90},
             },
             term_structure={
                 "quality": {"rows": 50, "coverage": 0.75, "data_freshness_days": 1},
@@ -710,7 +710,7 @@ def test_research_summary_preserves_real_metrics_and_risks():
             }}},
             "combined": {
                 "direction": "short", "oi_divergence": "conflict",
-                "volatility": {"regime": "high", "atr_ratio_pctl180": 91},
+                "volatility": {"regime": "high", "atr_ratio_pctl180": 0.91},
                 "signals": ["价仓背离，警惕趋势反转"],
             },
         },
@@ -732,7 +732,7 @@ def test_research_summary_preserves_real_metrics_and_risks():
         "positioning": {
             "snapshot": {
                 "net_long_change_5d": 0.08, "long_short_ratio": 1.3,
-                "crowding_pctl_180d": 98, "price_oi_regime": "多头强势(价涨仓增)",
+                "crowding_pctl_180d": 0.98, "price_oi_regime": "多头强势(价涨仓增)",
                 "cross_contract_consistency": "分化", "rollover_detected": True,
             },
             "signals": ["拥挤度处高分位，警惕反转风险"],
@@ -763,7 +763,7 @@ def test_research_summary_preserves_real_metrics_and_risks():
 
     for expected in (
         "composite_score=0.62", "oi_divergence=conflict", "spot_price=3600",
-        "value=88", "carry_score=-0.7", "crowding_pctl_180d=98",
+        "value=88", "carry_score=-0.7", "crowding_pctl_180d=0.98",
         "高重要度事件: 限产政策变化", "强制保留风险信号",
         "高度拥挤，反转风险高", "需求下行警告",
         "拥挤度极高分位，反转风险高", "L1 冲突: 看多=1, 看空=2",
