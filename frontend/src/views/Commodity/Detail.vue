@@ -590,15 +590,20 @@ async function reload() {
   await loadContractsList()
 
   // 并行加载:基础数据(K 线用 klineSymbol) + 合约列表 + 扩展数据(手续费/合约信息)
-  await Promise.all([
-    store.loadSymbolDetail(klineSymbol.value || fullSymbol.value, klineDays.value),
-    store.loadInventory(fullSymbol.value),
-    store.loadBasisForVars([underlying], startStr, endDate),
-    store.loadHoldingPositionAll(fullSymbol.value),
-    store.loadNewsCategories(),
-    loadFees(),
-    loadContractInfo(),
-  ])
+  // 各子调用内部已有 try/catch,Promise.all 不会 reject
+  try {
+    await Promise.all([
+      store.loadSymbolDetail(klineSymbol.value || fullSymbol.value, klineDays.value),
+      store.loadInventory(fullSymbol.value),
+      store.loadBasisForVars([underlying], startStr, endDate),
+      store.loadHoldingPositionAll(fullSymbol.value),
+      store.loadNewsCategories(),
+      loadFees(),
+      loadContractInfo(),
+    ])
+  } catch (e) {
+    console.warn('[commodity] reload 部分数据加载失败:', e)
+  }
   await nextTick()
   renderKline()
   // 非激活 tab 的渲染由 watch(activeTab) 触发,避免 ECharts 在隐藏容器初始化失败

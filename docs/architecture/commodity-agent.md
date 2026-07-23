@@ -1,10 +1,10 @@
 # 商品期货多智能体分析链路 — 完整实施文档
 
-> 版本: v2.1 (2026-07-21)
+> 版本: v2.2 (2026-07-22)
 >
 > 范围: `TradingAgent-CN` 项目从股票向大宗商品期货改造所实现的端到端多智能体分析链路,覆盖 **数据层 → 特征层 → L1 分析师 → L2 推理分析师 → L3 CIO → SafetyOverride 风控二审**。
 >
-> 代码基线: Phase 0–3b + Phase UI + Phase Agent 全部已合并(`fix/agent-data-layer-optimization` 分支,合并日期 2026-07-21)。
+> 代码基线: main 分支,截至 2026-07-22 共 1,331+ 次提交。
 >
 > **v2.1 变更**: 拆分 §4 为"两条平行路径"(Adapter 注入决策链 vs Engine 独立分析页),补全 `custom_data_adapter.py` 说明;新增"当前实现局限"实测记录(COMEX 库存案例 4 个 LLM 全部忽略上传数据),标注 🚧 待重构项,指向实施计划。
 
@@ -186,6 +186,13 @@
 | **C** | 未识别 category | 警告 + 返回 `[]` |
 
 服务层增强: MongoDB `commodity_news_annotations` 优先读; 不足 → Provider 实时 + `NewsAnnotator` (DeepSeek, `max_concurrent=3`) 实时标注。
+
+**LLM 语义标注 (v2.2, ee64682a)**: 每条新闻经 DeepSeek 提取 `event_key` (语义事件指纹, 如 `"美联储7月加息25bp决议"`), 实现跨源事件级聚合。规则: `event_key = extract_event_key(title, content, llm)`; 相同 event_key 的新闻自动归并为同一事件。
+
+**读取端三层去重 (v2.2, 637673b8)**:
+1. **event_key 精确去重**: 相同语义事件只保留 1 条 (取最新)
+2. **SimHash 指纹去重**: 全文 SimHash + Hamming 距离 ≤ 3 视为重复
+3. **语义相似度去重**: LLM embedding 余弦相似度 > 0.92 视为重复
 
 **情感打分 (双层)**:
 1. 商品专用关键词词典 (`BULLISH_KW` 30 / `BEARISH_KW` 30 / `IMPORTANCE_KW` 16)
@@ -480,9 +487,15 @@ from tradingagents.features.commodity import (
 
 **调用链**：`_run_commodity_analysis` (`app/routers/commodity/analysis.py:440-458`) → `parse_custom_data()` → `commodity_features["custom_data"]` → `CommodityTradingAgentsGraph.propagate` → 4 个 L1 分析师 + `research_manager` + `investment_director` 都调 `build_custom_data_context` 注入。
 
-**当前实现局限**（2026-07-21 实测，CU.SHF + COMEX 库存历史案例）：`parse_custom_data` 仅产出纯文本统计摘要（行数/列名/均值/标准差/最大最小/p5-p95 分位），**不提取"最后一行"作为当前观测值**。`_base.py::build_custom_data_context` 因此判定 `is_historical_series=True`，触发"无法获取当前时点数值，禁止据此声称当前趋势"的 guardrail。**4 个 L1 分析师全部在 prompt 里明确写"未纳入当前分析"**，用户上传的数据实际上**未参与决策**。
+**v2.2 修复 (a1aef00c, 14a88736)**: 针对实测发现的自定义数据被 L1 分析师忽略的问题，实施 3 项改进：
 
-> **🚧 待重构**：设计目标是把自定义数据提升为决策链的**一等 feature 模块**（同 inventory / basis 级别）：
+1. **as_of 回退 (`F1`)**: 当数据为历史时间序列时，自动取最后一行时间戳作为当前观测值 (`as_of`)，提取最新数值注入 prompt 而非仅输出统计摘要
+2. **证据链接入 (`F2`)**: 自定义数据分析结果写入 `analyst_registry`，通过 `evidence_chain` 呈现给 Research Manager 和 CIO，确保上层节点能感知用户上传数据的存在
+3. **交叉验证 (`F3`)**: 当自定义数据列名与系统 feature 模块匹配时 (如 `inventory` / `basis`)，自动与系统数据做对比，输出 `cross_market` 信号供 L1 分析师参考
+
+**效果**: 用户上传的 Excel/CSV 数据现在可被 L1 分析师纳入分析（不再被 guardrail 阻断），并通过证据链传递至 L2 推理分析师和 CIO。前端 `CustomDataAnalysis.vue` 可展示自定义数据的分析结果。
+
+> **🚧 待重构**：长期目标是把自定义数据提升为决策链的**一等 feature 模块**（同 inventory / basis 级别）：
 > - 自动识别模块类型（inventory / basis / price / positioning）
 > - 提取最后一行作为 `latest.value` + `as_of`
 > - 计算自身历史分位（own_percentile_180d）
@@ -1012,16 +1025,15 @@ LLM 输出后强制执行不可协商的纯规则二审, 返回完整审计记�
 
 ## 10. 测试覆盖与性能数据
 
-### 10.1 测试覆盖汇总 (2026-07-19 状态)
+### 10.1 测试覆盖汇总 (2026-07-22 状态)
 
 | 层 | 测试文件 | 用例数 | 验证内容 |
 |---|---|---|---|
-| 数据层 | `tests/test_commodity_data_layer.py` | 90 | AKShare provider 35+ 函数 mock, 16 测试组; `_call()` 路径在 akshare 不可用时优雅返回 `None` |
-| 特征层 | `tests/test_commodity_features.py` | 97 | 6 模块 schema + 信号 + 边界 |
-| 分析师 | `tests/test_commodity_analyst.py` | 45 | 4 个 analyst MagicMock LLM + 边界 + fallback |
-| 决策链 | `tests/test_commodity_decision_chain.py` | 32 | 8 节点 commodity 分支 + CIO + SafetyOverride |
-| HTTP 端点 | `tests/test_phase3a_curl.py` | 24 调用 | 后端 22 端点 100% 200 OK |
-| **全部** | | **288** | |
+| 数据层 | `tests/test_commodity_data_layer.py` | 82 | AKShare provider 35+ 函数 mock, 16 测试组; `_call()` 路径在 akshare 不可用时优雅返回 `None` |
+| 特征层 | `tests/test_commodity_features.py` | 124 | 9 模块 schema + 信号 + 边界 (含 data_freshness + signal_convergence + module_agreement) |
+| 分析师 | `tests/test_commodity_analyst.py` | 69 | 4 个 analyst MagicMock LLM + 边界 + fallback + JSON schema |
+| 决策链 | `tests/test_commodity_decision_chain.py` | 46 | 8 节点 commodity 分支 + CIO + SafetyOverride + evidence_chain |
+| **全部** | | **321** | |
 
 ### 10.2 LLM 调用次数与端到端性能
 
@@ -1045,6 +1057,12 @@ LLM 输出后强制执行不可协商的纯规则二审, 返回完整审计记�
 - LLM 调用次数: 13 次 (用户上传 CSV + 4 个 extra 主动分析)
 - CIO 输出含: 换月检测 + 基差/库存/杠杆决策
 - 单任务内存峰值: ~600 MB (主力连续 K 线 8 年 + 持仓排名 30 天并发)
+
+**历史回测支持 (v2.2, d8e31e7c)**:
+- `POST /api/commodity/{symbol}/backtest` 端点，支持指定日期范围批量回测
+- 交易日历验证 + 过期数据自动跳过
+- 回测结果输出为时序决策记录，可追溯每步决策依据
+- 数据新鲜度校验: `data_freshness.py` 交易日历验证 + quality 聚合评分
 
 ### 10.3 集成点速查
 
@@ -1135,7 +1153,15 @@ cd frontend && npm run lint && npm run type-check
 | 2026-07-18 | `feat/queue-and-stats` | Phase 3c 异步队列 + 批量任务 + 任务中心优化 |
 | 2026-07-19 | `d31f9492` | 前端 UI 全面梳理 (品类修正 + Dashboard 重构 + 设置精简 + 侧边栏清理 + 新闻修复) |
 | 2026-07-20 | `7269fedc` | Agent 层 10 项改进 (Checkpointer / SafetyOverride / L2 精简化 / L1 并行化 / 证据链) + 自定义数据分析师 + 前端重设计 |
-| 2026-07-21 | `fix/agent-data-layer-optimization` (本分支) | 当前文档基线 |
+| 2026-07-21 | — | 文档基线 v2.1 |
+| 2026-07-22 | `a1aef00c` | 自定义数据适配器 3 项改进: as_of 回退 + 证据链接入 + 交叉验证 |
+| 2026-07-22 | `14a88736` | 决策链优化: Bull/Bear 辩论增强 + 方向信号链修复 + 自定义数据分析师可见化 |
+| 2026-07-22 | `5dd21447` | propagate 状态流 None 守卫 + 端到端调试脚本 |
+| 2026-07-22 | `741d646a` | 自定义数据 Timestamp 序列化修复 + 商品报告/证据链前端调整 |
+| 2026-07-22 | `ee64682a` | LLM 标注新增 event_key 语义事件指纹 |
+| 2026-07-22 | `637673b8` | 读取端新闻三层去重 (event_key + 指纹 + 相似度) |
+| 2026-07-22 | `16d82f4c` | 报告详情总览 tab 重设计 — 决策摘要卡 + 情景推演 key/方向修复 |
+| 2026-07-22 | `d8e31e7c` | 历史回测支持 + 数据新鲜度交易日历 + 全链路 robustness 加固 |
 
 ---
 

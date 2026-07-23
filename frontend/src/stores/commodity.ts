@@ -215,16 +215,15 @@ export const useCommodityStore = defineStore('commodity', {
     },
 
     async loadBasisForVars(vars: string[], startDay: string, endDay: string, force = false) {
-      const key = `basis:${vars.join(',')}:${startDay}:${endDay}`
-      this._setLoading(key, true)
+      this._setLoading('basis', true)
       try {
         const r = await commodityApi.getBasisHistory(vars, startDay, endDay, force)
         // /api/commodity/basis 返回 {success, data: BasisResponse, message}
         this.basis = (r as any)?.data ?? null
       } catch (e) {
-        this._setError(key, String(e))
+        this._setError('basis', String(e))
       } finally {
-        this.loadingFlags[key] = false
+        this.loadingFlags.basis = false
       }
     },
 
