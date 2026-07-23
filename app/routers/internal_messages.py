@@ -80,7 +80,7 @@ async def save_internal_messages(request: InternalMessageBatchRequest):
     try:
         service = await get_internal_message_service()
         
-        # 转换消息格式并添加股票代码
+        # 转换消息格式并添加品种代码
         messages = []
         for msg in request.messages:
             message_dict = msg.dict()
