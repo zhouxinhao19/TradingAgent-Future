@@ -123,7 +123,7 @@ def get_realtime_quotes(self):
 **优点**：
 - ✅ 免费，无需 Token
 - ✅ 数据来源稳定（东方财富）
-- ✅ 覆盖全市场股票
+- ✅ 覆盖全市场期货品种
 
 **缺点**：
 - ⚠️ 可能有频率限制
@@ -156,7 +156,7 @@ def get_realtime_quotes(self):
 **说明**：
 - ❌ **不支持实时行情**
 - ✅ 支持历史数据和每日基础数据
-- ✅ 用于股票基础信息同步
+- ✅ 用于期货品种基础信息同步
 
 ---
 
@@ -169,9 +169,9 @@ def get_realtime_quotes(self):
 14:30:01 ─→ 检查可用数据源
 14:30:02 ─→ Tushare is_available() = True
 14:30:03 ─→ 尝试从 Tushare 获取行情
-14:30:08 ─→ ✅ 成功获取 5438 只股票行情
+14:30:08 ─→ ✅ 成功获取 5438 只期货行情
 14:30:10 ─→ 批量更新 MongoDB
-14:30:12 ─→ 日志: "✅ 行情入库成功: 5438 只股票 (来源: tushare)"
+14:30:12 ─→ 日志: "✅ 行情入库成功: 5438 只期货品种 (来源: tushare)"
 ```
 
 ### 场景2：Tushare 不可用，自动切换到 AKShare
@@ -183,9 +183,9 @@ def get_realtime_quotes(self):
 14:30:03 ─→ ⚠️ 日志: "Data source tushare is not available"
 14:30:04 ─→ AKShare is_available() = True
 14:30:05 ─→ 尝试从 AKShare 获取行情
-14:30:12 ─→ ✅ 成功获取 5438 只股票行情
+14:30:12 ─→ ✅ 成功获取 5438 只期货行情
 14:30:15 ─→ 批量更新 MongoDB
-14:30:17 ─→ 日志: "✅ 行情入库成功: 5438 只股票 (来源: akshare)"
+14:30:17 ─→ 日志: "✅ 行情入库成功: 5438 只期货品种 (来源: akshare)"
 ```
 
 ### 场景3：Tushare 调用失败，自动切换到 AKShare
@@ -200,9 +200,9 @@ def get_realtime_quotes(self):
 14:30:07 ─→ 自动切换到 AKShare
 14:30:08 ─→ AKShare is_available() = True
 14:30:09 ─→ 尝试从 AKShare 获取行情
-14:30:15 ─→ ✅ 成功获取 5438 只股票行情
+14:30:15 ─→ ✅ 成功获取 5438 只期货行情
 14:30:18 ─→ 批量更新 MongoDB
-14:30:20 ─→ 日志: "✅ 行情入库成功: 5438 只股票 (来源: akshare)"
+14:30:20 ─→ 日志: "✅ 行情入库成功: 5438 只期货品种 (来源: akshare)"
 ```
 
 ### 场景4：所有数据源都不可用
@@ -268,13 +268,13 @@ tail -f logs/app.log
 
 # 成功日志示例
 [INFO] Trying to fetch realtime quotes from tushare
-[INFO] ✅ 行情入库成功: 5438 只股票 (来源: tushare)
+[INFO] ✅ 行情入库成功: 5438 只期货品种 (来源: tushare)
 
 # 切换日志示例
 [WARNING] Data source tushare is not available
 [INFO] Data source akshare is available (priority: 2)
 [INFO] Trying to fetch realtime quotes from akshare
-[INFO] ✅ 行情入库成功: 5438 只股票 (来源: akshare)
+[INFO] ✅ 行情入库成功: 5438 只期货品种 (来源: akshare)
 ```
 
 ### 方法2：查看 MongoDB

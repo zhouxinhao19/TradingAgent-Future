@@ -331,7 +331,7 @@ class AgentState(MessagesState):
     """智能体状态管理类 - 继承自 LangGraph MessagesState"""
     
     # 基础信息
-    company_of_interest: Annotated[str, "目标分析公司股票代码"]
+    company_of_interest: Annotated[str, "目标分析公司品种代码"]
     trade_date: Annotated[str, "交易日期"]
     sender: Annotated[str, "发送消息的智能体"]
     
@@ -401,7 +401,7 @@ class Toolkit:
         self.dataflow = DataFlowInterface(config)
     
     def get_stock_fundamentals_unified(self, ticker: str):
-        """统一基本面分析工具，自动识别股票类型"""
+        """统一基本面分析工具，自动识别期货品种类型"""
         from tradingagents.utils.stock_utils import StockUtils
         market_info = StockUtils.get_market_info(ticker)
         
@@ -430,14 +430,14 @@ from .config import get_config, set_config, DATA_DIR
 
 # 数据获取函数
 def get_finnhub_news(
-    ticker: Annotated[str, "公司股票代码，如 'AAPL', 'TSM' 等"],
+    ticker: Annotated[str, "公司品种代码，如 'AAPL', 'TSM' 等"],
     curr_date: Annotated[str, "当前日期，格式为 yyyy-mm-dd"],
     look_back_days: Annotated[int, "回看天数"],
 ):
     """获取指定时间范围内的公司新闻
     
     Args:
-        ticker (str): 目标公司的股票代码
+        ticker (str): 目标公司的品种代码
         curr_date (str): 当前日期，格式为 yyyy-mm-dd
         look_back_days (int): 回看天数
     
@@ -725,7 +725,7 @@ from tradingagents.utils.logging_init import get_logger
 
 # 获取日志记录器
 logger = get_logger("default")
-logger.info("📊 [系统] 开始分析股票: AAPL")
+logger.info("📊 [系统] 开始分析期货品种: AAPL")
 logger.debug("📊 [DEBUG] 配置信息: {config}")
 logger.warning("⚠️ [警告] 数据源不可用")
 logger.error("❌ [错误] API调用失败")

@@ -253,7 +253,7 @@ python -m streamlit run web/app.py
 
 **操作**:
 1. 配置多个模型（qwen-turbo, qwen-plus, gpt-3.5-turbo）
-2. 对同一股票进行多次分析
+2. 对同一期货品种进行多次分析
 3. 在使用统计中比较成本和效果
 
 ### 场景3：团队使用管理

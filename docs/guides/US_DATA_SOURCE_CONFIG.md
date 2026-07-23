@@ -6,7 +6,7 @@
 
 ### 1. **yfinance** (推荐，免费)
 - **提供商**: Yahoo Finance
-- **数据类型**: 股票价格、技术指标、基本面信息
+- **数据类型**: 期货价格、技术指标、基本面信息
 - **费用**: 完全免费
 - **API Key**: 不需要
 - **限制**: 无严格限制
@@ -32,7 +32,7 @@
 
 ### 3. **Finnhub** (备用)
 - **提供商**: Finnhub
-- **数据类型**: 股票价格、基本面、新闻
+- **数据类型**: 期货价格、基本面、新闻
 - **费用**: 免费版 60 请求/分钟，付费版无限制
 - **API Key**: 需要（免费申请）
 - **限制**: 免费版有速率限制
@@ -79,7 +79,7 @@
 {
   "type": "yfinance",
   "enabled": true,
-  "description": "yfinance - 免费股票数据"
+  "description": "yfinance - 免费期货数据"
 }
 ```
 
@@ -94,7 +94,7 @@
     "market_category_id": "us_stocks",
     "priority": 100,
     "enabled": true,
-    "description": "yfinance - 股票价格和技术指标"
+    "description": "yfinance - 期货价格和技术指标"
   },
   {
     "data_source_name": "alpha_vantage",

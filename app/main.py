@@ -400,7 +400,7 @@ app.include_router(system_config_router.router, prefix="/api/system", tags=["sys
 # 通知模块（REST + SSE）
 app.include_router(notifications_router.router, prefix="/api", tags=["notifications"])
 
-# ===== 自选品种模块（统一支持股票+商品期货） =====
+# ===== 自选品种模块（统一支持商品期货+历史兼容） =====
 from app.routers import favorites as favorites_router
 app.include_router(favorites_router.router, prefix="/api")
 logger.info("✅ 自选品种路由已注册(/api/favorites/*)")

@@ -12,7 +12,7 @@
 
 ### 1. 核心抽象层
 - ✅ `tradingagents/utils/commodity_utils.py` — 大宗商品市场识别(国内期货/国际期货/现货/未知)
-- ✅ `tradingagents/core/instrument.py` — 标的抽象 + 工厂方法,支持股票和商品互斥识别
+- ✅ `tradingagents/core/instrument.py` — 标的抽象 + 工厂方法,支持期货品种和商品互斥识别
 - ✅ 单元测试 `tests/test_instrument.py` — **57 个测试全部通过**
 
 ### 2. Feature Flag 机制
@@ -123,7 +123,7 @@ cd frontend && npm run dev
 # 3. 验证
 curl http://localhost:8000/api/config/features
 # 访问 http://localhost:8000/docs 看新增的 /api/config/features 端点
-# 浏览器访问 http://localhost:5173 → 看到原股票分析平台,无任何变化(商品功能默认关闭)
+# 浏览器访问 http://localhost:5173 → 看到原期货分析平台,无任何变化(商品功能默认关闭)
 
 # 4. 跑单元测试
 python -m pytest tests/test_instrument.py -v
@@ -134,4 +134,4 @@ python -m pytest tests/test_instrument.py -v
 - ✅ 前端无任何商品入口(flag 全 false)
 - ✅ `/api/config/features` 返回 `commodity_*: false`
 - ✅ 单元测试 57 passed
-- ✅ 主流程(股票分析)完全不受影响
+- ✅ 主流程(期货分析)完全不受影响

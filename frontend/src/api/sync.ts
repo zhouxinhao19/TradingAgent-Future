@@ -101,7 +101,7 @@ export const getSyncStatus = (): Promise<ApiResponse<SyncStatus>> => {
 }
 
 /**
- * 运行股票基础信息同步
+ * 运行基础信息同步
  */
 export const runStockBasicsSync = (params?: {
   force?: boolean

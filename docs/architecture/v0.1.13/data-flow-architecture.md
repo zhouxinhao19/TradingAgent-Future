@@ -59,7 +59,7 @@ graph TB
     subgraph "工具集成层 (Tool Integration Layer)"
         TOOLKIT[Toolkit工具包]
         UNIFIED_TOOLS[统一工具接口]
-        STOCK_UTILS[股票工具]
+        STOCK_UTILS[期货品种工具]
     end
     
     subgraph "智能体消费层 (Agent Consumption Layer)"
@@ -152,7 +152,7 @@ class TushareProvider:
             raise ValueError("TUSHARE_TOKEN环境变量未设置")
     
     def get_stock_data(self, ts_code: str, start_date: str, end_date: str):
-        """获取股票历史数据"""
+        """获取期货品种历史数据"""
         try:
             df = self.pro.daily(
                 ts_code=ts_code,
@@ -165,7 +165,7 @@ class TushareProvider:
             return None
     
     def get_stock_basic(self, ts_code: str):
-        """获取股票基本信息"""
+        """获取期货品种基本信息"""
         try:
             df = self.pro.stock_basic(
                 ts_code=ts_code,
@@ -208,7 +208,7 @@ class AKShareProvider:
             )
             return df
         except Exception as e:
-            self.logger.error(f"AKShare A股数据获取失败: {e}")
+            self.logger.error(f"AKShare 期货数据获取失败: {e}")
             return None
     
     def get_hk_stock_data_akshare(self, symbol: str, period: str = "daily"):
@@ -233,7 +233,7 @@ class AKShareProvider:
         try:
             df = ak.stock_hk_spot_em()
             if not df.empty:
-                # 查找匹配的股票
+                # 查找匹配的期货品种
                 matched = df[df['代码'].str.contains(symbol, na=False)]
                 return matched
             return None
@@ -259,7 +259,7 @@ class BaoStockProvider:
             self.logger.error(f"BaoStock登录失败: {self.login_result.error_msg}")
     
     def get_stock_data(self, code: str, start_date: str, end_date: str):
-        """获取股票历史数据"""
+        """获取期货品种历史数据"""
         try:
             rs = bs.query_history_k_data_plus(
                 code,
@@ -300,13 +300,13 @@ def get_yahoo_finance_data(ticker: str, period: str = "1y",
     """获取Yahoo Finance数据
     
     Args:
-        ticker: 股票代码
+        ticker: 品种代码
         period: 时间周期 (1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max)
         start_date: 开始日期 (YYYY-MM-DD)
         end_date: 结束日期 (YYYY-MM-DD)
     
     Returns:
-        DataFrame: 股票数据
+        DataFrame: 期货数据
     """
     try:
         stock = yf.Ticker(ticker)
@@ -326,7 +326,7 @@ def get_yahoo_finance_data(ticker: str, period: str = "1y",
         return None
 
 def get_stock_info_yahoo(ticker: str):
-    """获取股票基本信息"""
+    """获取期货品种基本信息"""
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
@@ -349,7 +349,7 @@ def get_data_in_range(ticker: str, start_date: str, end_date: str,
     """从缓存中获取指定时间范围的数据
     
     Args:
-        ticker: 股票代码
+        ticker: 品种代码
         start_date: 开始日期
         end_date: 结束日期
         data_type: 数据类型 (news_data, insider_senti, insider_trans)
@@ -452,7 +452,7 @@ def get_chinese_social_sentiment(ticker: str, platform: str = "weibo"):
     """获取中国社交媒体情绪数据
     
     Args:
-        ticker: 股票代码
+        ticker: 品种代码
         platform: 平台名称 (weibo, xueqiu, eastmoney)
     
     Returns:
@@ -497,7 +497,7 @@ from enum import Enum
 from typing import List, Optional
 
 class ChinaDataSource(Enum):
-    """中国股票数据源枚举"""
+    """中国期货数据源枚举"""
     TUSHARE = "tushare"
     AKSHARE = "akshare"
     BAOSTOCK = "baostock"
@@ -621,7 +621,7 @@ def validate_and_clean_data(data, data_type: str):
     
     try:
         if data_type == "stock_data":
-            # 股票数据验证
+            # 期货数据验证
             required_columns = ['open', 'high', 'low', 'close', 'volume']
             if hasattr(data, 'columns'):
                 missing_cols = [col for col in required_columns if col not in data.columns]
@@ -695,14 +695,14 @@ os.makedirs(CACHE_DIR, exist_ok=True)
 ```python
 # 统一数据获取接口
 def get_finnhub_news(
-    ticker: Annotated[str, "公司股票代码，如 'AAPL', 'TSM' 等"],
+    ticker: Annotated[str, "公司品种代码，如 'AAPL', 'TSM' 等"],
     curr_date: Annotated[str, "当前日期，格式为 yyyy-mm-dd"],
     look_back_days: Annotated[int, "回看天数"],
 ):
     """获取指定时间范围内的公司新闻
     
     Args:
-        ticker (str): 目标公司的股票代码
+        ticker (str): 目标公司的品种代码
         curr_date (str): 当前日期，格式为 yyyy-mm-dd
         look_back_days (int): 回看天数
     
@@ -738,14 +738,14 @@ def get_finnhub_news(
     return f"## {ticker} News, from {before} to {curr_date}:\n" + str(combined_result)
 
 def get_finnhub_company_insider_sentiment(
-    ticker: Annotated[str, "股票代码"],
+    ticker: Annotated[str, "品种代码"],
     curr_date: Annotated[str, "当前交易日期，yyyy-mm-dd格式"],
     look_back_days: Annotated[int, "回看天数"],
 ):
     """获取公司内部人士情绪数据（来自公开SEC信息）
     
     Args:
-        ticker (str): 公司股票代码
+        ticker (str): 公司品种代码
         curr_date (str): 当前交易日期，yyyy-mm-dd格式
         look_back_days (int): 回看天数
     
@@ -790,7 +790,7 @@ class Toolkit:
         self.logger = get_logger('agents')
     
     def get_stock_fundamentals_unified(self, ticker: str):
-        """统一基本面分析工具，自动识别股票类型"""
+        """统一基本面分析工具，自动识别期货品种类型"""
         from tradingagents.utils.stock_utils import StockUtils
         
         try:
@@ -807,7 +807,7 @@ class Toolkit:
             return f"❌ 基本面数据获取失败: {str(e)}"
     
     def _get_china_stock_fundamentals(self, ticker: str):
-        """获取中国股票基本面数据"""
+        """获取中国期货品种基本面数据"""
         try:
             from tradingagents.dataflows.data_source_manager import DataSourceManager
             
@@ -822,8 +822,8 @@ class Toolkit:
                 # 降级策略
                 return self._get_akshare_fundamentals(ticker)
         except Exception as e:
-            self.logger.error(f"中国股票基本面获取失败: {e}")
-            return f"❌ 中国股票基本面获取失败: {str(e)}"
+            self.logger.error(f"中国期货品种基本面获取失败: {e}")
+            return f"❌ 中国期货品种基本面获取失败: {str(e)}"
     
     def _get_tushare_fundamentals(self, ticker: str):
         """使用Tushare获取基本面数据"""
@@ -842,7 +842,7 @@ class Toolkit:
             report = f"""## {ticker} 基本面分析报告 (Tushare数据源)
             
 **基本信息**:
-- 股票名称: {basic_info.get('name', 'N/A')}
+- 期货品种名称: {basic_info.get('name', 'N/A')}
 - 所属行业: {basic_info.get('industry', 'N/A')}
 - 上市日期: {basic_info.get('list_date', 'N/A')}
 
@@ -859,7 +859,7 @@ class Toolkit:
             return f"❌ Tushare基本面获取失败: {str(e)}"
 ```
 
-#### 股票工具
+#### 期货品种工具
 **文件位置**: `tradingagents/utils/stock_utils.py`
 
 ```python
@@ -867,24 +867,24 @@ from enum import Enum
 from typing import Dict, Any
 
 class StockMarket(Enum):
-    """股票市场枚举"""
+    """期货市场枚举"""
     CHINA_A = "china_a"      # 中国A股
     HONG_KONG = "hong_kong"  # 港股
     US = "us"                # 美股
     UNKNOWN = "unknown"      # 未知市场
 
 class StockUtils:
-    """股票工具类"""
+    """期货品种工具类"""
     
     @staticmethod
     def identify_stock_market(ticker: str) -> StockMarket:
-        """识别股票所属市场
+        """识别期货品种所属市场
         
         Args:
-            ticker: 股票代码
+            ticker: 品种代码
             
         Returns:
-            StockMarket: 股票市场类型
+            StockMarket: 期货市场类型
         """
         ticker = ticker.upper().strip()
         
@@ -905,10 +905,10 @@ class StockUtils:
     
     @staticmethod
     def get_market_info(ticker: str) -> Dict[str, Any]:
-        """获取股票市场信息
+        """获取期货市场信息
         
         Args:
-            ticker: 股票代码
+            ticker: 品种代码
             
         Returns:
             Dict: 市场信息字典
@@ -918,7 +918,7 @@ class StockUtils:
         market_info = {
             StockMarket.CHINA_A: {
                 'market_type': 'A股',
-                'market_name': '中国A股市场',
+                'market_name': '中国期货市场',
                 'currency_name': '人民币',
                 'currency_symbol': '¥',
                 'timezone': 'Asia/Shanghai',
@@ -926,7 +926,7 @@ class StockUtils:
             },
             StockMarket.HONG_KONG: {
                 'market_type': '港股',
-                'market_name': '香港股票市场',
+                'market_name': '香港期货市场',
                 'currency_name': '港币',
                 'currency_symbol': 'HK$',
                 'timezone': 'Asia/Hong_Kong',
@@ -934,7 +934,7 @@ class StockUtils:
             },
             StockMarket.US: {
                 'market_type': '美股',
-                'market_name': '美国股票市场',
+                'market_name': '美国期货市场',
                 'currency_name': '美元',
                 'currency_symbol': '$',
                 'timezone': 'America/New_York',
@@ -954,10 +954,10 @@ class StockUtils:
     
     @staticmethod
     def get_data_source(ticker: str) -> str:
-        """根据股票代码获取推荐的数据源
+        """根据品种代码获取推荐的数据源
         
         Args:
-            ticker: 股票代码
+            ticker: 品种代码
             
         Returns:
             str: 数据源名称
@@ -965,7 +965,7 @@ class StockUtils:
         market = StockUtils.identify_stock_market(ticker)
         
         if market == StockMarket.CHINA_A:
-            return "china_unified"  # 使用统一的中国股票数据源
+            return "china_unified"  # 使用统一的中国期货数据源
         elif market == StockMarket.HONG_KONG:
             return "yahoo_finance"  # 港股使用Yahoo Finance
         elif market == StockMarket.US:
@@ -987,7 +987,7 @@ sequenceDiagram
     participant Cache as 缓存系统
     participant Source as 数据源
     
-    Agent->>Toolkit: 请求股票数据
+    Agent->>Toolkit: 请求期货数据
     Toolkit->>Interface: 调用统一接口
     Interface->>Cache: 检查缓存
     
@@ -1009,7 +1009,7 @@ sequenceDiagram
 
 1. **数据请求**: 智能体通过Toolkit请求数据
 2. **缓存检查**: 首先检查本地缓存是否有效
-3. **数据源选择**: 根据股票类型选择最佳数据源
+3. **数据源选择**: 根据期货品种类型选择最佳数据源
 4. **数据获取**: 从外部API获取原始数据
 5. **数据验证**: 验证数据完整性和有效性
 6. **数据清洗**: 清理异常值和缺失数据
@@ -1242,7 +1242,7 @@ class DataSourceFallback:
         """使用降级策略获取数据
         
         Args:
-            ticker: 股票代码
+            ticker: 品种代码
             data_type: 数据类型
             get_data_func: 数据获取函数
             *args, **kwargs: 函数参数

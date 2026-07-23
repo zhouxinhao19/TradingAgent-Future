@@ -48,7 +48,7 @@
 ```python
 # 统一市场数据工具 (推荐)
 get_stock_market_data_unified(ticker, start_date, end_date)
-# 自动识别股票类型，调用最佳数据源
+# 自动识别期货品种类型，调用最佳数据源
 # A股: Tushare + AKShare | 港股: AKShare + Yahoo | 美股: Yahoo + FinnHub
 
 # 备用工具
@@ -60,7 +60,7 @@ get_stockstats_indicators_report_online(symbol, period)     # 技术指标
 ```python
 # 统一基本面工具 (推荐)
 get_stock_fundamentals_unified(ticker, start_date, end_date, curr_date)
-# 自动识别股票类型，调用最佳数据源
+# 自动识别期货品种类型，调用最佳数据源
 # A股: Tushare + AKShare | 港股: AKShare | 美股: FinnHub + SimFin
 
 # 补充工具
@@ -72,7 +72,7 @@ get_simfin_income_stmt(ticker, year, period)               # 利润表
 ### 📰 新闻工具
 ```python
 # 实时新闻
-get_realtime_stock_news(symbol, days_back)                 # 实时股票新闻
+get_realtime_stock_news(symbol, days_back)                 # 实时期货品种新闻
 get_global_news_openai(query, max_results)                 # 全球新闻 (OpenAI)
 get_google_news(query, lang, country)                      # Google 新闻
 
@@ -84,14 +84,14 @@ get_reddit_news(subreddit, limit)                          # Reddit 新闻
 ### 💬 社交媒体工具
 ```python
 # 情绪分析
-get_stock_news_openai(symbol, sentiment_focus)             # 股票新闻情绪
+get_stock_news_openai(symbol, sentiment_focus)             # 期货品种新闻情绪
 get_reddit_stock_info(symbol, limit)                       # Reddit 讨论
 get_chinese_social_sentiment(symbol, platform)             # 中国社交媒体
 ```
 
 ## 🎯 数据源映射
 
-| 股票类型 | 识别规则 | 市场数据源 | 基本面数据源 | 新闻数据源 |
+| 期货品种类型 | 识别规则 | 市场数据源 | 基本面数据源 | 新闻数据源 |
 |---------|---------|-----------|-------------|-----------|
 | **A股** | 6位数字 (000001) | Tushare + AKShare | Tushare + AKShare | 财联社 + 新浪财经 |
 | **港股** | .HK后缀 (0700.HK) | AKShare + Yahoo | AKShare | Google News |
@@ -145,7 +145,7 @@ llm_provider = "google"       # Google Gemini (质量高)
 
 **日志示例**:
 ```
-📊 [模块开始] market_analyst - 股票: 000858
+📊 [模块开始] market_analyst - 期货品种: 000858
 📊 [市场分析师] 工具调用: ['get_stock_market_data_unified']  
 📊 [模块完成] market_analyst - ✅ 成功 - 耗时: 41.73s
 ```
@@ -173,7 +173,7 @@ print(f"建议: {decision['action']}, 置信度: {decision['confidence']}")
 python web/run_web.py
 
 # 访问 http://localhost:8501
-# 1. 输入股票代码
+# 1. 输入品种代码
 # 2. 选择分析师和研究深度  
 # 3. 点击"开始分析"
 # 4. 查看实时进度和结果
@@ -229,7 +229,7 @@ python web/run_web.py
 ### 分析报告结构
 ```
 📈 市场分析报告
-├── 股票基本信息
+├── 期货品种基本信息
 ├── 技术指标分析  
 ├── 价格趋势分析
 ├── 成交量分析

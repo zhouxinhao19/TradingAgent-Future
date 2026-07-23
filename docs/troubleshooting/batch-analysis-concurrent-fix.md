@@ -2,7 +2,7 @@
 
 ## 问题描述
 
-用户提交批量分析3个股票时，发现任务是**串行执行**的（一个接一个），而不是并发执行。
+用户提交批量分析3品种票时，发现任务是**串行执行**的（一个接一个），而不是并发执行。
 
 **现象**：
 - ✅ 任务中心显示3个任务都已创建
@@ -76,7 +76,7 @@ def _get_trading_graph(self, config: Dict[str, Any]) -> TradingAgentsGraph:
 **问题**：
 - `TradingAgentsGraph` 有可变的实例变量（`self.ticker`, `self.curr_state`, `self._current_task_id`）
 - 多个线程共享同一个实例时，这些变量会相互覆盖
-- **严重后果**：A 股票的分析可能拿到 B 股票的数据！
+- **严重后果**：A 期货品种的分析可能拿到 B 期货品种的数据！
 
 **修复**：
 ```python

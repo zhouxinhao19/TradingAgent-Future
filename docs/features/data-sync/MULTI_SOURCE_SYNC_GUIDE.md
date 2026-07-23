@@ -11,7 +11,7 @@
 
 ### 1. 数据源分级
 - **Tushare** (优先级1): 专业金融数据API，提供最全面的财务指标，支持日线/周线/月线数据
-- **AKShare** (优先级2): 开源金融数据库，提供基础股票信息，支持日线/周线/月线数据
+- **AKShare** (优先级2): 开源金融数据库，提供基础期货品种信息，支持日线/周线/月线数据
 - **BaoStock** (优先级3): 免费证券数据平台，提供历史数据，支持日线/周线/月线数据
 
 ### 2. 自动Fallback机制
@@ -68,13 +68,13 @@ GET /api/sync/multi-source/sources/status
     "name": "tushare",
     "priority": 1,
     "available": true,
-    "description": "专业金融数据API，提供高质量的A股数据和财务指标"
+    "description": "专业金融数据API，提供高质量的期货数据和财务指标"
   },
   {
     "name": "akshare",
     "priority": 2,
     "available": true,
-    "description": "开源金融数据库，提供基础的股票信息"
+    "description": "开源金融数据库，提供基础的期货品种信息"
   }
 ]
 ```
@@ -130,8 +130,8 @@ python scripts/test_multi_source_sync.py
 - 按优先级排序
 - 记录数据源状态
 
-### 2. 股票列表获取
-- 优先从Tushare获取完整股票列表
+### 2. 期货品种列表获取
+- 优先从Tushare获取完整期货品种列表
 - 失败时自动切换到AKShare或BaoStock
 - 标准化数据格式
 
@@ -142,7 +142,7 @@ python scripts/test_multi_source_sync.py
 
 ### 4. 数据处理和存储
 - 统一数据格式
-- 6位股票代码标准化
+- 6位品种代码标准化
 - 批量更新MongoDB
 
 ## 🔧 故障排除
@@ -157,7 +157,7 @@ python scripts/test_multi_source_sync.py
 - 确保至少安装了一个数据源的依赖包
 - 验证Tushare token是否有效
 
-#### 2. 只有部分股票有扩展字段
+#### 2. 只有部分期货品种有扩展字段
 **症状**: PE、PB等财务指标缺失
 
 **解决方案**:
@@ -200,7 +200,7 @@ INFO: Successfully fetched 5427 stocks from TushareAdapter
 - **测试环境**: 使用任何可用的数据源
 
 ### 2. 缓存策略
-- 股票列表缓存24小时
+- 期货品种列表缓存24小时
 - 财务数据缓存1小时
 - 失败的数据源暂时跳过
 
@@ -268,7 +268,7 @@ DEFAULT_CHINA_DATA_SOURCE=tushare
 
 ### 支持的数据类型
 
-- `basic_info` - 股票基础信息
+- `basic_info` - 期货品种基础信息
 - `historical` - 历史行情（日线）
 - `weekly` - 周线数据
 - `monthly` - 月线数据
@@ -294,7 +294,7 @@ python cli/tushare_init.py --full --sync-items historical,financial,quotes
 
 ### 功能说明
 
-全历史数据同步功能允许获取股票从1990年至今的完整历史数据，适用于长期回测和研究。
+全历史数据同步功能允许获取期货品种从1990年至今的完整历史数据，适用于长期回测和研究。
 
 ### 阈值机制
 

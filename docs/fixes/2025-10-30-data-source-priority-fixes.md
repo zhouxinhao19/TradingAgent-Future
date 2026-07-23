@@ -125,7 +125,7 @@ pipeline = [
 
 1. 调用 `/api/stocks/000001/fundamentals` 接口，验证返回的 `roe`、`debt_ratio`、`ps` 不再是 `null`
 2. 验证接口返回的数据来自 Tushare（最高优先级）
-3. 测试其他股票代码，确保数据一致性
+3. 测试其他品种代码，确保数据一致性
 
 ## 相关配置
 

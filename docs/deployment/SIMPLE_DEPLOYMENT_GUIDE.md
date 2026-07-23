@@ -98,7 +98,7 @@ GOOGLE_API_KEY=AIzaSyxxxxxxxxxxxxxxxx
 ### 可选配置（提升体验）
 
 ```bash
-# A股数据增强（可选）
+# 期货数据增强（可选）
 TUSHARE_TOKEN=your_token  # https://tushare.pro/
 
 # 美股数据（可选）
@@ -288,7 +288,7 @@ python scripts/prefetch_stock_data.py 000001 600519 AAPL
 使用批量分析功能一次分析多只股票：
 
 ```python
-# 在Web界面输入多个股票代码（逗号分隔）
+# 在Web界面输入多个品种代码（逗号分隔）
 000001, 600519, 300750
 ```
 

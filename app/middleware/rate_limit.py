@@ -21,9 +21,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         
         # 不同端点的速率限制配置
         self.endpoint_limits = {
-            "/api/analysis/single": 10,      # 单股分析：每分钟10次
+            "/api/analysis/single": 10,      # 单品种分析：每分钟10次
             "/api/analysis/batch": 5,        # 批量分析：每分钟5次
-            "/api/screening/filter": 20,     # 股票筛选：每分钟20次
+            "/api/screening/filter": 20,     # 筛选：每分钟20次
             "/api/auth/login": 5,            # 登录：每分钟5次
             "/api/auth/register": 3,         # 注册：每分钟3次
         }

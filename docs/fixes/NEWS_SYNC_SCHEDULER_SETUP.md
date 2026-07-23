@@ -22,24 +22,24 @@
 
 <augment_code_snippet path="app/main.py" mode="EXCERPT">
 ````python
-# 新闻数据同步任务配置（使用AKShare同步所有股票新闻）
+# 新闻数据同步任务配置（使用AKShare同步所有期货品种新闻）
 if settings.NEWS_SYNC_ENABLED:
     logger.info("🔄 配置新闻数据同步任务...")
 
     from app.worker.akshare_sync_service import get_akshare_sync_service
 
     async def run_news_sync():
-        """运行新闻同步任务 - 使用AKShare同步所有股票新闻"""
+        """运行新闻同步任务 - 使用AKShare同步所有期货品种新闻"""
         try:
             logger.info("📰 开始新闻数据同步（AKShare）...")
             service = await get_akshare_sync_service()
             result = await service.sync_news_data(
-                symbols=None,  # None表示同步所有股票
+                symbols=None,  # None表示同步所有期货品种
                 max_news_per_stock=settings.NEWS_SYNC_MAX_PER_SOURCE
             )
             logger.info(
                 f"✅ 新闻同步完成: "
-                f"处理{result['total_processed']}只股票, "
+                f"处理{result['total_processed']}只期货品种, "
                 f"成功{result['success_count']}只, "
                 f"失败{result['error_count']}只, "
                 f"新闻总数{result['news_count']}条, "
@@ -65,7 +65,7 @@ if settings.NEWS_SYNC_ENABLED:
 # 新闻数据同步任务
 "news_sync": {
     "display_name": "新闻数据同步（AKShare）",
-    "description": "使用AKShare（东方财富）同步所有股票的个股新闻。每2小时执行一次，每只股票获取最新50条新闻。支持批量处理，自动去重和情绪分析。"
+    "description": "使用AKShare（东方财富）同步所有期货品种的品种新闻。每2小时执行一次，每只期货品种获取最新50条新闻。支持批量处理，自动去重和情绪分析。"
 },
 ```
 
@@ -191,10 +191,10 @@ NEWS_SYNC_ENABLED=true
 
 **配置项**：`NEWS_SYNC_MAX_PER_SOURCE`
 
-**默认值**：`50`（每只股票最多获取 50 条新闻）
+**默认值**：`50`（每只期货品种最多获取 50 条新闻）
 
 **说明**：
-- 控制每只股票获取的新闻数量
+- 控制每只期货品种获取的新闻数量
 - 避免单次同步数据量过大
 - 建议根据服务器性能和网络状况调整
 
@@ -209,14 +209,14 @@ NEWS_SYNC_ENABLED=true
 | **任务 ID** | `news_sync` |
 | **显示名称** | 新闻数据同步（AKShare） |
 | **数据源** | AKShare（东方财富） |
-| **同步范围** | 所有股票的个股新闻 |
+| **同步范围** | 所有期货品种的品种新闻 |
 | **执行频率** | 每 2 小时（可配置） |
 | **回溯时间** | 24 小时（可配置） |
 | **每股新闻数** | 50 条（可配置） |
 
 ### 任务功能
 
-- ✅ 自动同步所有股票的最新新闻
+- ✅ 自动同步所有期货品种的最新新闻
 - ✅ 支持批量处理，提高效率
 - ✅ 自动去重，避免重复保存
 - ✅ 情绪分析，标注新闻情绪（正面/负面/中性）
@@ -283,7 +283,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 3. 查看后端日志，应该显示：
    ```
    📰 开始新闻数据同步（AKShare）...
-   ✅ 新闻同步完成: 处理XXX只股票, 成功XXX只, 失败XXX只, 新闻总数XXX条, 耗时XX.XX秒
+   ✅ 新闻同步完成: 处理XXX只期货品种, 成功XXX只, 失败XXX只, 新闻总数XXX条, 耗时XX.XX秒
    ```
 4. 刷新仪表板页面，查看市场快讯区域是否显示最新新闻
 
@@ -320,7 +320,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 3. 查看任务执行历史：
    - 执行时间
    - 执行状态（成功/失败）
-   - 执行结果（处理股票数、新闻数等）
+   - 执行结果（处理期货品种数、新闻数等）
    - 错误信息（如果失败）
 
 ---

@@ -23,7 +23,7 @@
 ```
 data/
 ├── 📊 cache/                    # 数据缓存 (原 tradingagents/dataflows/data_cache/)
-│   ├── stock_data/             # 股票数据缓存
+│   ├── stock_data/             # 期货数据缓存
 │   ├── news_data/              # 新闻数据缓存
 │   ├── fundamentals/           # 基本面数据缓存
 │   └── metadata/               # 缓存元数据

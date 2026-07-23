@@ -19,7 +19,7 @@
 
 | 平台类型 | 主要平台 | 特色功能 | 数据获取难度 |
 |----------|----------|----------|-------------|
-| **专业投资社区** | 雪球、东方财富股吧 | 股票讨论、投资策略 | 中等 |
+| **专业投资社区** | 雪球、东方财富股吧 | 期货品种讨论、投资策略 | 中等 |
 | **综合社交媒体** | 微博、知乎 | 财经大V、专业分析 | 较高 |
 | **新闻资讯平台** | 财联社、新浪财经 | 实时快讯、深度报道 | 中等 |
 | **短视频平台** | 抖音、快手 | 财经科普、投资教育 | 较高 |
@@ -37,7 +37,7 @@ class WeiboSentimentAnalyzer:
         self.api_key = api_key
         
     def get_stock_sentiment(self, stock_symbol, days=7):
-        """获取股票相关微博情绪"""
+        """获取期货品种相关微博情绪"""
         # 搜索相关微博
         keywords = [stock_symbol, self.get_company_name(stock_symbol)]
         weibo_posts = self.search_weibo(keywords, days)
@@ -57,11 +57,11 @@ class WeiboSentimentAnalyzer:
 
 #### 2. 雪球数据集成
 ```python
-# 雪球股票讨论分析
+# 雪球期货品种讨论分析
 class XueqiuAnalyzer:
     def get_stock_discussions(self, stock_code):
-        """获取雪球股票讨论"""
-        # 雪球股票页面爬取
+        """获取雪球期货品种讨论"""
+        # 雪球期货品种页面爬取
         discussions = self.crawl_xueqiu_discussions(stock_code)
         
         # 分析投资者观点
@@ -95,7 +95,7 @@ class ChineseFinanceNews:
         ]
     
     def get_stock_news(self, stock_symbol, days=7):
-        """获取股票相关新闻"""
+        """获取期货品种相关新闻"""
         all_news = []
         
         for source in self.sources:
@@ -110,7 +110,7 @@ class ChineseFinanceNews:
 ### 阶段二：深度集成 (需要API支持)
 
 #### 1. 知乎专业分析
-- 搜索股票相关的专业回答
+- 搜索期货品种相关的专业回答
 - 分析知乎大V的投资观点
 - 提取高质量的投资分析内容
 
@@ -150,11 +150,11 @@ class ChineseFinanceNews:
 ```python
 # 修改 social_media_analyst.py
 system_message = """
-您是一位专业的中国市场社交媒体分析师，负责分析中国投资者在各大平台上对特定股票的讨论和情绪。
+您是一位专业的中国市场社交媒体分析师，负责分析中国投资者在各大平台上对特定期货品种的讨论和情绪。
 
 主要分析平台包括：
 - 微博：财经大V观点、热搜话题、散户情绪
-- 雪球：专业投资者讨论、股票评级、投资策略
+- 雪球：专业投资者讨论、期货品种评级、投资策略
 - 东方财富股吧：散户投资者情绪、讨论热度
 - 知乎：深度分析文章、专业问答
 - 财经新闻：财联社、新浪财经、东方财富等

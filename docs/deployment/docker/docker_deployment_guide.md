@@ -173,17 +173,17 @@ python scripts/quick_login_fix.py
 
 1. **配置 API 密钥**：
    - 配置 `DASHSCOPE_API_KEY`（通义千问）
-   - 配置 `TUSHARE_TOKEN`（股票数据）
+   - 配置 `TUSHARE_TOKEN`（期货数据）
    - 配置其他需要的 API 密钥
 
-2. **初始化股票数据**：
+2. **初始化期货数据**：
    ```bash
-   # 初始化基础股票数据
+   # 初始化基础期货数据
    python cli/tushare_init.py --basic
    ```
 
 3. **测试系统功能**：
-   - 尝试进行股票分析
+   - 尝试进行期货分析
    - 检查数据同步功能
    - 验证各项功能正常
 

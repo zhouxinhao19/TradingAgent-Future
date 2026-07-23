@@ -49,7 +49,7 @@ class UnifiedMarketDataService:
     
     @property
     def cn_service(self):
-        """A股数据服务"""
+        """期货数据服务"""
         if self._cn_service is None:
             self._cn_service = get_stock_data_service()
         return self._cn_service
@@ -780,7 +780,7 @@ export function parseFullSymbol(fullSymbol: string): NormalizedSymbol | null {
 
 /**
  * 推断市场类型
- * @param code 股票代码
+ * @param code 品种代码
  * @returns 市场类型
  */
 export function inferMarket(code: string): 'CN' | 'HK' | 'US' {
@@ -818,7 +818,7 @@ export function inferMarket(code: string): 'CN' | 'HK' | 'US' {
 
 /**
  * 推断交易所MIC代码
- * @param symbol 股票代码
+ * @param symbol 品种代码
  * @param market 市场类型
  * @returns 交易所MIC代码
  */
@@ -883,8 +883,8 @@ export function exchangeMicToCode(exchangeMic: string): string {
 }
 
 /**
- * 格式化股票代码显示
- * @param symbol 股票代码
+ * 格式化品种代码显示
+ * @param symbol 品种代码
  * @param market 市场类型
  * @returns 格式化后的代码
  */
@@ -947,7 +947,7 @@ export function getMarketDisplayName(market: 'CN' | 'HK' | 'US'): string {
    - 运行测试确保通过
 
 3. **渐进式迁移**：
-   - 不破坏现有A股数据
+   - 不破坏现有期货数据
    - 新字段设为可选
    - 保持向后兼容
 

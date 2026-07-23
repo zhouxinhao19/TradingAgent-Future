@@ -2,7 +2,7 @@
 
 ## 🎉 恭喜！您的Tushare配置已完成
 
-您的系统已经成功配置并使用Tushare作为默认的中国股票数据源。现在您可以享受高质量、稳定的A股数据服务！
+您的系统已经成功配置并使用Tushare作为默认的中国期货数据源。现在您可以享受高质量、稳定的期货数据服务！
 
 ## ✅ 当前配置状态
 
@@ -22,7 +22,7 @@
 # 启动CLI
 python -m cli.main
 
-# 选择分析中国股票
+# 选择分析中国期货品种
 # 系统会自动使用Tushare数据源获取数据
 ```
 
@@ -48,7 +48,7 @@ from tradingagents.dataflows import (
 data = get_china_stock_data_unified("000001", "2024-01-01", "2024-12-31")
 print(data)
 
-# 获取股票基本信息
+# 获取期货品种基本信息
 info = get_china_stock_info_unified("000001")
 print(info)
 ```
@@ -65,7 +65,7 @@ print(info)
 | 技术支持 | ❌ 无官方支持 | ✅ 专业支持 |
 
 ### 数据覆盖
-- ✅ **股票基础数据**: 所有A股股票信息
+- ✅ **期货品种基础数据**: 所有A股期货品种信息
 - ✅ **历史行情**: 日线、周线、月线数据（支持多周期同步）
 - ✅ **财务数据**: 三大财务报表
 - ✅ **实时数据**: 最新价格和交易信息
@@ -79,7 +79,7 @@ print(info)
 
 ## 🎯 常用功能示例
 
-### 1. 股票分析
+### 1. 期货分析
 
 ```python
 # 分析平安银行
@@ -90,7 +90,7 @@ fundamentals = get_china_stock_fundamentals_tushare("000001")
 print(fundamentals)
 ```
 
-### 2. 股票搜索
+### 2. 期货品种搜索
 
 ```python
 # 搜索银行股
@@ -171,11 +171,11 @@ switch_china_data_source("tushare")  # 确保使用Tushare
 
 ### 2. 批量查询
 ```python
-# 批量获取多只股票信息
+# 批量获取多只期货品种信息
 stocks = ["000001", "000002", "600036", "600519"]
 for stock in stocks:
     info = get_china_stock_info_unified(stock)
-    print(f"{stock}: {info.split('股票名称: ')[1].split('\\n')[0]}")
+    print(f"{stock}: {info.split('期货品种名称: ')[1].split('\\n')[0]}")
 ```
 
 ### 3. 合理使用API
@@ -284,9 +284,9 @@ else:
 
 ---
 
-🎉 **恭喜您成功配置Tushare！现在可以享受高质量的A股数据服务了！**
+🎉 **恭喜您成功配置Tushare！现在可以享受高质量的期货数据服务了！**
 
-💡 **建议**: 立即尝试运行`python -m cli.main`开始您的股票分析之旅！
+💡 **建议**: 立即尝试运行`python -m cli.main`开始您的期货分析之旅！
 
 ---
 

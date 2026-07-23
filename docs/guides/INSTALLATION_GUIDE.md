@@ -367,7 +367,7 @@ GOOGLE_API_KEY=your_google_api_key_here
 # 数据源配置
 # =============================================================================
 
-# Tushare配置 (A股数据，推荐)
+# Tushare配置 (期货数据，推荐)
 TUSHARE_TOKEN=your_tushare_token_here
 
 # FinnHub配置 (美股数据)
@@ -411,7 +411,7 @@ MAX_RETRIES=3  # 最大重试次数
 ### 配置优先级说明
 
 1. **必须配置**: 至少一个AI模型API密钥
-2. **推荐配置**: Tushare Token（A股分析）
+2. **推荐配置**: Tushare Token（期货分析）
 3. **可选配置**: 数据库（提升性能）
 4. **高级配置**: 自定义参数
 
@@ -456,7 +456,7 @@ MAX_RETRIES=3  # 最大重试次数
 
 ### 获取数据源API密钥
 
-#### Tushare (A股数据，强烈推荐)
+#### Tushare (期货数据，强烈推荐)
 1. 访问 [Tushare官网](https://tushare.pro/)
 2. 注册账号
 3. 获取Token
@@ -500,7 +500,7 @@ python -c "import os; print('✅ API密钥已配置' if os.getenv('DEEPSEEK_API_
 
 1. 启动应用后访问 http://localhost:8501
 2. 检查页面是否正常加载
-3. 尝试输入股票代码（如：000001）
+3. 尝试输入品种代码（如：000001）
 4. 选择分析师团队
 5. 点击"开始分析"按钮
 6. 观察是否有错误信息
@@ -521,10 +521,10 @@ docker-compose logs redis
 
 ### 功能测试
 
-#### 测试A股分析
+#### 测试期货分析
 ```bash
 # 在Web界面中测试
-股票代码: 000001
+品种代码: 000001
 市场类型: A股
 研究深度: 3级
 分析师: 市场分析师 + 基本面分析师
@@ -532,7 +532,7 @@ docker-compose logs redis
 
 #### 测试美股分析
 ```bash
-股票代码: AAPL
+品种代码: AAPL
 市场类型: 美股
 研究深度: 3级
 分析师: 市场分析师 + 基本面分析师
@@ -540,7 +540,7 @@ docker-compose logs redis
 
 #### 测试港股分析
 ```bash
-股票代码: 0700.HK
+品种代码: 0700.HK
 市场类型: 港股
 研究深度: 3级
 分析师: 市场分析师 + 基本面分析师
@@ -586,7 +586,7 @@ docker-compose build --no-cache
 ### Q5: 数据获取失败
 **A**: 检查数据源配置
 - 确认Tushare Token有效
-- 检查股票代码格式
+- 检查品种代码格式
 - 验证网络访问权限
 
 ### Q6: 中文显示乱码
@@ -767,4 +767,4 @@ pip install -r requirements.txt
 
 ---
 
-🎉 **恭喜！** 您已成功安装TradingAgents-CN。开始您的AI股票分析之旅吧！
+🎉 **恭喜！** 您已成功安装TradingAgents-CN。开始您的AI期货分析之旅吧！

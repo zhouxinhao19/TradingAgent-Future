@@ -2,18 +2,18 @@
 
 ## 📋 问题概述
 
-在股票信息获取过程中，发现了一个**死循环调用**的问题，导致系统无限递归，最终耗尽资源。
+在期货品种信息获取过程中，发现了一个**死循环调用**的问题，导致系统无限递归，最终耗尽资源。
 
 ## 🔍 问题表现
 
 ### 日志特征
 
 ```json
-{"message": "📊 [数据来源: tushare] 开始获取股票信息: 00005"}
-{"message": "🔍 [股票代码追踪] 重定向到data_source_manager"}
-{"message": "📊 [数据来源: tushare] 开始获取股票信息: 00005"}
-{"message": "🔍 [股票代码追踪] 重定向到data_source_manager"}
-{"message": "📊 [数据来源: tushare] 开始获取股票信息: 00005"}
+{"message": "📊 [数据来源: tushare] 开始获取期货品种信息: 00005"}
+{"message": "🔍 [品种代码追踪] 重定向到data_source_manager"}
+{"message": "📊 [数据来源: tushare] 开始获取期货品种信息: 00005"}
+{"message": "🔍 [品种代码追踪] 重定向到data_source_manager"}
+{"message": "📊 [数据来源: tushare] 开始获取期货品种信息: 00005"}
 ...（无限重复）
 ```
 
@@ -54,7 +54,7 @@ if self.current_source == ChinaDataSource.TUSHARE:
 **`interface.py` 第1293-1300行**（修复前）：
 ```python
 manager = get_data_source_manager()
-# 临时切换到Tushare数据源获取股票信息
+# 临时切换到Tushare数据源获取期货品种信息
 from .data_source_manager import ChinaDataSource
 original_source = manager.current_source
 manager.current_source = ChinaDataSource.TUSHARE
@@ -89,7 +89,7 @@ def get_china_stock_info_tushare(ticker: str) -> str:
     try:
         from .data_source_manager import get_data_source_manager
         
-        logger.info(f"🔍 [股票代码追踪] 直接调用 Tushare 适配器")
+        logger.info(f"🔍 [品种代码追踪] 直接调用 Tushare 适配器")
         
         manager = get_data_source_manager()
         
@@ -99,16 +99,16 @@ def get_china_stock_info_tushare(ticker: str) -> str:
         
         # 格式化返回字符串
         if info and isinstance(info, dict):
-            return f"""股票代码: {info.get('symbol', ticker)}
-股票名称: {info.get('name', '未知')}
+            return f"""品种代码: {info.get('symbol', ticker)}
+期货品种名称: {info.get('name', '未知')}
 所属行业: {info.get('industry', '未知')}
 上市日期: {info.get('list_date', '未知')}
 交易所: {info.get('exchange', '未知')}"""
         else:
-            return f"❌ 未找到{ticker}的股票信息"
+            return f"❌ 未找到{ticker}的期货品种信息"
     except Exception as e:
-        logger.error(f"❌ [Tushare] 获取股票信息失败: {e}")
-        return f"❌ 获取{ticker}股票信息失败: {e}"
+        logger.error(f"❌ [Tushare] 获取期货品种信息失败: {e}")
+        return f"❌ 获取{ticker}期货品种信息失败: {e}"
 ```
 
 **关键改动**：
@@ -119,7 +119,7 @@ def get_china_stock_info_tushare(ticker: str) -> str:
 **2. `data_source_manager.py` 的 `_try_fallback_stock_info()`（第1567-1569行）**：
 
 ```python
-# 根据数据源类型获取股票信息
+# 根据数据源类型获取期货品种信息
 if source == ChinaDataSource.TUSHARE:
     # 🔥 直接调用 Tushare 适配器，避免循环调用
     result = self._get_tushare_stock_info(symbol)
@@ -168,13 +168,13 @@ interface.get_china_stock_info_unified()
 
 ### 修复的功能
 
-- ✅ 股票信息获取（Tushare数据源）
+- ✅ 期货品种信息获取（Tushare数据源）
 - ✅ 数据源降级机制（备用数据源）
 - ✅ 系统稳定性（避免死循环）
 
 ### 不受影响的功能
 
-- ✅ A股数据获取
+- ✅ 期货数据获取
 - ✅ 港股数据获取
 - ✅ 美股数据获取
 - ✅ 其他数据源（AKShare, BaoStock）

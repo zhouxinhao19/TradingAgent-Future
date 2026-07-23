@@ -48,13 +48,13 @@ else:
 
 ```python
 if is_china:
-    # 1. 获取股票价格数据
+    # 1. 获取期货价格数据
     stock_data = get_china_stock_data_unified(ticker, start_date, end_date)
     result_data.append(f"## A股价格数据\n{stock_data}")
     
     # 2. 获取基本面数据
     fundamentals_data = analyzer._generate_fundamentals_report(ticker, stock_data)
-    result_data.append(f"## A股基本面数据\n{fundamentals_data}")
+    result_data.append(f"## 基本面数据\n{fundamentals_data}")
 ```
 
 **结论**：统一工具 `get_stock_fundamentals_unified` 内部已经自动调用了：
@@ -84,7 +84,7 @@ if is_china:
 **移除 `online_tools` 配置判断，所有分析师统一使用统一工具。**
 
 统一工具内部会自动：
-- 识别股票类型（A股/港股/美股）
+- 识别期货品种类型（商品）
 - 调用相应的数据源
 - 整合所有需要的数据
 - 返回完整的分析数据
@@ -114,9 +114,9 @@ else:
 **修改后**（第115-133行）：
 ```python
 # 统一使用 get_stock_fundamentals_unified 工具
-# 该工具内部会自动识别股票类型（A股/港股/美股）并调用相应的数据源
+# 该工具内部会自动识别期货品种类型（商品）并调用相应的数据源
 # 对于A股，它会自动获取价格数据和基本面数据，无需LLM调用多个工具
-logger.info(f"📊 [基本面分析师] 使用统一基本面分析工具，自动识别股票类型")
+logger.info(f"📊 [基本面分析师] 使用统一基本面分析工具，自动识别期货品种类型")
 tools = [toolkit.get_stock_fundamentals_unified]
 
 # 安全地获取工具名称用于调试
@@ -148,8 +148,8 @@ else:
 **修改后**（第100-119行）：
 ```python
 # 统一使用 get_stock_market_data_unified 工具
-# 该工具内部会自动识别股票类型（A股/港股/美股）并调用相应的数据源
-logger.info(f"📊 [市场分析师] 使用统一市场数据工具，自动识别股票类型")
+# 该工具内部会自动识别期货品种类型（商品）并调用相应的数据源
+logger.info(f"📊 [市场分析师] 使用统一市场数据工具，自动识别期货品种类型")
 tools = [toolkit.get_stock_market_data_unified]
 
 # 安全地获取工具名称用于调试
@@ -181,8 +181,8 @@ else:
 **修改后**（第88-95行）：
 ```python
 # 统一使用 get_stock_sentiment_unified 工具
-# 该工具内部会自动识别股票类型并调用相应的情绪数据源
-logger.info(f"[社交媒体分析师] 使用统一情绪分析工具，自动识别股票类型")
+# 该工具内部会自动识别期货品种类型并调用相应的情绪数据源
+logger.info(f"[社交媒体分析师] 使用统一情绪分析工具，自动识别期货品种类型")
 tools = [toolkit.get_stock_sentiment_unified]
 ```
 
@@ -251,7 +251,7 @@ ONLINE_TOOLS_ENABLED=false
 
 ## 🔄 统一工具的优势
 
-### 1. 自动识别股票类型
+### 1. 自动识别期货品种类型
 ```python
 market_info = StockUtils.get_market_info(ticker)
 is_china = market_info['is_china']
@@ -332,7 +332,7 @@ is_us = market_info['is_us']
 ### 解决方案
 - **移除 `online_tools` 配置判断**
 - **统一使用统一工具**（`get_stock_fundamentals_unified`, `get_stock_market_data_unified`, `get_stock_sentiment_unified`）
-- **统一工具内部自动处理**股票类型识别、数据源选择、数据整合
+- **统一工具内部自动处理**期货品种类型识别、数据源选择、数据整合
 
 ### 效果
 - ✅ 解决死循环问题

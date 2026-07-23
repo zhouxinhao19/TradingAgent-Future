@@ -180,7 +180,7 @@ print(versions)  # ['1.0', '1.1', '1.2']
 ## 🔑 关键变量
 
 所有模版支持以下变量：
-- `{ticker}` - 股票代码
+- `{ticker}` - 品种代码
 - `{company_name}` - 公司名称
 - `{market_name}` - 市场名称
 - `{currency_name}` - 货币名称

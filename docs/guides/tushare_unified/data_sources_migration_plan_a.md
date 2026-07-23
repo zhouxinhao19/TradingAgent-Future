@@ -52,7 +52,7 @@ import pandas as pd
 import logging
 
 class BaseStockDataProvider(ABC):
-    """统一的股票数据提供器基类"""
+    """统一的期货数据提供器基类"""
     
     def __init__(self, name: str = None):
         self.name = name or self.__class__.__name__
@@ -74,12 +74,12 @@ class BaseStockDataProvider(ABC):
     # 核心数据接口 (必须实现)
     @abstractmethod
     async def get_stock_list(self, market: str = None) -> Optional[List[Dict[str, Any]]]:
-        """获取股票列表"""
+        """获取期货品种列表"""
         pass
     
     @abstractmethod
     async def get_stock_basic_info(self, symbol: str = None) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]:
-        """获取股票基础信息"""
+        """获取期货品种基础信息"""
         pass
     
     @abstractmethod
@@ -107,7 +107,7 @@ class BaseStockDataProvider(ABC):
     
     # 数据标准化 (统一实现)
     def standardize_basic_info(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
-        """标准化股票基础信息"""
+        """标准化期货品种基础信息"""
         # 统一的标准化逻辑
         pass
     
@@ -196,7 +196,7 @@ class DataSourceManager:
         return None
     
     async def get_stock_basic_info(self, symbol: str = None, source: str = None):
-        """获取股票基础信息"""
+        """获取期货品种基础信息"""
         return await self.get_data('get_stock_basic_info', source, symbol=symbol)
     
     async def get_stock_quotes(self, symbol: str, source: str = None):
@@ -289,7 +289,7 @@ from app.services.stock_data_service import get_stock_data_service
 from app.core.database import get_mongo_db
 
 class UnifiedStockDataSyncService:
-    """统一股票数据同步服务"""
+    """统一期货数据同步服务"""
     
     def __init__(self):
         self.data_manager = DataSourceManager()
@@ -311,7 +311,7 @@ class UnifiedStockDataSyncService:
         start_time = datetime.now()
         
         try:
-            # 同步股票基础信息
+            # 同步期货品种基础信息
             await self.sync_basic_info(source)
             
             # 同步实时行情
@@ -331,15 +331,15 @@ class UnifiedStockDataSyncService:
             return False
     
     async def sync_basic_info(self, source: str = None):
-        """同步股票基础信息"""
-        self.logger.info("📊 开始同步股票基础信息...")
+        """同步期货品种基础信息"""
+        self.logger.info("📊 开始同步期货品种基础信息...")
         
         try:
-            # 从数据源获取股票列表
+            # 从数据源获取期货品种列表
             stock_list = await self.data_manager.get_stock_basic_info(source=source)
             
             if not stock_list:
-                self.logger.warning("⚠️ 未获取到股票基础信息")
+                self.logger.warning("⚠️ 未获取到期货品种基础信息")
                 return
             
             # 确保是列表格式
@@ -360,23 +360,23 @@ class UnifiedStockDataSyncService:
                 # 避免API限制
                 await asyncio.sleep(0.1)
             
-            self.logger.info(f"✅ 股票基础信息同步完成: {self.sync_stats['basic_info']['success']}/{self.sync_stats['basic_info']['total']}")
+            self.logger.info(f"✅ 期货品种基础信息同步完成: {self.sync_stats['basic_info']['success']}/{self.sync_stats['basic_info']['total']}")
             
         except Exception as e:
-            self.logger.error(f"❌ 股票基础信息同步失败: {e}")
+            self.logger.error(f"❌ 期货品种基础信息同步失败: {e}")
     
     async def sync_realtime_quotes(self, source: str = None):
         """同步实时行情"""
         self.logger.info("📈 开始同步实时行情...")
         
         try:
-            # 获取需要同步的股票代码列表
+            # 获取需要同步的品种代码列表
             db = get_mongo_db()
             cursor = db.stock_basic_info.find({}, {"code": 1})
             stock_codes = [doc["code"] async for doc in cursor]
             
             if not stock_codes:
-                self.logger.warning("⚠️ 未找到需要同步行情的股票")
+                self.logger.warning("⚠️ 未找到需要同步行情的期货品种")
                 return
             
             self.sync_stats['quotes']['total'] = len(stock_codes)

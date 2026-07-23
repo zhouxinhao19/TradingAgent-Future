@@ -50,13 +50,13 @@ src/
 
 ## 关键页面
 - Dashboard: 概览与快捷入口
-- Screening: 选股与多选
+- Screening: 选品种与多选
 - BatchAnalysis: 批量提交与参数配置
 - QueuePanel: 队列状态与任务操作
 - History: 历史记录与报告
 
 ## 组件建议
-- StockSelector: 股票搜索与多选
+- StockSelector: 期货品种搜索与多选
 - BatchUploader: 文本域+CSV上传
 - ProgressBar: 可订阅SSE的进度条
 - TaskList: 任务列表

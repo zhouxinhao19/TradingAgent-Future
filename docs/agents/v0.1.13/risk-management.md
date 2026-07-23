@@ -30,7 +30,7 @@ def risk_node(state):
 
 ```python
 class AgentState:
-    company_of_interest: str      # 股票代码
+    company_of_interest: str      # 品种代码
     trade_date: str              # 交易日期
     fundamentals_report: str     # 基本面报告
     market_report: str           # 市场分析报告
@@ -61,11 +61,11 @@ def create_safe_debator(llm):
         company_name = state["company_of_interest"]
         trader_recommendation = state.get("trader_recommendation", "")
         
-        # 获取股票市场信息
+        # 获取期货市场信息
         from tradingagents.utils.stock_utils import StockUtils
         market_info = StockUtils.get_market_info(company_name)
         
-        # 确定股票类型和货币信息
+        # 确定期货品种类型和货币信息
         if market_info.get("is_china"):
             stock_type = "A股"
             currency_unit = "人民币"
@@ -90,7 +90,7 @@ def create_safe_debator(llm):
         作为安全/保守风险分析师，请对以下投资决策进行风险评估：
         
         公司名称: {company_name}
-        股票类型: {stock_type}
+        期货品种类型: {stock_type}
         货币单位: {currency_unit}
         
         交易员建议: {trader_recommendation}
@@ -201,7 +201,7 @@ risk_config = {
 ```python
 # 风险管理活动日志
 logger.info(f"🛡️ [风险管理] 开始风险评估: {company_name}")
-logger.info(f"📊 [风险分析] 股票类型: {stock_type}, 货币: {currency_unit}")
+logger.info(f"📊 [风险分析] 期货品种类型: {stock_type}, 货币: {currency_unit}")
 logger.debug(f"⚠️ [风险因素] 识别到 {len(risk_factors)} 个风险因素")
 logger.warning(f"🚨 [风险预警] 发现高风险因素: {high_risk_factors}")
 logger.info(f"✅ [风险评估] 风险分析完成，风险等级: {risk_level}")
@@ -277,7 +277,7 @@ new_risk_analyst = create_new_risk_analyst(llm)
 1. **风险分析失败**
    - 检查输入数据完整性
    - 验证LLM连接状态
-   - 确认股票市场信息获取
+   - 确认期货市场信息获取
    - 检查日志记录
 
 2. **风险评估不准确**

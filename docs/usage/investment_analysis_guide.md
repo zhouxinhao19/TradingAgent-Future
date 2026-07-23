@@ -2,7 +2,7 @@
 
 ## 🎯 概述
 
-TradingAgents-CN 是一个基于多智能体大语言模型的投资分析框架，能够为您提供专业的股票分析报告。
+TradingAgents-CN 是一个基于多智能体大语言模型的投资分析框架，能够为您提供专业的期货分析报告。
 
 ## 🚀 快速开始
 
@@ -92,15 +92,15 @@ python examples/dashscope/demo_dashscope_simple.py
 
 ```python
 # 在 demo_dashscope_chinese.py 中修改
-STOCK_SYMBOL = "TSLA"  # 改为您想分析的股票
+STOCK_SYMBOL = "TSLA"  # 改为您想分析的期货品种
 ANALYSIS_DATE = "2024-06-26"  # 修改分析日期
 ```
 
-### 支持的股票代码
+### 支持的品种代码
 
 - **美股**: AAPL, TSLA, MSFT, GOOGL, AMZN, NVDA 等
 - **指数**: SPY, QQQ, DIA 等ETF
-- **其他**: 大部分在美国交易所上市的股票
+- **其他**: 大部分在美国交易所上市的期货品种
 
 ## 🎯 使用技巧
 
@@ -166,7 +166,7 @@ python -m cli.main examples
 
 ### 批量分析
 
-您可以修改程序来分析多只股票：
+您可以修改程序来分析多只期货品种：
 
 ```python
 stocks = ["AAPL", "MSFT", "GOOGL", "TSLA"]

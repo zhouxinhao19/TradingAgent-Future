@@ -2,7 +2,7 @@
 
 ## 📊 迁移概述
 
-本次迁移成功将TradingAgents项目中的TongDaXin (TDX)数据源替换为Tushare数据源，提供更稳定、更高质量的中国A股数据服务。
+本次迁移成功将TradingAgents项目中的TongDaXin (TDX)数据源替换为Tushare数据源，提供更稳定、更高质量的中国期货数据服务。
 
 ## 🎯 迁移目标
 
@@ -25,15 +25,15 @@
 ### 1. 新增核心组件
 
 #### 数据源管理器 (`data_source_manager.py`)
-- **DataSourceManager类**: 统一管理所有中国股票数据源
+- **DataSourceManager类**: 统一管理所有中国期货数据源
 - **ChinaDataSource枚举**: 定义支持的数据源类型
 - **自动数据源检测**: 检查可用的数据源
 - **智能备用机制**: 主数据源失败时自动切换
 - **配置管理**: 从环境变量读取默认数据源
 
 #### 统一接口函数
-- `get_china_stock_data_unified()`: 统一股票数据获取
-- `get_china_stock_info_unified()`: 统一股票信息获取
+- `get_china_stock_data_unified()`: 统一期货数据获取
+- `get_china_stock_info_unified()`: 统一期货品种信息获取
 - `switch_china_data_source()`: 动态切换数据源
 - `get_current_china_data_source()`: 查询当前数据源
 
@@ -151,10 +151,10 @@ from tradingagents.dataflows import (
     get_china_stock_info_unified
 )
 
-# 获取股票数据（自动使用Tushare）
+# 获取期货数据（自动使用Tushare）
 data = get_china_stock_data_unified("000001", "2024-01-01", "2024-12-31")
 
-# 获取股票信息
+# 获取期货品种信息
 info = get_china_stock_info_unified("000001")
 ```
 

@@ -1,6 +1,6 @@
 # 🚀 TradingAgents-CN 演示环境快速部署指南
 
-> 使用 Docker Compose 部署完整的 AI 股票分析系统
+> 使用 Docker Compose 部署完整的 AI 期货分析系统
 
 ## 📋 目录
 
@@ -17,7 +17,7 @@
 
 ## 🎯 系统简介
 
-**TradingAgents-CN** 是一个基于多智能体架构的 AI 股票分析系统，支持：
+**TradingAgents-CN** 是一个基于多智能体架构的 AI 期货分析系统，支持：
 
 - 🤖 **15+ AI 模型**：集成国内外主流大语言模型
 - 📊 **多维度分析**：基本面、技术面、新闻分析、社媒分析
@@ -113,7 +113,7 @@
 | 7 | 下载 Nginx 配置 | 反向代理配置，统一访问入口 | ✅ 必须 | 10 秒 |
 | **第三阶段：配置系统** | | | | |
 | 8 | 配置 API 密钥 | 配置 LLM 模型的 API 密钥（如阿里百炼、DeepSeek） | ✅ 必须 | 2-5 分钟 |
-| 9 | 配置数据源 | 配置股票数据源（Tushare Token 或使用 AKShare） | ⚠️ 可选 | 2 分钟 |
+| 9 | 配置数据源 | 配置期货数据源（Tushare Token 或使用 AKShare） | ⚠️ 可选 | 2 分钟 |
 | **第四阶段：启动服务** | | | | |
 | 10 | 拉取镜像 | 从 Docker Hub 下载所有服务的镜像 | ✅ 必须 | 2-5 分钟 |
 | 11 | 启动容器 | 启动所有服务（前端/后端/MongoDB/Redis/Nginx） | ✅ 必须 | 30-60 秒 |
@@ -626,7 +626,7 @@ notepad .env
 #   将等号后面改为你的 API Key，例如：DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxx
 #
 # 其他可选配置：
-#   - TUSHARE_TOKEN=你的Tushare Token（可选，用于获取更全面的股票数据，注册地址：https://tushare.pro/weborder/#/login?reg=tacn）
+#   - TUSHARE_TOKEN=你的Tushare Token（可选，用于获取更全面的期货数据，注册地址：https://tushare.pro/weborder/#/login?reg=tacn）
 #   - OPENAI_API_KEY=你的OpenAI Key（可选）
 #
 # 配置完成后保存并关闭编辑器
@@ -681,7 +681,7 @@ nano .env
 #   将等号后面改为你的 API Key，例如：DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxx
 #
 # 其他可选配置：
-#   - TUSHARE_TOKEN=你的Tushare Token（可选，用于获取更全面的股票数据，注册地址：https://tushare.pro/weborder/#/login?reg=tacn）
+#   - TUSHARE_TOKEN=你的Tushare Token（可选，用于获取更全面的期货数据，注册地址：https://tushare.pro/weborder/#/login?reg=tacn）
 #   - OPENAI_API_KEY=你的OpenAI Key（可选）
 #
 # 配置完成后保存并退出编辑器（nano: Ctrl+X, Y, Enter；vim: :wq）
@@ -736,7 +736,7 @@ nano .env
 #   将等号后面改为你的 API Key，例如：DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxx
 #
 # 其他可选配置：
-#   - TUSHARE_TOKEN=你的Tushare Token（可选，用于获取更全面的股票数据，注册地址：https://tushare.pro/weborder/#/login?reg=tacn）
+#   - TUSHARE_TOKEN=你的Tushare Token（可选，用于获取更全面的期货数据，注册地址：https://tushare.pro/weborder/#/login?reg=tacn）
 #   - OPENAI_API_KEY=你的OpenAI Key（可选）
 #
 # 配置完成后保存并退出编辑器（nano: Ctrl+X, Y, Enter；vim: :wq）
@@ -1605,7 +1605,7 @@ docker image prune -a
 ✅ 进行系统监控和维护  
 
 **下一步**：
-1. 探索系统功能，运行第一个股票分析
+1. 探索系统功能，运行第一个期货分析
 2. 配置更多 AI 模型，对比分析效果
 3. 自定义分析策略和参数
 4. 集成到你的投资决策流程

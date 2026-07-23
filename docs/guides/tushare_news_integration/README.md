@@ -24,7 +24,7 @@ TradingAgents-CN系统已成功集成Tushare新闻接口，提供了业界领先
    - 新闻去重和时间排序
 
 3. **灵活查询功能**
-   - 个股新闻和市场新闻
+   - 品种新闻和市场新闻
    - 可配置时间范围 (6-72小时)
    - 可指定新闻源
    - 批量获取和单源获取
@@ -47,7 +47,7 @@ market_news = await provider.get_stock_news(
     hours_back=24
 )
 
-# 获取个股新闻
+# 获取品种新闻
 stock_news = await provider.get_stock_news(
     symbol="000001",
     limit=5,
@@ -77,7 +77,7 @@ sina_news = await provider.get_stock_news(
     "category": "market_news",  # company_announcement/market_news/policy_news
     "sentiment": "positive",    # positive/negative/neutral
     "importance": "high",       # high/medium/low
-    "keywords": ["股票", "市场", "投资"],
+    "keywords": ["期货品种", "市场", "投资"],
     "data_source": "tushare",
     "original_source": "sina"
 }
@@ -107,7 +107,7 @@ print(f"同步成功: {stats.successful_saves} 条新闻")
 ### 2. API接口调用
 
 ```bash
-# 获取股票新闻
+# 获取期货品种新闻
 curl -X GET "http://localhost:8000/api/news-data/query/000001?limit=10&hours_back=24"
 
 # 启动新闻同步
@@ -169,7 +169,7 @@ TUSHARE_TOKEN=your_tushare_token_here
 |---------|------|------|
 | **连接测试** | ✅ 通过 | Tushare API连接正常 |
 | **多新闻源** | ✅ 通过 | 4个新闻源全部可用 |
-| **个股新闻** | ✅ 通过 | 基础功能正常 |
+| **品种新闻** | ✅ 通过 | 基础功能正常 |
 | **数据集成** | ❌ 失败 | 需要权限开通 |
 | **功能特性** | ✅ 通过 | 智能分析功能正常 |
 
@@ -319,4 +319,4 @@ await cache.set(cache_key, news, expire=3600)  # 1小时缓存
 
 **Tushare新闻接口已成功集成到TradingAgents-CN系统！** 🎉
 
-通过多新闻源支持、智能数据处理和完整的系统集成，为您的股票投资分析提供强大的新闻数据支持。
+通过多新闻源支持、智能数据处理和完整的系统集成，为您的期货投资分析提供强大的新闻数据支持。

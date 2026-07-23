@@ -74,7 +74,7 @@ from tradingagents.llm_adapters.openai_compatible_base import create_openai_comp
 
 @tool
 def get_stock_price(symbol: str) -> str:
-    return f"股票 {symbol} 的当前价格是 $150.00"
+    return f"期货品种 {symbol} 的当前价格是 $150.00"
 
 llm = create_openai_compatible_llm(provider="qianfan", model="ernie-3.5-8k")
 llm_tools = llm.bind_tools([get_stock_price])

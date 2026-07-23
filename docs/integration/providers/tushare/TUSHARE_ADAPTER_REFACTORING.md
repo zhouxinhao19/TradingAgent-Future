@@ -89,7 +89,7 @@ def _save_to_cache(self, symbol, data, start_date, end_date):
         self.cache_manager.save_stock_data(symbol, data, start_date, end_date)
 
 def _format_stock_data_response(self, data, symbol, stock_name, start_date, end_date):
-    """格式化股票数据响应"""
+    """格式化期货数据响应"""
     # 统一的数据格式化逻辑
     ...
 

@@ -397,7 +397,7 @@ class UnifiedConfigManager:
                 endpoint="https://finnhub.io/api/v1",
                 enabled=True,
                 priority=3,
-                description="Finnhub股票数据接口"
+                description="Finnhub数据接口"
             )
             data_sources.append(finnhub_config)
 

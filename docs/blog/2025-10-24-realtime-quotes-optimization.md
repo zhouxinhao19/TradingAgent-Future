@@ -169,7 +169,7 @@ def _apply_source_priority(self, records: List[Dict], market: str = "A") -> List
 
 **提交记录**：
 - `3f009da` - opt: 优化 AkShare 批量获取实时行情，避免频率限制
-- `3915f5e` - fix: 支持带前缀的股票代码匹配，增强批量获取兼容性
+- `3915f5e` - fix: 支持带前缀的品种代码匹配，增强批量获取兼容性
 - `3193107` - opt: 降低 AkShare 实时行情同步频率，避免被封
 
 **问题背景**：
@@ -178,7 +178,7 @@ def _apply_source_priority(self, records: List[Dict], market: str = "A") -> List
    - 原有代码每次获取全市场行情
    - 单次请求数据量大，容易触发限流
 
-2. **股票代码匹配问题**
+2. **品种代码匹配问题**
    - 部分代码带前缀（如 `SH600000`）
    - 部分代码不带前缀（如 `600000`）
    - 导致批量获取失败
@@ -201,7 +201,7 @@ def get_realtime_quotes_batch(self, codes: List[str]) -> Dict[str, Dict]:
     # 获取全市场行情
     all_quotes = self.get_realtime_quotes()
 
-    # 筛选指定股票
+    # 筛选指定期货品种
     result = {}
     for code in normalized_codes:
         if code in all_quotes:
@@ -211,7 +211,7 @@ def get_realtime_quotes_batch(self, codes: List[str]) -> Dict[str, Dict]:
 ```
 
 **效果**：
-- ✅ 支持带前缀的股票代码
+- ✅ 支持带前缀的品种代码
 - ✅ 提高批量获取成功率
 - ✅ 降低被封 IP 风险
 
@@ -715,7 +715,7 @@ name = stock_dict.get("name")
 
 1. **任务手动触发功能不支持暂停任务**
 2. **历史数据同步存在问题**
-   - 股票列表查询条件不正确
+   - 期货品种列表查询条件不正确
    - 每次全量同步，导致数据重复
 3. **财务数据同步问题**
    - 只同步季报，缺少年报
@@ -757,7 +757,7 @@ scheduler.add_job(
     run_akshare_basic_info_sync,
     CronTrigger.from_crontab(settings.AKSHARE_BASIC_INFO_SYNC_CRON, timezone=settings.TIMEZONE),
     id="akshare_basic_info_sync",
-    name="股票基础信息同步（AKShare）",  # ← 新增友好名称
+    name="期货品种基础信息同步（AKShare）",  # ← 新增友好名称
     kwargs={"force_update": False}
 )
 ```
@@ -1041,7 +1041,7 @@ now = datetime.now(tz)  # 配置时区时间
 
 #### 实时行情优化（5 commits）
 - `3f009da` - opt: 优化 AkShare 批量获取实时行情，避免频率限制
-- `3915f5e` - fix: 支持带前缀的股票代码匹配，增强批量获取兼容性
+- `3915f5e` - fix: 支持带前缀的品种代码匹配，增强批量获取兼容性
 - `3193107` - opt: 降低 AkShare 实时行情同步频率，避免被封
 - `ebb9197` - feat: 优化实时行情入库服务 - 智能频率控制和接口轮换
 - `bd4c976` - docs: 添加实时行情入库服务配置文档和优化总结

@@ -36,8 +36,8 @@
 ```python
 # 第289-292行
 if toolkit.config["online_tools"]:
-    # 使用统一的市场数据工具，工具内部会自动识别股票类型
-    logger.info(f"📊 [市场分析师] 使用统一市场数据工具，自动识别股票类型")
+    # 使用统一的市场数据工具，工具内部会自动识别期货品种类型
+    logger.info(f"📊 [市场分析师] 使用统一市场数据工具，自动识别期货品种类型")
     tools = [toolkit.get_stock_market_data_unified]
 ```
 

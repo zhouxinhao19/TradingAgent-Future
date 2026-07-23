@@ -119,7 +119,7 @@ async def get_stock_basic_info(
     """
     获取股票基础信息
     Args:
-        symbol: 6位股票代码
+        symbol: 6位品种代码
         source: 数据源 (tushare/akshare/baostock/multi_source)
                 默认优先级：tushare > multi_source > akshare > baostock
     """
@@ -661,7 +661,7 @@ onMounted(() => {
 **改进内容**：
 
 ```typescript
-// 统一格式：TradingAgents_报告类型_股票代码_日期时间.pdf
+// 统一格式：TradingAgents_报告类型_品种代码_日期时间.pdf
 const filename = `TradingAgents_${reportType}_${stockCode}_${timestamp}.pdf`
 
 // 示例
@@ -680,7 +680,7 @@ const filename = `TradingAgents_${reportType}_${stockCode}_${timestamp}.pdf`
 # 多层降级策略
 # 1. 从 stock_basic_info 获取
 # 2. 从 market_quotes 获取
-# 3. 使用股票代码作为后备
+# 3. 使用品种代码作为后备
 ```
 
 ---

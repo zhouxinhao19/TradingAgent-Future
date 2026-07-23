@@ -115,11 +115,11 @@ const checkFirstTimeSetup = async () => {
 
 ### 步骤 3：数据源配置
 
-选择股票数据源：
+选择期货数据源：
 
 **支持的数据源**:
 - **AKShare**（推荐，免费无需密钥）
-- **Tushare**（专业A股数据，需要 Token）
+- **Tushare**（专业期货数据，需要 Token）
 - **FinnHub**（美股数据，需要 API Key）
 
 **配置项**:

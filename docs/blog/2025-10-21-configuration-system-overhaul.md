@@ -45,7 +45,7 @@
 **1.2 数据源配置测试 (commit: 13b13f5)**
 - ✅ **Tushare**: 真实调用交易日历接口
 - ✅ **AKShare**: 真实调用实时行情接口
-- ✅ **Yahoo Finance**: 真实调用股票数据接口
+- ✅ **Yahoo Finance**: 真实调用期货数据接口
 - ✅ **Alpha Vantage**: 验证 API Key 有效性
 - ✅ 其他数据源：基本的端点连接测试
 
@@ -279,7 +279,7 @@ MongoDB 集合结构：
 # 基础信息字段
 {
     "symbol": str,           # 统一代码格式
-    "name": str,             # 股票名称
+    "name": str,             # 期货品种名称
     "market": str,           # 市场标识（CN/HK/US）
     "list_date": datetime,   # 上市日期
     "industry": str,         # 行业分类

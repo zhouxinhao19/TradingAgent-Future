@@ -379,7 +379,7 @@ class SignalProcessor:
     def process_signal(self, full_signal: str, stock_symbol: str = None) -> dict:
         """处理完整的交易信号以提取结构化决策信息"""
         
-        # 检测股票类型和货币
+        # 检测期货品种类型和货币
         from tradingagents.utils.stock_utils import StockUtils
         market_info = StockUtils.get_market_info(stock_symbol)
         

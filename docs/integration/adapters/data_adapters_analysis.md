@@ -120,7 +120,7 @@ app/services/data_sources/
 - 包含数据一致性检查功能
 
 **使用者**:
-- `app/routers/stocks.py` - 股票数据路由
+- `app/routers/stocks.py` - 期货数据路由
 - `app/services/quotes_ingestion_service.py` - 行情数据摄取服务
 
 **代码示例**:
@@ -161,7 +161,7 @@ df, source = manager.get_stock_list_with_fallback()  # 同步调用，返回Data
    - 需要数据源优先级管理
    
 2. **基础信息同步服务** (`multi_source_basics_sync_service.py`)
-   - 定时任务中的股票基础信息同步
+   - 定时任务中的期货品种基础信息同步
    - 需要数据源降级和容错
 
 ### `data_sources/` 使用场景
@@ -169,7 +169,7 @@ df, source = manager.get_stock_list_with_fallback()  # 同步调用，返回Data
    - 实时行情数据摄取
    - 需要高性能和稳定性
    
-2. **股票数据查询** (`stocks.py`)
+2. **期货数据查询** (`stocks.py`)
    - 前端API调用
    - 需要快速响应
 

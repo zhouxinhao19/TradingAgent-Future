@@ -2,7 +2,7 @@
 
 ## 📋 概述
 
-TradingAgents 采用多智能体协作架构，通过专业分工和结构化流程实现全面的股票分析。本文档详细介绍了系统中的所有分析节点、工具配置以及数据流转过程。
+TradingAgents 采用多智能体协作架构，通过专业分工和结构化流程实现全面的期货分析。本文档详细介绍了系统中的所有分析节点、工具配置以及数据流转过程。
 
 ## 🔄 完整分析流程
 
@@ -126,7 +126,7 @@ graph TD
 **使用工具**:
 ```python
 # 在线工具
-- get_realtime_stock_news         # 实时股票新闻
+- get_realtime_stock_news         # 实时期货品种新闻
 - get_global_news_openai         # 全球新闻 (OpenAI)
 - get_google_news               # Google 新闻
 
@@ -148,10 +148,10 @@ graph TD
 **使用工具**:
 ```python
 # 在线工具
-- get_stock_news_openai          # 股票新闻情绪 (OpenAI)
+- get_stock_news_openai          # 期货品种新闻情绪 (OpenAI)
 
 # 离线工具
-- get_reddit_stock_info          # Reddit 股票讨论
+- get_reddit_stock_info          # Reddit 期货品种讨论
 - get_chinese_social_sentiment   # 中国社交媒体情绪
 ```
 
@@ -271,13 +271,13 @@ graph TD
 
 #### 智能路由
 ```python
-# 自动识别股票类型并路由到最佳数据源
+# 自动识别期货品种类型并路由到最佳数据源
 get_stock_market_data_unified(ticker, start_date, end_date)
 get_stock_fundamentals_unified(ticker, start_date, end_date)
 ```
 
 #### 数据源映射
-| 股票类型 | 市场数据 | 基本面数据 | 新闻数据 |
+| 期货品种类型 | 市场数据 | 基本面数据 | 新闻数据 |
 |---------|---------|-----------|---------|
 | **A股** | Tushare + AKShare | Tushare + AKShare | 财联社 + 新浪财经 |
 | **港股** | AKShare + Yahoo | AKShare | Google News |
@@ -316,7 +316,7 @@ LLM并不会调用ToolNode中的所有工具，而是基于以下逻辑智能选
 #### 2️⃣ 工具描述的匹配度
 | 工具名称 | 描述 | 参数复杂度 | 匹配度 |
 |---------|------|-----------|--------|
-| `get_stock_market_data_unified` | **统一的股票市场数据工具，自动识别股票类型** | 简单(3个参数) | ⭐⭐⭐⭐⭐ |
+| `get_stock_market_data_unified` | **统一的期货市场数据工具，自动识别期货品种类型** | 简单(3个参数) | ⭐⭐⭐⭐⭐ |
 | `get_YFin_data_online` | Retrieve stock price data from Yahoo Finance | 简单(3个参数) | ⭐⭐⭐ |
 | `get_stockstats_indicators_report_online` | Retrieve stock stats indicators | 复杂(4个参数) | ⭐⭐ |
 
@@ -337,7 +337,7 @@ get_stockstats_indicators_report_online(symbol, indicator, curr_date, look_back_
 ### 🔍 LLM的决策过程
 
 ```
-1. 任务理解: "需要对股票进行技术分析"
+1. 任务理解: "需要对期货品种进行技术分析"
 2. 工具扫描: 查看可用的5个工具
 3. 描述匹配: "统一工具"最符合"全面分析"需求
 4. 指令遵循: 系统提示明确要求调用unified工具
@@ -359,13 +359,13 @@ ToolNode中的多个工具形成**分层备用体系**：
 
 ### 📊 实际调用验证
 
-**A股分析日志示例**:
+**期货分析日志示例**:
 ```
 📊 [DEBUG] 选择的工具: ['get_stock_market_data_unified']
 📊 [市场分析师] 工具调用: ['get_stock_market_data_unified']
-📈 [统一市场工具] 分析股票: 000858
-📈 [统一市场工具] 股票类型: 中国A股
-🇨🇳 [统一市场工具] 处理A股市场数据...
+📈 [统一市场工具] 分析期货品种: 000858
+📈 [统一市场工具] 期货品种类型: 中国A股
+🇨🇳 [统一市场工具] 处理期货市场数据...
 ```
 
 **结论**: LLM实际只调用1个工具，而非所有5个工具！
@@ -429,18 +429,18 @@ else:
 
 **正常情况（3轮）**:
 ```
-📊 [模块开始] fundamentals_analyst - 股票: 000858
+📊 [模块开始] fundamentals_analyst - 期货品种: 000858
 📊 [基本面分析师] 工具调用: ['get_stock_fundamentals_unified']  # 第1轮：决定调用工具
-📊 [统一基本面工具] 分析股票: 000858                           # 第2轮：执行工具
+📊 [统一基本面工具] 分析期货品种: 000858                           # 第2轮：执行工具
 📊 [模块完成] fundamentals_analyst - ✅ 成功 - 耗时: 45.32s    # 第3轮：生成报告
 ```
 
 **强制调用情况（可能更多轮）**:
 ```
-📊 [模块开始] fundamentals_analyst - 股票: 000858
+📊 [模块开始] fundamentals_analyst - 期货品种: 000858
 📊 [DEBUG] 检测到模型未调用工具，启用强制工具调用模式          # 第1轮：LLM未调用工具
 📊 [DEBUG] 强制调用 get_stock_fundamentals_unified...        # 第2轮：强制调用工具
-📊 [统一基本面工具] 分析股票: 000858                         # 第3轮：执行工具
+📊 [统一基本面工具] 分析期货品种: 000858                         # 第3轮：执行工具
 📊 [基本面分析师] 强制工具调用完成，报告长度: 1847            # 第4轮：重新生成报告
 📊 [模块完成] fundamentals_analyst - ✅ 成功 - 耗时: 52.18s  # 完成
 ```
@@ -585,9 +585,9 @@ fundamentals = toolkit.get_stock_fundamentals_unified.invoke({
 
 ### 工具调用日志示例
 ```
-📊 [模块开始] market_analyst - 股票: 000858
+📊 [模块开始] market_analyst - 期货品种: 000858
 📊 [市场分析师] 工具调用: ['get_stock_market_data_unified']
-📊 [统一市场工具] 检测到A股代码: 000858
+📊 [统一市场工具] 检测到品种代码: 000858
 📊 [统一市场工具] 使用Tushare数据源
 📊 [模块完成] market_analyst - ✅ 成功 - 耗时: 41.73s
 ```
@@ -604,10 +604,10 @@ A:
 - **全面分析**: market + fundamentals + news + social
 
 ### Q: 统一工具如何选择数据源？
-A: 系统自动识别股票代码格式：
-- 6位数字 → A股 → Tushare/AKShare
-- .HK后缀 → 港股 → AKShare/Yahoo
-- 字母代码 → 美股 → FinnHub/Yahoo
+A: 系统自动识别品种代码格式：
+- 6位数字 → 国内期货 → Tushare/AKShare
+- .HK后缀 → 国际期货 → AKShare/Yahoo
+- 字母代码 → 国际期货 → FinnHub/Yahoo
 
 ### Q: 分析时间过长怎么办？
 A:

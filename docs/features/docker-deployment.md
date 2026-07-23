@@ -31,7 +31,7 @@ TradingAgents-CN 提供了完整的Docker容器化部署方案，支持一键启
 1. **🌐 TradingAgents-Web**
    - Streamlit Web应用
    - 端口: 8501
-   - 功能: 股票分析、报告导出
+   - 功能: 期货分析、报告导出
 
 2. **🗄️ MongoDB**
    - 数据持久化存储

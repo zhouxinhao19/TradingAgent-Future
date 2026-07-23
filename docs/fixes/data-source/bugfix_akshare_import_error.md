@@ -2,7 +2,7 @@
 
 ## 📋 问题描述
 
-在股票分析过程中，新闻获取模块出现以下错误：
+在期货分析过程中，新闻获取模块出现以下错误：
 
 ```
 ModuleNotFoundError: No module named 'tradingagents.dataflows.news.akshare_utils'
@@ -67,10 +67,10 @@ cursor = collection.find(query).sort('publish_time', -1).limit(max_news)
 ```python
 def get_stock_news_sync(self, symbol: str = None, limit: int = 10) -> Optional[pd.DataFrame]:
     """
-    获取股票新闻（同步版本，返回原始 DataFrame）
+    获取期货品种新闻（同步版本，返回原始 DataFrame）
 
     Args:
-        symbol: 股票代码，为None时获取市场新闻
+        symbol: 品种代码，为None时获取市场新闻
         limit: 返回数量限制
 
     Returns:
@@ -83,13 +83,13 @@ def get_stock_news_sync(self, symbol: str = None, limit: int = 10) -> Optional[p
         import akshare as ak
 
         if symbol:
-            # 获取个股新闻
-            self.logger.debug(f"📰 获取AKShare个股新闻: {symbol}")
+            # 获取品种新闻
+            self.logger.debug(f"📰 获取AKShare品种新闻: {symbol}")
 
-            # 标准化股票代码
+            # 标准化品种代码
             symbol_6 = symbol.zfill(6)
 
-            # 获取东方财富个股新闻
+            # 获取东方财富品种新闻
             news_df = ak.stock_news_em(symbol=symbol_6)
 
             if news_df is not None and not news_df.empty:
@@ -299,10 +299,10 @@ from tradingagents.dataflows.providers.china.akshare import AKShareProvider
 # 创建 Provider 实例
 provider = AKShareProvider()
 
-# 获取个股新闻（同步版本）
+# 获取品种新闻（同步版本）
 news_df = provider.get_stock_news_sync(symbol="600519", limit=10)
 
-# 获取个股新闻（异步版本）
+# 获取品种新闻（异步版本）
 news_list = await provider.get_stock_news(symbol="600519", limit=10)
 ```
 
@@ -331,7 +331,7 @@ from tradingagents.dataflows.akshare_utils import get_stock_news_em
 **异步版本** (`get_stock_news`)：
 - 返回：`List[Dict]` 或 `None`
 - 字段：
-  - `symbol`：股票代码
+  - `symbol`：品种代码
   - `title`：新闻标题
   - `content`：新闻内容
   - `summary`：新闻摘要
@@ -344,7 +344,7 @@ from tradingagents.dataflows.akshare_utils import get_stock_news_em
 
 ### 参数说明
 
-- `symbol`：股票代码（6位数字，不带后缀）
+- `symbol`：品种代码（6位数字，不带后缀）
   - A股示例：`"600519"`（贵州茅台）
   - 港股示例：`"00700"`（腾讯控股）
 - `limit`：返回数量限制（默认 10）
@@ -429,7 +429,7 @@ print(news)
 ### 测试 3：完整分析流程
 
 1. **重启后端服务**
-2. **发起股票分析**（如 `600519`）
+2. **发起期货分析**（如 `600519`）
 3. **查看日志**，应该看到：
    ```
    ✅ [新闻分析] 成功创建 AKShare Provider 实例

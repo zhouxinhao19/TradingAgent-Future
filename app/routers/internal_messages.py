@@ -49,7 +49,7 @@ class InternalMessage(BaseModel):
 
 class InternalMessageBatchRequest(BaseModel):
     """批量保存内部消息请求"""
-    symbol: str = Field(..., description="股票代码")
+    symbol: str = Field(..., description="品种代码")
     messages: List[InternalMessage] = Field(..., description="内部消息列表")
 
 
@@ -169,7 +169,7 @@ async def get_latest_messages(
 @router.get("/search", response_model=dict)
 async def search_messages(
     query: str = Query(..., description="搜索关键词"),
-    symbol: Optional[str] = Query(None, description="股票代码"),
+    symbol: Optional[str] = Query(None, description="品种代码"),
     access_level: Optional[str] = Query(None, description="访问级别"),
     limit: int = Query(50, ge=1, le=200, description="返回数量")
 ):
@@ -242,7 +242,7 @@ async def get_analyst_notes(
 
 @router.get("/statistics", response_model=dict)
 async def get_statistics(
-    symbol: Optional[str] = Query(None, description="股票代码"),
+    symbol: Optional[str] = Query(None, description="品种代码"),
     hours_back: int = Query(24, ge=1, le=168, description="回溯小时数")
 ):
     """获取内部消息统计信息"""

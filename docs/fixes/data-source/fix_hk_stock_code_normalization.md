@@ -2,7 +2,7 @@
 
 ## 问题描述
 
-用户反馈：分析港股 `00700`（腾讯控股）时，Yahoo Finance 返回错误：
+用户反馈：分析国际期货 `00700`（腾讯控股）时，Yahoo Finance 返回错误：
 
 ```
 ERROR | $00700.HK: possibly delisted; no price data found (1d 2025-09-13 -> 2025-10-13)
@@ -77,7 +77,7 @@ Yahoo Finance 对港股代码的格式要求：
 
 ### 为什么会有两套逻辑？
 
-1. **`stock_validator.py`**：用于验证阶段，确保股票代码存在
+1. **`stock_validator.py`**：用于验证阶段，确保品种代码存在
 2. **`hk_stock.py`**：用于数据获取阶段，从 Yahoo Finance 获取数据
 
 两个模块独立开发，没有统一标准化逻辑，导致不一致。

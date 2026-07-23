@@ -1,14 +1,14 @@
 # Tushare数据源集成指南
 
-本指南介绍如何在TradingAgents中集成和使用Tushare数据源，获取高质量的中国A股市场数据。
+本指南介绍如何在TradingAgents中集成和使用Tushare数据源，获取高质量的中国期货市场数据。
 
 ## 📊 Tushare简介
 
-Tushare是一个免费、开源的Python财经数据接口包，主要实现对股票等金融数据从数据采集、清洗加工到数据存储的过程，能够为金融分析人员提供快速、整洁、和多样的便于分析的数据。
+Tushare是一个免费、开源的Python财经数据接口包，主要实现对期货品种等金融数据从数据采集、清洗加工到数据存储的过程，能够为金融分析人员提供快速、整洁、和多样的便于分析的数据。
 
 ### 主要特点
 
-- **数据全面**: 覆盖股票、基金、期货、债券等多种金融产品
+- **数据全面**: 覆盖期货品种、基金、期货、债券等多种金融产品
 - **数据质量高**: 数据来源权威，经过清洗和验证
 - **更新及时**: 提供实时和历史数据
 - **接口简单**: Python原生接口，易于使用
@@ -37,7 +37,7 @@ pip install tushare>=1.4.21
 # Tushare API Token
 TUSHARE_TOKEN=your_tushare_token_here
 
-# 设置默认A股数据源为Tushare
+# 设置默认数据源为Tushare
 DEFAULT_CHINA_DATA_SOURCE=tushare
 
 # 启用数据缓存
@@ -60,7 +60,7 @@ python tests/test_tushare_integration.py
 # 启动CLI
 python -m cli.main
 
-# 选择分析中国股票
+# 选择分析中国期货品种
 # 系统会自动使用Tushare数据源
 ```
 
@@ -70,7 +70,7 @@ python -m cli.main
 # 启动Web界面
 python -m streamlit run web/app.py
 
-# 在配置页面选择Tushare作为A股数据源
+# 在配置页面选择Tushare作为数据源
 ```
 
 ### API接口
@@ -83,16 +83,16 @@ from tradingagents.dataflows import (
     get_china_stock_info_tushare
 )
 
-# 获取股票历史数据
+# 获取期货品种历史数据
 data = get_china_stock_data_tushare("000001", "2024-01-01", "2024-12-31")
 
-# 搜索股票
+# 搜索期货品种
 results = search_china_stocks_tushare("平安银行")
 
 # 获取基本面数据
 fundamentals = get_china_stock_fundamentals_tushare("000001")
 
-# 获取股票基本信息
+# 获取期货品种基本信息
 info = get_china_stock_info_tushare("000001")
 ```
 
@@ -104,13 +104,13 @@ from tradingagents.dataflows.tushare_adapter import get_tushare_adapter
 # 获取适配器实例
 adapter = get_tushare_adapter()
 
-# 获取股票数据
+# 获取期货数据
 data = adapter.get_stock_data("000001", "2024-01-01", "2024-12-31")
 
-# 获取股票信息
+# 获取期货品种信息
 info = adapter.get_stock_info("000001")
 
-# 搜索股票
+# 搜索期货品种
 results = adapter.search_stocks("平安")
 
 # 获取基本面数据
@@ -163,10 +163,10 @@ AUTO_FALLBACK_ENABLED=true
 
 ## 📊 支持的数据类型
 
-### 1. 股票基础数据
+### 1. 期货品种基础数据
 
-- **股票列表**: 获取所有A股股票基本信息
-- **股票信息**: 股票名称、行业、地区等基本信息
+- **期货品种列表**: 获取所有A股期货品种基本信息
+- **期货品种信息**: 期货品种名称、行业、地区等基本信息
 - **历史行情**: 日线、周线、月线数据
 - **实时行情**: 最新价格和交易数据
 
@@ -180,7 +180,7 @@ AUTO_FALLBACK_ENABLED=true
 ### 3. 市场数据
 
 - **交易日历**: 交易日、节假日信息
-- **股票分类**: 行业分类、概念分类
+- **期货品种分类**: 行业分类、概念分类
 - **指数数据**: 上证指数、深证成指等
 
 ## 🎯 最佳实践
@@ -248,7 +248,7 @@ except Exception as e:
 4. **数据为空**
    ```
    错误: 返回空数据
-   解决: 检查股票代码和日期范围是否正确
+   解决: 检查品种代码和日期范围是否正确
    ```
 
 ### 调试模式
@@ -277,7 +277,7 @@ ENABLE_VERBOSE_LOGGING=true
 
 ### 3. 数据预取
 
-- 预先获取常用股票数据
+- 预先获取常用期货数据
 - 批量获取减少API调用次数
 - 使用异步请求提高效率
 

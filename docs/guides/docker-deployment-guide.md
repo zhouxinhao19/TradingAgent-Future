@@ -2,7 +2,7 @@
 
 ## 📋 概述
 
-TradingAgents-CN v0.1.7 引入了完整的Docker容器化部署方案，让您可以通过一条命令启动完整的股票分析环境。本指南将详细介绍如何使用Docker部署和管理TradingAgents-CN。
+TradingAgents-CN v0.1.7 引入了完整的Docker容器化部署方案，让您可以通过一条命令启动完整的期货分析环境。本指南将详细介绍如何使用Docker部署和管理TradingAgents-CN。
 
 ## 🎯 Docker部署优势
 
@@ -203,17 +203,17 @@ docker-compose ps
 
 | 服务 | 地址 | 用途 |
 |------|------|------|
-| **主应用** | http://localhost:8501 | 股票分析界面 |
+| **主应用** | http://localhost:8501 | 期货分析界面 |
 | **数据库管理** | http://localhost:8081 | MongoDB管理 |
 | **缓存管理** | http://localhost:8082 | Redis管理 |
 
 ## 🎯 使用指南
 
-### 进行股票分析
+### 进行期货分析
 
 1. **访问主界面**: http://localhost:8501
 2. **选择LLM模型**: 推荐DeepSeek V3（成本低）
-3. **输入股票代码**: 
+3. **输入品种代码**: 
    - A股: 000001, 600519, 000858
    - 美股: AAPL, TSLA, MSFT
 4. **选择分析深度**: 快速/标准/深度

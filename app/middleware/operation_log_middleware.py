@@ -196,7 +196,7 @@ class OperationLogMiddleware(BaseHTTPMiddleware):
                 return f"{action_verb}分析任务"
 
         elif "/screening/" in path:
-            return f"{action_verb}股票筛选"
+            return f"{action_verb}筛选"
 
         elif "/config/" in path:
             if "llm" in path:

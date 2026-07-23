@@ -230,7 +230,7 @@ SILICONFLOW_API_KEY=your_siliconflow_api_key_here
 # 数据源API配置
 # ===========================================
 
-# Tushare配置 (A股数据)
+# Tushare配置 (期货数据)
 TUSHARE_TOKEN=your_tushare_token_here
 
 # FinnHub配置 (美股数据)
@@ -384,8 +384,8 @@ start_web.bat
 
 1. **选择LLM提供商**: 在侧边栏选择已配置的LLM提供商
 2. **选择模型**: 根据需要选择具体的模型
-3. **配置分析参数**: 设置分析日期、股票代码等
-4. **开始分析**: 输入股票代码进行测试
+3. **配置分析参数**: 设置分析日期、品种代码等
+4. **开始分析**: 输入品种代码进行测试
 
 ## ✅ 验证安装
 
@@ -417,7 +417,7 @@ python test_data_sources.py
 1. 启动应用后访问 http://localhost:8501
 2. 检查侧边栏是否正常显示
 3. 尝试选择不同的LLM提供商
-4. 输入测试股票代码 (如: AAPL, 000001)
+4. 输入测试品种代码 (如: AAPL, 000001)
 
 ## 🔧 常见问题
 
@@ -473,11 +473,11 @@ lsof -ti:8501 | xargs kill -9
 
 ### 5. 数据获取失败
 ```bash
-# 问题: 无法获取股票数据
+# 问题: 无法获取期货数据
 # 解决方案:
 1. 检查网络连接
 2. 验证数据源API密钥
-3. 检查股票代码格式
+3. 检查品种代码格式
 4. 查看缓存目录: data/cache
 ```
 
@@ -581,7 +581,7 @@ docker-compose logs -f
 
 1. **[快速开始指南](../QUICK_START.md)** - 了解基本使用方法
 2. **[配置管理指南](./config-management-guide.md)** - 深入了解配置选项
-3. **[A股分析指南](./a-share-analysis-guide.md)** - A股市场分析教程
+3. **[期货分析指南](./a-share-analysis-guide.md)** - 期货市场分析教程
 4. **[Docker部署指南](./docker-deployment-guide.md)** - 生产环境部署
 5. **[故障排除指南](../troubleshooting/)** - 常见问题解决方案
 

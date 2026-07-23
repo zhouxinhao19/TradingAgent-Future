@@ -1,4 +1,4 @@
-# 美股 Providers 迁移总结
+# 国际期货 Providers 迁移总结
 
 ## 📋 执行内容
 
@@ -38,7 +38,7 @@ DefaultUSProvider = OptimizedUSDataProvider
 ### 3. 更新导入路径
 
 #### 3.1 `providers/__init__.py`
-- ✅ 添加美股 providers 导入
+- ✅ 添加国际期货 providers 导入
 - ✅ 添加向后兼容的 fallback
 - ✅ 更新 `__all__` 导出列表
 
@@ -167,7 +167,7 @@ Select-String -Path "tradingagents\**\*.py","app\**\*.py" -Pattern "from.*finnhu
 2. **更新文档**: 更新开发文档，说明新的导入路径
 
 ### 长期（第三阶段或第四阶段）
-1. **统一 Provider 接口**: 让所有美股 providers 继承 `BaseStockDataProvider`
+1. **统一 Provider 接口**: 让所有国际期货 providers 继承 `BaseStockDataProvider`
 2. **异步化**: 将同步接口改为异步接口
 3. **标准化方法名**: 统一所有 providers 的方法名
 

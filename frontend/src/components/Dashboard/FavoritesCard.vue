@@ -25,8 +25,8 @@
         class="favorite-item"
         @click="viewFavoriteDetail(item)"
       >
-        <div class="stock-info">
-          <div class="stock-code">
+        <div class="symbol-info">
+          <div class="symbol-code">
             <el-tag
               :type="item.asset_type === 'commodity' ? 'warning' : 'info'"
               size="small"
@@ -41,13 +41,13 @@
             <template v-else>
               {{ item.stock_code }}
             </template>
-            <span class="stock-name">
+            <span class="symbol-name">
               <template v-if="item.asset_type === 'commodity'">{{ extractCommodityCode(item.full_symbol) }}</template>
               <template v-else>{{ item.display_name || item.stock_name || '' }}</template>
             </span>
           </div>
         </div>
-        <div class="stock-price">
+        <div class="symbol-price">
           <div class="current-price">
             {{ formatPrice(item) }}
           </div>
@@ -167,7 +167,7 @@ defineExpose({ reload: () => favoritesStore.loadFavorites(props.loadAssetType ==
 .favorites-card .favorites-list .favorite-item:last-child {
   border-bottom: none;
 }
-.favorites-card .stock-code {
+.favorites-card .symbol-code {
   font-weight: 600;
   font-size: 14px;
   color: var(--el-text-color-primary);
@@ -175,12 +175,12 @@ defineExpose({ reload: () => favoritesStore.loadFavorites(props.loadAssetType ==
   align-items: center;
   gap: 6px;
 }
-.favorites-card .stock-name {
+.favorites-card .symbol-name {
   font-weight: 400;
   font-size: 12px;
   color: var(--el-text-color-regular);
 }
-.favorites-card .stock-price {
+.favorites-card .symbol-price {
   text-align: right;
 }
 .favorites-card .current-price {

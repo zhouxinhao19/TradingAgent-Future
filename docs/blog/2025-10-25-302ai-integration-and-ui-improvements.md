@@ -294,24 +294,24 @@ if "risk_debate_state" in result:
 
 ---
 
-### 6. 自选股功能修复
+### 6. 自选品种功能修复
 
 #### 问题描述
 
-**提交**: `700d923` - fix: 强制使用 user_favorites 集合存储自选股
+**提交**: `700d923` - fix: 强制使用 user_favorites 集合存储自选品种
 
-添加自选股时返回 500 错误。
+添加自选品种时返回 500 错误。
 
 #### 根本原因
 
 1. 数据库中 `users` 集合的 `_id` 字段存储的是字符串类型
 2. `ObjectId.is_valid()` 判断该字符串是有效的 ObjectId 格式
 3. 代码尝试用 `ObjectId()` 转换后查询，但数据库中存的是字符串
-4. `matched_count=0`，导致添加自选股返回 `False`，抛出 500 错误
+4. `matched_count=0`，导致添加自选品种返回 `False`，抛出 500 错误
 
 #### 解决方案
 
-强制使用 `user_favorites` 集合存储自选股：
+强制使用 `user_favorites` 集合存储自选品种：
 ```python
 def _is_valid_object_id(self, user_id: str) -> bool:
     """检查 user_id 是否是有效的 ObjectId 格式"""
@@ -325,8 +325,8 @@ def _is_valid_object_id(self, user_id: str) -> bool:
 - 统一数据存储位置，便于维护
 
 **相关提交**:
-- `7c81ffb` - fix: 修复添加自选股时返回值判断错误
-- `bf176bd` - debug: 添加自选股功能详细日志以排查 500 错误
+- `7c81ffb` - fix: 修复添加自选品种时返回值判断错误
+- `bf176bd` - debug: 添加自选品种功能详细日志以排查 500 错误
 
 ---
 
@@ -459,7 +459,7 @@ def _sanitize_document(self, doc: dict) -> dict:
 
 ### 功能分类
 - **新功能**: 6 项（302.ai 接入、脱敏导出、Token 自动刷新等）
-- **Bug 修复**: 15 项（URL 拼接、WebSocket 连接、自选股等）
+- **Bug 修复**: 15 项（URL 拼接、WebSocket 连接、自选品种等）
 - **UI 优化**: 7 项（深色主题、页面头部、按钮对比度等）
 
 ### 代码变更

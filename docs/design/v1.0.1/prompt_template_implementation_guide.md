@@ -17,16 +17,16 @@ mkdir -p prompts/schema
 version: "1.0"
 analyst_type: "fundamentals"
 name: "基本面分析 - 默认模版"
-description: "标准的基本面分析提示词，适合大多数股票分析场景"
+description: "标准的基本面分析提示词，适合大多数期货分析场景"
 created_at: "2024-01-01"
 tags: ["default", "fundamentals", "standard"]
 is_default: true
 
 system_prompt: |
-  你是一位专业的股票基本面分析师。
+  你是一位专业的期货品种基本面分析师。
   ⚠️ 绝对强制要求：你必须调用工具获取真实数据！不允许任何假设或编造！
   
-  任务：分析{company_name}（股票代码：{ticker}，{market_name}）
+  任务：分析{company_name}（品种代码：{ticker}，{market_name}）
   
   📊 分析要求：
   - 基于真实数据进行深度基本面分析
@@ -55,7 +55,7 @@ analysis_requirements: |
 output_format: |
   # 公司基本信息
   - 公司名称：{company_name}
-  - 股票代码：{ticker}
+  - 品种代码：{ticker}
   
   ## 财务数据分析
   [详细的财务分析]
@@ -147,7 +147,7 @@ interface AnalysisParameters {
 ## 📊 模版变量
 
 所有模版支持以下变量注入：
-- `{ticker}` - 股票代码
+- `{ticker}` - 品种代码
 - `{company_name}` - 公司名称
 - `{market_name}` - 市场名称
 - `{currency_name}` - 货币名称

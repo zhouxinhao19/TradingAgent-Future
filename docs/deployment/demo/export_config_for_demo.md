@@ -10,7 +10,7 @@
 
 当您需要在新服务器上部署演示系统时，可以：
 - ✅ **保留**：系统配置、LLM 配置、用户数据等配置信息
-- ❌ **不保留**：分析报告、股票数据、历史记录等业务数据
+- ❌ **不保留**：分析报告、期货数据、历史记录等业务数据
 
 这样可以快速搭建一个包含完整配置的演示环境，而不需要重新配置 15 个 LLM 模型。
 
@@ -130,7 +130,7 @@ curl -X POST "http://new-server:8000/api/system/database/import" \
 | `user_configs` | 用户个性化配置 | ⭐⭐ |
 | `model_catalog` | 模型目录 | ⭐⭐ |
 | `market_quotes` | 实时行情数据 | ⭐⭐⭐⭐ |
-| `stock_basic_info` | 股票基础信息 | ⭐⭐⭐⭐ |
+| `stock_basic_info` | 期货品种基础信息 | ⭐⭐⭐⭐ |
 
 ### 包含的 LLM 配置（15 个）
 
@@ -173,7 +173,7 @@ curl -X POST "http://new-server:8000/api/system/database/import" \
 |---------|------|------|
 | `analysis_reports` | 分析报告 | 演示系统不需要历史报告 |
 | `analysis_tasks` | 分析任务 | 演示系统不需要历史任务 |
-| `stock_basic_info` | 股票基础信息 | 数据量大，可重新同步 |
+| `stock_basic_info` | 期货品种基础信息 | 数据量大，可重新同步 |
 | `market_quotes` | 市场行情 | 实时数据，可重新获取 |
 | `stock_daily_quotes` | 日线行情 | 数据量大，可重新同步 |
 | `financial_data_cache` | 财务数据缓存 | 缓存数据，可重新生成 |

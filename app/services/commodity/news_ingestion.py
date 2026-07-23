@@ -43,7 +43,7 @@ async def _get_annotator_llm() -> Any:
     然后用 create_llm_by_provider（返回底层 .get_llm()，有 ainvoke）。
     """
     from app.core.unified_config import unified_config
-    from app.services.simple_analysis_service import get_provider_by_model_name
+    from app.services.provider_lookup import get_provider_by_model_name
     from tradingagents.llm_clients.provider_keys import normalize_provider_key
     from tradingagents.graph.trading_graph import create_llm_by_provider
 

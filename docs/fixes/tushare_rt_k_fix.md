@@ -15,10 +15,10 @@
    - 代码尝试调用 `self.api.realtime_quote()` 方法，但该方法不存在
    - 回退到 `self.api.daily()` 接口（历史数据接口，不适合获取实时行情）
    - 再调用 `self.api.daily_basic()` 补充数据
-   - **每只股票调用 2 次 API**
+   - **每只期货品种调用 2 次 API**
 
 2. **低效的调用模式**
-   - 逐个股票调用：5,439 只股票 × 2 次 = **10,878 次调用**
+   - 逐品种票调用：5,439 只期货品种 × 2 次 = **10,878 次调用**
    - 远超 800 次/分钟的限制
    - 必然触发限流
 
@@ -100,7 +100,7 @@ async def get_realtime_quotes_batch(self) -> Optional[Dict[str, Dict[str, Any]]]
 
 **修改前**:
 ```python
-# 逐个股票调用
+# 逐品种票调用
 for symbol in symbols:
     quotes = await self.provider.get_stock_quotes(symbol)  # 5,439 次调用
     await self.stock_service.update_market_quotes(symbol, quotes)
@@ -215,7 +215,7 @@ TUSHARE_QUOTES_SYNC_CRON=*/1 9-15 * * 1-5  # 每1分钟
 ### 测试内容
 
 1. **rt_k 接口测试**: 验证批量获取全市场行情
-2. **单只股票测试**: 验证单只股票获取
+2. **单只期货品种测试**: 验证单只期货品种获取
 3. **交易时间判断**: 验证时间检测逻辑
 4. **同步服务测试**: 验证完整同步流程
 
@@ -223,7 +223,7 @@ TUSHARE_QUOTES_SYNC_CRON=*/1 9-15 * * 1-5  # 每1分钟
 
 **交易时间内**:
 ```
-✅ 获取到 5000+ 只股票的实时行情
+✅ 获取到 5000+ 只期货品种的实时行情
 ✅ 实时行情同步完成: 总计 5000+ 只, 成功 5000+ 只, 耗时 2-5 秒
 ```
 

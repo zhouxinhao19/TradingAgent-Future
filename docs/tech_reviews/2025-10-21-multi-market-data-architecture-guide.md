@@ -25,8 +25,8 @@
 ### 1.1 当前状况
 
 **v1.0.0-preview 已完成**：
-- ✅ A股数据本地存储（MongoDB）
-- ✅ A股分析引擎调用本地数据
+- ✅ 期货数据本地存储（MongoDB）
+- ✅ 期货分析引擎调用本地数据
 - ✅ 基础字段标准化（`symbol`/`full_symbol`/`market`）
 - ✅ 多数据源适配器（Tushare/AKShare/BaoStock）
 
@@ -66,14 +66,14 @@
         ┌─────────────────┼─────────────────┐
         ▼                 ▼                 ▼
 ┌───────────────┐ ┌───────────────┐ ┌───────────────┐
-│  A股数据服务   │ │  港股数据服务  │ │  美股数据服务  │
+│  期货数据服务   │ │  港股数据服务  │ │  美股数据服务  │
 │ ChinaStock    │ │  HKStock      │ │  USStock      │
 │ DataService   │ │  DataService  │ │  DataService  │
 └───────────────┘ └───────────────┘ └───────────────┘
         │                 │                 │
         ▼                 ▼                 ▼
 ┌───────────────┐ ┌───────────────┐ ┌───────────────┐
-│  A股数据库     │ │  港股数据库    │ │  美股数据库    │
+│  期货数据库     │ │  港股数据库    │ │  美股数据库    │
 │ *_cn 集合     │ │ *_hk 集合     │ │ *_us 集合     │
 └───────────────┘ └───────────────┘ └───────────────┘
 ```
@@ -93,7 +93,7 @@
    - 避免跨市场查询的复杂性
 
 3. **迁移风险低**：
-   - 现有A股数据无需大规模迁移
+   - 现有期货数据无需大规模迁移
    - 港股/美股可独立开发测试
    - 出问题只影响单个市场
 
@@ -117,7 +117,7 @@
 ### 3.1 MongoDB 集合设计
 
 ```javascript
-// ============ A股数据（现有，保持不变）============
+// ============ 期货数据（现有，保持不变）============
 db.stock_basic_info         // A股基础信息
 db.stock_daily_quotes       // A股历史K线
 db.market_quotes            // A股实时行情
@@ -147,9 +147,9 @@ db.symbol_registry          // 股票标识符注册表（统一查询入口）
 
 | 市场 | 后缀 | 示例 |
 |------|------|------|
-| A股 | 无后缀（兼容现有） | `stock_basic_info` |
-| 港股 | `_hk` | `stock_basic_info_hk` |
-| 美股 | `_us` | `stock_basic_info_us` |
+| 国内期货 | 无后缀（兼容现有） | `stock_basic_info` |
+| 国际期货 | `_hk` | `stock_basic_info_hk` |
+| 国际期货 | `_us` | `stock_basic_info_us` |
 
 **注意**：A股集合保持现有命名，无需迁移。
 
@@ -313,12 +313,12 @@ db.symbol_registry          // 股票标识符注册表（统一查询入口）
 - [ ] **创建标准化工具函数**
   - 文件：`tradingagents/dataflows/normalization.py`
   - 函数：
-    - `normalize_symbol()` - 标准化股票代码
+    - `normalize_symbol()` - 标准化品种代码
     - `parse_full_symbol()` - 解析完整标识符
     - `get_exchange_info()` - 获取交易所信息
     - `map_industry_to_gics()` - 行业映射
 
-- [ ] **更新A股数据模型（添加新字段）**
+- [ ] **更新期货数据模型（添加新字段）**
   - 文件：`tradingagents/models/stock_data_models.py`
   - 添加：`exchange_mic`、`vendor_symbols`、`industry`（嵌套对象）
   - **注意**：新字段设为可选，不破坏现有数据
@@ -554,7 +554,7 @@ def _load_standards() -> Dict:
 
 def normalize_symbol(source: str, code: str, market: str = None) -> Dict[str, str]:
     """
-    标准化股票代码
+    标准化品种代码
     
     Args:
         source: 数据源（tushare/akshare/yfinance等）
@@ -664,7 +664,7 @@ def infer_market(code: str) -> str:
     推断市场类型
     
     Args:
-        code: 股票代码
+        code: 品种代码
     
     Returns:
         市场类型（CN/HK/US）

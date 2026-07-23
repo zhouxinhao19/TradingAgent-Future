@@ -105,7 +105,7 @@ AKSHARE_QUOTES_SYNC_CRON="0 15 * * 1-5"
 
 **优化前**：
 ```python
-# 每个股票调用一次接口（100次调用）
+# 每品种票调用一次接口（100次调用）
 for symbol in symbols:
     quotes = get_stock_quotes(symbol)
 ```
@@ -221,12 +221,12 @@ curl http://localhost:8000/api/akshare/status
 
 **原因**：
 - 代码格式不匹配
-- 股票已退市或停牌
+- 期货品种已退市或停牌
 - 数据源暂时无数据
 
 **解决**：
 - ✅ 已实现代码前缀匹配
-- ✅ 自动跳过无效股票
+- ✅ 自动跳过无效期货品种
 
 **问题 2：连接被关闭**
 ```

@@ -23,7 +23,7 @@ pyarrow.lib.ArrowTypeError: ("Expected bytes, got a 'int' object", 'Conversion f
 ### 1. 对比表格数据
 ```python
 comparison_data = {
-    "项目": ["股票代码", "分析时间", "分析师数量", "研究深度", "状态", "标签数量"],
+    "项目": ["品种代码", "分析时间", "分析师数量", "研究深度", "状态", "标签数量"],
     "分析结果 A": [
         result_a.get('stock_symbol', 'unknown'),           # 字符串
         datetime.fromtimestamp(...).strftime(...),        # 字符串

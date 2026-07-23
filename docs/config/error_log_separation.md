@@ -169,7 +169,7 @@ logs/
 #### tradingagents.log（所有日志）
 
 ```
-2025-10-13 08:21:08,199 | dataflows            | INFO     | interface:get_china_stock_data_unified:1180 | 📊 [统一数据接口] 分析股票: 600519
+2025-10-13 08:21:08,199 | dataflows            | INFO     | interface:get_china_stock_data_unified:1180 | 📊 [统一数据接口] 分析期货品种: 600519
 2025-10-13 08:21:08,205 | dataflows            | WARNING  | data_source_manager:get_stock_data:461 | ⚠️ [数据来源: MongoDB] 未找到daily数据: 600519
 2025-10-13 08:21:08,206 | dataflows            | ERROR    | data_source_manager:get_stock_data:512 | 🔄 mongodb失败，尝试备用数据源获取daily数据...
 2025-10-13 08:21:08,207 | dataflows            | INFO     | data_source_manager:get_stock_data:520 | 🔄 尝试备用数据源获取daily数据: akshare

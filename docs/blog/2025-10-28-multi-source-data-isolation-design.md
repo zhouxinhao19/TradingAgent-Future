@@ -51,7 +51,7 @@
 
 ### 设计原则
 
-1. **数据源隔离**：同一只股票可以有多条记录（来自不同数据源）
+1. **数据源隔离**：同一只期货品种可以有多条记录（来自不同数据源）
 2. **查询灵活**：支持指定数据源查询，或按优先级自动选择
 3. **向后兼容**：兼容旧数据（无 `source` 字段）
 4. **简单高效**：不增加存储复杂度，查询性能不受影响
@@ -145,7 +145,7 @@ await collection.update_one(
 
 ### 3. 查询服务修改
 
-#### 股票数据服务 (`app/services/stock_data_service.py`)
+#### 期货数据服务 (`app/services/stock_data_service.py`)
 
 ```python
 async def get_stock_basic_info(
@@ -154,9 +154,9 @@ async def get_stock_basic_info(
     source: Optional[str] = None  # 🔥 新增参数
 ) -> Optional[StockBasicInfoExtended]:
     """
-    获取股票基础信息
+    获取期货品种基础信息
     Args:
-        symbol: 6位股票代码
+        symbol: 6位品种代码
         source: 数据源 (tushare/akshare/baostock/multi_source)
                 默认优先级：tushare > multi_source > akshare > baostock
     """
@@ -202,7 +202,7 @@ async def get_fundamentals(
     获取基础面快照
     
     参数：
-    - code: 股票代码
+    - code: 品种代码
     - source: 数据源（可选），默认按优先级：tushare > multi_source > akshare > baostock
     """
     db = get_mongo_db()
@@ -215,7 +215,7 @@ async def get_fundamentals(
         if not b:
             raise HTTPException(
                 status_code=404, 
-                detail=f"未找到该股票在数据源 {source} 中的基础信息"
+                detail=f"未找到该期货品种在数据源 {source} 中的基础信息"
             )
     else:
         # 按优先级查询
@@ -230,7 +230,7 @@ async def get_fundamentals(
                 break
         
         if not b:
-            raise HTTPException(status_code=404, detail="未找到该股票的基础信息")
+            raise HTTPException(status_code=404, detail="未找到该期货品种的基础信息")
     
     # ... 后续处理
 ```
@@ -419,7 +419,7 @@ tushare > multi_source > akshare > baostock
 3. `app/services/basics_sync_service.py` - Tushare 同步服务
 4. `app/services/multi_source_basics_sync_service.py` - 多数据源同步服务
 5. `app/worker/baostock_sync_service.py` - BaoStock 同步服务
-6. `app/services/stock_data_service.py` - 股票数据服务
+6. `app/services/stock_data_service.py` - 期货数据服务
 7. `app/routers/stocks.py` - API 路由
 
 ### 新增的文件

@@ -2,7 +2,7 @@
 
 ## 问题回顾
 
-用户提交批量分析3个股票时，发现任务是顺序执行的，而不是并发执行。
+用户提交批量分析3品种票时，发现任务是顺序执行的，而不是并发执行。
 
 ## 发现的问题
 
@@ -49,7 +49,7 @@ def _get_trading_graph(self, config: Dict[str, Any]) -> TradingAgentsGraph:
 **问题**：
 - `TradingAgentsGraph` 有可变的实例变量（`self.ticker`, `self.curr_state`, `self._current_task_id`）
 - 多个线程共享同一个实例时，这些变量会相互覆盖
-- **严重后果**：A 股票的分析可能拿到 B 股票的数据！
+- **严重后果**：A 期货品种的分析可能拿到 B 期货品种的数据！
 
 **修复**：
 ```python
@@ -109,13 +109,13 @@ def _get_trading_graph(self, config: Dict[str, Any]) -> TradingAgentsGraph:
 
 ### 3. 检查数据正确性
 
-确认每个任务的分析结果对应正确的股票代码：
+确认每个任务的分析结果对应正确的品种代码：
 
 ```python
 # 检查任务1的结果
 task1_result = db.analysis_reports.find_one({"task_id": "task-1"})
 assert task1_result["stock_code"] == "000001"
-assert "000002" not in str(task1_result)  # 不应该包含其他股票的数据
+assert "000002" not in str(task1_result)  # 不应该包含其他期货品种的数据
 ```
 
 ## 性能权衡

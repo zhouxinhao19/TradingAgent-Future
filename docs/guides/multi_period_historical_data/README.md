@@ -25,7 +25,7 @@
 
 4. **多周期同步服务**
    - ✅ 统一的多周期数据同步管理
-   - ✅ 支持按数据源、周期、股票范围灵活同步
+   - ✅ 支持按数据源、周期、期货品种范围灵活同步
    - ✅ 完整的错误处理和进度跟踪
 
 5. **RESTful API接口**
@@ -84,8 +84,8 @@ API服务层 (RESTful APIs)
 ```javascript
 {
   "_id": ObjectId,
-  "symbol": "000001",           // 股票代码
-  "full_symbol": "000001.SZ",   // 完整股票代码
+  "symbol": "000001",           // 品种代码
+  "full_symbol": "000001.SZ",   // 完整品种代码
   "market": "CN",               // 市场类型
   "trade_date": "2024-01-15",   // 交易日期
   "period": "daily",            // 数据周期 (daily/weekly/monthly)
@@ -357,7 +357,7 @@ GET /api/multi-period-sync/health
 
 1. **首次部署系统**
    ```bash
-   # 获取所有股票的完整历史数据
+   # 获取所有期货品种的完整历史数据
    POST /api/multi-period-sync/start-all-history
    ```
 
@@ -367,9 +367,9 @@ GET /api/multi-period-sync/health
    POST /api/multi-period-sync/start-incremental?days_back=7
    ```
 
-3. **特定股票补全**
+3. **特定期货品种补全**
    ```bash
-   # 为特定股票补全历史数据
+   # 为特定期货品种补全历史数据
    POST /api/multi-period-sync/start
    {
      "all_history": true,

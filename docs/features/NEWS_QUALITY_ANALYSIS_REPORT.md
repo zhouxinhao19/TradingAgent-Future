@@ -11,7 +11,7 @@
 **东方财富API返回的新闻内容偏离主题：**
 
 ```
-查询股票：招商银行（600036）
+查询期货品种：招商银行（600036）
 实际返回的新闻主题：
 - 上证180ETF指数基金（530280）
 - A500ETF基金（512050）  
@@ -53,7 +53,7 @@
 ## 根本原因
 
 ### 1. 数据源选择问题
-- 东方财富个股新闻API (`stock_news_em`) 返回的是"相关新闻"而非"公司新闻"
+- 东方财富品种新闻API (`stock_news_em`) 返回的是"相关新闻"而非"公司新闻"
 - 包含大量ETF、指数基金等衍生产品新闻
 - 缺乏对新闻相关性的过滤机制
 
@@ -103,7 +103,7 @@ def calculate_news_relevance(title, content, stock_code, company_name):
     """计算新闻与公司的相关性评分"""
     score = 0
     
-    # 直接提及公司名称或股票代码
+    # 直接提及公司名称或品种代码
     if company_name in title: score += 50
     if stock_code in title: score += 40
     if company_name in content: score += 30

@@ -2,7 +2,7 @@
 
 ## 📋 问题描述
 
-用户在使用 Google AI (Gemini) 模型进行股票分析时，遇到以下错误：
+用户在使用 Google AI (Gemini) 模型进行期货分析时，遇到以下错误：
 
 ```
 NameError: name 'client_options' is not defined
@@ -167,7 +167,7 @@ except Exception as e:
 ### 运行完整分析
 
 ```python
-# 运行股票分析
+# 运行期货分析
 state, decision = graph.propagate("AAPL", "2025-01-17")
 print(f"✅ 分析完成: {decision}")
 ```

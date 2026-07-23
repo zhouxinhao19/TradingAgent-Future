@@ -1,6 +1,6 @@
-# 股票数据SDK接入检查清单
+# 期货数据SDK接入检查清单
 
-本检查清单帮助开发者确保新的股票数据SDK正确接入到TradingAgents系统中。
+本检查清单帮助开发者确保新的期货数据SDK正确接入到TradingAgents系统中。
 
 ## 📋 接入前准备
 
@@ -123,7 +123,7 @@
 - [ ] 验证财务数据准确性
 
 ### ✅ 数据标准化
-- [ ] 股票代码格式统一
+- [ ] 品种代码格式统一
 - [ ] 市场信息正确识别
 - [ ] 货币单位统一
 - [ ] 时区处理正确
@@ -222,7 +222,7 @@
 
 如果在接入过程中遇到问题，请参考：
 
-1. **技术文档**: [股票数据SDK接入指南](stock_data_sdk_integration_guide.md)
+1. **技术文档**: [期货数据SDK接入指南](stock_data_sdk_integration_guide.md)
 2. **示例代码**: 
    - [基础提供器](../../tradingagents/dataflows/base_provider.py)
    - [示例适配器](../../tradingagents/dataflows/example_sdk_provider.py)

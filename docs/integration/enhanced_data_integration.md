@@ -17,7 +17,7 @@
 - 向后兼容现有功能
 
 ### 3. **多数据类型支持**
-- ✅ 股票基础信息
+- ✅ 期货品种基础信息
 - ✅ 历史价格数据
 - ✅ 财务数据
 - ✅ 新闻数据
@@ -60,7 +60,7 @@ from tradingagents.dataflows.optimized_china_data import get_optimized_china_dat
 # 获取数据提供器
 provider = get_optimized_china_data_provider()
 
-# 获取股票数据（自动使用MongoDB优先）
+# 获取期货数据（自动使用MongoDB优先）
 stock_data = provider.get_stock_data("000001", "2024-01-01", "2024-01-31")
 
 # 获取基本面数据（自动使用MongoDB财务数据）
@@ -162,7 +162,7 @@ API实时获取 → 保存缓存 → 返回结果
 
 ```
 📁 增强数据适配器使用传统缓存模式
-⚡ 从缓存加载A股数据: 000001
+⚡ 从缓存加载期货数据: 000001
 🌐 从Tushare数据接口获取数据: 000001
 ```
 

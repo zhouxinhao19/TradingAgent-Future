@@ -1,8 +1,8 @@
-# 股票分析历史功能增强总结
+# 期货分析历史功能增强总结
 
 ## 项目概述
 
-本次更新大幅增强了TradingAgents-CN Web界面的股票分析历史功能，从基础的历史查看升级为功能完整的分析对比和趋势分析平台。
+本次更新大幅增强了TradingAgents-CN Web界面的期货分析历史功能，从基础的历史查看升级为功能完整的分析对比和趋势分析平台。
 
 ## 主要改进
 
@@ -16,19 +16,19 @@
   - 详细报告分标签页对比
   - 智能相似度计算
 
-#### 2. 同股票历史趋势对比
-- **功能**: 同一股票的历史分析趋势
+#### 2. 同期货品种历史趋势对比
+- **功能**: 同一期货品种的历史分析趋势
 - **特色**:
-  - 自动按股票分组
+  - 自动按期货品种分组
   - 时间序列趋势图表
   - 分析频率统计
   - 最新与历史对比
 
-#### 3. 跨股票对比
-- **功能**: 不同股票的横向对比
+#### 3. 跨期货品种对比
+- **功能**: 不同期货品种的横向对比
 - **特色**:
   - 自动选择最新分析
-  - 跨股票差异分析
+  - 跨期货品种差异分析
   - 投资标的比较
 
 #### 4. 批量对比
@@ -41,9 +41,9 @@
 ### 📊 增强统计图表
 
 #### 1. 综合仪表盘
-- 关键指标概览（总分析数、股票数、成功率、平均深度）
+- 关键指标概览（总分析数、期货品种数、成功率、平均深度）
 - 每日分析趋势线图
-- 热门股票分析柱状图
+- 热门期货分析柱状图
 - 一站式数据洞察
 
 #### 2. 时间分布分析
@@ -52,15 +52,15 @@
 - 星期使用模式分析
 - 工作日vs周末对比
 
-#### 3. 股票分布分析
-- 最常分析股票排行榜
+#### 3. 期货品种分布分析
+- 最常分析期货品种排行榜
 - 分析频率分布统计
-- 股票分析活跃度热力图
+- 期货分析活跃度热力图
 - 投资关注度分析
 
 #### 4. 成功率统计
 - 总体成功率饼图
-- 按股票成功率排行
+- 按期货品种成功率排行
 - 成功率时间趋势
 - 平均成功率基准线
 
@@ -115,14 +115,14 @@
 #### 对比功能
 - `render_results_comparison()`: 主对比界面
 - `render_basic_comparison()`: 基础对比
-- `render_same_stock_trend_comparison()`: 同股票趋势对比
-- `render_cross_stock_comparison()`: 跨股票对比
+- `render_same_stock_trend_comparison()`: 同期货品种趋势对比
+- `render_cross_stock_comparison()`: 跨期货品种对比
 - `render_batch_comparison()`: 批量对比
 
 #### 图表功能
 - `render_comprehensive_dashboard()`: 综合仪表盘
 - `render_time_distribution_charts()`: 时间分布图表
-- `render_stock_distribution_charts()`: 股票分布图表
+- `render_stock_distribution_charts()`: 期货品种分布图表
 - `render_success_rate_charts()`: 成功率统计
 - `render_analyst_statistics_charts()`: 分析师统计
 - `render_tag_statistics_charts()`: 标签统计
@@ -132,12 +132,12 @@
 #### 工具函数
 - `calculate_text_similarity()`: 文本相似度计算
 - `get_report_content()`: 报告内容提取
-- `render_stock_trend_charts()`: 股票趋势图表
+- `render_stock_trend_charts()`: 期货品种趋势图表
 
 ### 数据处理
 
 #### 数据源支持
-- **文件系统**: `data/analysis_results/detailed/{股票代码}/{日期}/reports/`
+- **文件系统**: `data/analysis_results/detailed/{品种代码}/{日期}/reports/`
 - **数据库**: `data/analysis_results/summary/`
 - **内存数据**: 实时分析结果
 
@@ -176,7 +176,7 @@
 - 改进用户体验
 
 ### 4. 投资组合管理
-- 横向对比不同股票
+- 横向对比不同期货品种
 - 识别投资机会
 - 风险分散分析
 

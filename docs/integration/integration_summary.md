@@ -12,7 +12,7 @@
 - ✅ 智能降级机制（MongoDB → 文件缓存 → API获取）
 - ✅ 完善的错误处理和日志记录
 
-### 2. **优化的A股数据提供器** (修改 `optimized_china_data.py`)
+### 2. **优化的期货数据提供器** (修改 `optimized_china_data.py`)
 - ✅ 集成MongoDB优先访问逻辑
 - ✅ 保持向后兼容性
 - ✅ 财务数据自动转换为基本面分析格式
@@ -36,7 +36,7 @@
 ❌ 新闻数据获取: 无数据 (正常，降级工作)
 
 🔄 优化数据提供器测试:
-✅ 股票数据获取: 452字符 (降级到API)
+✅ 期货数据获取: 452字符 (降级到API)
 ✅ 基本面数据获取: 1606字符 (降级到API)
 
 🔄 缓存模式对比:
@@ -96,7 +96,7 @@ from tradingagents.dataflows.optimized_china_data import get_optimized_china_dat
 # 获取数据提供器（自动使用MongoDB优先）
 provider = get_optimized_china_data_provider()
 
-# 获取股票数据（优先MongoDB，降级到API）
+# 获取期货数据（优先MongoDB，降级到API）
 stock_data = provider.get_stock_data("000001", "2024-01-01", "2024-01-31")
 
 # 获取基本面数据（优先MongoDB财务数据）

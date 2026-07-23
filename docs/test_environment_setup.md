@@ -137,7 +137,7 @@ INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 3. 配置 Tushare Token
 4. 启用数据同步任务
 5. 等待数据同步完成
-6. 测试股票查询、分析等功能
+6. 测试期货品种查询、分析等功能
 
 **验证点**：
 - ✅ 用户注册流程是否顺畅

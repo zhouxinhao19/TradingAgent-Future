@@ -2,7 +2,7 @@
   <div class="learning-center">
     <div class="learning-header">
       <h1>📚 学习中心</h1>
-      <p class="subtitle">了解AI、大模型和智能股票分析</p>
+      <p class="subtitle">了解AI、大模型和智能分析</p>
     </div>
 
     <el-row :gutter="20" class="learning-categories">
@@ -36,12 +36,12 @@
         </el-card>
       </el-col>
 
-      <!-- AI分析股票原理 -->
+      <!-- AI分析原理 -->
       <el-col :xs="24" :sm="12" :md="8" :lg="6">
         <el-card class="category-card" shadow="hover" @click="navigateTo('analysis-principles')">
           <div class="card-icon">📊</div>
-          <h3>AI分析股票原理</h3>
-          <p>深入了解多智能体如何协作分析股票</p>
+          <h3>AI分析原理</h3>
+          <p>深入了解多智能体如何协作分析</p>
           <el-tag type="info" size="small">1篇文章</el-tag>
         </el-card>
       </el-col>
@@ -139,7 +139,7 @@ const recommendedArticles = ref<RecommendedArticle[]>([
     category: 'AI分析',
     tagType: 'info',
     title: '多智能体系统详解',
-    description: '了解本工具如何通过多个AI智能体协作分析股票',
+    description: '了解本工具如何通过多个AI智能体协作分析',
     readTime: '15分钟'
   },
   {

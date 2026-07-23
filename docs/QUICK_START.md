@@ -78,7 +78,7 @@ python scripts/setup/quick_install.py
 
 ### 可选配置（提升体验）
 
-#### Tushare（A股数据）
+#### Tushare（期货数据）
 - 🌐 **注册地址**: https://tushare.pro/
 - 💰 **费用**: 免费，有积分限制
 - 🔧 **配置**: 在`.env`文件中设置 `TUSHARE_TOKEN`
@@ -97,7 +97,7 @@ DEEPSEEK_API_KEY=sk-your-deepseek-key-here
 # 或者使用OpenAI
 # OPENAI_API_KEY=sk-your-openai-key-here
 
-# A股数据源（推荐）
+# 数据源（推荐）
 TUSHARE_TOKEN=your-tushare-token-here
 
 # 数据库（可选，提升性能）
@@ -111,7 +111,7 @@ REDIS_ENABLED=false
 打开浏览器访问: http://localhost:8501
 
 ### 2. 测试分析功能
-- 输入股票代码（如：`000001`、`AAPL`、`0700.HK`）
+- 输入品种代码（如：`000001`、`AAPL`、`0700.HK`）
 - 选择分析师团队
 - 点击"开始分析"
 
@@ -126,11 +126,11 @@ tail -f logs/tradingagents.log
 
 ## 🎯 第一次使用
 
-### 推荐测试股票
+### 推荐测试期货品种
 
 #### A股测试
 ```
-股票代码: 000001
+品种代码: 000001
 市场类型: A股
 研究深度: 1级（快速测试）
 分析师: 市场分析师 + 基本面分析师
@@ -138,7 +138,7 @@ tail -f logs/tradingagents.log
 
 #### 美股测试
 ```
-股票代码: AAPL
+品种代码: AAPL
 市场类型: 美股
 研究深度: 1级（快速测试）
 分析师: 市场分析师 + 基本面分析师
@@ -146,7 +146,7 @@ tail -f logs/tradingagents.log
 
 #### 港股测试
 ```
-股票代码: 0700.HK
+品种代码: 0700.HK
 市场类型: 港股
 研究深度: 1级（快速测试）
 分析师: 市场分析师 + 基本面分析师
@@ -165,7 +165,7 @@ tail -f logs/tradingagents.log
 **A**: 检查以下几点：
 1. API密钥是否有效
 2. API余额是否充足
-3. 股票代码格式是否正确
+3. 品种代码格式是否正确
 4. 网络是否能访问相关API
 
 ### Q: 如何获取更多帮助？
@@ -184,4 +184,4 @@ tail -f logs/tradingagents.log
 3. ⚙️ **优化配置**: 根据需要调整数据库和缓存设置
 4. 🚀 **高级功能**: 探索批量分析、自定义提示等功能
 
-**享受您的AI股票分析之旅！** 🚀📈
+**享受您的AI期货分析之旅！** 🚀📈

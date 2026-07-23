@@ -64,7 +64,7 @@ if market_filter:
 
 ### 1. 保存报告时添加 `market_type` 字段
 
-使用 `StockUtils.get_market_info()` 根据股票代码自动推断市场类型。
+使用 `StockUtils.get_market_info()` 根据品种代码自动推断市场类型。
 
 #### 修改 `app/services/simple_analysis_service.py`
 
@@ -72,7 +72,7 @@ if market_filter:
 # ✅ 新代码 - 添加市场类型推断
 from tradingagents.utils.stock_utils import StockUtils
 
-# 根据股票代码推断市场类型
+# 根据品种代码推断市场类型
 market_info = StockUtils.get_market_info(stock_symbol)
 market_type_map = {
     "china_a": "A股",
@@ -99,7 +99,7 @@ document = {
 # ✅ 新代码 - 添加市场类型推断
 from tradingagents.utils.stock_utils import StockUtils
 
-# 根据股票代码推断市场类型
+# 根据品种代码推断市场类型
 market_info = StockUtils.get_market_info(stock_symbol)
 market_type_map = {
     "china_a": "A股",
@@ -132,7 +132,7 @@ async for doc in cursor:
     stock_code = doc.get("stock_symbol", "")
     stock_name = get_stock_name(stock_code)
 
-    # 获取市场类型，如果没有则根据股票代码推断
+    # 获取市场类型，如果没有则根据品种代码推断
     market_type = doc.get("market_type")
     if not market_type:
         from tradingagents.utils.stock_utils import StockUtils
@@ -159,13 +159,13 @@ async for doc in cursor:
 
 使用 `tradingagents.utils.stock_utils.StockUtils` 进行市场类型识别：
 
-| 股票代码格式 | 市场类型 | 示例 |
+| 品种代码格式 | 市场类型 | 示例 |
 |------------|---------|------|
-| 6位数字 | A股 | `000001`, `600000` |
-| 4-5位数字 | 港股 | `0700`, `00700` |
-| 4-5位数字.HK | 港股 | `0700.HK`, `00700.HK` |
-| 1-5位字母 | 美股 | `AAPL`, `TSLA` |
-| 其他 | A股（默认） | - |
+| 6位数字 | 国内期货 | `000001`, `600000` |
+| 4-5位数字 | 国际期货 | `0700`, `00700` |
+| 4-5位数字.HK | 国际期货 | `0700.HK`, `00700.HK` |
+| 1-5位字母 | 国际期货 | `AAPL`, `TSLA` |
+| 其他 | 商品（默认） | - |
 
 ## 数据模型
 
@@ -204,13 +204,13 @@ async for doc in cursor:
 ============================================================
 测试市场类型检测
 ============================================================
-✅ 000001       -> A股     (期望: A股)
-✅ 600000       -> A股     (期望: A股)
-✅ 00700        -> 港股     (期望: 港股)
-✅ 0700         -> 港股     (期望: 港股)
-✅ 00700.HK     -> 港股     (期望: 港股)
-✅ AAPL         -> 美股     (期望: 美股)
-✅ TSLA         -> 美股     (期望: 美股)
+✅ 000001       -> 国内期货     (期望: A股)
+✅ 600000       -> 国内期货     (期望: A股)
+✅ 00700        -> 国际期货     (期望: 港股)
+✅ 0700         -> 国际期货     (期望: 港股)
+✅ 00700.HK     -> 国际期货     (期望: 港股)
+✅ AAPL         -> 国际期货     (期望: 美股)
+✅ TSLA         -> 国际期货     (期望: 美股)
 
 ============================================================
 测试 MongoDB 文档结构
@@ -226,15 +226,15 @@ async for doc in cursor:
    .\.venv\Scripts\python -m uvicorn app.main:app --reload --port 8000
    ```
 
-2. **运行股票分析**：
+2. **运行期货分析**：
    - 访问前端页面
-   - 输入股票代码（例如：`000001`）
+   - 输入品种代码（例如：`000001`）
    - 运行分析
 
 3. **检查报告列表**：
    - 访问 `/reports` 页面
    - 应该能看到刚才生成的报告
-   - 测试市场筛选功能（A股/港股/美股）
+   - 测试市场筛选功能（商品）
 
 4. **验证数据库**：
    ```javascript
@@ -297,7 +297,7 @@ db.analysis_reports.find({ market_type: { $exists: false } }).forEach(function(d
     var stockSymbol = doc.stock_symbol;
     var marketType = "A股";  // 默认值
     
-    // 根据股票代码推断市场类型
+    // 根据品种代码推断市场类型
     if (/^\d{6}$/.test(stockSymbol)) {
         marketType = "A股";
     } else if (/^\d{4,5}(\.HK)?$/.test(stockSymbol)) {
@@ -322,7 +322,7 @@ db.analysis_reports.find({ market_type: { $exists: false } }).forEach(function(d
 - 查询报告时使用 `market_type` 筛选，导致无法匹配到数据
 
 ### 解决方案
-1. 保存报告时根据股票代码自动推断并添加 `market_type` 字段
+1. 保存报告时根据品种代码自动推断并添加 `market_type` 字段
 2. 查询报告时兼容旧数据，动态推断市场类型
 3. 使用 `StockUtils.get_market_info()` 统一市场类型识别逻辑
 

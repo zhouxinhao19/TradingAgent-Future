@@ -200,7 +200,7 @@ config = {
 
 2. **分批处理**：
 ```python
-# 分批分析多只股票
+# 分批分析多只期货品种
 def batch_analysis(symbols, batch_size=5):
     for i in range(0, len(symbols), batch_size):
         batch = symbols[i:i+batch_size]
@@ -266,13 +266,13 @@ os.environ['HTTPS_PROXY'] = 'https://proxy.company.com:8080'
 
 ## 📊 数据和分析
 
-### Q9: 某些股票无法获取数据？
+### Q9: 某些期货品种无法获取数据？
 
 **A:** 数据获取问题排查：
 
-1. **检查股票代码**：
+1. **检查品种代码**：
 ```python
-# 确保使用正确的股票代码格式
+# 确保使用正确的品种代码格式
 symbols = {
     "US": "AAPL",           # 美股
     "HK": "0700.HK",        # 港股
@@ -419,7 +419,7 @@ config = {
 | `API_KEY_INVALID` | API密钥无效 | 检查密钥格式和权限 |
 | `RATE_LIMIT_EXCEEDED` | 超过API限制 | 降低调用频率或升级账户 |
 | `NETWORK_TIMEOUT` | 网络超时 | 检查网络连接，增加超时时间 |
-| `DATA_NOT_FOUND` | 数据不存在 | 检查股票代码，使用备用数据源 |
+| `DATA_NOT_FOUND` | 数据不存在 | 检查品种代码，使用备用数据源 |
 | `INSUFFICIENT_MEMORY` | 内存不足 | 减少缓存大小，分批处理 |
 
 ### Q14: 如何启用调试模式？

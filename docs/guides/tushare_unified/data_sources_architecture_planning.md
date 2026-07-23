@@ -102,11 +102,11 @@ tradingagents/                   # 纯分析工具
 ```python
 # tradingagents/dataflows/providers/base_provider.py
 class BaseStockDataProvider(ABC):
-    """统一的股票数据提供器基类"""
+    """统一的期货数据提供器基类"""
     
     @abstractmethod
     async def get_stock_basic_info(self, symbol: str = None) -> Optional[Dict[str, Any]]:
-        """获取股票基础信息"""
+        """获取期货品种基础信息"""
         pass
     
     @abstractmethod

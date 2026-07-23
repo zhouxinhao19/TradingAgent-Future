@@ -123,7 +123,7 @@ async def test_data_sources():
     """
     测试所有数据源的连接和数据获取能力
     
-    注意：此接口会执行耗时操作（获取股票列表等），
+    注意：此接口会执行耗时操作（获取期货品种列表等），
     所有同步操作都在后台线程中执行，避免阻塞事件循环
     """
     manager = DataSourceManager()
@@ -226,9 +226,9 @@ python scripts/test_concurrent_api.py
   [10] ✅ 通知接口响应成功 (0.13秒): {'success': True, 'data': {'count': 0}}
 
 🧪 数据源测试完成 (58.32秒)
-   📡 tushare: ✅ 5438 只股票
-   📡 akshare: ✅ 5437 只股票
-   📡 baostock: ✅ 5473 只股票
+   📡 tushare: ✅ 5438 只期货品种
+   📡 akshare: ✅ 5437 只期货品种
+   📡 baostock: ✅ 5473 只期货品种
 
 📊 测试结果汇总
 ⏰ 结束时间: 14:31:00

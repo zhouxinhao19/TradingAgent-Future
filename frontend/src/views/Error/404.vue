@@ -41,7 +41,7 @@
           </el-link>
           <el-link type="primary" @click="$router.push('/screening')">
             <el-icon><Search /></el-icon>
-            股票筛选
+            品种筛选
           </el-link>
           <el-link type="primary" @click="$router.push('/queue')">
             <el-icon><Document /></el-icon>

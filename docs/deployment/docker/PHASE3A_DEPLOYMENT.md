@@ -377,7 +377,7 @@ docker run -e FEATURE_COMMODITY_ENABLED=true -e FEATURE_COMMODITY_DATA=true ...
 | **Phase 3a(本阶段)** | `ENABLE=true / DATA=true` | `ANALYSIS=false / PAPER=false` |
 | **Phase 3b(下一步)** | + `ANALYSIS=true` | `PAPER=false` |
 | **Phase 4** | + `PAPER=true` | - |
-| **Phase 5(清股票)** | 移除所有股票侧 | 商品完全替代 |
+| **Phase 5(清期货品种)** | 移除所有期货品种侧 | 商品完全替代 |
 
 升级到下一 Phase 时,只需翻一个 flag,然后 `docker compose restart backend`,前端无需重新 build(HMR 自动接)。
 

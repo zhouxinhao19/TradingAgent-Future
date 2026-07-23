@@ -19,7 +19,7 @@ status: updated
 - **[配置管理指南](./config-management-guide.md)** - 深入的配置管理说明
 
 ### 📊 分析指南
-- **[A股分析指南](./a-share-analysis-guide.md)** - A股市场专项分析教程
+- **[期货分析指南](./a-share-analysis-guide.md)** - 期货市场专项分析教程
 - **[美股分析指南](./us-stock-analysis-guide.md)** - 美股市场分析指导
 - **[港股分析指南](./hk-stock-analysis-guide.md)** - 港股市场分析说明
 
@@ -37,7 +37,7 @@ status: updated
 
 ### 新用户路径
 ```
-1. 安装配置指导 → 2. 快速开始指南 → 3. A股分析指南
+1. 安装配置指导 → 2. 快速开始指南 → 3. 期货分析指南
 ```
 
 ### 开发者路径
@@ -78,7 +78,7 @@ status: updated
 
 #### 📊 开始分析
 - **快速上手**: [快速开始指南](./quick-start-guide.md)
-- **A股分析**: [A股分析指南](./a-share-analysis-guide.md)
+- **期货分析**: [期货分析指南](./a-share-analysis-guide.md)
 - **美股分析**: [美股分析指南](./us-stock-analysis-guide.md)
 
 #### 🔧 深入使用
@@ -95,7 +95,7 @@ status: updated
 
 ### 🔰 新手用户
 1. **必读**: 安装配置指导 + 快速开始指南
-2. **推荐**: A股分析指南 (如果主要分析A股)
+2. **推荐**: 期货分析指南 (如果主要分析A股)
 3. **可选**: 配置管理指南 (深入使用时)
 
 ### 👨‍💻 开发者
@@ -178,4 +178,4 @@ status: updated
 
 **开始你的TradingAgents-CN学习之旅！** 🚀
 
-选择适合你的指南，开始探索AI驱动的股票分析世界。
+选择适合你的指南，开始探索AI驱动的期货分析世界。

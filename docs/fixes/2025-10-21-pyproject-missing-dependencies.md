@@ -211,7 +211,7 @@ pip install -e ".[qianfan]"
 
 | 包名 | 版本要求 | 用途 |
 |------|----------|------|
-| akshare | >=1.16.98 | A股数据源 |
+| akshare | >=1.16.98 | 数据源 |
 | tushare | >=1.4.21 | Tushare 数据源 |
 | yfinance | >=0.2.63 | Yahoo Finance 数据源 |
 | baostock | >=0.8.8 | BaoStock 数据源 |

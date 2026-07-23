@@ -6,13 +6,13 @@
 
 **基础信息接口**:
 ```python
-# 股票列表
+# 期货品种列表
 pro.stock_basic(exchange='', list_status='L', fields='ts_code,symbol,name,area,industry,list_date')
 
 # 输出字段
 ts_code      # TS代码 (000001.SZ)
-symbol       # 股票代码 (000001)  
-name         # 股票名称
+symbol       # 品种代码 (000001)  
+name         # 期货品种名称
 area         # 地域
 industry     # 所属行业
 market       # 市场类型（主板/创业板/科创板/CDR）
@@ -66,14 +66,14 @@ pro.cashflow(ts_code='000001.SZ', period='20240930')
 - ✅ 完整的异步支持
 - ✅ 智能缓存集成
 - ✅ 前复权价格计算
-- ✅ 股票代码标准化
+- ✅ 品种代码标准化
 - ✅ 财务数据获取
 
 **TushareDataAdapter (tushare_adapter.py)**:
 - ✅ 数据标准化处理
 - ✅ 多种数据类型支持
 - ✅ 基本面分析报告生成
-- ✅ 股票搜索功能
+- ✅ 期货品种搜索功能
 
 ## 🎯 统一设计方案
 
@@ -134,14 +134,14 @@ class TushareProvider(BaseStockDataProvider):
     # ==================== 基础数据接口 ====================
     
     async def get_stock_list(self, market: str = None) -> Optional[List[Dict[str, Any]]]:
-        """获取股票列表"""
+        """获取期货品种列表"""
         if not self.is_available():
             return None
         
         try:
             # 构建查询参数
             params = {
-                'list_status': 'L',  # 只获取上市股票
+                'list_status': 'L',  # 只获取上市期货品种
                 'fields': 'ts_code,symbol,name,area,industry,market,exchange,list_date,is_hs'
             }
             
@@ -166,21 +166,21 @@ class TushareProvider(BaseStockDataProvider):
                 stock_info = self.standardize_basic_info(row.to_dict())
                 stock_list.append(stock_info)
             
-            self.logger.info(f"✅ 获取股票列表: {len(stock_list)}只")
+            self.logger.info(f"✅ 获取期货品种列表: {len(stock_list)}只")
             return stock_list
             
         except Exception as e:
-            self.logger.error(f"❌ 获取股票列表失败: {e}")
+            self.logger.error(f"❌ 获取期货品种列表失败: {e}")
             return None
     
     async def get_stock_basic_info(self, symbol: str = None) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]:
-        """获取股票基础信息"""
+        """获取期货品种基础信息"""
         if not self.is_available():
             return None
         
         try:
             if symbol:
-                # 获取单个股票信息
+                # 获取单品种票信息
                 ts_code = self._normalize_ts_code(symbol)
                 df = await asyncio.to_thread(
                     self.api.stock_basic,
@@ -193,11 +193,11 @@ class TushareProvider(BaseStockDataProvider):
                 
                 return self.standardize_basic_info(df.iloc[0].to_dict())
             else:
-                # 获取所有股票信息
+                # 获取所有期货品种信息
                 return await self.get_stock_list()
                 
         except Exception as e:
-            self.logger.error(f"❌ 获取股票基础信息失败 symbol={symbol}: {e}")
+            self.logger.error(f"❌ 获取期货品种基础信息失败 symbol={symbol}: {e}")
             return None
     
     async def get_stock_quotes(self, symbol: str) -> Optional[Dict[str, Any]]:
@@ -395,7 +395,7 @@ class TushareProvider(BaseStockDataProvider):
     # ==================== 数据标准化方法 ====================
     
     def standardize_basic_info(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
-        """标准化股票基础信息"""
+        """标准化期货品种基础信息"""
         ts_code = raw_data.get('ts_code', '')
         symbol = raw_data.get('symbol', ts_code.split('.')[0] if '.' in ts_code else ts_code)
         
@@ -595,7 +595,7 @@ class TushareProvider(BaseStockDataProvider):
 
 ### 数据映射关系
 
-**股票基础信息映射**:
+**期货品种基础信息映射**:
 ```python
 # Tushare → 标准化模型
 {
@@ -637,7 +637,7 @@ class TushareSyncService:
         self.stock_service = get_stock_data_service()
     
     async def sync_basic_info(self):
-        """同步股票基础信息"""
+        """同步期货品种基础信息"""
         # 1. 从Tushare获取标准化数据
         stock_list = await self.provider.get_stock_list()
         
@@ -650,7 +650,7 @@ class TushareSyncService:
     
     async def sync_realtime_quotes(self):
         """同步实时行情"""
-        # 获取需要同步的股票列表
+        # 获取需要同步的期货品种列表
         db = get_mongo_db()
         cursor = db.stock_basic_info.find({}, {"code": 1})
         stock_codes = [doc["code"] async for doc in cursor]
@@ -733,7 +733,7 @@ class TushareSyncService:
 
     async def sync_stock_basic_info(self, force_update: bool = False) -> Dict[str, Any]:
         """
-        同步股票基础信息
+        同步期货品种基础信息
 
         Args:
             force_update: 是否强制更新所有数据
@@ -741,7 +741,7 @@ class TushareSyncService:
         Returns:
             同步结果统计
         """
-        logger.info("🔄 开始同步股票基础信息...")
+        logger.info("🔄 开始同步期货品种基础信息...")
 
         stats = {
             "total_processed": 0,
@@ -753,14 +753,14 @@ class TushareSyncService:
         }
 
         try:
-            # 1. 从Tushare获取股票列表
+            # 1. 从Tushare获取期货品种列表
             stock_list = await self.provider.get_stock_list(market="CN")
             if not stock_list:
-                logger.error("❌ 无法获取股票列表")
+                logger.error("❌ 无法获取期货品种列表")
                 return stats
 
             stats["total_processed"] = len(stock_list)
-            logger.info(f"📊 获取到 {len(stock_list)} 只股票信息")
+            logger.info(f"📊 获取到 {len(stock_list)} 只期货品种信息")
 
             # 2. 批量处理
             for i in range(0, len(stock_list), self.batch_size):
@@ -786,7 +786,7 @@ class TushareSyncService:
             stats["end_time"] = datetime.utcnow()
             stats["duration"] = (stats["end_time"] - stats["start_time"]).total_seconds()
 
-            logger.info(f"✅ 股票基础信息同步完成: "
+            logger.info(f"✅ 期货品种基础信息同步完成: "
                        f"总计 {stats['total_processed']} 只, "
                        f"成功 {stats['success_count']} 只, "
                        f"错误 {stats['error_count']} 只, "
@@ -796,7 +796,7 @@ class TushareSyncService:
             return stats
 
         except Exception as e:
-            logger.error(f"❌ 股票基础信息同步失败: {e}")
+            logger.error(f"❌ 期货品种基础信息同步失败: {e}")
             stats["errors"].append({"error": str(e), "context": "sync_stock_basic_info"})
             return stats
 
@@ -849,7 +849,7 @@ class TushareSyncService:
         同步实时行情数据
 
         Args:
-            symbols: 指定股票代码列表，为空则同步所有股票
+            symbols: 指定品种代码列表，为空则同步所有期货品种
 
         Returns:
             同步结果统计
@@ -865,7 +865,7 @@ class TushareSyncService:
         }
 
         try:
-            # 1. 获取需要同步的股票列表
+            # 1. 获取需要同步的期货品种列表
             if symbols is None:
                 cursor = self.db.stock_basic_info.find(
                     {"market_info.market": "CN"},
@@ -874,7 +874,7 @@ class TushareSyncService:
                 symbols = [doc["code"] async for doc in cursor]
 
             stats["total_processed"] = len(symbols)
-            logger.info(f"📊 需要同步 {len(symbols)} 只股票行情")
+            logger.info(f"📊 需要同步 {len(symbols)} 只期货行情")
 
             # 2. 批量处理
             for i in range(0, len(symbols), self.batch_size):
@@ -951,7 +951,7 @@ class TushareSyncService:
         return batch_stats
 
     async def _get_and_save_quotes(self, symbol: str) -> bool:
-        """获取并保存单个股票行情"""
+        """获取并保存单个期货行情"""
         try:
             quotes = await self.provider.get_stock_quotes(symbol)
             if quotes:
@@ -974,7 +974,7 @@ class TushareSyncService:
         同步历史数据
 
         Args:
-            symbols: 股票代码列表
+            symbols: 品种代码列表
             start_date: 开始日期
             end_date: 结束日期
             incremental: 是否增量同步
@@ -994,7 +994,7 @@ class TushareSyncService:
         }
 
         try:
-            # 1. 获取股票列表
+            # 1. 获取期货品种列表
             if symbols is None:
                 cursor = self.db.stock_basic_info.find(
                     {"market_info.market": "CN"},
@@ -1016,7 +1016,7 @@ class TushareSyncService:
             if not end_date:
                 end_date = datetime.now().strftime('%Y-%m-%d')
 
-            logger.info(f"📊 历史数据同步范围: {start_date} 到 {end_date}, 股票数量: {len(symbols)}")
+            logger.info(f"📊 历史数据同步范围: {start_date} 到 {end_date}, 期货品种数量: {len(symbols)}")
 
             # 3. 批量处理
             for i, symbol in enumerate(symbols):
@@ -1056,7 +1056,7 @@ class TushareSyncService:
             stats["duration"] = (stats["end_time"] - stats["start_time"]).total_seconds()
 
             logger.info(f"✅ 历史数据同步完成: "
-                       f"股票 {stats['success_count']}/{stats['total_processed']}, "
+                       f"期货品种 {stats['success_count']}/{stats['total_processed']}, "
                        f"记录 {stats['total_records']} 条, "
                        f"错误 {stats['error_count']} 个, "
                        f"耗时 {stats['duration']:.2f} 秒")
@@ -1096,7 +1096,7 @@ class TushareSyncService:
         }
 
         try:
-            # 获取股票列表
+            # 获取期货品种列表
             if symbols is None:
                 cursor = self.db.stock_basic_info.find(
                     {"market_info.market": "CN"},
@@ -1105,7 +1105,7 @@ class TushareSyncService:
                 symbols = [doc["code"] async for doc in cursor]
 
             stats["total_processed"] = len(symbols)
-            logger.info(f"📊 需要同步 {len(symbols)} 只股票财务数据")
+            logger.info(f"📊 需要同步 {len(symbols)} 只期货品种财务数据")
 
             # 批量处理
             for i, symbol in enumerate(symbols):
@@ -1262,18 +1262,18 @@ app = Celery('tushare_sync')
 
 @app.task(bind=True, max_retries=3)
 def sync_stock_basic_info_task(self, force_update: bool = False):
-    """同步股票基础信息任务"""
+    """同步期货品种基础信息任务"""
     try:
         async def run_sync():
             service = await get_tushare_sync_service()
             return await service.sync_stock_basic_info(force_update)
 
         result = asyncio.run(run_sync())
-        logger.info(f"✅ 股票基础信息同步完成: {result}")
+        logger.info(f"✅ 期货品种基础信息同步完成: {result}")
         return result
 
     except Exception as e:
-        logger.error(f"❌ 股票基础信息同步任务失败: {e}")
+        logger.error(f"❌ 期货品种基础信息同步任务失败: {e}")
         raise self.retry(countdown=60, exc=e)
 
 @app.task(bind=True, max_retries=3)

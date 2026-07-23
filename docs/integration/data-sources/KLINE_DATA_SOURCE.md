@@ -7,7 +7,7 @@
 **示例请求**: `GET /api/stocks/600036/kline?period=day&limit=200&adj=none`
 
 **参数说明**:
-- `code`: 股票代码（6位）
+- `code`: 品种代码（6位）
 - `period`: K线周期（day/week/month/5m/15m/30m/60m）
 - `limit`: 返回数据条数（默认120）
 - `adj`: 复权方式（none/qfq/hfq）
@@ -27,7 +27,7 @@ collection = self.db.stock_daily_quotes
 
 # 查询条件
 query = {
-    "symbol": "600036",      # 6位股票代码
+    "symbol": "600036",      # 6位品种代码
     "period": "daily",       # 周期（daily/weekly/monthly）
     "trade_date": {          # 日期范围
         "$gte": start_date,
@@ -260,9 +260,9 @@ curl -X POST "http://localhost:8000/api/multi-source-sync/historical" \
 ### 问题 1：K线数据为空
 
 **可能原因**:
-1. MongoDB 中没有该股票的数据
+1. MongoDB 中没有该期货品种的数据
 2. 外部 API 请求失败
-3. 股票代码不存在
+3. 品种代码不存在
 
 **解决方案**:
 ```bash
@@ -346,7 +346,7 @@ db.system.profile.find().sort({ts: -1}).limit(5)
 
 ### 1. 数据预热
 
-在系统启动后，建议预先同步常用股票的历史数据：
+在系统启动后，建议预先同步常用期货品种的历史数据：
 
 ```bash
 # 同步沪深300成分股
@@ -380,7 +380,7 @@ db.stock_daily_quotes.aggregate([
       count: { $sum: 1 },
       latest: { $max: "$trade_date" }
   }},
-  { $match: { count: { $lt: 200 } } }  // 找出数据不足200条的股票
+  { $match: { count: { $lt: 200 } } }  // 找出数据不足200条的期货品种
 ])
 ```
 

@@ -159,14 +159,14 @@ from langchain_core.tools import tool
 
 @tool
 def get_stock_data(symbol: str) -> str:
-    """获取股票数据"""
-    return f"股票{symbol}的数据"
+    """获取期货数据"""
+    return f"期货品种{symbol}的数据"
 
 llm_with_tools = llm.bind_tools([get_stock_data])
 
 # 调用
 response = llm_with_tools.invoke([
-    {"role": "user", "content": "请分析AAPL股票"}
+    {"role": "user", "content": "请分析AAPL期货品种"}
 ])
 ```
 

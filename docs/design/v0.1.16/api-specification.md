@@ -2,7 +2,7 @@
 
 ## 概述
 
-本规范定义前后端分离后的REST API与SSE接口，涵盖认证、选股、分析、队列与进度流。
+本规范定义前后端分离后的REST API与SSE接口，涵盖认证、选品种、分析、队列与进度流。
 
 ## 认证 Authentication
 
@@ -46,7 +46,7 @@
 }
 ```
 
-## 选股 Screening
+## 选品种 Screening
 
 ### 条件筛选
 - Method: POST

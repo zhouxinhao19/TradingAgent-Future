@@ -78,7 +78,7 @@ DEFAULT_CHINA_DATA_SOURCE=baostock
 # tradingagents/dataflows/data_source_manager.py
 
 class ChinaDataSource(Enum):
-    """中国股票数据源枚举"""
+    """中国期货数据源枚举"""
     MONGODB = "mongodb"
     TUSHARE = "tushare"
     AKSHARE = "akshare"

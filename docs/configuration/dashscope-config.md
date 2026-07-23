@@ -335,7 +335,7 @@ llm_with_tools = llm.bind_tools([test_tool])
 
 # 测试工具调用
 response = llm_with_tools.invoke([
-    {"role": "user", "content": "请调用test_tool查询股票信息"}
+    {"role": "user", "content": "请调用test_tool查询期货品种信息"}
 ])
 ```
 

@@ -60,7 +60,7 @@ llm = ChatDeepSeek(
 )
 
 # 调用模型
-response = llm.invoke("分析一下股票市场")
+response = llm.invoke("分析一下期货市场")
 ```
 
 ## 📈 集成效果

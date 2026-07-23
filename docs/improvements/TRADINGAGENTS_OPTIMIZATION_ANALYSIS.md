@@ -244,7 +244,7 @@ tradingagents/dataflows/
    ├── scoring.py           # 评分引擎（200行）
    └── config/
        ├── industry.py      # 行业配置
-       ├── special_stocks.py # 特殊股票
+       ├── special_stocks.py # 特殊期货品种
        └── templates.py     # 报告模板
    ```
 

@@ -52,15 +52,15 @@ def get_china_stock_data_tushare(self, symbol: str, start_date: str, end_date: s
         self.current_source = original_source
 
 def search_china_stocks_tushare(self, keyword: str) -> str:
-    """使用Tushare搜索中国股票"""
+    """使用Tushare搜索中国期货品种"""
     # 直接调用适配器实现
 
 def get_china_stock_fundamentals_tushare(self, symbol: str) -> str:
-    """使用Tushare获取中国股票基本面数据"""
+    """使用Tushare获取中国期货品种基本面数据"""
     # 直接调用适配器实现
 
 def get_china_stock_info_tushare(self, symbol: str) -> str:
-    """使用Tushare获取中国股票基本信息"""
+    """使用Tushare获取中国期货品种基本信息"""
     # 直接调用适配器实现
 ```
 
@@ -89,8 +89,8 @@ def get_china_stock_data_tushare(ticker: str, start_date: str, end_date: str) ->
         manager = get_data_source_manager()
         return manager.get_china_stock_data_tushare(ticker, start_date, end_date)
     except Exception as e:
-        logger.error(f"❌ [Tushare] 获取股票数据失败: {e}")
-        return f"❌ 获取{ticker}股票数据失败: {e}"
+        logger.error(f"❌ [Tushare] 获取期货数据失败: {e}")
+        return f"❌ 获取{ticker}期货数据失败: {e}"
 ```
 
 #### D. 添加全局管理器实例

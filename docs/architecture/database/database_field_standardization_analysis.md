@@ -1,10 +1,10 @@
 # 数据库字段标准化分析
 
-> 分析项目中所有MongoDB集合的股票代码字段命名不一致问题，并提供统一方案
+> 分析项目中所有MongoDB集合的品种代码字段命名不一致问题，并提供统一方案
 
 ## 📋 问题概述
 
-当前项目中，不同的MongoDB集合和模型对股票代码字段使用了不同的命名，导致：
+当前项目中，不同的MongoDB集合和模型对品种代码字段使用了不同的命名，导致：
 - 代码可读性差
 - 容易产生混淆
 - 增加维护成本
@@ -12,18 +12,18 @@
 
 ## 🔍 当前字段命名情况
 
-### 1. 股票代码字段命名汇总
+### 1. 品种代码字段命名汇总
 
 | 集合/模型 | 当前字段名 | 含义 | 示例值 |
 |----------|-----------|------|--------|
-| **stock_basic_info** | `code` | 6位股票代码 | "000001" |
-| **stock_daily_quotes** | `symbol` | 6位股票代码 | "000001" |
-| **analysis_tasks** | `stock_code` | 6位股票代码 | "000001" |
+| **stock_basic_info** | `code` | 6位品种代码 | "000001" |
+| **stock_daily_quotes** | `symbol` | 6位品种代码 | "000001" |
+| **analysis_tasks** | `stock_code` | 6位品种代码 | "000001" |
 | **analysis_batches** | - | (通过tasks关联) | - |
-| **screening** | `code` | 6位股票代码 | "000001" |
-| **StockBasicInfo (tradingagents)** | `symbol` | 6位股票代码 | "000001" |
-| **StockDailyQuote (tradingagents)** | `symbol` | 6位股票代码 | "000001" |
-| **StockBasicInfoExtended (app)** | `code` | 6位股票代码 | "000001" |
+| **screening** | `code` | 6位品种代码 | "000001" |
+| **StockBasicInfo (tradingagents)** | `symbol` | 6位品种代码 | "000001" |
+| **StockDailyQuote (tradingagents)** | `symbol` | 6位品种代码 | "000001" |
+| **StockBasicInfoExtended (app)** | `code` | 6位品种代码 | "000001" |
 
 ### 2. 完整代码字段命名
 
@@ -137,7 +137,7 @@
 **标准字段定义**:
 ```python
 # 基础字段
-symbol: str          # 6位股票代码，如 "000001"
+symbol: str          # 6位品种代码，如 "000001"
 full_symbol: str     # 完整代码，如 "000001.SZ"
 market: str          # 市场代码，如 "SZ", "SH"
 exchange: str        # 交易所，如 "SZSE", "SSE"
@@ -159,9 +159,9 @@ exchange: str        # 交易所，如 "SZSE", "SSE"
 
 | 字段名 | 类型 | 必填 | 说明 | 示例 |
 |--------|------|------|------|------|
-| `symbol` | string | ✅ | 6位股票代码 | "000001" |
+| `symbol` | string | ✅ | 6位品种代码 | "000001" |
 | `full_symbol` | string | ✅ | 完整标准化代码 | "000001.SZ" |
-| `name` | string | ✅ | 股票名称 | "平安银行" |
+| `name` | string | ✅ | 期货品种名称 | "平安银行" |
 | `market` | string | ✅ | 市场代码 | "SZ" |
 | `exchange` | string | ✅ | 交易所代码 | "SZSE" |
 | `exchange_name` | string | ❌ | 交易所名称 | "深圳证券交易所" |
@@ -193,16 +193,16 @@ from pydantic import BaseModel, Field
 from typing import Optional
 
 class StockIdentifier(BaseModel):
-    """股票标识符基类"""
-    symbol: str = Field(..., description="6位股票代码", pattern=r"^\d{6}$")
+    """期货品种标识符基类"""
+    symbol: str = Field(..., description="6位品种代码", pattern=r"^\d{6}$")
     full_symbol: str = Field(..., description="完整标准化代码", pattern=r"^\d{6}\.(SZ|SH|BJ)$")
     market: str = Field(..., description="市场代码", pattern=r"^(SZ|SH|BJ)$")
     exchange: str = Field(..., description="交易所代码")
-    name: str = Field(..., description="股票名称")
+    name: str = Field(..., description="期货品种名称")
 
 # app/models/stock_models.py
 class StockBasicInfo(StockIdentifier):
-    """股票基础信息"""
+    """期货品种基础信息"""
     area: Optional[str] = None
     industry: Optional[str] = None
     list_date: Optional[str] = None
@@ -212,7 +212,7 @@ class StockBasicInfo(StockIdentifier):
 class AnalysisTask(BaseModel):
     """分析任务"""
     task_id: str
-    symbol: str = Field(..., description="6位股票代码")  # ✅ 统一使用symbol
+    symbol: str = Field(..., description="6位品种代码")  # ✅ 统一使用symbol
     full_symbol: Optional[str] = None
     stock_name: Optional[str] = None
     # ... 其他字段
@@ -316,7 +316,7 @@ db.stock_basic_info.dropIndex("code_1")
 ### 3. 服务文件
 
 - [ ] `app/services/analysis_service.py` - 分析服务
-- [ ] `app/services/stock_service.py` - 股票数据服务
+- [ ] `app/services/stock_service.py` - 期货数据服务
 - [ ] `app/services/screening_service.py` - 筛选服务
 
 ### 4. 数据库脚本
@@ -329,7 +329,7 @@ db.stock_basic_info.dropIndex("code_1")
 
 - [ ] `frontend/src/api/stock.ts` - API接口
 - [ ] `frontend/src/types/stock.ts` - 类型定义
-- [ ] `frontend/src/views/` - 所有使用股票代码的视图
+- [ ] `frontend/src/views/` - 所有使用品种代码的视图
 
 ## 🎯 实施建议
 

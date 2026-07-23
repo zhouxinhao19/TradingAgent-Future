@@ -2,13 +2,13 @@
 
 ## 📋 概述
 
-`combined_data` 是 `get_stock_fundamentals_unified` 工具返回的综合数据，包含了股票的基本面分析所需的所有关键信息。这个工具会根据股票类型（A股/港股/美股）自动选择合适的数据源并返回格式化的数据。
+`combined_data` 是 `get_stock_fundamentals_unified` 工具返回的综合数据，包含了期货品种的基本面分析所需的所有关键信息。这个工具会根据期货品种类型（商品）自动选择合适的数据源并返回格式化的数据。
 
 ## ⚠️ 重要：数据获取优先级
 
 ### MongoDB 优先策略
 
-**对于A股数据，系统采用 MongoDB 优先策略**：
+**对于期货数据，系统采用 MongoDB 优先策略**：
 
 1. **第一优先级：MongoDB 数据库**
    - 如果启用了 `TA_USE_APP_CACHE` 环境变量
@@ -28,7 +28,7 @@
 3. **数据源优先级配置**
    - 可通过 Web 界面的"数据源管理"配置优先级
    - 配置存储在 MongoDB `datasource_groupings` 集合
-   - 支持按市场类别（A股/港股/美股）设置不同优先级
+   - 支持按市场类别（商品）设置不同优先级
 
 ### 为什么 MongoDB 优先？
 
@@ -60,7 +60,7 @@ combined_data = unified_tool.invoke({
 ```
 # {ticker} 基本面分析数据
 
-**股票类型**: {市场名称}
+**期货品种类型**: {市场名称}
 **货币**: {货币名称} ({货币符号})
 **分析日期**: {当前日期}
 **数据深度级别**: {数据深度}
@@ -68,12 +68,12 @@ combined_data = unified_tool.invoke({
 {具体数据模块}
 
 ---
-*数据来源: 根据股票类型自动选择最适合的数据源*
+*数据来源: 根据期货品种类型自动选择最适合的数据源*
 ```
 
 ### 2. 针对不同市场的数据内容
 
-#### 2.1 中国A股数据 (is_china=True)
+#### 2.1 中国期货数据 (is_china=True)
 
 对于A股，`combined_data` 包含两个主要模块：
 
@@ -82,8 +82,8 @@ combined_data = unified_tool.invoke({
 ```markdown
 ## A股当前价格信息
 
-股票代码: {ticker}
-股票名称: {公司名称}
+品种代码: {ticker}
+期货品种名称: {公司名称}
 交易所: {上海证券交易所/深圳证券交易所}
 行业: {所属行业}
 板块: {主板/创业板/科创板/北交所}
@@ -105,13 +105,13 @@ combined_data = unified_tool.invoke({
 - **第二优先级**: 按配置的数据源优先级（默认：Tushare → AKShare → BaoStock）
 - 包含最近1-2天的交易数据
 
-##### 模块2: A股基本面财务数据
+##### 模块2: 基本面财务数据
 
 ```markdown
-## A股基本面财务数据
+## 基本面财务数据
 
 ### 1. 公司基本信息
-- 股票代码: {ticker}
+- 品种代码: {ticker}
 - 公司名称: {公司全称}
 - 所属行业: {行业分类}
 - 上市板块: {主板/创业板/科创板/北交所}
@@ -182,8 +182,8 @@ combined_data = unified_tool.invoke({
 ```markdown
 ## 港股基础信息
 
-**股票代码**: {ticker}
-**股票名称**: {公司名称}
+**品种代码**: {ticker}
+**期货品种名称**: {公司名称}
 **交易货币**: 港币 (HK$)
 **交易所**: 香港交易所 (HKG)
 **数据源**: {数据源名称}
@@ -199,8 +199,8 @@ combined_data = unified_tool.invoke({
 ```markdown
 ## 港股数据
 
-### 股票基本信息
-- 股票代码: {ticker}
+### 期货品种基本信息
+- 品种代码: {ticker}
 - 公司名称: {公司名称}
 - 交易货币: 港币 (HK$)
 - 交易所: 香港交易所 (HKG)
@@ -234,8 +234,8 @@ combined_data = unified_tool.invoke({
 ```markdown
 ## 美股基础信息
 
-**股票代码**: {ticker}
-**股票类型**: 美股
+**品种代码**: {ticker}
+**期货品种类型**: 美股
 **交易货币**: 美元 (USD)
 **交易所**: 美国证券交易所
 
@@ -252,7 +252,7 @@ combined_data = unified_tool.invoke({
 ## 美股基本面数据
 
 ### 公司信息
-- 股票代码: {ticker}
+- 品种代码: {ticker}
 - 公司名称: {公司名称}
 - 交易货币: 美元 (USD)
 - 行业: {所属行业}
@@ -275,7 +275,7 @@ combined_data = unified_tool.invoke({
 
 ## 🔍 数据来源总结
 
-### A股（中国股票）- MongoDB 优先
+### 商品（中国期货品种）- MongoDB 优先
 **第一优先级：MongoDB 数据库**
 - `market_quotes` - 实时行情
 - `stock_financial_data` - 财务数据
@@ -314,13 +314,13 @@ combined_data = unified_tool.invoke({
 - **最高价 (high)**: 当日最高价格
 - **最低价 (low)**: 当日最低价格
 - **收盘价 (close)**: 当日收盘价格
-- **成交量 (volume)**: 当日成交股票数量
+- **成交量 (volume)**: 当日成交期货品种数量
 - **成交额 (amount)**: 当日成交金额总额
 - **涨跌幅 (change_percent)**: 相对前一交易日的涨跌百分比
 - **换手率 (turnover_rate)**: 成交量占流通股本的比例
 
 ### 估值指标字段
-- **市盈率 (PE)**: 股价 / 每股收益，衡量股票估值水平
+- **市盈率 (PE)**: 股价 / 每股收益，衡量期货品种估值水平
 - **市净率 (PB)**: 股价 / 每股净资产，衡量资产价值
 - **市销率 (PS)**: 市值 / 营业收入，衡量销售能力
 - **总市值 (total_mv)**: 股价 × 总股本
@@ -337,12 +337,12 @@ combined_data = unified_tool.invoke({
 
 ## 🔧 数据获取流程
 
-### A股数据获取流程（重点）
+### 期货数据获取流程（重点）
 
 ```mermaid
 graph TD
-    A[调用 get_stock_fundamentals_unified] --> B{识别股票类型}
-    B -->|A股| C[A股数据获取]
+    A[调用 get_stock_fundamentals_unified] --> B{识别期货品种类型}
+    B -->|A股| C[期货数据获取]
 
     C --> C1[价格数据获取]
     C1 --> C1A{MongoDB可用?}
@@ -382,8 +382,8 @@ graph TD
 
 ```mermaid
 graph TD
-    A[调用 get_stock_fundamentals_unified] --> B{识别股票类型}
-    B -->|A股| C[获取A股数据<br/>MongoDB优先]
+    A[调用 get_stock_fundamentals_unified] --> B{识别期货品种类型}
+    B -->|A股| C[获取期货数据<br/>MongoDB优先]
     B -->|港股| D[获取港股数据<br/>yfinance]
     B -->|美股| E[获取美股数据<br/>OpenAI/Finnhub]
 
@@ -396,7 +396,7 @@ graph TD
 
 ## 💡 使用示例
 
-### 示例1: A股基本面分析
+### 示例1: 基本面分析
 
 ```python
 # 输入参数
@@ -409,14 +409,14 @@ curr_date = "2025-11-04"
 """
 # 000001 基本面分析数据
 
-**股票类型**: 中国A股
+**期货品种类型**: 中国A股
 **货币**: 人民币 (¥)
 **分析日期**: 2025-11-04
 **数据深度级别**: standard
 
 ## A股当前价格信息
-股票代码: 000001
-股票名称: 平安银行
+品种代码: 000001
+期货品种名称: 平安银行
 交易所: 深圳证券交易所
 行业: 银行
 板块: 主板
@@ -428,7 +428,7 @@ curr_date = "2025-11-04"
 成交量: 45678900 股
 换手率: 0.85%
 
-## A股基本面财务数据
+## 基本面财务数据
 ### 估值指标
 - 市盈率 (PE): 4.94
 - 市净率 (PB): 0.50
@@ -458,8 +458,8 @@ curr_date = "2025-11-04"
 ## 📦 MongoDB 集合说明
 
 ### 1. `market_quotes` - 实时行情数据
-存储股票的实时价格信息：
-- `code`: 6位股票代码
+存储期货品种的实时价格信息：
+- `code`: 6位品种代码
 - `close`: 收盘价
 - `open`: 开盘价
 - `high`: 最高价
@@ -470,8 +470,8 @@ curr_date = "2025-11-04"
 - `turnover_rate`: 换手率
 
 ### 2. `stock_financial_data` - 财务数据
-存储股票的财务指标：
-- `code`/`symbol`: 股票代码
+存储期货品种的财务指标：
+- `code`/`symbol`: 品种代码
 - `report_period`: 报告期（如：20250630）
 - `data_source`: 数据来源（tushare/akshare）
 - `financial_indicators`: 财务指标对象
@@ -484,9 +484,9 @@ curr_date = "2025-11-04"
   - `net_margin`: 净利率
 
 ### 3. `stock_basic_info` - 基础信息
-存储股票的基本信息：
-- `code`: 6位股票代码
-- `name`: 股票名称
+存储期货品种的基本信息：
+- `code`: 6位品种代码
+- `name`: 期货品种名称
 - `industry`: 所属行业
 - `market`: 板块（主板/创业板/科创板/北交所）
 - `pe`: 市盈率
@@ -496,7 +496,7 @@ curr_date = "2025-11-04"
 - `source`: 数据来源（tushare/akshare/baostock）
 
 ### 4. `stock_daily_data` - 历史交易数据
-存储股票的历史日线数据（用于技术分析）
+存储期货品种的历史日线数据（用于技术分析）
 
 ## 🔗 相关文件
 
@@ -504,7 +504,7 @@ curr_date = "2025-11-04"
 - **工具定义**: `tradingagents/agents/utils/agent_utils.py` (第 770-1164 行)
   - `get_stock_fundamentals_unified()` 统一基本面分析工具
 
-- **A股数据处理**: `tradingagents/dataflows/optimized_china_data.py`
+- **期货数据处理**: `tradingagents/dataflows/optimized_china_data.py`
   - `OptimizedChinaDataProvider` 类
   - `_get_real_financial_metrics()` - MongoDB优先的财务数据获取
   - `_generate_fundamentals_report()` - 基本面报告生成

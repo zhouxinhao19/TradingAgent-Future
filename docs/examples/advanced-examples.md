@@ -310,9 +310,9 @@ class RealTimeTradingSystem:
     async def start_real_time_trading(self, watchlist: List[str]):
         """启动实时交易"""
 
-        print(f"启动实时交易系统，监控 {len(watchlist)} 只股票...")
+        print(f"启动实时交易系统，监控 {len(watchlist)} 只期货品种...")
 
-        # 初始化每只股票的交易智能体
+        # 初始化每只期货品种的交易智能体
         for symbol in watchlist:
             self.trading_agents[symbol] = TradingAgentsGraph(
                 debug=False,
@@ -333,7 +333,7 @@ class RealTimeTradingSystem:
                 # 获取最新市场数据
                 market_updates = await self.market_data_feed.get_updates()
 
-                # 并行处理所有股票
+                # 并行处理所有期货品种
                 tasks = []
                 for symbol in watchlist:
                     if symbol in market_updates:
@@ -354,7 +354,7 @@ class RealTimeTradingSystem:
                 await asyncio.sleep(5)
 
     async def _process_symbol_update(self, symbol: str, market_data: Dict):
-        """处理单个股票的市场更新"""
+        """处理单个期货品种的市场更新"""
 
         try:
             # 检查是否需要重新分析
@@ -449,7 +449,7 @@ class AdvancedBacktester:
                                  universe: List[str]) -> Dict:
         """运行综合回测"""
 
-        print(f"开始回测: {start_date} 到 {end_date}, 股票池: {len(universe)} 只")
+        print(f"开始回测: {start_date} 到 {end_date}, 品种池: {len(universe)} 只")
 
         # 1. 数据准备
         historical_data = self._prepare_historical_data(universe, start_date, end_date)
@@ -493,7 +493,7 @@ class AdvancedBacktester:
         for date in dates:
             daily_data = historical_data[date]
 
-            # 为每只股票生成交易信号
+            # 为每只期货品种生成交易信号
             daily_signals = {}
             for symbol in daily_data:
                 try:

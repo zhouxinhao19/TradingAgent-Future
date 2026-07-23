@@ -253,7 +253,7 @@ const checkModelSuitability = async () => {
       const depthDescriptions: Record<string, string> = {
         '快速': '快速浏览，获取基本信息',
         '基础': '基础分析，了解主要指标',
-        '标准': '标准分析，全面评估股票',
+        '标准': '标准分析，全面评估品种',
         '深度': '深度研究，挖掘投资机会',
         '全面': '全面分析，专业投资决策'
       }

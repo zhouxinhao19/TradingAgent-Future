@@ -15,7 +15,7 @@
   - 前端 SingleAnalysis.vue 已支持 Markdown 渲染与结果展示。
 
 ## 2. 用户工作流（One-person pipeline）
-1) 股票筛选（Screening）→ 选中一批候选标的
+1) 品种筛选（Screening）→ 选中一批候选标的
 2) 自选/候选篮（Favorites/Basket）→ 管理与分组
 3) 批量分析（BatchAnalysis）→ 生成任务并进入队列
 4) 队列管理（Queue）→ 跟踪进度、对完成项生成计划
@@ -28,8 +28,8 @@
 - views/Analysis/SingleAnalysis.vue：结果展示、Markdown 修复完成（挂载“一键生成计划”）。
 - views/Analysis/BatchAnalysis.vue：批量发起分析（支持预填与回跳 Queue）。
 - views/Queue：任务队列（增强完成项的“生成计划”CTA）。
-- views/Favorites：自选股（支持多选→批量分析、状态徽标）。
-- views/Screening：股票筛选（新增“加入候选篮/自选/批量分析”操作条）。
+- views/Favorites：自选品种（支持多选→批量分析、状态徽标）。
+- views/Screening：品种筛选（新增“加入候选篮/自选/批量分析”操作条）。
 
 ## 4. 端到端方案概览
 - 统一入口：在 Screening/Favorites 批量选择后，底部操作条“一键批量分析/加入候选篮/加入自选”。
@@ -37,17 +37,17 @@
 - 统一动作：在 Queue/SingleAnalysis 对已完成分析项，强引导“生成计划（可套模板）→启用触发器→推送到模拟盘”。
 
 ## 5. 页面级改造清单
-### A. Screening（股票筛选）
+### A. Screening（品种筛选）
 - 新增：多选 + 底部操作条 [加入自选][加入候选篮][批量分析]
 - 列增强：最近分析日期/摘要/置信度（缓存/后端）
 - 保存筛选器：可命名与“一键运行”→ 自动加入候选篮并触发批量分析（可选）
 
-### B. Favorites（自选股）
+### B. Favorites（自选品种）
 - 新增：分组管理与多选批量分析；“新鲜度”徽标（>7天黄，>14天红）
 - 快捷 CTA：重新分析 | 生成计划 | 移至候选篮
 
 ### C. BatchAnalysis（批量分析）
-- 预填：从候选篮/自选/筛选器导入股票与参数
+- 预填：从候选篮/自选/筛选器导入期货品种与参数
 - 提交后：显示嵌入式队列面板或跳转 Queue
 - 完成项就地弹出 PlanEditor 抽屉
 
@@ -66,7 +66,7 @@
 - Journal（复盘中心）：交易日记、报表、周报
 
 ## 6. Stores 设计（Pinia）
-- stores/basket.ts：候选篮（跨页临时收集股票）
+- stores/basket.ts：候选篮（跨页临时收集期货品种）
 - stores/workflow.ts：工作流状态（collected→analyzing→ready_for_plan→planned→executing→review）
 - stores/plans.ts：计划（草稿/启用/完成）
 - stores/triggers.ts：触发器（价格/均线/量能/关键词）

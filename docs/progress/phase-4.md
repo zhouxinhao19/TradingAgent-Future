@@ -569,7 +569,7 @@ PnL 折线图调用 dataviz skill 出设计:
 
 | 后续 | 主题 | 与 Phase 4 关系 | 周期 |
 |---|---|---|---|
-| **Phase 5** | 删除股票 | 与 Phase 4 独立 | 1-2 周 |
+| **Phase 5** | 删除期货品种 | 与 Phase 4 独立 | 1-2 周 |
 | **Phase 6** ⭐ | 回测框架 | 复用 Phase 4 撮合/PnL/risk,只换 K 线 driver | 2-3 周 |
 | **Phase 7** | 实盘接入(谨慎) | 同一接口替换 paper → live broker | 4-6 周 |
 | **Phase 8** | 组合管理 | 多账户 / 多策略聚合 | 2-3 周 |

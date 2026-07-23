@@ -30,7 +30,7 @@ def researcher_node(state):
 
 ```python
 class AgentState:
-    company_of_interest: str      # 股票代码
+    company_of_interest: str      # 品种代码
     trade_date: str              # 交易日期
     fundamentals_report: str     # 基本面报告
     market_report: str           # 市场分析报告
@@ -62,7 +62,7 @@ def create_bull_researcher(llm, memory=None):
         company_name = state["company_of_interest"]
         debate_state = state.get("debate_state", "")
         
-        # 获取股票市场信息
+        # 获取期货市场信息
         from tradingagents.utils.stock_utils import StockUtils
         market_info = StockUtils.get_market_info(company_name)
         
@@ -105,7 +105,7 @@ def create_bear_researcher(llm, memory=None):
         company_name = state["company_of_interest"]
         debate_state = state.get("debate_state", "")
         
-        # 获取股票市场信息
+        # 获取期货市场信息
         from tradingagents.utils.stock_utils import StockUtils
         market_info = StockUtils.get_market_info(company_name)
         
@@ -180,7 +180,7 @@ def update_debate_state(current_state, participant):
 1. **历史辩论回顾**: 参考之前的辩论结果和观点
 2. **学习改进**: 从历史决策的成败中学习
 3. **一致性维护**: 保持观点的逻辑一致性
-4. **经验积累**: 积累特定股票或行业的分析经验
+4. **经验积累**: 积累特定期货品种或行业的分析经验
 
 ```python
 # 记忆检索示例
@@ -191,11 +191,11 @@ else:
     logger.warning(f"⚠️ [DEBUG] memory为None，跳过历史记忆检索")
 ```
 
-## 股票类型支持
+## 期货品种类型支持
 
 ### 多市场分析能力
 
-研究员团队支持全球主要股票市场的分析：
+研究员团队支持全球主要期货市场的分析：
 
 ```python
 # 市场信息获取
@@ -205,7 +205,7 @@ market_info = StockUtils.get_market_info(ticker)
 # 根据市场类型调整分析策略
 if market_info.get("is_china"):
     # A股特有的分析逻辑
-    analysis_context = "中国A股市场"
+    analysis_context = "中国期货市场"
     currency = "人民币"
 elif market_info.get("is_hk"):
     # 港股特有的分析逻辑
@@ -219,7 +219,7 @@ elif market_info.get("is_us"):
 
 ### 本土化分析
 
-1. **A股市场**:
+1. **期货市场**:
    - 政策影响分析
    - 监管环境评估
    - 国内经济周期考量
@@ -386,8 +386,8 @@ def cached_analysis(ticker, date, report_hash):
 
 ```python
 # 研究员活动日志
-logger.info(f"🐂 [看涨研究员] 开始分析股票: {company_name}")
-logger.info(f"🐻 [看跌研究员] 开始分析股票: {company_name}")
+logger.info(f"🐂 [看涨研究员] 开始分析期货品种: {company_name}")
+logger.info(f"🐻 [看跌研究员] 开始分析期货品种: {company_name}")
 logger.debug(f"📊 [辩论状态] 当前状态: {debate_state}")
 logger.warning(f"⚠️ [记忆系统] memory为None，跳过历史记忆检索")
 ```

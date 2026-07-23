@@ -173,7 +173,7 @@ def _get_trading_graph(self, config: Dict[str, Any]) -> TradingAgentsGraph:
    - 快速分析模型：`qwen-turbo`
    - 深度分析模型：`qwen-plus`
 3. 选择分析深度：`3级 - 标准分析`
-4. 输入股票代码：`000001`
+4. 输入品种代码：`000001`
 5. 点击"开始分析"
 
 ### 步骤 3：查看后端日志

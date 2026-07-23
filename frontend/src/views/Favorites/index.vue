@@ -202,7 +202,7 @@ const goToTaskCenter = () => {
 }
 
 const handleBatchAnalyze = async () => {
-  // 仅取选中行的品种全代码（商品才有 full_symbol，股票本功能暂不支持）
+  // 仅取选中行的品种全代码（商品才有 full_symbol，本功能暂不支持）
   const symbols = items.value
     .filter(it => selectedIds.value.includes(it.id) && it.asset_type === 'commodity' && it.full_symbol)
     .map(it => it.full_symbol as string)
@@ -211,7 +211,7 @@ const handleBatchAnalyze = async () => {
     return
   }
   if (selectedIds.value.length > symbols.length) {
-    ElMessage.warning(`已忽略 ${selectedIds.value.length - symbols.length} 个股票项目（批量分析仅支持商品）`)
+    ElMessage.warning(`已忽略 ${selectedIds.value.length - symbols.length} 个品种项目（批量分析仅支持商品）`)
   }
   // 后端 max=50
   const limited = symbols.slice(0, 50)

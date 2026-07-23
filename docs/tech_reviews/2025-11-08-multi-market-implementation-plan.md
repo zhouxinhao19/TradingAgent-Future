@@ -9,7 +9,7 @@
 ## 🎯 核心设计
 
 **分市场存储 + 多数据源支持**：
-- ✅ 三个市场数据分开存储（A股/港股/美股独立集合）
+- ✅ 三个市场数据分开存储（商品独立集合）
 - ✅ 参考A股设计，同一股票可有多个数据源记录
 - ✅ 通过 `(code, source)` 联合唯一索引区分数据源
 - ✅ 数据源优先级在数据库中配置（`datasource_groupings` 集合）
@@ -48,7 +48,7 @@ TradingAgentsCN/
 ├── tradingagents/                # 核心分析引擎
 │   ├── dataflows/
 │   │   ├── providers/
-│   │   │   ├── china/            # A股数据提供器（已完善）
+│   │   │   ├── china/            # 期货数据提供器（已完善）
 │   │   │   ├── hk/               # 港股数据提供器（已有基础实现）
 │   │   │   └── us/               # 美股数据提供器（已有基础实现）
 │   │   ├── interface.py          # 统一数据接口
@@ -81,10 +81,10 @@ TradingAgentsCN/
 - 字段：已预留 `market_info`, `status`, `currency` 等扩展字段
 
 #### ⚠️ **待完善部分**
-1. **后端API层**：`app/routers/stocks.py` 目前只支持A股（6位数字代码）
+1. **后端API层**：`app/routers/stocks.py` 目前只支持商品（6位数字代码）
 2. **数据同步服务**：`app/worker/` 下没有港股/美股的同步服务
-3. **前端界面**：股票搜索、详情页面只支持A股代码格式
-4. **智能体分析**：`tradingagents/agents/` 主要针对A股市场
+3. **前端界面**：股票搜索、详情页面只支持品种代码格式
+4. **智能体分析**：`tradingagents/agents/` 主要针对期货市场
 
 ---
 
@@ -126,9 +126,9 @@ TradingAgentsCN/
 
 | 市场 | 示例 | Full Symbol | Exchange MIC |
 |------|------|-------------|--------------|
-| A股 | 000001 | XSHE:000001 | XSHG/XSHE/XBEJ |
-| 港股 | 0700 | XHKG:0700 | XHKG |
-| 美股 | AAPL | XNAS:AAPL | XNAS/XNYS |
+| 国内期货 | 000001 | XSHE:000001 | XSHG/XSHE/XBEJ |
+| 国际期货 | 0700 | XHKG:0700 | XHKG |
+| 国际期货 | AAPL | XNAS:AAPL | XNAS/XNYS |
 
 **实现**:
 - 配置文件: `docs/config/data_standards.yaml` ✅ 已创建
@@ -208,7 +208,7 @@ async def get_quote(market: str, code: str):
     
     Args:
         market: 市场类型 (cn/hk/us)
-        code: 股票代码
+        code: 品种代码
     """
     # 标准化代码
     normalized = normalize_symbol(source="api", code=code, market=market.upper())
@@ -266,7 +266,7 @@ export const stocksApi = {
 #### 3.2 界面组件适配
 
 **股票搜索组件** (`frontend/src/components/StockSearch.vue` - 新建)
-- 市场选择下拉框（A股/港股/美股）
+- 市场选择下拉框（商品）
 - 智能代码格式识别
 - 搜索结果显示市场标识
 
@@ -289,7 +289,7 @@ export const stocksApi = {
 **优点**:
 - ✅ 数据隔离，查询性能好
 - ✅ 数据库压力分散
-- ✅ 不影响现有A股数据和代码
+- ✅ 不影响现有期货数据和代码
 - ✅ 扩展简单，风险低
 - ✅ 便于独立维护和备份
 - ✅ 支持多数据源冗余，提高可靠性
@@ -579,7 +579,7 @@ class UnifiedStockService:
 
         Args:
             market: 市场类型 (CN/HK/US)
-            code: 股票代码
+            code: 品种代码
             source: 指定数据源（可选）
 
         Returns:
@@ -948,7 +948,7 @@ if not (settings.US_SYNC_ENABLED and settings.US_YFINANCE_SYNC_ENABLED):
 - [ ] 备份现有数据库（可选）
 
 **说明**:
-- 由于采用分市场存储，**不需要迁移现有A股数据**，只需创建新集合即可
+- 由于采用分市场存储，**不需要迁移现有期货数据**，只需创建新集合即可
 - 数据源供应商配置在数据库中管理，不需要额外配置文件
 - **多数据源设计**：同一股票可有多个数据源记录，通过 `(code, source)` 联合唯一索引区分
 
@@ -967,10 +967,10 @@ if not (settings.US_SYNC_ENABLED and settings.US_YFINANCE_SYNC_ENABLED):
   - `hk_yfinance_basic_info_sync`: 港股基础信息同步（yfinance）
   - `hk_akshare_basic_info_sync`: 港股基础信息同步（AKShare）
   - `hk_yfinance_quotes_sync`: 港股实时行情同步（yfinance）
-- [ ] 扩展API路由支持港股 (`app/routers/stocks.py`)
+- [ ] 扩展API路由支持国际期货 (`app/routers/stocks.py`)
   - `GET /api/stocks/hk/{code}/info?source={source}`: 获取港股信息（支持指定数据源）
   - `GET /api/stocks/hk/{code}/quote`: 获取港股行情
-  - `GET /api/stocks/hk/search?q={query}`: 搜索港股（去重，返回最优数据源）
+  - `GET /api/stocks/hk/search?q={query}`: 搜索国际商品（去重，返回最优数据源）
 - [ ] 单元测试
 
 #### Week 2: 前端适配
@@ -1008,7 +1008,7 @@ if not (settings.US_SYNC_ENABLED and settings.US_YFINANCE_SYNC_ENABLED):
 - [ ] 扩展API路由支持美股
   - `GET /api/stocks/us/{code}/info?source={source}`: 获取美股信息（支持指定数据源）
   - `GET /api/stocks/us/{code}/quote`: 获取美股行情
-  - `GET /api/stocks/us/search?q={query}`: 搜索美股（去重，返回最优数据源）
+  - `GET /api/stocks/us/search?q={query}`: 搜索国际商品（去重，返回最优数据源）
 - [ ] 单元测试
 
 #### Week 2: 统一查询接口
@@ -1020,7 +1020,7 @@ if not (settings.US_SYNC_ENABLED and settings.US_YFINANCE_SYNC_ENABLED):
   - `GET /api/stocks/search?q={query}&market={market}`: 跨市场搜索
   - `GET /api/markets`: 获取支持的市场列表
 - [ ] 前端市场切换功能
-  - 市场选择组件（A股/港股/美股）
+  - 市场选择组件（商品）
   - 智能代码格式识别
 - [ ] 集成测试
 
@@ -1058,7 +1058,7 @@ if not (settings.US_SYNC_ENABLED and settings.US_YFINANCE_SYNC_ENABLED):
 - [ ] 简化版港股/美股分析流程
 
 **交付物**:
-- 智能体可分析港股/美股（基础功能）
+- 智能体可分析港股/国际商品（基础功能）
 - 多市场技术指标计算
 - 多市场基本面数据获取
 
@@ -1133,7 +1133,7 @@ if not (settings.US_SYNC_ENABLED and settings.US_YFINANCE_SYNC_ENABLED):
 - [ ] 前端支持按行业筛选
 
 ### Phase 4 (智能体)
-- [ ] 智能体可分析港股/美股（基础功能）
+- [ ] 智能体可分析港股/国际商品（基础功能）
 - [ ] 技术指标计算正确
 - [ ] 分析报告包含市场标识
 
@@ -1170,7 +1170,7 @@ if not (settings.US_SYNC_ENABLED and settings.US_YFINANCE_SYNC_ENABLED):
 **优点**:
 - ✅ 数据隔离，查询性能好
 - ✅ 数据库压力分散
-- ✅ 不影响现有A股数据和代码
+- ✅ 不影响现有期货数据和代码
 - ✅ 不需要数据迁移
 - ✅ 字段结构保持一致，便于维护
 
@@ -1259,7 +1259,7 @@ if not (settings.US_SYNC_ENABLED and settings.US_YFINANCE_SYNC_ENABLED):
    - 查询时自动选择最优数据源
 
 2. **零风险实施**
-   - A股数据和代码完全不受影响
+   - 期货数据和代码完全不受影响
    - 只需创建新集合，无需数据迁移
    - 渐进式实施，可随时回滚
 
@@ -1277,9 +1277,9 @@ if not (settings.US_SYNC_ENABLED and settings.US_YFINANCE_SYNC_ENABLED):
 
 | 市场 | 主数据源 | 备用数据源 | 可选数据源 |
 |------|---------|-----------|-----------|
-| A股 | Tushare | AKShare | BaoStock |
-| 港股 | yfinance | AKShare | Futu OpenAPI（可选） |
-| 美股 | yfinance | - | Alpha Vantage（可选） |
+| 国内期货 | Tushare | AKShare | BaoStock |
+| 国际期货 | yfinance | AKShare | Futu OpenAPI（可选） |
+| 国际期货 | yfinance | - | Alpha Vantage（可选） |
 
 ### 实施时间线
 

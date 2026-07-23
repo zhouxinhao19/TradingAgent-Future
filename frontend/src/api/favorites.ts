@@ -1,5 +1,5 @@
 /**
- * 自选品种 API（统一支持股票+商品期货）
+ * 自选品种 API（统一支持商品期货+历史兼容）
  */
 import { ApiClient } from './request'
 
@@ -7,7 +7,7 @@ export interface FavoriteItem {
   id: string
   user_id: string
   asset_type: 'stock' | 'commodity'
-  // 股票
+  // 历史兼容（旧股票数据）
   stock_code?: string
   stock_name?: string
   market?: string

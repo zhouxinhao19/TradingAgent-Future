@@ -19,7 +19,7 @@ NameError: name 'is_china' is not defined
 ```
 
 ### 错误场景
-在基本面分析师节点中，当使用**离线模式**（`online_tools=False`）时，代码尝试根据股票类型选择不同的工具，但使用了未定义的变量 `is_china`。
+在基本面分析师节点中，当使用**离线模式**（`online_tools=False`）时，代码尝试根据期货品种类型选择不同的工具，但使用了未定义的变量 `is_china`。
 
 ---
 
@@ -48,8 +48,8 @@ NameError: name 'is_china' is not defined
 
 ### 问题原因
 
-- 在在线模式（第118-132行）中，代码使用统一工具，不需要区分股票类型
-- 在离线模式（第133-150行）中，需要根据股票类型选择不同工具
+- 在在线模式（第118-132行）中，代码使用统一工具，不需要区分期货品种类型
+- 在离线模式（第133-150行）中，需要根据期货品种类型选择不同工具
 - **但忘记从 `market_info` 中提取 `is_china` 变量**
 
 ---
@@ -98,7 +98,7 @@ else:
 
 ### 受影响的功能
 - ✅ **基本面分析师** - 离线模式下的工具选择
-- ✅ **A股分析** - 使用本地缓存数据
+- ✅ **期货分析** - 使用本地缓存数据
 - ✅ **美股/港股分析** - 使用FinnHub和SimFin数据
 
 ### 不受影响的功能
@@ -117,7 +117,7 @@ else:
 #### ✅ `market_analyst.py` (第99行)
 ```python
 is_china = is_china_stock(ticker)  # ✅ 正确定义
-logger.debug(f"📈 [DEBUG] 股票类型检查: {ticker} -> 中国A股: {is_china}")
+logger.debug(f"📈 [DEBUG] 期货品种类型检查: {ticker} -> 中国A股: {is_china}")
 ```
 
 #### ✅ `bull_researcher.py` (第28-30行)
