@@ -10,7 +10,7 @@
 
 1. **前端**：使用了 `statusFilter`（状态筛选），选项为"已完成/处理中/失败"
 2. **后端**：API 接受 `status_filter` 参数，但报告数据中没有 `status` 字段
-3. **数据模型**：报告数据有 `market_type` 字段（A股/港股/美股），但没有被用于筛选
+3. **数据模型**：报告数据有 `market_type` 字段（商品），但没有被用于筛选
 
 ## 解决方案
 
@@ -89,7 +89,7 @@ async def get_reports_list(
     status_filter: Optional[str] = Query(None, description="状态筛选"),
     start_date: Optional[str] = Query(None, description="开始日期"),
     end_date: Optional[str] = Query(None, description="结束日期"),
-    stock_code: Optional[str] = Query(None, description="股票代码"),
+    stock_code: Optional[str] = Query(None, description="品种代码"),
     user: dict = Depends(get_current_user)
 ):
 
@@ -99,10 +99,10 @@ async def get_reports_list(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
     search_keyword: Optional[str] = Query(None, description="搜索关键词"),
-    market_filter: Optional[str] = Query(None, description="市场筛选（A股/港股/美股）"),
+    market_filter: Optional[str] = Query(None, description="市场筛选（商品）"),
     start_date: Optional[str] = Query(None, description="开始日期"),
     end_date: Optional[str] = Query(None, description="结束日期"),
-    stock_code: Optional[str] = Query(None, description="股票代码"),
+    stock_code: Optional[str] = Query(None, description="品种代码"),
     user: dict = Depends(get_current_user)
 ):
 ```
@@ -189,7 +189,7 @@ class ReportFilter(BaseModel):
 ```
 
 **关键字段**：
-- `market_type`：市场类型（A股/港股/美股）
+- `market_type`：市场类型（商品）
 - ~~`status`~~：不存在（所有报告都是成功生成的）
 
 ## 验证
@@ -200,7 +200,7 @@ class ReportFilter(BaseModel):
    - 访问 `/reports`
 
 2. **测试市场筛选**：
-   - ✅ 选择"A股"，只显示 A股 报告
+   - ✅ 选择"A股"，只显示 国内期货 报告
    - ✅ 选择"港股"，只显示港股报告
    - ✅ 选择"美股"，只显示美股报告
    - ✅ 清除筛选，显示所有报告
@@ -212,7 +212,7 @@ class ReportFilter(BaseModel):
 
 4. **验证 UI**：
    - ✅ 筛选器显示"市场筛选"
-   - ✅ 选项为"A股/港股/美股"
+   - ✅ 选项为"商品"
    - ✅ 可以清除筛选
 
 ### 预期结果
@@ -272,7 +272,7 @@ Authorization: Bearer <token>
    </el-select>
    ```
 
-2. **股票筛选页面**（`frontend/src/views/Screening/index.vue`）：
+2. **品种筛选页面**（`frontend/src/views/Screening/index.vue`）：
    ```typescript
    const filters = reactive({
      market: 'A股',

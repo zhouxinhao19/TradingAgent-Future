@@ -135,7 +135,7 @@ class OptimizedUSDataProvider:
 
 ### 方案 A：完整重构（推荐，但工作量大）
 
-1. **创建统一的美股 Provider 基类**
+1. **创建统一的国际期货 Provider 基类**
    ```python
    # providers/us/base.py
    from ..base_provider import BaseStockDataProvider

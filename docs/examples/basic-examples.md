@@ -4,7 +4,7 @@
 
 本文档提供了 TradingAgents 框架的基本使用示例，帮助您快速上手并了解各种功能的使用方法。
 
-## 示例 1: 基本股票分析
+## 示例 1: 基本期货分析
 
 ### 最简单的使用方式
 ```python
@@ -14,7 +14,7 @@ from tradingagents.default_config import DEFAULT_CONFIG
 # 使用默认配置
 ta = TradingAgentsGraph(debug=True, config=DEFAULT_CONFIG.copy())
 
-# 分析苹果公司股票
+# 分析苹果公司期货品种
 state, decision = ta.propagate("AAPL", "2024-01-15")
 
 print(f"推荐动作: {decision['action']}")
@@ -26,7 +26,7 @@ print(f"推理: {decision['reasoning']}")
 ```
 推荐动作: buy
 置信度: 0.75
-推理: 基于强劲的基本面数据和积极的技术指标，建议买入AAPL股票...
+推理: 基于强劲的基本面数据和积极的技术指标，建议买入AAPL期货品种...
 ```
 
 ## 示例 2: 自定义配置分析
@@ -70,22 +70,22 @@ def analyze_with_custom_config(symbol, date):
 state, decision = analyze_with_custom_config("TSLA", "2024-01-15")
 
 print("\n=== 分析结果 ===")
-print(f"股票: TSLA")
+print(f"期货品种: TSLA")
 print(f"动作: {decision['action']}")
 print(f"数量: {decision.get('quantity', 0)}")
 print(f"置信度: {decision['confidence']:.1%}")
 print(f"风险评分: {decision['risk_score']:.1%}")
 ```
 
-## 示例 3: 批量股票分析
+## 示例 3: 批量期货分析
 
-### 分析多只股票
+### 分析多只期货品种
 ```python
 import pandas as pd
 from datetime import datetime, timedelta
 
 def batch_analysis(symbols, date):
-    """批量分析多只股票"""
+    """批量分析多只期货品种"""
     
     # 配置
     config = DEFAULT_CONFIG.copy()
@@ -282,13 +282,13 @@ print(f"\n平均置信度: {avg_confidence:.1%}")
 
 ## 示例 6: 实时监控
 
-### 实时股票监控
+### 实时期货品种监控
 ```python
 import time
 from datetime import datetime
 
 def real_time_monitor(symbols, check_interval=300):
-    """实时监控股票"""
+    """实时监控期货品种"""
     
     config = DEFAULT_CONFIG.copy()
     config["max_debate_rounds"] = 1
@@ -296,7 +296,7 @@ def real_time_monitor(symbols, check_interval=300):
     
     ta = TradingAgentsGraph(debug=False, config=config)
     
-    print(f"开始监控 {len(symbols)} 只股票...")
+    print(f"开始监控 {len(symbols)} 只期货品种...")
     print(f"检查间隔: {check_interval} 秒")
     print("按 Ctrl+C 停止监控\n")
     

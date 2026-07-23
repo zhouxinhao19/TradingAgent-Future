@@ -1,4 +1,4 @@
-# 修复：股票基础信息同步支持多数据源自动切换
+# 修复：期货品种基础信息同步支持多数据源自动切换
 
 ## 📋 问题描述
 
@@ -9,7 +9,7 @@
 **错误日志**：
 ```
 2025-10-17 09:25:32 | app.services.basics_sync_service | ERROR    | ❌ Tushare 数据源已禁用 (TUSHARE_ENABLED=false)
-💡 股票基础信息同步需要 Tushare 数据源
+💡 期货品种基础信息同步需要 Tushare 数据源
 📋 解决方案：
    1. 在 .env 文件中设置 TUSHARE_ENABLED=true
    2. 配置有效的 TUSHARE_TOKEN
@@ -28,7 +28,7 @@
 
 ### 方案选择
 
-项目中已经存在两套股票基础信息同步服务：
+项目中已经存在两套期货品种基础信息同步服务：
 
 1. **`BasicsSync Service`** (`app/services/basics_sync_service.py`)
    - ❌ 只支持 Tushare 数据源
@@ -64,11 +64,11 @@ preferred_sources = None  # None 表示使用默认优先级顺序
 if settings.TUSHARE_ENABLED:
     # Tushare 启用时，优先使用 Tushare
     preferred_sources = ["tushare", "akshare", "baostock"]
-    logger.info("📊 股票基础信息同步优先数据源: Tushare > AKShare > BaoStock")
+    logger.info("📊 期货品种基础信息同步优先数据源: Tushare > AKShare > BaoStock")
 else:
     # Tushare 禁用时，使用 AKShare 和 BaoStock
     preferred_sources = ["akshare", "baostock"]
-    logger.info("📊 股票基础信息同步优先数据源: AKShare > BaoStock (Tushare已禁用)")
+    logger.info("📊 期货品种基础信息同步优先数据源: AKShare > BaoStock (Tushare已禁用)")
 
 # 立即在启动后尝试一次（不阻塞）
 async def run_sync_with_sources():
@@ -153,7 +153,7 @@ if not settings.TUSHARE_ENABLED:
 
 **日志输出**：
 ```
-📊 股票基础信息同步优先数据源: Tushare > AKShare > BaoStock
+📊 期货品种基础信息同步优先数据源: Tushare > AKShare > BaoStock
 Available data sources: ['tushare', 'akshare', 'baostock']
 Successfully fetched 5000 stocks from tushare
 ```
@@ -164,7 +164,7 @@ Successfully fetched 5000 stocks from tushare
 
 **日志输出**：
 ```
-📊 股票基础信息同步优先数据源: AKShare > BaoStock (Tushare已禁用)
+📊 期货品种基础信息同步优先数据源: AKShare > BaoStock (Tushare已禁用)
 Available data sources: ['akshare', 'baostock']
 Successfully fetched 5000 stocks from akshare
 ```
@@ -197,8 +197,8 @@ TUSHARE_ENABLED=false
 ```
 
 **预期结果**：
-- ✅ 系统启动时显示：`📊 股票基础信息同步优先数据源: AKShare > BaoStock (Tushare已禁用)`
-- ✅ 自动使用 AKShare 获取股票列表
+- ✅ 系统启动时显示：`📊 期货品种基础信息同步优先数据源: AKShare > BaoStock (Tushare已禁用)`
+- ✅ 自动使用 AKShare 获取期货品种列表
 - ✅ 如果 AKShare 失败，自动切换到 BaoStock
 - ✅ 不再出现 5 秒等待超时
 
@@ -211,8 +211,8 @@ TUSHARE_TOKEN=your_token_here
 ```
 
 **预期结果**：
-- ✅ 系统启动时显示：`📊 股票基础信息同步优先数据源: Tushare > AKShare > BaoStock`
-- ✅ 优先使用 Tushare 获取股票列表
+- ✅ 系统启动时显示：`📊 期货品种基础信息同步优先数据源: Tushare > AKShare > BaoStock`
+- ✅ 优先使用 Tushare 获取期货品种列表
 - ✅ 如果 Tushare 失败，自动切换到 AKShare
 - ✅ 如果 AKShare 失败，自动切换到 BaoStock
 
@@ -230,7 +230,7 @@ TUSHARE_TOKEN=your_token_here
 ### 相关配置项
 
 ```bash
-# 股票基础信息同步总开关
+# 期货品种基础信息同步总开关
 SYNC_STOCK_BASICS_ENABLED=true
 
 # 调度时间（CRON 表达式优先）

@@ -2,7 +2,7 @@
 
 ## 概述
 
-TradingAgents-CN 新闻数据系统提供了完整的股票新闻数据获取、存储、分析和查询功能。系统支持多数据源新闻聚合、智能情绪分析、重要性评估和高级查询功能。
+TradingAgents-CN 新闻数据系统提供了完整的期货品种新闻数据获取、存储、分析和查询功能。系统支持多数据源新闻聚合、智能情绪分析、重要性评估和高级查询功能。
 
 ## 系统架构
 
@@ -33,12 +33,12 @@ TradingAgents-CN 新闻数据系统提供了完整的股票新闻数据获取、
 ### 1. 多数据源新闻获取
 
 #### AKShare 新闻源
-- **个股新闻**: 东方财富个股新闻
+- **品种新闻**: 东方财富品种新闻
 - **市场新闻**: CCTV财经、新浪财经新闻
 - **数据字段**: 标题、内容、摘要、链接、来源、作者、发布时间
 
 #### Tushare 新闻源
-- **个股新闻**: Tushare个股新闻
+- **品种新闻**: Tushare品种新闻
 - **市场新闻**: Tushare市场新闻
 - **数据字段**: 标题、内容、来源、发布时间、重要性
 
@@ -78,8 +78,8 @@ sentiment_analysis = {
 // stock_news 集合结构
 {
   "_id": ObjectId,
-  "symbol": "000001",                    // 股票代码
-  "symbols": ["000001", "000002"],       // 多股票代码
+  "symbol": "000001",                    // 品种代码
+  "symbols": ["000001", "000002"],       // 多品种代码
   "title": "新闻标题",                   // 新闻标题
   "content": "新闻内容",                 // 新闻内容
   "summary": "新闻摘要",                 // 新闻摘要
@@ -103,16 +103,16 @@ sentiment_analysis = {
 ```javascript
 // 15个优化索引
 db.stock_news.createIndex({"url": 1, "title": 1, "publish_time": 1}, {unique: true})  // 唯一约束
-db.stock_news.createIndex({"symbol": 1})                                               // 股票代码
-db.stock_news.createIndex({"symbols": 1})                                              // 多股票代码
+db.stock_news.createIndex({"symbol": 1})                                               // 品种代码
+db.stock_news.createIndex({"symbols": 1})                                              // 多品种代码
 db.stock_news.createIndex({"publish_time": -1})                                        // 发布时间
-db.stock_news.createIndex({"symbol": 1, "publish_time": -1})                          // 股票时间复合
-db.stock_news.createIndex({"symbols": 1, "publish_time": -1})                         // 多股票时间复合
+db.stock_news.createIndex({"symbol": 1, "publish_time": -1})                          // 期货品种时间复合
+db.stock_news.createIndex({"symbols": 1, "publish_time": -1})                         // 多期货品种时间复合
 db.stock_news.createIndex({"category": 1})                                             // 新闻类别
 db.stock_news.createIndex({"sentiment": 1})                                            // 情绪分析
 db.stock_news.createIndex({"importance": 1})                                           // 重要性
 db.stock_news.createIndex({"data_source": 1})                                          // 数据源
-db.stock_news.createIndex({"symbol": 1, "category": 1, "publish_time": -1})           // 股票类别时间
+db.stock_news.createIndex({"symbol": 1, "category": 1, "publish_time": -1})           // 期货品种类别时间
 db.stock_news.createIndex({"sentiment": 1, "importance": 1, "publish_time": -1})      // 情绪重要性时间
 db.stock_news.createIndex({"title": "text", "content": "text", "summary": "text"})    // 全文搜索
 db.stock_news.createIndex({"created_at": -1})                                          // 创建时间
@@ -122,7 +122,7 @@ db.stock_news.createIndex({"created_at": -1})                                   
 
 ### 1. 新闻查询接口
 
-#### 查询股票新闻
+#### 查询期货品种新闻
 ```http
 GET /api/news-data/query/000001?hours_back=24&limit=20&category=company_announcement
 ```
@@ -209,7 +209,7 @@ Content-Type: application/json
 }
 ```
 
-#### 同步单只股票
+#### 同步单只期货品种
 ```http
 POST /api/news-data/sync/single?symbol=000001&hours_back=24&max_news_per_source=50
 ```
@@ -264,7 +264,7 @@ from app.worker.news_data_sync_service import get_news_data_sync_service
 # 获取同步服务
 sync_service = await get_news_data_sync_service()
 
-# 同步股票新闻
+# 同步期货品种新闻
 stats = await sync_service.sync_stock_news(
     symbol="000001",
     data_sources=["akshare"],
@@ -318,7 +318,7 @@ SYNC_CONFIG = {
 
 ### 3. 并发处理
 - **异步处理**: 全异步架构，支持高并发
-- **批量同步**: 支持多股票并发同步
+- **批量同步**: 支持多期货品种并发同步
 - **限流控制**: API调用限流，避免数据源限制
 
 ## 监控和日志
@@ -376,4 +376,4 @@ SYNC_CONFIG = {
 
 ## 总结
 
-TradingAgents-CN 新闻数据系统提供了完整的新闻数据管理解决方案，支持多数据源聚合、智能分析、高效存储和灵活查询。系统经过充分测试，性能优秀，可靠性高，是股票投资分析的重要工具。
+TradingAgents-CN 新闻数据系统提供了完整的新闻数据管理解决方案，支持多数据源聚合、智能分析、高效存储和灵活查询。系统经过充分测试，性能优秀，可靠性高，是期货投资分析的重要工具。

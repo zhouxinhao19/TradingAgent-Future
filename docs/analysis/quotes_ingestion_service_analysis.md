@@ -27,7 +27,7 @@
 | **交易时段判断** | 自动识别交易时段（09:30-11:30, 13:00-15:00） |
 | **休市处理** | 非交易时段跳过采集，保持上次收盘数据 |
 | **冷启动兜底** | 启动时自动补齐最新收盘快照 |
-| **数据覆盖** | 全市场 5000+ 只股票 |
+| **数据覆盖** | 全市场 5000+ 只期货品种 |
 
 ### 文件位置
 
@@ -280,7 +280,7 @@ async def backfill_last_close_snapshot_if_needed(self) -> None:
     ┌──────────────────────┐
     │ 批量写入 MongoDB     │
     │ (market_quotes)      │
-    │ - 5000+ 只股票       │
+    │ - 5000+ 只期货品种       │
     │ - Upsert 策略        │
     └──────────────────────┘
                 │
@@ -298,7 +298,7 @@ async def backfill_last_close_snapshot_if_needed(self) -> None:
 
 ## 使用场景
 
-### 1. 前端股票行情展示
+### 1. 前端期货行情展示
 
 **API 接口**：`GET /api/stocks/{code}/quote`
 
@@ -307,7 +307,7 @@ async def backfill_last_close_snapshot_if_needed(self) -> None:
 ```python
 @router.get("/{code}/quote", response_model=dict)
 async def get_quote(code: str, current_user: dict = Depends(get_current_user)):
-    """获取股票近实时快照"""
+    """获取期货品种近实时快照"""
     db = get_mongo_db()
     code6 = _zfill_code(code)
     
@@ -339,7 +339,7 @@ export const stocksApi = {
 }
 ```
 
-### 2. 自选股列表行情
+### 2. 自选品种列表行情
 
 **API 接口**：`GET /api/favorites`
 
@@ -527,7 +527,7 @@ db.market_quotes.createIndex({ "updated_at": 1 })
 **A**:
 - **MongoDB 集合**：`market_quotes`
 - **数据库**：`tradingagents`（默认）
-- **数据量**：5000+ 只股票，每只股票一条记录
+- **数据量**：5000+ 只期货品种，每只期货品种一条记录
 
 ### Q8: 如何禁用实时行情入库服务？
 
@@ -548,8 +548,8 @@ db.market_quotes.createIndex({ "updated_at": 1 })
 5. ✅ **冷启动兜底**：启动时自动补齐最新收盘快照
 
 **使用场景**：
-- 前端股票行情展示
-- 自选股列表行情
+- 前端期货行情展示
+- 自选品种列表行情
 - AI 分析报告
 - 实时行情 API
 

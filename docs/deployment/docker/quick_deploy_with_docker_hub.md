@@ -1,6 +1,6 @@
 # 🚀 TradingAgents-CN 快速部署指南（Docker Hub 镜像）
 
-> 5 分钟快速部署完整的 AI 股票分析系统
+> 5 分钟快速部署完整的 AI 期货分析系统
 
 ## 📋 前置要求
 
@@ -194,7 +194,7 @@ docker exec -it tradingagents-backend python scripts/import_config_and_create_us
    - platform_configs: 4 个配置
    - user_configs: 0 个配置
    - market_quotes: 5760 条行情数据
-   - stock_basic_info: 5684 条股票信息
+   - stock_basic_info: 5684 条期货品种信息
 
 🚀 开始导入...
    ✅ 导入成功
@@ -219,7 +219,7 @@ docker exec -it tradingagents-backend python scripts/import_config_and_create_us
   - LLM 提供商配置（8 个提供商）
   - LLM 模型目录（15+ 个模型）
   - 市场分类、用户标签、数据源分组等
-  - 示例股票数据（5000+ 条）
+  - 示例期货数据（5000+ 条）
 - ⚠️ 如果看到重复键错误（E11000），说明数据已存在，可以忽略
 
 **预期输出（完整导入）**：
@@ -248,7 +248,7 @@ docker exec -it tradingagents-backend python scripts/import_config_and_create_us
    - platform_configs: 4 个文档
    - model_catalog: 8 个文档
    - market_quotes: 5760 个实时行情数据
-   - stock_basic_info: 5684 个股票基础信息
+   - stock_basic_info: 5684 品种票基础信息
 
 🚀 开始导入...
    ✅ 导入成功
@@ -530,7 +530,7 @@ docker-compose -f docker-compose.hub.nginx.yml down -v
 ✅ 解决常见部署问题  
 
 **下一步**：
-1. 探索系统功能，运行第一个股票分析
+1. 探索系统功能，运行第一个期货分析
 2. 配置更多 AI 模型，对比分析效果
 3. 自定义分析策略和参数
 4. 集成到你的投资决策流程

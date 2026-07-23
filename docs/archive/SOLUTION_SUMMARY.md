@@ -1,8 +1,8 @@
-# 股票详情页分析报告展示问题 - 解决方案总结
+# 期货品种详情页分析报告展示问题 - 解决方案总结
 
 ## 📋 问题描述
 
-**用户反馈**：前端股票详情页可以获取到该股票的分析报告，但是没有展示出来，初步判断是前后端数据格式不一致导致的。
+**用户反馈**：前端期货品种详情页可以获取到该期货品种的分析报告，但是没有展示出来，初步判断是前后端数据格式不一致导致的。
 
 ---
 
@@ -35,8 +35,8 @@ GET /api/analysis/user/history?stock_code=002475&page=1&page_size=1&status=compl
     "analysts": ["market", "fundamentals", "investment_team", "trader", "risk_manager"],
     "research_depth": "快速",
     "reports": {
-      "market_report": "# 002475 股票技术分析报告\n\n## 一、价格趋势分析\n\n...",
-      "fundamentals_report": "### 1. **公司基本信息分析（立讯精密，股票代码：002475）**\n\n...",
+      "market_report": "# 002475 期货品种技术分析报告\n\n## 一、价格趋势分析\n\n...",
+      "fundamentals_report": "### 1. **公司基本信息分析（立讯精密，品种代码：002475）**\n\n...",
       "investment_plan": "我们来一场真正意义上的投资决策辩论——不是走形式，而是基于事实、逻辑和经验...",
       "trader_investment_plan": "最终交易建议: **卖出**\n\n### 📌 投资建议：**卖出**\n\n...",
       "final_trade_decision": "---\n\n## 📌 **最终决策：明确建议 —— 卖出（Sell）**\n\n...",
@@ -85,7 +85,7 @@ GET /api/analysis/user/history?stock_code=002475&page=1&page_size=1&status=compl
 ## ✅ 解决方案
 
 ### 核心思路
-在前端股票详情页添加报告展示功能，包括：
+在前端期货品种详情页添加报告展示功能，包括：
 1. 报告预览区域（显示报告数量和标签列表）
 2. "查看完整报告"按钮
 3. 报告对话框（使用标签页展示多个报告）
@@ -238,7 +238,7 @@ function exportReport() {
 ### 3. 报告导出
 - ✅ 导出为Markdown格式
 - ✅ 包含所有报告内容
-- ✅ 自动命名（股票代码_分析日期.md）
+- ✅ 自动命名（品种代码_分析日期.md）
 
 ### 4. 样式优化
 - ✅ 美观的Markdown渲染样式

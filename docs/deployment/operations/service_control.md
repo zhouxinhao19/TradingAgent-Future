@@ -26,7 +26,7 @@ python -m app
 
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
-| `SYNC_STOCK_BASICS_ENABLED` | `true` | 股票基础信息同步 |
+| `SYNC_STOCK_BASICS_ENABLED` | `true` | 期货品种基础信息同步 |
 | `QUOTES_INGEST_ENABLED` | `true` | 实时行情入库任务 |
 | `QUOTES_INGEST_INTERVAL_SECONDS` | `30` | 行情入库间隔（秒） |
 

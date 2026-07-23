@@ -2,7 +2,7 @@
 
 ## 概述
 
-分析师团队是 TradingAgents 框架的核心分析组件，负责从不同维度对股票进行专业分析。团队由四类专业分析师组成，每个分析师都专注于特定的分析领域，通过协作为投资决策提供全面的数据支持。
+分析师团队是 TradingAgents 框架的核心分析组件，负责从不同维度对期货品种进行专业分析。团队由四类专业分析师组成，每个分析师都专注于特定的分析领域，通过协作为投资决策提供全面的数据支持。
 
 ## 分析师架构
 
@@ -30,7 +30,7 @@ def analyst_node(state):
 
 ```python
 class AgentState:
-    company_of_interest: str      # 股票代码
+    company_of_interest: str      # 品种代码
     trade_date: str              # 交易日期
     fundamentals_report: str     # 基本面报告
     market_report: str           # 市场分析报告
@@ -51,7 +51,7 @@ class AgentState:
 - 提供基于财务数据的投资建议
 
 **技术特性**:
-- 使用统一工具架构自动识别股票类型
+- 使用统一工具架构自动识别期货品种类型
 - 支持A股、港股、美股的基本面分析
 - 智能选择合适的数据源（在线/离线模式）
 
@@ -62,7 +62,7 @@ def create_fundamentals_analyst(llm, toolkit):
     def fundamentals_analyst_node(state):
         ticker = state["company_of_interest"]
         
-        # 获取股票市场信息
+        # 获取期货市场信息
         from tradingagents.utils.stock_utils import StockUtils
         market_info = StockUtils.get_market_info(ticker)
         
@@ -78,7 +78,7 @@ def create_fundamentals_analyst(llm, toolkit):
 ```
 
 **支持的数据源**:
-- **A股**: 统一接口获取中国股票信息
+- **A股**: 统一接口获取中国期货品种信息
 - **港股**: 改进的港股工具
 - **美股**: FinnHub、SimFin等数据源
 
@@ -140,7 +140,7 @@ def create_fundamentals_analyst(llm, toolkit):
 **文件位置**: `tradingagents/agents/analysts/china_market_analyst.py`
 
 **核心职责**:
-- 专门针对中国A股市场的分析
+- 专门针对中国期货市场的分析
 - 中国特色的市场因素分析
 - 政策环境影响评估
 - 本土化的投资逻辑
@@ -149,14 +149,14 @@ def create_fundamentals_analyst(llm, toolkit):
 
 ### 统一工具架构
 
-分析师使用统一的工具接口，支持自动股票类型识别：
+分析师使用统一的工具接口，支持自动期货品种类型识别：
 
 ```python
 # 统一基本面分析工具
 tools = [toolkit.get_stock_fundamentals_unified]
 
-# 工具内部自动识别股票类型并调用相应数据源
-# - A股: 使用中国股票数据接口
+# 工具内部自动识别期货品种类型并调用相应数据源
+# - A股: 使用中国期货数据接口
 # - 港股: 使用港股专用接口
 # - 美股: 使用FinnHub等国际数据源
 ```
@@ -173,7 +173,7 @@ tools = [toolkit.get_stock_fundamentals_unified]
 - 成本低但数据可能滞后
 - 适合开发和测试
 
-## 股票类型支持
+## 期货品种类型支持
 
 ### 市场识别机制
 
@@ -193,17 +193,17 @@ market_info = StockUtils.get_market_info(ticker)
 ### 支持的市场
 
 1. **中国A股**
-   - 股票代码格式：000001, 600000等
+   - 品种代码格式：000001, 600000等
    - 货币单位：人民币(CNY)
-   - 数据源：统一中国股票接口
+   - 数据源：统一中国期货品种接口
 
 2. **香港股市**
-   - 股票代码格式：0700.HK, 00700等
+   - 品种代码格式：0700.HK, 00700等
    - 货币单位：港币(HKD)
    - 数据源：改进的港股工具
 
 3. **美国股市**
-   - 股票代码格式：AAPL, TSLA等
+   - 品种代码格式：AAPL, TSLA等
    - 货币单位：美元(USD)
    - 数据源：FinnHub, Yahoo Finance等
 
@@ -212,7 +212,7 @@ market_info = StockUtils.get_market_info(ticker)
 ### 1. 数据获取阶段
 ```mermaid
 graph LR
-    A[股票代码] --> B[市场类型识别]
+    A[品种代码] --> B[市场类型识别]
     B --> C[选择数据源]
     C --> D[获取原始数据]
     D --> E[数据预处理]
@@ -272,7 +272,7 @@ logger = get_logger("default")
 
 # 详细的调试日志
 logger.debug(f"📊 [DEBUG] 基本面分析师节点开始")
-logger.info(f"📊 [基本面分析师] 正在分析股票: {ticker}")
+logger.info(f"📊 [基本面分析师] 正在分析期货品种: {ticker}")
 logger.warning(f"⚠️ [DEBUG] memory为None，跳过历史记忆检索")
 ```
 
@@ -344,7 +344,7 @@ selected_analysts.append("custom")
    - 查看速率限制
 
 2. **数据格式错误**
-   - 检查股票代码格式
+   - 检查品种代码格式
    - 验证市场类型识别
    - 查看数据源兼容性
 

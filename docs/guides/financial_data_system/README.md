@@ -2,7 +2,7 @@
 
 ## 🎯 概述
 
-TradingAgents-CN财务数据系统提供了完整的股票财务数据管理功能，支持多数据源同步、统一存储、高效查询和数据对比分析。
+TradingAgents-CN财务数据系统提供了完整的期货品种财务数据管理功能，支持多数据源同步、统一存储、高效查询和数据对比分析。
 
 ### ✨ 核心特性
 
@@ -57,7 +57,7 @@ graph TD
 ```javascript
 {
   "_id": ObjectId("..."),
-  "symbol": "000001",           // 股票代码
+  "symbol": "000001",           // 品种代码
   "full_symbol": "000001.SZ",   // 完整代码
   "market": "CN",               // 市场标识
   "report_period": "20231231",  // 报告期 (YYYYMMDD)
@@ -119,7 +119,7 @@ python test_financial_data_system.py
 #### 查询财务数据
 
 ```bash
-# 查询股票财务数据
+# 查询期货品种财务数据
 GET /api/financial-data/query/000001?limit=10
 
 # 获取最新财务数据
@@ -148,7 +148,7 @@ POST /api/financial-data/sync/start
   "delay_seconds": 1.0
 }
 
-# 同步单只股票
+# 同步单只期货品种
 POST /api/financial-data/sync/single
 {
   "symbol": "000001",
@@ -216,7 +216,7 @@ results = await sync_service.sync_financial_data(
     batch_size=50
 )
 
-# 单股票同步
+# 单期货品种同步
 result = await sync_service.sync_single_stock(
     symbol="000001",
     data_sources=["tushare"]
@@ -226,7 +226,7 @@ result = await sync_service.sync_single_stock(
 ### 4. 数据库查询
 
 ```javascript
-// 查询股票财务数据
+// 查询期货品种财务数据
 db.stock_financial_data.find({"symbol": "000001"})
 
 // 查询最新财务数据
@@ -315,7 +315,7 @@ async def compare_financial_data(symbol: str, report_period: str):
 ```python
 # 行业财务指标分析
 async def analyze_industry_financials(industry: str):
-    # 获取行业股票列表
+    # 获取行业期货品种列表
     stocks = await get_industry_stocks(industry)
     
     # 批量获取财务数据
@@ -336,7 +336,7 @@ async def analyze_industry_financials(industry: str):
 async def scheduled_financial_sync():
     sync_service = await get_financial_sync_service()
     
-    # 同步主要股票的财务数据
+    # 同步主要期货品种的财务数据
     results = await sync_service.sync_financial_data(
         symbols=get_major_stocks(),
         data_sources=["tushare", "akshare"],

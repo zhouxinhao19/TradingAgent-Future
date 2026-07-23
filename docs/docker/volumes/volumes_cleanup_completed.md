@@ -63,7 +63,7 @@
 **重要集合**:
 - `system_configs` - 系统配置
 - `users` - 用户数据
-- `stock_basic_info` - 股票基础信息
+- `stock_basic_info` - 期货品种基础信息
 - `market_quotes` - 市场行情
 - `analysis_tasks` - 分析任务
 - `analysis_reports` - 分析报告
@@ -196,7 +196,7 @@ docker-compose -f docker-compose.v1.0.0.yml up -d
 ✅ **您的数据完全安全**：
 - 所有重要数据都在 `tradingagents_mongodb_data` 中
 - 15 个 LLM 配置完整保留
-- 所有用户数据、股票数据、分析报告都完整保留
+- 所有用户数据、期货数据、分析报告都完整保留
 
 ### 备份建议
 

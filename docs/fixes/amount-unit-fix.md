@@ -3,14 +3,14 @@
 ## 📋 问题描述
 
 ### 现象
-在股票详情页面，成交额显示错误：
+在期货品种详情页面，成交额显示错误：
 - **实际值**: 90.92亿元
 - **显示值**: 909.18万元
 - **错误倍数**: 10,000倍（差了4个数量级）
 
 ### 影响范围
-- 股票详情页面的成交额显示
-- 所有使用 Tushare 数据源的股票
+- 期货品种详情页面的成交额显示
+- 所有使用 Tushare 数据源的期货品种
 - `market_quotes` 集合中的成交额数据
 - `stock_daily_quotes` 集合中的成交额数据
 
@@ -146,7 +146,7 @@ python test_amount_fix.py
 ================================================================================
 
 1️⃣ 测试 Tushare Provider 标准化
-   股票代码: 300750
+   品种代码: 300750
 
 2️⃣ 获取历史数据
    日期范围: 2025-10-30 ~ 2025-11-04
@@ -200,7 +200,7 @@ python cli/tushare_init.py --full --historical-days 30
 
 ### 3. 验证前端显示
 
-1. 打开股票详情页面：`http://localhost:8000/stocks/300750`
+1. 打开期货品种详情页面：`http://localhost:8000/stocks/300750`
 2. 查看成交额字段
 3. **预期显示**: `90.92亿` ✅
 4. **错误显示**: `909.18万` ❌
@@ -224,7 +224,7 @@ python cli/tushare_init.py --full --historical-days 30
 | 数据源 | 原始单位 | 转换后单位 | 转换系数 | 官方文档 |
 |--------|---------|-----------|---------|---------|
 | Tushare | **千元** | 元 | × 1000 | [Tushare日线行情](https://tushare.pro/document/2?doc_id=27) |
-| AKShare | 元 | 元 | × 1 | [AKShare股票数据](https://akshare.akfamily.xyz/data/stock/stock.html) |
+| AKShare | 元 | 元 | × 1 | [AKShare期货数据](https://akshare.akfamily.xyz/data/stock/stock.html) |
 | BaoStock | 元 | 元 | × 1 | [BaoStock API文档](http://baostock.com/baostock/index.php/Python_API%E6%96%87%E6%A1%A3) |
 
 **官方文档说明**：
@@ -265,7 +265,7 @@ python run.py
 
 ### 4. 验证修复
 
-访问股票详情页面，检查成交额显示是否正确。
+访问期货品种详情页面，检查成交额显示是否正确。
 
 ---
 
@@ -305,6 +305,6 @@ python run.py
 ## 📚 参考资料
 
 - [Tushare 日线行情接口文档](https://tushare.pro/document/2?doc_id=27)
-- [AKShare 股票数据文档](https://akshare.akfamily.xyz/data/stock/stock.html)
+- [AKShare 期货数据文档](https://akshare.akfamily.xyz/data/stock/stock.html)
 - [MongoDB 数据库集合对比文档](../architecture/database/MONGODB_COLLECTIONS_COMPARISON.md)
 

@@ -50,7 +50,7 @@ async def get_stock_quotes(self, symbol: str) -> Optional[Dict[str, Any]]:
 
 ```python
 async def _get_and_save_quotes(self, symbol: str) -> bool:
-    """获取并保存单个股票行情"""
+    """获取并保存单个期货行情"""
     try:
         quotes = await self.provider.get_stock_quotes(symbol)
         # ... 保存数据的代码 ...
@@ -119,7 +119,7 @@ async def sync_realtime_quotes(self, symbols: List[str] = None) -> Dict[str, Any
     }
     
     try:
-        # ... 获取股票列表 ...
+        # ... 获取期货品种列表 ...
         
         # 批量处理
         for i in range(0, len(symbols), self.batch_size):
@@ -166,7 +166,7 @@ async def sync_realtime_quotes(self, symbols: List[str] = None) -> Dict[str, Any
 ```
 2025-10-03 11:55:52 | ERROR | ❌ 获取实时行情失败 symbol=301307: 抱歉，您每分钟最多访问该接口800次
 2025-10-03 11:55:52 | ERROR | ❌ 获取实时行情失败 symbol=301303: 抱歉，您每分钟最多访问该接口800次
-... (继续处理剩余 4636 只股票，生成大量错误日志)
+... (继续处理剩余 4636 只期货品种，生成大量错误日志)
 2025-10-03 11:55:52 | INFO | 📈 行情同步进度: 2600/5436 (成功: 0, 错误: 2600)
 ```
 
@@ -182,7 +182,7 @@ async def sync_realtime_quotes(self, symbols: List[str] = None) -> Dict[str, Any
 
 1. **立即停止**：检测到限流错误后立即停止，不再浪费资源
 2. **清晰日志**：明确标记任务因限流而停止
-3. **统计准确**：记录实际处理的股票数量和耗时
+3. **统计准确**：记录实际处理的期货品种数量和耗时
 4. **可扩展**：支持多种限流错误关键词检测
 
 ## 🔧 相关文件

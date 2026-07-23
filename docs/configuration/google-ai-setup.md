@@ -1,6 +1,6 @@
 # Google AI 配置指南
 
-本指南将帮助您配置Google AI (Gemini)模型，以便在TradingAgents-CN中使用Google的强大AI能力进行股票分析。
+本指南将帮助您配置Google AI (Gemini)模型，以便在TradingAgents-CN中使用Google的强大AI能力进行期货分析。
 
 ## 🎯 概述
 
@@ -43,7 +43,7 @@ GOOGLE_API_KEY=your_google_api_key_here
 #### Gemini 2.5 Pro
 - **模型名称**: `gemini-2.5-pro`
 - **特点**: Google最新旗舰模型，性能卓越
-- **适用场景**: 复杂股票分析，重要投资决策
+- **适用场景**: 复杂期货分析，重要投资决策
 - **优势**: 
   - 🧠 最强的推理能力
   - 🌍 优秀的中文理解
@@ -80,7 +80,7 @@ GOOGLE_API_KEY=your_google_api_key_here
 #### Gemini 2.0 Flash (推荐)
 - **模型名称**: `gemini-2.0-flash`
 - **特点**: 最新版本，性能优秀，LangChain集成稳定
-- **适用场景**: 日常股票分析，推荐首选
+- **适用场景**: 日常期货分析，推荐首选
 - **优势**: 
   - 🧠 优秀的推理能力
   - 🌍 完美的中文支持
@@ -116,7 +116,7 @@ GOOGLE_API_KEY=your_google_api_key_here
    - 启用记忆功能获得更好效果
 
 3. **开始分析**:
-   - 输入股票代码
+   - 输入品种代码
    - 选择分析师
    - 点击"开始分析"
 
@@ -162,7 +162,7 @@ TradingAgents-CN的一个独特功能是智能混合嵌入服务：
     ↓  
 💾 ChromaDB (向量数据库)
     ↓
-🎯 中文股票分析结果
+🎯 中文期货分析结果
 ```
 
 ### 优势

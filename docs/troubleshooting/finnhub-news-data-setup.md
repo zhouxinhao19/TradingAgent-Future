@@ -5,7 +5,7 @@
 如果您遇到以下错误信息：
 
 ```
-[DEBUG] FinnhubNewsTool调用，股票代码: AAPL 
+[DEBUG] FinnhubNewsTool调用，品种代码: AAPL 
 获取新闻数据失败: [Errno 2] No such file or directory: '/Users/yluo/Documents/Code/ScAI/FR1-data\\finnhub_data\\news_data\\AAPL_data_formatted.json'
 ```
 
@@ -72,7 +72,7 @@
 
 3. **脚本参数说明**
    - `--data-type`: 数据类型 (news, sentiment, transactions, all)
-   - `--symbols`: 股票代码，用逗号分隔
+   - `--symbols`: 品种代码，用逗号分隔
    - `--days`: 新闻数据天数 (默认7天)
    - `--force-refresh`: 强制刷新已存在的数据
    - `--all`: 下载所有类型数据

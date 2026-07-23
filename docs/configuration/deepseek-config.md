@@ -44,10 +44,10 @@ DEEPSEEK_ENABLED=true
 
 | 模型名称 | 说明 | 适用场景 | 上下文长度 | 推荐度 |
 |---------|------|---------|-----------|--------|
-| **deepseek-chat** | 通用对话模型 | 股票投资分析、推荐使用 | 128K | ⭐⭐⭐⭐⭐ |
+| **deepseek-chat** | 通用对话模型 | 期货投资分析、推荐使用 | 128K | ⭐⭐⭐⭐⭐ |
 
 **说明**：
-- ✅ **deepseek-chat**：最适合股票投资分析，平衡了技术分析和自然语言表达
+- ✅ **deepseek-chat**：最适合期货投资分析，平衡了技术分析和自然语言表达
 - ⚠️ **deepseek-coder**：虽然支持工具调用，但专注代码任务，在投资建议表达方面不如通用模型
 - ❌ **deepseek-reasoner**：不支持工具调用，不适用于TradingAgents的智能体架构
 
@@ -75,7 +75,7 @@ python -m cli.main
 ### 2. Web界面使用
 
 1. 在分析页面选择DeepSeek模型
-2. 输入股票代码
+2. 输入品种代码
 3. 选择分析深度
 4. 开始分析
 
@@ -96,16 +96,16 @@ from langchain.tools import tool
 
 @tool
 def get_stock_price(symbol: str) -> str:
-    """获取股票价格"""
-    return f"股票{symbol}的价格信息"
+    """获取期货价格"""
+    return f"期货品种{symbol}的价格信息"
 
 agent = adapter.create_agent(
     tools=[get_stock_price],
-    system_prompt="你是股票分析专家"
+    system_prompt="你是期货分析专家"
 )
 
 # 执行分析
-result = agent.invoke({"input": "分析AAPL股票"})
+result = agent.invoke({"input": "分析AAPL期货品种"})
 print(result["output"])
 ```
 
@@ -216,4 +216,4 @@ DeepSeek V3为TradingAgents提供了：
 - 📊 **专业的分析能力**：适合金融数据分析
 - 🚀 **快速的响应速度**：API响应稳定快速
 
-通过DeepSeek V3，您可以享受到高质量、低成本的AI股票分析服务！
+通过DeepSeek V3，您可以享受到高质量、低成本的AI期货分析服务！

@@ -2,10 +2,10 @@
 
 ## 问题现象
 
-用户提交批量分析3个股票代码时：
-- 前端传了3个股票代码，例如：`["000001", "600519", "600036"]`
-- 但是只有最后一个股票（`600036`）创建了任务
-- 前面两个股票没有创建任务
+用户提交批量分析3个品种代码时：
+- 前端传了3个品种代码，例如：`["000001", "600519", "600036"]`
+- 但是只有最后一品种票（`600036`）创建了任务
+- 前面两品种票没有创建任务
 - 接口返回 400 错误
 - 日志显示错误：`is bound to a different event loop`
 
@@ -21,7 +21,7 @@
 - **位置**：`app/services/simple_analysis_service.py` - `create_analysis_task` 和 `execute_analysis_background` 方法
 - **问题**：代码直接使用 `request.stock_code`，但 `SingleAnalysisRequest` 模型中 `stock_code` 是 `Optional` 的
 - **后果**：如果前端传的是 `symbol` 字段，`request.stock_code` 为 `None`，导致创建任务失败
-- **修复**：使用 `request.get_symbol()` 方法获取股票代码（兼容两个字段）
+- **修复**：使用 `request.get_symbol()` 方法获取品种代码（兼容两个字段）
 
 ### 问题3：线程池配置问题（已修复）
 - **影响**：资源竞争导致性能下降
@@ -56,7 +56,7 @@ task_state = await self.memory_manager.create_task(
 # ✅ 修复代码
 stock_code = request.get_symbol()  # 兼容 symbol 和 stock_code 字段
 if not stock_code:
-    raise ValueError("股票代码不能为空")
+    raise ValueError("品种代码不能为空")
 
 logger.info(f"📝 创建分析任务: {task_id} - {stock_code}")
 task_state = await self.memory_manager.create_task(
@@ -71,7 +71,7 @@ task_state = await self.memory_manager.create_task(
 
 ```python
 # ❌ 问题代码
-logger.info(f"🔍 开始验证股票代码: {request.stock_code}")
+logger.info(f"🔍 开始验证品种代码: {request.stock_code}")
 validation_result = await asyncio.to_thread(
     prepare_stock_data,
     stock_code=request.stock_code,  # ❌ 可能是 None
@@ -80,7 +80,7 @@ validation_result = await asyncio.to_thread(
 
 # ✅ 修复代码
 stock_code = request.get_symbol()  # 兼容 symbol 和 stock_code 字段
-logger.info(f"🔍 开始验证股票代码: {stock_code}")
+logger.info(f"🔍 开始验证品种代码: {stock_code}")
 validation_result = await asyncio.to_thread(
     prepare_stock_data,
     stock_code=stock_code,  # ✅ 确保有值
@@ -151,7 +151,7 @@ asyncio.create_task(run_concurrent_analysis())
 
 ```python
 logger.info(f"🎯 [批量分析] 收到批量分析请求: title={request.title}")
-logger.info(f"📊 [批量分析] 股票代码列表: {stock_symbols}")
+logger.info(f"📊 [批量分析] 品种代码列表: {stock_symbols}")
 
 for i, symbol in enumerate(stock_symbols):
     logger.info(f"📝 [批量分析] 正在创建第 {i+1}/{len(stock_symbols)} 个任务: {symbol}")
@@ -163,7 +163,7 @@ for i, symbol in enumerate(stock_symbols):
 
 1. **app/routers/analysis.py**
    - 添加 `import asyncio`
-   - 第753-772行：添加批量分析数量限制（最多10个股票）
+   - 第753-772行：添加批量分析数量限制（最多10品种票）
    - 第789-823行：`submit_batch_analysis` 端点改用 `asyncio.create_task`
    - 添加详细日志
 
@@ -189,7 +189,7 @@ for i, symbol in enumerate(stock_symbols):
 
 ```
 🎯 [批量分析] 收到批量分析请求: title=批量分析
-📊 [批量分析] 股票代码列表: ['000001', '600519', '600036']
+📊 [批量分析] 品种代码列表: ['000001', '600519', '600036']
 📝 [批量分析] 正在创建第 1/3 个任务: 000001
 ✅ [批量分析] 已创建任务: xxx-xxx-xxx - 000001
 📝 [批量分析] 正在创建第 2/3 个任务: 600519
@@ -217,11 +217,11 @@ for i, symbol in enumerate(stock_symbols):
 
 根据日志分析：
 
-1. **前端传了3个股票代码**：`["000001", "600519", "600036"]`
+1. **前端传了3个品种代码**：`["000001", "600519", "600036"]`
 2. **循环创建任务时**：
-   - 第1个股票（`000001`）：`request.stock_code` 为 `None`，创建失败，抛出异常
-   - 第2个股票（`600519`）：`request.stock_code` 为 `None`，创建失败，抛出异常
-   - 第3个股票（`600036`）：由于某种原因（可能是前端兼容性代码），`request.stock_code` 有值，创建成功
+   - 第1品种票（`000001`）：`request.stock_code` 为 `None`，创建失败，抛出异常
+   - 第2品种票（`600519`）：`request.stock_code` 为 `None`，创建失败，抛出异常
+   - 第3品种票（`600036`）：由于某种原因（可能是前端兼容性代码），`request.stock_code` 有值，创建成功
 3. **异常被捕获**：在 `try-except` 块中，前两个任务的异常被捕获，但没有详细日志
 4. **返回400错误**：最终抛出异常，返回400错误
 
@@ -230,18 +230,18 @@ for i, symbol in enumerate(stock_symbols):
 ```python
 class SingleAnalysisRequest(BaseModel):
     """单股分析请求"""
-    symbol: Optional[str] = Field(None, description="6位股票代码")
-    stock_code: Optional[str] = Field(None, description="股票代码(已废弃,使用symbol)")
+    symbol: Optional[str] = Field(None, description="6位品种代码")
+    stock_code: Optional[str] = Field(None, description="品种代码(已废弃,使用symbol)")
     parameters: Optional[AnalysisParameters] = None
 
     def get_symbol(self) -> str:
-        """获取股票代码(兼容旧字段)"""
+        """获取品种代码(兼容旧字段)"""
         return self.symbol or self.stock_code or ""
 ```
 
 **关键点**：
 - `symbol` 和 `stock_code` 都是 `Optional` 的
-- 应该使用 `get_symbol()` 方法获取股票代码，而不是直接访问 `stock_code` 属性
+- 应该使用 `get_symbol()` 方法获取品种代码，而不是直接访问 `stock_code` 属性
 - `get_symbol()` 会优先返回 `symbol`，如果没有则返回 `stock_code`
 
 ## 并发控制
@@ -254,28 +254,28 @@ self._thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=3)
 ```
 
 - **最多同时执行3个分析任务**
-- 如果提交了超过3个股票，多余的任务会排队等待
+- 如果提交了超过3品种票，多余的任务会排队等待
 - 根据服务器资源可以调整 `max_workers` 参数
 
 ### 批量分析数量限制
 
 ```python
 # app/models/analysis.py
-symbols: Optional[List[str]] = Field(None, min_items=1, max_items=10, description="股票代码列表（最多10个）")
+symbols: Optional[List[str]] = Field(None, min_items=1, max_items=10, description="品种代码列表（最多10个）")
 
 # app/routers/analysis.py
 MAX_BATCH_SIZE = 10
 if len(stock_symbols) > MAX_BATCH_SIZE:
-    raise ValueError(f"批量分析最多支持 {MAX_BATCH_SIZE} 个股票，当前提交了 {len(stock_symbols)} 个")
+    raise ValueError(f"批量分析最多支持 {MAX_BATCH_SIZE} 品种票，当前提交了 {len(stock_symbols)} 个")
 ```
 
-- **批量分析最多支持10个股票**
+- **批量分析最多支持10品种票**
 - Pydantic 模型层面和路由层面都有验证
 - 超过限制会返回友好的错误提示
 
 ### 并发执行流程
 
-假设用户提交了5个股票代码：
+假设用户提交了5个品种代码：
 
 1. **所有5个任务都会被创建**（在 MongoDB 和内存中）
 2. **所有5个 `asyncio.create_task` 都会启动**
@@ -296,10 +296,10 @@ if len(stock_symbols) > MAX_BATCH_SIZE:
 
 并添加了并发控制：
 - ✅ **线程池限制为3个工作线程**（可根据服务器资源调整）
-- ✅ **批量分析最多支持10个股票**（防止资源耗尽）
+- ✅ **批量分析最多支持10品种票**（防止资源耗尽）
 
 修复后的系统：
-- ✅ 所有股票代码都能正确创建任务
+- ✅ 所有品种代码都能正确创建任务
 - ✅ 最多3个任务真正并发执行，其他任务排队等待
 - ✅ 数据完全隔离
 - ✅ 进度更新正常工作（不再有事件循环错误）

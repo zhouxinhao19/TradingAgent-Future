@@ -732,7 +732,7 @@ if (!dateStr.includes('Z') && !dateStr.includes('+') && !dateStr.includes('-')) 
 #### 8.3 历史数据覆盖实时数据
 
 **提交记录**：
-- `c0f185e` - fix: 修复历史数据覆盖实时数据的问题，优化自选股同步策略
+- `c0f185e` - fix: 修复历史数据覆盖实时数据的问题，优化自选品种同步策略
 - `440ae8f` - fix: 优化单个股票同步逻辑，避免历史数据覆盖实时行情
 
 **问题描述**：
@@ -782,7 +782,7 @@ if not data:
     logger.warning(f"   可能原因:")
     logger.warning(f"   1) 该股票在此期间无交易数据")
     logger.warning(f"   2) 日期范围不正确")
-    logger.warning(f"   3) 股票代码格式错误")
+    logger.warning(f"   3) 品种代码格式错误")
     logger.warning(f"   4) Tushare API限制或积分不足")
 ```
 
@@ -1126,7 +1126,7 @@ docker-compose -f docker-compose.hub.nginx.yml ps
 use tradingagents
 print('股票日线数据:', db.stock_daily_quotes.countDocuments())
 print('股票基本信息:', db.stock_basic_info.countDocuments())
-print('自选股:', db.user_favorites.countDocuments())
+print('自选品种:', db.user_favorites.countDocuments())
 "
 ```
 
@@ -1137,7 +1137,7 @@ docker exec tradingagents-mongodb mongosh \
     tradingagents --eval "
 print('股票日线数据:', db.stock_daily_quotes.countDocuments());
 print('股票基本信息:', db.stock_basic_info.countDocuments());
-print('自选股:', db.user_favorites.countDocuments());
+print('自选品种:', db.user_favorites.countDocuments());
 "
 ```
 
@@ -1166,7 +1166,7 @@ docker-compose -f docker-compose.hub.nginx.yml logs backend | grep "技术指标
 #### 4. 功能测试
 
 - ✅ 股票搜索
-- ✅ 自选股管理
+- ✅ 自选品种管理
 - ✅ 市场分析
 - ✅ 基本面分析
 - ✅ 新闻分析

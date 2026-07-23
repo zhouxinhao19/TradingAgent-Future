@@ -63,7 +63,7 @@
 **统一缓存统计格式**：
 - 修改所有缓存类的 `get_cache_stats()` 返回标准格式：
   - `total_files`: 总文件数
-  - `stock_data_count`: 股票数据数量
+  - `stock_data_count`: 期货数据数量
   - `news_count`: 新闻数据数量
   - `fundamentals_count`: 基本面数据数量
   - `total_size`: 总大小（字节）

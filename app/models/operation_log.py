@@ -114,7 +114,7 @@ class ActionType:
 
 # 操作类型映射
 ACTION_TYPE_NAMES = {
-    ActionType.STOCK_ANALYSIS: "股票分析",
+    ActionType.STOCK_ANALYSIS: "品种分析",
     ActionType.CONFIG_MANAGEMENT: "配置管理",
     ActionType.CACHE_OPERATION: "缓存操作",
     ActionType.DATA_IMPORT: "数据导入",
@@ -124,7 +124,7 @@ ACTION_TYPE_NAMES = {
     ActionType.USER_LOGOUT: "用户登出",
     ActionType.USER_MANAGEMENT: "用户管理",  # 🔧 添加用户管理操作类型名称
     ActionType.DATABASE_OPERATION: "数据库操作",
-    ActionType.SCREENING: "股票筛选",
+    ActionType.SCREENING: "品种筛选",
     ActionType.REPORT_GENERATION: "报告生成",
 }
 

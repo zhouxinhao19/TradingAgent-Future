@@ -75,10 +75,10 @@ export interface PaperAccountSummary {
 
 ### 2. 添加辅助函数 (`frontend/src/views/Reports/ReportDetail.vue`)
 
-创建 `getCashByCurrency` 函数，根据股票代码自动判断市场类型并返回对应货币的现金：
+创建 `getCashByCurrency` 函数，根据品种代码自动判断市场类型并返回对应货币的现金：
 
 ```typescript
-// 辅助函数：根据股票代码获取对应货币的现金金额
+// 辅助函数：根据品种代码获取对应货币的现金金额
 const getCashByCurrency = (account: any, stockSymbol: string): number => {
   const cash = account.cash
   
@@ -89,7 +89,7 @@ const getCashByCurrency = (account: any, stockSymbol: string): number => {
   
   // 新格式（多货币对象）
   if (typeof cash === 'object' && cash !== null) {
-    // 根据股票代码判断市场类型
+    // 根据品种代码判断市场类型
     const marketType = getMarketByStockCode(stockSymbol)
     
     // 映射市场类型到货币
@@ -137,7 +137,7 @@ maxQuantity = Math.floor(availableCash / currentPrice / 100) * 100
 
 ## 市场类型判断逻辑
 
-使用 `getMarketByStockCode` 函数自动识别股票市场：
+使用 `getMarketByStockCode` 函数自动识别期货市场：
 
 - **A股**：6位数字（如 `600519`）→ 使用 CNY
 - **港股**：4-5位数字或 `.HK` 后缀（如 `00700`、`0700.HK`）→ 使用 HKD
@@ -147,9 +147,9 @@ maxQuantity = Math.floor(availableCash / currentPrice / 100) * 100
 
 修复后应测试以下场景：
 
-1. ✅ A股股票（如 600519）- 应使用 CNY 账户
-2. ✅ 港股股票（如 00700）- 应使用 HKD 账户
-3. ✅ 美股股票（如 AAPL）- 应使用 USD 账户
+1. ✅ A股期货品种（如 600519）- 应使用 CNY 账户
+2. ✅ 港股期货品种（如 00700）- 应使用 HKD 账户
+3. ✅ 美股期货品种（如 AAPL）- 应使用 USD 账户
 4. ✅ 兼容旧格式账户数据
 
 ## 相关文件

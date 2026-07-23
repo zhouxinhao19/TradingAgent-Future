@@ -5,7 +5,7 @@
 **更新日期**: 2025-09-30
 **版本**: v1.4
 
-为 Tushare 和 AKShare 数据源添加了新闻数据同步功能，支持从多个新闻源获取股票相关新闻，并提供情绪分析和关键词提取。
+为 Tushare 和 AKShare 数据源添加了新闻数据同步功能，支持从多个新闻源获取期货品种相关新闻，并提供情绪分析和关键词提取。
 
 ## 🎯 主要特性
 
@@ -23,7 +23,7 @@
 - **fenghuang** - 凤凰财经
 
 #### AKShare 新闻源
-- **东方财富** - 个股新闻（stock_news_em）
+- **东方财富** - 品种新闻（stock_news_em）
 - **CCTV** - 市场新闻（news_cctv）
 
 ### 2. 智能去重
@@ -42,7 +42,7 @@
 ### 4. 关键词提取（Tushare & AKShare）
 
 - 自动提取财经相关关键词
-- 支持多种关键词类型（股票、公司、市场、政策等）
+- 支持多种关键词类型（期货品种、公司、市场、政策等）
 - 最多提取10个关键词
 
 ### 5. 新闻分类（Tushare & AKShare）
@@ -65,7 +65,7 @@
 ### 7. 灵活的同步选项
 
 - 可指定回溯时间（Tushare：默认24小时，最多7天）
-- 可限制每只股票的新闻数量
+- 可限制每只期货品种的新闻数量
 - 支持选择性同步（仅同步新闻数据）
 
 ## 📊 数据结构
@@ -74,11 +74,11 @@
 
 ```javascript
 {
-  // 股票信息
-  "symbol": "000001",           // 股票代码
+  // 期货品种信息
+  "symbol": "000001",           // 品种代码
   "full_symbol": "000001.SZ",   // 完整代码
   "market": "CN",               // 市场
-  "symbols": ["000001"],        // 相关股票列表
+  "symbols": ["000001"],        // 相关期货品种列表
   
   // 新闻内容
   "title": "新闻标题",
@@ -120,7 +120,7 @@
 ##### 1. 仅同步新闻数据
 
 ```bash
-# 同步所有股票的新闻（默认回溯24小时）
+# 同步所有期货品种的新闻（默认回溯24小时）
 python cli/tushare_init.py --full --sync-items news
 ```
 
@@ -146,7 +146,7 @@ python cli/tushare_init.py --full --sync-items basic_info,historical,financial,q
 ##### 1. 仅同步新闻数据
 
 ```bash
-# 同步所有股票的新闻
+# 同步所有期货品种的新闻
 python cli/akshare_init.py --full --sync-items news
 ```
 
@@ -177,13 +177,13 @@ from app.worker.tushare_sync_service import get_tushare_sync_service
 # 获取同步服务
 sync_service = await get_tushare_sync_service()
 
-# 同步所有股票的新闻
+# 同步所有期货品种的新闻
 result = await sync_service.sync_news_data(
     hours_back=24,              # 回溯24小时
-    max_news_per_stock=20       # 每只股票最多20条新闻
+    max_news_per_stock=20       # 每只期货品种最多20条新闻
 )
 
-# 同步指定股票的新闻
+# 同步指定期货品种的新闻
 result = await sync_service.sync_news_data(
     symbols=["000001", "600000"],
     hours_back=48,
@@ -215,7 +215,7 @@ from tradingagents.dataflows.providers.tushare_provider import get_tushare_provi
 provider = get_tushare_provider()
 await provider.connect()
 
-# 获取单只股票的新闻
+# 获取单只期货品种的新闻
 news_data = await provider.get_stock_news(
     symbol="000001",
     limit=20,
@@ -229,7 +229,7 @@ news_data = await provider.get_stock_news(
 
 ```python
 {
-    "total_processed": 100,      # 处理的股票总数
+    "total_processed": 100,      # 处理的期货品种总数
     "success_count": 98,         # 成功数量
     "error_count": 2,            # 错误数量
     "news_count": 1234,          # 获取的新闻总数
@@ -264,7 +264,7 @@ news_data = await provider.get_stock_news(
 
 - 默认回溯时间：24小时
 - 最大回溯时间：7天
-- 每只股票默认最多获取20条新闻
+- 每只期货品种默认最多获取20条新闻
 - 受 Tushare API 速率限制约束
 
 ### 3. 数据质量
@@ -310,11 +310,11 @@ news_data = await provider.get_stock_news(
 **可能原因**:
 - 网络延迟
 - API 速率限制
-- 股票数量过多
+- 期货品种数量过多
 
 **解决方法**:
 - 使用更快的网络连接
-- 减少每批次处理的股票数量
+- 减少每批次处理的期货品种数量
 - 分批次进行同步
 
 ## 📚 相关文档

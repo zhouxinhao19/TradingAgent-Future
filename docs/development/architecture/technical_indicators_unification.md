@@ -13,10 +13,10 @@
 痛点：
 - 命名不一致（`MACD`/`MACD_Signal` vs `dif/dea/macd_hist` vs stockstats 命名）。
 - 指标分散、重复实现，难以复用和扩展。
-- 复权口径与参数未显式纳管，跨场景（选股/分析/回测）难统一。
+- 复权口径与参数未显式纳管，跨场景（选品种/分析/回测）难统一。
 
 目标：
-- 形成一套“统一指标体系”（Unified Indicator Library，UIL），服务于选股、分析、回测等。
+- 形成一套“统一指标体系”（Unified Indicator Library，UIL），服务于选品种、分析、回测等。
 - 统一命名/参数/返回格式；支持批量向量化计算与缓存；可扩展。
 
 ## 2. 统一命名与参数规范
@@ -105,14 +105,14 @@ def last_values(df: pd.DataFrame, columns: List[str]) -> Dict[str, Any]:
 - atr14
 - kdj_k, kdj_d, kdj_j
 
-## 9. 与选股 DSL 的映射
+## 9. 与选品种 DSL 的映射
 - 字段名称与 DSL 白名单完全一致，避免额外映射层。
 - 交叉条件（cross_up/cross_down）在服务层以列向量方式判断最近两日，或者在筛选执行器中完成。
 
 ## 10. 后续（P1）
 - 自定义参数列名规范：rsi_21、ma_30、boll_20_2 等；提供列名生成器，避免硬编码。
 - 指标注册中心：支持插件化注册（名称→函数、默认参数、依赖列）。
-- AI 选股：提示词中暴露字段白名单与中文名称映射（如 “均线20日”→`ma20`）。
+- AI 选品种：提示词中暴露字段白名单与中文名称映射（如 “均线20日”→`ma20`）。
 
 ## 11. 实施计划
 1) 创建 `tools/analysis/indicators.py` 并实现 MA/EMA/MACD/RSI/BOLL/ATR/KDJ（P0）。

@@ -1,13 +1,13 @@
 # TradingAgents-CN 文档中心 (v1.0.1)
 
-欢迎来到 TradingAgents-CN 多智能体金融交易框架的文档中心。本文档适用于 `v1.0.1` 版本，覆盖配置管理、模型目录、大模型配置、股票详情、单股同步、日志排查、部署升级等核心内容。
+欢迎来到 TradingAgents-CN 多智能体金融交易框架的文档中心。本文档适用于 `v1.0.1` 版本，覆盖配置管理、模型目录、大模型配置、期货品种详情、单股同步、日志排查、部署升级等核心内容。
 
 ## 🎯 版本亮点 (v1.0.1)
 
 - 🧩 **配置管理优化** - 新增厂家和模型按最新顺序置顶显示
 - 🔗 **聚合厂家增强** - 新增 `AiHubMix` 聚合 LLM 厂家，并支持聚合渠道初始化
 - 🤖 **模型选择统一排序** - 配置页、下拉框、分析页模型顺序一致
-- 🔄 **页面切换修复** - 股票详情、报告详情切换时自动刷新正确内容
+- 🔄 **页面切换修复** - 期货品种详情、报告详情切换时自动刷新正确内容
 - 📈 **单股同步增强** - 返回主链路、回退链路、错误原因和落库状态
 - 🛡️ **AKShare 兜底增强** - 单股实时行情支持多级备份接口回退
 - 🔄 **上游能力持续吸收** - 明确同步了 LLM clients、共享模型目录、provider 规范化和数据库迁移增强
@@ -38,7 +38,7 @@
 
 ### 📊 数据处理
 - [数据源集成](./data/data-sources.md) - 支持的数据源和API (含A股支持) ✨
-- [Tushare数据接口集成](./data/china_stock-api-integration.md) - A股数据源详解 ✨
+- [Tushare数据接口集成](./data/china_stock-api-integration.md) - 数据源详解 ✨
 - [数据处理流程](./data/data-processing.md) - 数据获取和处理
 - [缓存机制](./data/caching.md) - 数据缓存策略
 
@@ -98,7 +98,7 @@
 - [🔗 OpenRouter使用指南](./guides/openrouter-usage-guide.md) - 60+模型使用指南 (v0.1.11) ✨
 - [🌐 Web界面指南](./usage/web-interface-guide.md) - Web界面详细使用指南 (v0.1.11更新) ✨
 - [📊 投资分析指南](./usage/investment_analysis_guide.md) - 投资分析完整流程
-- [🇨🇳 A股分析指南](./guides/a-share-analysis-guide.md) - A股市场分析专项指南 (v0.1.7) ✨
+- [🇨🇳 期货分析指南](./guides/a-share-analysis-guide.md) - 期货市场分析专项指南 (v0.1.7) ✨
 - [⚙️ 配置管理指南](./guides/config-management-guide.md) - 配置管理和成本统计使用方法 (v0.1.7) ✨
 - [🐳 Docker部署指南](./guides/docker-deployment-guide.md) - Docker容器化部署详细指南 (v0.1.7) ✨
 - [📄 报告导出指南](./guides/report-export-guide.md) - 专业报告导出使用指南 (v0.1.7) ✨

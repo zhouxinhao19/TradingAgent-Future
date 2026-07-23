@@ -9,11 +9,11 @@
             <span class="version-badge">v1.0.1</span>
           </h1>
           <p class="hero-subtitle">
-            现代化的多智能体股票分析学习平台
+            现代化的多智能体期货分析学习平台
           </p>
           <p class="hero-description">
-            基于先进的AI技术，为投资者提供专业、准确、及时的股票分析服务。
-            采用多智能体协作模式，从不同角度对股票进行全方位分析，助您做出更明智的投资决策。
+            基于先进的AI技术，为投资者提供专业、准确、及时的期货分析服务。
+            采用多智能体协作模式，从不同角度对品种进行全方位分析，助您做出更明智的投资决策。
           </p>
           <div class="hero-acknowledgment">
             <el-icon><Star /></el-icon>
@@ -66,7 +66,7 @@
             </div>
             <h3>多智能体分析</h3>
           </div>
-          <p>基本面、技术面、新闻分析、社媒分析等12个智能体协作，提供全方位的股票分析视角</p>
+          <p>基本面、技术面、新闻分析、社媒分析等12个智能体协作，提供全方位的期货分析视角</p>
           <div class="feature-tags">
             <el-tag size="small">基本面分析</el-tag>
             <el-tag size="small">技术分析</el-tag>
@@ -80,9 +80,9 @@
             <div class="feature-icon success">
               <el-icon><Search /></el-icon>
             </div>
-            <h3>智能股票筛选</h3>
+            <h3>智能品种筛选</h3>
           </div>
-          <p>多维度筛选条件，智能算法推荐，快速发现具有投资价值的优质股票</p>
+          <p>多维度筛选条件，智能算法推荐，快速发现具有投资价值的优质期货品种</p>
           <div class="feature-tags">
             <el-tag size="small" type="success">多维筛选</el-tag>
             <el-tag size="small" type="success">智能推荐</el-tag>
@@ -96,7 +96,7 @@
             </div>
             <h3>批量分析处理</h3>
           </div>
-          <p>支持批量股票分析，并行处理提高效率，适合大规模投资组合分析</p>
+          <p>支持批量品种分析，并行处理提高效率，适合大规模投资组合分析</p>
           <div class="feature-tags">
             <el-tag size="small" type="warning">批量处理</el-tag>
             <el-tag size="small" type="warning">并行计算</el-tag>
@@ -274,7 +274,7 @@
           <div class="origin-description">
             <p>
               <strong>TradingAgents-Future</strong> 是基于 <strong>TradingAgents</strong> 项目开发的中文本地化版本。
-              原项目由 Tauric Research 团队开发，是一个创新的多智能体股票分析框架。
+              原项目由 Tauric Research 团队开发，是一个创新的多智能体交易分析框架。
             </p>
             <p>
               我们在原项目的基础上进行了以下改进和扩展：
@@ -298,7 +298,7 @@
               </li>
               <li>
                 <el-icon class="check-icon"><CircleCheck /></el-icon>
-                <span><strong>批量分析功能：</strong>支持批量股票分析和任务管理</span>
+                <span><strong>批量分析功能：</strong>支持批量品种分析和任务管理</span>
               </li>
               <li>
                 <el-icon class="check-icon"><CircleCheck /></el-icon>

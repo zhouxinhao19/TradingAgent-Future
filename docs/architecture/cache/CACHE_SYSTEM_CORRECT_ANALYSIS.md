@@ -13,7 +13,7 @@
 **功能**: 从 app 层的 MongoDB 读取已同步的数据
 
 **被使用的地方**:
-- `data_source_manager.py` (line 827) - 获取股票基础信息
+- `data_source_manager.py` (line 827) - 获取期货品种基础信息
 - `optimized_china_data.py` (line 291, 354, 559) - 获取行情数据和基础信息
 - `tushare_adapter.py` (line 208) - 获取实时行情
 

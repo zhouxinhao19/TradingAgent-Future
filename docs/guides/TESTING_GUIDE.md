@@ -65,7 +65,7 @@ python tests/test_deepseek_token_tracking.py
 python -c "
 from tradingagents.llm_adapters.deepseek_adapter import ChatDeepSeek
 llm = ChatDeepSeek(model='deepseek-chat', temperature=0.1)
-response = llm.invoke('你好，请简单介绍一下股票投资')
+response = llm.invoke('你好，请简单介绍一下期货投资')
 print('响应:', response.content[:100] + '...')
 "
 ```
@@ -90,9 +90,9 @@ python examples/demo_deepseek_analysis.py
 
 ### 2. 基本面分析功能测试
 
-#### 2.1 A股分析测试
+#### 2.1 期货分析测试
 ```bash
-# 测试A股基本面分析
+# 测试基本面分析
 python -c "
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
@@ -116,7 +116,7 @@ print('分析结果:', result)
 "
 ```
 
-**测试股票建议**：
+**测试期货品种建议**：
 - `000001` - 平安银行
 - `600519` - 贵州茅台  
 - `000858` - 五粮液
@@ -140,7 +140,7 @@ print('苹果公司分析:', result)
 "
 ```
 
-**测试股票建议**：
+**测试期货品种建议**：
 - `AAPL` - 苹果公司
 - `MSFT` - 微软
 - `GOOGL` - 谷歌
@@ -161,7 +161,7 @@ streamlit run web/app.py
 - [ ] 模型切换是否正常工作
 
 #### 3.2 分析页面测试
-- [ ] 股票代码输入是否正常
+- [ ] 品种代码输入是否正常
 - [ ] 分析师选择是否包含基本面分析师
 - [ ] 分析过程是否显示进度
 - [ ] 结果展示是否完整清晰
@@ -181,7 +181,7 @@ python -m cli.main
 **测试流程**：
 1. 选择"DeepSeek V3"作为LLM提供商
 2. 选择"deepseek-chat"模型
-3. 输入股票代码进行分析
+3. 输入品种代码进行分析
 4. 检查分析结果质量
 
 **测试要点**：

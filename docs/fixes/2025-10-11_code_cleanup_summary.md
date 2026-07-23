@@ -47,7 +47,7 @@
 
 **工具选择阶段**：
 ```python
-logger.info(f"📊 [市场分析师] 使用统一市场数据工具，自动识别股票类型")
+logger.info(f"📊 [市场分析师] 使用统一市场数据工具，自动识别期货品种类型")
 logger.info(f"📊 [市场分析师] 配置: online_tools={toolkit.config['online_tools']}")
 logger.info(f"📊 [市场分析师] 绑定的工具: {tool_names_debug}")
 logger.info(f"📊 [市场分析师] 目标市场: {market_info['market_name']}")
@@ -75,7 +75,7 @@ for i, tc in enumerate(result.tool_calls):
 
 **工具选择阶段**：
 ```python
-logger.info(f"📊 [基本面分析师] 使用统一基本面分析工具，自动识别股票类型")
+logger.info(f"📊 [基本面分析师] 使用统一基本面分析工具，自动识别期货品种类型")
 logger.info(f"📊 [基本面分析师] 配置: online_tools={toolkit.config['online_tools']}")
 logger.info(f"📊 [基本面分析师] 绑定的工具: {tool_names_debug}")
 logger.info(f"📊 [基本面分析师] 目标市场: {market_info['market_name']}")

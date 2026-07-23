@@ -30,7 +30,7 @@ def _get_default_source(self):
 ```
 
 **数据获取流程**:
-1. **股票基本信息** (`get_stock_info`):
+1. **期货品种基本信息** (`get_stock_info`):
    - 第1优先级: MongoDB (`app_cache`) - 第 1002-1067 行
    - 第2优先级: Tushare/AKShare/BaoStock
    - 自动降级
@@ -149,7 +149,7 @@ class StockDataService:
 ```
 
 **功能**:
-- 从 MongoDB 获取股票基本信息
+- 从 MongoDB 获取期货品种基本信息
 - 从 MongoDB 获取实时行情
 - 不调用外部 API（纯数据库服务）
 
@@ -171,7 +171,7 @@ class NewsDataService:
 
 **功能**:
 - 从 MongoDB 查询新闻数据
-- 支持多种查询条件（股票代码、时间范围、情绪、重要性等）
+- 支持多种查询条件（品种代码、时间范围、情绪、重要性等）
 - 不调用外部 API（纯数据库服务）
 
 ---
@@ -202,7 +202,7 @@ def _get_stock_info_safe(stock_code: str):
 
 ```
 1. MongoDB 数据库（最高优先级）
-   ├─ stock_basic_info（股票基本信息）
+   ├─ stock_basic_info（期货品种基本信息）
    ├─ stock_daily_quotes（历史行情）
    ├─ stock_financial_data（财务数据）
    ├─ stock_news（新闻数据）

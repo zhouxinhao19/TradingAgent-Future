@@ -111,7 +111,7 @@ AttributeError: 'DataSourceConfig' object has no attribute 'source_type'
 **步骤**:
 1. 在配置管理中修改 AKShare 的超时时间为 60 秒
 2. 重载配置
-3. 执行股票分析
+3. 执行期货分析
 4. 观察 AKShare 是否使用 60 秒超时
 
 ### 测试 2: 验证模型配置
@@ -250,5 +250,5 @@ AttributeError: 'DataSourceConfig' object has no attribute 'source_type'
 1. 修复系统设置桥接问题
 2. 添加更详细的日志输出
 3. 测试配置热重载功能
-4. 测试实际的股票分析是否使用桥接的配置
+4. 测试实际的期货分析是否使用桥接的配置
 

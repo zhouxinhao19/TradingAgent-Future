@@ -17,7 +17,7 @@
 - 确保 `.env` 文件中 `OPENAI_ENABLED=false`
 - 社交媒体分析师现在使用离线工具：
   - `get_chinese_social_sentiment` (中文社交情绪分析)
-  - `get_reddit_stock_info` (Reddit股票信息)
+  - `get_reddit_stock_info` (Reddit期货品种信息)
 
 **修复文件：**
 - `c:\TradingAgentsCN\tradingagents\default_config.py`

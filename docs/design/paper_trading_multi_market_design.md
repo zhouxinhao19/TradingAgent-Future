@@ -236,7 +236,7 @@
 **新的请求模型**:
 ```python
 class PlaceOrderRequest(BaseModel):
-    code: str = Field(..., description="股票代码（支持A股/港股/美股）")
+    code: str = Field(..., description="品种代码（支持商品）")
     side: Literal["buy", "sell"]
     quantity: int = Field(..., gt=0)
     market: Optional[str] = Field(None, description="市场类型 (CN/HK/US)，不传则自动识别")
@@ -283,7 +283,7 @@ async def get_account(current_user: dict = Depends(get_current_user)):
 
 **UI示例**:
 ```vue
-<el-form-item label="股票代码">
+<el-form-item label="品种代码">
   <el-input v-model="order.code" placeholder="输入代码（如：AAPL、0700、000001）">
     <template #append>
       <el-tag v-if="detectedMarket">{{ detectedMarket }}</el-tag>

@@ -1,14 +1,14 @@
-# 股票详情页 ROE 和负债率显示问题修复文档
+# 期货品种详情页 ROE 和负债率显示问题修复文档
 
 ## 问题描述
 
 ### 用户报告
-在股票详情页面（如 601288 农业银行），ROE 和负债率字段显示为空（`-`）。
+在期货品种详情页面（如 601288 农业银行），ROE 和负债率字段显示为空（`-`）。
 
 ### 根本原因
 
 1. **字段不匹配**
-   - `stock_financial_data` 集合使用 `code` 字段存储股票代码
+   - `stock_financial_data` 集合使用 `code` 字段存储品种代码
    - 后端 API (`/api/stocks/{code}/fundamentals`) 使用 `symbol` 字段查询
    - 查询条件不匹配，导致无法找到财务数据
 
@@ -209,7 +209,7 @@ python scripts/check_financial_data.py
 
 ### 2. API 接口验证
 ```bash
-# 测试股票: 601288 (农业银行)
+# 测试期货品种: 601288 (农业银行)
 GET /api/stocks/601288/fundamentals
 
 # 返回结果
@@ -228,7 +228,7 @@ GET /api/stocks/601288/fundamentals
 
 ### 3. 前端显示验证
 ```
-股票详情页 - 601288 农业银行
+期货品种详情页 - 601288 农业银行
 ┌─────────────────────────────┐
 │ 行业: 银行                   │
 │ 板块: 主板                   │
@@ -242,7 +242,7 @@ GET /api/stocks/601288/fundamentals
 ## 影响范围
 
 ### 正面影响
-- ✅ 修复了股票详情页基本面数据显示问题
+- ✅ 修复了期货品种详情页基本面数据显示问题
 - ✅ 提高了数据库字段命名一致性
 - ✅ 优化了查询性能（添加索引）
 - ✅ 保持向后兼容性
@@ -292,7 +292,7 @@ python scripts/migrations/migrate_financial_data_add_symbol.py --rollback
 - `scripts/migrations/migrate_financial_data_add_symbol.py` - 财务数据迁移脚本
 - `scripts/migrations/fix_stock_basic_info_symbol.py` - 基础信息修复脚本
 - `scripts/check_financial_data.py` - 财务数据检查工具
-- `frontend/src/views/Stocks/Detail.vue` - 前端股票详情页
+- `frontend/src/views/Stocks/Detail.vue` - 前端期货品种详情页
 
 ## 版本信息
 

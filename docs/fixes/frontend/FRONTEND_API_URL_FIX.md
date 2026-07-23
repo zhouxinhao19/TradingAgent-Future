@@ -62,7 +62,7 @@ export const configApi = {
 | `/api/config/migrate-legacy` | `/config/migrate-legacy` | 传统配置迁移 |
 
 #### 2. `frontend/src/api/analysis.ts`
-修复了所有股票分析相关的API路径：
+修复了所有期货分析相关的API路径：
 
 | 修复前 | 修复后 | 功能 |
 |--------|--------|------|
@@ -72,9 +72,9 @@ export const configApi = {
 | `/api/analysis/{id}/stop` | `/analysis/{id}/stop` | 停止分析 |
 | `/api/analysis/history` | `/analysis/history` | 获取分析历史 |
 | `/api/analysis/{id}` | `/analysis/{id}` | 删除分析结果 |
-| `/api/analysis/stock-info` | `/analysis/stock-info` | 获取股票信息 |
-| `/api/analysis/search` | `/analysis/search` | 搜索股票 |
-| `/api/analysis/popular` | `/analysis/popular` | 获取热门股票 |
+| `/api/analysis/stock-info` | `/analysis/stock-info` | 获取期货品种信息 |
+| `/api/analysis/search` | `/analysis/search` | 搜索期货品种 |
+| `/api/analysis/popular` | `/analysis/popular` | 获取热门期货品种 |
 | `/api/analysis/stats` | `/analysis/stats` | 获取分析统计 |
 
 #### 3. `frontend/src/api/auth.ts`
@@ -98,7 +98,7 @@ GET /api/api/config/llm → 404 Not Found
 GET /api/config/llm → 200 OK
 ```
 
-#### 股票分析API
+#### 期货分析API
 ```typescript
 // 修复前 ❌
 POST /api/api/analysis/start → 404 Not Found
@@ -200,7 +200,7 @@ const instance = axios.create({
 现在前端API调用应该能够正确访问后端接口：
 
 - ✅ **配置管理**: 可以正常获取和更新大模型配置
-- ✅ **股票分析**: 可以正常进行股票分析操作
+- ✅ **期货分析**: 可以正常进行期货分析操作
 - ✅ **用户认证**: 认证相关功能正常工作
 - ✅ **URL规范**: 所有API路径都符合规范
 

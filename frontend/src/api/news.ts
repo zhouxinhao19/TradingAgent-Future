@@ -1,5 +1,5 @@
 /**
- * 市场快讯 API (股票系统)
+ * 市场快讯 API (期货版)
  */
 
 import { ApiClient, type ApiEnvelope } from './request'

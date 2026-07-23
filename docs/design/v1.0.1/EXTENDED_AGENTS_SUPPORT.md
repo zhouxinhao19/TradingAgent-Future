@@ -179,9 +179,9 @@ prompts/
 所有Agent的模版都支持以下标准变量:
 
 ### 基础变量
-- `{ticker}` - 股票代码
+- `{ticker}` - 品种代码
 - `{company_name}` - 公司名称
-- `{market_name}` - 市场名称 (A股/港股/美股)
+- `{market_name}` - 市场名称 (商品)
 - `{currency_name}` - 货币名称 (CNY/HKD/USD)
 - `{currency_symbol}` - 货币符号 (¥/HK$/US$)
 
@@ -220,8 +220,8 @@ description: "标准的基本面分析提示词"
 
 # 核心提示词
 system_prompt: |
-  你是一位专业的股票基本面分析师。
-  任务：分析{company_name}（股票代码：{ticker}）
+  你是一位专业的期货品种基本面分析师。
+  任务：分析{company_name}（品种代码：{ticker}）
 
 # Agent特定的指导
 tool_guidance: |

@@ -104,7 +104,7 @@ Settings 配置:
   NO_PROXY: localhost,127.0.0.1,*.eastmoney.com,...
 
 📋 测试 3: 测试 AKShare 连接
-✅ AKShare 连接成功，获取到 5000 条股票数据
+✅ AKShare 连接成功，获取到 5000 条期货数据
 
 🎉 所有测试通过！代理配置正确。
 ```
@@ -155,7 +155,7 @@ python -c "import akshare as ak; print(ak.stock_zh_a_spot_em().head())"
 ```
 
 **预期结果**：
-- ✅ 成功返回股票数据
+- ✅ 成功返回期货数据
 - ❌ 如果仍然失败，检查代理配置是否正确
 
 ### 测试 3：测试 Google AI 连接

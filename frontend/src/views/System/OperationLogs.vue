@@ -30,7 +30,7 @@
         <el-form-item label="操作类型">
           <el-select v-model="filterForm.actionType" clearable placeholder="全部类型" style="width: 150px">
             <el-option label="全部类型" value="" />
-            <el-option label="股票分析" value="stock_analysis" />
+            <el-option label="品种分析" value="stock_analysis" />
             <el-option label="配置管理" value="config_management" />
             <el-option label="缓存操作" value="cache_operation" />
             <el-option label="数据导入" value="data_import" />
@@ -177,7 +177,7 @@
             <div class="action-content">
               <div class="action-title">{{ row.action }}</div>
               <div v-if="row.details && row.details.stock_symbol" class="action-detail">
-                股票: {{ row.details.stock_symbol }}
+                品种: {{ row.details.stock_symbol }}
               </div>
             </div>
           </template>
@@ -294,7 +294,7 @@
           <div class="empty-tips">
             <h4>💡 如何产生操作日志？</h4>
             <ul>
-              <li>进行股票分析操作</li>
+              <li>进行品种分析操作</li>
               <li>修改系统配置</li>
               <li>执行缓存管理操作</li>
               <li>进行数据导入导出</li>

@@ -104,7 +104,7 @@ class ConfigService:
                 id="us_stocks",
                 name="us_stocks",
                 display_name="美股",
-                description="美国股票市场数据源",
+                description="美国市场数据源（旧股票兼容）",
                 enabled=True,
                 sort_order=2
             ),
@@ -112,7 +112,7 @@ class ConfigService:
                 id="hk_stocks",
                 name="hk_stocks",
                 display_name="港股",
-                description="香港股票市场数据源",
+                description="香港市场数据源（旧股票兼容）",
                 enabled=True,
                 sort_order=3
             ),

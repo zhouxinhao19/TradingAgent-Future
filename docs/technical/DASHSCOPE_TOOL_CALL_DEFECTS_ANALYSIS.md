@@ -129,7 +129,7 @@ for tool_call in result.tool_calls:
 ```python
 @tool
 def get_realtime_stock_news(ticker: str) -> str:
-    """获取股票实时新闻"""
+    """获取期货品种实时新闻"""
     pass
 ```
 
@@ -139,7 +139,7 @@ def get_realtime_stock_news(ticker: str) -> str:
     "type": "function",
     "function": {
         "name": "get_realtime_stock_news",
-        "description": "获取股票实时新闻",
+        "description": "获取期货品种实时新闻",
         "parameters": {
             "type": "object",
             "properties": {

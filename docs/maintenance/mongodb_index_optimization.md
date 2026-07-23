@@ -149,7 +149,7 @@ db.stock_daily_quotes.createIndex(
   }
 )
 
-// 2. 查询优化索引（按股票代码+周期查询）
+// 2. 查询优化索引（按品种代码+周期查询）
 db.stock_daily_quotes.createIndex(
   {
     "symbol": 1,
@@ -162,7 +162,7 @@ db.stock_daily_quotes.createIndex(
   }
 )
 
-// 3. 查询优化索引（按股票代码查询）
+// 3. 查询优化索引（按品种代码查询）
 db.stock_daily_quotes.createIndex(
   {
     "symbol": 1,

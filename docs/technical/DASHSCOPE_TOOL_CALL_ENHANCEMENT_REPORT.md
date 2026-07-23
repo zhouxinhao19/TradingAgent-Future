@@ -57,13 +57,13 @@ forced_news = toolkit.get_realtime_stock_news.invoke({"ticker": ticker, "curr_da
 
 # 备用补救：使用Google新闻作为后备
 if not forced_news:
-    backup_news = toolkit.get_google_news.invoke({"query": f"{ticker} 股票 新闻", "curr_date": current_date})
+    backup_news = toolkit.get_google_news.invoke({"query": f"{ticker} 期货品种 新闻", "curr_date": current_date})
 ```
 
 #### 3. **基于真实数据重新生成分析**
 ```python
 forced_prompt = f"""
-您是一位专业的财经新闻分析师。请基于以下最新获取的新闻数据，对股票 {ticker} 进行详细的新闻分析：
+您是一位专业的财经新闻分析师。请基于以下最新获取的新闻数据，对期货品种 {ticker} 进行详细的新闻分析：
 
 === 最新新闻数据 ===
 {forced_news}
@@ -82,7 +82,7 @@ forced_prompt = f"""
 
 ### 测试场景
 - **模型类型**：ChatDashScopeOpenAI
-- **测试股票**：600036
+- **测试期货品种**：600036
 - **工具调用数量**：0（模拟完全不调用工具的情况）
 
 ### 测试结果

@@ -1,5 +1,5 @@
 """
-自选品种统一数据模型（支持股票+商品期货）
+自选品种统一数据模型
 持久化到独立的 user_favorites MongoDB 集合
 """
 
@@ -19,7 +19,7 @@ class FavoriteItem(BaseModel):
     user_id: str = Field(..., description="用户ID")
     asset_type: AssetType = Field(..., description="资产类型: stock/commodity")
 
-    # ---- 股票特有字段 ----
+    # ---- 历史兼容字段（旧 stock 数据） ----
     stock_code: Optional[str] = Field(default=None, description="股票代码,如 000001.SZ")
     stock_name: Optional[str] = Field(default=None, description="股票名称")
     market: Optional[str] = Field(default=None, description="市场: A股/港股/美股")

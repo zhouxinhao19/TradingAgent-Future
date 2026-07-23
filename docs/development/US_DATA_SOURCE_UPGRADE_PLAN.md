@@ -11,7 +11,7 @@
 ## 📋 背景
 
 原版 TradingAgents 已经从 Finnhub 切换到 yfinance + Alpha Vantage 的组合：
-- **yfinance**: 用于股票价格和技术指标数据
+- **yfinance**: 用于期货价格和技术指标数据
 - **Alpha Vantage**: 用于基本面和新闻数据（准确度更高）
 
 这个升级显著提高了新闻数据的准确性和可靠性。
@@ -38,7 +38,7 @@ tradingagents/dataflows/
 ├── yfin_utils.py                   # yfinance 工具函数
 ├── alpha_vantage.py                # Alpha Vantage 入口
 ├── alpha_vantage_common.py         # Alpha Vantage 公共函数
-├── alpha_vantage_stock.py          # Alpha Vantage 股票数据
+├── alpha_vantage_stock.py          # Alpha Vantage 期货数据
 ├── alpha_vantage_fundamentals.py   # Alpha Vantage 基本面数据
 ├── alpha_vantage_news.py           # Alpha Vantage 新闻数据
 ├── alpha_vantage_indicator.py      # Alpha Vantage 技术指标
@@ -55,7 +55,7 @@ tradingagents/dataflows/
 DEFAULT_CONFIG = {
     # 类别级配置（默认）
     "data_vendors": {
-        "core_stock_apis": "yfinance",       # 股票价格数据
+        "core_stock_apis": "yfinance",       # 期货价格数据
         "technical_indicators": "yfinance",  # 技术指标
         "fundamental_data": "alpha_vantage", # 基本面数据
         "news_data": "alpha_vantage",        # 新闻数据
@@ -107,7 +107,7 @@ def get_vendor(tool_name, category, config):
 **文件**: `tradingagents/dataflows/providers/us/yfinance_provider.py`
 
 **功能**:
-- ✅ 获取股票价格数据（OHLCV）
+- ✅ 获取期货价格数据（OHLCV）
 - ✅ 获取技术指标（MA、MACD、RSI、BOLL 等）
 - ✅ 获取公司基本信息
 - ✅ 数据格式化和标准化
@@ -247,7 +247,7 @@ class USDataSourceManager:
         return self.vendors["yfinance"]
     
     def get_stock_data(self, ticker, start_date, end_date):
-        """获取股票数据，支持降级"""
+        """获取期货数据，支持降级"""
         vendor = self.get_vendor("get_stock_data", "core_stock_apis")
         
         try:
@@ -311,7 +311,7 @@ class USDataSourceManager:
 #### 5.3 数据质量验证
 
 **对比项目**:
-- ✅ 股票价格数据准确性
+- ✅ 期货价格数据准确性
 - ✅ 技术指标计算准确性
 - ✅ 基本面数据完整性
 - ✅ 新闻数据相关性和时效性
@@ -361,7 +361,7 @@ US_NEWS_DATA=alpha_vantage
 
 | 数据类型 | Finnhub (旧) | yfinance (新) | Alpha Vantage (新) | 推荐 |
 |---------|-------------|---------------|-------------------|------|
-| **股票价格** | ✅ 支持 | ✅ 支持 | ✅ 支持 | yfinance |
+| **期货价格** | ✅ 支持 | ✅ 支持 | ✅ 支持 | yfinance |
 | **技术指标** | ⚠️ 需计算 | ✅ 内置 | ✅ API | yfinance |
 | **基本面数据** | ⚠️ 有限 | ⚠️ 有限 | ✅ 完整 | Alpha Vantage |
 | **新闻数据** | ⚠️ 准确度低 | ❌ 不支持 | ✅ 准确度高 | Alpha Vantage |

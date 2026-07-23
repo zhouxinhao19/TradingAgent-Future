@@ -8,7 +8,6 @@ export const useFavoritesStore = defineStore('favorites', () => {
   const error = ref<string | null>(null)
 
   // Getters
-  const stockItems = computed(() => items.value.filter(i => i.asset_type === 'stock'))
   const commodityItems = computed(() => items.value.filter(i => i.asset_type === 'commodity'))
   const count = computed(() => items.value.length)
 
@@ -93,7 +92,7 @@ export const useFavoritesStore = defineStore('favorites', () => {
 
   return {
     items, loading, error,
-    stockItems, commodityItems, count, isFavorited,
+    commodityItems, count, isFavorited,
     loadFavorites, addFavorite, removeFavorite, batchRemove, updateFavorite,
   }
 })

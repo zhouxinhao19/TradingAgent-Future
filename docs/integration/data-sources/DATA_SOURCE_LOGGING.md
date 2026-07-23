@@ -20,7 +20,7 @@
 - `[数据来源: MongoDB-历史数据]` - MongoDB 历史行情数据
 - `[数据来源: MongoDB-财务数据]` - MongoDB 财务数据
 - `[数据来源: MongoDB-新闻数据]` - MongoDB 新闻数据
-- `[数据来源: MongoDB-stock_basic_info]` - MongoDB 股票基本信息
+- `[数据来源: MongoDB-stock_basic_info]` - MongoDB 期货品种基本信息
 
 #### 文件缓存
 - `[数据来源: 文件缓存]` - 从本地文件缓存获取
@@ -48,7 +48,7 @@
 
 ## 📊 数据获取流程
 
-### A股数据获取流程
+### 期货数据获取流程
 
 ```
 市场分析师
@@ -61,8 +61,8 @@ DataSourceManager.get_stock_data (data_source_manager.py)
   ↓
 Provider (AKShare/Tushare/BaoStock)
   ↓
-日志: [数据来源: akshare] 开始获取股票数据: 000001
-日志: ✅ [数据来源: akshare] 成功获取股票数据: 000001 (455字符, 耗时0.19秒)
+日志: [数据来源: akshare] 开始获取期货数据: 000001
+日志: ✅ [数据来源: akshare] 成功获取期货数据: 000001 (455字符, 耗时0.19秒)
 ```
 
 ### 美股数据获取流程
@@ -84,14 +84,14 @@ FINNHUB API / Yahoo Finance API
 
 ## 🔍 日志示例
 
-### 示例 1: A股数据从 AKShare 获取
+### 示例 1: 期货数据从 AKShare 获取
 
 ```log
-2025-09-30 17:30:12,310 | dataflows | INFO | 📊 [数据来源: akshare] 开始获取股票数据: 002475
-2025-09-30 17:30:12,524 | dataflows | INFO | ✅ [数据来源: akshare] 成功获取股票数据: 002475 (455字符, 耗时0.19秒)
+2025-09-30 17:30:12,310 | dataflows | INFO | 📊 [数据来源: akshare] 开始获取期货数据: 002475
+2025-09-30 17:30:12,524 | dataflows | INFO | ✅ [数据来源: akshare] 成功获取期货数据: 002475 (455字符, 耗时0.19秒)
 ```
 
-### 示例 2: 股票信息从 MongoDB 缓存获取
+### 示例 2: 期货品种信息从 MongoDB 缓存获取
 
 ```log
 2025-09-30 17:30:11,250 | dataflows | INFO | ✅ [数据来源: MongoDB-stock_basic_info] 缓存命中 | cache_hit=true code=002475
@@ -189,7 +189,7 @@ FINNHUB API / Yahoo Finance API
 # 查看所有数据来源日志
 tail -f logs/tradingagents.log | grep "数据来源"
 
-# 查看特定股票的数据来源
+# 查看特定期货品种的数据来源
 tail -f logs/tradingagents.log | grep "数据来源" | grep "000001"
 
 # 查看 API 调用日志
@@ -241,7 +241,7 @@ export TA_USE_APP_CACHE=false
 
 禁用后，日志会显示：
 ```
-🌐 [数据来源: akshare] 开始获取股票数据: 000001
+🌐 [数据来源: akshare] 开始获取期货数据: 000001
 ```
 
 ## 📚 相关文档

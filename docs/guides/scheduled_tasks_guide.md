@@ -4,18 +4,18 @@
 
 TradingAgents-CN 使用 **APScheduler** 来管理定时任务，主要有两个核心任务：
 
-1. **BasicsSyncService.run_full_sync** - 股票基础信息同步
+1. **BasicsSyncService.run_full_sync** - 期货品种基础信息同步
 2. **QuotesIngestionService.run_once** - 实时行情入库
 
-## 🔄 任务1: 股票基础信息同步 (BasicsSyncService)
+## 🔄 任务1: 期货品种基础信息同步 (BasicsSyncService)
 
 ### 📝 功能说明
 
 **任务ID**: `basics_sync_service`
 
 **功能**：
-- 从数据源（Tushare/AKShare/BaoStock）获取股票基础信息
-- 包括：股票代码、名称、行业、地区、上市日期等
+- 从数据源（Tushare/AKShare/BaoStock）获取期货品种基础信息
+- 包括：品种代码、名称、行业、地区、上市日期等
 - 同步到 MongoDB 的 `stock_basics` 集合
 
 **数据内容**：
@@ -68,7 +68,7 @@ TradingAgents-CN 使用 **APScheduler** 来管理定时任务，主要有两个�
 ```
 06:30:00 ─→ 任务触发
 06:30:01 ─→ 检查是否已在运行（防止重复）
-06:30:02 ─→ 从数据源获取股票列表（5000+ 只）
+06:30:02 ─→ 从数据源获取期货品种列表（5000+ 只）
 06:30:15 ─→ 获取最新交易日期
 06:30:20 ─→ 获取每日基础数据（市值、ROE等）
 06:30:45 ─→ 批量更新 MongoDB
@@ -248,7 +248,7 @@ QUOTES_BACKFILL_ON_OFFHOURS=false
 ### 2. 通过 API 接口
 
 ```bash
-# 查看股票基础信息同步状态
+# 查看期货品种基础信息同步状态
 GET /api/sync/status
 
 # 查看调度器状态
@@ -262,7 +262,7 @@ GET /api/scheduler/jobs
 
 查看应用日志：
 ```bash
-# 股票基础信息同步日志
+# 期货品种基础信息同步日志
 [INFO] Stock basics sync scheduled daily at 06:30 (Asia/Shanghai)
 [INFO] Stock basics sync started
 [INFO] Successfully fetched 5438 stocks from tushare
@@ -270,7 +270,7 @@ GET /api/scheduler/jobs
 
 # 实时行情入库日志
 [INFO] 实时行情入库任务已启动: 每 30s
-[INFO] ✅ 行情入库成功: 5438 只股票 (来源: tushare)
+[INFO] ✅ 行情入库成功: 5438 只期货品种 (来源: tushare)
 [INFO] ⏭️ 非交易时段，跳过行情采集
 ```
 
@@ -278,7 +278,7 @@ GET /api/scheduler/jobs
 
 ## ⚙️ 配置参数完整列表
 
-### 股票基础信息同步
+### 期货品种基础信息同步
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -304,7 +304,7 @@ GET /api/scheduler/jobs
 
 **A**: 可能的原因：
 1. **数据源响应慢**：网络问题或数据源服务器慢
-2. **数据量大**：5000+ 只股票需要一定时间处理
+2. **数据量大**：5000+ 只期货品种需要一定时间处理
 3. **任务卡住**：极少数情况下任务可能卡住
 
 **解决方法**：
@@ -360,7 +360,7 @@ SYNC_STOCK_BASICS_CRON=0 2 * * *
 
 | 任务 | 执行频率 | 是否一直运行 | 主要用途 |
 |------|----------|-------------|----------|
-| **BasicsSyncService** | 每天 06:30 | ❌ 否 | 同步股票基础信息 |
+| **BasicsSyncService** | 每天 06:30 | ❌ 否 | 同步期货品种基础信息 |
 | **QuotesIngestionService** | 每 30 秒 | ✅ 是（交易时段） | 采集实时行情 |
 
 **关键点**：

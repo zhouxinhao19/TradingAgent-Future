@@ -1,5 +1,5 @@
 /**
- * 模拟交易 API (股票系统)
+ * 模拟交易 API (期货版)
  */
 
 import { ApiClient, type ApiEnvelope } from './request'

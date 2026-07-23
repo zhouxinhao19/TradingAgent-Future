@@ -30,7 +30,7 @@ class FavoriteService:
                 await db.user_favorites.drop_index(bad_name)
             except Exception:
                 pass
-        # 每个用户的股票不可重复（stock_code 唯一）
+        # 每个用户的品种不可重复（stock_code/commodity 唯一）
         await db.user_favorites.create_index(
             [("user_id", 1), ("asset_type", 1), ("stock_code", 1)],
             unique=True,

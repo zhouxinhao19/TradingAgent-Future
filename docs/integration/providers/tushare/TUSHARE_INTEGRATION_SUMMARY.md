@@ -2,7 +2,7 @@
 
 ## 📊 集成概述
 
-本次工作完成了Tushare数据源在TradingAgents项目中的完整集成，为用户提供了高质量的中国A股数据服务。
+本次工作完成了Tushare数据源在TradingAgents项目中的完整集成，为用户提供了高质量的中国期货数据服务。
 
 ## 🎯 完成的功能
 
@@ -11,9 +11,9 @@
 #### Tushare工具类 (`tradingagents/dataflows/tushare_utils.py`)
 - ✅ TushareProvider类：核心数据提供器
 - ✅ API连接管理和错误处理
-- ✅ 股票列表、历史数据、基本信息获取
+- ✅ 期货品种列表、历史数据、基本信息获取
 - ✅ 财务数据获取（资产负债表、利润表、现金流量表）
-- ✅ 股票代码标准化处理
+- ✅ 品种代码标准化处理
 - ✅ 智能缓存集成
 
 #### Tushare适配器 (`tradingagents/dataflows/tushare_adapter.py`)
@@ -22,12 +22,12 @@
 - ✅ 缓存策略优化
 - ✅ 多种数据类型支持（日线、实时）
 - ✅ 基本面分析报告生成
-- ✅ 股票搜索功能
+- ✅ 期货品种搜索功能
 
 #### 接口函数 (`tradingagents/dataflows/interface.py`)
-- ✅ `get_china_stock_data_tushare()` - 获取股票历史数据
-- ✅ `search_china_stocks_tushare()` - 搜索股票
-- ✅ `get_china_stock_info_tushare()` - 获取股票基本信息
+- ✅ `get_china_stock_data_tushare()` - 获取期货品种历史数据
+- ✅ `search_china_stocks_tushare()` - 搜索期货品种
+- ✅ `get_china_stock_info_tushare()` - 获取期货品种基本信息
 - ✅ `get_china_stock_fundamentals_tushare()` - 获取基本面数据
 
 ### 2. 配置和文档
@@ -62,10 +62,10 @@
 ## 🔧 技术特性
 
 ### 1. 数据获取能力
-- **股票基础数据**: 股票列表、基本信息、历史行情
+- **期货品种基础数据**: 期货品种列表、基本信息、历史行情
 - **财务数据**: 三大财务报表和关键财务指标
 - **市场数据**: 交易日历、行业分类、指数数据
-- **搜索功能**: 按名称、代码、行业搜索股票
+- **搜索功能**: 按名称、代码、行业搜索期货品种
 
 ### 2. 性能优化
 - **智能缓存**: 多级缓存策略，支持文件、Redis、MongoDB
@@ -88,7 +88,7 @@
 ## 📈 集成效果
 
 ### 1. 数据覆盖
-- **A股市场**: 覆盖上海、深圳、北京三大交易所
+- **期货市场**: 覆盖上海、深圳、北京三大交易所
 - **数据类型**: 实时行情、历史数据、财务数据、基本信息
 - **更新频率**: 日线数据T+1更新，基本信息定期更新
 - **数据质量**: 来源权威，经过清洗和验证
@@ -121,7 +121,7 @@ echo "DEFAULT_CHINA_DATA_SOURCE=tushare" >> .env
 # 启动CLI
 python -m cli.main
 
-# 选择分析中国股票，系统自动使用Tushare
+# 选择分析中国期货品种，系统自动使用Tushare
 ```
 
 ### 3. Web界面使用
@@ -136,7 +136,7 @@ python -m streamlit run web/app.py
 ```python
 from tradingagents.dataflows import get_china_stock_data_tushare
 
-# 获取股票数据
+# 获取期货数据
 data = get_china_stock_data_tushare("000001", "2024-01-01", "2024-12-31")
 ```
 

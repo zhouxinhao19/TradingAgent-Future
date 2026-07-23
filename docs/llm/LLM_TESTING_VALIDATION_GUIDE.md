@@ -16,7 +16,7 @@
 验证新的 LLM 选项在前端界面中正确显示和工作。
 
 ### 4. 端到端分析测试
-验证完整的股票分析流程能够使用新的 LLM 正常运行。
+验证完整的期货分析流程能够使用新的 LLM 正常运行。
 
 ## 🔧 测试环境准备
 
@@ -109,15 +109,15 @@ def test_qianfan_function_calling():
     try:
         @tool
         def get_stock_price(symbol: str) -> str:
-            """获取股票价格
+            """获取期货价格
             
             Args:
-                symbol: 股票代码，如 AAPL
+                symbol: 品种代码，如 AAPL
             
             Returns:
-                股票价格信息
+                期货价格信息
             """
-            return f"股票 {symbol} 的当前价格是 $150.00"
+            return f"期货品种 {symbol} 的当前价格是 $150.00"
         
         llm = create_openai_compatible_llm(
             provider="qianfan",
@@ -128,7 +128,7 @@ def test_qianfan_function_calling():
         llm_with_tools = llm.bind_tools([get_stock_price])
         
         response = llm_with_tools.invoke([
-            HumanMessage(content="请帮我查询 AAPL 股票的价格")
+            HumanMessage(content="请帮我查询 AAPL 期货品种的价格")
         ])
         
         print(f"✅ 千帆工具调用成功: {response.content[:200]}...")
@@ -313,15 +313,15 @@ def test_function_calling():
         # 定义测试工具
         @tool
         def get_stock_price(symbol: str) -> str:
-            """获取股票价格
+            """获取期货价格
             
             Args:
-                symbol: 股票代码，如 AAPL
+                symbol: 品种代码，如 AAPL
             
             Returns:
-                股票价格信息
+                期货价格信息
             """
-            return f"股票 {symbol} 的当前价格是 $150.00"
+            return f"期货品种 {symbol} 的当前价格是 $150.00"
         
         # 创建带工具的适配器
         llm = ChatYourProvider(
@@ -333,7 +333,7 @@ def test_function_calling():
         
         # 测试工具调用
         response = llm_with_tools.invoke([
-            HumanMessage(content="请帮我查询 AAPL 股票的价格")
+            HumanMessage(content="请帮我查询 AAPL 期货品种的价格")
         ])
         
         print(f"✅ 工具调用成功")
@@ -472,7 +472,7 @@ if __name__ == "__main__":
    - 尝试选择不同的模型
 
 4. **进行简单分析**
-   - 输入股票代码（如 AAPL）
+   - 输入品种代码（如 AAPL）
    - 选择一个分析师（建议选择"基本面分析师"）
    - 点击"开始分析"
    - 观察分析是否正常进行
@@ -568,7 +568,7 @@ if __name__ == "__main__":
 ### ✅ 端到端验证
 
 - [ ] **基本分析流程**
-  - [ ] 能够进行简单股票分析
+  - [ ] 能够进行简单期货分析
   - [ ] 分析师选择正常工作
   - [ ] 工具调用在分析中正常执行
   - [ ] 分析结果格式正确

@@ -20,13 +20,13 @@
    ```python
    async def get_stock_quotes(self, code: str) -> Dict[str, Any]:
        """
-       获取股票实时行情
+       获取期货品种实时行情
        
        Args:
-           code: 股票代码
+           code: 品种代码
            
        Returns:
-           股票行情数据
+           期货行情数据
        """
        if not self.connected:
            return {}
@@ -221,7 +221,7 @@ else:
 **修改前**：
 ```bash
 # 📈 实时行情同步 (交易时间每15分钟)
-# 同步股票价格、涨跌幅、成交量等行情数据
+# 同步期货价格、涨跌幅、成交量等行情数据
 BAOSTOCK_QUOTES_SYNC_ENABLED=true
 BAOSTOCK_QUOTES_SYNC_CRON="*/15 9-15 * * 1-5"
 ```
@@ -330,7 +330,7 @@ docker logs -f tradingagents-backend | grep "BaoStock日K线"
 # 预期输出
 🔄 开始BaoStock日K线同步（最新交易日）...
 ℹ️ 注意：BaoStock不支持实时行情，此任务同步最新交易日的日K线数据
-📈 开始同步XXXX只股票的日K线数据...
+📈 开始同步XXXX只期货品种的日K线数据...
 ✅ BaoStock日K线同步完成: XXX条记录
 ```
 

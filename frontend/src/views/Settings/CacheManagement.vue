@@ -39,7 +39,7 @@
               <el-col :span="12">
                 <div class="stat-item">
                   <div class="stat-value">{{ cacheStats.stockDataCount }}</div>
-                  <div class="stat-label">股票数据</div>
+                  <div class="stat-label">品种数据</div>
                 </div>
               </el-col>
               <el-col :span="12">
@@ -154,7 +154,7 @@
               <el-tag :type="getCacheTypeTag(row.type)">{{ row.type }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="symbol" label="股票代码" width="120" />
+          <el-table-column prop="symbol" label="品种代码" width="120" />
           <el-table-column prop="size" label="大小" width="100">
             <template #default="{ row }">
               {{ formatSize(row.size) }}
@@ -273,7 +273,7 @@ const getProgressColor = (percentage: number): string => {
 
 const getCacheTypeTag = (type: string): TagType => {
   const typeMap: Record<string, TagType> = {
-    'stock': 'primary',
+    'commodity': 'primary',
     'news': 'success',
     'analysis': 'warning'
   }

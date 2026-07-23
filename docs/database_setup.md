@@ -74,7 +74,7 @@ python -m streamlit run app.py
 - **键前缀**: `tradingagents:`
 - **TTL配置**:
   - 美股数据: 2小时
-  - A股数据: 1小时
+  - 期货数据: 1小时
   - 新闻数据: 4-6小时
   - 基本面数据: 12-24小时
 

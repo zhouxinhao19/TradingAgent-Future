@@ -36,7 +36,7 @@ tradingagents/dataflows/data_source_manager.py
 
 **不一致性：**
 - 美股数据源已经支持从数据库读取 API Key
-- A股数据源还是只从环境变量读取
+- 数据源还是只从环境变量读取
 - 逻辑不统一，容易出错
 
 ## 🎯 重构目标
@@ -169,7 +169,7 @@ class DataSourceManager:
    - `get_enabled_datasources(market_category)` - 获取启用的数据源列表
    - `get_datasource_priority(market_category)` - 获取数据源优先级
 
-### 阶段 2：修改 A股数据源管理器
+### 阶段 2：修改 数据源管理器
 
 1. 修改 `DataSourceManager._check_available_sources()`
 2. 添加从数据库读取 Tushare API Key 的逻辑
@@ -189,7 +189,7 @@ class DataSourceManager:
 
 ## 🚀 快速修复（临时方案）
 
-在完整重构之前，先修复 A股数据源的 API Key 读取问题：
+在完整重构之前，先修复 数据源的 API Key 读取问题：
 
 **修改位置：** `tradingagents/dataflows/data_source_manager.py` 第 462-475 行
 
@@ -244,7 +244,7 @@ else:
 
 3. **端到端测试：**
    - 美股分析流程
-   - A股分析流程
+   - 期货分析流程
    - 港股分析流程
 
 ## 🎯 预期效果
@@ -258,7 +258,7 @@ else:
     ↓
 系统启动时读取配置
     ↓
-A股数据源管理器：只检查环境变量 ❌
+数据源管理器：只检查环境变量 ❌
     ↓
 显示"Tushare数据源不可用: 未设置TUSHARE_TOKEN" ❌
 ```
@@ -274,7 +274,7 @@ A股数据源管理器：只检查环境变量 ❌
     ↓
 配置提供器：从数据库读取 API Key ✅
     ↓
-A股数据源管理器：使用配置提供器的配置 ✅
+数据源管理器：使用配置提供器的配置 ✅
     ↓
 显示"✅ Tushare数据源可用且已启用 (API Key来源: 数据库配置)" ✅
 ```

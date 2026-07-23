@@ -81,7 +81,7 @@ export interface LatestNewsResponse {
 export const newsApi = {
   /**
    * 获取最新新闻
-   * @param symbol 股票代码，为空则获取市场新闻
+   * @param symbol 品种代码，为空则获取市场新闻
    * @param limit 返回数量限制
    * @param hours_back 回溯小时数
    */
@@ -94,8 +94,8 @@ export const newsApi = {
   },
 
   /**
-   * 查询股票新闻
-   * @param symbol 股票代码
+   * 查询期货品种新闻
+   * @param symbol 品种代码
    * @param hours_back 回溯小时数
    * @param limit 返回数量限制
    */
@@ -177,7 +177,7 @@ const openNews = (news: any) => {
 
 ```typescript
 onMounted(async () => {
-  // 加载自选股数据
+  // 加载自选品种数据
   await loadFavoriteStocks()
   // 加载最近分析
   await loadRecentAnalyses()
@@ -228,7 +228,7 @@ onMounted(async () => {
 
 - **后端API**：`GET /api/news-data/latest`
 - **参数**：
-  - `symbol`：股票代码（可选，为空则获取市场新闻）
+  - `symbol`：品种代码（可选，为空则获取市场新闻）
   - `limit`：返回数量（默认10条）
   - `hours_back`：回溯小时数（默认24小时）
 
@@ -273,13 +273,13 @@ GET /api/news-data/latest
 ```typescript
 import { newsApi } from '@/api/news'
 
-// 获取市场新闻（不指定股票代码）
+// 获取市场新闻（不指定品种代码）
 const marketNews = await newsApi.getLatestNews(undefined, 10, 24)
 
-// 获取特定股票的新闻
+// 获取特定期货品种的新闻
 const stockNews = await newsApi.getLatestNews('000001', 10, 24)
 
-// 查询股票新闻
+// 查询期货品种新闻
 const news = await newsApi.queryStockNews('000001', 24, 20)
 
 // 同步市场新闻（后台任务）
@@ -292,10 +292,10 @@ const syncResult = await newsApi.syncMarketNews(24, 50)
 # 获取市场新闻
 curl -X GET "http://localhost:8000/api/news-data/latest?limit=10&hours_back=24"
 
-# 获取特定股票的新闻
+# 获取特定期货品种的新闻
 curl -X GET "http://localhost:8000/api/news-data/latest?symbol=000001&limit=10&hours_back=24"
 
-# 查询股票新闻
+# 查询期货品种新闻
 curl -X GET "http://localhost:8000/api/news-data/query/000001?limit=20&hours_back=24"
 
 # 同步市场新闻（后台任务）

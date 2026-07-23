@@ -2,7 +2,7 @@
 
 ## 📋 问题描述
 
-在运行股票基础信息同步任务时，出现 MongoDB 唯一索引冲突错误：
+在运行期货品种基础信息同步任务时，出现 MongoDB 唯一索引冲突错误：
 
 ```
 ERROR | Bulk write error on batch 2: batch op errors occurred, full error: 
@@ -12,12 +12,12 @@ ERROR | Bulk write error on batch 2: batch op errors occurred, full error:
 index: full_symbol_1 dup key: { full_symbol: null }', ...}]}
 ```
 
-### 受影响的股票
+### 受影响的期货品种
 
 - **301563** (N云汉) - 创业板新股，上市日期：20250930
 - **920080** (奥美森) - 北交所，上市日期：20251010
 
-这些都是新上市的股票，数据同步时 `full_symbol` 字段没有被正确设置。
+这些都是新上市的期货品种，数据同步时 `full_symbol` 字段没有被正确设置。
 
 ---
 
@@ -127,10 +127,10 @@ full_symbol 不存在的记录: 1
 ```python
 def _generate_full_symbol(self, code: str) -> str:
     """
-    根据股票代码生成完整标准化代码
+    根据品种代码生成完整标准化代码
     
     Args:
-        code: 6位股票代码
+        code: 6位品种代码
         
     Returns:
         完整标准化代码（如 000001.SZ）
@@ -202,7 +202,7 @@ db.stock_basic_info.find({}, {code: 1, full_symbol: 1}).limit(10)
 ### 2. 测试数据同步
 
 ```bash
-# 运行股票基础信息同步
+# 运行期货品种基础信息同步
 curl -X POST http://localhost:8000/api/admin/sync/stock-basics \
   -H "Authorization: Bearer <token>"
 
@@ -210,10 +210,10 @@ curl -X POST http://localhost:8000/api/admin/sync/stock-basics \
 tail -f logs/tradingagents.log | grep "full_symbol"
 ```
 
-### 3. 验证新股票
+### 3. 验证新期货品种
 
 ```bash
-# 查询新上市的股票
+# 查询新上市的期货品种
 db.stock_basic_info.find({code: "301563"}, {code: 1, name: 1, full_symbol: 1})
 db.stock_basic_info.find({code: "920080"}, {code: 1, name: 1, full_symbol: 1})
 ```
@@ -299,7 +299,7 @@ db.stock_basic_info.find({code: "920080"}, {code: 1, name: 1, full_symbol: 1})
 
 ## 📚 相关文档
 
-- [股票数据模型设计](./design/stock_data_model_design.md)
-- [股票基础信息同步指南](./guides/stock_basics_sync.md)
+- [期货数据模型设计](./design/stock_data_model_design.md)
+- [期货品种基础信息同步指南](./guides/stock_basics_sync.md)
 - [MongoDB 索引设计](./guides/mongodb_index_design.md)
 

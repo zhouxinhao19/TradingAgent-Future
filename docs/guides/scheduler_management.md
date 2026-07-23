@@ -32,7 +32,7 @@ TradingAgents-CN 使用 APScheduler 作为定时任务调度器，提供了完�
 
 ## 📊 当前定时任务列表
 
-### 1. 股票基础信息同步
+### 1. 期货品种基础信息同步
 - **任务ID**: 无（未设置ID）
 - **函数**: `BasicsSync Service.run_full_sync`
 - **触发器**: Cron 表达式（可配置）

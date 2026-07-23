@@ -370,7 +370,7 @@ python scripts/branch_manager.py delete feature/portfolio-optimization
 #### 本地化功能开发
 ```bash
 # 步骤1: 创建增强分支
-python scripts/branch_manager.py create enhancement tushare-integration -d "集成Tushare A股数据源"
+python scripts/branch_manager.py create enhancement tushare-integration -d "集成Tushare 数据源"
 
 # 步骤2: 开发中文功能
 # 集成中文数据源

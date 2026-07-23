@@ -7,7 +7,7 @@
 | 数据类型 | 方法 | MongoDB 支持 | 状态 |
 |---------|------|-------------|------|
 | **历史行情数据** | `get_stock_data()` | ✅ 是 | ✅ 完成 |
-| **股票基本信息** | `get_stock_info()` | ⚠️ 部分 | ⚠️ 未统一 |
+| **期货品种基本信息** | `get_stock_info()` | ⚠️ 部分 | ⚠️ 未统一 |
 
 ### ❌ 还没有通过 DataSourceManager 管理的数据
 
@@ -128,7 +128,7 @@ def _try_fallback_fundamentals(self, symbol: str) -> str:
     return self._generate_fundamentals_analysis(symbol)
 ```
 
-### 2. **股票基本信息统一**
+### 2. **期货品种基本信息统一**
 
 #### 当前问题
 `get_stock_info()` 方法中有 MongoDB 缓存逻辑，但不是通过 `ChinaDataSource.MONGODB` 管理的。
@@ -136,8 +136,8 @@ def _try_fallback_fundamentals(self, symbol: str) -> str:
 #### 改进方案
 ```python
 def get_stock_info(self, symbol: str) -> Dict:
-    """获取股票基本信息，统一使用数据源管理"""
-    logger.info(f"📊 [数据来源: {self.current_source.value}] 开始获取股票信息: {symbol}")
+    """获取期货品种基本信息，统一使用数据源管理"""
+    logger.info(f"📊 [数据来源: {self.current_source.value}] 开始获取期货品种信息: {symbol}")
     
     try:
         # 根据数据源调用相应的获取方法
@@ -154,7 +154,7 @@ def get_stock_info(self, symbol: str) -> Dict:
         return self._try_fallback_stock_info(symbol)
 
 def _get_mongodb_stock_info(self, symbol: str) -> Dict:
-    """从 MongoDB 获取股票基本信息"""
+    """从 MongoDB 获取期货品种基本信息"""
     from .app_cache_adapter import get_basics_from_cache
     doc = get_basics_from_cache(symbol)
     
@@ -162,7 +162,7 @@ def _get_mongodb_stock_info(self, symbol: str) -> Dict:
         logger.info(f"✅ [数据来源: MongoDB-stock_basic_info] 缓存命中: {symbol}")
         return self._format_stock_info(doc)
     else:
-        logger.warning(f"⚠️ [数据来源: MongoDB] 未找到股票信息: {symbol}")
+        logger.warning(f"⚠️ [数据来源: MongoDB] 未找到期货品种信息: {symbol}")
         return self._try_fallback_stock_info(symbol)
 ```
 
@@ -178,10 +178,10 @@ def get_stock_data(
     period: str = "daily"  # 新增参数：daily/weekly/monthly
 ) -> str:
     """
-    获取股票数据，支持多周期
+    获取期货数据，支持多周期
     
     Args:
-        symbol: 股票代码
+        symbol: 品种代码
         start_date: 开始日期
         end_date: 结束日期
         period: 数据周期（daily/weekly/monthly）
@@ -273,7 +273,7 @@ def _get_mongodb_news(self, symbol: str, hours_back: int, limit: int) -> List[Di
 4. ✅ 实现 `_try_fallback_fundamentals()` 降级机制
 5. ✅ 更新 `interface.py` 中的调用
 
-### 阶段 2：股票信息统一
+### 阶段 2：期货品种信息统一
 1. ⬜ 重构 `get_stock_info()` 方法
 2. ⬜ 实现 `_get_mongodb_stock_info()` 方法
 3. ⬜ 统一数据源管理逻辑
@@ -320,7 +320,7 @@ DataSourceManager（统一管理）
 📊 [数据来源: mongodb] 开始获取基本面数据: 000001
 ✅ [数据来源: MongoDB-财务数据] 成功获取: 000001
 
-📊 [数据来源: mongodb] 开始获取股票信息: 000001
+📊 [数据来源: mongodb] 开始获取期货品种信息: 000001
 ✅ [数据来源: MongoDB-stock_basic_info] 缓存命中: 000001
 
 📰 [数据来源: mongodb] 开始获取新闻: 000001

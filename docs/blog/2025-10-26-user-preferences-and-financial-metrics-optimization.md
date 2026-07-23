@@ -312,7 +312,7 @@ def _calculate_ttm_metrics(self, reports: List[Dict]) -> Optional[Dict]:
 
 **示例**：
 
-某股票：
+某期货品种：
 - 市值：100 亿
 - 2024Q3 营业收入（累计）：60 亿
 - TTM 营业收入：80 亿

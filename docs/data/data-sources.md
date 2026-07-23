@@ -2,7 +2,7 @@
 
 ## 概述
 
-TradingAgents 中文增强版集成了多种金融数据源，特别加强了对中国A股市场的支持。为智能体提供全面、准确、实时的市场信息。本文档详细介绍了支持的数据源、API集成方法、数据格式和使用指南。
+TradingAgents 中文增强版集成了多种金融数据源，特别加强了对中国期货市场的支持。为智能体提供全面、准确、实时的市场信息。本文档详细介绍了支持的数据源、API集成方法、数据格式和使用指南。
 
 ## 🔄 v0.1.6 重大更新
 
@@ -17,8 +17,8 @@ TradingAgents 中文增强版集成了多种金融数据源，特别加强了对
 
 | 数据源 | 市场 | 状态 | 说明 |
 |--------|------|------|------|
-| 🇨🇳 **Tushare数据接口** | A股 | ✅ 完整支持 | 实时行情、历史数据、技术指标 |
-| **FinnHub** | 美股 | ✅ 完整支持 | 实时数据、基本面、新闻 |
+| 🇨🇳 **Tushare数据接口** | 国内期货 | ✅ 完整支持 | 实时行情、历史数据、技术指标 |
+| **FinnHub** | 国际期货 | ✅ 完整支持 | 实时数据、基本面、新闻 |
 | **Google News** | 全球 | ✅ 完整支持 | 财经新闻、市场资讯 |
 | **Reddit** | 全球 | ✅ 完整支持 | 社交媒体情绪分析 |
 | **MongoDB** | 缓存 | ✅ 完整支持 | 数据持久化存储 |
@@ -29,7 +29,7 @@ TradingAgents 中文增强版集成了多种金融数据源，特别加强了对
 ### 🇨🇳 1. Tushare数据接口 (新增 v0.1.3)
 
 #### 简介
-Tushare数据接口是中国领先的股票数据提供商，为A股市场提供实时行情和历史数据。
+Tushare数据接口是中国领先的期货数据提供商，为期货市场提供实时行情和历史数据。
 
 #### 数据类型
 ```python
@@ -65,7 +65,7 @@ tdx_data_types = {
 ```python
 from tradingagents.dataflows.tdx_utils import get_stock_data
 
-# 获取A股数据
+# 获取期货数据
 data = get_stock_data(
     stock_code="000001",  # 平安银行
     start_date="2024-01-01",
@@ -76,13 +76,13 @@ data = get_stock_data(
 ### 1. FinnHub API
 
 #### 简介
-FinnHub 是领先的金融数据提供商，提供实时股票价格、公司基本面数据、新闻和市场指标。
+FinnHub 是领先的金融数据提供商，提供实时期货价格、公司基本面数据、新闻和市场指标。
 
 #### 数据类型
 ```python
 finnhub_data_types = {
     "实时数据": [
-        "股票价格",
+        "期货价格",
         "交易量",
         "市场深度",
         "实时新闻"
@@ -102,7 +102,7 @@ finnhub_data_types = {
     "市场数据": [
         "IPO日历",
         "分红信息",
-        "股票分割",
+        "期货品种分割",
         "期权数据"
     ]
 }
@@ -121,7 +121,7 @@ class FinnHubDataProvider:
         self.rate_limiter = RateLimiter(calls_per_minute=60)  # 免费版限制
     
     def get_stock_price(self, symbol: str) -> Dict:
-        """获取股票价格"""
+        """获取期货价格"""
         with self.rate_limiter:
             quote = self.client.quote(symbol)
             return {
@@ -170,7 +170,7 @@ class FinnHubDataProvider:
 # 初始化 FinnHub 客户端
 finnhub_provider = FinnHubDataProvider(api_key=os.getenv("FINNHUB_API_KEY"))
 
-# 获取股票价格
+# 获取期货价格
 price_data = finnhub_provider.get_stock_price("AAPL")
 print(f"AAPL 当前价格: ${price_data['current_price']}")
 
@@ -182,13 +182,13 @@ print(f"公司名称: {company_info['name']}")
 ### 2. Yahoo Finance
 
 #### 简介
-Yahoo Finance 提供免费的历史股票数据、财务信息和市场指标，是获取历史数据的优秀选择。
+Yahoo Finance 提供免费的历史期货数据、财务信息和市场指标，是获取历史数据的优秀选择。
 
 #### 数据类型
 ```python
 yahoo_finance_data_types = {
     "历史数据": [
-        "股票价格历史",
+        "期货价格历史",
         "交易量历史",
         "调整后价格",
         "股息历史"
@@ -327,7 +327,7 @@ class RedditDataProvider:
         self.sentiment_analyzer = SentimentAnalyzer()
     
     def get_stock_discussions(self, symbol: str, subreddit: str = "stocks", limit: int = 100) -> List[Dict]:
-        """获取股票讨论"""
+        """获取期货品种讨论"""
         discussions = []
         
         # 搜索相关帖子
@@ -417,7 +417,7 @@ class GoogleNewsProvider:
         self.sentiment_analyzer = SentimentAnalyzer()
     
     def get_stock_news(self, symbol: str, days: int = 7) -> List[Dict]:
-        """获取股票相关新闻"""
+        """获取期货品种相关新闻"""
         # 设置搜索参数
         self.googlenews.clear()
         self.googlenews.set_time_range(f"{days}d")

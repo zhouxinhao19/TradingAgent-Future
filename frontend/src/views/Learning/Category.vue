@@ -64,9 +64,9 @@ const categoryMap: Record<string, any> = {
     description: '了解不同大模型的特点，选择最适合你的模型'
   },
   'analysis-principles': {
-    title: 'AI分析股票原理',
+    title: 'AI分析原理',
     icon: '📊',
-    description: '深入了解多智能体如何协作分析股票'
+    description: '深入了解多智能体如何协作分析'
   },
   'risks-limitations': {
     title: '风险与局限性',
@@ -104,7 +104,7 @@ const articlesDatabase: Record<string, any[]> = {
     {
       id: 'what-is-llm',
       title: '什么是大语言模型（LLM）？',
-      description: '深入了解大语言模型的定义、工作原理和在股票分析中的应用',
+      description: '深入了解大语言模型的定义、工作原理和在金融分析中的应用',
       readTime: '10分钟',
       views: 2345,
       difficulty: 'success',
@@ -156,7 +156,7 @@ const articlesDatabase: Record<string, any[]> = {
   'risks-limitations': [
     {
       id: 'risk-warnings',
-      title: 'AI股票分析的风险与局限性',
+      title: 'AI分析的风险与局限性',
       description: '了解AI的主要局限性、使用风险和正确的使用方式',
       readTime: '12分钟',
       views: 2134,
@@ -188,7 +188,7 @@ const articlesDatabase: Record<string, any[]> = {
     {
       id: 'getting-started',
       title: '快速入门教程',
-      description: '从零开始学习如何使用TradingAgents-CN进行股票分析',
+      description: '从零开始学习如何使用TradingAgents-CN进行品种分析',
       readTime: '10分钟',
       views: 3456,
       difficulty: 'success',

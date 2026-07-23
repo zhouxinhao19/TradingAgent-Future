@@ -160,7 +160,7 @@ QUOTES_INGEST_ENABLED=true
 ### 自动检测流程
 
 1. **首次运行**：服务启动后第一次采集时自动检测
-2. **检测方法**：尝试调用 `rt_k` 接口获取单只股票数据
+2. **检测方法**：尝试调用 `rt_k` 接口获取单只期货数据
 3. **检测结果**：
    - ✅ **有权限**：提示可设置高频采集
    - ❌ **无权限**：提示当前限制和建议
@@ -209,7 +209,7 @@ tail -f logs/app.log | grep "使用.*接口获取实时行情"
 **接口轮换**：
 ```
 📊 使用 AKShare eastmoney 接口获取实时行情
-✅ AKShare eastmoney 获取到 5440 只股票的实时行情
+✅ AKShare eastmoney 获取到 5440 只期货品种的实时行情
 ✅ 行情入库完成 source=akshare_eastmoney, matched=5440, modified=5440
 ```
 

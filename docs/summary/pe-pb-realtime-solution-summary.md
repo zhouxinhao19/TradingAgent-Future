@@ -68,17 +68,17 @@
 | 接口 | 文件 | 影响 |
 |-----|------|------|
 | **分析数据流** | `tradingagents/dataflows/optimized_china_data.py` | 分析报告中的PE/PB |
-| **股票详情-基本面** | `app/routers/stocks.py` - `get_fundamentals()` | 详情页基本面快照 |
-| **股票筛选** | `app/routers/screening.py` | 筛选结果中的PE/PB |
-| **自选股列表** | `app/routers/favorites.py` | 自选股的PE/PB |
+| **期货品种详情-基本面** | `app/routers/stocks.py` - `get_fundamentals()` | 详情页基本面快照 |
+| **品种筛选** | `app/routers/screening.py` | 筛选结果中的PE/PB |
+| **自选品种列表** | `app/routers/favorites.py` | 自选品种的PE/PB |
 
 ### 前端页面（需要优化）
 
 | 页面 | 文件 | 使用场景 |
 |-----|------|---------|
-| **股票详情页** | `frontend/src/views/Stocks/Detail.vue` | 基本面快照显示PE |
-| **股票筛选页** | `frontend/src/views/Screening/index.vue` | 筛选条件和结果列表 |
-| **自选股页面** | `frontend/src/views/Favorites/index.vue` | 自选股列表 |
+| **期货品种详情页** | `frontend/src/views/Stocks/Detail.vue` | 基本面快照显示PE |
+| **品种筛选页** | `frontend/src/views/Screening/index.vue` | 筛选条件和结果列表 |
+| **自选品种页面** | `frontend/src/views/Favorites/index.vue` | 自选品种列表 |
 | **分析报告** | 各分析相关页面 | 报告中的估值指标 |
 
 ## 实施方案
@@ -94,7 +94,7 @@
 
 ### 第二步：修改后端接口
 
-#### 2.1 股票详情接口
+#### 2.1 期货品种详情接口
 
 **文件**：`app/routers/stocks.py` - `get_fundamentals()`
 
@@ -109,7 +109,7 @@ realtime_metrics = await get_pe_pb_with_fallback(code6, db.client)
 "pe_is_realtime": realtime_metrics.get("is_realtime", False),
 ```
 
-#### 2.2 股票筛选服务
+#### 2.2 品种筛选服务
 
 **文件**：`app/services/enhanced_screening_service.py`
 
@@ -176,13 +176,13 @@ realtime_metrics = await get_pe_pb_with_fallback(code6, db.client)
 ### 🔴 第一阶段：核心功能（1天）
 
 - [ ] 创建 `realtime_metrics.py` 工具模块
-- [ ] 修改股票详情接口
+- [ ] 修改期货品种详情接口
 - [ ] 修改分析数据流
 - [ ] 基本测试验证
 
 ### 🟡 第二阶段：完善功能（2天）
 
-- [ ] 修改股票筛选服务
+- [ ] 修改品种筛选服务
 - [ ] 前端显示优化
 - [ ] 添加数据时效性标识
 - [ ] 完整测试
@@ -218,7 +218,7 @@ realtime_metrics = await get_pe_pb_with_fallback(code6, db.client)
 
 ### 4. 性能
 
-- ✅ **单个股票计算**：< 50ms
+- ✅ **单品种票计算**：< 50ms
 - ✅ **批量计算（100只）**：< 2s
 - ✅ **缓存优化**：30秒TTL，避免重复计算
 

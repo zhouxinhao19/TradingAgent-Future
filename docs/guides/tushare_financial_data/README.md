@@ -59,7 +59,7 @@ async def get_financial_data(
 ```
 
 **参数说明**:
-- `symbol`: 股票代码 (如: "000001")
+- `symbol`: 品种代码 (如: "000001")
 - `report_type`: 报告类型 ("quarterly"/"annual")
 - `period`: 指定报告期 (YYYYMMDD格式)，为空则获取最新数据
 - `limit`: 获取记录数量，默认4条（最近4个季度）
@@ -229,7 +229,7 @@ if financial_data:
     print(f"保存了 {saved_count} 条记录")
 ```
 
-### 6. 批量处理多只股票
+### 6. 批量处理多只期货品种
 
 ```python
 symbols = ["000001", "000002", "600000", "600036"]
@@ -406,7 +406,7 @@ python test_tushare_financial_data.py
 - ✅ 财务指标获取
 - ✅ 期间范围数据获取
 - ✅ 数据集成测试
-- ✅ 多股票批量测试
+- ✅ 多期货品种批量测试
 
 ## 📝 总结
 

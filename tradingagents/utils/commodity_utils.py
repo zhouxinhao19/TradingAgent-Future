@@ -1,7 +1,7 @@
 """
 大宗商品工具函数
 提供大宗商品代码识别、分类和处理功能
-与 stock_utils.py 对称设计,便于 Phase 5 清理时整体替换
+(原 stock_utils.py 已清理,此为唯一商品工具模块)
 """
 
 import re

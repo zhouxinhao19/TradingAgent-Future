@@ -119,7 +119,7 @@ tradingagents/dataflows/
 - 提供缓存和基本面分析功能
 - 功能独特，无法合并
 
-**职责**: 优化的A股数据提供器，提供缓存和基本面分析功能
+**职责**: 优化的期货数据提供器，提供缓存和基本面分析功能
 
 ### 4. stock_data_service.py (12.14 KB) - 保留
 **原因**:
@@ -127,7 +127,7 @@ tradingagents/dataflows/
 - 被5处使用（API、Worker）
 - 与 data_source_manager 服务不同场景
 
-**职责**: 股票数据服务，实现 MongoDB → TDX 的降级机制
+**职责**: 期货数据服务，实现 MongoDB → TDX 的降级机制
 
 ### 5. stock_api.py (3.91 KB) - 保留
 **原因**:
@@ -135,7 +135,7 @@ tradingagents/dataflows/
 - 被 simple_analysis_service 使用
 - 文件小，保留成本低
 
-**职责**: 简化的股票API接口
+**职责**: 简化的期货品种API接口
 
 ### 6. unified_dataframe.py (5.77 KB) - 保留
 **原因**:

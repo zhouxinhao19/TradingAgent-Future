@@ -135,7 +135,7 @@ python scripts/test_scheduler_frontend.py
 系统中共有 **17 个定时任务**，分为以下类别：
 
 ### 基础服务（2个）
-- 股票基础信息同步
+- 期货品种基础信息同步
 - 实时行情入库
 
 ### Tushare 数据源（6个）

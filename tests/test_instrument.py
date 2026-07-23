@@ -1,15 +1,12 @@
 """
-测试标的抽象(Instrument)和商品工具(CommodityUtils)
-Phase 0 验证:stock / commodity 标识互斥、工厂方法正确
+测试商品工具(CommodityUtils)和标的抽象(Instrument)
 """
 
 import pytest
 
 from tradingagents.core.instrument import (
     Instrument,
-    ASSET_TYPE_STOCK,
     ASSET_TYPE_COMMODITY,
-    ASSET_TYPE_UNKNOWN,
 )
 from tradingagents.utils.commodity_utils import (
     CommodityMarket,
@@ -20,42 +17,12 @@ from tradingagents.utils.commodity_utils import (
 # ==================== Instrument 工厂方法 ====================
 
 class TestInstrumentOf:
-    """Instrument.of 工厂方法"""
-
-    # --- 股票标识 ---
-
-    def test_of_a_share(self):
-        inst = Instrument.of("000001")
-        assert inst.asset_type == ASSET_TYPE_STOCK
-        assert inst.is_stock is True
-        assert inst.is_commodity is False
-        assert inst.market == "china_a"
-        assert inst.currency == "CNY"
-
-    def test_of_hk_stock_with_suffix(self):
-        inst = Instrument.of("0700.HK")
-        assert inst.asset_type == ASSET_TYPE_STOCK
-        assert inst.market == "hong_kong"
-        assert inst.currency == "HKD"
-
-    def test_of_hk_stock_digits_only(self):
-        inst = Instrument.of("09988")
-        assert inst.asset_type == ASSET_TYPE_STOCK
-        assert inst.market == "hong_kong"
-
-    def test_of_us_stock(self):
-        inst = Instrument.of("AAPL")
-        assert inst.asset_type == ASSET_TYPE_STOCK
-        assert inst.market == "us"
-        assert inst.currency == "USD"
-
-    # --- 商品标识 ---
+    """Instrument.of 工厂方法（仅商品）"""
 
     def test_of_china_futures(self):
         inst = Instrument.of("CU2501.SHF")
         assert inst.asset_type == ASSET_TYPE_COMMODITY
         assert inst.is_commodity is True
-        assert inst.is_stock is False
         assert inst.market == "china_futures"
         assert inst.currency == "CNY"
         assert inst.category == "metal"
@@ -104,17 +71,9 @@ class TestInstrumentOf:
     def test_try_of_returns_none_on_invalid(self):
         assert Instrument.try_of("") is None
         assert Instrument.try_of("garbage") is None
-        assert Instrument.try_of("000001") is not None
+        assert Instrument.try_of("000001") is None  # 非商品代码
 
     # --- 序列化 ---
-
-    def test_to_dict_stock(self):
-        inst = Instrument.of("AAPL")
-        d = inst.to_dict()
-        assert d["code"] == "AAPL"
-        assert d["asset_type"] == "stock"
-        assert "market" in d
-        assert "currency" in d
 
     def test_to_dict_commodity(self):
         inst = Instrument.of("CU2501.SHF")
@@ -150,8 +109,8 @@ class TestCommodityUtils:
         # 未知
         ("random_xxx", CommodityMarket.UNKNOWN),
         ("", CommodityMarket.UNKNOWN),
-        ("000001", CommodityMarket.UNKNOWN),  # 6 位数字 = A股,不是商品
-        ("AAPL", CommodityMarket.UNKNOWN),     # 美股代码,不是商品
+        ("000001", CommodityMarket.UNKNOWN),
+        ("AAPL", CommodityMarket.UNKNOWN),
     ])
     def test_identify_market(self, code, expected):
         assert CommodityUtils.identify_market(code) == expected
@@ -221,27 +180,15 @@ class TestCommodityUtils:
         assert CommodityUtils.is_spot_cn("CU2501.SHF") is False
 
 
-# ==================== 互斥性测试(关键) ====================
+# ==================== 互斥性测试 ====================
 
-class TestStockCommodityExclusivity:
-    """股票和商品识别互斥,同一代码不能同时被识别为两者"""
+class TestExclusivity:
+    """商品代码识别不误报"""
 
     @pytest.mark.parametrize("code", [
-        # 股票代码不会被识别为商品
         "000001", "600519", "AAPL", "TSLA", "0700.HK",
     ])
     def test_stock_codes_not_commodity(self, code):
         market = CommodityUtils.identify_market(code)
         assert market == CommodityMarket.UNKNOWN, \
-            f"股票代码 {code} 误识别为商品: {market}"
-
-    @pytest.mark.parametrize("code", [
-        # 商品代码不会被识别为股票
-        "CU2501.SHF", "CL=F", "AU9999.SGE", "GC=F",
-    ])
-    def test_commodity_codes_not_stock(self, code):
-        market = StockUtils.StockUtils.identify_stock_market(code) if False else None
-        from tradingagents.utils.stock_utils import StockUtils, StockMarket
-        stock_market = StockUtils.identify_stock_market(code)
-        assert stock_market == StockMarket.UNKNOWN, \
-            f"商品代码 {code} 误识别为股票: {stock_market}"
+            f"代码 {code} 误识别为商品: {market}"

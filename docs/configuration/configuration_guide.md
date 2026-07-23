@@ -93,7 +93,7 @@ npm run dev
 
 #### MongoDB（必需）
 
-用于存储股票数据、分析结果、用户信息等。
+用于存储期货数据、分析结果、用户信息等。
 
 ```bash
 # [REQUIRED] MongoDB连接配置
@@ -209,7 +209,7 @@ ZHIPU_API_KEY=xxx
 
 ### 3.2 数据源配置（推荐）
 
-#### Tushare（推荐，专业A股数据）
+#### Tushare（推荐，专业期货数据）
 
 ```bash
 # [RECOMMENDED] Tushare Token

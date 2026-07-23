@@ -59,7 +59,7 @@ fallback_news = toolkit.get_realtime_stock_news.invoke({
 ```python
 # 修复后
 backup_news = toolkit.get_google_news.invoke({
-    "query": f"{ticker} 股票 新闻", 
+    "query": f"{ticker} 期货品种 新闻", 
     "curr_date": current_date
 })
 ```
@@ -81,7 +81,7 @@ backup_news = toolkit.get_google_news.invoke({
    📝 返回数据长度: 26555 字符
 
 🔍 测试 get_google_news 工具调用...
-   参数: {'query': '600036 股票 新闻', 'curr_date': '2025-07-28'}
+   参数: {'query': '600036 期货品种 新闻', 'curr_date': '2025-07-28'}
    ✅ get_google_news 调用成功
    📝 返回数据长度: 676 字符
 

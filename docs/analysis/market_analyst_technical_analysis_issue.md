@@ -41,7 +41,7 @@ result = f"""# {symbol} 美股数据分析
 
 ---
 
-### 2. 中国A股数据 ❌ 没有技术指标
+### 2. 中国期货数据 ❌ 没有技术指标
 
 **文件**: `tradingagents/dataflows/data_source_manager.py`
 
@@ -50,7 +50,7 @@ result = f"""# {symbol} 美股数据分析
 ```python
 def _format_stock_data_response(self, data: pd.DataFrame, symbol: str, stock_name: str,
                                 start_date: str, end_date: str) -> str:
-    """格式化股票数据响应"""
+    """格式化期货数据响应"""
     try:
         # 🔧 优化：只保留最后3天的数据，减少token消耗
         if len(data) > 3:
@@ -150,7 +150,7 @@ def _format_stock_data_response(self, data: pd.DataFrame, symbol: str, stock_nam
 
 ## 📊 技术指标对比
 
-| 指标类型 | 美股 | A股 | 说明 |
+| 指标类型 | 国际期货 | 国内期货 | 说明 |
 |---------|------|-----|------|
 | **移动平均线** | ✅ MA5, MA10, MA20 | ❌ 无 | 趋势判断的基础指标 |
 | **RSI** | ✅ 14日RSI | ❌ 无 | 超买超卖判断 |
@@ -206,12 +206,12 @@ def _format_stock_data_response(self, data: pd.DataFrame, symbol: str, stock_nam
 
 ## 📝 代码示例
 
-### 修复后的 A股数据格式化函数（示例）
+### 修复后的 期货数据格式化函数（示例）
 
 ```python
 def _format_stock_data_response(self, data: pd.DataFrame, symbol: str, stock_name: str,
                                 start_date: str, end_date: str) -> str:
-    """格式化股票数据响应（包含技术指标）"""
+    """格式化期货数据响应（包含技术指标）"""
     try:
         # 🔧 计算技术指标需要足够的历史数据
         # 但只返回最后3-5天的数据给大模型
@@ -304,7 +304,7 @@ def _format_stock_data_response(self, data: pd.DataFrame, symbol: str, stock_nam
 
 ## 📌 总结
 
-**问题根源**: A股数据没有提供技术指标，大模型只能基于简单价格信息进行"猜测"
+**问题根源**: 期货数据没有提供技术指标，大模型只能基于简单价格信息进行"猜测"
 
 **解决方案**: 在数据源层面添加技术指标计算，确保大模型收到完整的技术分析数据
 

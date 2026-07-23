@@ -106,10 +106,10 @@ tradingagents/dataflows/
 ├── config.py                    # 2.32 KB - 配置管理
 ├── data_source_manager.py       # 67.81 KB - ⭐ 核心数据源管理器
 ├── interface.py                 # 60.25 KB - ⭐ 核心公共接口
-├── optimized_china_data.py      # 67.68 KB - ⭐ 核心A股数据提供器
+├── optimized_china_data.py      # 67.68 KB - ⭐ 核心期货数据提供器
 ├── providers_config.py          # 9.29 KB - 提供器配置（广泛使用）
 ├── stock_api.py                 # 3.91 KB - 简化API接口
-├── stock_data_service.py        # 12.14 KB - 股票数据服务
+├── stock_data_service.py        # 12.14 KB - 期货数据服务
 ├── unified_dataframe.py         # 5.77 KB - 统一DataFrame
 └── utils.py                     # 1.17 KB - 工具函数
 ```

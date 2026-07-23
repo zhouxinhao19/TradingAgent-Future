@@ -131,7 +131,7 @@ print(f"实时数据: {DEFAULT_CONFIG['realtime_data']}")
 ### 受 `ONLINE_NEWS_ENABLED` 控制的工具
 - `get_google_news` - Google新闻获取
 - `get_reddit_news` - Reddit新闻获取
-- `get_reddit_stock_info` - Reddit股票讨论
+- `get_reddit_stock_info` - Reddit期货品种讨论
 - `get_chinese_social_sentiment` - 中国社交媒体情绪
 
 ### 受 `REALTIME_DATA_ENABLED` 控制的工具

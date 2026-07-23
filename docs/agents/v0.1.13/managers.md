@@ -30,7 +30,7 @@ def manager_node(state):
 
 ```python
 class AgentState:
-    company_of_interest: str      # 股票代码
+    company_of_interest: str      # 品种代码
     trade_date: str              # 交易日期
     fundamentals_report: str     # 基本面报告
     market_report: str           # 市场分析报告
@@ -65,11 +65,11 @@ def create_research_manager(llm):
         company_name = state["company_of_interest"]
         trade_date = state.get("trade_date", "")
         
-        # 获取股票市场信息
+        # 获取期货市场信息
         from tradingagents.utils.stock_utils import StockUtils
         market_info = StockUtils.get_market_info(company_name)
         
-        # 确定股票类型和货币信息
+        # 确定期货品种类型和货币信息
         if market_info.get("is_china"):
             stock_type = "A股"
             currency_unit = "人民币"
@@ -98,7 +98,7 @@ def create_research_manager(llm):
         作为投资组合经理和辩论主持人，请基于以下信息做出投资决策：
         
         公司名称: {company_name}
-        股票类型: {stock_type}
+        期货品种类型: {stock_type}
         货币单位: {currency_unit}
         交易日期: {trade_date}
         
@@ -141,7 +141,7 @@ def create_research_manager(llm):
 
 **核心职责**:
 - 管理整体投资组合配置
-- 协调多个股票的投资决策
+- 协调多个期货品种的投资决策
 - 优化资产配置和风险分散
 - 监控组合绩效和风险指标
 
@@ -169,7 +169,7 @@ def create_portfolio_manager(llm):
         风险偏好: {risk_tolerance}
         
         === 新投资建议 ===
-        目标股票: {company_name}
+        目标期货品种: {company_name}
         投资计划: {new_investment_plan}
         
         请分析：
@@ -227,7 +227,7 @@ def create_risk_manager(llm):
         中性风险分析: {neutral_analysis}
         
         === 投资计划 ===
-        目标股票: {company_name}
+        目标期货品种: {company_name}
         投资方案: {investment_plan}
         
         请制定：

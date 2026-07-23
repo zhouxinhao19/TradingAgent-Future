@@ -1,6 +1,6 @@
 # 数据库字段标准化完成报告
 
-> 股票代码字段统一为 `symbol` 的迁移工作已完成
+> 品种代码字段统一为 `symbol` 的迁移工作已完成
 
 ## ✅ 完成概览
 
@@ -50,12 +50,12 @@
 ```python
 # 旧版本
 class StockBasicInfoExtended(BaseModel):
-    code: str = Field(..., description="6位股票代码")
-    symbol: Optional[str] = Field(None, description="标准化股票代码")
+    code: str = Field(..., description="6位品种代码")
+    symbol: Optional[str] = Field(None, description="标准化品种代码")
 
 # 新版本
 class StockBasicInfoExtended(BaseModel):
-    symbol: str = Field(..., description="6位股票代码")
+    symbol: str = Field(..., description="6位品种代码")
     full_symbol: str = Field(..., description="完整标准化代码")
     code: Optional[str] = Field(None, description="已废弃,使用symbol")
 ```
@@ -71,11 +71,11 @@ class StockBasicInfoExtended(BaseModel):
 **兼容性处理**:
 ```python
 class SingleAnalysisRequest(BaseModel):
-    symbol: Optional[str] = Field(None, description="6位股票代码")
+    symbol: Optional[str] = Field(None, description="6位品种代码")
     stock_code: Optional[str] = Field(None, description="已废弃")
     
     def get_symbol(self) -> str:
-        """获取股票代码(兼容旧字段)"""
+        """获取品种代码(兼容旧字段)"""
         return self.symbol or self.stock_code or ""
 ```
 
@@ -125,8 +125,8 @@ async def get_stock_basic_info(symbol: str):
   - [x] `frontend/src/views/Analysis/SingleAnalysis.vue` - 单股分析
   - [x] `frontend/src/views/Analysis/BatchAnalysis.vue` - 批量分析
   - [x] `frontend/src/views/Analysis/AnalysisHistory.vue` - 分析历史
-  - [x] `frontend/src/views/Stocks/Detail.vue` - 股票详情
-  - [x] `frontend/src/views/Screening/index.vue` - 股票筛选
+  - [x] `frontend/src/views/Stocks/Detail.vue` - 期货品种详情
+  - [x] `frontend/src/views/Screening/index.vue` - 品种筛选
   - [x] `frontend/src/api/favorites.ts` - 收藏API
 
 ### 低优先级 (P2)
@@ -317,7 +317,7 @@ git revert <commit-hash>
 
 #### 工具函数 (frontend/src/utils/)
 - ✅ `stock.ts`: 新增字段兼容性工具函数
-  - `getStockSymbol()`: 从对象获取股票代码
+  - `getStockSymbol()`: 从对象获取品种代码
   - `getFullSymbol()`: 获取完整代码
   - `createSymbolObject()`: 创建兼容对象
   - `normalizeSymbols()`: 标准化代码列表
@@ -331,10 +331,10 @@ git revert <commit-hash>
 
 #### 视图组件 (frontend/src/views/)
 - ✅ `Analysis/SingleAnalysis.vue`: 单股分析表单和结果显示
-- ✅ `Analysis/BatchAnalysis.vue`: 批量分析股票列表处理
+- ✅ `Analysis/BatchAnalysis.vue`: 批量分析期货品种列表处理
 - ✅ `Analysis/AnalysisHistory.vue`: 历史记录列表显示
-- ✅ `Stocks/Detail.vue`: 股票详情页面
-- ✅ `Screening/index.vue`: 股票筛选结果处理
+- ✅ `Stocks/Detail.vue`: 期货品种详情页面
+- ✅ `Screening/index.vue`: 品种筛选结果处理
 
 ### 兼容性处理
 

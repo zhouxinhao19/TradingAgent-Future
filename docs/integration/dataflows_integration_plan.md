@@ -8,10 +8,10 @@
 ```
 tradingagents/dataflows/
 ├── interface.py              # 主要数据接口
-├── stock_data_service.py     # 股票数据服务
+├── stock_data_service.py     # 期货数据服务
 ├── data_source_manager.py    # 数据源管理器
 ├── db_cache_manager.py       # 数据库缓存管理
-├── optimized_china_data.py   # 优化的A股数据
+├── optimized_china_data.py   # 优化的期货数据
 ├── providers/                # 数据提供器
 │   ├── tushare_provider.py
 │   ├── akshare_provider.py
@@ -27,13 +27,13 @@ app/services/
 ├── news_data_service.py          # 新闻数据服务
 ├── social_media_service.py       # 社媒数据服务
 ├── internal_message_service.py   # 内部消息服务
-└── stock_data_service.py         # 股票数据服务
+└── stock_data_service.py         # 期货数据服务
 ```
 
 #### 3. **数据存储层**
 ```
 MongoDB Collections:
-├── stock_basic_info          # 股票基础信息
+├── stock_basic_info          # 期货品种基础信息
 ├── market_quotes            # 实时行情
 ├── stock_daily_quotes       # 历史数据 (新)
 ├── financial_data           # 财务数据 (新)
@@ -78,7 +78,7 @@ class UnifiedDataService:
         self.cache_manager = DatabaseCacheManager()
     
     async def get_stock_data(self, symbol: str, **kwargs):
-        """统一股票数据获取接口"""
+        """统一期货数据获取接口"""
         pass
     
     async def get_financial_data(self, symbol: str, **kwargs):
@@ -94,7 +94,7 @@ class UnifiedDataService:
 ```python
 # tradingagents/dataflows/interface.py 扩展
 def get_enhanced_stock_analysis(symbol: str, **kwargs):
-    """增强的股票分析 - 集成多维度数据"""
+    """增强的期货分析 - 集成多维度数据"""
     
     # 1. 基础数据
     basic_data = get_stock_data(symbol)
@@ -165,7 +165,7 @@ class EnhancedAnalysisFramework:
     """增强分析框架"""
     
     def comprehensive_stock_analysis(self, symbol: str):
-        """综合股票分析"""
+        """综合期货分析"""
         
         analysis_result = {
             'basic_info': self.get_basic_analysis(symbol),

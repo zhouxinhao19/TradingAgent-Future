@@ -96,7 +96,7 @@ llm = ChatDashScope(
 
 # 发送消息（自动记录token使用）
 response = llm.invoke([
-    HumanMessage(content="分析一下苹果公司的股票")
+    HumanMessage(content="分析一下苹果公司的期货品种")
 ], session_id="my_session", analysis_type="stock_analysis")
 ```
 

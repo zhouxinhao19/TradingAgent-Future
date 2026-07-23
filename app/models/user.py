@@ -37,7 +37,7 @@ PyObjectId = Annotated[
 class UserPreferences(BaseModel):
     """用户偏好设置"""
     # 分析偏好
-    default_market: str = "A股"
+    default_market: str = "期货"
     default_depth: str = "3"  # 1-5级，3级为标准分析（推荐）
     default_analysts: List[str] = Field(default_factory=lambda: ["市场分析师", "基本面分析师"])
     auto_refresh: bool = True
@@ -59,9 +59,9 @@ class UserPreferences(BaseModel):
 
 
 class FavoriteStock(BaseModel):
-    """自选股信息"""
-    stock_code: str = Field(..., description="股票代码")
-    stock_name: str = Field(..., description="股票名称")
+    """旧版自选股信息（历史兼容）"""
+    stock_code: str = Field(..., description="旧股票代码")
+    stock_name: str = Field(..., description="旧股票名称")
     market: str = Field(..., description="市场类型")
     added_at: datetime = Field(default_factory=now_tz, description="添加时间")
     tags: List[str] = Field(default_factory=list, description="用户标签")
@@ -93,8 +93,8 @@ class User(BaseModel):
     successful_analyses: int = 0
     failed_analyses: int = 0
 
-    # 自选股
-    favorite_stocks: List[FavoriteStock] = Field(default_factory=list, description="用户自选股列表")
+    # 旧版自选股（历史兼容，推荐使用 user_favorites 集合）
+    favorite_stocks: List[FavoriteStock] = Field(default_factory=list, description="旧股票自选列表（历史兼容）")
     
     model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True)
 

@@ -198,7 +198,7 @@ export const ActionTypes = {
 
 // 操作类型名称映射
 export const ActionTypeNames = {
-  [ActionTypes.STOCK_ANALYSIS]: '股票分析',
+  [ActionTypes.STOCK_ANALYSIS]: '品种分析',
   [ActionTypes.CONFIG_MANAGEMENT]: '配置管理',
   [ActionTypes.CACHE_OPERATION]: '缓存操作',
   [ActionTypes.DATA_IMPORT]: '数据导入',
@@ -206,9 +206,9 @@ export const ActionTypeNames = {
   [ActionTypes.SYSTEM_SETTINGS]: '系统设置',
   [ActionTypes.USER_LOGIN]: '用户登录',
   [ActionTypes.USER_LOGOUT]: '用户登出',
-  [ActionTypes.USER_MANAGEMENT]: '用户管理',  // 🔧 添加用户管理操作类型名称
+  [ActionTypes.USER_MANAGEMENT]: '用户管理',
   [ActionTypes.DATABASE_OPERATION]: '数据库操作',
-  [ActionTypes.SCREENING]: '股票筛选',
+  [ActionTypes.SCREENING]: '品种筛选',
   [ActionTypes.REPORT_GENERATION]: '报告生成'
 } as const
 

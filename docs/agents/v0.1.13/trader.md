@@ -30,7 +30,7 @@ def trader_node(state):
 
 ```python
 class AgentState:
-    company_of_interest: str      # 股票代码
+    company_of_interest: str      # 品种代码
     trade_date: str              # 交易日期
     fundamentals_report: str     # 基本面报告
     market_report: str           # 市场分析报告
@@ -63,11 +63,11 @@ def create_trader(llm):
         company_name = state["company_of_interest"]
         investment_plan = state.get("investment_plan", "")
         
-        # 获取股票市场信息
+        # 获取期货市场信息
         from tradingagents.utils.stock_utils import StockUtils
         market_info = StockUtils.get_market_info(company_name)
         
-        # 确定股票类型和货币信息
+        # 确定期货品种类型和货币信息
         if market_info.get("is_china"):
             stock_type = "A股"
             currency_unit = "人民币"
@@ -92,7 +92,7 @@ def create_trader(llm):
         作为专业交易员，请基于以下信息生成投资建议：
         
         公司名称: {company_name}
-        股票类型: {stock_type}
+        期货品种类型: {stock_type}
         货币单位: {currency_unit}
         
         投资计划: {investment_plan}
@@ -160,11 +160,11 @@ info_weights = {
 }
 ```
 
-## 股票类型支持
+## 期货品种类型支持
 
 ### 多市场交易能力
 
-交易员支持全球主要股票市场的交易决策：
+交易员支持全球主要期货市场的交易决策：
 
 ```python
 # 市场信息获取和处理
@@ -175,7 +175,7 @@ market_info = StockUtils.get_market_info(company_name)
 if market_info.get("is_china"):
     # A股交易特点
     trading_hours = "09:30-15:00 (北京时间)"
-    price_limit = "±10% (ST股票±5%)"
+    price_limit = "±10% (ST期货品种±5%)"
     settlement = "T+1"
     currency = "人民币(CNY)"
     
@@ -196,7 +196,7 @@ elif market_info.get("is_us"):
 
 ### 本土化交易策略
 
-1. **A股市场特色**:
+1. **期货市场特色**:
    - 涨跌停板制度考虑
    - T+1交易制度影响
    - 政策敏感性分析
@@ -419,8 +419,8 @@ market_config = {
 
 ```python
 # 交易员活动日志
-logger.info(f"💼 [交易员] 开始分析股票: {company_name}")
-logger.info(f"📈 [交易员] 股票类型: {stock_type}, 货币: {currency_unit}")
+logger.info(f"💼 [交易员] 开始分析期货品种: {company_name}")
+logger.info(f"📈 [交易员] 期货品种类型: {stock_type}, 货币: {currency_unit}")
 logger.debug(f"📊 [交易员] 投资计划: {investment_plan[:100]}...")
 logger.info(f"🎯 [交易员] 生成投资建议完成")
 ```

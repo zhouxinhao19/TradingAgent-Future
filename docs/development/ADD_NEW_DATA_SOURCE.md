@@ -135,15 +135,15 @@ class YourNewSourceProvider:
     
     def get_stock_data(self, symbol: str, start_date: str, end_date: str) -> Dict[str, Any]:
         """
-        获取股票历史数据
+        获取期货品种历史数据
         
         Args:
-            symbol: 股票代码
+            symbol: 品种代码
             start_date: 开始日期（YYYY-MM-DD）
             end_date: 结束日期（YYYY-MM-DD）
         
         Returns:
-            股票数据字典
+            期货数据字典
         """
         try:
             # 实现数据获取逻辑
@@ -191,7 +191,7 @@ def get_your_new_source_provider() -> YourNewSourceProvider:
 
 ```python
 class ChinaDataSource(Enum):
-    """中国股票数据源枚举"""
+    """中国期货数据源枚举"""
     # ... 现有数据源 ...
     YOUR_NEW_SOURCE = "your_new_source"
 ```

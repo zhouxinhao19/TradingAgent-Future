@@ -55,10 +55,10 @@ tradingagents/dataflows/
 ├── data_source_manager.py           # ⚠️ 数据源管理器（核心）
 ├── fundamentals_snapshot.py         # ⚠️ 基本面快照
 ├── interface.py                     # ⚠️ 公共接口（核心）
-├── optimized_china_data.py          # ⚠️ 优化的A股数据提供器
+├── optimized_china_data.py          # ⚠️ 优化的期货数据提供器
 ├── providers_config.py              # ⚠️ 提供器配置
-├── stock_api.py                     # ⚠️ 股票API接口
-├── stock_data_service.py            # ⚠️ 股票数据服务
+├── stock_api.py                     # ⚠️ 期货品种API接口
+├── stock_data_service.py            # ⚠️ 期货数据服务
 ├── unified_dataframe.py             # ⚠️ 统一DataFrame
 └── utils.py                         # ⚠️ 工具函数
 ```
@@ -136,7 +136,7 @@ tradingagents/dataflows/
   - **选项 B**: 保留单文件，但使用 `__init__.py` 重新导出
 
 #### 6. **optimized_china_data.py** (67.68 KB) ⭐ 核心文件
-- **功能**: 优化的A股数据提供器（缓存 + 基本面分析）
+- **功能**: 优化的期货数据提供器（缓存 + 基本面分析）
 - **使用情况**: **广泛使用**
   - `tradingagents/agents/utils/agent_utils.py` - 4 处（Agent 工具）
   - `tradingagents/agents/analysts/market_analyst.py` - 2 处（市场分析师）
@@ -144,7 +144,7 @@ tradingagents/dataflows/
   - 测试/示例文件 - 16 处
 - **主要功能**:
   - `OptimizedChinaDataProvider` - 优化的数据提供器类
-  - `get_china_stock_data_cached()` - 缓存的股票数据获取
+  - `get_china_stock_data_cached()` - 缓存的期货数据获取
   - `get_china_fundamentals_cached()` - 缓存的基本面数据获取
   - `_generate_fundamentals_report()` - 生成基本面分析报告
 - **问题**:
@@ -168,7 +168,7 @@ tradingagents/dataflows/
   - **选项 B**: 移到 `providers/config.py`
 
 #### 8. **stock_api.py** (3.91 KB)
-- **功能**: 简单的股票API接口封装
+- **功能**: 简单的期货品种API接口封装
 - **使用情况**: 仅在 `app/services/simple_analysis_service.py` 使用 1 次
 - **问题**: 
   - 功能与 `interface.py` 重叠
@@ -178,7 +178,7 @@ tradingagents/dataflows/
   - **选项 B**: 移到 `interfaces/simple_api.py`
 
 #### 9. **stock_data_service.py** (12.14 KB)
-- **功能**: 统一的股票数据获取服务（MongoDB → TDX 降级）
+- **功能**: 统一的期货数据获取服务（MongoDB → TDX 降级）
 - **使用情况**: 在多个地方使用（5 次）
 - **问题**: 
   - 功能与 `data_source_manager.py` 重叠
@@ -239,7 +239,7 @@ tradingagents/dataflows/
 │
 ├── services/                        # 🆕 数据服务
 │   ├── __init__.py
-│   └── stock_data_service.py       # 股票数据服务
+│   └── stock_data_service.py       # 期货数据服务
 │
 ├── sentiment/                       # 🆕 情绪分析
 │   ├── __init__.py

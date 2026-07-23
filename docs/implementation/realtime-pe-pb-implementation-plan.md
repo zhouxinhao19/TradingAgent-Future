@@ -21,17 +21,17 @@
 | 接口 | 文件 | 影响 | 优先级 |
 |-----|------|------|--------|
 | **分析数据流** | `tradingagents/dataflows/optimized_china_data.py` | 分析报告中的PE/PB | 🔴 高 |
-| **股票详情-基本面** | `app/routers/stocks.py` - `get_fundamentals()` | 详情页基本面快照 | 🔴 高 |
-| **股票筛选** | `app/routers/screening.py` | 筛选结果中的PE/PB | 🔴 高 |
-| **自选股列表** | `app/routers/favorites.py` | 自选股的PE/PB | 🟡 中 |
+| **期货品种详情-基本面** | `app/routers/stocks.py` - `get_fundamentals()` | 详情页基本面快照 | 🔴 高 |
+| **品种筛选** | `app/routers/screening.py` | 筛选结果中的PE/PB | 🔴 高 |
+| **自选品种列表** | `app/routers/favorites.py` | 自选品种的PE/PB | 🟡 中 |
 
 ### 前端页面
 
 | 页面 | 文件 | 使用场景 | 优先级 |
 |-----|------|---------|--------|
-| **股票详情页** | `frontend/src/views/Stocks/Detail.vue` | 基本面快照显示PE | 🔴 高 |
-| **股票筛选页** | `frontend/src/views/Screening/index.vue` | 筛选条件和结果列表 | 🔴 高 |
-| **自选股页面** | `frontend/src/views/Favorites/index.vue` | 自选股列表（如果显示PE/PB） | 🟡 中 |
+| **期货品种详情页** | `frontend/src/views/Stocks/Detail.vue` | 基本面快照显示PE | 🔴 高 |
+| **品种筛选页** | `frontend/src/views/Screening/index.vue` | 筛选条件和结果列表 | 🔴 高 |
+| **自选品种页面** | `frontend/src/views/Favorites/index.vue` | 自选品种列表（如果显示PE/PB） | 🟡 中 |
 | **分析报告** | 各分析相关页面 | 报告中的估值指标 | 🔴 高 |
 
 ## 实施步骤
@@ -60,7 +60,7 @@ async def calculate_realtime_pe_pb(
     基于实时行情和财务数据计算PE/PB
     
     Args:
-        symbol: 6位股票代码
+        symbol: 6位品种代码
         db_client: MongoDB客户端（可选，用于同步调用）
     
     Returns:
@@ -92,18 +92,18 @@ async def calculate_realtime_pe_pb(
         # 1. 获取实时行情（market_quotes）
         quote = db.market_quotes.find_one({"code": code6})
         if not quote:
-            logger.debug(f"未找到股票 {code6} 的实时行情")
+            logger.debug(f"未找到期货品种 {code6} 的实时行情")
             return None
         
         realtime_price = quote.get("close")
         if not realtime_price or realtime_price <= 0:
-            logger.debug(f"股票 {code6} 的实时价格无效: {realtime_price}")
+            logger.debug(f"期货品种 {code6} 的实时价格无效: {realtime_price}")
             return None
         
         # 2. 获取基础信息和财务数据（stock_basic_info）
         basic_info = db.stock_basic_info.find_one({"code": code6})
         if not basic_info:
-            logger.debug(f"未找到股票 {code6} 的基础信息")
+            logger.debug(f"未找到期货品种 {code6} 的基础信息")
             return None
         
         # 获取财务数据
@@ -112,7 +112,7 @@ async def calculate_realtime_pe_pb(
         total_equity = basic_info.get("total_hldr_eqy_exc_min_int")  # 净资产（万元）
         
         if not total_shares or total_shares <= 0:
-            logger.debug(f"股票 {code6} 的总股本无效: {total_shares}")
+            logger.debug(f"期货品种 {code6} 的总股本无效: {total_shares}")
             return None
         
         # 3. 计算实时市值（万元）
@@ -143,11 +143,11 @@ async def calculate_realtime_pe_pb(
             "note": "基于实时价格和最新财报计算"
         }
         
-        logger.debug(f"股票 {code6} 实时PE/PB计算成功: PE={result['pe']}, PB={result['pb']}")
+        logger.debug(f"期货品种 {code6} 实时PE/PB计算成功: PE={result['pe']}, PB={result['pb']}")
         return result
         
     except Exception as e:
-        logger.error(f"计算股票 {symbol} 的实时PE/PB失败: {e}", exc_info=True)
+        logger.error(f"计算期货品种 {symbol} 的实时PE/PB失败: {e}", exc_info=True)
         return None
 
 
@@ -183,7 +183,7 @@ async def get_pe_pb_with_fallback(
     获取PE/PB，优先使用实时计算，失败时降级到静态数据
     
     Args:
-        symbol: 6位股票代码
+        symbol: 6位品种代码
         db_client: MongoDB客户端（可选）
     
     Returns:
@@ -203,7 +203,7 @@ async def get_pe_pb_with_fallback(
         if validate_pe_pb(realtime_metrics.get('pe'), realtime_metrics.get('pb')):
             return realtime_metrics
         else:
-            logger.warning(f"股票 {symbol} 的实时PE/PB数据异常，降级到静态数据")
+            logger.warning(f"期货品种 {symbol} 的实时PE/PB数据异常，降级到静态数据")
     
     # 2. 降级到静态数据
     try:
@@ -233,13 +233,13 @@ async def get_pe_pb_with_fallback(
         }
         
     except Exception as e:
-        logger.error(f"获取股票 {symbol} 的静态PE/PB失败: {e}")
+        logger.error(f"获取期货品种 {symbol} 的静态PE/PB失败: {e}")
         return {}
 ```
 
 ### 第二步：修改后端接口
 
-#### 2.1 修改股票详情接口
+#### 2.1 修改期货品种详情接口
 
 **文件**：`app/routers/stocks.py` - `get_fundamentals()`
 
@@ -269,12 +269,12 @@ realtime_metrics = await get_pe_pb_with_fallback(code6, db.client)
 "pe_updated_at": realtime_metrics.get("updated_at"),
 ```
 
-#### 2.2 修改股票筛选服务
+#### 2.2 修改品种筛选服务
 
 **文件**：`app/services/enhanced_screening_service.py`
 
 **需要修改的地方**：
-1. 在返回筛选结果时，为每个股票计算实时PE/PB
+1. 在返回筛选结果时，为每品种票计算实时PE/PB
 2. 批量计算以提高性能
 
 **实现方案**：
@@ -321,7 +321,7 @@ else:
 
 ### 第四步：前端显示优化
 
-#### 4.1 股票详情页
+#### 4.1 期货品种详情页
 
 **文件**：`frontend/src/views/Stocks/Detail.vue`
 
@@ -343,7 +343,7 @@ else:
 </div>
 ```
 
-#### 4.2 股票筛选页
+#### 4.2 品种筛选页
 
 **文件**：`frontend/src/views/Screening/index.vue`
 
@@ -401,7 +401,7 @@ async def test_calculate_realtime_pe_pb():
 
 ### 集成测试
 
-1. **测试股票详情接口**
+1. **测试期货品种详情接口**
    ```bash
    curl -H "Authorization: Bearer <token>" \
         http://localhost:8000/api/stocks/000001/fundamentals
@@ -411,7 +411,7 @@ async def test_calculate_realtime_pe_pb():
    - `pe_is_realtime: true`
    - `pe_source: "realtime_calculated"`
 
-2. **测试股票筛选接口**
+2. **测试品种筛选接口**
    ```bash
    curl -X POST -H "Authorization: Bearer <token>" \
         -H "Content-Type: application/json" \
@@ -419,7 +419,7 @@ async def test_calculate_realtime_pe_pb():
         http://localhost:8000/api/screening/screen
    ```
    
-   验证返回的股票列表中PE/PB是实时计算的
+   验证返回的期货品种列表中PE/PB是实时计算的
 
 3. **测试分析功能**
    - 触发单股分析
@@ -427,10 +427,10 @@ async def test_calculate_realtime_pe_pb():
 
 ### 性能测试
 
-1. **单个股票计算性能**
+1. **单品种票计算性能**
    - 目标：< 50ms
 
-2. **批量计算性能（100只股票）**
+2. **批量计算性能（100只期货品种）**
    - 目标：< 2s
 
 3. **筛选接口性能**
@@ -441,13 +441,13 @@ async def test_calculate_realtime_pe_pb():
 ### 第一阶段：核心功能（1天）
 
 - [x] 创建 `realtime_metrics.py` 工具模块
-- [ ] 修改股票详情接口
+- [ ] 修改期货品种详情接口
 - [ ] 修改分析数据流
 - [ ] 基本测试验证
 
 ### 第二阶段：完善功能（2天）
 
-- [ ] 修改股票筛选服务
+- [ ] 修改品种筛选服务
 - [ ] 前端显示优化
 - [ ] 添加数据时效性标识
 - [ ] 完整测试

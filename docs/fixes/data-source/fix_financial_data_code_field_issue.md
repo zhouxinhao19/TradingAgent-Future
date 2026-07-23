@@ -12,8 +12,8 @@ dup key: { code: null, report_period: "20251231", data_source: "akshare" }
 
 **错误信息解读**：
 - **集合**：`stock_financial_data`（财务数据表）
-- **唯一索引**：`code_period_source_unique`（股票代码 + 报告期 + 数据源）
-- **冲突键值**：`code: null`（**股票代码为空！**）
+- **唯一索引**：`code_period_source_unique`（品种代码 + 报告期 + 数据源）
+- **冲突键值**：`code: null`（**品种代码为空！**）
 - **报告期**：`20251231`
 - **数据源**：`akshare`
 

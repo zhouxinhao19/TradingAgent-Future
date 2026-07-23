@@ -2,14 +2,14 @@
 
 ## 架构概览
 
-TradingAgents-CN v0.1.16 采用现代化的前后端分离架构，引入任务队列系统和选股功能，实现高并发、可扩展的股票分析平台。
+TradingAgents-CN v0.1.16 采用现代化的前后端分离架构，引入任务队列系统和选品种功能，实现高并发、可扩展的股票分析平台。
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Vue3 前端     │    │   FastAPI 后端  │    │   Redis 队列    │
 │                 │    │                 │    │                 │
 │ ┌─────────────┐ │    │ ┌─────────────┐ │    │ ┌─────────────┐ │
-│ │ 选股界面    │ │────│ │ 选股API     │ │    │ │ 任务队列    │ │
+│ │ 选品种界面    │ │────│ │ 选品种API     │ │    │ │ 任务队列    │ │
 │ └─────────────┘ │    │ └─────────────┘ │    │ └─────────────┘ │
 │ ┌─────────────┐ │    │ ┌─────────────┐ │    │ ┌─────────────┐ │
 │ │ 批量分析    │ │────│ │ 分析API     │ │────│ │ 进度缓存    │ │
@@ -69,7 +69,7 @@ Vue3 + Composition API
 ```
 src/
 ├── components/          # 通用组件
-│   ├── StockSelector/   # 选股组件
+│   ├── StockSelector/   # 选品种组件
 │   ├── BatchAnalysis/   # 批量分析
 │   ├── QueueStatus/     # 队列状态
 │   └── ProgressBar/     # 进度条
@@ -107,14 +107,14 @@ webapi/
 ├── routers/            # 路由模块
 │   ├── auth.py         # 认证接口
 │   ├── analysis.py     # 分析接口
-│   ├── screening.py    # 选股接口
+│   ├── screening.py    # 选品种接口
 │   ├── queue.py        # 队列管理
 │   └── sse.py          # 服务端推送
 ├── services/           # 业务逻辑
 │   ├── auth_service.py # 认证服务
 │   ├── queue_service.py# 队列服务
 │   ├── analysis_service.py # 分析服务
-│   └── screening_service.py # 选股服务
+│   └── screening_service.py # 选品种服务
 ├── models/             # 数据模型
 │   ├── user.py         # 用户模型
 │   ├── analysis.py     # 分析模型
@@ -184,7 +184,7 @@ async def worker_lifecycle():
 
 ## 数据流设计
 
-### 1. 选股流程
+### 1. 选品种流程
 ```mermaid
 sequenceDiagram
     participant U as 用户
@@ -300,7 +300,7 @@ sequenceDiagram
   task_id: String,            // 任务唯一标识
   batch_id: String,           // 所属批次
   user_id: ObjectId,          // 用户ID
-  stock_code: String,         // 股票代码
+  stock_code: String,         // 品种代码
   status: String,             // queued/processing/completed/failed/cancelled
   priority: Number,           // 优先级
   progress: Number,           // 任务进度 0-100
@@ -355,7 +355,7 @@ HASH session:{session_id}
 STRING rate_limit:{user_id}:{endpoint}
 # 值: 请求计数，带TTL
 
-# 选股结果缓存
+# 选品种结果缓存
 HASH screening:{cache_key}
 # 字段: results, created_at, expires_at
 ```

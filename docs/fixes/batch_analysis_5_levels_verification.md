@@ -45,7 +45,7 @@ async def submit_batch_analysis(
     background_tasks: BackgroundTasks,
     user: dict = Depends(get_current_user)
 ):
-    # 为每只股票创建单股分析任务
+    # 为每只期货品种创建单股分析任务
     for symbol in stock_symbols:
         single_req = SingleAnalysisRequest(
             symbol=symbol,
@@ -85,7 +85,7 @@ POST /api/analysis/batch
   }
   ↓
 后端 submit_batch_analysis()
-  ↓ (为每只股票创建任务)
+  ↓ (为每只期货品种创建任务)
   ↓
 SingleAnalysisRequest(
   symbol="000001",
@@ -130,10 +130,10 @@ tests/test_research_depth_5_levels.py::TestAnalysisParametersDefault::test_resea
 
 ## 📊 批量分析场景示例
 
-### 场景1：快速扫描多只股票（1级）
+### 场景1：快速扫描多只期货品种（1级）
 ```
 批次：日常监控
-股票：000001, 600519, 000002, 600036, 000858
+期货品种：000001, 600519, 000002, 600036, 000858
 深度：⚡ 1级 - 快速分析
 预期：每只 2-4分钟，总计 10-20分钟
 配置：禁用记忆和在线工具，使用缓存数据
@@ -142,16 +142,16 @@ tests/test_research_depth_5_levels.py::TestAnalysisParametersDefault::test_resea
 ### 场景2：常规投资组合分析（2级）
 ```
 批次：月度投资组合
-股票：000001, 600519, 000002
+期货品种：000001, 600519, 000002
 深度：📈 2级 - 基础分析
 预期：每只 4-6分钟，总计 12-18分钟
 配置：启用记忆和在线工具，获取最新数据
 ```
 
-### 场景3：重点股票深度研究（3级，推荐）
+### 场景3：重点期货品种深度研究（3级，推荐）
 ```
-批次：重点关注股票
-股票：000001, 600519
+批次：重点关注期货品种
+期货品种：000001, 600519
 深度：🎯 3级 - 标准分析
 预期：每只 6-10分钟，总计 12-20分钟
 配置：1轮辩论 + 2轮风险讨论
@@ -160,7 +160,7 @@ tests/test_research_depth_5_levels.py::TestAnalysisParametersDefault::test_resea
 ### 场景4：投资决策前的全面评估（4级）
 ```
 批次：投资决策候选
-股票：000001, 600519
+期货品种：000001, 600519
 深度：🔍 4级 - 深度分析
 预期：每只 10-15分钟，总计 20-30分钟
 配置：2轮辩论 + 2轮风险讨论
@@ -169,7 +169,7 @@ tests/test_research_depth_5_levels.py::TestAnalysisParametersDefault::test_resea
 ### 场景5：重大投资的完整研究（5级）
 ```
 批次：重大投资研究
-股票：000001
+期货品种：000001
 深度：🏆 5级 - 全面分析
 预期：15-25分钟
 配置：3轮辩论 + 3轮风险讨论，最高质量
@@ -178,7 +178,7 @@ tests/test_research_depth_5_levels.py::TestAnalysisParametersDefault::test_resea
 ## 🎯 批量分析优势
 
 ### 1. 统一配置
-- 所有股票使用相同的分析深度
+- 所有期货品种使用相同的分析深度
 - 确保结果的可比性
 - 便于批量决策
 
@@ -188,12 +188,12 @@ tests/test_research_depth_5_levels.py::TestAnalysisParametersDefault::test_resea
 - 5个级别满足不同需求
 
 ### 3. 并发执行
-- 多只股票并发分析
+- 多只期货品种并发分析
 - 充分利用系统资源
 - 提高整体效率
 
 ### 4. 进度跟踪
-- 每只股票独立跟踪进度
+- 每只期货品种独立跟踪进度
 - 实时查看完成情况
 - 支持部分成功
 
@@ -222,7 +222,7 @@ tests/test_research_depth_5_levels.py::TestAnalysisParametersDefault::test_resea
 
 1. ✅ **前端界面**：正确显示5个深度选项
 2. ✅ **参数传递**：正确传递 research_depth 参数
-3. ✅ **后端处理**：正确为每只股票创建任务
+3. ✅ **后端处理**：正确为每只期货品种创建任务
 4. ✅ **配置生成**：正确根据深度生成配置
 5. ✅ **单元测试**：所有测试通过
 6. ✅ **数据流**：完整的数据流验证通过

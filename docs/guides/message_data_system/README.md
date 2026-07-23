@@ -33,7 +33,7 @@ TradingAgents-CN系统已成功实现了统一的消息数据存储架构，包�
 ```javascript
 {
   "_id": ObjectId("..."),
-  "symbol": "000001",           // 相关股票代码
+  "symbol": "000001",           // 相关品种代码
   "message_id": "weibo_123456789",  // 原始消息ID
   "platform": "weibo",         // 平台类型
   "message_type": "post",      // 消息类型
@@ -277,7 +277,7 @@ GET /api/internal-messages/categories
 **位置**: `examples/crawlers/social_media_crawler.py`
 
 **支持平台**:
-- 微博 (Weibo) - 股票讨论、投资观点
+- 微博 (Weibo) - 期货品种讨论、投资观点
 - 抖音 (Douyin) - 财经视频、投资教育
 
 **使用方法**:
@@ -303,7 +303,7 @@ python examples/crawlers/social_media_crawler.py
 # 使用社媒爬虫
 from examples.crawlers.social_media_crawler import crawl_and_save_social_media
 
-# 爬取指定股票的社媒消息
+# 爬取指定期货品种的社媒消息
 symbols = ["000001", "000002", "600000"]
 platforms = ["weibo", "douyin"]
 saved_count = await crawl_and_save_social_media(symbols, platforms)
@@ -341,7 +341,7 @@ python examples/crawlers/internal_message_crawler.py
 # 使用内部消息爬虫
 from examples.crawlers.internal_message_crawler import crawl_and_save_internal_messages
 
-# 爬取指定股票的内部消息
+# 爬取指定期货品种的内部消息
 symbols = ["000001", "000002", "600000"]
 message_types = ["research_report", "analyst_note"]
 saved_count = await crawl_and_save_internal_messages(symbols, message_types)
@@ -636,7 +636,7 @@ result = await collection.bulk_write(operations, ordered=False)
 ### 1. 社媒情绪监控
 
 ```python
-# 监控股票社媒情绪变化
+# 监控期货品种社媒情绪变化
 async def monitor_social_sentiment(symbol: str):
     service = await get_social_media_service()
     
@@ -1131,6 +1131,6 @@ reports = await service.get_research_reports(symbol="000001", limit=5)
 
 **消息数据系统已完整实现并准备投入使用！** 🎉
 
-通过统一的存储架构、完善的API接口、智能的数据分析和强大的爬虫系统，为您的股票投资分析提供全方位的消息数据支持。
+通过统一的存储架构、完善的API接口、智能的数据分析和强大的爬虫系统，为您的期货投资分析提供全方位的消息数据支持。
 
 **立即开始使用**: `python examples/run_message_crawlers.py` 🚀

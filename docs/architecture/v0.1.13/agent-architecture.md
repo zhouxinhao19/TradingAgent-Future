@@ -83,7 +83,7 @@ class AgentState(MessagesState):
     """智能体状态管理类 - 继承自 LangGraph MessagesState"""
     
     # 基础信息
-    company_of_interest: Annotated[str, "目标分析公司股票代码"]
+    company_of_interest: Annotated[str, "目标分析公司品种代码"]
     trade_date: Annotated[str, "交易日期"]
     sender: Annotated[str, "发送消息的智能体"]
     
@@ -157,7 +157,7 @@ def create_fundamentals_analyst(llm, toolkit):
         current_date = state["trade_date"]
         ticker = state["company_of_interest"]
         
-        # 股票类型检测
+        # 期货品种类型检测
         from tradingagents.utils.stock_utils import StockUtils
         market_info = StockUtils.get_market_info(ticker)
         
@@ -233,7 +233,7 @@ def create_china_market_analyst(llm, toolkit):
     @log_analyst_module("china_market")
     def china_market_analyst_node(state):
         """中国市场分析师节点实现"""
-        # 专门针对中国A股市场的分析
+        # 专门针对中国期货市场的分析
         # ...
         return state
     
@@ -288,7 +288,7 @@ def create_trader(llm, memory):
         news_report = state["news_report"]
         fundamentals_report = state["fundamentals_report"]
         
-        # 股票类型检测
+        # 期货品种类型检测
         from tradingagents.utils.stock_utils import StockUtils
         market_info = StockUtils.get_market_info(company_name)
         
@@ -402,7 +402,7 @@ class ToolKit:
     
     # 基本面分析工具
     def get_stock_fundamentals_unified(self, ticker: str):
-        """统一基本面分析工具，自动识别股票类型"""
+        """统一基本面分析工具，自动识别期货品种类型"""
         pass
     
     # 市场数据工具
@@ -459,14 +459,14 @@ history = state["messages"]
 
 ## 🛠️ 工具和实用程序
 
-### 股票工具
+### 期货品种工具
 
 **文件位置**: `tradingagents/agents/utils/agent_utils.py`
 
 ```python
 from tradingagents.utils.stock_utils import StockUtils
 
-# 股票类型检测
+# 期货品种类型检测
 market_info = StockUtils.get_market_info(ticker)
 print(f"市场类型: {market_info['market_name']}")
 print(f"货币: {market_info['currency_name']}")
@@ -512,8 +512,8 @@ class GoogleToolCallHandler:
 from tradingagents.utils.logging_init import get_logger
 
 logger = get_logger("default")
-logger.info(f"📊 [基本面分析师] 正在分析股票: {ticker}")
-logger.debug(f"📊 [DEBUG] 股票类型: {market_info}")
+logger.info(f"📊 [基本面分析师] 正在分析期货品种: {ticker}")
+logger.debug(f"📊 [DEBUG] 期货品种类型: {market_info}")
 ```
 
 ### 执行追踪

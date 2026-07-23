@@ -59,7 +59,7 @@ class BasicsSyncService:
     async def run_full_sync(self, force: bool = False) -> Dict[str, Any]:
         """Run a full sync. If already running, return current status unless force."""
         
-        # Step 1: 获取股票基本信息列表
+        # Step 1: 获取期货品种基本信息列表
         stock_df = await asyncio.to_thread(self._fetch_stock_basic_df)
         
         # Step 2: 获取最近交易日
@@ -481,7 +481,7 @@ def validate_realtime_metrics(metrics: dict) -> bool:
 
 ```python
 # 缓存实时计算结果（30秒有效期）
-# 避免同一股票在短时间内重复计算
+# 避免同一期货品种在短时间内重复计算
 cache = TTLCache(maxsize=1000, ttl=30)
 ```
 
@@ -501,7 +501,7 @@ cache = TTLCache(maxsize=1000, ttl=30)
 
 #### 2. 历史PE/PB分位数
 
-- 计算股票的历史PE/PB分位数
+- 计算期货品种的历史PE/PB分位数
 - 提供"当前估值处于历史XX%分位"的参考
 
 #### 3. 行业PE/PB对比

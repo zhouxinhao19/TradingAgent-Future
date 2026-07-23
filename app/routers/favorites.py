@@ -1,7 +1,7 @@
 """
 自选品种统一 API 路由
 前缀: /api/favorites
-同时支持股票(stock)和商品期货(commodity)
+支持商品期货(commodity)和历史兼容(stock)
 """
 
 from typing import Optional, List
@@ -28,8 +28,8 @@ router = APIRouter(prefix="/favorites", tags=["自选品种"])
 
 class AddFavoriteRequest(BaseModel):
     asset_type: str = Field(..., pattern="^(stock|commodity)$", description="资产类型")
-    stock_code: Optional[str] = Field(default=None, description="股票代码")
-    stock_name: Optional[str] = Field(default=None, description="股票名称")
+    stock_code: Optional[str] = Field(default=None, description="股票代码（旧兼容）")
+    stock_name: Optional[str] = Field(default=None, description="股票名称（旧兼容）")
     market: Optional[str] = Field(default=None, description="市场类型")
     full_symbol: Optional[str] = Field(default=None, description="商品合约代码")
     commodity_name: Optional[str] = Field(default=None, description="商品名称")

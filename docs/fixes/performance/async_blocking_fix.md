@@ -38,9 +38,9 @@ async def test_data_sources():
 ### 2. 耗时操作
 
 每个数据源的测试都包含：
-- **获取股票列表**：5000+ 只股票，需要 5-10 秒
+- **获取期货品种列表**：5000+ 只期货品种，需要 5-10 秒
 - **查找最新交易日期**：需要 1-2 秒
-- **获取每日基础数据**：5000+ 只股票，需要 10-20 秒
+- **获取每日基础数据**：5000+ 只期货品种，需要 10-20 秒
 
 **总耗时**：3个数据源 × 20秒 = **60秒左右**
 
@@ -104,7 +104,7 @@ async def _test_single_adapter(adapter) -> dict:
         "tests": {}
     }
     
-    # 测试股票列表获取（在后台线程中执行）
+    # 测试期货品种列表获取（在后台线程中执行）
     try:
         df = await asyncio.to_thread(adapter.get_stock_list)
         if df is not None and not df.empty:
@@ -146,7 +146,7 @@ async def test_data_sources():
     """
     测试所有数据源的连接和数据获取能力
     
-    注意：此接口会执行耗时操作（获取股票列表等），
+    注意：此接口会执行耗时操作（获取期货品种列表等），
     所有同步操作都在后台线程中执行，避免阻塞事件循环
     """
     manager = DataSourceManager()

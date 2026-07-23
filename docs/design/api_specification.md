@@ -23,7 +23,7 @@ def get_stock_fundamentals_unified(
 #### 输入参数
 ```json
 {
-    "ticker": "002027",           // 股票代码 (必填)
+    "ticker": "002027",           // 品种代码 (必填)
     "start_date": "2025-06-01",   // 开始日期 (必填)
     "end_date": "2025-07-15",     // 结束日期 (必填)
     "curr_date": "2025-07-15"     // 当前日期 (必填)
@@ -32,11 +32,11 @@ def get_stock_fundamentals_unified(
 
 #### 输出格式
 ```markdown
-# 中国A股基本面分析报告 - 002027
+# 中国基本面分析报告 - 002027
 
-## 📊 股票基本信息
-- **股票代码**: 002027
-- **股票名称**: 分众传媒
+## 📊 期货品种基本信息
+- **品种代码**: 002027
+- **期货品种名称**: 分众传媒
 - **所属行业**: 广告包装
 - **当前股价**: ¥7.67
 - **涨跌幅**: -1.41%
@@ -271,7 +271,7 @@ def trader(state: Dict[str, Any]) -> Dict[str, Any]
 
 ### 1. Tushare数据接口
 
-#### 股票基本数据
+#### 期货品种基本数据
 ```python
 def get_china_stock_data_tushare(
     ticker: str,
@@ -280,14 +280,14 @@ def get_china_stock_data_tushare(
 ) -> str
 ```
 
-#### 股票信息
+#### 期货品种信息
 ```python
 def get_china_stock_info_tushare(ticker: str) -> Dict[str, Any]
 ```
 
 ### 2. 统一数据接口
 
-#### 中国股票数据
+#### 中国期货数据
 ```python
 def get_china_stock_data_unified(
     symbol: str,
@@ -305,7 +305,7 @@ def switch_china_data_source(source: str) -> bool
 
 ## 🔧 工具API接口
 
-### 1. 股票工具类
+### 1. 期货品种工具类
 
 #### 市场信息获取
 ```python
@@ -344,7 +344,7 @@ def clear_cache(pattern: str = "*") -> int
 | 错误代码 | 错误类型 | 描述 |
 |---------|---------|------|
 | 1001 | 参数错误 | 必填参数缺失或格式错误 |
-| 1002 | 股票代码错误 | 股票代码不存在或格式错误 |
+| 1002 | 品种代码错误 | 品种代码不存在或格式错误 |
 | 2001 | 数据源错误 | 外部API调用失败 |
 | 2002 | 缓存错误 | 缓存系统异常 |
 | 3001 | LLM错误 | 语言模型调用失败 |
@@ -356,8 +356,8 @@ def clear_cache(pattern: str = "*") -> int
 {
     "success": false,
     "error_code": 1002,
-    "error_message": "股票代码格式错误",
-    "error_details": "股票代码应为6位数字",
+    "error_message": "品种代码格式错误",
+    "error_details": "品种代码应为6位数字",
     "timestamp": "2025-07-16T01:30:00Z"
 }
 ```

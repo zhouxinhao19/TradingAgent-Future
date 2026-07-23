@@ -238,7 +238,7 @@ function fmtAmount(v: any) {
 
 - [Tushare 日线行情接口](https://tushare.pro/document/2?doc_id=27)
 - [Tushare 每日指标接口](https://tushare.pro/document/2?doc_id=32)
-- [AKShare 股票数据文档](https://akshare.akfamily.xyz/data/stock/stock.html)
+- [AKShare 期货数据文档](https://akshare.akfamily.xyz/data/stock/stock.html)
 - [BaoStock API 文档](http://baostock.com/baostock/index.php/Python_API%E6%96%87%E6%A1%A3)
 
 ### 内部文档

@@ -62,7 +62,7 @@ for template in templates:
 
 # 输出示例：
 # 模版: 基本面分析 - 默认模版
-# 描述: 标准的基本面分析提示词，适合大多数股票分析场景
+# 描述: 标准的基本面分析提示词，适合大多数期货分析场景
 # 标签: ['default', 'fundamentals', 'standard']
 # 默认: True
 # ---

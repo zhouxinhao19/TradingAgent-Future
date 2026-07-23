@@ -42,7 +42,7 @@ class NewsRelevanceFilter:
         elif self.company_name in content:
             score += 20
             
-        # 直接提及股票代码 (+30分)
+        # 直接提及品种代码 (+30分)
         if self.stock_code in title:
             score += 30
         elif self.stock_code in content:
@@ -110,7 +110,7 @@ class SemanticNewsFilter:
             f"{company_name}公司新闻",
             f"{company_name}业绩财报",
             f"{company_name}重大公告",
-            f"{stock_code}股票新闻"
+            f"{stock_code}期货品种新闻"
         ]
         self.target_embeddings = self.model.encode(self.target_semantics)
     
@@ -274,7 +274,7 @@ def get_realtime_stock_news(ticker: str, curr_date: str, hours_back: int = 6):
 
 **2. 添加公司名称映射:**
 ```python
-# 创建股票代码到公司名称的映射
+# 创建品种代码到公司名称的映射
 STOCK_COMPANY_MAPPING = {
     '600036': '招商银行',
     '000858': '五粮液',
@@ -283,8 +283,8 @@ STOCK_COMPANY_MAPPING = {
 }
 
 def get_company_name(ticker: str) -> str:
-    """获取股票对应的公司名称"""
-    return STOCK_COMPANY_MAPPING.get(ticker, f"股票{ticker}")
+    """获取期货品种对应的公司名称"""
+    return STOCK_COMPANY_MAPPING.get(ticker, f"期货品种{ticker}")
 ```
 
 ## 📈 预期效果

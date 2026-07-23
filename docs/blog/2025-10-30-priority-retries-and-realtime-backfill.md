@@ -27,7 +27,7 @@
 #### 1.1 问题背景
 
 **提交记录**：
-- `719b9da` - feat: 优化数据源优先级管理和股票筛选功能
+- `719b9da` - feat: 优化数据源优先级管理和品种筛选功能
 - `f632395` - fix: 修复数据查询不按优先级的问题
 - `586e3dc` - fix: 修复数据源状态列表排序顺序
 - `f094a62` - docs: 添加数据源优先级修复说明文档
@@ -97,9 +97,9 @@ class BaseDataSourceAdapter(ABC):
 **步骤 3：修复所有查询接口**
 
 ```python
-# app/routers/reports.py - 按优先级查询股票名称
+# app/routers/reports.py - 按优先级查询期货品种名称
 async def get_stock_name(code: str) -> str:
-    """按数据源优先级查询股票名称"""
+    """按数据源优先级查询期货品种名称"""
     db = await get_mongo_db()
     
     # 按优先级顺序尝试
@@ -122,7 +122,7 @@ async def get_stock_name(code: str) -> str:
 ```python
 # app/services/database_screening_service.py - 筛选时按优先级
 async def screen(self, criteria: ScreeningCriteria) -> List[Dict]:
-    """股票筛选，只使用优先级最高的数据源"""
+    """品种筛选，只使用优先级最高的数据源"""
     # 获取优先级最高的数据源
     primary_source = await self._get_primary_source()
     
@@ -222,7 +222,7 @@ async def _execute_bulk_write_with_retry(
     执行批量写入，支持重试
     
     Args:
-        symbol: 股票代码
+        symbol: 品种代码
         operations: 批量操作列表
         max_retries: 最大重试次数
     
@@ -444,7 +444,7 @@ async def get_daily_data(self, symbol: str) -> Optional[pd.DataFrame]:
 在非交易时段启动系统时，`market_quotes` 集合为空，导致：
 
 1. **前端显示空白**
-   - 股票列表没有价格信息
+   - 期货品种列表没有价格信息
    - K线图无法显示
    - 用户体验差
 
@@ -495,7 +495,7 @@ async def backfill_from_historical_data(self) -> Dict[str, Any]:
     latest_date = result[0]["max_date"]
     logger.info(f"📅 最新交易日: {latest_date}")
 
-    # 4. 查询最新交易日的所有股票数据
+    # 4. 查询最新交易日的所有期货数据
     cursor = db.stock_daily_quotes.find(
         {"date": latest_date},
         {"_id": 0}
@@ -599,17 +599,17 @@ async def backfill_last_close_snapshot_if_needed(self):
 #### 5.1 问题背景
 
 **提交记录**：
-- `cc32639` - fix: 修复AKShare新浪接口股票代码带交易所前缀的问题
+- `cc32639` - fix: 修复AKShare新浪接口品种代码带交易所前缀的问题
 
 **问题描述**：
 
-AKShare的新浪财经接口返回的股票代码带有交易所前缀：
+AKShare的新浪财经接口返回的品种代码带有交易所前缀：
 
 ```python
 # 新浪接口返回的代码格式
 "sz000001"  # 深圳平安银行
 "sh600036"  # 上海招商银行
-"bj430047"  # 北京股票
+"bj430047"  # 北京期货品种
 ```
 
 **问题影响**：
@@ -634,7 +634,7 @@ AKShare的新浪财经接口返回的股票代码带有交易所前缀：
 @staticmethod
 def _normalize_stock_code(code: str) -> str:
     """
-    标准化股票代码为6位数字
+    标准化品种代码为6位数字
 
     处理以下格式：
     - sz000001 -> 000001
@@ -643,10 +643,10 @@ def _normalize_stock_code(code: str) -> str:
     - 000001 -> 000001 (已标准化)
 
     Args:
-        code: 原始股票代码
+        code: 原始品种代码
 
     Returns:
-        标准化的6位股票代码
+        标准化的6位品种代码
     """
     if not code:
         return code
@@ -668,14 +668,14 @@ async def get_realtime_quotes(
     self,
     symbols: Optional[List[str]] = None
 ) -> List[Dict[str, Any]]:
-    """获取实时行情，标准化股票代码"""
+    """获取实时行情，标准化品种代码"""
     try:
         # 获取新浪接口数据
         df = ak.stock_zh_a_spot()
 
         quotes = []
         for _, row in df.iterrows():
-            # 🔥 标准化股票代码
+            # 🔥 标准化品种代码
             code = self._normalize_stock_code(row.get("代码", ""))
 
             if not code:
@@ -704,11 +704,11 @@ async def get_realtime_quotes(
 ```python
 # app/services/quotes_ingestion_service.py
 async def _bulk_upsert(self, quotes: List[Dict]) -> int:
-    """批量更新行情，标准化股票代码"""
+    """批量更新行情，标准化品种代码"""
     operations = []
 
     for quote in quotes:
-        # 🔥 标准化股票代码
+        # 🔥 标准化品种代码
         code = self._normalize_stock_code(quote.get("code", ""))
 
         if not code or len(code) != 6:
@@ -730,7 +730,7 @@ async def _bulk_upsert(self, quotes: List[Dict]) -> int:
 
 @staticmethod
 def _normalize_stock_code(code: str) -> str:
-    """标准化股票代码为6位数字"""
+    """标准化品种代码为6位数字"""
     if not code:
         return code
 
@@ -743,7 +743,7 @@ def _normalize_stock_code(code: str) -> str:
 ```
 
 **效果**：
-- ✅ 所有股票代码统一为6位标准格式
+- ✅ 所有品种代码统一为6位标准格式
 - ✅ 数据库查询正常
 - ✅ 前端显示正确
 - ✅ 跨模块格式一致
@@ -852,12 +852,12 @@ def _normalize_stock_code(code: str) -> str:
 
 1. **修复DeepSeek无法理解任务的问题**
    ```python
-   # ❌ 之前：只传股票代码
+   # ❌ 之前：只传品种代码
    initial_message = ("human", "601179")
 
    # ✅ 现在：传明确的分析请求
    initial_message = HumanMessage(
-       content=f"请对股票 {company_name}({symbol}) 进行全面分析"
+       content=f"请对期货品种 {company_name}({symbol}) 进行全面分析"
    )
    ```
 
@@ -935,13 +935,13 @@ def _normalize_stock_code(code: str) -> str:
 # 1. 检查数据源配置
 curl http://localhost:8000/api/multi-source-sync/status
 
-# 2. 测试股票筛选
+# 2. 测试品种筛选
 curl http://localhost:8000/api/screening/screen \
   -H "Content-Type: application/json" \
   -d '{"pe_min": 0, "pe_max": 20}'
 
 # 3. 检查前端显示
-# 访问股票筛选页面，查看"当前数据源"显示
+# 访问品种筛选页面，查看"当前数据源"显示
 ```
 
 ### 2. 重试机制验证
@@ -1075,10 +1075,10 @@ curl -X POST http://localhost:8000/api/scheduler/trigger/sync_stock_basic_info
 13. `fd372c7` - feat: 改进Tushare Token配置优先级和测试超时
 14. `8e4eecc` - refactor: 简化数据源连通性测试接口
 15. `b17deee` - fix: 修复数据源测试接口参数传递问题
-16. `719b9da` - feat: 优化数据源优先级管理和股票筛选功能
+16. `719b9da` - feat: 优化数据源优先级管理和品种筛选功能
 17. `586e3dc` - fix: 修复数据源状态列表排序顺序
 18. `cf892e3` - feat: 程序启动时自动从历史数据导入收盘数据到market_quotes
-19. `cc32639` - fix: 修复AKShare新浪接口股票代码带交易所前缀的问题
+19. `cc32639` - fix: 修复AKShare新浪接口品种代码带交易所前缀的问题
 
 ---
 
@@ -1090,7 +1090,7 @@ curl -X POST http://localhost:8000/api/scheduler/trigger/sync_stock_basic_info
 - **重试机制完善**：为批量操作和数据同步添加智能重试，大幅提升成功率
 - **MongoDB超时优化**：解决大批量数据处理超时问题，支持灵活配置
 - **实时行情增强**：启动时自动回填历史收盘数据，提升非交易时段体验
-- **代码标准化**：统一股票代码格式，消除跨模块不一致
+- **代码标准化**：统一品种代码格式，消除跨模块不一致
 - **工具优化**：改进Tushare配置、数据源测试和日志系统
 
 这些改进显著提升了系统的可靠性、可维护性和用户体验，为后续功能开发奠定了坚实基础。

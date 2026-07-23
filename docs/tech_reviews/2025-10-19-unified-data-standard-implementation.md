@@ -72,9 +72,9 @@
 - 行业：采用 GICS 四级，保留来源字段与映射置信度。
 
 ## 5. 快速示例
-- 美股 AAPL：`symbol=AAPL`，`full_symbol=XNAS:AAPL`，`yfinance=AAPL`。
-- A股 贵州茅台：`symbol=600519`，`full_symbol=XSHG:600519`，`tushare=600519.SH`，`yfinance=600519.SS`。
-- 港股 长江和记：`symbol=0005`，`full_symbol=XHKG:0005`，`yfinance=0005.HK`（适配器支持左补零 4）。
+- 国际期货 AAPL：`symbol=AAPL`，`full_symbol=XNAS:AAPL`，`yfinance=AAPL`。
+- 国内期货 贵州茅台：`symbol=600519`，`full_symbol=XSHG:600519`，`tushare=600519.SH`，`yfinance=600519.SS`。
+- 国际期货 长江和记：`symbol=0005`，`full_symbol=XHKG:0005`，`yfinance=0005.HK`（适配器支持左补零 4）。
 
 ## 6. 落地检查清单（Checklist）
 - 明确 `full_symbol` 与 `exchange_mic` 作为唯一主键，完成字典发布。

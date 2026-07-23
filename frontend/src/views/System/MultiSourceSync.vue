@@ -9,7 +9,7 @@
             多数据源同步
           </h1>
           <p class="page-description">
-            管理和监控多个数据源的股票基础信息同步，支持自动fallback和优先级配置
+            管理和监控多个数据源的基础信息同步，支持自动fallback和优先级配置
           </p>
         </div>
         <div class="header-actions">
