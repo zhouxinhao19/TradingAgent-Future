@@ -2,7 +2,7 @@
 
 ## 📋 概述
 
-TradingAgents-CN v0.1.7 引入了专业级的报告导出功能，支持将期货分析结果导出为Word、PDF、Markdown三种格式。本指南将详细介绍如何使用报告导出功能。
+TradingAgent-Future v0.1.7 引入了专业级的报告导出功能，支持将期货分析结果导出为Word、PDF、Markdown三种格式。本指南将详细介绍如何使用报告导出功能。
 
 ## 🎯 导出功能特色
 
@@ -363,7 +363,7 @@ for symbol in symbols:
 crontab -e
 
 # 每日导出重要期货分析
-0 18 * * 1-5 cd /path/to/TradingAgents-CN && python scripts/daily_export.py
+0 18 * * 1-5 cd /path/to/TradingAgent-Future && python scripts/daily_export.py
 ```
 
 ## 📈 最佳实践
@@ -410,8 +410,8 @@ tar -czf exports_archive_$(date +%Y%m).tar.gz exports/
 
 如果在使用报告导出功能时遇到问题：
 
-- 🐛 [GitHub Issues](https://github.com/hsliuping/TradingAgents-CN/issues)
-- 💬 [GitHub Discussions](https://github.com/hsliuping/TradingAgents-CN/discussions)
+- 🐛 [GitHub Issues](#/issues)
+- 💬 [GitHub Discussions](#/discussions)
 - 📚 [Pandoc文档](https://pandoc.org/MANUAL.html)
 
 ---

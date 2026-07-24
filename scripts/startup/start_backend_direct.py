@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-TradingAgents-CN 后端直接启动脚本
+TradingAgent-Future 后端直接启动脚本
 控制日志级别，减少不必要的文件监控日志
 """
 
@@ -34,7 +34,7 @@ def setup_logging():
 
 def main():
     """主函数"""
-    print("🚀 启动 TradingAgents-CN 后端服务...")
+    print("🚀 启动 TradingAgent-Future 后端服务...")
     
     # 设置日志
     setup_logging()

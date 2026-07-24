@@ -1,4 +1,4 @@
-# 🎉 TradingAgents-CN v0.1.7 发布说明
+# 🎉 TradingAgent-Future v0.1.7 发布说明
 
 ## 📅 发布信息
 
@@ -10,7 +10,7 @@
 
 ### 🚀 重大功能突破
 
-本版本实现了**完整的报告导出功能**，这是用户期待已久的核心功能，标志着TradingAgents-CN在实用性方面的重大突破。
+本版本实现了**完整的报告导出功能**，这是用户期待已久的核心功能，标志着TradingAgent-Future在实用性方面的重大突破。
 
 ## ✨ 新增功能
 
@@ -303,20 +303,20 @@ docker-compose up -d --build
 
 ### 👥 其他贡献者
 
-- **核心开发**: TradingAgents-CN团队
+- **核心开发**: TradingAgent-Future团队
 - **测试反馈**: 社区用户
 - **文档完善**: 技术文档团队
 - **问题反馈**: GitHub Issues贡献者
 
 ---
 
-**下载地址**: [GitHub Releases](https://github.com/hsliuping/TradingAgents-CN/releases/tag/cn-0.1.7)
+**下载地址**: [GitHub Releases](#/releases/tag/cn-0.1.7)
 
-**问题反馈**: [GitHub Issues](https://github.com/hsliuping/TradingAgents-CN/issues)
+**问题反馈**: [GitHub Issues](#/issues)
 
 **技术支持**: [项目文档](docs/)
 
 ---
 
-*TradingAgents-CN开发团队*
+*TradingAgent-Future开发团队*
 *2025年1月13日*

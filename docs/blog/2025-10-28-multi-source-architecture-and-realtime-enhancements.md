@@ -1,7 +1,7 @@
 # 多数据源架构完善与实时数据增强
 
 **日期**: 2025-10-28  
-**作者**: TradingAgents-CN 开发团队  
+**作者**: TradingAgent-Future 开发团队  
 **标签**: `多数据源` `实时数据` `PE/PB计算` `K线图` `数据隔离`
 
 ---
@@ -773,7 +773,7 @@ source_priority = ["tushare", "multi_source", "akshare", "baostock"]
 
 ---
 
-**感谢使用 TradingAgents-CN！** 🚀
+**感谢使用 TradingAgent-Future！** 🚀
 
-如有问题或建议，欢迎在 [GitHub Issues](https://github.com/hsliuping/TradingAgents-CN/issues) 中反馈。
+如有问题或建议，欢迎在 [GitHub Issues](#/issues) 中反馈。
 

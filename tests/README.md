@@ -1,6 +1,6 @@
-# TradingAgents-CN 测试目录
+# TradingAgent-Future 测试目录
 
-这个目录包含了TradingAgents-CN项目的所有测试文件，用于验证功能正确性、API集成和模型测试。
+这个目录包含了TradingAgent-Future项目的所有测试文件，用于验证功能正确性、API集成和模型测试。
 
 ## 目录结构
 

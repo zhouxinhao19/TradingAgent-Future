@@ -1,4 +1,4 @@
-# TradingAgents-CN v1.0.0-preview 安装指南
+# TradingAgent-Future v1.0.0-preview 安装指南
 
 > **版本**: v1.0.0-preview  
 > **最后更新**: 2025-11-10  
@@ -17,7 +17,7 @@
 
 ## 🎯 部署方式选择
 
-TradingAgents-CN 提供三种部署方式，请根据您的需求选择：
+TradingAgent-Future 提供三种部署方式，请根据您的需求选择：
 
 | 部署方式 | 适用场景 | 优点 | 缺点 | 难度 |
 |---------|---------|------|------|------|
@@ -59,9 +59,9 @@ TradingAgents-CN 提供三种部署方式，请根据您的需求选择：
 
 访问以下任一渠道下载最新版本：
 
-- **GitHub Releases**: [https://github.com/hsliuping/TradingAgents-CN/releases](https://github.com/hsliuping/TradingAgents-CN/releases)
-- **百度网盘**: 关注公众号 "TradingAgents-CN" 获取下载链接
-- **阿里云盘**: 关注公众号 "TradingAgents-CN" 获取下载链接
+- **GitHub Releases**: [#/releases](#/releases)
+- **百度网盘**: 关注公众号 "TradingAgent-Future" 获取下载链接
+- **阿里云盘**: 关注公众号 "TradingAgent-Future" 获取下载链接
 
 文件名格式：`TradingAgentsCN-Portable-v1.0.0-preview.zip` 或 `.7z`
 
@@ -142,7 +142,7 @@ OPENAI_API_KEY=your_openai_api_key_here
    ✅ 后端服务已启动
    ✅ 前端服务已启动
    
-   🎉 TradingAgents-CN 已成功启动！
+   🎉 TradingAgent-Future 已成功启动！
    
    📱 访问地址:
       前端: http://localhost:5173
@@ -256,7 +256,7 @@ docker-compose --version
 2. **下载 docker-compose.yml**：
    ```bash
    # 从 GitHub 下载
-   curl -O https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/main/docker-compose.yml
+   curl -O https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/main/docker-compose.yml
    
    # 或手动创建（见下方配置）
    ```
@@ -264,7 +264,7 @@ docker-compose --version
 3. **创建 .env 文件**：
    ```bash
    # 复制示例配置
-   curl -O https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/main/.env.example
+   curl -O https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/main/.env.example
    mv .env.example .env
    
    # 编辑配置
@@ -298,8 +298,8 @@ docker-compose --version
 
 1. **克隆代码**：
    ```bash
-   git clone https://github.com/hsliuping/TradingAgents-CN.git
-   cd TradingAgents-CN
+   git clone #.git
+   cd TradingAgent-Future
    ```
 
 2. **配置环境变量**：
@@ -472,8 +472,8 @@ sudo systemctl enable redis-server
 #### 1. 克隆代码
 
 ```bash
-git clone https://github.com/hsliuping/TradingAgents-CN.git
-cd TradingAgents-CN
+git clone #.git
+cd TradingAgent-Future
 ```
 
 #### 2. 创建虚拟环境
@@ -684,8 +684,8 @@ docker-compose up -d
 如果遇到问题，可以通过以下方式获取帮助：
 
 1. **查看文档**: [docs/](../)
-2. **GitHub Issues**: [https://github.com/hsliuping/TradingAgents-CN/issues](https://github.com/hsliuping/TradingAgents-CN/issues)
-3. **微信公众号**: TradingAgents-CN
+2. **GitHub Issues**: [#/issues](#/issues)
+3. **微信公众号**: TradingAgent-Future
 4. **QQ 群**: 关注公众号获取群号
 
 ---

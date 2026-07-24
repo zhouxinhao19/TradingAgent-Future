@@ -39,7 +39,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概览
 
-**TradingAgents-CN** 是面向中文用户的多智能体股票分析学习平台，基于 [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents) 多智能体交易框架改造，采用 Apache 2.0 + 专有组件的混合许可证。当前版本 `v1.0.1`（见根目录 `VERSION`）。**当前正在改造方向：股票 → 大宗商品期货**（详见后文"股票→大宗商品改造"）。
+**TradingAgent-Future** 是面向中文用户的多智能体期货分析学习平台，基于 [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents) 多智能体交易框架改造，采用 Apache 2.0 + 专有组件的混合许可证。当前版本 `v1.0.0`（见根目录 `VERSION`）。**当前正在改造方向：股票 → 大宗商品期货**（详见后文"股票→大宗商品改造"）。
 
 **注意**：
 - `app/`（FastAPI 后端）和 `frontend/`（Vue 前端）属于**专有组件**，商业使用需单独授权（`app/LICENSE`、`frontend/LICENSE`）。
@@ -330,7 +330,7 @@ python tests/debug_docker.py
 
 ## 风险与免责
 
-本框架**仅用于研究与教学**，**不构成投资建议**。本项目主要负责人：hsliuping；官方邮箱 `hsliup@163.com`，微信公众号 `TradingAgents-CN`。
+本框架**仅用于研究与教学**，**不构成投资建议**。
 
 ---
 

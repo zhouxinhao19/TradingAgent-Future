@@ -73,7 +73,7 @@ def create_risk_manager(llm, memory):
         instrument_context = build_instrument_context(company_name)
 
         # === Phase 3b-ii-B:检测 asset_type ===
-        asset_type = state.get("asset_type", "stock")
+        asset_type = state.get("asset_type", "commodity")
         full_symbol = state.get("full_symbol") or company_name
 
         history = state["risk_debate_state"]["history"]

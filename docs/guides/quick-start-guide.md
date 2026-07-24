@@ -5,7 +5,7 @@ code_compatibility: cn-0.1.14-preview
 status: updated
 ---
 
-# TradingAgents-CN 快速开始指南
+# TradingAgent-Future 快速开始指南
 
 > **版本说明**: 本文档基于 `cn-0.1.14-preview` 版本编写  
 > **最后更新**: 2025-01-13  
@@ -182,7 +182,7 @@ for stock in stocks:
 ### 3. 定时分析任务
 ```bash
 # 使用cron设置定时任务 (Linux/macOS)
-0 9 * * 1-5 cd /path/to/TradingAgents-CN && python scripts/daily_analysis.py
+0 9 * * 1-5 cd /path/to/TradingAgent-Future && python scripts/daily_analysis.py
 
 # 使用任务计划程序 (Windows)
 # 创建每日9点执行的任务

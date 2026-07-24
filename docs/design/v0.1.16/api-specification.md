@@ -1,4 +1,4 @@
-# TradingAgents-CN v0.1.16 API 接口规范
+# TradingAgent-Future v0.1.16 API 接口规范
 
 ## 概述
 

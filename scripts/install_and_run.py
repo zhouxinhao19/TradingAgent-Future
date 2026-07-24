@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-TradingAgents-CN 安装和启动脚本
+TradingAgent-Future 安装和启动脚本
 解决模块导入问题，提供一键安装和启动
 """
 
@@ -135,7 +135,7 @@ def start_web_app():
 
 def main():
     """主函数"""
-    print("🔧 TradingAgents-CN 安装和启动工具")
+    print("🔧 TradingAgent-Future 安装和启动工具")
     print("=" * 50)
     
     # 检查虚拟环境

@@ -1,4 +1,4 @@
-# 🏗️ TradingAgents-CN Docker 镜像构建指南
+# 🏗️ TradingAgent-Future Docker 镜像构建指南
 
 本文档说明如何为不同架构构建 Docker 镜像。
 
@@ -21,8 +21,8 @@
 
 ```bash
 # 从 Docker Hub 拉取（最快）
-docker pull hsliuping/tradingagents-backend:v1.0.0-preview-amd64
-docker pull hsliuping/tradingagents-frontend:v1.0.0-preview-amd64
+docker pull TradingAgent-Future/tradingagents-backend:v1.0.0-preview-amd64
+docker pull TradingAgent-Future/tradingagents-frontend:v1.0.0-preview-amd64
 ```
 
 ### 方案 2：本地构建（按架构）
@@ -230,11 +230,11 @@ docker pull your-dockerhub-username/tradingagents-backend:v1.0.0-preview-amd64
 
 ```bash
 # 1. 拉取镜像
-docker pull hsliuping/tradingagents-backend:v1.0.0-preview-amd64
-docker pull hsliuping/tradingagents-frontend:v1.0.0-preview-amd64
+docker pull TradingAgent-Future/tradingagents-backend:v1.0.0-preview-amd64
+docker pull TradingAgent-Future/tradingagents-frontend:v1.0.0-preview-amd64
 
 # 2. 修改 docker-compose.yml 中的镜像名称
-# image: hsliuping/tradingagents-backend:v1.0.0-preview-amd64
+# image: TradingAgent-Future/tradingagents-backend:v1.0.0-preview-amd64
 
 # 3. 启动服务
 docker-compose up -d
@@ -314,7 +314,7 @@ docker-compose up -d
 3. **使用预构建镜像**
    ```bash
    # 直接拉取，无需构建
-   docker pull hsliuping/tradingagents-backend:v1.0.0-preview-amd64
+   docker pull TradingAgent-Future/tradingagents-backend:v1.0.0-preview-amd64
    ```
 
 ### Q6: 镜像标签说明
@@ -352,7 +352,7 @@ docker buildx imagetools inspect tradingagents-backend:v1.0.0-preview
 
 1. 查看构建日志
 2. 检查 Docker 版本和配置
-3. 提交 Issue：[GitHub Issues](https://github.com/hsliuping/TradingAgents-CN/issues)
+3. 提交 Issue：[GitHub Issues](#/issues)
 
 ---
 

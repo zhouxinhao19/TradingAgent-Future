@@ -58,7 +58,7 @@
 
 ```bash
 # 使用 scp
-scp database_export_config_2025-10-16.json user@new-server:/path/to/TradingAgents-CN/
+scp database_export_config_2025-10-16.json user@new-server:/path/to/TradingAgent-Future/
 
 # 或使用其他方式（FTP、云存储等）
 ```
@@ -67,7 +67,7 @@ scp database_export_config_2025-10-16.json user@new-server:/path/to/TradingAgent
 
 ```bash
 # 进入项目目录
-cd /path/to/TradingAgents-CN
+cd /path/to/TradingAgent-Future
 
 # 激活虚拟环境（如果使用）
 source .venv/bin/activate  # Linux/Mac

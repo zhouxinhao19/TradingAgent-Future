@@ -2,7 +2,7 @@
 
 ## 🎯 更新概述
 
-本次文档更新针对TradingAgents-CN v0.1.7版本，主要包含Docker容器化部署和报告导出功能的完整文档化，以及所有文档的版本信息更新。
+本次文档更新针对TradingAgent-Future v0.1.7版本，主要包含Docker容器化部署和报告导出功能的完整文档化，以及所有文档的版本信息更新。
 
 ## ✅ 已完成的文档更新
 
@@ -137,7 +137,7 @@
 
 ### 文档贡献
 
-- **核心文档**: TradingAgents-CN开发团队
+- **核心文档**: TradingAgent-Future开发团队
 - **Docker功能文档**: [@breeze303](https://github.com/breeze303)
 - **导出功能文档**: [@baiyuxiong](https://github.com/baiyuxiong)
 - **用户反馈**: 社区用户和测试者
@@ -155,12 +155,12 @@
 
 如果您发现文档中的问题或有改进建议，请通过以下方式反馈：
 
-- 🐛 [GitHub Issues](https://github.com/hsliuping/TradingAgents-CN/issues)
-- 💡 [GitHub Discussions](https://github.com/hsliuping/TradingAgents-CN/discussions)
+- 🐛 [GitHub Issues](#/issues)
+- 💡 [GitHub Discussions](#/discussions)
 - 📧 直接联系维护团队
 
 ---
 
 *文档更新完成时间: 2025-07-13*  
 *版本: cn-0.1.7*  
-*更新者: TradingAgents-CN文档团队*
+*更新者: TradingAgent-Future文档团队*

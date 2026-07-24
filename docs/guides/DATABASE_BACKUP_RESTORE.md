@@ -2,7 +2,7 @@
 
 ## 概述
 
-TradingAgents-CN 使用 MongoDB 作为主数据库。对于大数据量（>100MB）的备份和还原操作，**强烈建议使用 MongoDB 原生工具**（`mongodump` 和 `mongorestore`），而不是通过 Web 界面操作。
+TradingAgent-Future 使用 MongoDB 作为主数据库。对于大数据量（>100MB）的备份和还原操作，**强烈建议使用 MongoDB 原生工具**（`mongodump` 和 `mongorestore`），而不是通过 Web 界面操作。
 
 ## 为什么使用命令行工具？
 

@@ -124,7 +124,7 @@ async def websocket_notifications_endpoint(
             "title": "...",
             "content": "...",
             "type": "analysis",
-            "link": "/stocks/000001",
+            "link": "/commodity/list",
             "source": "analysis",
             "created_at": "2025-10-23T12:00:00",
             "status": "unread"

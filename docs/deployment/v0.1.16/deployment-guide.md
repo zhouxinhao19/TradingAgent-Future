@@ -1,4 +1,4 @@
-# TradingAgents-CN v0.1.16 部署与运维指南
+# TradingAgent-Future v0.1.16 部署与运维指南
 
 ## 架构组件
 - Nginx: 静态文件和反向代理

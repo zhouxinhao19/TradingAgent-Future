@@ -1,8 +1,8 @@
-# TradingAgents-CN API接口规范
+# TradingAgent-Future API接口规范
 
 ## 📋 概述
 
-本文档详细描述了TradingAgents-CN系统中各个模块的API接口规范，包括输入参数、输出格式、错误处理等。
+本文档详细描述了TradingAgent-Future系统中各个模块的API接口规范，包括输入参数、输出格式、错误处理等。
 
 ---
 

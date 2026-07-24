@@ -109,8 +109,8 @@ python start_web.py
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/hsliuping/TradingAgents-CN.git
-cd TradingAgents-CN
+git clone #.git
+cd TradingAgent-Future
 
 # 2. 创建虚拟环境
 python -m venv env
@@ -164,7 +164,7 @@ python start_web.py 2>&1 | tee startup.log
 4. **✅ 增强了容错能力** - 系统更加稳定可靠
 5. **✅ 改善了用户体验** - 清晰的指导和错误提示
 
-现在用户可以更轻松地启动和使用TradingAgents-CN！🚀
+现在用户可以更轻松地启动和使用TradingAgent-Future！🚀
 
 ---
 

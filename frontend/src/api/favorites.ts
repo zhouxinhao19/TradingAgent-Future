@@ -6,11 +6,7 @@ import { ApiClient } from './request'
 export interface FavoriteItem {
   id: string
   user_id: string
-  asset_type: 'stock' | 'commodity'
-  // 历史兼容（旧股票数据）
-  stock_code?: string
-  stock_name?: string
-  market?: string
+  asset_type: 'commodity'
   // 商品
   full_symbol?: string
   commodity_name?: string
@@ -34,10 +30,7 @@ export interface FavoriteItem {
 }
 
 export interface AddFavoriteParams {
-  asset_type: 'stock' | 'commodity'
-  stock_code?: string
-  stock_name?: string
-  market?: string
+  asset_type: 'commodity'
   full_symbol?: string
   commodity_name?: string
   exchange?: string

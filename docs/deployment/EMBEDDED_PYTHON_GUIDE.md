@@ -2,7 +2,7 @@
 
 ## 📋 概述
 
-本指南介绍如何将 TradingAgents-CN 绿色版从依赖系统 Python 的虚拟环境迁移到完全独立的嵌入式 Python。
+本指南介绍如何将 TradingAgent-Future 绿色版从依赖系统 Python 的虚拟环境迁移到完全独立的嵌入式 Python。
 
 ---
 
@@ -423,7 +423,7 @@ cd C:\TradingAgentsCN\release\TradingAgentsCN-portable
 
 ## 🎉 总结
 
-使用嵌入式 Python 后，TradingAgents-CN 绿色版将：
+使用嵌入式 Python 后，TradingAgent-Future 绿色版将：
 
 ✅ **真正独立** - 不依赖任何外部软件
 ✅ **开箱即用** - 解压即可运行

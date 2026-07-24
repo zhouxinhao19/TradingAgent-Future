@@ -2,7 +2,7 @@
 
 ## 📋 概述
 
-本文档说明如何构建 TradingAgents-CN 的 Docker 镜像并发布到 Docker Hub。
+本文档说明如何构建 TradingAgent-Future 的 Docker 镜像并发布到 Docker Hub。
 
 ---
 
@@ -49,7 +49,7 @@
 
 # 完整示例
 .\scripts\publish-docker-images.ps1 `
-  -DockerHubUsername "hsliuping" `
+  -DockerHubUsername "TradingAgent-Future" `
   -Version "v1.0.0-preview" `
   -PushLatest
 ```
@@ -70,7 +70,7 @@ SKIP_BUILD=true ./scripts/publish-docker-images.sh your-username
 PUSH_LATEST=false ./scripts/publish-docker-images.sh your-username
 
 # 完整示例
-./scripts/publish-docker-images.sh hsliuping v1.0.0-preview
+./scripts/publish-docker-images.sh TradingAgent-Future v1.0.0-preview
 ```
 
 ---
@@ -116,10 +116,10 @@ PUSH_LATEST=false ./scripts/publish-docker-images.sh your-username
 
 ```powershell
 # Windows
-.\scripts\publish-docker-images.ps1 -DockerHubUsername "hsliuping"
+.\scripts\publish-docker-images.ps1 -DockerHubUsername "TradingAgent-Future"
 
 # Linux/Mac
-./scripts/publish-docker-images.sh hsliuping
+./scripts/publish-docker-images.sh TradingAgent-Future
 ```
 
 ### 步骤 3: 验证发布
@@ -144,10 +144,10 @@ PUSH_LATEST=false ./scripts/publish-docker-images.sh your-username
 ```yaml
 services:
   tradingagents-backend:
-    image: hsliuping/tradingagents-backend:latest  # 替换为你的用户名
+    image: TradingAgent-Future/tradingagents-backend:latest  # 替换为你的用户名
     
   tradingagents-frontend:
-    image: hsliuping/tradingagents-frontend:latest  # 替换为你的用户名
+    image: TradingAgent-Future/tradingagents-frontend:latest  # 替换为你的用户名
 ```
 
 ---
@@ -183,7 +183,7 @@ services:
 
 **解决**: 必须在项目根目录运行：
 ```bash
-cd /path/to/TradingAgents-CN
+cd /path/to/TradingAgent-Future
 ./scripts/publish-docker-images.sh your-username
 ```
 

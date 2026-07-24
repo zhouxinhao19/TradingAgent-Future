@@ -142,11 +142,11 @@ def show_release_info():
     logger.info(f"  📚 详细的使用文档")
     
     logger.info(f"\n🔗 GitHub链接:")
-    logger.info(f"  📦 Release: https://github.com/hsliuping/TradingAgents-CN/releases/tag/cn-v0.1.2")
-    logger.info(f"  📝 代码: https://github.com/hsliuping/TradingAgents-CN")
+    logger.info(f"  📦 Release: https://github.com/TradingAgent-Future/TradingAgents-CN/releases/tag/cn-v0.1.2")
+    logger.info(f"  📝 代码: https://github.com/TradingAgent-Future/TradingAgents-CN")
     
     logger.info(f"\n🚀 快速开始:")
-    logger.info(f"  1. git clone https://github.com/hsliuping/TradingAgents-CN.git")
+    logger.info(f"  1. git clone https://github.com/TradingAgent-Future/TradingAgents-CN.git")
     logger.info(f"  2. cd TradingAgents-CN")
     logger.info(f"  3. pip install -r requirements.txt")
     logger.info(f"  4. python -m streamlit run web/app.py")
@@ -201,7 +201,7 @@ def main():
     # 显示GitHub Release创建指南
     logger.info(f"\n📋 GitHub Release创建指南:")
     logger.info(f"=")
-    logger.info(f"1. 访问: https://github.com/hsliuping/TradingAgents-CN/releases/new")
+    logger.info(f"1. 访问: https://github.com/TradingAgent-Future/TradingAgents-CN/releases/new")
     logger.info(f"2. 选择标签: cn-v0.1.2")
     logger.info(f"3. 发布标题: TradingAgents-CN v0.1.2 - Web管理界面和Google AI支持")
     logger.info(f"4. 复制 RELEASE_NOTES_v0.1.2.md 的内容到描述框")

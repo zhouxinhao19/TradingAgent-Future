@@ -2,7 +2,7 @@
 
 ## 📋 简介
 
-硅基流动（SiliconFlow）是一个高性价比的 AI 推理服务平台，提供多种开源大模型的 API 访问。本指南将帮助您在 TradingAgents-CN 中配置和使用硅基流动。
+硅基流动（SiliconFlow）是一个高性价比的 AI 推理服务平台，提供多种开源大模型的 API 访问。本指南将帮助您在 TradingAgent-Future 中配置和使用硅基流动。
 
 ---
 
@@ -293,7 +293,7 @@ curl https://api.siliconflow.cn/v1/chat/completions \
 
 ## 🎉 完成
 
-恭喜！您已经成功配置了硅基流动。现在可以在 TradingAgents-CN 中使用硅基流动的模型进行 AI 分析了。
+恭喜！您已经成功配置了硅基流动。现在可以在 TradingAgent-Future 中使用硅基流动的模型进行 AI 分析了。
 
 如有任何问题，请参考上方的常见问题或查阅官方文档。
 

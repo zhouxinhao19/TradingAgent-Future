@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-TradingAgents-CN v0.1.2 版本发布脚本
+TradingAgent-Future v0.1.2 版本发布脚本
 """
 
 import os
@@ -51,7 +51,7 @@ def create_release_tag():
     logger.info(f"🏷️ 创建版本标签...")
     
     tag_name = "cn-v0.1.2"
-    tag_message = "TradingAgents-CN v0.1.2 - Web管理界面和Google AI支持"
+    tag_message = "TradingAgent-Future v0.1.2 - Web管理界面和Google AI支持"
     
     # 检查标签是否已存在
     success, stdout, stderr = run_command(f"git tag -l {tag_name}")
@@ -73,7 +73,7 @@ def generate_release_notes():
     logger.info(f"📝 生成发布说明...")
     
     release_notes = """
-# TradingAgents-CN v0.1.2 发布说明
+# TradingAgent-Future v0.1.2 发布说明
 
 ## 🌐 Web管理界面和Google AI支持
 
@@ -164,7 +164,7 @@ python cli/main.py --stock AAPL --analysts market fundamentals
 def show_release_summary():
     """显示发布摘要"""
     logger.info(f"\n")
-    logger.info(f"🎉 TradingAgents-CN v0.1.2 发布准备完成！")
+    logger.info(f"🎉 TradingAgent-Future v0.1.2 发布准备完成！")
     logger.info(f"=")
     
     logger.info(f"\n📋 本次发布包含:")
@@ -196,7 +196,7 @@ def show_release_summary():
 
 def main():
     """主函数"""
-    logger.info(f"🚀 TradingAgents-CN v0.1.2 版本发布")
+    logger.info(f"🚀 TradingAgent-Future v0.1.2 版本发布")
     logger.info(f"=")
     
     # 检查Git状态

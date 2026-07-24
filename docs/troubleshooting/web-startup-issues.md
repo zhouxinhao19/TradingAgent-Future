@@ -203,7 +203,7 @@ python start_web.py
    ```
 
 4. **提交Issue**: 
-   - 访问 [GitHub Issues](https://github.com/hsliuping/TradingAgents-CN/issues)
+   - 访问 [GitHub Issues](#/issues)
    - 提供错误日志和系统信息
 
 ## 💡 最佳实践

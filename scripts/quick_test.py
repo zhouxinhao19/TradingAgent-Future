@@ -180,7 +180,7 @@ async def test_api_imports():
 
 async def main():
     """主测试函数"""
-    print("🧪 TradingAgents-CN v0.1.16 API架构快速测试")
+    print("🧪 TradingAgent-Future v0.1.16 API架构快速测试")
     print("=" * 60)
     
     tests = [

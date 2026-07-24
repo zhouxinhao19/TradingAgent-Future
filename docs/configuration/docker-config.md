@@ -2,7 +2,7 @@
 
 ## 📋 概述
 
-本文档详细介绍TradingAgents-CN在Docker环境中的配置方法，包括环境变量设置、服务配置、网络配置和数据持久化配置。
+本文档详细介绍TradingAgent-Future在Docker环境中的配置方法，包括环境变量设置、服务配置、网络配置和数据持久化配置。
 
 ## 🎯 Docker配置特点
 
@@ -29,7 +29,7 @@
 ```bash
 # === Docker环境基础配置 ===
 # 应用配置
-APP_NAME=TradingAgents-CN
+APP_NAME=TradingAgent-Future
 APP_VERSION=0.1.7
 APP_ENV=production
 

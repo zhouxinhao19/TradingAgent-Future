@@ -1,7 +1,7 @@
 # 配置测试与 Docker 环境适配：解决实际部署中的关键问题
 
 **日期**: 2025-10-22  
-**作者**: TradingAgents-CN 开发团队  
+**作者**: TradingAgent-Future 开发团队  
 **标签**: `bug-fix`, `docker`, `configuration`, `llm`, `testing`
 
 ---

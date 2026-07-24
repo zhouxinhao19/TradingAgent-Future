@@ -5,7 +5,7 @@ code_compatibility: cn-0.1.14-preview
 status: updated
 ---
 
-# TradingAgents-CN 安装配置指导
+# TradingAgent-Future 安装配置指导
 
 > **版本说明**: 本文档基于 `cn-0.1.14-preview` 版本编写  
 > **最后更新**: 2025-01-13  
@@ -105,8 +105,8 @@ uv --version
 ### 1. 克隆项目
 ```bash
 # 克隆项目到本地
-git clone https://github.com/your-repo/TradingAgents-CN.git
-cd TradingAgents-CN
+git clone https://github.com/your-repo/TradingAgent-Future.git
+cd TradingAgent-Future
 
 # 查看当前版本
 cat VERSION
@@ -193,7 +193,7 @@ cp .env.example .env
 
 ```bash
 # ===========================================
-# TradingAgents-CN 环境配置
+# TradingAgent-Future 环境配置
 # ===========================================
 
 # 基础配置
@@ -589,7 +589,7 @@ docker-compose logs -f
 
 如果遇到问题，可以通过以下方式获取帮助：
 
-- **GitHub Issues**: [提交问题](https://github.com/your-repo/TradingAgents-CN/issues)
+- **GitHub Issues**: [提交问题](https://github.com/your-repo/TradingAgent-Future/issues)
 - **文档**: [查看完整文档](../README.md)
 - **社区**: [加入讨论群](https://your-community-link)
 

@@ -1,8 +1,8 @@
-# TradingAgents-CN 用户调查问卷
+# TradingAgent-Future 用户调查问卷
 
 ## 📋 文件说明
 
-本目录包含 TradingAgents-CN 项目的用户调查问卷相关文件：
+本目录包含 TradingAgent-Future 项目的用户调查问卷相关文件：
 
 ### 1. USER_SURVEY_2025.md
 **完整版问卷**（Markdown 格式）
@@ -92,10 +92,10 @@
 #### Issue 公告
 创建一个置顶 Issue：
 ```markdown
-标题：📊 TradingAgents-CN 用户调查 - 您的意见很重要！
+标题：📊 TradingAgent-Future 用户调查 - 您的意见很重要！
 
 内容：
-感谢您使用 TradingAgents-CN！为了更好地了解用户需求，优化产品功能，
+感谢您使用 TradingAgent-Future！为了更好地了解用户需求，优化产品功能，
 我们诚邀您参与本次调查。
 
 👉 [点击参与调查](问卷链接)
@@ -116,7 +116,7 @@
 #### 知乎
 发布文章：
 ```
-标题：TradingAgents-CN 用户调查 - 一起打造更好的 AI 股票分析工具
+标题：TradingAgent-Future 用户调查 - 一起打造更好的 AI 股票分析工具
 
 正文：
 介绍项目 → 说明调查目的 → 邀请参与 → 福利说明
@@ -125,7 +125,7 @@
 #### CSDN / 掘金
 发布博客：
 ```
-标题：开源项目 TradingAgents-CN 用户调查，邀您参与
+标题：开源项目 TradingAgent-Future 用户调查，邀您参与
 
 正文：
 项目介绍 → 调查背景 → 问卷链接 → 参与福利
@@ -135,7 +135,7 @@
 
 #### 微信公众号
 ```
-标题：📊 用户调查 | 您的意见决定 TradingAgents-CN 的未来
+标题：📊 用户调查 | 您的意见决定 TradingAgent-Future 的未来
 
 内容：
 - 项目简介
@@ -159,7 +159,7 @@
 
 #### Twitter
 ```
-📊 User Survey for TradingAgents-CN
+📊 User Survey for TradingAgent-Future
 
 We're conducting a user survey to understand your needs better!
 
@@ -338,7 +338,7 @@ df.to_excel('survey_data_cleaned.xlsx', index=False)
 ## 📞 联系方式
 
 如有问题或建议，请联系：
-- **GitHub**: https://github.com/hsliuping/TradingAgents-CN
+- **GitHub**: #
 - **Email**: [项目邮箱]
 - **微信群**: [二维码]
 

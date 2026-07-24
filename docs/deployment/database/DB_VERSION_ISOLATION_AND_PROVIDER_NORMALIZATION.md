@@ -1,6 +1,6 @@
 # 数据库版本隔离与 Provider 规范化
 
-本文档说明 TradingAgents-CN 当前的 MongoDB 命名策略、开发环境共享库保护，以及两个常用运维脚本的推荐用法。
+本文档说明 TradingAgent-Future 当前的 MongoDB 命名策略、开发环境共享库保护，以及两个常用运维脚本的推荐用法。
 
 ## 1. 数据库命名策略
 

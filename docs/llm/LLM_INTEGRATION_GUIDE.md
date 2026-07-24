@@ -1,8 +1,8 @@
-# TradingAgents-CN 大模型接入指导手册
+# TradingAgent-Future 大模型接入指导手册
 
 ## 📋 概述
 
-本手册旨在帮助开发者为 TradingAgents-CN 项目添加新的大模型支持。通过遵循本指南，您可以快速集成新的大模型提供商，并提交高质量的 Pull Request。
+本手册旨在帮助开发者为 TradingAgent-Future 项目添加新的大模型支持。通过遵循本指南，您可以快速集成新的大模型提供商，并提交高质量的 Pull Request。
 
 ## 🎯 适用场景
 

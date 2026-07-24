@@ -1,7 +1,7 @@
-# TradingAgents-CN v0.1.16 前端开发指南 (Vue3)
+# TradingAgent-Future v0.1.16 前端开发指南 (Vue3)
 
 ## 概述
-本指南面向前端开发者，介绍如何基于Vue3+Vite构建TradingAgents-CN的SPA前端，连接FastAPI后端与SSE进度流。
+本指南面向前端开发者，介绍如何基于Vue3+Vite构建TradingAgent-Future的SPA前端，连接FastAPI后端与SSE进度流。
 
 ## 技术栈
 - Vue3 + Composition API

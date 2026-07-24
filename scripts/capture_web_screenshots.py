@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Web界面截图捕获脚本
-用于自动化捕获TradingAgents-CN Web界面的截图
+用于自动化捕获TradingAgent-Future Web界面的截图
 """
 
 import os
@@ -252,7 +252,7 @@ pip install selenium
 
 def main():
     """主函数"""
-    logger.info("🚀 TradingAgents-CN Web界面截图捕获工具")
+    logger.info("🚀 TradingAgent-Future Web界面截图捕获工具")
     logger.info("=" * 50)
     
     # 创建截图指南

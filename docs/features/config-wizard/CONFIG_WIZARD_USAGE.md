@@ -8,7 +8,7 @@
 
 ## 📋 概述
 
-本文档介绍如何使用 TradingAgents-CN 的配置向导和配置验证功能，帮助用户快速完成系统配置。
+本文档介绍如何使用 TradingAgent-Future 的配置向导和配置验证功能，帮助用户快速完成系统配置。
 
 ---
 
@@ -48,7 +48,7 @@
 
 ```bash
 # 启动后端服务
-cd TradingAgents-CN
+cd TradingAgent-Future
 .\.venv\Scripts\python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 # 启动前端服务（新终端）
@@ -370,13 +370,13 @@ GET /api/system/config/validate
 - **配置错误定位**: 从查看日志 → 可视化显示 (+80%)
 - **用户体验**: 从复杂 → 简单友好 (+100%)
 
-开始使用 TradingAgents-CN，享受智能期货分析的乐趣！🚀
+开始使用 TradingAgent-Future，享受智能期货分析的乐趣！🚀
 
 ---
 
 **需要帮助？**
 
-- 📧 提交 Issue: https://github.com/hsliuping/TradingAgents-CN/issues
+- 📧 提交 Issue: #/issues
 - 📖 查看文档: `docs/` 目录
 - 💬 加入讨论: GitHub Discussions
 

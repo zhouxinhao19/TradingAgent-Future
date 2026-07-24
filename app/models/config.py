@@ -310,8 +310,8 @@ class UsageRecord(BaseModel):
     cost: float = Field(..., description="成本")
     currency: str = Field(default="CNY", description="货币单位")
     session_id: str = Field(..., description="会话ID")
-    analysis_type: str = Field(default="stock_analysis", description="分析类型")
-    stock_code: Optional[str] = Field(None, description="股票代码")
+    analysis_type: str = Field(default="commodity_analysis", description="分析类型")
+    symbol: Optional[str] = Field(None, description="品种代码")
 
 
 class UsageStatistics(BaseModel):

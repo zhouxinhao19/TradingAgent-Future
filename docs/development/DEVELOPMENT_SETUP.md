@@ -2,7 +2,7 @@
 
 ## 📋 概述
 
-本文档介绍如何配置TradingAgents-CN的开发环境，包括Docker映射配置和快速调试方法。
+本文档介绍如何配置TradingAgent-Future的开发环境，包括Docker映射配置和快速调试方法。
 
 ## 🐳 Docker开发环境
 

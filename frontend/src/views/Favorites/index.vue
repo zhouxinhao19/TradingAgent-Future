@@ -63,12 +63,12 @@
       <el-table-column type="selection" width="40" />
       <el-table-column label="品种代码" width="100">
         <template #default="{ row }">
-          <span class="symbol-text">{{ row.asset_type === 'commodity' ? (row.full_symbol?.split('.')[0]?.replace(/\d+$/, '') || row.full_symbol) : (row.stock_code || row.full_symbol) }}</span>
+          <span class="symbol-text">{{ row.full_symbol?.split('.')[0]?.replace(/\d+$/, '') || row.full_symbol }}</span>
         </template>
       </el-table-column>
       <el-table-column label="品种名称" min-width="140">
         <template #default="{ row }">
-          {{ row.asset_type === 'commodity' ? (row.commodity_name || '-') : (row.display_name || row.stock_name || '-') }}
+          {{ row.commodity_name || row.display_name || '-' }}
         </template>
       </el-table-column>
       <el-table-column label="交易所" width="100">
@@ -186,10 +186,8 @@ const handleBatchRemove = async () => {
 }
 
 const viewDetail = (row: any) => {
-  if (row.asset_type === 'commodity' && row.full_symbol) {
+  if (row.full_symbol) {
     router.push(`/commodity/analysis?symbol=${row.full_symbol}`)
-  } else if (row.asset_type === 'stock' && row.stock_code) {
-    router.push(`/analysis/single?stock_code=${row.stock_code}`)
   }
 }
 

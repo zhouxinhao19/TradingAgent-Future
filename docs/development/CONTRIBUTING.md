@@ -1,6 +1,6 @@
 # 贡献指南
 
-感谢您对TradingAgents-CN项目的关注！我们欢迎各种形式的贡献。
+感谢您对TradingAgent-Future项目的关注！我们欢迎各种形式的贡献。
 
 ## 🤝 如何贡献
 
@@ -49,8 +49,8 @@
 
 ### 1. 克隆仓库
 ```bash
-git clone https://github.com/hsliuping/TradingAgents-CN.git
-cd TradingAgents-CN
+git clone #.git
+cd TradingAgent-Future
 ```
 
 ### 2. 创建虚拟环境

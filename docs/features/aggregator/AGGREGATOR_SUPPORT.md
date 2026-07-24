@@ -2,7 +2,7 @@
 
 ## 📖 概述
 
-TradingAgents-CN 现已支持聚合渠道（如 302.AI、OpenRouter、One API 等），允许通过单一 API 端点访问多个原厂模型。
+TradingAgent-Future 现已支持聚合渠道（如 302.AI、OpenRouter、One API 等），允许通过单一 API 端点访问多个原厂模型。
 
 ## 🎯 什么是聚合渠道？
 

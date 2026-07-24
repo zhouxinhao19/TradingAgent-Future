@@ -140,7 +140,7 @@ class NewsDataService:
         """获取新闻数据集合"""
         if self._collection is None:
             self._db = get_database()
-            self._collection = self._db.stock_news
+            self._collection = self._db.commodity_news
         return self._collection
     
     async def save_news_data(
@@ -264,7 +264,7 @@ class NewsDataService:
 
             # 获取同步数据库连接
             db = get_mongo_db_sync()
-            collection = db.stock_news
+            collection = db.commodity_news
             now = datetime.utcnow()
 
             # 标准化数据

@@ -2,7 +2,7 @@
 
 ## 概述
 
-TradingAgents-CN 提供了统一的配置系统，所有配置通过 `.env` 文件管理。本指南详细介绍了所有可用的配置选项和最佳实践，包括v0.1.7新增的Docker部署和报告导出配置。
+TradingAgent-Future 提供了统一的配置系统，所有配置通过 `.env` 文件管理。本指南详细介绍了所有可用的配置选项和最佳实践，包括v0.1.7新增的Docker部署和报告导出配置。
 
 ## 🎯 v0.1.7 配置新特性
 
@@ -26,7 +26,7 @@ TradingAgents-CN 提供了统一的配置系统，所有配置通过 `.env` 文�
 ### .env 配置文件 (推荐)
 ```bash
 # ===========================================
-# TradingAgents-CN 配置文件 (v0.1.7)
+# TradingAgent-Future 配置文件 (v0.1.7)
 # ===========================================
 
 # 🧠 LLM 配置 (多模型支持)
@@ -397,7 +397,7 @@ class TradingAgentsGraph:
         self._setup_agents()
 ```
 
-通过合理的配置，您可以根据不同的使用场景优化 TradingAgents-CN 的性能和成本。
+通过合理的配置，您可以根据不同的使用场景优化 TradingAgent-Future 的性能和成本。
 
 ## 🐳 Docker部署配置 (v0.1.7新增)
 

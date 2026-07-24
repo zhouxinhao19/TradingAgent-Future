@@ -2,7 +2,7 @@
 
 ## 📋 概述
 
-TradingAgents-CN 使用 APScheduler 作为定时任务调度器，提供了完整的定时任务管理功能，包括：
+TradingAgent-Future 使用 APScheduler 作为定时任务调度器，提供了完整的定时任务管理功能，包括：
 
 - ✅ 查看所有定时任务
 - ✅ 查看任务详情

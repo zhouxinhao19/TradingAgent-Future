@@ -2,7 +2,7 @@
 
 ## 🎯 概述
 
-本文档提供了TradingAgents-CN导出功能常见问题的详细解决方案，包括Word、PDF、Markdown导出的各种故障排除方法。
+本文档提供了TradingAgent-Future导出功能常见问题的详细解决方案，包括Word、PDF、Markdown导出的各种故障排除方法。
 
 ## 📄 Word导出问题
 

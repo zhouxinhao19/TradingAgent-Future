@@ -94,7 +94,7 @@ AI编造了25%这个数字
 
 2. **使用实时数据源**
    ```
-   TradingAgents-CN会自动获取最新数据
+   TradingAgent-Future会自动获取最新数据
    但仍需关注数据更新时间
    ```
 
@@ -255,7 +255,7 @@ AI分析 + 自己研究 + 专业意见 → 综合判断
 
 ### 免责声明
 
-**TradingAgents-CN提供的分析**：
+**TradingAgent-Future提供的分析**：
 
 ✅ **是**：
 - 学习工具

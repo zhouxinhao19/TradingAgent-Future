@@ -1,8 +1,8 @@
-# TradingAgents-CN 投资分析使用指南
+# TradingAgent-Future 投资分析使用指南
 
 ## 🎯 概述
 
-TradingAgents-CN 是一个基于多智能体大语言模型的投资分析框架，能够为您提供专业的期货分析报告。
+TradingAgent-Future 是一个基于多智能体大语言模型的投资分析框架，能够为您提供专业的期货分析报告。
 
 ## 🚀 快速开始
 

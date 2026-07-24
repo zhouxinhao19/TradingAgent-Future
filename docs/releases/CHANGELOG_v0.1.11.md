@@ -1,4 +1,4 @@
-# TradingAgents-CN v0.1.11 更新日志
+# TradingAgent-Future v0.1.11 更新日志
 
 ## 🚀 版本概述
 

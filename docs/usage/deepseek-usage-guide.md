@@ -2,7 +2,7 @@
 
 ## 📋 概述
 
-本指南详细介绍如何在TradingAgents-CN中使用DeepSeek V3进行期货投资分析。DeepSeek V3是一个高性价比的大语言模型，特别适合中文金融分析场景。
+本指南详细介绍如何在TradingAgent-Future中使用DeepSeek V3进行期货投资分析。DeepSeek V3是一个高性价比的大语言模型，特别适合中文金融分析场景。
 
 ## 🚀 快速开始
 

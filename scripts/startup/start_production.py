@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-TradingAgents-CN Backend Production Launcher
+TradingAgent-Future Backend Production Launcher
 生产环境启动脚本
 """
 
@@ -18,7 +18,7 @@ from app.core.config import settings
 
 def main():
     """生产环境启动函数"""
-    print("🚀 Starting TradingAgents-CN Backend (Production Mode)")
+    print("🚀 Starting TradingAgent-Future Backend (Production Mode)")
     print(f"📍 Host: {settings.HOST}")
     print(f"🔌 Port: {settings.PORT}")
     print("🔒 Production Mode: Enabled")

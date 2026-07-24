@@ -26,9 +26,9 @@ class TaskState:
     """任务状态数据类"""
     task_id: str
     user_id: str
-    stock_code: str
+    symbol: str
     status: TaskStatus
-    stock_name: Optional[str] = None
+    name: Optional[str] = None
     progress: int = 0
     message: str = ""
     current_step: str = ""
@@ -110,9 +110,9 @@ class MemoryStateManager:
         self,
         task_id: str,
         user_id: str,
-        stock_code: str,
+        symbol: str,
         parameters: Optional[Dict[str, Any]] = None,
-        stock_name: Optional[str] = None,
+        name: Optional[str] = None,
     ) -> TaskState:
         """创建新任务"""
         with self._lock:
@@ -122,8 +122,8 @@ class MemoryStateManager:
             task_state = TaskState(
                 task_id=task_id,
                 user_id=user_id,
-                stock_code=stock_code,
-                stock_name=stock_name,
+                symbol=symbol,
+                name=name,
                 status=TaskStatus.PENDING,
                 start_time=datetime.now(),
                 parameters=parameters or {},
@@ -277,8 +277,8 @@ class MemoryStateManager:
                 if status is None or task.status == status:
                     item = task.to_dict()
                     # 兼容前端字段
-                    if 'stock_name' not in item or not item.get('stock_name'):
-                        item['stock_name'] = None
+                    if 'name' not in item or not item.get('name'):
+                        item['name'] = None
                     tasks.append(item)
 
             # 按开始时间倒序排列
@@ -302,8 +302,8 @@ class MemoryStateManager:
                     if status is None or task.status == status:
                         item = task.to_dict()
                         # 兼容前端字段
-                        if 'stock_name' not in item or not item.get('stock_name'):
-                            item['stock_name'] = None
+                        if 'name' not in item or not item.get('name'):
+                            item['name'] = None
                         tasks.append(item)
 
             # 按开始时间倒序排列

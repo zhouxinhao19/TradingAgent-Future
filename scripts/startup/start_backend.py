@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-TradingAgents-CN Backend Launcher
+TradingAgent-Future Backend Launcher
 快速启动脚本
 """
 
@@ -12,7 +12,7 @@ from pathlib import Path
 
 def main():
     """启动后端服务"""
-    print("🚀 TradingAgents-CN Backend Launcher")
+    print("🚀 TradingAgent-Future Backend Launcher")
     print("=" * 50)
     
     # 确保在项目根目录

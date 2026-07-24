@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-TradingAgents-CN 核心模块
+TradingAgent-Future 核心模块
 
 这是一个基于多智能体的大宗商品分析系统，支持国内期货和国际期货的综合分析。
 """
 
 __version__ = "1.0.0-preview"
-__author__ = "TradingAgents-CN Team"
+__author__ = "TradingAgent-Future Team"
 __description__ = "Multi-agent commodity analysis system for Chinese futures and global futures markets"
 
 # 导入核心模块

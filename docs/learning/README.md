@@ -1,6 +1,6 @@
 # 学习中心文档
 
-本目录包含TradingAgents-CN学习中心的所有教学内容。
+本目录包含TradingAgent-Future学习中心的所有教学内容。
 
 ## 📁 目录结构
 

@@ -1,6 +1,6 @@
-# TradingAgents-CN 文档中心 (v1.0.1)
+# TradingAgent-Future 文档中心 (v1.0.1)
 
-欢迎来到 TradingAgents-CN 多智能体金融交易框架的文档中心。本文档适用于 `v1.0.1` 版本，覆盖配置管理、模型目录、大模型配置、期货品种详情、单股同步、日志排查、部署升级等核心内容。
+欢迎来到 TradingAgent-Future 多智能体金融交易框架的文档中心。本文档适用于 `v1.0.1` 版本，覆盖配置管理、模型目录、大模型配置、期货品种详情、单股同步、日志排查、部署升级等核心内容。
 
 ## 🎯 版本亮点 (v1.0.1)
 
@@ -130,7 +130,5 @@
 
 ## 联系我们
 
-- **GitHub Issues**: [提交问题和建议](https://github.com/hsliuping/TradingAgents-CN/issues)
-- **邮箱**: hsliup@163.com
-- 项目ＱＱ群：782124367
+- **GitHub Issues**: [提交问题和建议](#/issues)
 - **原项目**: [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents)

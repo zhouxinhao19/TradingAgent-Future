@@ -1,7 +1,7 @@
 # 用户偏好设置与财务指标计算优化：TTM 计算、WebSocket 连接、UI 改进
 
 **日期**: 2025-10-26  
-**作者**: TradingAgents-CN 开发团队  
+**作者**: TradingAgent-Future 开发团队  
 **标签**: `feature`, `bug-fix`, `optimization`, `ui`, `websocket`, `financial-metrics`
 
 ---
@@ -758,7 +758,7 @@ docker-compose -f docker-compose.hub.nginx.yml up -d
 
 ---
 
-**感谢使用 TradingAgents-CN！** 🚀
+**感谢使用 TradingAgent-Future！** 🚀
 
-如有问题或建议，欢迎在 [GitHub Issues](https://github.com/hsliuping/TradingAgents-CN/issues) 中反馈。
+如有问题或建议，欢迎在 [GitHub Issues](#/issues) 中反馈。
 

@@ -38,8 +38,8 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="stock_code" label="合约代码" width="140" />
-        <el-table-column prop="stock_name" label="品种名称" width="100" />
+        <el-table-column prop="symbol" label="品种代码" width="140" />
+        <el-table-column prop="name" label="品种名称" width="100" />
 
         <el-table-column prop="status" label="状态" width="120">
           <template #default="{ row }">
@@ -100,7 +100,7 @@
     <el-dialog v-model="resultDialogVisible" title="任务结果" width="60%">
       <div v-if="resultData">
         <el-descriptions :column="2" border>
-          <el-descriptions-item label="合约代码">{{ resultData.stock_symbol || resultData.full_symbol || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="品种代码">{{ resultData.symbol || resultData.full_symbol || '-' }}</el-descriptions-item>
           <el-descriptions-item label="状态">{{ getStatusText(resultData.status || currentTaskRow?.status || '') }}</el-descriptions-item>
         </el-descriptions>
         <div style="margin-top: 16px;" v-if="resultData.error_message">
@@ -202,8 +202,8 @@ const refreshQueue = async () => {
 
     const tasks = tasksRaw.map((t: CommodityTaskItem) => ({
       task_id: t.task_id,
-      stock_code: t.full_symbol,
-      stock_name: t.variety_name || '',
+      symbol: t.full_symbol,
+      name: t.variety_name || '',
       status: t.status,
       progress: t.status === 'completed' ? 100 : (t.status === 'processing' ? 50 : 0),
       priority: 0,

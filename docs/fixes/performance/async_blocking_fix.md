@@ -216,7 +216,7 @@ python scripts/test_concurrent_api.py
 
 **终端1：启动后端**
 ```bash
-cd d:\code\TradingAgents-CN
+cd d:\code\TradingAgent-Future
 .\.venv\Scripts\python -m uvicorn app.main:app --reload
 ```
 

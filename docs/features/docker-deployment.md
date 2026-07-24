@@ -2,7 +2,7 @@
 
 ## 🎯 功能概述
 
-TradingAgents-CN 提供了完整的Docker容器化部署方案，支持一键启动完整的分析环境，包括Web应用、数据库、缓存系统和管理界面。
+TradingAgent-Future 提供了完整的Docker容器化部署方案，支持一键启动完整的分析环境，包括Web应用、数据库、缓存系统和管理界面。
 
 ## 🏗️ 架构设计
 
@@ -66,8 +66,8 @@ TradingAgents-CN 提供了完整的Docker容器化部署方案，支持一键启
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/hsliuping/TradingAgents-CN.git
-cd TradingAgents-CN
+git clone #.git
+cd TradingAgent-Future
 
 # 2. 配置环境变量
 cp .env.example .env
@@ -83,7 +83,7 @@ docker-compose ps
 
 ### 📦 Docker镜像构建说明
 
-**重要提醒**: TradingAgents-CN不提供预构建的Docker镜像，需要本地构建。
+**重要提醒**: TradingAgent-Future不提供预构建的Docker镜像，需要本地构建。
 
 #### 构建过程详解
 
@@ -393,7 +393,7 @@ Docker容器化功能由社区贡献者 **[@breeze303](https://github.com/breeze
 - 🔧 开发环境Volume映射配置
 - 📚 完整的部署文档和最佳实践
 
-感谢他的杰出贡献，让TradingAgents-CN拥有了专业级的容器化部署能力！
+感谢他的杰出贡献，让TradingAgent-Future拥有了专业级的容器化部署能力！
 
 ---
 

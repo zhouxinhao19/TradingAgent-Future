@@ -101,9 +101,9 @@ export const getSyncStatus = (): Promise<ApiResponse<SyncStatus>> => {
 }
 
 /**
- * 运行基础信息同步
+ * 运行品种基础信息同步
  */
-export const runStockBasicsSync = (params?: {
+export const runBasicsSync = (params?: {
   force?: boolean
   preferred_sources?: string
 }): Promise<ApiResponse<SyncStatus>> => {
@@ -115,11 +115,16 @@ export const runStockBasicsSync = (params?: {
     queryParams.append('preferred_sources', params.preferred_sources)
   }
 
-  const url = `/api/sync/multi-source/stock_basics/run${queryParams.toString() ? '?' + queryParams.toString() : ''}`
+  const url = `/api/sync/multi-source/basics/run${queryParams.toString() ? '?' + queryParams.toString() : ''}`
   return ApiClient.post(url, undefined, {
-    timeout: 600000 // 🔥 同步操作需要更长时间，设置为10分钟（BaoStock需要逐个获取估值数据）
+    timeout: 600000 // 同步操作需要更长时间
   })
 }
+
+/**
+ * @deprecated 使用 runBasicsSync 代替
+ */
+export const runStockBasicsSync = runBasicsSync
 
 /**
  * 测试数据源连接

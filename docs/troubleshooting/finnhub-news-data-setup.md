@@ -231,4 +231,4 @@ if not os.path.exists(data_path):
 
 **更新日期**：2025-01-02  
 **版本**：v1.0  
-**适用范围**：TradingAgents-CN v0.1.3+
+**适用范围**：TradingAgent-Future v0.1.3+

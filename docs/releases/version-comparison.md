@@ -1,8 +1,8 @@
-# 📊 TradingAgents-CN 版本对比
+# 📊 TradingAgent-Future 版本对比
 
 ## 📋 概述
 
-本文档提供TradingAgents-CN各版本之间的详细对比，帮助用户了解版本演进和选择合适的版本。
+本文档提供TradingAgent-Future各版本之间的详细对比，帮助用户了解版本演进和选择合适的版本。
 
 ## 🎯 版本总览
 
@@ -152,8 +152,8 @@ streamlit run web/app.py
 
 ```bash
 # 1. 全新安装 (推荐)
-git clone https://github.com/hsliuping/TradingAgents-CN.git
-cd TradingAgents-CN
+git clone #.git
+cd TradingAgent-Future
 
 # 2. 迁移配置
 # 手动迁移.env配置到新版本
@@ -187,4 +187,4 @@ docker-compose up -d
 
 *最后更新: 2025-07-29*
 *版本: cn-0.1.12*
-*文档维护: TradingAgents-CN团队*
+*文档维护: TradingAgent-Future团队*

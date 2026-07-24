@@ -25,7 +25,7 @@ def apply_fundamentals_analyst_fix():
     """修复基本面分析师的死循环问题"""
     print("🔧 开始修复基本面分析师死循环问题...")
     
-    fundamentals_file = "d:\\code\\TradingAgents-CN\\tradingagents\\agents\\analysts\\fundamentals_analyst.py"
+    fundamentals_file = "d:\\code\\TradingAgent-Future\\tradingagents\\agents\\analysts\\fundamentals_analyst.py"
     
     # 读取原文件
     with open(fundamentals_file, 'r', encoding='utf-8') as f:
@@ -142,7 +142,7 @@ def apply_conditional_logic_fix():
     """修复条件判断逻辑的死循环问题"""
     print("🔧 开始修复条件判断逻辑...")
     
-    conditional_file = "d:\\code\\TradingAgents-CN\\tradingagents\\graph\\conditional_logic.py"
+    conditional_file = "d:\\code\\TradingAgent-Future\\tradingagents\\graph\\conditional_logic.py"
     
     # 读取原文件
     with open(conditional_file, 'r', encoding='utf-8') as f:
@@ -349,7 +349,7 @@ if __name__ == "__main__":
         print("\\n❌ 级别3死循环修复测试失败！")
 '''
     
-    with open("d:\\code\\TradingAgents-CN\\test_level3_fix.py", 'w', encoding='utf-8') as f:
+    with open("d:\\code\\TradingAgent-Future\\test_level3_fix.py", 'w', encoding='utf-8') as f:
         f.write(test_content)
     
     print("✅ 测试脚本创建完成: test_level3_fix.py")

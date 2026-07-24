@@ -11,7 +11,7 @@
 1. 登录 https://hub.docker.com
 2. 点击右上角头像 → **Account Settings** → **Security**
 3. 点击 **New Access Token**
-4. 填写描述：`GitHub Actions - TradingAgents-CN`
+4. 填写描述：`GitHub Actions - TradingAgent-Future`
 5. 权限选择：**Read, Write, Delete**
 6. 点击 **Generate** 并**复制 token**（只显示一次）
 

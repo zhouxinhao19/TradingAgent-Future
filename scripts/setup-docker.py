@@ -18,7 +18,7 @@ def setup_docker_env():
     env_example = project_root / ".env.example"
     env_file = project_root / ".env"
     
-    logger.info(f"🐳 TradingAgents-CN Docker环境配置向导")
+    logger.info(f"🐳 TradingAgent-Future Docker环境配置向导")
     logger.info(f"=")
     
     # 检查.env文件

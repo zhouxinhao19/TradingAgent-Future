@@ -1,6 +1,6 @@
 # 分支管理指南
 
-本文档说明了TradingAgents-CN项目的分支管理策略和工作流程。
+本文档说明了TradingAgent-Future项目的分支管理策略和工作流程。
 
 ## 🌳 分支结构
 

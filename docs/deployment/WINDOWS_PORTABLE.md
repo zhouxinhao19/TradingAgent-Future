@@ -1,4 +1,4 @@
-# TradingAgents-CN Windows 便携版安装与使用
+# TradingAgent-Future Windows 便携版安装与使用
 
 本指南说明如何使用“一步到位”的 Windows 便携包进行安装与启动。该方案旨在让普通用户无需预装依赖，解压即可运行，并通过脚本完成首次配置与服务编排。
 

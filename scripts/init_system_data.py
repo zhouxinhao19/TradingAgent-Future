@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-系统初始化数据脚本 - TradingAgents-CN v1.0.0-preview
+系统初始化数据脚本 - TradingAgent-Future v1.0.0-preview
 用于初始化系统所需的基础数据
 """
 
@@ -300,7 +300,7 @@ async def create_sync_status(db):
 async def main():
     """主函数"""
     logger.info("=" * 60)
-    logger.info("TradingAgents-CN v1.0.0-preview 系统初始化")
+    logger.info("TradingAgent-Future v1.0.0-preview 系统初始化")
     logger.info("=" * 60)
     
     try:

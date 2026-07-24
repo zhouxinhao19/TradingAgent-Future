@@ -1,7 +1,7 @@
 # 实时 PE/PB 计算与完善的回退策略实现
 
 **日期**: 2025-10-28  
-**作者**: TradingAgents-CN 开发团队  
+**作者**: TradingAgent-Future 开发团队  
 **标签**: `估值指标` `实时计算` `回退策略` `数据完整性`
 
 ---
@@ -439,9 +439,9 @@ logger.error(f"❌ [AKShare-PE计算-全部失败] 无可用EPS数据")
 ## 🤝 贡献者
 
 - **问题发现**: 用户反馈（688146 涨幅 15% 但 PE 未更新）
-- **方案设计**: TradingAgents-CN 开发团队
-- **代码实现**: TradingAgents-CN 开发团队
-- **测试验证**: TradingAgents-CN 开发团队
+- **方案设计**: TradingAgent-Future 开发团队
+- **代码实现**: TradingAgent-Future 开发团队
+- **测试验证**: TradingAgent-Future 开发团队
 
 ---
 

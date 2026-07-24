@@ -1,7 +1,7 @@
 # 2025-10-24 运维指南：从 Docker Hub 更新 TradingAgents‑CN 镜像（含清理数据卷）
 
 **日期**: 2025-10-24  
-**作者**: TradingAgents-CN 开发团队  
+**作者**: TradingAgent-Future 开发团队  
 **标签**: `deployment`, `docker`, `how-to`, `maintenance`
 
 ---
@@ -29,7 +29,7 @@
 Windows PowerShell：
 
 ```powershell
-cd d:\code\TradingAgents-CN
+cd d:\code\TradingAgent-Future
 # 拉取最新镜像
 docker-compose -f docker-compose.hub.nginx.yml pull
 # 停止并清理容器（保留数据）
@@ -47,7 +47,7 @@ docker-compose -f docker-compose.hub.nginx.yml logs -f --tail=100
 Linux/macOS（Bash）：
 
 ```bash
-cd /path/to/TradingAgents-CN
+cd /path/to/TradingAgent-Future
 # 拉取最新镜像
 docker compose -f docker-compose.hub.nginx.yml pull
 # 停止并清理容器（保留数据）

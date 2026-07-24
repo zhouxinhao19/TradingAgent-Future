@@ -2,7 +2,7 @@
 
 ## 🎯 升级概述
 
-本指南将帮助您从 TradingAgents-CN v0.1.12 升级到 v0.1.13，享受原生OpenAI支持和Google AI全面集成的新功能。
+本指南将帮助您从 TradingAgent-Future v0.1.12 升级到 v0.1.13，享受原生OpenAI支持和Google AI全面集成的新功能。
 
 ## ⏰ 预计升级时间
 
@@ -287,7 +287,7 @@ cp -r reports_backup reports
 
 ## 🎉 升级完成
 
-恭喜！您已成功升级到 TradingAgents-CN v0.1.13。
+恭喜！您已成功升级到 TradingAgent-Future v0.1.13。
 
 现在您可以：
 - 🤖 使用原生OpenAI端点支持
@@ -295,4 +295,4 @@ cp -r reports_backup reports
 - 🔧 享受优化的LLM适配器架构
 - 🎨 使用改进的Web界面
 
-感谢您选择 TradingAgents-CN，祝您使用愉快！
+感谢您选择 TradingAgent-Future，祝您使用愉快！

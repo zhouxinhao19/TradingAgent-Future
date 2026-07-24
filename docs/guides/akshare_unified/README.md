@@ -2,7 +2,7 @@
 
 ## 📋 概述
 
-AKShare统一数据源集成方案是TradingAgents-CN系统的第二个主要数据源，与Tushare统一方案并行运行，为系统提供更全面、更可靠的期货数据支持。
+AKShare统一数据源集成方案是TradingAgent-Future系统的第二个主要数据源，与Tushare统一方案并行运行，为系统提供更全面、更可靠的期货数据支持。
 
 ## 🎯 核心特性
 
@@ -311,7 +311,7 @@ python cli/akshare_init.py --full
 
 ## 🎉 总结
 
-AKShare统一数据源集成方案为TradingAgents-CN系统提供了：
+AKShare统一数据源集成方案为TradingAgent-Future系统提供了：
 
 ✅ **完整的数据覆盖** - 期货品种基础信息、实时行情、历史数据、财务数据
 ✅ **自动化同步** - APScheduler集成，无需人工干预

@@ -1,8 +1,8 @@
-# TradingAgents-CN 配置管理设计
+# TradingAgent-Future 配置管理设计
 
 ## 📋 概述
 
-本文档描述了TradingAgents-CN系统的配置管理机制，包括配置文件结构、环境变量管理、动态配置更新等。
+本文档描述了TradingAgent-Future系统的配置管理机制，包括配置文件结构、环境变量管理、动态配置更新等。
 
 ---
 
@@ -12,7 +12,7 @@
 
 ```bash
 # ===========================================
-# TradingAgents-CN 主配置文件
+# TradingAgent-Future 主配置文件
 # ===========================================
 
 # ===== LLM配置 =====
@@ -70,7 +70,7 @@ MAX_EXPORT_SIZE=50MB
 ### 2. 默认配置 (default_config.py)
 
 ```python
-# TradingAgents-CN 默认配置
+# TradingAgent-Future 默认配置
 DEFAULT_CONFIG = {
     # ===== 系统配置 =====
     "system": {

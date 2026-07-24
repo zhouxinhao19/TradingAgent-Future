@@ -1,5 +1,5 @@
 {
-  "_description": "TradingAgents-CN 预配置数据说明",
+  "_description": "TradingAgent-Future 预配置数据说明",
   "_note": "实际的配置数据文件是 database_export_config_2025-10-17.json，已打包到 Docker 镜像中",
   "_image_path": "/app/install/database_export_config_2025-10-17.json",
   "_usage": "docker exec -it tradingagents-backend python scripts/import_config_and_create_user.py",
@@ -194,9 +194,9 @@
   },
   
   "技术支持": {
-    "文档": "https://github.com/hsliuping/TradingAgents-CN/tree/v1.0.0-preview/docs",
-    "Issues": "https://github.com/hsliuping/TradingAgents-CN/issues",
-    "示例": "https://github.com/hsliuping/TradingAgents-CN/tree/v1.0.0-preview/examples"
+    "文档": "https://github.com/TradingAgent-Future/TradingAgent-Future/tree/v1.0.0-preview/docs",
+    "Issues": "https://github.com/TradingAgent-Future/TradingAgent-Future/issues",
+    "示例": "https://github.com/TradingAgent-Future/TradingAgent-Future/tree/v1.0.0-preview/examples"
   }
 }
 

@@ -1,8 +1,8 @@
-# TradingAgents-CN 绿色安装版使用手册
+# TradingAgent-Future 绿色安装版使用手册
 
 ## 📦 简介
 
-TradingAgents-CN 绿色安装版是一个**免安装、开箱即用**的便携版本，无需复杂的环境配置，适合快速部署和测试。
+TradingAgent-Future 绿色安装版是一个**免安装、开箱即用**的便携版本，无需复杂的环境配置，适合快速部署和测试。
 
 ### ✨ 特点
 

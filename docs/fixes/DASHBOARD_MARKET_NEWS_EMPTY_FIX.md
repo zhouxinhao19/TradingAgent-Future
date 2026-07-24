@@ -234,7 +234,7 @@ crontab -e
 
 **添加定时任务**（每小时同步一次）：
 ```cron
-0 * * * * cd /path/to/TradingAgents-CN && .venv/bin/python scripts/sync_market_news.py >> logs/news_sync.log 2>&1
+0 * * * * cd /path/to/TradingAgent-Future && .venv/bin/python scripts/sync_market_news.py >> logs/news_sync.log 2>&1
 ```
 
 ### 2. 使用 Windows 任务计划程序
@@ -244,9 +244,9 @@ crontab -e
 2. 创建基本任务
 3. 触发器：每小时
 4. 操作：启动程序
-   - 程序：`d:\code\TradingAgents-CN\.venv\Scripts\python.exe`
+   - 程序：`d:\code\TradingAgent-Future\.venv\Scripts\python.exe`
    - 参数：`scripts/sync_market_news.py`
-   - 起始于：`d:\code\TradingAgents-CN`
+   - 起始于：`d:\code\TradingAgent-Future`
 
 ### 3. 使用后台 Worker（推荐）
 

@@ -539,7 +539,7 @@ db.market_quotes.createIndex({ "updated_at": 1 })
 
 ## 总结
 
-**实时行情入库服务**是 TradingAgents-CN 的核心基础设施之一，负责：
+**实时行情入库服务**是 TradingAgent-Future 的核心基础设施之一，负责：
 
 1. ✅ **定时采集**：每 30 秒从外部数据源获取全市场实时行情
 2. ✅ **数据存储**：批量写入 MongoDB，提供高性能查询

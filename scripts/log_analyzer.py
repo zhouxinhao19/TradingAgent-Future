@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 日志分析工具
-分析TradingAgents-CN的日志文件，提供统计和洞察
+分析TradingAgent-Future的日志文件，提供统计和洞察
 """
 
 import json
@@ -305,7 +305,7 @@ class LogAnalyzer:
         usage = self.analyze_usage()
         
         report = f"""
-# TradingAgents-CN 日志分析报告
+# TradingAgent-Future 日志分析报告
 
 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 日志文件: {self.log_file}
@@ -342,7 +342,7 @@ class LogAnalyzer:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='TradingAgents-CN 日志分析工具')
+    parser = argparse.ArgumentParser(description='TradingAgent-Future 日志分析工具')
     parser.add_argument('log_file', help='日志文件路径')
     parser.add_argument('--output', '-o', help='输出报告文件路径')
     parser.add_argument('--format', choices=['text', 'json'], default='text', help='输出格式')

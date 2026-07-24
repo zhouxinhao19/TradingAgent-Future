@@ -1,4 +1,4 @@
-# TradingAgents-CN Stop Services Guide
+# TradingAgent-Future Stop Services Guide
 
 [中文版本](#中文版本) | [English Version](#english-version)
 
@@ -8,7 +8,7 @@
 
 ### 概述
 
-本文档说明如何停止 TradingAgents-CN 绿色版的所有服务。
+本文档说明如何停止 TradingAgent-Future 绿色版的所有服务。
 
 ### 停止服务的方法
 
@@ -205,7 +205,7 @@ Get-Process -Name mongod -ErrorAction SilentlyContinue | Stop-Process -Force
 
 ### Overview
 
-This document explains how to stop all TradingAgents-CN portable version services.
+This document explains how to stop all TradingAgent-Future portable version services.
 
 ### Methods to Stop Services
 

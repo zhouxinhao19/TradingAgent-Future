@@ -2,7 +2,7 @@
 
 ## 📋 概述
 
-TradingAgents-CN 的 Docker 镜像已经内置了完整的 PDF 导出支持，包括：
+TradingAgent-Future 的 Docker 镜像已经内置了完整的 PDF 导出支持，包括：
 
 - ✅ **WeasyPrint** - 推荐的 PDF 生成工具（纯 Python 实现）
 - ✅ **pdfkit + wkhtmltopdf** - 备选的 PDF 生成工具

@@ -2,7 +2,7 @@
 
 ## 🎉 功能概述
 
-TradingAgents-CN系统已成功集成Tushare新闻接口，提供了业界领先的多源新闻数据获取能力。
+TradingAgent-Future系统已成功集成Tushare新闻接口，提供了业界领先的多源新闻数据获取能力。
 
 ### ✅ 核心功能
 
@@ -317,6 +317,6 @@ await cache.set(cache_key, news, expire=3600)  # 1小时缓存
 
 ---
 
-**Tushare新闻接口已成功集成到TradingAgents-CN系统！** 🎉
+**Tushare新闻接口已成功集成到TradingAgent-Future系统！** 🎉
 
 通过多新闻源支持、智能数据处理和完整的系统集成，为您的期货投资分析提供强大的新闻数据支持。
