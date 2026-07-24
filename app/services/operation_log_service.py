@@ -106,7 +106,7 @@ class OperationLogService:
                 filter_query["$or"] = [
                     {"action": {"$regex": query.keyword, "$options": "i"}},
                     {"username": {"$regex": query.keyword, "$options": "i"}},
-                    {"details.stock_symbol": {"$regex": query.keyword, "$options": "i"}}
+                    {"details.symbol": {"$regex": query.keyword, "$options": "i"}}
                 ]
             
             # 获取总数

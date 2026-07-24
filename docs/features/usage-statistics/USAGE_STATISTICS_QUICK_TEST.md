@@ -10,7 +10,7 @@
 
 ```powershell
 # 进入项目目录
-cd d:\code\TradingAgents-CN
+cd d:\code\TradingAgent-Future
 
 # 激活虚拟环境
 .\.venv\Scripts\Activate.ps1
@@ -23,7 +23,7 @@ cd d:\code\TradingAgents-CN
 
 ```powershell
 # 新开一个终端
-cd d:\code\TradingAgents-CN\frontend
+cd d:\code\TradingAgent-Future\frontend
 
 # 启动前端
 npm run dev

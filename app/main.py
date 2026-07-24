@@ -1,16 +1,13 @@
 """
-TradingAgents-CN v1.0.0-preview FastAPI Backend
+TradingAgent-Future v1.0.0 FastAPI Backend
 主应用程序入口
 
-Copyright (c) 2025 hsliuping. All rights reserved.
-版权所有 (c) 2025 hsliuping。保留所有权利。
+Copyright (c) 2026 TradingAgent-Future. All rights reserved.
+版权所有 (c) 2026 TradingAgent-Future。保留所有权利。
 
 This software is proprietary and confidential. Unauthorized copying, distribution,
 or use of this software, via any medium, is strictly prohibited.
 本软件为专有和机密软件。严禁通过任何媒介未经授权复制、分发或使用本软件。
-
-For commercial licensing, please contact: hsliup@163.com
-商业许可咨询，请联系：hsliup@163.com
 """
 
 from fastapi import FastAPI, Request
@@ -52,7 +49,7 @@ async def _print_config_summary(logger):
     """显示配置摘要"""
     try:
         logger.info("=" * 70)
-        logger.info("📋 TradingAgents-CN Configuration Summary")
+        logger.info("📋 TradingAgent-Future Configuration Summary")
         logger.info("=" * 70)
 
         # .env 文件路径信息
@@ -300,7 +297,7 @@ async def lifespan(app: FastAPI):
 
 # 创建FastAPI应用
 app = FastAPI(
-    title="TradingAgents-CN API",
+    title="TradingAgent-Future API",
     description="大宗商品分析与批量队列系统 API",
     version=get_version(),
     docs_url="/docs" if settings.DEBUG else None,
@@ -457,7 +454,7 @@ async def root():
     """根路径，返回API信息"""
     print("🏠 根路径被访问")
     return {
-        "name": "TradingAgents-CN API",
+        "name": "TradingAgent-Future API",
         "version": get_version(),
         "status": "running",
         "docs_url": "/docs" if settings.DEBUG else None

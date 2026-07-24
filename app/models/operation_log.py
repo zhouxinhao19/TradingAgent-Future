@@ -98,7 +98,7 @@ class ClearLogsResponse(BaseModel):
 # 操作类型常量
 class ActionType:
     """操作类型常量"""
-    STOCK_ANALYSIS = "stock_analysis"
+    COMMODITY_ANALYSIS = "commodity_analysis"
     CONFIG_MANAGEMENT = "config_management"
     CACHE_OPERATION = "cache_operation"
     DATA_IMPORT = "data_import"
@@ -114,7 +114,7 @@ class ActionType:
 
 # 操作类型映射
 ACTION_TYPE_NAMES = {
-    ActionType.STOCK_ANALYSIS: "品种分析",
+    ActionType.COMMODITY_ANALYSIS: "品种分析",
     ActionType.CONFIG_MANAGEMENT: "配置管理",
     ActionType.CACHE_OPERATION: "缓存操作",
     ActionType.DATA_IMPORT: "数据导入",

@@ -377,7 +377,7 @@ powershell -ExecutionPolicy Bypass -File scripts\deployment\build_portable_packa
 
 ## 🎊 结语
 
-通过这次实施，TradingAgents-CN 绿色版现在：
+通过这次实施，TradingAgent-Future 绿色版现在：
 
 ✅ **真正独立** - 不依赖任何外部软件
 ✅ **开箱即用** - 解压即可运行

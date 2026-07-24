@@ -25,9 +25,9 @@ class Propagator:
         """Create the initial state for the agent graph."""
         from langchain_core.messages import HumanMessage
 
-        # 🔥 修复：创建明确的分析请求消息，而不是只传递股票代码
+        # 🔥 修复：创建明确的分析请求消息，而不是只传递标的代码
         # 这样可以确保所有LLM（包括DeepSeek）都能理解任务
-        analysis_request = f"请对股票 {company_name} 进行全面分析，交易日期为 {trade_date}。"
+        analysis_request = f"请对标的 {company_name} 进行全面分析，交易日期为 {trade_date}。"
 
         return {
             "messages": [HumanMessage(content=analysis_request)],

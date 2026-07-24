@@ -1,6 +1,6 @@
-# TradingAgents-CN 前端应用
+# TradingAgent-Future 前端应用
 
-现代化的Vue3前端界面，为TradingAgents-CN提供优秀的用户体验。
+现代化的Vue3前端界面，为TradingAgent-Future提供优秀的用户体验。
 
 ## 🚀 快速开始
 
@@ -177,7 +177,7 @@ frontend/
 VITE_API_BASE_URL=http://localhost:8000/api
 
 # 应用标题
-VITE_APP_TITLE=TradingAgents-CN
+VITE_APP_TITLE=TradingAgent-Future
 ```
 
 ### 代理配置
@@ -299,14 +299,10 @@ const exampleStore = useExampleStore()
    npm run type-check
    ```
 
-## 📞 技术支持
+## 技术支持
 
-如有问题，请通过以下方式联系：
-
-- 📧 邮箱: hsliup@163.com
-- 💬 微信群: 扫描README中的二维码
-- 🐛 问题反馈: GitHub Issues
+如有问题，请通过 GitHub Issues 反馈。
 
 ---
 
-**TradingAgents-CN Frontend v1.0.0-preview** - 现代化的股票分析平台前端
+**TradingAgent-Future Frontend v1.0.0** - 多智能体期货分析平台前端

@@ -1,4 +1,4 @@
-# 🌳 TradingAgents-CN 分支管理策略
+# 🌳 TradingAgent-Future 分支管理策略
 
 ## 📋 当前分支状况分析
 
@@ -169,7 +169,7 @@ git checkout main
 git merge feature/tushare-integration
 
 # 创建版本标签
-git tag -a v0.1.6 -m "TradingAgents-CN v0.1.6正式版"
+git tag -a v0.1.6 -m "TradingAgent-Future v0.1.6正式版"
 
 # 推送到远程
 git push origin main --tags

@@ -318,7 +318,6 @@ python -m pytest tests/ -v --cov=tradingagents
 - [上游同步指南](../maintenance/upstream-sync.md)
 
 ### 联系方式
-- **GitHub Issues**: [提交问题](https://github.com/hsliuping/TradingAgents-CN/issues)
-- **邮箱**: hsliup@163.com
+- **GitHub Issues**: [提交问题](#/issues)
 
 通过遵循这套标准化的开发工作流程，我们可以确保项目的高质量开发和稳定发布。

@@ -1,10 +1,10 @@
 # Google AI 配置指南
 
-本指南将帮助您配置Google AI (Gemini)模型，以便在TradingAgents-CN中使用Google的强大AI能力进行期货分析。
+本指南将帮助您配置Google AI (Gemini)模型，以便在TradingAgent-Future中使用Google的强大AI能力进行期货分析。
 
 ## 🎯 概述
 
-TradingAgents-CN v0.1.2新增了对Google AI的完整支持，包括：
+TradingAgent-Future v0.1.2新增了对Google AI的完整支持，包括：
 
 - **Gemini 2.5 Pro** - 🚀 最新旗舰模型，推荐使用
 - **Gemini 2.0 Flash** - 最新模型，推荐使用
@@ -152,7 +152,7 @@ state, decision = graph.propagate("AAPL", "2025-06-27")
 
 ## 🔄 智能混合嵌入
 
-TradingAgents-CN的一个独特功能是智能混合嵌入服务：
+TradingAgent-Future的一个独特功能是智能混合嵌入服务：
 
 ### 工作原理
 ```
@@ -278,7 +278,7 @@ python tests/test_correct_apis.py
 
 1. 📖 查看 [完整文档](../README.md)
 2. 🧪 运行 [测试程序](../../tests/)
-3. 💬 提交 [GitHub Issue](https://github.com/hsliuping/TradingAgents-CN/issues)
+3. 💬 提交 [GitHub Issue](#/issues)
 
 ## 🎉 开始使用
 

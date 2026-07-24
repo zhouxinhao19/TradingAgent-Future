@@ -9,7 +9,7 @@
 
 ## 📋 引言
 
-TradingAgents-CN是基于**TradingAgents**项目开发的中文本地化版本。TradingAgents是一个开源的AI驱动的多智能体股票分析平台，由Tauric Research团队开发。本文将介绍TradingAgents项目的背景、核心理念和技术架构。
+TradingAgent-Future是基于**TradingAgents**项目开发的中文本地化版本。TradingAgents是一个开源的AI驱动的多智能体股票分析平台，由Tauric Research团队开发。本文将介绍TradingAgents项目的背景、核心理念和技术架构。
 
 ---
 
@@ -147,7 +147,7 @@ ANALYST_PROMPT = """
 ### 2. 多市场支持
 
 - 🇺🇸 美股市场
-- 🇨🇳 A股市场（TradingAgents-CN增强）
+- 🇨🇳 A股市场（TradingAgent-Future增强）
 - 🇭🇰 港股市场
 
 ### 3. 灵活的部署方式
@@ -159,9 +159,9 @@ ANALYST_PROMPT = """
 
 ---
 
-## 📊 TradingAgents-CN的改进
+## 📊 TradingAgent-Future的改进
 
-TradingAgents-CN在TradingAgents的基础上进行了大量本地化改进：
+TradingAgent-Future在TradingAgents的基础上进行了大量本地化改进：
 
 ### 1. 中国市场适配
 
@@ -223,11 +223,11 @@ TradingAgents论文提出了一个开源的AI智能体平台，用于股票分�
 - 🌐 [TradingAgents（源项目）](https://github.com/TauricResearch/TradingAgents)
 - 📚 [TradingAgents文档](https://github.com/TauricResearch/TradingAgents)
 
-### TradingAgents-CN资源
+### TradingAgent-Future资源
 
-- 🌐 [GitHub仓库](https://github.com/hsliuping/TradingAgents-CN)
+- 🌐 [GitHub仓库](#)
 - 📚 [中文文档](../../README.md)
-- 💬 [问题反馈](https://github.com/hsliuping/TradingAgents-CN/issues)
+- 💬 [问题反馈](#/issues)
 
 ### 学习资源
 
@@ -237,7 +237,7 @@ TradingAgents论文提出了一个开源的AI智能体平台，用于股票分�
 
 ## 💡 总结
 
-TradingAgents是一个创新的开源股票分析平台，通过多智能体协作和大语言模型，为股票分析提供了新的解决方案。TradingAgents-CN在此基础上进行了深度本地化，使其更适合中国市场和中文用户。
+TradingAgents是一个创新的开源股票分析平台，通过多智能体协作和大语言模型，为股票分析提供了新的解决方案。TradingAgent-Future在此基础上进行了深度本地化，使其更适合中国市场和中文用户。
 
 **核心价值**：
 - 🎯 学术研究与实际应用的结合
@@ -249,13 +249,13 @@ TradingAgents是一个创新的开源股票分析平台，通过多智能体协�
 
 ## ❓ 常见问题
 
-**Q: TradingAgents和TradingAgents-CN有什么区别？**
+**Q: TradingAgents和TradingAgent-Future有什么区别？**
 
-A: TradingAgents-CN是TradingAgents的中文本地化版本，增加了对中国市场的支持，优化了用户体验，并提供了更完善的中文文档。
+A: TradingAgent-Future是TradingAgents的中文本地化版本，增加了对中国市场的支持，优化了用户体验，并提供了更完善的中文文档。
 
 **Q: 可以商业使用吗？**
 
-A: 可以。TradingAgents和TradingAgents-CN都采用开源许可证，允许商业使用。但请注意遵守相关金融法规。
+A: 可以。TradingAgents和TradingAgent-Future都采用开源许可证，允许商业使用。但请注意遵守相关金融法规。
 
 **Q: 如何贡献代码？**
 

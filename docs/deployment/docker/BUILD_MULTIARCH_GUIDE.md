@@ -1,4 +1,4 @@
-# TradingAgents-CN 多架构镜像构建指南（Ubuntu 服务器）
+# TradingAgent-Future 多架构镜像构建指南（Ubuntu 服务器）
 
 > 📦 在 Ubuntu 22.04 Intel 服务器上构建支持 ARM 和 x86_64 的 Docker 镜像
 
@@ -87,7 +87,7 @@ tradingagents-builder *    docker-container
 ### 步骤 1: 进入项目目录
 
 ```bash
-cd /home/hsliup/TradingAgents-CN
+cd /home/hsliup/TradingAgent-Future
 ```
 
 ### 步骤 2: 给脚本添加执行权限

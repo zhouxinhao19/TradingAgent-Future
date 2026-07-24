@@ -671,7 +671,7 @@ def create_research_manager(llm, memory):
         fundamentals_report = state["fundamentals_report"]
 
         # === Phase 3b-ii-B:检测 asset_type ===
-        asset_type = state.get("asset_type", "stock")
+        asset_type = state.get("asset_type", "commodity")
 
         curr_situation = f"{market_research_report}\n\n{sentiment_report}\n\n{news_report}\n\n{fundamentals_report}"
 

@@ -2,12 +2,12 @@
 
 ## 🎯 软件性质
 
-TradingAgents-CN 采用**双许可证（混合许可证）模式**：
+TradingAgent-Future 采用**双许可证（混合许可证）模式**：
 
 ### 许可证结构
 
 ```
-TradingAgents-CN/
+TradingAgent-Future/
 ├── 🔓 Apache 2.0 开源组件
 │   ├── tradingagents/    # 核心交易智能体库
 │   ├── cli/              # 命令行工具
@@ -158,7 +158,6 @@ TradingAgents-CN/
 - 使用专有组件需获取商业许可证
 - 遵守商业许可证条款
 - 不得未经授权分发专有组件
-- 联系获取商业授权：hsliup@163.com
 
 ## 📋 许可证详细说明
 
@@ -208,7 +207,6 @@ TradingAgents-CN/
 
 如需商业使用专有组件，需要获取商业许可证：
 
-📧 **联系方式**：hsliup@163.com
 💼 **商业许可包含**：
 - 商业使用权
 - 修改和定制权
@@ -324,7 +322,7 @@ TradingAgents-CN/
 - 🎓 **学习**：促进知识传播
 - 🌍 **共享**：造福整个社区
 
-感谢您选择使用 TradingAgents-CN！
+感谢您选择使用 TradingAgent-Future！
 
 ---
 
@@ -332,7 +330,6 @@ TradingAgents-CN/
 **版本**: v1.0.0-preview
 
 如有疑问，请访问：
-- GitHub: https://github.com/hsliuping/TradingAgents-CN
-- Issues: https://github.com/hsliuping/TradingAgents-CN/issues
-- QQ群: 782124367
+- GitHub: #
+- Issues: #/issues
 

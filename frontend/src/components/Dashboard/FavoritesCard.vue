@@ -38,12 +38,9 @@
             <template v-if="item.asset_type === 'commodity'">
               {{ item.commodity_name || extractCommodityCode(item.full_symbol) }}
             </template>
-            <template v-else>
-              {{ item.stock_code }}
-            </template>
             <span class="symbol-name">
               <template v-if="item.asset_type === 'commodity'">{{ extractCommodityCode(item.full_symbol) }}</template>
-              <template v-else>{{ item.display_name || item.stock_name || '' }}</template>
+              <template v-else>{{ item.display_name || '' }}</template>
             </span>
           </div>
         </div>
@@ -78,7 +75,7 @@ import { useFavoritesStore } from '@/stores/favorites'
 import type { FavoriteItem } from '@/api/favorites'
 
 const props = withDefaults(
-  defineProps<{ compact?: boolean; maxDisplay?: number; loadAssetType?: 'stock' | 'commodity' | 'all' }>(),
+  defineProps<{ compact?: boolean; maxDisplay?: number; loadAssetType?: 'commodity' | 'all' }>(),
   { compact: false, maxDisplay: 5, loadAssetType: 'all' },
 )
 
@@ -120,15 +117,13 @@ function goToFavorites() {
 }
 
 function viewFavoriteDetail(item: FavoriteItem) {
-  if (item.asset_type === 'commodity') {
+  if (item.full_symbol) {
     if (props.compact) {
       // compact 模式：通知父组件填入表单，不跳转页面
       emit('select', item)
     } else {
       router.push(`/commodity/${item.full_symbol}`)
     }
-  } else {
-    router.push(`/analysis/single?stock_code=${item.stock_code}`)
   }
 }
 

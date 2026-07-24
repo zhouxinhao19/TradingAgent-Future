@@ -11,10 +11,7 @@ export const useFavoritesStore = defineStore('favorites', () => {
   const commodityItems = computed(() => items.value.filter(i => i.asset_type === 'commodity'))
   const count = computed(() => items.value.length)
 
-  function isFavorited(assetType: 'stock' | 'commodity', code: string): boolean {
-    if (assetType === 'stock') {
-      return items.value.some(i => i.asset_type === 'stock' && i.stock_code === code)
-    }
+  function isFavorited(assetType: 'commodity', code: string): boolean {
     return items.value.some(i => i.asset_type === 'commodity' && i.full_symbol === code)
   }
 

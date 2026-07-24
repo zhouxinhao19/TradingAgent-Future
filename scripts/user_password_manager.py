@@ -173,7 +173,7 @@ def reset_to_default():
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(
-        description="TradingAgents-CN 用户密码管理工具",
+        description="TradingAgent-Future 用户密码管理工具",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例:
@@ -224,7 +224,7 @@ def main():
         parser.print_help()
         return
     
-    print("🔧 TradingAgents-CN 用户密码管理工具")
+    print("🔧 TradingAgent-Future 用户密码管理工具")
     print("=" * 50)
     
     try:

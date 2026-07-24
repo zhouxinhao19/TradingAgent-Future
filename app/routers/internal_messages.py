@@ -29,7 +29,7 @@ class InternalMessage(BaseModel):
     subcategory: Optional[str] = ""
     tags: Optional[List[str]] = []
     importance: str = "medium"
-    impact_scope: str = "stock_specific"
+    impact_scope: str = "commodity_specific"
     time_sensitivity: str = "medium_term"
     confidence_level: float = Field(0.5, ge=0.0, le=1.0)
     sentiment: Optional[str] = "neutral"

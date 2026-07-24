@@ -2,7 +2,7 @@
 
 ## 📋 概述
 
-为了提高发布效率，TradingAgents-CN 采用**分架构独立仓库**策略：
+为了提高发布效率，TradingAgent-Future 采用**分架构独立仓库**策略：
 
 - **AMD64 版本**：独立仓库，频繁更新
 - **ARM64 版本**：独立仓库，按需更新
@@ -46,17 +46,17 @@ tradingagents-backend-arm64:v1.0.0  (只包含 ARM64)
 
 | 架构 | 后端镜像 | 前端镜像 |
 |------|---------|---------|
-| **AMD64** | `hsliuping/tradingagents-backend-amd64` | `hsliuping/tradingagents-frontend-amd64` |
-| **ARM64** | `hsliuping/tradingagents-backend-arm64` | `hsliuping/tradingagents-frontend-arm64` |
+| **AMD64** | `TradingAgent-Future/tradingagents-backend-amd64` | `TradingAgent-Future/tradingagents-frontend-amd64` |
+| **ARM64** | `TradingAgent-Future/tradingagents-backend-arm64` | `TradingAgent-Future/tradingagents-frontend-arm64` |
 
 ### 镜像标签
 
 | 标签 | 说明 | 示例 |
 |------|------|------|
-| `latest` | 最新稳定版 | `hsliuping/tradingagents-backend-amd64:latest` |
-| `v{version}` | 指定版本 | `hsliuping/tradingagents-backend-amd64:v1.0.0-preview` |
-| `v{version}-rc{n}` | 候选版本 | `hsliuping/tradingagents-backend-amd64:v1.0.0-rc1` |
-| `dev` | 开发版本 | `hsliuping/tradingagents-backend-amd64:dev` |
+| `latest` | 最新稳定版 | `TradingAgent-Future/tradingagents-backend-amd64:latest` |
+| `v{version}` | 指定版本 | `TradingAgent-Future/tradingagents-backend-amd64:v1.0.0-preview` |
+| `v{version}-rc{n}` | 候选版本 | `TradingAgent-Future/tradingagents-backend-amd64:v1.0.0-rc1` |
+| `dev` | 开发版本 | `TradingAgent-Future/tradingagents-backend-amd64:dev` |
 
 ---
 
@@ -66,14 +66,14 @@ tradingagents-backend-arm64:v1.0.0  (只包含 ARM64)
 
 ```bash
 # 1. 只构建 AMD64 版本（快速）
-REGISTRY=hsliuping VERSION=v1.0.1 ./scripts/build-amd64.sh
+REGISTRY=TradingAgent-Future VERSION=v1.0.1 ./scripts/build-amd64.sh
 
 # 2. 推送到 Docker Hub
 # 自动推送到:
-#   - hsliuping/tradingagents-backend-amd64:v1.0.1
-#   - hsliuping/tradingagents-backend-amd64:latest
-#   - hsliuping/tradingagents-frontend-amd64:v1.0.1
-#   - hsliuping/tradingagents-frontend-amd64:latest
+#   - TradingAgent-Future/tradingagents-backend-amd64:v1.0.1
+#   - TradingAgent-Future/tradingagents-backend-amd64:latest
+#   - TradingAgent-Future/tradingagents-frontend-amd64:v1.0.1
+#   - TradingAgent-Future/tradingagents-frontend-amd64:latest
 
 # 3. ARM64 用户继续使用旧版本（不受影响）
 ```
@@ -86,14 +86,14 @@ REGISTRY=hsliuping VERSION=v1.0.1 ./scripts/build-amd64.sh
 
 ```bash
 # 1. 只在需要时构建 ARM64 版本
-REGISTRY=hsliuping VERSION=v1.0.1 ./scripts/build-arm64.sh
+REGISTRY=TradingAgent-Future VERSION=v1.0.1 ./scripts/build-arm64.sh
 
 # 2. 推送到 Docker Hub
 # 自动推送到:
-#   - hsliuping/tradingagents-backend-arm64:v1.0.1
-#   - hsliuping/tradingagents-backend-arm64:latest
-#   - hsliuping/tradingagents-frontend-arm64:v1.0.1
-#   - hsliuping/tradingagents-frontend-arm64:latest
+#   - TradingAgent-Future/tradingagents-backend-arm64:v1.0.1
+#   - TradingAgent-Future/tradingagents-backend-arm64:latest
+#   - TradingAgent-Future/tradingagents-frontend-arm64:v1.0.1
+#   - TradingAgent-Future/tradingagents-frontend-arm64:latest
 ```
 
 **时间**：10-20 分钟（ARM 设备）或 20-40 分钟（x86 交叉编译）
@@ -104,10 +104,10 @@ REGISTRY=hsliuping VERSION=v1.0.1 ./scripts/build-arm64.sh
 
 ```bash
 # 1. 构建 AMD64 版本
-REGISTRY=hsliuping VERSION=v2.0.0 ./scripts/build-amd64.sh
+REGISTRY=TradingAgent-Future VERSION=v2.0.0 ./scripts/build-amd64.sh
 
 # 2. 构建 ARM64 版本
-REGISTRY=hsliuping VERSION=v2.0.0 ./scripts/build-arm64.sh
+REGISTRY=TradingAgent-Future VERSION=v2.0.0 ./scripts/build-arm64.sh
 
 # 3. 两个架构都更新到最新版本
 ```
@@ -122,11 +122,11 @@ REGISTRY=hsliuping VERSION=v2.0.0 ./scripts/build-arm64.sh
 
 ```bash
 # 拉取镜像
-docker pull hsliuping/tradingagents-backend-amd64:latest
-docker pull hsliuping/tradingagents-frontend-amd64:latest
+docker pull TradingAgent-Future/tradingagents-backend-amd64:latest
+docker pull TradingAgent-Future/tradingagents-frontend-amd64:latest
 
 # 或指定版本
-docker pull hsliuping/tradingagents-backend-amd64:v1.0.0-preview
+docker pull TradingAgent-Future/tradingagents-backend-amd64:v1.0.0-preview
 ```
 
 **docker-compose.yml 配置**：
@@ -134,11 +134,11 @@ docker pull hsliuping/tradingagents-backend-amd64:v1.0.0-preview
 ```yaml
 services:
   backend:
-    image: hsliuping/tradingagents-backend-amd64:latest
+    image: TradingAgent-Future/tradingagents-backend-amd64:latest
     # ...
   
   frontend:
-    image: hsliuping/tradingagents-frontend-amd64:latest
+    image: TradingAgent-Future/tradingagents-frontend-amd64:latest
     # ...
 ```
 
@@ -148,11 +148,11 @@ services:
 
 ```bash
 # 拉取镜像
-docker pull hsliuping/tradingagents-backend-arm64:latest
-docker pull hsliuping/tradingagents-frontend-arm64:latest
+docker pull TradingAgent-Future/tradingagents-backend-arm64:latest
+docker pull TradingAgent-Future/tradingagents-frontend-arm64:latest
 
 # 或指定版本
-docker pull hsliuping/tradingagents-backend-arm64:v1.0.0-preview
+docker pull TradingAgent-Future/tradingagents-backend-arm64:v1.0.0-preview
 ```
 
 **docker-compose.yml 配置**：
@@ -160,11 +160,11 @@ docker pull hsliuping/tradingagents-backend-arm64:v1.0.0-preview
 ```yaml
 services:
   backend:
-    image: hsliuping/tradingagents-backend-arm64:latest
+    image: TradingAgent-Future/tradingagents-backend-arm64:latest
     # ...
   
   frontend:
-    image: hsliuping/tradingagents-frontend-arm64:latest
+    image: TradingAgent-Future/tradingagents-frontend-arm64:latest
     # ...
 ```
 
@@ -176,8 +176,8 @@ services:
 
 ```bash
 # 使用 ARM64 镜像（与 ARM 服务器相同）
-docker pull hsliuping/tradingagents-backend-arm64:latest
-docker pull hsliuping/tradingagents-frontend-arm64:latest
+docker pull TradingAgent-Future/tradingagents-backend-arm64:latest
+docker pull TradingAgent-Future/tradingagents-frontend-arm64:latest
 ```
 
 **docker-compose.yml 配置**：
@@ -185,11 +185,11 @@ docker pull hsliuping/tradingagents-frontend-arm64:latest
 ```yaml
 services:
   backend:
-    image: hsliuping/tradingagents-backend-arm64:latest
+    image: TradingAgent-Future/tradingagents-backend-arm64:latest
     # ...
 
   frontend:
-    image: hsliuping/tradingagents-frontend-arm64:latest
+    image: TradingAgent-Future/tradingagents-frontend-arm64:latest
     # ...
 ```
 
@@ -197,7 +197,7 @@ services:
 
 ```bash
 # Apple Silicon 用户使用 ARM64 构建脚本
-REGISTRY=hsliuping VERSION=v1.0.0 ./scripts/build-arm64.sh
+REGISTRY=TradingAgent-Future VERSION=v1.0.0 ./scripts/build-arm64.sh
 ```
 
 ---
@@ -283,14 +283,14 @@ ARM64: v2.0.0
 
 ```bash
 # 大部分用户使用 AMD64，优先发布
-REGISTRY=hsliuping VERSION=v1.0.1 ./scripts/build-amd64.sh
+REGISTRY=TradingAgent-Future VERSION=v1.0.1 ./scripts/build-amd64.sh
 ```
 
 ### 2. ARM64 批量更新
 
 ```bash
 # 积累多个小更新后，一次性发布 ARM64
-REGISTRY=hsliuping VERSION=v1.0.5 ./scripts/build-arm64.sh
+REGISTRY=TradingAgent-Future VERSION=v1.0.5 ./scripts/build-arm64.sh
 ```
 
 ### 3. 使用 CI/CD 自动化
@@ -361,7 +361,7 @@ VERSION=v1.0.0 ./scripts/build-amd64.sh
 
 ```bash
 # 查看镜像架构
-docker inspect hsliuping/tradingagents-backend-amd64:latest | grep Architecture
+docker inspect TradingAgent-Future/tradingagents-backend-amd64:latest | grep Architecture
 
 # 输出: "Architecture": "amd64"
 ```

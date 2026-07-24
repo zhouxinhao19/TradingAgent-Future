@@ -5,7 +5,7 @@ code_compatibility: cn-0.1.14-preview
 status: updated
 ---
 
-# TradingAgents-CN 配置管理指南
+# TradingAgent-Future 配置管理指南
 
 > **版本说明**: 本文档基于 `cn-0.1.14-preview` 版本编写
 > **最后更新**: 2025-01-13
@@ -13,7 +13,7 @@ status: updated
 
 ## 📋 概述
 
-TradingAgents-CN 提供了完整的配置管理和成本统计系统，让您可以：
+TradingAgent-Future 提供了完整的配置管理和成本统计系统，让您可以：
 
 - 🔧 **统一管理API密钥和模型配置**
 - 💰 **实时跟踪Token使用和成本**

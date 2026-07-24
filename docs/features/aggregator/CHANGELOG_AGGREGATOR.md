@@ -308,5 +308,5 @@ config = service.get_model_config(model_name)
 
 ---
 
-**感谢使用 TradingAgents-CN！** 🎉
+**感谢使用 TradingAgent-Future！** 🎉
 

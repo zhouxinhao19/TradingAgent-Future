@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-TradingAgents-CN 快速安装脚本
+TradingAgent-Future 快速安装脚本
 自动检测环境并引导用户完成安装配置
 """
 
@@ -27,7 +27,7 @@ def print_colored(text, color=Colors.GREEN):
 def print_header():
     """打印欢迎信息"""
     print_colored("=" * 60, Colors.BLUE)
-    print_colored("🚀 TradingAgents-CN 快速安装向导", Colors.BOLD)
+    print_colored("🚀 TradingAgent-Future 快速安装向导", Colors.BOLD)
     print_colored("=" * 60, Colors.BLUE)
     print()
 
@@ -252,7 +252,7 @@ def main():
     if success:
         print_colored("\n🎉 安装完成!", Colors.GREEN)
         print_colored("📖 详细文档: docs/INSTALLATION_GUIDE.md", Colors.BLUE)
-        print_colored("❓ 遇到问题: https://github.com/hsliuping/TradingAgents-CN/issues", Colors.BLUE)
+        print_colored("❓ 遇到问题: https://github.com/TradingAgent-Future/TradingAgent-Future/issues", Colors.BLUE)
     else:
         print_colored("\n❌ 安装失败", Colors.RED)
         print_colored("📖 请查看详细安装指南: docs/INSTALLATION_GUIDE.md", Colors.YELLOW)

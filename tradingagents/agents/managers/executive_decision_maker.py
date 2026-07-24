@@ -113,7 +113,7 @@ def create_executive_decision_maker(llm):
 
     def cio_node(state: dict) -> dict:
         full_symbol = state.get("full_symbol") or state.get("company_of_interest", "Unknown")
-        asset_type = state.get("asset_type", "stock")
+        asset_type = state.get("asset_type", "commodity")
 
         logger.info(f"👔 [CIO] 最终决策启动: {full_symbol} (asset_type={asset_type})")
 

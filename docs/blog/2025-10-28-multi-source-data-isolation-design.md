@@ -1,7 +1,7 @@
 # 多数据源隔离存储设计与实现
 
 **日期**: 2025-10-28  
-**作者**: TradingAgents-CN 开发团队  
+**作者**: TradingAgent-Future 开发团队  
 **标签**: `数据源管理` `数据隔离` `索引优化` `数据迁移`
 
 ---
@@ -432,9 +432,9 @@ tushare > multi_source > akshare > baostock
 ## 🤝 贡献者
 
 - **问题发现**: 用户反馈（多数据源相互覆盖）
-- **方案设计**: TradingAgents-CN 开发团队
-- **代码实现**: TradingAgents-CN 开发团队
-- **文档编写**: TradingAgents-CN 开发团队
+- **方案设计**: TradingAgent-Future 开发团队
+- **代码实现**: TradingAgent-Future 开发团队
+- **文档编写**: TradingAgent-Future 开发团队
 
 ---
 

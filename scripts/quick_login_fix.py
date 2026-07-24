@@ -260,7 +260,7 @@ def check_env_file():
 
 def main():
     """主函数"""
-    print("🔧 TradingAgents-CN 快速登录修复工具")
+    print("🔧 TradingAgent-Future 快速登录修复工具")
     print("=" * 50)
     print("此工具将帮助您解决新机器部署后的登录问题")
     print()

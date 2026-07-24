@@ -527,7 +527,7 @@ class ConfigService:
                 "ta_hk_rate_limit_wait_seconds": 60,
                 "ta_hk_cache_ttl_seconds": 86400,
                 # 新增：TradingAgents 数据来源策略
-                # 是否优先从 app 缓存(Mongo 集合 stock_basic_info / market_quotes) 读取
+                # 是否优先从 app 缓存(Mongo 集合 commodity_basic_info / market_quotes) 读取
                 "ta_use_app_cache": False,
                 "ta_china_min_api_interval_seconds": 0.5,
                 "ta_us_min_api_interval_seconds": 1.0,
@@ -3739,7 +3739,7 @@ class ConfigService:
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {api_key}",
                 "HTTP-Referer": "https://tradingagents.cn",  # OpenRouter要求
-                "X-Title": "TradingAgents-CN"
+                "X-Title": "TradingAgent-Future"
             }
 
             data = {

@@ -35,17 +35,17 @@
             <el-icon><House /></el-icon>
             仪表板
           </el-link>
-          <el-link type="primary" @click="$router.push('/analysis/single')">
+          <el-link type="primary" @click="$router.push('/commodity/analysis')">
             <el-icon><TrendCharts /></el-icon>
-            单股分析
+            商品分析
           </el-link>
-          <el-link type="primary" @click="$router.push('/screening')">
+          <el-link type="primary" @click="$router.push('/commodity/list')">
             <el-icon><Search /></el-icon>
-            品种筛选
+            商品列表
           </el-link>
-          <el-link type="primary" @click="$router.push('/queue')">
+          <el-link type="primary" @click="$router.push('/tasks')">
             <el-icon><Document /></el-icon>
-            队列管理
+            任务中心
           </el-link>
         </div>
       </div>

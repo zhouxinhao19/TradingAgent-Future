@@ -30,18 +30,10 @@ class FavoriteService:
                 await db.user_favorites.drop_index(bad_name)
             except Exception:
                 pass
-        # 每个用户的品种不可重复（stock_code/commodity 唯一）
-        await db.user_favorites.create_index(
-            [("user_id", 1), ("asset_type", 1), ("stock_code", 1)],
-            unique=True,
-            partialFilterExpression={"asset_type": "stock"},
-            name="uniq_user_stock"
-        )
         # 每个用户的商品不可重复（full_symbol 唯一）
         await db.user_favorites.create_index(
             [("user_id", 1), ("asset_type", 1), ("full_symbol", 1)],
             unique=True,
-            partialFilterExpression={"asset_type": "commodity"},
             name="uniq_user_commodity"
         )
         # 按添加时间倒排
@@ -56,7 +48,7 @@ class FavoriteService:
         db = await self._get_db()
         await self.ensure_indexes()
         query: Dict[str, Any] = {"user_id": user_id}
-        if asset_type and asset_type in ("stock", "commodity"):
+        if asset_type and asset_type in ("commodity",):
             query["asset_type"] = asset_type
         cursor = db.user_favorites.find(query).sort("added_at", -1)
         docs = await cursor.to_list(length=None)
@@ -69,7 +61,7 @@ class FavoriteService:
         item.user_id = user_id
         if not item.display_name:
             item.display_name = (
-                item.stock_name or item.commodity_name or item.full_symbol or item.stock_code or ""
+                item.commodity_name or item.full_symbol or ""
             )
         doc = item.model_dump(by_alias=True)
         await db.user_favorites.insert_one(doc)
@@ -104,9 +96,6 @@ class FavoriteService:
             "id": str(doc.get("_id")),
             "user_id": doc.get("user_id"),
             "asset_type": doc.get("asset_type"),
-            "stock_code": doc.get("stock_code"),
-            "stock_name": doc.get("stock_name"),
-            "market": doc.get("market"),
             "full_symbol": doc.get("full_symbol"),
             "commodity_name": doc.get("commodity_name"),
             "exchange": doc.get("exchange"),

@@ -18,10 +18,10 @@ DEFAULT_EXCLUDED_COLLECTIONS = {
     "market_quotes_us",
     "news_data",
     "social_media_data",
-    "stock_basic_info",
-    "stock_basic_info_hk",
-    "stock_basic_info_us",
-    "stock_financial_data",
+    "commodity_basic_info",
+    "commodity_basic_info_hk",
+    "commodity_basic_info_us",
+    "commodity_financial_data",
     "usage_records",
 }
 

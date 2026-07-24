@@ -1,7 +1,7 @@
 # 合规性优化与错误修复：提升用户体验与系统稳定性
 
 **日期**: 2025-10-27  
-**作者**: TradingAgents-CN 开发团队  
+**作者**: TradingAgent-Future 开发团队  
 **标签**: `合规性` `用户体验` `bug-fix` `日志系统` `ARM架构`
 
 ---
@@ -666,7 +666,7 @@ pb = market_cap / net_assets_billion
 
 ---
 
-**感谢使用 TradingAgents-CN！** 🚀
+**感谢使用 TradingAgent-Future！** 🚀
 
-如有问题或建议，欢迎在 [GitHub Issues](https://github.com/hsliuping/TradingAgents-CN/issues) 中反馈。
+如有问题或建议，欢迎在 [GitHub Issues](#/issues) 中反馈。
 

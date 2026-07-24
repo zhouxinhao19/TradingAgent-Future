@@ -1,8 +1,8 @@
-# TradingAgents-CN Web界面使用指南 (v0.1.4)
+# TradingAgent-Future Web界面使用指南 (v0.1.4)
 
 ## 🌐 概述
 
-TradingAgents-CN 提供了直观易用的Web界面，让您可以通过浏览器轻松进行期货投资分析。v0.1.4版本新增了配置管理、Token统计等功能，本指南将详细介绍Web界面的各项功能和配置选项。
+TradingAgent-Future 提供了直观易用的Web界面，让您可以通过浏览器轻松进行期货投资分析。v0.1.4版本新增了配置管理、Token统计等功能，本指南将详细介绍Web界面的各项功能和配置选项。
 
 ## ✨ v0.1.4 新增功能
 

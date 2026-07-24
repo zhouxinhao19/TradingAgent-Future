@@ -34,7 +34,7 @@ import { configApi } from '@/api/config'
 // 需要缓存的组件
 const keepAliveComponents = computed(() => [
   'Dashboard',
-  'StockScreening',
+  'CommodityList',
   'AnalysisHistory'
 ])
 

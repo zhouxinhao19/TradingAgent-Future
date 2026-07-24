@@ -1,7 +1,7 @@
 # 302.ai 聚合平台接入与系统优化：深色主题、配置管理、WebSocket 改进
 
 **日期**: 2025-10-25  
-**作者**: TradingAgents-CN 开发团队  
+**作者**: TradingAgent-Future 开发团队  
 **标签**: `feature`, `bug-fix`, `ui`, `integration`, `configuration`, `websocket`
 
 ---

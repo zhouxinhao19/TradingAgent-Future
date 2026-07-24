@@ -18,7 +18,7 @@ import logging
 
 logger = logging.getLogger("webapi")
 
-# 品种名称缓存（旧 stock_basic_info 查询）
+# 品种名称缓存
 _symbol_name_cache = {}
 
 def get_symbol_name(symbol: str) -> str:
@@ -92,7 +92,7 @@ class ReportFilter(BaseModel):
     market_filter: Optional[str] = None
     start_date: Optional[str] = None
     end_date: Optional[str] = None
-    stock_code: Optional[str] = None
+    symbol: Optional[str] = None
     report_type: Optional[str] = None
 
 class ReportListResponse(BaseModel):
@@ -110,7 +110,7 @@ async def get_reports_list(
     market_filter: Optional[str] = Query(None, description="市场筛选"),
     start_date: Optional[str] = Query(None, description="开始日期"),
     end_date: Optional[str] = Query(None, description="结束日期"),
-    stock_code: Optional[str] = Query(None, description="品种代码（旧版字段）"),
+    symbol: Optional[str] = Query(None, description="品种代码"),
     user: dict = Depends(get_current_user)
 ):
     """获取分析报告列表"""
@@ -125,7 +125,8 @@ async def get_reports_list(
         # 搜索关键词
         if search_keyword:
             query["$or"] = [
-                {"stock_symbol": {"$regex": search_keyword, "$options": "i"}},
+                {"stock_symbol": {"$regex": search_keyword, "$options": "i"}},  # 历史字段名
+                {"symbol": {"$regex": search_keyword, "$options": "i"}},
                 {"analysis_id": {"$regex": search_keyword, "$options": "i"}},
                 {"summary": {"$regex": search_keyword, "$options": "i"}}
             ]
@@ -134,9 +135,9 @@ async def get_reports_list(
         if market_filter:
             query["market_type"] = market_filter
 
-        # 股票代码筛选
-        if stock_code:
-            query["stock_symbol"] = stock_code
+        # 品种代码筛选
+        if symbol:
+            query["stock_symbol"] = symbol  # DB 字段名保持不变以兼容存量数据
 
         # 日期范围筛选
         if start_date or end_date:
@@ -159,11 +160,11 @@ async def get_reports_list(
         reports = []
         async for doc in cursor:
             # 转换为前端需要的格式
-            stock_code = doc.get("stock_symbol", "")
-            # 🔥 优先使用MongoDB中保存的股票名称，如果没有则查询
-            stock_name = doc.get("stock_name")
-            if not stock_name:
-                stock_name = get_symbol_name(stock_code)
+            symbol = doc.get("stock_symbol", "")
+            # 优先使用MongoDB中保存的名称，如果没有则查询
+            name = doc.get("stock_name")
+            if not name:
+                name = get_symbol_name(symbol)
 
             # 获取市场类型
             market_type = doc.get("market_type", "期货")
@@ -175,9 +176,9 @@ async def get_reports_list(
             report = {
                 "id": str(doc["_id"]),
                 "analysis_id": doc.get("analysis_id", ""),
-                "title": f"{stock_name}({stock_code}) 分析报告",
-                "stock_code": stock_code,
-                "stock_name": stock_name,
+                "title": f"{name}({symbol}) 分析报告",
+                "symbol": symbol,
+                "name": name,
                 "market_type": market_type,  # 🔥 添加市场类型字段
                 "model_info": doc.get("model_info", "Unknown"),  # 🔥 添加模型信息字段
                 "type": "single",  # 单品种分析
@@ -231,7 +232,7 @@ async def get_report_detail(
             logger.info(f"⚠️ 未在analysis_reports找到，尝试从analysis_tasks还原: {report_id}")
             tasks_doc = await db.analysis_tasks.find_one(
                 {"$or": [{"task_id": report_id}, {"result.analysis_id": report_id}]},
-                {"result": 1, "task_id": 1, "stock_code": 1, "created_at": 1, "completed_at": 1}
+                {"result": 1, "task_id": 1, "full_symbol": 1, "created_at": 1, "completed_at": 1}
             )
             if not tasks_doc or not tasks_doc.get("result"):
                 raise HTTPException(status_code=404, detail="报告不存在")
@@ -249,16 +250,16 @@ async def get_report_detail(
                     return x.isoformat()
                 return x or ""
 
-            stock_symbol = r.get("stock_symbol", r.get("stock_code", tasks_doc.get("stock_code", "")))
-            stock_name = r.get("stock_name")
-            if not stock_name:
-                stock_name = get_symbol_name(stock_symbol)
+            symbol = r.get("stock_symbol", r.get("stock_code", tasks_doc.get("full_symbol", "")))
+            name = r.get("stock_name")
+            if not name:
+                name = get_symbol_name(symbol)
 
             report = {
                 "id": tasks_doc.get("task_id", report_id),
                 "analysis_id": r.get("analysis_id", ""),
-                "stock_symbol": stock_symbol,
-                "stock_name": stock_name,  # 🔥 添加股票名称字段
+                "symbol": symbol,
+                "name": name,
                 "model_info": r.get("model_info", "Unknown"),  # 🔥 添加模型信息字段
                 "analysis_date": r.get("analysis_date", ""),
                 "status": r.get("status", "completed"),
@@ -279,10 +280,10 @@ async def get_report_detail(
             }
         else:
             # 转换为详细格式（analysis_reports 命中）
-            stock_symbol = doc.get("stock_symbol", "")
-            stock_name = doc.get("stock_name")
-            if not stock_name:
-                stock_name = get_symbol_name(stock_symbol)
+            symbol = doc.get("stock_symbol", "")
+            name = doc.get("stock_name")
+            if not name:
+                name = get_symbol_name(symbol)
 
             # 获取时间（数据库中是 UTC 时间，需要转换为 UTC+8）
             created_at = doc.get("created_at", datetime.utcnow())
@@ -295,9 +296,9 @@ async def get_report_detail(
             report = {
                 "id": str(doc["_id"]),
                 "analysis_id": doc.get("analysis_id", ""),
-                "stock_symbol": stock_symbol,
-                "stock_name": stock_name,  # 🔥 添加股票名称字段
-                "model_info": doc.get("model_info", "Unknown"),  # 🔥 添加模型信息字段
+                "symbol": symbol,
+                "name": name,
+                "model_info": doc.get("model_info", "Unknown"),
                 "analysis_date": doc.get("analysis_date", ""),
                 "status": doc.get("status", "completed"),
                 "created_at": created_at_tz.isoformat() if created_at_tz else str(created_at),
@@ -427,106 +428,29 @@ async def download_report(
         if not doc:
             raise HTTPException(status_code=404, detail="报告不存在")
 
-        stock_symbol = doc.get("stock_symbol", "unknown")
+        symbol = doc.get("stock_symbol", "unknown")
         analysis_date = doc.get("analysis_date", datetime.now().strftime("%Y-%m-%d"))
 
         if format == "json":
             # JSON格式下载
             content = json.dumps(doc, ensure_ascii=False, indent=2, default=str)
-            filename = f"{stock_symbol}_{analysis_date}_report.json"
-            media_type = "application/json"
+            filename = f"{symbol}_{analysis_date}_report.json"
 
-            # 返回文件流
-            def generate():
-                yield content.encode('utf-8')
-
-            return StreamingResponse(
-                generate(),
-                media_type=media_type,
-                headers={"Content-Disposition": f"attachment; filename={filename}"}
-            )
-
-        elif format == "markdown":
-            # Markdown格式下载
-            reports = doc.get("reports", {})
-            content_parts = []
-
-            # 添加标题
-            content_parts.append(f"# {stock_symbol} 分析报告")
-            content_parts.append(f"**分析日期**: {analysis_date}")
-            content_parts.append(f"**分析师**: {', '.join(doc.get('analysts', []))}")
-            content_parts.append(f"**研究深度**: {doc.get('research_depth', 1)}")
-            content_parts.append("")
-
-            # 添加摘要
-            if doc.get("summary"):
-                content_parts.append("## 执行摘要")
-                content_parts.append(doc["summary"])
-                content_parts.append("")
-
-            # 添加各模块内容
-            for module_name, module_content in reports.items():
-                if isinstance(module_content, str) and module_content.strip():
-                    content_parts.append(f"## {module_name}")
-                    content_parts.append(module_content)
-                    content_parts.append("")
+... (other formats)
 
             content = "\n".join(content_parts)
-            filename = f"{stock_symbol}_{analysis_date}_report.md"
+            filename = f"{symbol}_{analysis_date}_report.md"
             media_type = "text/markdown"
 
-            # 返回文件流
-            def generate():
-                yield content.encode('utf-8')
+...
 
-            return StreamingResponse(
-                generate(),
-                media_type=media_type,
-                headers={"Content-Disposition": f"attachment; filename={filename}"}
-            )
-
-        elif format == "docx":
-            # Word 文档格式下载
-            from app.utils.report_exporter import report_exporter
-
-            if not report_exporter.pandoc_available:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Word 导出功能不可用。请安装 pandoc: pip install pypandoc"
-                )
-
-            try:
-                # 生成 Word 文档
                 docx_content = report_exporter.generate_docx_report(doc)
-                filename = f"{stock_symbol}_{analysis_date}_report.docx"
+                filename = f"{symbol}_{analysis_date}_report.docx"
 
-                # 返回文件流
-                def generate():
-                    yield docx_content
+...
 
-                return StreamingResponse(
-                    generate(),
-                    media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    headers={"Content-Disposition": f"attachment; filename={filename}"}
-                )
-            except Exception as e:
-                logger.error(f"❌ Word 文档生成失败: {e}")
-                raise HTTPException(status_code=500, detail=f"Word 文档生成失败: {str(e)}")
-
-        elif format == "pdf":
-            # PDF 格式下载
-            from app.utils.report_exporter import report_exporter
-
-            if not report_exporter.pandoc_available:
-                raise HTTPException(
-                    status_code=400,
-                    detail="PDF 导出功能不可用。请安装 pandoc 和 PDF 引擎（wkhtmltopdf 或 LaTeX）"
-                )
-
-            try:
-                # 生成 PDF 文档
                 pdf_content = report_exporter.generate_pdf_report(doc)
-                filename = f"{stock_symbol}_{analysis_date}_report.pdf"
+                filename = f"{symbol}_{analysis_date}_report.pdf"
 
                 # 返回文件流
                 def generate():

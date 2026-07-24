@@ -7,7 +7,7 @@
         缓存管理
       </h1>
       <p class="page-description">
-        管理股票数据缓存，优化系统性能
+        管理品种数据缓存，优化系统性能
       </p>
     </div>
 
@@ -38,7 +38,7 @@
             <el-row :gutter="16" style="margin-top: 16px">
               <el-col :span="12">
                 <div class="stat-item">
-                  <div class="stat-value">{{ cacheStats.stockDataCount }}</div>
+                  <div class="stat-value">{{ cacheStats.commodityDataCount }}</div>
                   <div class="stat-label">品种数据</div>
                 </div>
               </el-col>
@@ -230,7 +230,7 @@ const cacheStats = ref<CacheStats>({
   totalFiles: 0,
   totalSize: 0,
   maxSize: 1024 * 1024 * 1024, // 1GB
-  stockDataCount: 0,
+  commodityDataCount: 0,
   newsDataCount: 0,
   analysisDataCount: 0
 })

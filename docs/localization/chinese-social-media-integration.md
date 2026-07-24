@@ -2,7 +2,7 @@
 
 ## 🎯 概述
 
-为了更好地服务中国用户，TradingAgents-CN 需要集成中国本土的社交媒体和财经平台，以获取更准确的市场情绪和投资者观点。
+为了更好地服务中国用户，TradingAgent-Future 需要集成中国本土的社交媒体和财经平台，以获取更准确的市场情绪和投资者观点。
 
 ## 🌐 平台对应关系
 
@@ -242,7 +242,7 @@ SOCIAL_MEDIA_PLATFORMS=weibo,xueqiu,eastmoney_guba
 
 ## 🎯 总结
 
-通过集成中国本土的社交媒体和财经平台，TradingAgents-CN 将能够：
+通过集成中国本土的社交媒体和财经平台，TradingAgent-Future 将能够：
 
 1. **提供更准确的市场情绪分析**
 2. **更好地理解中国投资者行为**

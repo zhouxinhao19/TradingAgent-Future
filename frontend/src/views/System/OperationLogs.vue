@@ -176,8 +176,8 @@
           <template #default="{ row }">
             <div class="action-content">
               <div class="action-title">{{ row.action }}</div>
-              <div v-if="row.details && row.details.stock_symbol" class="action-detail">
-                品种: {{ row.details.stock_symbol }}
+              <div v-if="row.details && (row.details.symbol || row.details.full_symbol)" class="action-detail">
+                品种: {{ row.details.symbol || row.details.full_symbol }}
               </div>
             </div>
           </template>

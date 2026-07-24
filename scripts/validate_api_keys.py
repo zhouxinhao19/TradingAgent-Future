@@ -138,7 +138,7 @@ def validate_openai(api_key: str) -> Tuple[bool, str]:
 
 def main():
     """主函数"""
-    print_header("🔐 TradingAgents-CN API密钥验证工具")
+    print_header("🔐 TradingAgent-Future API密钥验证工具")
     
     # 检查.env文件
     env_file = project_root / ".env"

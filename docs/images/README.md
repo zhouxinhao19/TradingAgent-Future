@@ -1,6 +1,6 @@
 # Web界面截图目录
 
-此目录用于存放TradingAgents-CN Web界面的截图文件。
+此目录用于存放TradingAgent-Future Web界面的截图文件。
 
 ## 📸 需要的截图文件
 

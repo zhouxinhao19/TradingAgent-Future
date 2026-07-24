@@ -2,7 +2,7 @@
 
 ## 📋 概述
 
-TradingAgents-CN 使用 **APScheduler** 来管理定时任务，主要有两个核心任务：
+TradingAgent-Future 使用 **APScheduler** 来管理定时任务，主要有两个核心任务：
 
 1. **BasicsSyncService.run_full_sync** - 期货品种基础信息同步
 2. **QuotesIngestionService.run_once** - 实时行情入库

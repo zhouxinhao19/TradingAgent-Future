@@ -6,7 +6,7 @@
 ## 📋 设置步骤
 
 ### 1. 访问仓库设置
-1. 打开 GitHub 仓库：`https://github.com/hsliuping/TradingAgents-CN`
+1. 打开 GitHub 仓库：`#`
 2. 点击 **Settings** 标签页
 3. 在左侧菜单中选择 **Branches**
 

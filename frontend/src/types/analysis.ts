@@ -100,47 +100,50 @@ export interface AnalysisBatch {
   results_summary?: Record<string, any>
 }
 
-// 品种信息（统一前后端字段名）
-export interface StockInfo {
+// 品种信息（统一字段名）
+export interface InstrumentInfo {
   // 基础信息
-  symbol: string  // 主字段：品种代码
-  code?: string   // 兼容字段（已废弃）
-  full_symbol?: string  // 完整代码（如 000001.SZ）
-  name: string
-  market: string
-  industry?: string
+  symbol: string           // 品种代码（如 CU2608.SHF）
+  code?: string            // 简码（如 CU）
+  full_symbol?: string     // 完整代码
+  name: string             // 品种名称
+  market: string           // 市场类型
+  industry?: string        // 行业/品类
   area?: string
-  board?: string         // 板块（主板、创业板、科创板等）
-  exchange?: string      // 交易所（上海证券交易所、深圳证券交易所等）
+  board?: string
+  exchange?: string        // 交易所
 
   // 市值信息（亿元）
-  total_mv?: number      // 总市值
-  circ_mv?: number       // 流通市值
+  total_mv?: number        // 总市值
+  circ_mv?: number         // 流通市值
 
   // 财务指标
-  pe?: number            // 市盈率
-  pb?: number            // 市净率
-  pe_ttm?: number        // 滚动市盈率
-  pb_mrq?: number        // 最新市净率
-  roe?: number           // 净资产收益率(%)
+  pe?: number
+  pb?: number
+  pe_ttm?: number
+  pb_mrq?: number
+  roe?: number
 
   // 交易数据
-  close?: number         // 收盘价
-  pct_chg?: number       // 涨跌幅(%)
-  amount?: number        // 成交额
-  turnover_rate?: number // 换手率(%)
-  volume_ratio?: number  // 量比
+  close?: number
+  pct_chg?: number
+  amount?: number
+  turnover_rate?: number
+  volume_ratio?: number
 
   // 技术指标
-  ma20?: number          // 20日均线
-  rsi14?: number         // RSI指标
-  kdj_k?: number         // KDJ-K
-  kdj_d?: number         // KDJ-D
-  kdj_j?: number         // KDJ-J
-  dif?: number           // MACD-DIF
-  dea?: number           // MACD-DEA
-  macd_hist?: number     // MACD柱状图
+  ma20?: number
+  rsi14?: number
+  kdj_k?: number
+  kdj_d?: number
+  kdj_j?: number
+  dif?: number
+  dea?: number
+  macd_hist?: number
 }
+
+// 向后兼容别名（已废弃，请使用 InstrumentInfo）
+export type StockInfo = InstrumentInfo
 
 // 单股分析请求
 export interface SingleAnalysisRequest {

@@ -1,4 +1,4 @@
-# 🚀 TradingAgents-CN 快速部署指南（Docker Hub 镜像）
+# 🚀 TradingAgent-Future 快速部署指南（Docker Hub 镜像）
 
 > 5 分钟快速部署完整的 AI 期货分析系统
 
@@ -29,14 +29,14 @@ mkdir -p ~/tradingagents-demo
 cd ~/tradingagents-demo
 
 # 下载 Docker Compose 配置文件
-wget https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/docker-compose.hub.nginx.yml
+wget https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/docker-compose.hub.nginx.yml
 
 # 下载环境配置模板
-wget https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/.env.docker -O .env
+wget https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/.env.docker -O .env
 
 # 下载 Nginx 配置文件
 mkdir -p nginx
-wget https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/nginx/nginx.conf -O nginx/nginx.conf
+wget https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/nginx/nginx.conf -O nginx/nginx.conf
 ```
 
 **Windows PowerShell**：
@@ -46,14 +46,14 @@ New-Item -ItemType Directory -Path "$env:USERPROFILE\tradingagents-demo" -Force
 Set-Location "$env:USERPROFILE\tradingagents-demo"
 
 # 下载 Docker Compose 配置
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/docker-compose.hub.nginx.yml" -OutFile "docker-compose.hub.nginx.yml"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/docker-compose.hub.nginx.yml" -OutFile "docker-compose.hub.nginx.yml"
 
 # 下载环境配置
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/.env.docker" -OutFile ".env"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/.env.docker" -OutFile ".env"
 
 # 下载 Nginx 配置
 New-Item -ItemType Directory -Path "nginx" -Force
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/nginx/nginx.conf" -OutFile "nginx\nginx.conf"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/nginx/nginx.conf" -OutFile "nginx\nginx.conf"
 ```
 
 ### 步骤 2：拉取 Docker 镜像
@@ -514,9 +514,9 @@ docker-compose -f docker-compose.hub.nginx.yml down -v
 
 ## 🆘 获取帮助
 
-- **GitHub Issues**: https://github.com/hsliuping/TradingAgents-CN/issues
-- **文档**: https://github.com/hsliuping/TradingAgents-CN/tree/v1.0.0-preview/docs
-- **示例**: https://github.com/hsliuping/TradingAgents-CN/tree/v1.0.0-preview/examples
+- **GitHub Issues**: #/issues
+- **文档**: #/tree/v1.0.0-preview/docs
+- **示例**: #/tree/v1.0.0-preview/examples
 
 ---
 

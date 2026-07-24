@@ -1,6 +1,6 @@
 # Token使用统计和成本跟踪指南 (v0.1.7)
 
-本指南介绍如何配置和使用TradingAgents-CN的Token使用统计和成本跟踪功能，包括v0.1.7新增的DeepSeek成本追踪和智能成本控制。
+本指南介绍如何配置和使用TradingAgent-Future的Token使用统计和成本跟踪功能，包括v0.1.7新增的DeepSeek成本追踪和智能成本控制。
 
 ## 功能概述
 

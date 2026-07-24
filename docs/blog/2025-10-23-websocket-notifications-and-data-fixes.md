@@ -1,7 +1,7 @@
 # WebSocket 通知系统与数据修复：彻底解决 Redis 连接泄漏问题
 
 **日期**: 2025-10-23  
-**作者**: TradingAgents-CN 开发团队  
+**作者**: TradingAgent-Future 开发团队  
 **标签**: `feature`, `bug-fix`, `websocket`, `redis`, `data-quality`, `performance`
 
 ---

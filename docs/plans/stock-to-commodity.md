@@ -1,4 +1,4 @@
-# TradingAgents-CN:股票 → 大宗商品 改造方案
+# TradingAgent-Future:股票 → 大宗商品 改造方案
 
 > **版本快照**:v5 — 反映 2026-07-18 实际进度(Phase 0/1/2/3a/3b/3c 全部完成)。
 > Phase 3b 六个子阶段(3b-i → 3b-ii-E)已全部交付,Phase 3c(队列+批量+任务中心优化)已完成,
@@ -6,7 +6,7 @@
 
 ## Context
 
-TradingAgents-CN 当前是基于 LangGraph 的多智能体股票分析平台,核心入口
+TradingAgent-Future 当前是基于 LangGraph 的多智能体股票分析平台,核心入口
 `tradingagents/graph/trading_graph.py:TradingAgentsGraph`,含 FastAPI 后端(`app/`)+ Vue3
 前端(`frontend/`)+ MongoDB/Redis。
 

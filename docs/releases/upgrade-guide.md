@@ -1,8 +1,8 @@
-# 🔄 TradingAgents-CN 升级指南
+# 🔄 TradingAgent-Future 升级指南
 
 ## 📋 概述
 
-本指南提供TradingAgents-CN各版本之间的升级方法，确保用户能够安全、顺利地升级到最新版本。
+本指南提供TradingAgent-Future各版本之间的升级方法，确保用户能够安全、顺利地升级到最新版本。
 
 ## 🚀 v1.0.1 升级指南 (2026-04-14)
 
@@ -412,11 +412,11 @@ cp .env custom_config_backup.env
 
 ```bash
 # 创建新目录
-mkdir TradingAgents-CN-v0.1.7
-cd TradingAgents-CN-v0.1.7
+mkdir TradingAgent-Future-v0.1.7
+cd TradingAgent-Future-v0.1.7
 
 # 克隆最新版本
-git clone https://github.com/hsliuping/TradingAgents-CN.git .
+git clone #.git .
 
 # 恢复配置
 cp ../custom_config_backup.env .env
@@ -611,9 +611,9 @@ docker-compose up -d
 
 如果在升级过程中遇到问题，可以通过以下方式获取帮助：
 
-- 🐛 [GitHub Issues](https://github.com/hsliuping/TradingAgents-CN/issues)
-- 💬 [GitHub Discussions](https://github.com/hsliuping/TradingAgents-CN/discussions)
-- 📚 [完整文档](https://github.com/hsliuping/TradingAgents-CN/tree/main/docs)
+- 🐛 [GitHub Issues](#/issues)
+- 💬 [GitHub Discussions](#/discussions)
+- 📚 [完整文档](#/tree/main/docs)
 
 ### 提交问题时请包含
 
@@ -627,4 +627,4 @@ docker-compose up -d
 
 *最后更新: 2025-07-13*
 *版本: cn-0.1.7*
-*维护团队: TradingAgents-CN开发团队*
+*维护团队: TradingAgent-Future开发团队*

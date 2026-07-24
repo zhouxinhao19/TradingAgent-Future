@@ -1,6 +1,6 @@
 # Docker镜像发布到Docker Hub指南
 
-本指南介绍如何将TradingAgents-CN的Docker镜像发布到Docker Hub。
+本指南介绍如何将TradingAgent-Future的Docker镜像发布到Docker Hub。
 
 ## 前置要求
 

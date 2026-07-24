@@ -26,7 +26,7 @@ Unable to serialize unknown type: <class 'bson.objectid.ObjectId'>
 ### 错误堆栈
 
 ```python
-File "D:\code\TradingAgents-CN\app\services\news_data_service.py", line 325
+File "D:\code\TradingAgent-Future\app\services\news_data_service.py", line 325
     self.logger.info(f"📊 查询新闻数据返回 {len(results)} 条记录")
     return results  # ❌ results 包含 ObjectId，无法序列化
 ```

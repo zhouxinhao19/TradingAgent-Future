@@ -16,13 +16,13 @@ class SignalProcessor:
         self.quick_thinking_llm = quick_thinking_llm
 
     @log_graph_module("signal_processing")
-    def process_signal(self, full_signal: str, stock_symbol: str = None) -> dict:
+    def process_signal(self, full_signal: str, symbol: str = None) -> dict:
         """
         Process a full trading signal to extract structured decision information.
 
         Args:
             full_signal: Complete trading signal text
-            stock_symbol: Stock symbol to determine currency type
+            symbol: Symbol code to determine currency type
 
         Returns:
             Dictionary containing extracted decision information
@@ -51,14 +51,14 @@ class SignalProcessor:
                 'reasoning': '信号内容为空，默认持有建议'
             }
 
-        # 使用默认参数（已移除对StockUtils的依赖）
+        # 使用默认参数
         market_name = "未知市场"
         currency = "人民币"
         currency_symbol = "¥"
-        is_china = True  # 默认假设A股
+        is_china = True
 
-        logger.info(f"🔍 [SignalProcessor] 处理信号: 股票={stock_symbol}, 市场={market_name}, 货币={currency}",
-                   extra={'stock_symbol': stock_symbol, 'market': market_name, 'currency': currency})
+        logger.info(f"🔍 [SignalProcessor] 处理信号: 标的={symbol}, 市场={market_name}, 货币={currency}",
+                   extra={'symbol': symbol, 'market': market_name, 'currency': currency})
 
         messages = [
             (
@@ -83,8 +83,8 @@ class SignalProcessor:
 5. 所有内容必须使用中文，不允许任何英文投资建议
 
 特别注意：
-- 股票代码 {stock_symbol or '未知'} 是{market_name}，使用{currency}计价
-- 目标价格必须与股票的交易货币一致（{currency_symbol}）
+- 标的代码 {symbol or '未知'} 是{market_name}，使用{currency}计价
+- 目标价格必须与标的的交易货币一致（{currency_symbol}）
 
 如果某些信息在报告中没有明确提及，请使用合理的默认值。""",
             ),
@@ -199,14 +199,14 @@ class SignalProcessor:
                 }
                 logger.info(f"🔍 [SignalProcessor] 处理结果: {result}",
                            extra={'action': result['action'], 'target_price': result['target_price'],
-                                 'confidence': result['confidence'], 'stock_symbol': stock_symbol})
+                                 'confidence': result['confidence'], 'symbol': symbol})
                 return result
             else:
                 # 如果无法解析JSON，使用简单的文本提取
                 return self._extract_simple_decision(response)
 
         except Exception as e:
-            logger.error(f"信号处理错误: {e}", exc_info=True, extra={'stock_symbol': stock_symbol})
+            logger.error(f"信号处理错误: {e}", exc_info=True, extra={'symbol': symbol})
             # 回退到简单提取
             return self._extract_simple_decision(full_signal)
 

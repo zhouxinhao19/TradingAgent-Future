@@ -2,7 +2,7 @@
 
 ## 📋 分析结论
 
-✅ **好消息**: 经过详细对比，TradingAgents-CN 的报告生成逻辑**已经完整实现了所有子报告**，与原版 TradingAgents 保持一致！
+✅ **好消息**: 经过详细对比，TradingAgent-Future 的报告生成逻辑**已经完整实现了所有子报告**，与原版 TradingAgents 保持一致！
 
 我们的实现不仅包含了原版的所有报告模块，还在某些方面做了改进（如更清晰的emoji标识、更好的格式化等）。
 
@@ -36,7 +36,7 @@ self.report_sections = {
 - `neutral_history` - 中立分析师的历史分析
 - `judge_decision` - 投资组合经理的最终决策
 
-### TradingAgents-CN (Web)
+### TradingAgent-Future (Web)
 
 #### 报告模块定义 (`web/utils/report_exporter.py` 第675-722行)
 ```python
@@ -195,7 +195,7 @@ if module_key in ['investment_debate_state', 'risk_debate_state']:
 
 ## 💡 结论
 
-**TradingAgents-CN 的报告生成功能已经完整实现，与原版保持一致，甚至在某些方面有所改进！**
+**TradingAgent-Future 的报告生成功能已经完整实现，与原版保持一致，甚至在某些方面有所改进！**
 
 不需要进行任何修复，现有实现已经满足需求。
 
@@ -205,7 +205,7 @@ if module_key in ['investment_debate_state', 'risk_debate_state']:
 - `cli/main.py` (第178-186行) - 报告模块定义
 - `cli/main.py` (第819-944行) - 报告展示逻辑
 
-### TradingAgents-CN
+### TradingAgent-Future
 - `web/utils/report_exporter.py` (第602-638行) - `_format_team_decision_content()` 函数
 - `web/utils/report_exporter.py` (第267-331行) - `_add_team_decision_reports()` 函数
 - `web/utils/report_exporter.py` (第641-844行) - `save_modular_reports_to_results_dir()` 函数
@@ -214,7 +214,7 @@ if module_key in ['investment_debate_state', 'risk_debate_state']:
 
 ## 📈 功能对比表
 
-| 功能 | 原版 TradingAgents | TradingAgents-CN | 状态 |
+| 功能 | 原版 TradingAgents | TradingAgent-Future | 状态 |
 |------|-------------------|------------------|------|
 | 市场分析报告 | ✅ | ✅ | 一致 |
 | 情绪分析报告 | ✅ | ✅ | 一致 |

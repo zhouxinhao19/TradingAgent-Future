@@ -38,7 +38,7 @@ async def get_cache_stats(current_user: dict = Depends(get_current_user)):
                 "totalFiles": stats.get('total_files', 0),
                 "totalSize": stats.get('total_size', 0),  # 字节
                 "maxSize": 1024 * 1024 * 1024,  # 1GB
-                "stockDataCount": stats.get('stock_data_count', 0),
+                "commodityDataCount": stats.get('stock_data_count', 0),
                 "newsDataCount": stats.get('news_count', 0),
                 "analysisDataCount": stats.get('fundamentals_count', 0)
             },

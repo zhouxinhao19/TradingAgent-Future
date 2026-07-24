@@ -235,7 +235,7 @@ def migrate_auth_to_db():
 
 def main():
     """主函数"""
-    print("🚀 TradingAgents-CN 认证系统迁移工具")
+    print("🚀 TradingAgent-Future 认证系统迁移工具")
     print("=" * 60)
     print("此工具将把基于配置文件的认证迁移到基于数据库的认证")
     print()

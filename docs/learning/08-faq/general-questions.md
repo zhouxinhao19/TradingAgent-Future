@@ -9,7 +9,7 @@
 
 ## 📋 目录
 
-- [关于TradingAgents-CN](#关于tradingagents-cn)
+- [关于TradingAgent-Future](#关于tradingagents-cn)
 - [功能相关](#功能相关)
 - [模型选择](#模型选择)
 - [使用技巧](#使用技巧)
@@ -18,11 +18,11 @@
 
 ---
 
-## 🏢 关于TradingAgents-CN
+## 🏢 关于TradingAgent-Future
 
-### Q1: TradingAgents-CN是什么？
+### Q1: TradingAgent-Future是什么？
 
-**A**: TradingAgents-CN是一个基于大语言模型的AI股票分析学习平台，采用多智能体协作机制，帮助用户学习和理解股票分析方法。
+**A**: TradingAgent-Future是一个基于大语言模型的AI股票分析学习平台，采用多智能体协作机制，帮助用户学习和理解股票分析方法。
 
 **核心特点**：
 - 🤖 多智能体协作分析
@@ -34,7 +34,7 @@
 
 **A**: 
 
-| 特点 | TradingAgents-CN | 传统分析工具 |
+| 特点 | TradingAgent-Future | 传统分析工具 |
 |------|-----------------|------------|
 | 分析方式 | AI多智能体协作 | 固定算法 |
 | 灵活性 | 可自定义提示词 | 固定模式 |
@@ -46,7 +46,7 @@
 
 **A**: ⚠️ **不提供投资建议**
 
-TradingAgents-CN是**学习工具**，提供的分析仅供参考，不构成投资建议。
+TradingAgent-Future是**学习工具**，提供的分析仅供参考，不构成投资建议。
 
 ```
 ✅ 我们提供：学习资源、分析参考、工具支持
@@ -484,7 +484,7 @@ TradingAgents-CN是**学习工具**，提供的分析仅供参考，不构成投
 
 ## 💰 费用相关
 
-### Q21: 使用TradingAgents-CN需要付费吗？
+### Q21: 使用TradingAgent-Future需要付费吗？
 
 **A**: 
 
@@ -534,7 +534,7 @@ TradingAgents-CN是**学习工具**，提供的分析仅供参考，不构成投
 
 **A**: 
 
-**在TradingAgents-CN中**：
+**在TradingAgent-Future中**：
 1. 进入"设置" → "使用统计"
 2. 查看：
    - 总调用次数

@@ -1,7 +1,7 @@
 # 2025-10-24 项目优化日志：数据源统一、实时行情优化与基本面分析增强
 
 **日期**: 2025-10-24
-**作者**: TradingAgents-CN 开发团队
+**作者**: TradingAgent-Future 开发团队
 **标签**: `feature`, `optimization`, `refactor`, `bug-fix`, `data-quality`, `performance`
 
 ---
@@ -1330,7 +1330,7 @@ TUSHARE_TOKEN=  # 不配置 Token
 
 ---
 
-**感谢使用 TradingAgents-CN！** 🚀
+**感谢使用 TradingAgent-Future！** 🚀
 
-如有问题或建议，欢迎在 [GitHub Issues](https://github.com/hsliuping/TradingAgents-CN/issues) 中反馈。
+如有问题或建议，欢迎在 [GitHub Issues](#/issues) 中反馈。
 

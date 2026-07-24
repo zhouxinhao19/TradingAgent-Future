@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "tradingagents"
 version = "1.0.0-preview"
-description = "Add your description here"
+description = "多智能体大宗商品期货交易分析平台 — 基于 LangGraph + LangChain 构建"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

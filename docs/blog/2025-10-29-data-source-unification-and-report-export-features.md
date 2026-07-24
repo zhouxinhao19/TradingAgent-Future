@@ -1,7 +1,7 @@
 # 数据源统一与报告导出功能：完善系统数据一致性与用户体验
 
 **日期**: 2025-10-29  
-**作者**: TradingAgents-CN 开发团队  
+**作者**: TradingAgent-Future 开发团队  
 **标签**: `数据源` `报告导出` `数据一致性` `用户体验` `系统优化`
 
 ---
@@ -788,7 +788,7 @@ const syncRequest = axios.create({
 
 ---
 
-**感谢使用 TradingAgents-CN！** 🚀
+**感谢使用 TradingAgent-Future！** 🚀
 
-如有问题或建议，欢迎在 [GitHub Issues](https://github.com/hsliuping/TradingAgents-CN/issues) 中反馈。
+如有问题或建议，欢迎在 [GitHub Issues](#/issues) 中反馈。
 

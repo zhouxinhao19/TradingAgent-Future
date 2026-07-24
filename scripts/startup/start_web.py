@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-TradingAgents-CN 简化启动脚本
+TradingAgent-Future 简化启动脚本
 解决模块导入问题的最简单方案
 """
 
@@ -11,7 +11,7 @@ from pathlib import Path
 
 def main():
     """主函数"""
-    print("🚀 TradingAgents-CN Web应用启动器")
+    print("🚀 TradingAgent-Future Web应用启动器")
     print("=" * 50)
     
     # 获取项目根目录

@@ -79,7 +79,7 @@ const handleWizardComplete = (data) => {
 **步骤 0: 欢迎**
 ```
 ┌─────────────────────────────────────────┐
-│  ⭐ 欢迎使用 TradingAgents-CN           │
+│  ⭐ 欢迎使用 TradingAgent-Future           │
 │                                         │
 │  让我们通过几个简单的步骤来配置您的系统  │
 │                                         │

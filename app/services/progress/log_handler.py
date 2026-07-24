@@ -121,13 +121,10 @@ class ProgressLogHandler(logging.Handler):
 
         return None
 
-    def _extract_stock_symbol(self, message: str) -> Optional[str]:
-        """从消息中提取股票代码"""
-        # 匹配常见的股票代码格式
+    def _extract_symbol(self, message: str) -> Optional[str]:
+        """从消息中提取品种代码"""
         patterns = [
-            r'\b(\d{6})\b',  # 6位数字（A股）
-            r'\b([A-Z]{1,5})\b',  # 1-5位大写字母（美股）
-            r'\b(\d{4,5}\.HK)\b',  # 港股格式
+            r'\b([A-Z]{2}\d{4}\.[A-Z]+)\b',  # 期货合约代码（如 CU2608.SHF）
         ]
 
         for pattern in patterns:

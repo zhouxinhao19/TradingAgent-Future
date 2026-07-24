@@ -5,7 +5,7 @@ code_compatibility: cn-0.1.14-preview
 status: updated
 ---
 
-# TradingAgents-CN 使用指南
+# TradingAgent-Future 使用指南
 
 > **版本说明**: 本文档基于 `cn-0.1.14-preview` 版本编写  
 > **最后更新**: 2025-01-13  
@@ -176,6 +176,6 @@ status: updated
 
 ---
 
-**开始你的TradingAgents-CN学习之旅！** 🚀
+**开始你的TradingAgent-Future学习之旅！** 🚀
 
 选择适合你的指南，开始探索AI驱动的期货分析世界。

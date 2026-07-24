@@ -165,7 +165,7 @@ def main():
     """主函数"""
     
     print()
-    print("🚀 TradingAgents-CN 聚合渠道环境变量测试")
+    print("🚀 TradingAgent-Future 聚合渠道环境变量测试")
     print()
     
     # 测试环境变量

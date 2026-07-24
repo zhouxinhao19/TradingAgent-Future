@@ -2,7 +2,7 @@
 
 ## 概述
 
-TradingAgents-CN 现在支持多架构 Docker 镜像构建，可以在 AMD64 (x86_64) 和 ARM64 (ARM) 架构上运行。
+TradingAgent-Future 现在支持多架构 Docker 镜像构建，可以在 AMD64 (x86_64) 和 ARM64 (ARM) 架构上运行。
 
 ## 架构支持
 

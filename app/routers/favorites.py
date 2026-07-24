@@ -1,7 +1,7 @@
 """
 自选品种统一 API 路由
 前缀: /api/favorites
-支持商品期货(commodity)和历史兼容(stock)
+支持商品期货(commodity)
 """
 
 from typing import Optional, List
@@ -27,10 +27,7 @@ router = APIRouter(prefix="/favorites", tags=["自选品种"])
 # ---- Request/Response 模型 ----
 
 class AddFavoriteRequest(BaseModel):
-    asset_type: str = Field(..., pattern="^(stock|commodity)$", description="资产类型")
-    stock_code: Optional[str] = Field(default=None, description="股票代码（旧兼容）")
-    stock_name: Optional[str] = Field(default=None, description="股票名称（旧兼容）")
-    market: Optional[str] = Field(default=None, description="市场类型")
+    asset_type: str = Field(..., pattern="^commodity$", description="资产类型")
     full_symbol: Optional[str] = Field(default=None, description="商品合约代码")
     commodity_name: Optional[str] = Field(default=None, description="商品名称")
     exchange: Optional[str] = Field(default=None, description="交易所代码")
@@ -62,7 +59,7 @@ async def list_favorites(
     asset_type: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ):
-    """获取当前用户自选列表。可选 ?asset_type=stock|commodity 过滤"""
+    """获取当前用户自选列表。可选 ?asset_type=commodity 过滤"""
     try:
         items = await favorite_service.list_favorites(
             user_id=current_user["id"],
@@ -84,9 +81,6 @@ async def add_favorite(
         item = FavoriteItem(
             user_id=current_user["id"],
             asset_type=payload.asset_type,  # type: ignore
-            stock_code=payload.stock_code,
-            stock_name=payload.stock_name,
-            market=payload.market,
             full_symbol=payload.full_symbol,
             commodity_name=payload.commodity_name,
             exchange=payload.exchange,

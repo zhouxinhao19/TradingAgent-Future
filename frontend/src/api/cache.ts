@@ -10,7 +10,7 @@ export interface CacheStats {
   totalFiles: number
   totalSize: number
   maxSize: number
-  stockDataCount: number
+  commodityDataCount: number
   newsDataCount: number
   analysisDataCount: number
 }

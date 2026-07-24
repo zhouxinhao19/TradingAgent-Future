@@ -2,7 +2,7 @@
 
 ## 🎯 概述
 
-TradingAgents-CN 提供了完整的期货市场支持，通过集成多种数据源（Tushare、AKShare、通达信API），为用户提供实时、准确的期货数据分析能力。v0.1.7版本进一步优化了分析性能和报告质量。
+TradingAgent-Future 提供了完整的期货市场支持，通过集成多种数据源（Tushare、AKShare、通达信API），为用户提供实时、准确的期货数据分析能力。v0.1.7版本进一步优化了分析性能和报告质量。
 
 ## 🎉 v0.1.7 A股功能亮点
 
@@ -18,8 +18,8 @@ TradingAgents-CN 提供了完整的期货市场支持，通过集成多种数据
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/hsliuping/TradingAgents-CN.git
-cd TradingAgents-CN
+git clone #.git
+cd TradingAgent-Future
 
 # 2. 配置环境变量
 cp .env.example .env
@@ -267,7 +267,7 @@ python tests/fast_tdx_test.py
 
 ## 🎉 总结
 
-TradingAgents-CN v0.1.3 的A股支持为中国投资者提供了：
+TradingAgent-Future v0.1.3 的A股支持为中国投资者提供了：
 
 1. **🇨🇳 本土化体验**: 完整的期货数据覆盖
 2. **⚡ 实时分析**: 秒级数据更新

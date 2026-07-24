@@ -33,8 +33,8 @@
 
 ```powershell
 # 1. 下载项目
-git clone https://github.com/hsliuping/TradingAgents-CN.git
-cd TradingAgents-CN
+git clone #.git
+cd TradingAgent-Future
 
 # 2. 运行一键安装脚本
 powershell -ExecutionPolicy Bypass -File scripts/easy_install.ps1
@@ -54,8 +54,8 @@ powershell -ExecutionPolicy Bypass -File scripts/easy_install.ps1
 
 ```bash
 # 1. 下载项目
-git clone https://github.com/hsliuping/TradingAgents-CN.git
-cd TradingAgents-CN
+git clone #.git
+cd TradingAgent-Future
 
 # 2. 运行一键安装脚本
 chmod +x scripts/easy_install.sh
@@ -339,9 +339,7 @@ python scripts/prefetch_stock_data.py 000001 600519 AAPL
 
 ## 🆘 获取帮助
 
-- **GitHub Issues**: [提交问题](https://github.com/hsliuping/TradingAgents-CN/issues)
-- **QQ群**: 782124367
-- **邮箱**: hsliup@163.com
+- **GitHub Issues**: [提交问题](#/issues)
 
 ---
 

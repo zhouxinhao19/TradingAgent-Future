@@ -2,7 +2,7 @@
 
 ## 概述
 
-TradingAgents-CN 框架支持多种大语言模型提供商，包括 DeepSeek、阿里百炼、Google AI、OpenAI 和 Anthropic。本文档详细介绍了如何配置和优化不同的 LLM 以获得最佳性能和成本效益。
+TradingAgent-Future 框架支持多种大语言模型提供商，包括 DeepSeek、阿里百炼、Google AI、OpenAI 和 Anthropic。本文档详细介绍了如何配置和优化不同的 LLM 以获得最佳性能和成本效益。
 
 ## 🎯 v0.1.7 LLM支持更新
 

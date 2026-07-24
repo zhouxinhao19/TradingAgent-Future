@@ -1,7 +1,7 @@
 # 会议纪要：数据一致性、回测与模拟交易架构与合规
 
 日期：2025-10-19  
-项目：TradingAgents-CN  
+项目：TradingAgent-Future  
 用途：技术回顾与工程/合规指南
 
 ## 1. 数据一致性（Point-in-Time, PIT）与时间线

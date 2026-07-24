@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-TradingAgents-CN v0.1.3 发布脚本
+TradingAgent-Future v0.1.3 发布脚本
 """
 
 import os
@@ -90,7 +90,7 @@ def create_git_tag():
     logger.info(f"🏷️ 创建Git标签...")
     
     tag_name = "v0.1.3"
-    tag_message = "TradingAgents-CN v0.1.3 - A股市场完整支持"
+    tag_message = "TradingAgent-Future v0.1.3 - A股市场完整支持"
     
     # 检查标签是否已存在
     success, stdout, stderr = run_command(f"git tag -l {tag_name}")
@@ -167,7 +167,7 @@ def push_to_remote():
 def generate_release_summary():
     """生成发布摘要"""
     logger.info(f"\n")
-    logger.info(f"🎉 TradingAgents-CN v0.1.3 发布完成!")
+    logger.info(f"🎉 TradingAgent-Future v0.1.3 发布完成!")
     logger.info(f"=")
     
     logger.info(f"\n📋 发布内容:")
@@ -196,7 +196,7 @@ def generate_release_summary():
 
 def main():
     """主函数"""
-    logger.info(f"🚀 TradingAgents-CN v0.1.3 发布流程")
+    logger.info(f"🚀 TradingAgent-Future v0.1.3 发布流程")
     logger.info(f"=")
     
     # 检查当前目录

@@ -2,7 +2,7 @@
 
 ## 📋 移除概述
 
-TDX（通达信）数据源已从 TradingAgents-CN 项目中完全移除。
+TDX（通达信）数据源已从 TradingAgent-Future 项目中完全移除。
 
 **移除日期**：2025-10-12
 

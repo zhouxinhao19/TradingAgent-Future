@@ -1,6 +1,6 @@
-# TradingAgents-CN
+# TradingAgent-Future
 
-**多智能体金融交易分析平台** — 基于 LangGraph + LangChain 构建的多智能体协作框架，支持股票与大宗商品期货的深度分析。
+**多智能体期货交易分析平台** — 基于 LangGraph + LangChain 构建的多智能体协作框架，专注于大宗商品期货的深度分析。
 
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
@@ -11,14 +11,14 @@
 
 ## 项目简介
 
-TradingAgents-CN 是基于 [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents) 改造的中文多智能体金融交易分析平台。通过多个专业化 AI 智能体（分析师、研究员、交易员、风控官、CIO）的协作，对股票和期货标的进行全方位深度分析并生成决策。
+TradingAgent-Future 是一个多智能体期货交易分析平台，通过多个专业化 AI 智能体（分析师、研究员、交易员、风控官、CIO）的协作，对期货标的进行全方位深度分析并生成决策报告。
 
 ### 核心能力
 
 - **多智能体辩论决策** — 看涨/看跌研究员辩论 → 研究经理汇总 → 交易员决策 → 多层风控 → CIO 终审的完整决策链
-- **多市场支持** — A股、港股、美股 + 大宗商品期货（6 大交易所 80+ 品种）
-- **多维度分析** — 基本面、技术面、新闻情绪、持仓分析、期限结构、基差、库存、资金流
-- **灵活 LLM 接入** — 支持 OpenAI、DeepSeek、Qwen（通义千问）、GLM（智谱）、Google Gemini、Anthropic Claude、Ollama 等多种模型
+- **大宗商品期货覆盖** — 6 大交易所 80+ 品种（黑色系、有色、能源化工、农产品、金融期货、贵金属）
+- **多维度分析** — 技术面、基本面、持仓分析、期限结构、基差、库存、新闻情绪
+- **灵活 LLM 接入** — 支持 DeepSeek、OpenAI、Qwen（通义千问）、GLM（智谱）、Google Gemini、Anthropic Claude、Ollama 等多种模型
 - **多级数据源** — AKShare → Tushare → BaoStock 多级降级链，确保数据可用性
 - **流式更新** — SSE + WebSocket 实时推送分析进度
 
@@ -53,8 +53,8 @@ TradingAgents-CN 是基于 [TauricResearch/TradingAgents](https://github.com/Tau
 
 ```bash
 # 克隆仓库
-git clone https://github.com/yourusername/TradingAgent-CN.git
-cd TradingAgent-CN
+git clone <your-repo-url>
+cd TradingAgent-Future
 
 # 安装 Python 依赖
 pip install -e .
@@ -96,7 +96,7 @@ docker compose -f docker-compose.hub.nginx.yml up -d
 ## 项目结构
 
 ```
-TradingAgent-CN/
+TradingAgent-Future/
 ├── tradingagents/          # 核心分析引擎（Apache 2.0 开源）
 │   ├── graph/              # LangGraph 图编排（入口：trading_graph.py）
 │   ├── agents/             # 多智能体节点（分析师/研究员/交易员/风控/CIO）
@@ -131,12 +131,12 @@ TradingAgent-CN/
 
 | 分类 | 内容 |
 |------|------|
-| 🚀 入门指南 | [安装部署](docs/guides/INSTALLATION_GUIDE.md)、[快速开始](docs/guides/quick-start-guide.md) |
-| 🏗️ 架构设计 | [系统架构](docs/architecture/v0.1.13/system-architecture.md)、[数据流设计](docs/architecture/v0.1.13/data-flow-architecture.md) |
-| 🔧 配置管理 | [配置指南](docs/configuration/configuration_guide.md)、[LLM 配置](docs/configuration/deepseek-config.md) |
-| 📊 分析能力 | [A 股分析](docs/guides/a-share-analysis-guide.md)、[新闻分析](docs/guides/news-analysis-guide.md) |
-| 🐳 Docker 部署 | [部署指南](docs/deployment/docker/docker_deployment_guide.md)、[Docker Hub 快速部署](docs/deployment/docker/quick_deploy_with_docker_hub.md) |
-| 🤝 开发扩展 | [新增数据源](docs/development/ADD_NEW_DATA_SOURCE.md)、[API 规范](docs/design/api_specification.md) |
+| 入门指南 | 安装部署、快速开始 |
+| 架构设计 | 系统架构、数据流设计 |
+| 配置管理 | 配置指南、LLM 配置 |
+| 分析能力 | 期货分析、新闻分析 |
+| Docker 部署 | 部署指南 |
+| 开发扩展 | 新增数据源、API 规范 |
 
 ---
 
@@ -151,7 +151,7 @@ TradingAgent-CN/
 | `frontend/` | **专有** | Vue 3 前端，商业使用需单独授权 |
 | `cli/` | **Apache 2.0** | CLI 工具，可自由使用 |
 
-详见 [LICENSE](LICENSE)、[LICENSING.md](LICENSING.md) 和 [COMMERCIAL_LICENSE_TEMPLATE.md](COMMERCIAL_LICENSE_TEMPLATE.md)。
+详见 [LICENSE](LICENSE) 和 [LICENSING.md](LICENSING.md)。
 
 ---
 
@@ -164,4 +164,4 @@ TradingAgent-CN/
 
 ---
 
-> ⚠️ **风险声明**：本框架**仅用于研究与教学**，**不构成投资建议**。所有分析结果仅供参考，实际投资决策需自行判断。
+> **风险声明**：本框架**仅用于研究与教学**，**不构成投资建议**。所有分析结果仅供参考，实际投资决策需自行判断。

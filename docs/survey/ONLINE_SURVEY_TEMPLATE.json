@@ -1,7 +1,7 @@
 {
   "survey": {
-    "title": "TradingAgents-CN 用户调查问卷",
-    "description": "感谢您使用 TradingAgents-CN！为了更好地了解用户需求，优化产品功能，我们诚邀您参与本次调查。预计用时 5-8 分钟。",
+    "title": "TradingAgent-Future 用户调查问卷",
+    "description": "感谢您使用 TradingAgent-Future！为了更好地了解用户需求，优化产品功能，我们诚邀您参与本次调查。预计用时 5-8 分钟。",
     "sections": [
       {
         "id": "section_1",
@@ -92,7 +92,7 @@
             "id": "q6",
             "type": "single_choice",
             "required": true,
-            "question": "您是如何了解到 TradingAgents-CN 的？",
+            "question": "您是如何了解到 TradingAgent-Future 的？",
             "options": [
               "GitHub 搜索/推荐",
               "技术社区（知乎/CSDN/掘金等）",
@@ -107,7 +107,7 @@
             "id": "q7",
             "type": "single_choice",
             "required": true,
-            "question": "您使用 TradingAgents-CN 多久了？",
+            "question": "您使用 TradingAgent-Future 多久了？",
             "options": [
               "刚开始使用（1 周内）",
               "1 周 - 1 个月",
@@ -120,7 +120,7 @@
             "id": "q8",
             "type": "single_choice",
             "required": true,
-            "question": "您使用 TradingAgents-CN 的频率？",
+            "question": "您使用 TradingAgent-Future 的频率？",
             "options": [
               "每天使用",
               "每周使用 3-5 次",
@@ -154,7 +154,7 @@
             "type": "multiple_choice",
             "required": true,
             "max_choices": 3,
-            "question": "您使用 TradingAgents-CN 的主要目的是？（最多选 3 项）",
+            "question": "您使用 TradingAgent-Future 的主要目的是？（最多选 3 项）",
             "options": [
               "获取股票分析报告，辅助投资决策",
               "学习 AI 在金融领域的应用",
@@ -173,7 +173,7 @@
             "type": "multiple_choice",
             "required": true,
             "max_choices": 3,
-            "question": "您最看重 TradingAgents-CN 的哪些特点？（最多选 3 项）",
+            "question": "您最看重 TradingAgent-Future 的哪些特点？（最多选 3 项）",
             "options": [
               "多角度分析（看涨/看跌/风险分析师）",
               "支持多种大模型（DeepSeek/通义千问/GPT 等）",
@@ -360,14 +360,14 @@
             "type": "text",
             "required": false,
             "multiline": true,
-            "question": "您对 TradingAgents-CN 最满意的地方是什么？"
+            "question": "您对 TradingAgent-Future 最满意的地方是什么？"
           },
           {
             "id": "q21",
             "type": "text",
             "required": false,
             "multiline": true,
-            "question": "您对 TradingAgents-CN 最不满意的地方是什么？"
+            "question": "您对 TradingAgent-Future 最不满意的地方是什么？"
           },
           {
             "id": "q22",

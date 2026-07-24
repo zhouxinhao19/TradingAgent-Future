@@ -1,4 +1,4 @@
-# 🚀 TradingAgents-CN 演示环境快速部署指南
+# 🚀 TradingAgent-Future 演示环境快速部署指南
 
 > 使用 Docker Compose 部署完整的 AI 期货分析系统
 
@@ -17,7 +17,7 @@
 
 ## 🎯 系统简介
 
-**TradingAgents-CN** 是一个基于多智能体架构的 AI 期货分析系统，支持：
+**TradingAgent-Future** 是一个基于多智能体架构的 AI 期货分析系统，支持：
 
 - 🤖 **15+ AI 模型**：集成国内外主流大语言模型
 - 📊 **多维度分析**：基本面、技术面、新闻分析、社媒分析
@@ -344,7 +344,7 @@ docker ps
 | **Linux 集成** | ❌ 无 | ✅ 完整支持 |
 | **推荐场景** | 仅运行 Docker 容器 | 需要 Linux 开发环境 |
 
-**推荐**：如果只是运行 TradingAgents-CN，选择 **Hyper-V 模式**更简单！
+**推荐**：如果只是运行 TradingAgent-Future，选择 **Hyper-V 模式**更简单！
 
 **问题 2**：Docker Desktop 无法启动
 
@@ -606,10 +606,10 @@ New-Item -ItemType Directory -Path "$env:USERPROFILE\tradingagents-demo" -Force
 Set-Location "$env:USERPROFILE\tradingagents-demo"
 
 # 2. 下载部署文件
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/docker-compose.hub.nginx.yml" -OutFile "docker-compose.hub.nginx.yml"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/docker-compose.hub.nginx.yml" -OutFile "docker-compose.hub.nginx.yml"
 
 # 3. 下载环境配置文件
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/.env.docker" -OutFile ".env"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/.env.docker" -OutFile ".env"
 
 # 4. 配置 API 密钥（⚠️ 重要：必须配置，否则无法使用 AI 分析功能）
 notepad .env
@@ -633,7 +633,7 @@ notepad .env
 
 # 5. 下载 Nginx 配置文件
 New-Item -ItemType Directory -Path "nginx" -Force
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/nginx/nginx.conf" -OutFile "nginx\nginx.conf"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/nginx/nginx.conf" -OutFile "nginx\nginx.conf"
 
 # 6. 拉取 Docker 镜像（首次部署需要下载，需要 2-5 分钟）
 docker-compose -f docker-compose.hub.nginx.yml pull
@@ -661,10 +661,10 @@ mkdir -p ~/tradingagents-demo
 cd ~/tradingagents-demo
 
 # 2. 下载部署文件
-wget https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/docker-compose.hub.nginx.yml
+wget https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/docker-compose.hub.nginx.yml
 
 # 3. 下载环境配置文件
-wget https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/.env.docker -O .env
+wget https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/.env.docker -O .env
 
 # 4. 配置 API 密钥（⚠️ 重要：必须配置，否则无法使用 AI 分析功能）
 nano .env
@@ -688,7 +688,7 @@ nano .env
 
 # 5. 下载 Nginx 配置文件
 mkdir -p nginx
-wget https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/nginx/nginx.conf -O nginx/nginx.conf
+wget https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/nginx/nginx.conf -O nginx/nginx.conf
 
 # 6. 拉取 Docker 镜像（首次部署需要下载，需要 2-5 分钟）
 docker-compose -f docker-compose.hub.nginx.yml pull
@@ -716,10 +716,10 @@ mkdir -p ~/tradingagents-demo
 cd ~/tradingagents-demo
 
 # 2. 下载 ARM 架构部署文件（重要！）
-curl -O https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/docker-compose.hub.nginx.arm.yml
+curl -O https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/docker-compose.hub.nginx.arm.yml
 
 # 3. 下载环境配置文件
-curl -o .env https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/.env.docker
+curl -o .env https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/.env.docker
 
 # 4. 配置 API 密钥（⚠️ 重要：必须配置，否则无法使用 AI 分析功能）
 nano .env
@@ -743,7 +743,7 @@ nano .env
 
 # 5. 下载 Nginx 配置文件
 mkdir -p nginx
-curl -o nginx/nginx.conf https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/nginx/nginx.conf
+curl -o nginx/nginx.conf https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/nginx/nginx.conf
 
 # 6. 拉取 Docker 镜像（首次部署需要下载，需要 2-5 分钟）
 docker-compose -f docker-compose.hub.nginx.arm.yml pull
@@ -819,14 +819,14 @@ New-Item -ItemType Directory -Path "$env:USERPROFILE\tradingagents-demo" -Force
 Set-Location "$env:USERPROFILE\tradingagents-demo"
 
 # 下载 Docker Compose 配置文件
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/docker-compose.hub.nginx.yml" -OutFile "docker-compose.hub.nginx.yml"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/docker-compose.hub.nginx.yml" -OutFile "docker-compose.hub.nginx.yml"
 
 # 下载环境配置文件
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/.env.docker" -OutFile ".env"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/.env.docker" -OutFile ".env"
 
 # 创建 Nginx 配置目录并下载配置文件
 New-Item -ItemType Directory -Path "nginx" -Force
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/nginx/nginx.conf" -OutFile "nginx\nginx.conf"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/nginx/nginx.conf" -OutFile "nginx\nginx.conf"
 ```
 
 **提示**：如果遇到 PowerShell 执行策略限制，请以管理员身份运行 PowerShell 并执行：
@@ -842,14 +842,14 @@ mkdir -p ~/tradingagents-demo
 cd ~/tradingagents-demo
 
 # 下载 Docker Compose 配置文件
-wget https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/docker-compose.hub.nginx.yml
+wget https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/docker-compose.hub.nginx.yml
 
 # 下载环境配置文件
-wget https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/.env.docker -O .env
+wget https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/.env.docker -O .env
 
 # 创建 Nginx 配置目录并下载配置文件
 mkdir -p nginx
-wget https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/nginx/nginx.conf -O nginx/nginx.conf
+wget https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/nginx/nginx.conf -O nginx/nginx.conf
 ```
 
 #### macOS 用户
@@ -862,14 +862,14 @@ mkdir -p ~/tradingagents-demo
 cd ~/tradingagents-demo
 
 # 下载 ARM 架构 Docker Compose 配置文件（重要！）
-curl -O https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/docker-compose.hub.nginx.arm.yml
+curl -O https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/docker-compose.hub.nginx.arm.yml
 
 # 下载环境配置文件
-curl -o .env https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/.env.docker
+curl -o .env https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/.env.docker
 
 # 创建 Nginx 配置目录并下载配置文件
 mkdir -p nginx
-curl -o nginx/nginx.conf https://raw.githubusercontent.com/hsliuping/TradingAgents-CN/v1.0.0-preview/nginx/nginx.conf
+curl -o nginx/nginx.conf https://raw.githubusercontent.com/TradingAgent-Future/TradingAgent-Future/v1.0.0-preview/nginx/nginx.conf
 ```
 
 **Intel 芯片**：使用 Linux 用户的命令即可。
@@ -1588,9 +1588,9 @@ docker image prune -a
 
 ## 🆘 获取帮助
 
-- **GitHub Issues**: https://github.com/hsliuping/TradingAgents-CN/issues
-- **文档**: https://github.com/hsliuping/TradingAgents-CN/tree/v1.0.0-preview/docs
-- **示例**: https://github.com/hsliuping/TradingAgents-CN/tree/v1.0.0-preview/examples
+- **GitHub Issues**: #/issues
+- **文档**: #/tree/v1.0.0-preview/docs
+- **示例**: #/tree/v1.0.0-preview/examples
 
 ---
 

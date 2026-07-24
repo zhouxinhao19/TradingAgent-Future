@@ -1,8 +1,8 @@
-# TradingAgents vs TradingAgents-CN 分析报告对比总结
+# TradingAgents vs TradingAgent-Future 分析报告对比总结
 
 ## 📋 执行摘要
 
-**结论**: ✅ TradingAgents-CN 的分析报告功能**已完整实现**，与原版 TradingAgents 保持一致，并在某些方面有所改进。
+**结论**: ✅ TradingAgent-Future 的分析报告功能**已完整实现**，与原版 TradingAgents 保持一致，并在某些方面有所改进。
 
 **不需要任何修复或补充！**
 
@@ -63,7 +63,7 @@ self.report_sections = {
 - 动态从 `risk_debate_state` 提取 `risky_history`, `safe_history`, `neutral_history`, `judge_decision`
 - 在CLI界面实时展示，不保存独立的 debate state 文件
 
-### TradingAgents-CN (Web)
+### TradingAgent-Future (Web)
 
 #### 报告定义
 **文件**: `web/utils/report_exporter.py` 第675-722行
@@ -308,7 +308,7 @@ def _add_team_decision_reports(self, md_content: str, state: Dict[str, Any]) -> 
 
 ## 🎉 最终结论
 
-**TradingAgents-CN 的分析报告功能完全达标，甚至超越原版！**
+**TradingAgent-Future 的分析报告功能完全达标，甚至超越原版！**
 
 ### 核心优势
 1. ✅ **功能完整**: 所有13个报告模块全部实现

@@ -2,7 +2,7 @@
 
 ## 📋 概述
 
-本文档说明 TradingAgents-CN 系统中 API Key 的配置优先级和验证逻辑。
+本文档说明 TradingAgent-Future 系统中 API Key 的配置优先级和验证逻辑。
 
 ## 🎯 配置来源
 

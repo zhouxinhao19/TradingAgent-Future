@@ -1183,7 +1183,7 @@ def create_investment_director(deep_thinking_llm):
         from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
         full_symbol = state.get("full_symbol") or state.get("company_of_interest", "Unknown")
-        asset_type = state.get("asset_type", "stock")
+        asset_type = state.get("asset_type", "commodity")
 
         if asset_type != "commodity":
             logger.warning("[投研总监] 非 commodity 路径，跳过")

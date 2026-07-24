@@ -1,4 +1,4 @@
-# TradingAgents-CN v0.1.16 测试策略
+# TradingAgent-Future v0.1.16 测试策略
 
 ## 测试范围
 - 后端API(功能/鉴权/限流)

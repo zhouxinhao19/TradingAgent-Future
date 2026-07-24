@@ -22,7 +22,7 @@
 3. 左侧菜单选择 **Security**
 4. 点击 **New Access Token**
 5. 填写信息：
-   - **Access Token Description**: `GitHub Actions - TradingAgents-CN`
+   - **Access Token Description**: `GitHub Actions - TradingAgent-Future`
    - **Access permissions**: 选择 **Read, Write, Delete**
 6. 点击 **Generate**
 7. **重要**：复制生成的 token（只显示一次，请妥善保存）
@@ -33,7 +33,7 @@
 
 ### 1. 打开仓库设置
 
-1. 访问您的 GitHub 仓库：`https://github.com/YOUR_USERNAME/TradingAgents-CN`
+1. 访问您的 GitHub 仓库：`https://github.com/YOUR_USERNAME/TradingAgent-Future`
 2. 点击 **Settings** 标签
 3. 左侧菜单选择 **Secrets and variables** → **Actions**
 

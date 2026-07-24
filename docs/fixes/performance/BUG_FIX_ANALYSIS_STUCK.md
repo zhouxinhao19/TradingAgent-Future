@@ -14,7 +14,7 @@
 
 ### 1. 日志分析
 
-通过分析 `D:\code\TradingAgents-CN\logs\tradingagents.log`，发现关键错误：
+通过分析 `D:\code\TradingAgent-Future\logs\tradingagents.log`，发现关键错误：
 
 ```
 2025-09-30 20:47:23,666 | app.services.simple_analysis_service | INFO | ✅ [线程池] 分析完成: 81976089-8296-4f75-8c51-172a9507b80b - 耗时249.11秒

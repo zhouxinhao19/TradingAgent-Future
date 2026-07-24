@@ -1,4 +1,4 @@
-# 🚀 TradingAgents-CN 快速开始
+# 🚀 TradingAgent-Future 快速开始
 
 > ⏱️ **5分钟快速上手** | 📋 **零基础友好** | 🎯 **一键启动**
 
@@ -10,8 +10,8 @@
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/hsliuping/TradingAgents-CN.git
-cd TradingAgents-CN
+git clone #.git
+cd TradingAgent-Future
 
 # 2. 配置API密钥
 cp .env.example .env
@@ -30,8 +30,8 @@ docker-compose up -d
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/hsliuping/TradingAgents-CN.git
-cd TradingAgents-CN
+git clone #.git
+cd TradingAgent-Future
 
 # 2. 创建虚拟环境
 python -m venv env
@@ -171,12 +171,12 @@ tail -f logs/tradingagents.log
 ### Q: 如何获取更多帮助？
 **A**: 
 - 📖 **详细文档**: [docs/INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md)
-- 🐛 **问题反馈**: https://github.com/hsliuping/TradingAgents-CN/issues
+- 🐛 **问题反馈**: #/issues
 - 💬 **社区讨论**: 见项目主页的微信群二维码
 
 ## 🎉 开始使用
 
-恭喜！您已成功安装TradingAgents-CN。
+恭喜！您已成功安装TradingAgent-Future。
 
 **下一步**:
 1. 🔍 **探索功能**: 尝试不同的分析师组合和研究深度

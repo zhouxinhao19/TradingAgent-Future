@@ -56,7 +56,7 @@ def create_risky_debator(llm):
         trader_decision = state.get("investment_plan", "")
 
         # === Phase 3b-ii-B:检测 asset_type ===
-        asset_type = state.get("asset_type", "stock")
+        asset_type = state.get("asset_type", "commodity")
 
         # 📊 记录输入数据长度
         logger.info(f"📊 [Risky Analyst] 输入数据长度统计:")

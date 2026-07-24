@@ -52,7 +52,7 @@
 
 ```bash
 # 下载并运行部署脚本
-curl -fsSL https://raw.githubusercontent.com/your-org/TradingAgents-CN/main/scripts/deploy_demo.sh | bash
+curl -fsSL https://raw.githubusercontent.com/your-org/TradingAgent-Future/main/scripts/deploy_demo.sh | bash
 ```
 
 ### 手动部署步骤
@@ -140,8 +140,8 @@ docker ps
 
 ```bash
 # 克隆仓库
-git clone https://github.com/your-org/TradingAgents-CN.git
-cd TradingAgents-CN
+git clone https://github.com/your-org/TradingAgent-Future.git
+cd TradingAgent-Future
 ```
 
 #### 方法 2：只下载部署文件
@@ -155,16 +155,16 @@ cd TradingAgents-Demo
 mkdir -p install scripts
 
 # 下载 docker-compose 文件
-curl -o docker-compose.hub.yml https://raw.githubusercontent.com/your-org/TradingAgents-CN/main/docker-compose.hub.yml
+curl -o docker-compose.hub.yml https://raw.githubusercontent.com/your-org/TradingAgent-Future/main/docker-compose.hub.yml
 
 # 下载环境变量模板
-curl -o .env.example https://raw.githubusercontent.com/your-org/TradingAgents-CN/main/.env.example
+curl -o .env.example https://raw.githubusercontent.com/your-org/TradingAgent-Future/main/.env.example
 
 # 下载配置数据
-curl -o install/database_export_config_2025-10-16.json https://raw.githubusercontent.com/your-org/TradingAgents-CN/main/install/database_export_config_2025-10-16.json
+curl -o install/database_export_config_2025-10-16.json https://raw.githubusercontent.com/your-org/TradingAgent-Future/main/install/database_export_config_2025-10-16.json
 
 # 下载导入脚本
-curl -o scripts/import_config_and_create_user.py https://raw.githubusercontent.com/your-org/TradingAgents-CN/main/scripts/import_config_and_create_user.py
+curl -o scripts/import_config_and_create_user.py https://raw.githubusercontent.com/your-org/TradingAgent-Future/main/scripts/import_config_and_create_user.py
 
 # 复制环境变量文件
 cp .env.example .env

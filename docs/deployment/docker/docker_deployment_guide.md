@@ -2,7 +2,7 @@
 
 ## 概述
 
-本指南帮助您在新机器上使用 `docker-compose.hub.yml` 部署 TradingAgents-CN 后，解决登录错误并准备必要的基础数据。
+本指南帮助您在新机器上使用 `docker-compose.hub.yml` 部署 TradingAgent-Future 后，解决登录错误并准备必要的基础数据。
 
 ## 问题描述
 

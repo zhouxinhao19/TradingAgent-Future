@@ -1,6 +1,6 @@
 # Phase 3a 大宗商品部署指南
 
-> 适用版本:TradingAgents-CN v1.0.1-commodity-phase3a(及以后)
+> 适用版本:TradingAgent-Future v1.0.1-commodity-phase3a(及以后)
 > 文档日期:2026-07-14
 > 关联文档:[Phase 3a 完成报告](../progress/phase-3a.md)|[大宗商品改造 plan](../plans/stock-to-commodity.md)|[通用 Docker 部署](DOCKER_DEPLOYMENT_v1.0.0.md)
 
@@ -42,8 +42,8 @@
 ### 2.1 拉取代码
 
 ```bash
-git clone https://github.com/hsliuping/TradingAgents-CN.git
-cd TradingAgents-CN
+git clone #.git
+cd TradingAgent-Future
 git checkout v1.0.1-commodity-phase3a    # 或 main(若 phase3a 已合并)
 ```
 

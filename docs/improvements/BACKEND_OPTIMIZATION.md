@@ -233,7 +233,7 @@ DEBUG=True python -m app
 
 ## 🎉 总结
 
-通过这次优化，TradingAgents-CN后端现在支持：
+通过这次优化，TradingAgent-Future后端现在支持：
 
 1. **标准化启动**: `python -m app`
 2. **智能监控**: 减少不必要的文件变化检测

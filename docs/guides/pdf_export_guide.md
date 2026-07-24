@@ -2,7 +2,7 @@
 
 ## 📋 概述
 
-TradingAgents-CN 支持将分析报告导出为多种格式：
+TradingAgent-Future 支持将分析报告导出为多种格式：
 - **Markdown** - 纯文本格式，易于编辑
 - **Word (DOCX)** - 适合进一步编辑和格式化
 - **PDF** - 适合打印和分享

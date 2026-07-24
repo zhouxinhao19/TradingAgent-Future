@@ -4,7 +4,7 @@
 
 ### 版本 1：简洁版
 ```
-📊 TradingAgents-CN 用户调查
+📊 TradingAgent-Future 用户调查
 
 您的意见很重要！5 分钟问卷，帮助我们打造更好的 AI 股票分析工具。
 
@@ -21,7 +21,7 @@
 ```
 🎁 福利来了！
 
-参与 TradingAgents-CN 用户调查，即有机会获得：
+参与 TradingAgent-Future 用户调查，即有机会获得：
 ✅ 大模型 API 额度（价值 100 元）
 ✅ 新功能优先体验权
 ✅ 定制开发优先权
@@ -36,7 +36,7 @@
 
 ### 版本 3：痛点版
 ```
-💡 您在使用 TradingAgents-CN 时遇到过这些问题吗？
+💡 您在使用 TradingAgent-Future 时遇到过这些问题吗？
 
 • 分析速度太慢？
 • 功能不够用？
@@ -55,19 +55,19 @@
 ## 📧 邮件模板
 
 ### 主题行选项
-1. `📊 TradingAgents-CN 用户调查 - 您的意见很重要`
+1. `📊 TradingAgent-Future 用户调查 - 您的意见很重要`
 2. `🎁 参与调查，赢取大模型 API 额度`
-3. `帮助我们改进 TradingAgents-CN - 5 分钟问卷`
-4. `您的反馈将决定 TradingAgents-CN 的未来`
+3. `帮助我们改进 TradingAgent-Future - 5 分钟问卷`
+4. `您的反馈将决定 TradingAgent-Future 的未来`
 
 ### 邮件正文
 
 ```
-尊敬的 TradingAgents-CN 用户：
+尊敬的 TradingAgent-Future 用户：
 
 您好！
 
-感谢您使用 TradingAgents-CN！作为一个开源的 AI 股票分析工具，我们一直致力于为用户提供更好的产品体验。
+感谢您使用 TradingAgent-Future！作为一个开源的 AI 股票分析工具，我们一直致力于为用户提供更好的产品体验。
 
 为了更好地了解您的需求和使用体验，我们诚邀您参与本次用户调查。
 
@@ -90,12 +90,12 @@
 您的每一条建议都很重要！期待您的参与。
 
 如有任何问题，欢迎随时联系我们：
-• GitHub: https://github.com/hsliuping/TradingAgents-CN
+• GitHub: #
 • Email: [项目邮箱]
 
 再次感谢您的支持！
 
-TradingAgents-CN 团队
+TradingAgent-Future 团队
 2025 年 1 月 20 日
 ```
 
@@ -105,17 +105,17 @@ TradingAgents-CN 团队
 
 ### Issue 标题
 ```
-📊 用户调查 | TradingAgents-CN User Survey - 您的意见很重要！
+📊 用户调查 | TradingAgent-Future User Survey - 您的意见很重要！
 ```
 
 ### Issue 内容
 
 ```markdown
-## 📊 TradingAgents-CN 用户调查
+## 📊 TradingAgent-Future 用户调查
 
 ### 👋 致所有用户
 
-感谢您使用 TradingAgents-CN！
+感谢您使用 TradingAgent-Future！
 
 为了更好地了解用户需求，优化产品功能，我们诚邀您参与本次调查。
 
@@ -142,7 +142,7 @@ TradingAgents-CN 团队
 <summary>点击展开问题列表</summary>
 
 1. 您的职业背景是？
-2. 您使用 TradingAgents-CN 的主要目的是？
+2. 您使用 TradingAgent-Future 的主要目的是？
 3. 您最希望增加哪些新功能？
 4. 您对当前版本有什么建议？
 
@@ -193,9 +193,9 @@ TradingAgents-CN 团队
 ---
 
 **相关链接**
-- 📖 [项目文档](https://github.com/hsliuping/TradingAgents-CN/wiki)
-- 💬 [讨论区](https://github.com/hsliuping/TradingAgents-CN/discussions)
-- 🐛 [问题反馈](https://github.com/hsliuping/TradingAgents-CN/issues)
+- 📖 [项目文档](#/wiki)
+- 💬 [讨论区](#/discussions)
+- 🐛 [问题反馈](#/issues)
 ```
 
 ---
@@ -208,7 +208,7 @@ TradingAgents-CN 团队
 
 **内容元素**：
 - 项目 Logo
-- 标题："TradingAgents-CN 用户调查"
+- 标题："TradingAgent-Future 用户调查"
 - 副标题："您的意见决定项目的未来"
 - 二维码（问卷链接）
 - 福利说明
@@ -246,7 +246,7 @@ TradingAgents-CN 团队
 ### 版本 1：正式版
 
 ```
-📢 【重要通知】TradingAgents-CN 用户调查
+📢 【重要通知】TradingAgent-Future 用户调查
 
 各位群友好！
 
@@ -273,7 +273,7 @@ TradingAgents-CN 团队
 ```
 嘿，各位！👋
 
-我们想听听大家对 TradingAgents-CN 的真实想法：
+我们想听听大家对 TradingAgent-Future 的真实想法：
 • 哪些功能好用？
 • 哪些功能不好用？
 • 还想要什么新功能？
@@ -315,7 +315,7 @@ TradingAgents-CN 团队
 ### 开场白
 
 ```
-大家好！我是 TradingAgents-CN 的开发者。
+大家好！我是 TradingAgent-Future 的开发者。
 
 今天想和大家聊一个重要的事情 —— 我们正在进行用户调查。
 

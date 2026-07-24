@@ -379,26 +379,17 @@
             <el-icon><Message /></el-icon>
           </div>
           <h4>邮箱联系</h4>
-          <p>hsliup@163.com</p>
-          <span class="contact-desc">技术支持和商务合作</span>
+          <p>（请通过 GitHub Issues 联系）</p>
+          <span class="contact-desc">技术支持和问题反馈</span>
         </div>
 
         <div class="contact-card">
-          <div class="contact-icon qq">
-            <el-icon><ChatDotRound /></el-icon>
+          <div class="contact-icon github">
+            <el-icon><Promotion /></el-icon>
           </div>
-          <h4>QQ交流群</h4>
-          <p>187537480</p>
-          <span class="contact-desc">用户交流和问题讨论</span>
-        </div>
-
-        <div class="contact-card">
-          <div class="contact-icon wechat">
-            <el-icon><ChatDotRound /></el-icon>
-          </div>
-          <h4>微信公众号</h4>
-          <p>TradingAgents-Future</p>
-          <span class="contact-desc">最新动态和使用教程</span>
+          <h4>GitHub Issues</h4>
+          <p>提交问题或建议</p>
+          <span class="contact-desc">问题反馈和功能建议</span>
         </div>
 
         <div class="contact-card">
@@ -451,7 +442,7 @@ const router = useRouter()
 const buildTime = ref(new Date().toLocaleString('zh-CN'))
 
 const goToAnalysis = () => {
-  router.push('/analysis/single')
+  router.push('/commodity/analysis')
 }
 
 const viewDocumentation = () => {

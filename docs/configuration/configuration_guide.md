@@ -1,4 +1,4 @@
-# TradingAgents-CN 配置指南
+# TradingAgent-Future 配置指南
 
 > **目标读者**: 新用户、系统管理员
 > 

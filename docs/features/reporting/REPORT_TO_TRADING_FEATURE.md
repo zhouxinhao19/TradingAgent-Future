@@ -369,5 +369,5 @@ POST /api/paper/order
 
 **版本**：v0.1.16
 **更新日期**：2025-10-04
-**作者**：TradingAgents-CN Team
+**作者**：TradingAgent-Future Team
 

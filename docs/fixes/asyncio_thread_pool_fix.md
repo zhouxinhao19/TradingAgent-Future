@@ -11,7 +11,7 @@ RuntimeError: There is no current event loop in thread 'ThreadPoolExecutor-41_0'
 当在**线程池**（ThreadPoolExecutor）中调用数据源管理器获取期货数据时，所有数据源（Tushare、AKShare、BaoStock）都会失败，错误堆栈显示：
 
 ```python
-File "D:\code\TradingAgents-CN\tradingagents\dataflows\data_source_manager.py", line 792, in _get_tushare_data
+File "D:\code\TradingAgent-Future\tradingagents\dataflows\data_source_manager.py", line 792, in _get_tushare_data
     loop = asyncio.get_event_loop()
   File "C:\Users\hsliu\AppData\Local\Programs\Python\Python310\lib\asyncio\events.py", line 656, in get_event_loop
     raise RuntimeError('There is no current event loop in thread %r.'

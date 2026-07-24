@@ -1,6 +1,6 @@
 # Linux服务器构建和发布Docker镜像指南
 
-本指南介绍如何在Linux服务器上构建和发布TradingAgents-CN的Docker镜像到Docker Hub。
+本指南介绍如何在Linux服务器上构建和发布TradingAgent-Future的Docker镜像到Docker Hub。
 
 ## 前置要求
 
@@ -16,8 +16,8 @@
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/YOUR_USERNAME/TradingAgents-CN.git
-cd TradingAgents-CN
+git clone https://github.com/YOUR_USERNAME/TradingAgent-Future.git
+cd TradingAgent-Future
 git checkout v1.0.0-preview
 
 # 2. 添加执行权限
@@ -124,8 +124,8 @@ git --version
 
 ```bash
 # 克隆仓库
-git clone https://github.com/YOUR_USERNAME/TradingAgents-CN.git
-cd TradingAgents-CN
+git clone https://github.com/YOUR_USERNAME/TradingAgent-Future.git
+cd TradingAgent-Future
 
 # 切换到v1.0.0-preview分支
 git checkout v1.0.0-preview

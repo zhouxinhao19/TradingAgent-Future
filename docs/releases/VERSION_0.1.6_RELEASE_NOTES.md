@@ -1,8 +1,8 @@
-# 🎉 TradingAgents-CN v0.1.6 正式版发布
+# 🎉 TradingAgent-Future v0.1.6 正式版发布
 
 ## 📋 版本概述
 
-TradingAgents-CN v0.1.6 是一个重大更新版本，主要解决了阿里百炼工具调用问题，完成了数据源升级，并实现了统一的LLM架构。本版本标志着项目在稳定性和功能完整性方面的重要里程碑。
+TradingAgent-Future v0.1.6 是一个重大更新版本，主要解决了阿里百炼工具调用问题，完成了数据源升级，并实现了统一的LLM架构。本版本标志着项目在稳定性和功能完整性方面的重要里程碑。
 
 ## 🎯 版本亮点
 
@@ -201,8 +201,8 @@ TUSHARE_TOKEN=your_tushare_token_here
 
 ---
 
-**TradingAgents-CN v0.1.6** - 让AI金融分析更简单、更可靠、更高效！
+**TradingAgent-Future v0.1.6** - 让AI金融分析更简单、更可靠、更高效！
 
 🚀 **立即体验**: [快速开始指南](docs/overview/quick-start.md)
 📚 **完整文档**: [项目文档](docs/)
-🐛 **问题反馈**: [GitHub Issues](https://github.com/hsliuping/TradingAgents/issues)
+🐛 **问题反馈**: [GitHub Issues](https://github.com/TradingAgent-Future/TradingAgents/issues)

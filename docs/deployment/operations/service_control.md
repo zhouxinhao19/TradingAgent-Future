@@ -1,8 +1,8 @@
-# 🎛️ TradingAgents-CN 服务启动控制指南
+# 🎛️ TradingAgent-Future 服务启动控制指南
 
 ## 📋 概述
 
-TradingAgents-CN 系统包含多个后台服务和定时任务，您可以通过配置文件灵活控制哪些服务启动，哪些服务不启动。
+TradingAgent-Future 系统包含多个后台服务和定时任务，您可以通过配置文件灵活控制哪些服务启动，哪些服务不启动。
 
 ## 🔧 配置方式
 

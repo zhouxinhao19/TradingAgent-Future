@@ -2,7 +2,7 @@
 
 ## 📋 概述
 
-TradingAgents-CN 绿色版使用以下端口：
+TradingAgent-Future 绿色版使用以下端口：
 
 | 服务 | 默认端口 | 说明 | 配置文件 |
 |------|---------|------|---------|
@@ -361,7 +361,7 @@ netstat -ano | findstr :80
    ```
 
 3. 提交 Issue：
-   - GitHub: https://github.com/your-repo/TradingAgents-CN/issues
+   - GitHub: https://github.com/your-repo/TradingAgent-Future/issues
    - 请附上错误日志和配置文件内容
 
 ---

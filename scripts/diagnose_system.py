@@ -182,7 +182,7 @@ def check_disk_space() -> Tuple[bool, str]:
 
 def main():
     """主函数"""
-    print_header("🔍 TradingAgents-CN 系统诊断工具")
+    print_header("🔍 TradingAgent-Future 系统诊断工具")
     
     print_info(f"项目目录: {project_root}")
     print()
@@ -268,7 +268,7 @@ def main():
         print_info("运行一键安装脚本: python scripts/easy_install.py")
     
     print()
-    print_info("如需帮助，请访问: https://github.com/hsliuping/TradingAgents-CN/issues")
+    print_info("如需帮助，请访问: https://github.com/TradingAgent-Future/TradingAgent-Future/issues")
 
 if __name__ == "__main__":
     try:

@@ -2,7 +2,7 @@
 
 ## 问题描述
 
-在 TradingAgents-CN Web 应用程序中发现了认证状态不稳定的问题：
+在 TradingAgent-Future Web 应用程序中发现了认证状态不稳定的问题：
 
 1. **认证状态丢失**：用户登录后，页面刷新时认证状态会丢失
 2. **NoneType 错误**：用户活动日志记录时出现 `NoneType` 错误

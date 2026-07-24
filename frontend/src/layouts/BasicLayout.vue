@@ -88,7 +88,7 @@ const { width } = useWindowSize()
 
 const keepAliveComponents = computed(() => [
   'Dashboard',
-  'StockScreening',
+  'CommodityList',
   'AnalysisHistory',
   'QueueManagement'
 ])

@@ -2,7 +2,7 @@
 
 ## 📋 实现概述
 
-本次更新为 TradingAgents-CN 添加了完整的聚合渠道支持，允许通过 302.AI、OpenRouter、One API 等平台统一访问多个 AI 模型。
+本次更新为 TradingAgent-Future 添加了完整的聚合渠道支持，允许通过 302.AI、OpenRouter、One API 等平台统一访问多个 AI 模型。
 
 ## 🎯 核心功能
 
@@ -275,7 +275,7 @@ AGGREGATOR_PROVIDERS = {
 
 ## 🎉 总结
 
-本次实现为 TradingAgents-CN 添加了完整的聚合渠道支持，具有以下特点：
+本次实现为 TradingAgent-Future 添加了完整的聚合渠道支持，具有以下特点：
 
 1. **灵活性**：支持多种聚合渠道和模型格式
 2. **智能化**：自动映射模型能力配置

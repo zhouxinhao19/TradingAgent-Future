@@ -1,6 +1,6 @@
 # 故障排查文档
 
-本目录包含 TradingAgents-CN 项目的常见问题排查和解决方案。
+本目录包含 TradingAgent-Future 项目的常见问题排查和解决方案。
 
 ## 文档列表
 
@@ -96,6 +96,6 @@
 
 ---
 
-**维护者**：TradingAgents-CN 开发团队  
+**维护者**：TradingAgent-Future 开发团队  
 **最后更新**：2025-01-10
 

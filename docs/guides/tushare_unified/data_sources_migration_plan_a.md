@@ -5,7 +5,7 @@
 ### 最终目录结构
 
 ```
-TradingAgents-CN/
+TradingAgent-Future/
 ├── tradingagents/                    # 核心工具库 (独立可用)
 │   └── dataflows/
 │       ├── providers/                # 统一数据源提供器

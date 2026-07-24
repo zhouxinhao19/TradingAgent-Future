@@ -59,9 +59,9 @@ class UserPreferences(BaseModel):
 
 
 class FavoriteStock(BaseModel):
-    """旧版自选股信息（历史兼容）"""
-    stock_code: str = Field(..., description="旧股票代码")
-    stock_name: str = Field(..., description="旧股票名称")
+    """历史兼容自选数据模型（已废弃，推荐使用 user_favorites 集合）"""
+    stock_code: str = Field(..., description="品种代码（历史字段名）")
+    stock_name: str = Field(..., description="品种名称（历史字段名）")
     market: str = Field(..., description="市场类型")
     added_at: datetime = Field(default_factory=now_tz, description="添加时间")
     tags: List[str] = Field(default_factory=list, description="用户标签")
@@ -93,8 +93,8 @@ class User(BaseModel):
     successful_analyses: int = 0
     failed_analyses: int = 0
 
-    # 旧版自选股（历史兼容，推荐使用 user_favorites 集合）
-    favorite_stocks: List[FavoriteStock] = Field(default_factory=list, description="旧股票自选列表（历史兼容）")
+    # 历史兼容自选列表（推荐使用 user_favorites 集合）
+    favorite_stocks: List[FavoriteStock] = Field(default_factory=list, description="历史自选列表（已废弃）")
     
     model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True)
 

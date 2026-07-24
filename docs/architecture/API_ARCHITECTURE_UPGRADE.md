@@ -1,8 +1,8 @@
-# TradingAgents-CN v0.1.16 API架构升级指南
+# TradingAgent-Future v0.1.16 API架构升级指南
 
 ## 🚀 概述
 
-TradingAgents-CN v0.1.16 引入了全新的现代化API架构，在保持现有Streamlit界面的同时，提供了强大的后端API服务，支持高并发、队列管理、实时进度跟踪等企业级功能。
+TradingAgent-Future v0.1.16 引入了全新的现代化API架构，在保持现有Streamlit界面的同时，提供了强大的后端API服务，支持高并发、队列管理、实时进度跟踪等企业级功能。
 
 ## 📋 新增功能
 
@@ -291,10 +291,9 @@ curl -X POST http://localhost:8000/api/analysis/single \
 
 如有问题，请通过以下方式联系：
 
-- 📧 邮箱: hsliup@163.com
 - 💬 微信群: 扫描README中的二维码
 - 🐛 问题反馈: GitHub Issues
 
 ---
 
-**TradingAgents-CN v0.1.16** - 现代化的多智能体期货分析学习平台
+**TradingAgent-Future v0.1.16** - 现代化的多智能体期货分析学习平台

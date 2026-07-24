@@ -1,6 +1,6 @@
-# TradingAgents-CN Portable Scripts
+# TradingAgent-Future Portable Scripts
 
-This directory contains scripts for the TradingAgents-CN portable (green) version.
+This directory contains scripts for the TradingAgent-Future portable (green) version.
 
 ## Files
 

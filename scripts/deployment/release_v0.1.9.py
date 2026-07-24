@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-TradingAgents-CN v0.1.9 版本发布脚本
+TradingAgent-Future v0.1.9 版本发布脚本
 CLI用户体验重大优化与统一日志管理版本
 """
 
@@ -72,7 +72,7 @@ def create_git_tag():
     print("🏷️ 创建Git标签...")
     
     tag_name = "v0.1.9"
-    tag_message = "TradingAgents-CN v0.1.9: CLI用户体验重大优化与统一日志管理"
+    tag_message = "TradingAgent-Future v0.1.9: CLI用户体验重大优化与统一日志管理"
     
     # 检查标签是否已存在
     success, stdout, stderr = run_command(f"git tag -l {tag_name}")
@@ -201,7 +201,7 @@ def validate_release():
 
 def main():
     """主函数"""
-    print("🚀 TradingAgents-CN v0.1.9 版本发布")
+    print("🚀 TradingAgent-Future v0.1.9 版本发布")
     print("=" * 60)
     print("📋 版本主题: CLI用户体验重大优化与统一日志管理")
     print("📅 发布日期:", datetime.now().strftime("%Y年%m月%d日"))
