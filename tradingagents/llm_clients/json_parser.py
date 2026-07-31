@@ -209,4 +209,35 @@ def legacy_parse_and_render(
     return parsed_dict, structured_report, report_md
 
 
-__all__ = ["legacy_parse_and_render", "parse_and_validate"]
+def log_p0_validation(
+    node: str,
+    status: str,
+    *,
+    error: Optional[str] = None,
+    elapsed_ms: Optional[float] = None,
+) -> None:
+    """Day 5 监控埋点 — 输出标准化 P0_VALIDATION 事件，便于外部聚合通过率。
+
+    输出格式（key=value 形式，便于 grep / Langfuse / Prometheus 解析）：
+        P0_VALIDATION node=<node> status=<status> [elapsed_ms=<ms>] [error=<err>]
+
+    Args:
+        node: 节点标识（如 "fundamental" / "research_manager" / "investment_director"）
+        status: "passed" | "failed" | "legacy" | "degraded" | "n/a"
+        error: 校验失败时的精简错误信息（可选）
+        elapsed_ms: 校验耗时毫秒（可选，parse_and_validate 内部可用 time.perf_counter()）
+
+    Examples:
+        >>> log_p0_validation("fundamental", "passed", elapsed_ms=12.3)
+        >>> log_p0_validation("research_manager", "failed", error="Pydantic ValidationError (3 errors, first: 主要风险: missing)")
+    """
+    parts = [f"node={node}", f"status={status}"]
+    if elapsed_ms is not None:
+        parts.append(f"elapsed_ms={elapsed_ms:.1f}")
+    if error:
+        # 截断 error 防止日志过长（最多 200 字）
+        parts.append(f"error={error[:200]}")
+    logger.info(f"P0_VALIDATION {' '.join(parts)}")
+
+
+__all__ = ["legacy_parse_and_render", "log_p0_validation", "parse_and_validate"]

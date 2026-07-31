@@ -181,6 +181,7 @@ def make_registry_entry(
     direction: str,
     summary: str,
     status: str = "ok",
+    validation_status: Optional[str] = None,
 ) -> dict:
     """构造标准化的 analyst registry entry。
 
@@ -193,9 +194,17 @@ def make_registry_entry(
         direction: 方向信号
         summary: 摘要文本
         status: "ok" | "degraded" | "skipped" — Phase Agent 改造(2026-07-19)
+        validation_status: P0 字段（Day 5 接入）— Pydantic 校验结果
+            None | "skipped" | "passed" | "failed" | "legacy" | "degraded"
+            - None/"skipped": 主路径未启用校验（feature flag off 或 fallback 跳过）
+            - "passed": 校验通过，标准化产物落库
+            - "failed": 校验失败，降级 legacy 路径
+            - "legacy": feature flag off，走原 _extract_json_safe 路径
+            - "degraded": LLM 不可用 / 数据缺失等非 schema 问题
 
     Returns:
-        dict, 单键值对: {analyst_id: {id, conclusion_id, prefix, analyst, cn_name, report_key, direction, summary, status}}
+        dict, 单键值对: {analyst_id: {id, conclusion_id, prefix, analyst, cn_name,
+                                     report_key, direction, summary, status, validation_status}}
     """
     cn_name = ANALYST_CN_NAMES.get(analyst_key, analyst_key)
     return {
@@ -209,6 +218,7 @@ def make_registry_entry(
             "direction": direction,
             "summary": summary,
             "status": status,
+            "validation_status": validation_status,
         }
     }
 

@@ -368,12 +368,14 @@ def create_news_analyst(llm):
             report_md = content
             logger.info(f"✅ [新闻分析师] LLM 报告生成: {len(report_md)} 字符")
 
+            # P0: news 输出是 Markdown,未接入 Pydantic 校验(Day 2 决策)
+            validation_status = "n/a"
             msg_out = result if hasattr(result, "content") else AIMessage(content=report_md)
             analyst_id = make_analyst_id("NEWS", full_symbol, trade_date)
             conclusion_id = make_conclusion_id("NEWS", 1)
             tagged_report = inject_analyst_id(report_md, analyst_id)
             news_direction = _derive_news_direction(sentiment_ratio, positive_count, negative_count)
-            registry_entry = make_registry_entry(analyst_id, conclusion_id, "NEWS", "news", "news_report", news_direction, extract_first_sentence(report_md))
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "NEWS", "news", "news_report", news_direction, extract_first_sentence(report_md), validation_status=validation_status)
             return {
                 "news_report": tagged_report,
                 "messages": [msg_out],

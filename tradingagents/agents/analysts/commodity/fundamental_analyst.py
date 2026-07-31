@@ -27,7 +27,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import AIMessage
 
 from tradingagents.utils.logging_init import get_logger
-from tradingagents.llm_clients.json_parser import legacy_parse_and_render, parse_and_validate
+from tradingagents.llm_clients.json_parser import legacy_parse_and_render, log_p0_validation, parse_and_validate
 
 from ._base import (
     build_custom_data_context,
@@ -499,6 +499,10 @@ def create_fundamental_analyst(llm):
                     structured_report = parsed_dict
                     report_md = _structured_to_markdown(parsed_dict)
                     validation_status = "passed"
+                    log_p0_validation(
+                        "fundamental", "passed",
+                        elapsed_ms=getattr(parsed_node, "_p0_elapsed_ms", None),
+                    )
                     logger.info(
                         f"💼 [产业分析师] Pydantic 校验通过: "
                         f"direction={parsed_node.direction}, "
@@ -506,6 +510,7 @@ def create_fundamental_analyst(llm):
                     )
                 else:
                     # 校验失败 → 降级到 legacy 路径(保留所有现有行为)
+                    log_p0_validation("fundamental", "failed", error=validation_error)
                     logger.warning(
                         f"💼 [产业分析师] Pydantic 校验失败,降级 legacy 路径: "
                         f"{validation_error}"
@@ -535,7 +540,7 @@ def create_fundamental_analyst(llm):
             analyst_id = make_analyst_id("FUND", full_symbol, trade_date)
             conclusion_id = make_conclusion_id("FUND", 1)
             tagged_report = inject_analyst_id(report_md, analyst_id)
-            registry_entry = make_registry_entry(analyst_id, conclusion_id, "FUND", "fundamental", "fundamentals_report", direction, extract_first_sentence(report_md))
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "FUND", "fundamental", "fundamentals_report", direction, extract_first_sentence(report_md), validation_status=validation_status)
             return {
                 "fundamentals_report": tagged_report,
                 "fundamentals_structured": structured_report,

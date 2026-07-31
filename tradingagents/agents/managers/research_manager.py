@@ -13,7 +13,7 @@ from tradingagents.agents.analysts.commodity import (
     _build_contradiction_map,
 )
 from tradingagents.agents.managers.schemas import ManagerDecision
-from tradingagents.llm_clients.json_parser import parse_and_validate
+from tradingagents.llm_clients.json_parser import log_p0_validation, parse_and_validate
 
 logger = get_logger("default")
 
@@ -803,12 +803,17 @@ def create_research_manager(llm, memory):
                 )
                 if parsed_plan is not None:
                     research_plan_validation_status = "passed"
+                    log_p0_validation(
+                        "research_manager", "passed",
+                        elapsed_ms=getattr(parsed_plan, "_p0_elapsed_ms", None),
+                    )
                     logger.info(
                         f"[推理分析师] Pydantic 校验通过: "
                         f"主要风险={len(parsed_plan.主要风险)} 条"
                     )
                 else:
                     research_plan_validation_status = "failed"
+                    log_p0_validation("research_manager", "failed", error=plan_validation_error)
                     logger.warning(
                         f"[推理分析师] Pydantic 校验失败,保留原输出: "
                         f"{plan_validation_error}"

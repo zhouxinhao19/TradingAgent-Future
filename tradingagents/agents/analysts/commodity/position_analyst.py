@@ -26,7 +26,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import AIMessage
 
 from tradingagents.utils.logging_init import get_logger
-from tradingagents.llm_clients.json_parser import legacy_parse_and_render, parse_and_validate
+from tradingagents.llm_clients.json_parser import legacy_parse_and_render, log_p0_validation, parse_and_validate
 
 from ._base import (
     build_custom_data_context,
@@ -664,12 +664,17 @@ def create_position_analyst(llm):
                     structured_report = parsed_dict
                     report_md = _structured_to_markdown(parsed_dict)
                     validation_status = "passed"
+                    log_p0_validation(
+                        "position", "passed",
+                        elapsed_ms=getattr(parsed_node, "_p0_elapsed_ms", None),
+                    )
                     logger.info(
                         f"🎯 [持仓分析师] Pydantic 校验通过: "
                         f"direction={parsed_node.direction}, "
                         f"long_change_5d={parsed_node.long_change_5d}"
                     )
                 else:
+                    log_p0_validation("position", "failed", error=validation_error)
                     logger.warning(
                         f"🎯 [持仓分析师] Pydantic 校验失败,降级 legacy 路径: "
                         f"{validation_error}"
@@ -697,7 +702,7 @@ def create_position_analyst(llm):
             analyst_id = make_analyst_id("POSN", full_symbol, trade_date)
             conclusion_id = make_conclusion_id("POSN", 1)
             tagged_report = inject_analyst_id(report_md, analyst_id)
-            registry_entry = make_registry_entry(analyst_id, conclusion_id, "POSN", "position", "position_report", direction or "neutral", extract_first_sentence(report_md))
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "POSN", "position", "position_report", direction or "neutral", extract_first_sentence(report_md), validation_status=validation_status)
             return {
                 "sentiment_report": report_md,  # 保持纯净
                 "position_report": tagged_report,

@@ -447,6 +447,8 @@ def create_technical_analyst(llm):
             report_md = content
             logger.info(f"✅ [技术分析师] LLM 报告生成: {len(report_md)} 字符")
 
+            # P0: technical 输出是 Markdown,未接入 Pydantic 校验(Day 2 决策)
+            validation_status = "n/a"
             # 构造 messages 字段(优先复用原 result,否则包装 AIMessage)
             if hasattr(result, "content") and isinstance(result, AIMessage):
                 msg_out = result
@@ -460,7 +462,7 @@ def create_technical_analyst(llm):
             analyst_id = make_analyst_id("TECH", full_symbol, trade_date)
             conclusion_id = make_conclusion_id("TECH", 1)
             tagged_report = inject_analyst_id(report_md, analyst_id)
-            registry_entry = make_registry_entry(analyst_id, conclusion_id, "TECH", "technical", "market_report", direction, extract_first_sentence(report_md))
+            registry_entry = make_registry_entry(analyst_id, conclusion_id, "TECH", "technical", "market_report", direction, extract_first_sentence(report_md), validation_status=validation_status)
 
             return {
                 "market_report": tagged_report,

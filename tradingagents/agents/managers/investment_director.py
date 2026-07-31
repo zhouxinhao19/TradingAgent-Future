@@ -22,7 +22,7 @@ from tradingagents.utils.logging_init import get_logger
 from tradingagents.agents.analysts.commodity import build_custom_data_context
 from tradingagents.agents.managers.schemas import InvestmentMemo
 from tradingagents.agents.managers.strategy_fitness import evaluate_strategy_fitness
-from tradingagents.llm_clients.json_parser import parse_and_validate
+from tradingagents.llm_clients.json_parser import log_p0_validation, parse_and_validate
 
 logger = get_logger("default")
 
@@ -1344,6 +1344,10 @@ def create_investment_director(deep_thinking_llm):
                     llm_brief = parsed_node.research_brief
                     if isinstance(llm_brief, str) and len(llm_brief) > 20:
                         research_brief = llm_brief
+                    log_p0_validation(
+                        "investment_director", "passed",
+                        elapsed_ms=getattr(parsed_node, "_p0_elapsed_ms", None),
+                    )
                     logger.info(
                         f"[投研总监] Pydantic 校验通过: "
                         f"备忘录 keys={len(investment_memo)}, "
@@ -1351,6 +1355,7 @@ def create_investment_director(deep_thinking_llm):
                     )
                 else:
                     cio_validation_status = "failed"
+                    log_p0_validation("investment_director", "failed", error=validation_error)
                     logger.warning(
                         f"[投研总监] Pydantic 校验失败,降级 legacy 解析: "
                         f"{validation_error}"
