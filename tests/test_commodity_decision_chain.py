@@ -1111,3 +1111,105 @@ class TestSafetyOverrideCustomData:
         assert result["custom_data_as_of"] is None
         assert "CUSTOM_DATA_CONTRADICTION" not in result["override_rules_triggered"]
         assert "CUSTOM_DATA_OVERRELIANCE" not in result["override_rules_triggered"]
+
+
+# =============================================================================
+# P0: Schema 硬约束补强 — research_manager + investment_director（Day 3）
+# =============================================================================
+
+def test_research_manager_manager_decision_schema_passed(
+    mock_reasoning_llm, mock_memory, base_state
+):
+    """合法复合 JSON → ManagerDecision 校验通过，输出原样保留。"""
+    from tradingagents.agents.managers.research_manager import create_research_manager
+
+    node = create_research_manager(mock_reasoning_llm, mock_memory)
+    result = node(base_state)
+
+    assert result["research_plan_validation_status"] == "passed"
+    assert "估值驱动矩阵" in result["investment_plan"]
+    assert "多空对照表" in result["investment_plan"]
+    assert "三种情景推演" in result["investment_plan"]
+
+
+def test_research_manager_manager_decision_schema_failed(
+    mock_llm, mock_memory, base_state
+):
+    """非 JSON 输出 → 校验失败，content 原样保留（legacy 行为不变）。"""
+    from tradingagents.agents.managers.research_manager import create_research_manager
+
+    node = create_research_manager(mock_llm, mock_memory)
+    result = node(base_state)
+
+    assert result["research_plan_validation_status"] == "failed"
+    assert result["investment_plan"] == "[MOCK] 期货分析输出"
+
+
+def test_research_manager_manager_decision_schema_legacy_when_disabled(
+    mock_reasoning_llm, mock_memory, base_state, monkeypatch
+):
+    """关闭 FEATURE_COMMODITY_SCHEMA_VALIDATION → 走 legacy 路径。"""
+    from tradingagents.agents.managers.research_manager import create_research_manager
+
+    monkeypatch.setenv("FEATURE_COMMODITY_SCHEMA_VALIDATION", "false")
+    node = create_research_manager(mock_reasoning_llm, mock_memory)
+    result = node(base_state)
+
+    assert result["research_plan_validation_status"] == "legacy"
+    assert "估值驱动矩阵" in result["investment_plan"]
+
+
+def test_investment_director_cio_memo_schema_passed():
+    """合法 InvestmentMemo JSON（无 extra 字段）→ 校验通过并产出标准字段。"""
+    from tradingagents.agents.managers.investment_director import create_investment_director
+
+    mock_llm = MagicMock()
+    mock_llm.invoke = MagicMock(return_value=MagicMock(content=json.dumps({
+        "投研备忘录": {
+            "投研结论": {"核心观点": "库存去化+基差走强共振，偏多格局", "风险等级": "R2"},
+            "情景裁决": {"选定情景": "基准情景"},
+            "估值审核": {"判定": "合理"},
+        },
+        "风险评估卡": {
+            "风险裁定": {"允许策略": ["套保"], "禁止策略": ["裸单边"], "策略约束说明": "控制仓位"},
+            "风险提示": ["宏观数据波动"],
+        },
+        "research_brief": "## 投研结论\n库存去化+基差走强共振，偏多格局。建议关注螺纹钢套保机会。",
+    }, ensure_ascii=False)))
+    result = create_investment_director(mock_llm)(make_commodity_state())
+
+    assert result["cio_validation_status"] == "passed"
+    assert result["investment_memo"]["投研结论"]["风险等级"] == "R2"
+    assert result["research_brief"] and "投研结论" in result["research_brief"]
+    assert result["risk_card"]["风险提示"] == ["宏观数据波动"]
+    assert result["risk_card"]["safety_override"]["executed"] is True
+
+
+def test_investment_director_cio_memo_schema_failed_degrades_legacy():
+    """带 extra 字段（final_decision_markdown）→ 校验失败，降级 legacy 解析。"""
+    from tradingagents.agents.managers.investment_director import create_investment_director
+
+    mock_llm = MagicMock()
+    mock_llm.invoke = MagicMock(return_value=MagicMock(content=json.dumps({
+        "投研备忘录": {"投研结论": {"方向倾向": "做多", "置信度": 0.7}},
+        "风险评估卡": {"风险裁定": {"建议动作": "开仓", "仓位上限": "账户30%"}},
+        "final_decision_markdown": "- **方向**：做多\n- **置信度**：0.7",
+    }, ensure_ascii=False)))
+    result = create_investment_director(mock_llm)(make_commodity_state())
+
+    assert result["cio_validation_status"] == "failed"
+    # legacy 路径解析出的 memo 仍保留（现有行为不变）
+    assert result["investment_memo"]["投研结论"]["方向倾向"] == "做多"
+    assert result["risk_card"]["safety_override"]["executed"] is True
+
+
+def test_investment_director_cio_memo_schema_degraded_on_llm_failure():
+    """LLM 抛异常 → fallback 输出，status=degraded。"""
+    from tradingagents.agents.managers.investment_director import create_investment_director
+
+    mock_llm = MagicMock()
+    mock_llm.invoke = MagicMock(side_effect=RuntimeError("LLM 不可用"))
+    result = create_investment_director(mock_llm)(make_commodity_state())
+
+    assert result["cio_validation_status"] == "degraded"
+    assert result["risk_card"]["safety_override"]["executed"] is True

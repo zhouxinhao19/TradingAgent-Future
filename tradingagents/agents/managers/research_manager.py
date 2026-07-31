@@ -1,5 +1,6 @@
 import time
 import json
+import os
 
 from typing import Any, Dict, List, Optional
 
@@ -11,7 +12,15 @@ from tradingagents.agents.analysts.commodity import (
     build_fact_cards,
     _build_contradiction_map,
 )
+from tradingagents.agents.managers.schemas import ManagerDecision
+from tradingagents.llm_clients.json_parser import parse_and_validate
+
 logger = get_logger("default")
+
+
+def _use_schema_validation() -> bool:
+    """P0: 开关控制是否启用 Pydantic 后置校验(运行时读取,便于测试 monkeypatch)。"""
+    return os.environ.get("FEATURE_COMMODITY_SCHEMA_VALIDATION", "true").lower() == "true"
 
 
 # =============================================================================
@@ -786,6 +795,27 @@ def create_research_manager(llm, memory):
             content = _strip_markdown_fence(content)
             content = _ensure_forced_risks_in_plan(content, forced_risks)
 
+            # ===== P0: Pydantic 后置校验（ManagerDecision） =====
+            research_plan_validation_status = "skipped"
+            if _use_schema_validation():
+                parsed_plan, plan_validation_error = parse_and_validate(
+                    content, ManagerDecision
+                )
+                if parsed_plan is not None:
+                    research_plan_validation_status = "passed"
+                    logger.info(
+                        f"[推理分析师] Pydantic 校验通过: "
+                        f"主要风险={len(parsed_plan.主要风险)} 条"
+                    )
+                else:
+                    research_plan_validation_status = "failed"
+                    logger.warning(
+                        f"[推理分析师] Pydantic 校验失败,保留原输出: "
+                        f"{plan_validation_error}"
+                    )
+            else:
+                research_plan_validation_status = "legacy"
+
             # 写入：保留辩论历史（修复覆写 bug）
             debate_state = state.get("investment_debate_state", {}) or {}
             return {
@@ -800,6 +830,7 @@ def create_research_manager(llm, memory):
                 "investment_plan": content,
                 "fact_cards": fact_cards,
                 "contradiction_map": contradiction_map,
+                "research_plan_validation_status": research_plan_validation_status,
             }
         else:
             history = state["investment_debate_state"].get("history", "")

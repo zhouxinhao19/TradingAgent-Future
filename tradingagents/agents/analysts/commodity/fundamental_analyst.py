@@ -20,12 +20,14 @@ LLM 调用失败降级为规则直出报告。
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List
+import os
+from typing import Any, Dict, List, Optional
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import AIMessage
 
 from tradingagents.utils.logging_init import get_logger
+from tradingagents.llm_clients.json_parser import legacy_parse_and_render, parse_and_validate
 
 from ._base import (
     build_custom_data_context,
@@ -40,8 +42,14 @@ from ._base import (
     quality_gate,
     truncate_snapshot,
 )
+from .node_outputs import FundamentalNodeOutput
 
 logger = get_logger("default")
+
+
+def _use_schema_validation() -> bool:
+    """P0: 开关控制是否启用 Pydantic 后置校验(运行时读取,便于测试 monkeypatch)。"""
+    return os.environ.get("FEATURE_COMMODITY_SCHEMA_VALIDATION", "true").lower() == "true"
 
 FUNDAMENTAL_SYSTEM_PROMPT = """你是一位产业分析师,聚焦产业链研究,运用"估值+驱动"框架.
 
@@ -474,27 +482,55 @@ def create_fundamental_analyst(llm):
             else:
                 content = str(result) if result is not None else ""
 
-            # 解析 LLM 返回的 JSON
-            try:
-                # 尝试从 Markdown 代码块或纯 JSON 中提取
-                cleaned = content.strip()
-                if cleaned.startswith("```"):
-                    lines = cleaned.splitlines()
-                    # 去掉首尾 ```json 和 ``` 行
-                    start = 1 if lines[0].strip().startswith("```") else 0
-                    end = -1 if lines[-1].strip() == "```" else len(lines)
-                    cleaned = "\n".join(lines[start:end])
-                parsed = json.loads(cleaned)
-                structured_report = parsed
-                report_md = _structured_to_markdown(parsed)
-            except (json.JSONDecodeError, Exception) as parse_err:
-                logger.warning(f"💼 [产业分析师] JSON 解析失败,回退原始内容: {parse_err}")
-                structured_report = {"raw": content, "parse_error": str(parse_err)}
-                report_md = content
+            # ===== P0: 解析 LLM 返回的 JSON（带 Pydantic 后置校验） =====
+            parsed_dict: Optional[Dict[str, Any]] = None
+            structured_report: Dict[str, Any] = {}
+            report_md = content  # 默认 raw markdown
+            validation_status = "skipped"
+
+            if _use_schema_validation():
+                # 新路径:Pydantic 后置校验(7 层 fallback + schema 校验)
+                parsed_node, validation_error = parse_and_validate(
+                    content, FundamentalNodeOutput
+                )
+                if parsed_node is not None:
+                    # 校验成功 → 标准化产物 + 渲染 Markdown
+                    parsed_dict = parsed_node.model_dump()
+                    structured_report = parsed_dict
+                    report_md = _structured_to_markdown(parsed_dict)
+                    validation_status = "passed"
+                    logger.info(
+                        f"💼 [产业分析师] Pydantic 校验通过: "
+                        f"direction={parsed_node.direction}, "
+                        f"confidence={parsed_node.confidence}"
+                    )
+                else:
+                    # 校验失败 → 降级到 legacy 路径(保留所有现有行为)
+                    logger.warning(
+                        f"💼 [产业分析师] Pydantic 校验失败,降级 legacy 路径: "
+                        f"{validation_error}"
+                    )
+                    parsed_dict, structured_report, report_md = legacy_parse_and_render(
+                        content, _structured_to_markdown,
+                        error_prefix="💼 [产业分析师]",
+                    )
+                    validation_status = "failed"
+            else:
+                # 旧路径:保持向后兼容
+                parsed_dict, structured_report, report_md = legacy_parse_and_render(
+                    content, _structured_to_markdown,
+                    error_prefix="💼 [产业分析师]",
+                )
+                validation_status = "legacy"
+
+            # 注:validation_status 不写入 structured_report(避免污染前端展示),
+            # 通过返回值传到 state 顶层(field 名: fundamentals_validation_status)
 
             logger.info(f"✅ [产业分析师] 报告生成: {len(report_md)} 字符")
 
             msg_out = result if hasattr(result, "content") else AIMessage(content=report_md)
+            # P0: 暂不联动 Pydantic 校验结果(保持现有 features 层 direction 兜底逻辑)
+            # 后续可优化:parsed_node is not None 时用 parsed_node.direction 覆盖
             direction = assessment.get("drive_direction", "neutral") or "neutral"
             analyst_id = make_analyst_id("FUND", full_symbol, trade_date)
             conclusion_id = make_conclusion_id("FUND", 1)
@@ -506,6 +542,8 @@ def create_fundamental_analyst(llm):
                 "messages": [msg_out],
                 "fundamentals_tool_call_count": 0,
                 "analyst_registry": registry_entry,
+                # P0: 校验状态写到 state 顶层(不污染 structured_report dict)
+                "fundamentals_validation_status": validation_status,
             }
 
         except Exception as e:

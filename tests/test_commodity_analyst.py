@@ -708,6 +708,49 @@ class TestFundamentalAnalystNode:
         result = node(_state(commodity_features=feats))
         assert "fundamentals_report" in result
 
+    def test_validation_status_passed(self, mock_llm_json, sample_features_all):
+        """P0 review 修复:validation_status 在 state 顶层,不在 structured_report dict 内。"""
+        node = create_fundamental_analyst(mock_llm_json)
+        result = node(_state(commodity_features=sample_features_all))
+        # validation_status 在 state 顶层
+        assert "fundamentals_validation_status" in result
+        assert result["fundamentals_validation_status"] == "passed"
+        # structured_report dict 内不应有 _validation_status key(不污染前端)
+        structured = result["fundamentals_structured"]
+        assert isinstance(structured, dict)
+        assert "_validation_status" not in structured
+        assert "valuation" in structured
+
+    def test_validation_status_legacy_when_disabled(self, mock_llm_json, sample_features_all, monkeypatch):
+        """FEATURE_COMMODITY_SCHEMA_VALIDATION=false 时走 legacy 路径,status='legacy'。"""
+        monkeypatch.setenv("FEATURE_COMMODITY_SCHEMA_VALIDATION", "false")
+        # 重新 import 模块以生效(USE_SCHEMA_VALIDATION 是模块级常量)
+        import importlib
+        from tradingagents.agents.analysts.commodity import fundamental_analyst as fa
+        importlib.reload(fa)
+        node = fa.create_fundamental_analyst(mock_llm_json)
+        result = node(_state(commodity_features=sample_features_all))
+        assert result.get("fundamentals_validation_status") == "legacy"
+        assert "_validation_status" not in result["fundamentals_structured"]
+
+    def test_llm_pure_text_output(self, sample_features_all):
+        """P0 review 补盲点:LLM 返回纯文本(无 JSON),Pydantic 校验失败→降级 legacy→raw 兜底。"""
+        mock = MagicMock()
+        mock.invoke.return_value = MagicMock(content="这是纯文本分析,没有 JSON。市场偏多,建议关注库存变化。")
+        node = create_fundamental_analyst(mock)
+        result = node(_state(commodity_features=sample_features_all))
+        # 校验失败 → legacy 也失败 → structured_report 含 raw/parse_error
+        assert "fundamentals_structured" in result
+        structured = result["fundamentals_structured"]
+        assert isinstance(structured, dict)
+        # raw 兜底:结构化 dict 里没有 valuation/drive,但有 raw 或 parse_error
+        assert "raw" in structured or "parse_error" in structured
+        # fundamentals_report 仍是原始 markdown(不丢内容)
+        assert "fundamentals_report" in result
+        assert "纯文本" in result["fundamentals_report"] or "没有 JSON" in result["fundamentals_report"]
+        # validation_status = failed(校验失败,但没走 LLM 异常路径)
+        assert result.get("fundamentals_validation_status") == "failed"
+
     def test_llm_failure_falls_back(self, sample_features_all):
         mock = MagicMock()
         mock.invoke.side_effect = RuntimeError("LLM down")

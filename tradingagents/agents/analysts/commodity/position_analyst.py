@@ -19,12 +19,14 @@ LLM 调用失败降级为 features 直拼 Markdown + JSON。
 from __future__ import annotations
 
 import json
+import os
 from typing import Any, Dict, Optional
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import AIMessage
 
 from tradingagents.utils.logging_init import get_logger
+from tradingagents.llm_clients.json_parser import legacy_parse_and_render, parse_and_validate
 
 from ._base import (
     build_custom_data_context,
@@ -38,8 +40,14 @@ from ._base import (
     make_registry_entry,
     quality_gate,
 )
+from .node_outputs import PositionNodeOutput
 
 logger = get_logger("default")
+
+
+def _use_schema_validation() -> bool:
+    """P0: 开关控制是否启用 Pydantic 后置校验(运行时读取,便于测试 monkeypatch)。"""
+    return os.environ.get("FEATURE_COMMODITY_SCHEMA_VALIDATION", "true").lower() == "true"
 
 POSITION_SYSTEM_PROMPT = """你是一位资深的期货持仓分析师,擅长"总量判断→结构分析→交叉验证"三层递进框架。
 
@@ -641,25 +649,51 @@ def create_position_analyst(llm):
             else:
                 content = str(result) if result is not None else ""
 
-            # 解析 LLM 返回的 JSON
-            try:
-                cleaned = content.strip()
-                if cleaned.startswith("```"):
-                    lines = cleaned.splitlines()
-                    start = 1 if lines[0].strip().startswith("```") else 0
-                    end = -1 if lines[-1].strip() == "```" else len(lines)
-                    cleaned = "\n".join(lines[start:end])
-                parsed = json.loads(cleaned)
-                structured_report = parsed
-                report_md = _structured_to_markdown(parsed)
-            except (json.JSONDecodeError, Exception) as parse_err:
-                logger.warning(f"🎯 [持仓分析师] JSON 解析失败,回退原始内容: {parse_err}")
-                structured_report = {"raw": content, "parse_error": str(parse_err)}
-                report_md = content
+            # ===== P0: 解析 LLM 返回的 JSON（带 Pydantic 后置校验） =====
+            parsed_dict: Optional[Dict[str, Any]] = None
+            structured_report: Dict[str, Any] = {}
+            report_md = content
+            validation_status = "skipped"
+
+            if _use_schema_validation():
+                parsed_node, validation_error = parse_and_validate(
+                    content, PositionNodeOutput
+                )
+                if parsed_node is not None:
+                    parsed_dict = parsed_node.model_dump()
+                    structured_report = parsed_dict
+                    report_md = _structured_to_markdown(parsed_dict)
+                    validation_status = "passed"
+                    logger.info(
+                        f"🎯 [持仓分析师] Pydantic 校验通过: "
+                        f"direction={parsed_node.direction}, "
+                        f"long_change_5d={parsed_node.long_change_5d}"
+                    )
+                else:
+                    logger.warning(
+                        f"🎯 [持仓分析师] Pydantic 校验失败,降级 legacy 路径: "
+                        f"{validation_error}"
+                    )
+                    parsed_dict, structured_report, report_md = legacy_parse_and_render(
+                        content, _structured_to_markdown,
+                        error_prefix="🎯 [持仓分析师]",
+                    )
+                    validation_status = "failed"
+            else:
+                parsed_dict, structured_report, report_md = legacy_parse_and_render(
+                    content, _structured_to_markdown,
+                    error_prefix="🎯 [持仓分析师]",
+                )
+                validation_status = "legacy"
+
+            # 注:validation_status 不写入 structured_report(避免污染前端展示),
+            # 通过返回值传到 state 顶层(field 名: position_validation_status)
 
             logger.info(f"✅ [持仓分析师] 报告生成: {len(report_md)} 字符")
 
             msg_out = result if hasattr(result, "content") else AIMessage(content=report_md)
+            # P0: 暂不联动 Pydantic 校验结果(保持现有 direction 兜底逻辑)
+            # 后续可优化:parsed_node is not None 时用 parsed_node.direction 覆盖
             analyst_id = make_analyst_id("POSN", full_symbol, trade_date)
             conclusion_id = make_conclusion_id("POSN", 1)
             tagged_report = inject_analyst_id(report_md, analyst_id)
@@ -671,6 +705,8 @@ def create_position_analyst(llm):
                 "messages": [msg_out],
                 "sentiment_tool_call_count": 0,
                 "analyst_registry": registry_entry,
+                # P0: 校验状态写到 state 顶层(不污染 structured_report dict)
+                "position_validation_status": validation_status,
             }
 
         except Exception as e:

@@ -12,6 +12,7 @@ investment_director.py — 投研总监节点 (Phase 4 改造)
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
 from typing import Any, Dict, List, Optional
@@ -19,9 +20,16 @@ from typing import Any, Dict, List, Optional
 from tradingagents.utils.logging_init import get_logger
 
 from tradingagents.agents.analysts.commodity import build_custom_data_context
+from tradingagents.agents.managers.schemas import InvestmentMemo
 from tradingagents.agents.managers.strategy_fitness import evaluate_strategy_fitness
+from tradingagents.llm_clients.json_parser import parse_and_validate
 
 logger = get_logger("default")
+
+
+def _use_schema_validation() -> bool:
+    """P0: 开关控制是否启用 Pydantic 后置校验(运行时读取,便于测试 monkeypatch)。"""
+    return os.environ.get("FEATURE_COMMODITY_SCHEMA_VALIDATION", "true").lower() == "true"
 
 
 # =============================================================================
@@ -1315,45 +1323,82 @@ def create_investment_director(deep_thinking_llm):
         if content:
             investment_memo: Any = {}
             research_brief = content
-            try:
-                parsed = json.loads(content)
-                if isinstance(parsed, dict):
-                    llm_memo = parsed.get("投研备忘录")
-                    if isinstance(llm_memo, dict):
+
+            # ===== P0: Pydantic 后置校验（InvestmentMemo） =====
+            cio_validation_status = "skipped"
+            p0_validated = False
+            if _use_schema_validation():
+                parsed_node, validation_error = parse_and_validate(
+                    content, InvestmentMemo
+                )
+                if parsed_node is not None:
+                    cio_validation_status = "passed"
+                    p0_validated = True
+                    # 校验成功 → 用 Pydantic 标准化产物（保留 rule 卡 merge 逻辑）
+                    llm_memo = parsed_node.投研备忘录
+                    if isinstance(llm_memo, dict) and llm_memo:
                         investment_memo = llm_memo
-                    llm_risk = parsed.get("风险评估卡")
-                    risk_card = _merge_llm_risk_card(rule_risk_card, llm_risk)
-                    llm_brief = parsed.get("research_brief")
+                    llm_risk = parsed_node.风险评估卡
+                    if isinstance(llm_risk, dict) and llm_risk:
+                        risk_card = _merge_llm_risk_card(rule_risk_card, llm_risk)
+                    llm_brief = parsed_node.research_brief
                     if isinstance(llm_brief, str) and len(llm_brief) > 20:
                         research_brief = llm_brief
-                    elif isinstance(llm_memo, dict):
-                        # 兜底:从投研备忘录提取核心观点组装 Markdown
-                        conclusion = llm_memo.get("投研结论", {}) or {}
-                        core_view = conclusion.get("核心观点", "") if isinstance(conclusion, dict) else ""
-                        scenario = llm_memo.get("情景裁决", {}) or {}
-                        selected = scenario.get("选定情景", "") if isinstance(scenario, dict) else ""
-                        divergence = scenario.get("核心分歧处理", "") if isinstance(scenario, dict) else ""
-                        brief_parts = []
-                        if core_view:
-                            brief_parts.append(f"## 核心矛盾与叙事\n\n{core_view}")
-                        if divergence:
-                            brief_parts.append(f"## 核心分歧处理\n\n{divergence}")
-                        if selected:
-                            brief_parts.append(f"## 情景裁决\n\n选定情景：{selected}")
-                        if brief_parts:
-                            research_brief = "\n\n".join(brief_parts)
-                            logger.info("[投研总监] LLM 未输出 research_brief，从备忘录自动组装")
-                        else:
-                            logger.warning("[投研总监] LLM 未输出 research_brief，且备忘录无可提取内容")
-            except (json.JSONDecodeError, TypeError):
-                logger.warning("[投研总监] LLM 输出非 JSON，使用 raw 文本")
-                investment_memo = {}
+                    logger.info(
+                        f"[投研总监] Pydantic 校验通过: "
+                        f"备忘录 keys={len(investment_memo)}, "
+                        f"research_brief={len(research_brief)} 字符"
+                    )
+                else:
+                    cio_validation_status = "failed"
+                    logger.warning(
+                        f"[投研总监] Pydantic 校验失败,降级 legacy 解析: "
+                        f"{validation_error}"
+                    )
+            else:
+                cio_validation_status = "legacy"
+
+            if not p0_validated:
+                try:
+                    parsed = json.loads(content)
+                    if isinstance(parsed, dict):
+                        llm_memo = parsed.get("投研备忘录")
+                        if isinstance(llm_memo, dict):
+                            investment_memo = llm_memo
+                        llm_risk = parsed.get("风险评估卡")
+                        risk_card = _merge_llm_risk_card(rule_risk_card, llm_risk)
+                        llm_brief = parsed.get("research_brief")
+                        if isinstance(llm_brief, str) and len(llm_brief) > 20:
+                            research_brief = llm_brief
+                        elif isinstance(llm_memo, dict):
+                            # 兜底:从投研备忘录提取核心观点组装 Markdown
+                            conclusion = llm_memo.get("投研结论", {}) or {}
+                            core_view = conclusion.get("核心观点", "") if isinstance(conclusion, dict) else ""
+                            scenario = llm_memo.get("情景裁决", {}) or {}
+                            selected = scenario.get("选定情景", "") if isinstance(scenario, dict) else ""
+                            divergence = scenario.get("核心分歧处理", "") if isinstance(scenario, dict) else ""
+                            brief_parts = []
+                            if core_view:
+                                brief_parts.append(f"## 核心矛盾与叙事\n\n{core_view}")
+                            if divergence:
+                                brief_parts.append(f"## 核心分歧处理\n\n{divergence}")
+                            if selected:
+                                brief_parts.append(f"## 情景裁决\n\n选定情景：{selected}")
+                            if brief_parts:
+                                research_brief = "\n\n".join(brief_parts)
+                                logger.info("[投研总监] LLM 未输出 research_brief，从备忘录自动组装")
+                            else:
+                                logger.warning("[投研总监] LLM 未输出 research_brief，且备忘录无可提取内容")
+                except (json.JSONDecodeError, TypeError):
+                    logger.warning("[投研总监] LLM 输出非 JSON，使用 raw 文本")
+                    investment_memo = {}
 
             msg_out = AIMessage(content=research_brief)
         else:
             investment_memo = _build_fallback_memo(risk_assessment)
             research_brief = _build_fallback_research_brief(full_symbol, risk_assessment)
             msg_out = AIMessage(content="(系统降级)")
+            cio_validation_status = "degraded"
             logger.warning("[投研总监] 使用 fallback 输出")
 
         # ---- Step 6: SafetyOverride 纯规则二审（0 LLM） ----
@@ -1390,6 +1435,7 @@ def create_investment_director(deep_thinking_llm):
             "strategy_matrix": strategy_matrix,
             "messages": [msg_out],
             "cio_decision_timestamp": "now",
+            "cio_validation_status": cio_validation_status,
         }
 
     return investment_director_node

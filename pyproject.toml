@@ -49,6 +49,7 @@ dependencies = [
     "chainlit>=2.5.5",
     "chromadb>=1.0.12",
     "dashscope>=1.20.0",
+    "json-repair>=0.30.0",  # P0: JSON 修复库(国产 LLM 输出常见错误修复)
     "langchain-anthropic>=0.3.15",
     "langchain-core>=0.3.0",
     "langchain-experimental>=0.3.4",

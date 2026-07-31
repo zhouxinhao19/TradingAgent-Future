@@ -1,5 +1,14 @@
 """
-news_analyst.py — 商品期货新闻分析师节点 (Phase 3b-ii / 新闻改造)
+news_analyst.py — 商品期货新闻分析师节点 (Phase 3b-ii / 新闻改造 + P0 schema 决策)
+
+⚠️ P0 决策:新闻分析师输出是 Markdown 文本(macro_narrative + industry_narrative),
+不接入 Pydantic 校验。
+
+原因（参考 technical_analyst.py 顶部注释）：
+  1. 新闻 LLM 输出主要是叙事性 Markdown,不是结构化 JSON
+  2. Pydantic 校验 Markdown 会 100% 失败
+  3. direction 由 sentiment_ratio + positive/negative count 推导（_derive_news_direction）
+  4. 若未来 LLM 追加结构化 JSON 块,可启用 NewsNodeOutput 校验
 
 输入:
   - state['commodity_features']['news_sentiment']

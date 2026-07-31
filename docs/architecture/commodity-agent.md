@@ -1114,7 +1114,7 @@ FEATURE_COMMODITY_PAPER=false        # Phase 4 翻 true
 | Analyst 共享 | `tradingagents/agents/analysts/commodity/_base.py` |
 | Analyst Pydantic | `tradingagents/agents/analysts/commodity/reports.py` |
 | 自定义数据 | `tradingagents/agents/custom_data/` |
-| 决策链 | `tradingagents/agents/researchers/{bull,bear}_researcher.py`、`managers/{research_manager,risk_manager,investment_director,executive_decision_maker}.py`、`risk_mgmt/{aggresive,conservative,neutral}_debator.py` |
+| 决策链 | `tradingagents/agents/researchers/{bull,bear}_researcher.py`、`managers/{research_manager,risk_manager,investment_director}.py`、`risk_mgmt/{aggresive,conservative,neutral}_debator.py` |
 | Graph 接线 | `tradingagents/graph/commodity_graph.py` |
 | State Schema | `tradingagents/agents/utils/agent_states.py` |
 | 后端服务 | `app/services/commodity/unified_commodity_service.py` |

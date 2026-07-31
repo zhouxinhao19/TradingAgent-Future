@@ -1,5 +1,16 @@
 """
-technical_analyst.py — 商品期货技术分析师节点 (Phase 3b-ii)
+technical_analyst.py — 商品期货技术分析师节点 (Phase 3b-ii + P0 schema validation 决策)
+
+⚠️ P0 决策:技术分析师输出是 Markdown 文本(report_md = content),不接入 Pydantic 校验。
+
+原因：
+  1. 技术分析师 LLM 输出是连续 Markdown（含表格/列表），不是结构化 JSON
+  2. Pydantic schema 校验 Markdown 几乎 100% 失败（缺必填字段）
+  3. 校验失败时降级 raw markdown 等于没校验，反而增加日志噪音
+  4. 现有 direction 由 features 层 combined.get("direction") 兜底（line 448），已稳定
+
+如果未来 LLM 在 Markdown 末尾追加结构化 JSON 块，可启用 TechnicalNodeOutput 校验。
+（参考 TechnicalNodeOutput schema + parse_and_validate 接入模式）
 
 输入:state['commodity_features']['technical'] (由 3b-i features 层算好)
 输出:state['market_report'] = Markdown 技术分析报告 (复用现有字段名,决策链节点零改动)
