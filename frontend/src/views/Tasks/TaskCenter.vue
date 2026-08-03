@@ -489,26 +489,6 @@ async function pollProgressOnly() {
   }
 }
 
-// ---- 报告查看 ----
-async function viewReport(row: CommodityTaskItem) {
-  if (row.status !== 'completed' || !row.report_id) {
-    ElMessage.warning('该任务尚未生成报告')
-    return
-  }
-  detailDrawerVisible.value = true
-  detailData.value = null
-  detailLoading.value = true
-  try {
-    const res = await commodityApi.getReportDetail(row.report_id)
-    detailData.value = (res as any)?.data || null
-  } catch {
-    ElMessage.error('获取报告详情失败')
-    detailDrawerVisible.value = false
-  } finally {
-    detailLoading.value = false
-  }
-}
-
 // ---- 导航 ----
 function goToCommodityAnalysis() {
   router.push('/commodity/analysis')

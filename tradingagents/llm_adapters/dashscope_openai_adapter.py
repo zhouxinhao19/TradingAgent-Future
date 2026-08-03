@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Union, Sequence
 from langchain_openai import ChatOpenAI
 from langchain_core.tools import BaseTool
 from pydantic import Field, SecretStr
-from ..config.config_manager import token_tracker
+from tradingagents.llm_clients.usage_tracker import token_tracker
 
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger

@@ -637,8 +637,8 @@ async function loadContractsList() {
   }
 }
 
-function switchKlineMode(mode: 'kline' | 'spot') {
-  klineMode.value = mode
+function switchKlineMode(mode: string | number | boolean | undefined) {
+  klineMode.value = mode as 'kline' | 'spot'
   if (mode === 'kline') {
     reloadKline()
   } else {
@@ -1086,7 +1086,7 @@ onUnmounted(() => {
   holdingChart?.dispose()
 })
 
-watch(activeTab, (newTab, oldTab) => {
+watch(activeTab, (newTab, _oldTab) => {
   nextTick(() => {
     if (newTab === 'kline') {
       if (klineMode.value === 'kline') renderKline()

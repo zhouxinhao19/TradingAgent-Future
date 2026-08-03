@@ -219,7 +219,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
@@ -287,7 +287,7 @@ async function handleFileUpload(options: any) {
   const { file, onSuccess, onError } = options
   try {
     const res = await commodityApi.uploadCustomData(file)
-    const fileInfo = res?.data?.file_id ? res.data : (res?.file_id ? res : null)
+    const fileInfo = res?.data || null
     if (fileInfo?.file_id) {
       uploadedFiles.value.push({ file_id: fileInfo.file_id, original_name: fileInfo.original_name || file.name })
       onSuccess?.(fileInfo)

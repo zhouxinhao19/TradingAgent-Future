@@ -9,11 +9,7 @@ import { ApiClient } from './request'
 // ============================================================
 // 通用响应包装 (与后端 ok() 格式一致)
 // ============================================================
-export interface ApiEnvelope<T = unknown> {
-  success: boolean
-  message?: string
-  data?: T
-}
+export type ApiEnvelope<T = unknown> = T
 
 // ============================================================
 // 品类 / 交易所 / 品种字典

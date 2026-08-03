@@ -109,8 +109,8 @@ import {
   Connection,
   Cpu,
   Refresh,
-  SuccessFilled,
-  CircleCloseFilled
+
+
 } from '@element-plus/icons-vue'
 import { configApi, type LLMProvider, type DataSourceConfig } from '@/api/config'
 

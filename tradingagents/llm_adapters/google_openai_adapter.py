@@ -11,7 +11,7 @@ from langchain_core.tools import BaseTool
 from langchain_core.messages import BaseMessage, AIMessage, HumanMessage, SystemMessage
 from langchain_core.outputs import LLMResult
 from pydantic import Field, SecretStr
-from ..config.config_manager import token_tracker
+from tradingagents.llm_clients.usage_tracker import token_tracker
 
 # 导入日志模块
 from tradingagents.utils.logging_manager import get_logger

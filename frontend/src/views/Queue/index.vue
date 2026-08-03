@@ -134,7 +134,7 @@ import { ref, onMounted, watch } from 'vue'
 
 import { commodityApi, type CommodityTaskItem } from '@/api/commodity'
 import { ElMessage } from 'element-plus'
-import { useRouter } from 'vue-router'
+
 
 import {
   List,
@@ -142,7 +142,7 @@ import {
   Delete
 } from '@element-plus/icons-vue'
 
-const router = useRouter()
+
 
 // 响应式数据
 const loading = ref(false)

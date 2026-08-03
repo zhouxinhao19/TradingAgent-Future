@@ -436,34 +436,30 @@ async def download_report(
             content = json.dumps(doc, ensure_ascii=False, indent=2, default=str)
             filename = f"{symbol}_{analysis_date}_report.json"
 
-... (other formats)
+            return Response(
+                content=content,
+                media_type="application/json",
+                headers={"Content-Disposition": f"attachment; filename={filename}"},
+            )
+
+        if format == "markdown":
+            content_parts = [f"# {symbol} 分析报告", ""]
+            summary = doc.get("summary")
+            if summary:
+                content_parts.extend(["## 摘要", str(summary), ""])
+            for module, module_content in (doc.get("reports") or {}).items():
+                content_parts.extend([f"## {module}", str(module_content), ""])
 
             content = "\n".join(content_parts)
             filename = f"{symbol}_{analysis_date}_report.md"
-            media_type = "text/markdown"
+            return Response(
+                content=content,
+                media_type="text/markdown",
+                headers={"Content-Disposition": f"attachment; filename={filename}"},
+            )
 
-...
-
-                docx_content = report_exporter.generate_docx_report(doc)
-                filename = f"{symbol}_{analysis_date}_report.docx"
-
-...
-
-                pdf_content = report_exporter.generate_pdf_report(doc)
-                filename = f"{symbol}_{analysis_date}_report.pdf"
-
-                # 返回文件流
-                def generate():
-                    yield pdf_content
-
-                return StreamingResponse(
-                    generate(),
-                    media_type="application/pdf",
-                    headers={"Content-Disposition": f"attachment; filename={filename}"}
-                )
-            except Exception as e:
-                logger.error(f"❌ PDF 文档生成失败: {e}")
-                raise HTTPException(status_code=500, detail=f"PDF 文档生成失败: {str(e)}")
+        if format in {"docx", "pdf"}:
+            raise HTTPException(status_code=501, detail=f"暂不支持 {format} 格式下载")
 
         else:
             raise HTTPException(status_code=400, detail=f"不支持的下载格式: {format}")

@@ -311,7 +311,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Coin, Refresh, Plus, Delete } from '@element-plus/icons-vue'
 import { useCommodityPaperStore } from '@/stores/commodity_paper'
-import { formatDateTime } from '@/utils/datetime'
+import { formatDateTime as formatDateTimeUtil } from '@/utils/datetime'
 
 const route = useRoute()
 const router = useRouter()
@@ -367,7 +367,7 @@ function fmtAmount(n: number | null | undefined) {
 }
 function formatDateTime(dt: string | undefined | null) {
   if (!dt) return '-'
-  return formatDateTime(dt)
+  return formatDateTimeUtil(dt)
 }
 function orderTypeLabel(t: string) {
   const map: Record<string, string> = { market: '市价', limit: '限价', stop: '止损', stop_limit: '止损限价' }
@@ -377,8 +377,8 @@ function orderStatusLabel(s: string) {
   const map: Record<string, string> = { pending: '待成交', filled: '已成交', partial: '部分成交', cancelled: '已撤单', rejected: '已拒单' }
   return map[s] || s
 }
-function orderStatusType(s: string) {
-  const map: Record<string, string> = { pending: 'warning', filled: 'success', partial: 'primary', cancelled: 'info', rejected: 'danger' }
+function orderStatusType(s: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' {
+  const map: Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = { pending: 'warning', filled: 'success', partial: 'primary', cancelled: 'info', rejected: 'danger' }
   return map[s] || 'info'
 }
 

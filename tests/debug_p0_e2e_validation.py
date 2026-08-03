@@ -29,13 +29,13 @@ os.environ.setdefault("PYTHONIOENCODING", "utf-8")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-# 5 个 plan 指定标的 × 交易所 + 品种覆盖
+# 5 个 plan 指定品种 × 交易所 + 品种覆盖（主力连续代码,不带 YYMM 自动触发 provider 主力连续路径）
 DEFAULT_SYMBOLS = [
-    {"full_symbol": "RB2510.SHF", "variety_name": "螺纹钢", "exchange": "SHF",  "category": "black",       "quote_unit": "元/吨"},
-    {"full_symbol": "CU2507.SHF", "variety_name": "铜",      "exchange": "SHF",  "category": "metal",       "quote_unit": "元/吨"},
-    {"full_symbol": "AU2506.SHF", "variety_name": "黄金",    "exchange": "SHF",  "category": "precious",    "quote_unit": "元/克"},
-    {"full_symbol": "M2509.DCE",  "variety_name": "豆粕",    "exchange": "DCE",  "category": "agricultural","quote_unit": "元/吨"},
-    {"full_symbol": "Y2509.DCE",  "variety_name": "豆油",    "exchange": "DCE",  "category": "agricultural","quote_unit": "元/吨"},
+    {"full_symbol": "RB.SHF", "variety_name": "螺纹钢", "exchange": "SHF",  "category": "black",       "quote_unit": "元/吨"},
+    {"full_symbol": "CU.SHF", "variety_name": "铜",      "exchange": "SHF",  "category": "metal",       "quote_unit": "元/吨"},
+    {"full_symbol": "AU.SHF", "variety_name": "黄金",    "exchange": "SHF",  "category": "precious",    "quote_unit": "元/克"},
+    {"full_symbol": "M.DCE",  "variety_name": "豆粕",    "exchange": "DCE",  "category": "agricultural","quote_unit": "元/吨"},
+    {"full_symbol": "Y.DCE",  "variety_name": "豆油",    "exchange": "DCE",  "category": "agricultural","quote_unit": "元/吨"},
 ]
 
 # 6 个节点 schema 校验状态字段映射

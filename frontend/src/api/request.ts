@@ -6,6 +6,7 @@ import { useAppStore } from '@/stores/app'
 import router from '@/router'
 
 // API响应接口
+
 export interface ApiResponse<T = any> {
   success: boolean
   data: T

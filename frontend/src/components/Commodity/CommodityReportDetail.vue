@@ -315,9 +315,11 @@ const riskTierDisplay = computed(() => {
 })
 
 /** 从 evidence_chain summary 提取策略标签 */
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
+
 const strategyTags = computed(() => {
   const ec_summary = report.value?.evidence_chain?.summary
-  const tags: Array<{ name: string; type: string }> = []
+  const tags: Array<{ name: string; type: TagType }> = []
   if (ec_summary?.allowed_strategies?.length) {
     for (const s of ec_summary.allowed_strategies) {
       tags.push({ name: s, type: 'success' })
@@ -526,8 +528,6 @@ function directionLabel(action?: string): string {
   }
   return map[action || ''] || action || '—'
 }
-
-type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
 
 function directionTagType(action?: string): TagType {
   const map: Record<string, TagType> = {

@@ -866,20 +866,6 @@ class ConfigService:
             print(f"验证配置数据失败: {e}")
             return False
 
-    async def migrate_legacy_config(self) -> bool:
-        """迁移传统配置"""
-        try:
-            # 这里可以调用迁移脚本的逻辑
-            # 或者直接在这里实现迁移逻辑
-            from scripts.migrate_config_to_webapi import ConfigMigrator
-
-            migrator = ConfigMigrator()
-            return await migrator.migrate_all_configs()
-
-        except Exception as e:
-            print(f"迁移传统配置失败: {e}")
-            return False
-    
     async def update_llm_config(self, llm_config: LLMConfig) -> bool:
         """更新大模型配置"""
         try:
