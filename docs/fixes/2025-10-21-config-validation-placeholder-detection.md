@@ -115,7 +115,7 @@ python scripts/test_api_key_validation.py
 - ✅ `your_openai_api_key_here` → 无效（占位符）
 - ✅ `your_dashscope_api_key_here` → 无效（占位符）
 - ✅ `your_anthropic_api_key_here` → 无效（占位符）
-- ✅ `sk-990547695d6046cf9be4e8d095235d91` → 有效
+- ✅ `YOUR_API_KEY_HERE` → 有效
 - ✅ `AIzaSyC3JdZVjblI0rfT_SNXXL5a4kvZ13_12CE` → 有效
 
 ### 集成测试

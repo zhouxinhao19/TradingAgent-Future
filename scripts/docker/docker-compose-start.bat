@@ -56,15 +56,15 @@ echo.
 echo 📊 服务访问信息:
 echo ========================================
 echo 🗄️ MongoDB:
-echo    - 连接地址: mongodb://admin:tradingagents123@localhost:27017/tradingagents
+echo    - 连接地址: mongodb://admin:CHANGE_ME_LOCAL_PASSWORD@localhost:27017/tradingagents
 echo    - 端口: 27017
 echo    - 用户名: admin
-echo    - 密码: tradingagents123
+echo    - 密码: CHANGE_ME_LOCAL_PASSWORD
 echo.
 echo 📦 Redis:
 echo    - 连接地址: redis://localhost:6379
 echo    - 端口: 6379
-echo    - 密码: tradingagents123
+echo    - 密码: CHANGE_ME_LOCAL_PASSWORD
 echo.
 echo 🖥️ 管理界面:
 echo    - Redis Commander: http://localhost:8081
@@ -78,7 +78,7 @@ if /i "%start_management%"=="y" (
     docker-compose --profile management up -d mongo-express
     if %errorlevel% equ 0 (
         echo ✅ Mongo Express启动成功: http://localhost:8082
-        echo    用户名: admin, 密码: tradingagents123
+        echo    用户名: admin, 密码: CHANGE_ME_LOCAL_PASSWORD
     ) else (
         echo ❌ Mongo Express启动失败
     )

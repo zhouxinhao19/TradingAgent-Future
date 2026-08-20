@@ -71,7 +71,7 @@ def create_admin_user(client):
         # 检查是否已存在管理员用户
         existing_admin = users_collection.find_one({"username": "admin"})
         
-        admin_password = "admin123"
+        admin_password = "CHANGE_ME_ADMIN_PASSWORD"
         
         if existing_admin:
             # 更新现有管理员用户
@@ -150,7 +150,7 @@ def create_web_user_config():
         # 创建用户配置文件
         users_config = {
             "admin": {
-                "password": hash_password("admin123"),
+                "password": hash_password("CHANGE_ME_ADMIN_PASSWORD"),
                 "role": "admin",
                 "name": "管理员",
                 "email": "admin@tradingagents.cn"
@@ -183,7 +183,7 @@ def create_admin_password_config():
         
         # 创建管理员密码配置
         admin_config = {
-            "password": "admin123",
+            "password": "CHANGE_ME_ADMIN_PASSWORD",
             "created_at": datetime.utcnow().isoformat(),
             "description": "系统管理员默认密码，请登录后立即修改"
         }
@@ -236,7 +236,7 @@ def main():
     
     print("\n🔐 登录信息:")
     print("  用户名: admin")
-    print("  密码: admin123")
+    print("  密码: CHANGE_ME_ADMIN_PASSWORD")
     
     print("\n🌐 访问地址:")
     print("  前端: http://your-server-ip:80")

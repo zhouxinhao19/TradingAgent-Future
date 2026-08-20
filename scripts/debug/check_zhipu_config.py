@@ -4,7 +4,7 @@ import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
 
 async def main():
-    client = AsyncIOMotorClient('mongodb://admin:tradingagents123@localhost:27017/')
+    client = AsyncIOMotorClient('mongodb://admin:CHANGE_ME_LOCAL_PASSWORD@localhost:27017/')
     db = client['tradingagents']
     
     provider = await db.llm_providers.find_one({'name': 'zhipu'})

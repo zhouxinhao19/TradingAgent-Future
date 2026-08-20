@@ -285,7 +285,7 @@ npm run dev
 
 ### 3. 访问页面
 1. 打开浏览器访问 `http://localhost:5173`
-2. 登录系统（用户名: `admin`, 密码: `admin123`）
+2. 登录系统（用户名: `admin`, 密码: `CHANGE_ME_ADMIN_PASSWORD`）
 3. 点击左侧菜单 "设置" → "系统管理" → "定时任务"
 
 ### 4. 测试功能

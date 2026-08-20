@@ -50,7 +50,7 @@ python -m streamlit run app.py
 ### 认证信息
 
 - **用户名**: admin
-- **密码**: tradingagents123
+- **密码**: CHANGE_ME_LOCAL_PASSWORD
 - **数据库**: tradingagents
 
 ## 📊 数据库结构
@@ -97,13 +97,13 @@ python -m streamlit run app.py
 MONGODB_HOST=localhost
 MONGODB_PORT=27018
 MONGODB_USERNAME=admin
-MONGODB_PASSWORD=tradingagents123
+MONGODB_PASSWORD=CHANGE_ME_LOCAL_PASSWORD
 MONGODB_DATABASE=tradingagents
 
 # Redis配置
 REDIS_HOST=localhost
 REDIS_PORT=6380
-REDIS_PASSWORD=tradingagents123
+REDIS_PASSWORD=CHANGE_ME_LOCAL_PASSWORD
 REDIS_DB=0
 ```
 

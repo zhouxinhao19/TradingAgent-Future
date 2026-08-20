@@ -232,7 +232,7 @@ docker restart tradingagents-backend
 ```bash
 # 连接到 MongoDB
 docker exec -it tradingagents-mongodb mongo tradingagents \
-  -u admin -p tradingagents123 --authenticationDatabase admin
+  -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin
 
 # 检查系统配置
 db.system_configs.countDocuments()
@@ -309,7 +309,7 @@ head -n 20 database_export_config_2025-10-16.json
 ```bash
 # 重置管理员密码
 docker exec -it tradingagents-mongodb mongo tradingagents \
-  -u admin -p tradingagents123 --authenticationDatabase admin \
+  -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin \
   --eval "db.users.updateOne({username: 'admin'}, {\$set: {password: '\$2b\$12\$...'}})"
 ```
 

@@ -18,8 +18,8 @@ services:
       PYTHONDONTWRITEBYTECODE: 1
       TZ: "Asia/Shanghai"
       TRADINGAGENTS_LOG_LEVEL: "INFO"
-      TRADINGAGENTS_MONGODB_URL: mongodb://admin:tradingagents123@mongodb:27017/tradingagents?authSource=admin
-      TRADINGAGENTS_REDIS_URL: redis://:tradingagents123@redis:6379
+      TRADINGAGENTS_MONGODB_URL: mongodb://admin:CHANGE_ME_LOCAL_PASSWORD@mongodb:27017/tradingagents?authSource=admin
+      TRADINGAGENTS_REDIS_URL: redis://:CHANGE_ME_LOCAL_PASSWORD@redis:6379
       TRADINGAGENTS_CACHE_TYPE: redis
       DOCKER_CONTAINER: "true"
     depends_on:
@@ -77,7 +77,7 @@ services:
       - "27017:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: tradingagents123
+      MONGO_INITDB_ROOT_PASSWORD: CHANGE_ME_LOCAL_PASSWORD
       MONGO_INITDB_DATABASE: tradingagents
       TZ: "Asia/Shanghai"
     volumes:
@@ -103,7 +103,7 @@ services:
       - "6379:6379"
     environment:
       TZ: "Asia/Shanghai"
-    command: redis-server --appendonly yes --requirepass tradingagents123
+    command: redis-server --appendonly yes --requirepass CHANGE_ME_LOCAL_PASSWORD
     volumes:
       - redis_data:/data
       - /etc/localtime:/etc/localtime:ro
@@ -125,7 +125,7 @@ services:
     ports:
       - "8081:8081"
     environment:
-      - REDIS_HOSTS=local:redis:6379:0:tradingagents123
+      - REDIS_HOSTS=local:redis:6379:0:CHANGE_ME_LOCAL_PASSWORD
     networks:
       - tradingagents-network
     depends_on:
@@ -148,10 +148,10 @@ services:
       - "8082:8081"
     environment:
       ME_CONFIG_MONGODB_ADMINUSERNAME: admin
-      ME_CONFIG_MONGODB_ADMINPASSWORD: tradingagents123
-      ME_CONFIG_MONGODB_URL: mongodb://admin:tradingagents123@mongodb:27017/
+      ME_CONFIG_MONGODB_ADMINPASSWORD: CHANGE_ME_LOCAL_PASSWORD
+      ME_CONFIG_MONGODB_URL: mongodb://admin:CHANGE_ME_LOCAL_PASSWORD@mongodb:27017/
       ME_CONFIG_BASICAUTH_USERNAME: admin
-      ME_CONFIG_BASICAUTH_PASSWORD: tradingagents123
+      ME_CONFIG_BASICAUTH_PASSWORD: CHANGE_ME_LOCAL_PASSWORD
     networks:
       - tradingagents-network
     depends_on:

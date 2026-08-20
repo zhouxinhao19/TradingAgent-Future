@@ -19,7 +19,7 @@ def debug_frontend_api():
     print("\n[步骤1] 登录...")
     login_response = requests.post(
         f"{BASE_URL}/api/auth/login",
-        json={"username": "admin", "password": "admin123"}
+        json={"username": "admin", "password": "CHANGE_ME_ADMIN_PASSWORD"}
     )
     
     if login_response.status_code != 200:

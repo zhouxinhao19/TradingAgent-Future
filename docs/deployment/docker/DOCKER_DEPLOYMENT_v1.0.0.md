@@ -167,14 +167,14 @@ docker-compose -f docker-compose.v1.0.0.yml --profile management up -d
 
 - **MongoDB管理**: http://localhost:8082
   - 用户名: `admin`
-  - 密码: `tradingagents123`
+  - 密码: `CHANGE_ME_LOCAL_PASSWORD`
 
 - **Redis管理**: http://localhost:8081
 
 ### 默认账号
 
 - **用户名**: `admin`
-- **密码**: `admin123`
+- **密码**: `CHANGE_ME_ADMIN_PASSWORD`
 
 ⚠️ **重要**: 请在首次登录后立即修改密码！
 
@@ -217,10 +217,10 @@ docker exec tradingagents-mongodb mongodump --out /data/backup
 docker exec tradingagents-mongodb mongorestore /data/backup
 
 # 清理Redis缓存
-docker exec tradingagents-redis redis-cli -a tradingagents123 FLUSHALL
+docker exec tradingagents-redis redis-cli -a CHANGE_ME_LOCAL_PASSWORD FLUSHALL
 
 # 查看MongoDB数据
-docker exec -it tradingagents-mongodb mongo -u admin -p tradingagents123
+docker exec -it tradingagents-mongodb mongo -u admin -p CHANGE_ME_LOCAL_PASSWORD
 ```
 
 ### 容器管理
@@ -313,7 +313,7 @@ docker-compose -f docker-compose.v1.0.0.yml restart backend
 MAX_CONCURRENT_ANALYSIS_TASKS=1
 
 # 3. 清理缓存
-docker exec tradingagents-redis redis-cli -a tradingagents123 FLUSHALL
+docker exec tradingagents-redis redis-cli -a CHANGE_ME_LOCAL_PASSWORD FLUSHALL
 ```
 
 ### 问题5：构建失败
@@ -410,7 +410,7 @@ services:
 
 ```bash
 # 进入MongoDB容器
-docker exec -it tradingagents-mongodb mongo -u admin -p tradingagents123
+docker exec -it tradingagents-mongodb mongo -u admin -p CHANGE_ME_LOCAL_PASSWORD
 
 # 创建索引
 use tradingagents

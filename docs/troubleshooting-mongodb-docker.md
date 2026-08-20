@@ -20,7 +20,7 @@
 cat docker-compose.hub.nginx.yml | grep MONGODB
 
 # 2. 进入 MongoDB 容器检查用户（MongoDB 4.4 使用 mongo 命令）
-docker exec -it tradingagents-mongodb mongo -u admin -p tradingagents123 --authenticationDatabase admin
+docker exec -it tradingagents-mongodb mongo -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin
 
 # 3. 在 mongo shell 中查看用户
 use admin
@@ -57,10 +57,10 @@ docker-compose -f docker-compose.hub.nginx.yml up -d
 **正确配置**：
 ```bash
 # 使用 root 用户（admin 数据库）
-mongodb://admin:tradingagents123@mongodb:27017/tradingagents?authSource=admin
+mongodb://admin:CHANGE_ME_LOCAL_PASSWORD@mongodb:27017/tradingagents?authSource=admin
 
 # 使用应用用户（tradingagents 数据库）
-mongodb://tradingagents:tradingagents123@mongodb:27017/tradingagents?authSource=admin
+mongodb://tradingagents:CHANGE_ME_LOCAL_PASSWORD@mongodb:27017/tradingagents?authSource=admin
 ```
 
 **注意**：
@@ -119,12 +119,12 @@ docker inspect tradingagents-mongodb | grep -A 10 Health
 
 ```bash
 # 方法 1：使用 mongo shell（MongoDB 4.4）
-docker exec -it tradingagents-mongodb mongo -u admin -p tradingagents123 --authenticationDatabase admin
+docker exec -it tradingagents-mongodb mongo -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin
 
 # 方法 2：使用 Python
 docker exec -it tradingagents-backend python3 -c "
 from pymongo import MongoClient
-client = MongoClient('mongodb://admin:tradingagents123@mongodb:27017/tradingagents?authSource=admin')
+client = MongoClient('mongodb://admin:CHANGE_ME_LOCAL_PASSWORD@mongodb:27017/tradingagents?authSource=admin')
 print(client.server_info())
 "
 ```
@@ -146,10 +146,10 @@ environment:
   MONGODB_HOST: "mongodb"
   MONGODB_PORT: "27017"
   MONGODB_USERNAME: "admin"
-  MONGODB_PASSWORD: "tradingagents123"
+  MONGODB_PASSWORD: "CHANGE_ME_LOCAL_PASSWORD"
   MONGODB_DATABASE: "tradingagents"
   MONGODB_AUTH_SOURCE: "admin"
-  MONGODB_CONNECTION_STRING: "mongodb://admin:tradingagents123@mongodb:27017/tradingagents?authSource=admin"
+  MONGODB_CONNECTION_STRING: "mongodb://admin:CHANGE_ME_LOCAL_PASSWORD@mongodb:27017/tradingagents?authSource=admin"
 ```
 
 **优点**：
@@ -169,10 +169,10 @@ environment:
   MONGODB_HOST: "mongodb"
   MONGODB_PORT: "27017"
   MONGODB_USERNAME: "tradingagents"
-  MONGODB_PASSWORD: "tradingagents123"
+  MONGODB_PASSWORD: "CHANGE_ME_LOCAL_PASSWORD"
   MONGODB_DATABASE: "tradingagents"
   MONGODB_AUTH_SOURCE: "admin"
-  MONGODB_CONNECTION_STRING: "mongodb://tradingagents:tradingagents123@mongodb:27017/tradingagents?authSource=admin"
+  MONGODB_CONNECTION_STRING: "mongodb://tradingagents:CHANGE_ME_LOCAL_PASSWORD@mongodb:27017/tradingagents?authSource=admin"
 ```
 
 **优点**：
@@ -206,20 +206,20 @@ docker logs -f tradingagents-backend
 
 ```bash
 # 1. 进入 MongoDB 容器（MongoDB 4.4 使用 mongo 命令）
-docker exec -it tradingagents-mongodb mongo -u admin -p tradingagents123 --authenticationDatabase admin
+docker exec -it tradingagents-mongodb mongo -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin
 
 # 2. 创建应用用户
 use admin
 db.createUser({
   user: 'tradingagents',
-  pwd: 'tradingagents123',
+  pwd: 'CHANGE_ME_LOCAL_PASSWORD',
   roles: [
     { role: 'readWrite', db: 'tradingagents' }
   ]
 })
 
 # 3. 验证用户
-db.auth('tradingagents', 'tradingagents123')
+db.auth('tradingagents', 'CHANGE_ME_LOCAL_PASSWORD')
 
 # 4. 退出并重启应用容器
 exit

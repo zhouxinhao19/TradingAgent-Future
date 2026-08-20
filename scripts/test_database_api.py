@@ -19,7 +19,7 @@ async def login() -> str:
             f"{BASE_URL}/api/auth/login",
             json={
                 "username": "admin",
-                "password": "admin123"
+                "password": "CHANGE_ME_ADMIN_PASSWORD"
             }
         )
         

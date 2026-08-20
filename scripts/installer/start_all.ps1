@@ -506,7 +506,7 @@ Write-Host "  API Docs: $apiDocsUrl" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Default Login:" -ForegroundColor White
 Write-Host "  Username: admin" -ForegroundColor Cyan
-Write-Host "  Password: admin123" -ForegroundColor Cyan
+Write-Host "  Password: CHANGE_ME_ADMIN_PASSWORD" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Press Ctrl+C to stop all services" -ForegroundColor Yellow
 Write-Host ""

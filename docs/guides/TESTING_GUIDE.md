@@ -33,7 +33,7 @@ cp .env.example .env
 4. 创建新的API Key
 5. 复制API Key到.env文件：
    ```bash
-   DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+   DEEPSEEK_API_KEY=YOUR_API_KEY_HERE
    DEEPSEEK_ENABLED=true
    ```
 

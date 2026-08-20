@@ -20,7 +20,7 @@ docker run -d ^
     --name tradingagents-mongodb ^
     -p 27017:27017 ^
     -e MONGO_INITDB_ROOT_USERNAME=admin ^
-    -e MONGO_INITDB_ROOT_PASSWORD=tradingagents123 ^
+    -e MONGO_INITDB_ROOT_PASSWORD=CHANGE_ME_LOCAL_PASSWORD ^
     -e MONGO_INITDB_DATABASE=tradingagents ^
     --restart unless-stopped ^
     mongo:4.4
@@ -36,7 +36,7 @@ docker run -d ^
     --name tradingagents-redis ^
     -p 6379:6379 ^
     --restart unless-stopped ^
-    redis:latest redis-server --appendonly yes --requirepass tradingagents123
+    redis:latest redis-server --appendonly yes --requirepass CHANGE_ME_LOCAL_PASSWORD
 
 if %errorlevel% equ 0 (
     echo [OK] Redis started successfully
@@ -57,11 +57,11 @@ echo Debug Services Started!
 echo ========================================
 echo MongoDB: localhost:27017
 echo   Username: admin
-echo   Password: tradingagents123
+echo   Password: CHANGE_ME_LOCAL_PASSWORD
 echo   Database: tradingagents
 echo.
 echo Redis: localhost:6379
-echo   Password: tradingagents123
+echo   Password: CHANGE_ME_LOCAL_PASSWORD
 echo.
 echo To stop services: docker stop tradingagents-mongodb tradingagents-redis
 echo.

@@ -24,40 +24,40 @@ def fix_admin_password():
         config_file.parent.mkdir(parents=True, exist_ok=True)
         
         # 读取当前配置
-        current_password = "admin123"  # 默认密码
+        current_password = "CHANGE_ME_ADMIN_PASSWORD"  # 默认密码
         if config_file.exists():
             try:
                 with open(config_file, "r", encoding="utf-8") as f:
                     config = json.load(f)
-                    current_password = config.get("password", "admin123")
+                    current_password = config.get("password", "CHANGE_ME_ADMIN_PASSWORD")
                 print(f"✓ 当前管理员密码: {current_password}")
             except Exception as e:
                 print(f"⚠️ 读取密码配置失败: {e}")
         
         # 如果密码不是默认密码，询问是否重置
-        if current_password != "admin123":
+        if current_password != "CHANGE_ME_ADMIN_PASSWORD":
             print(f"\n当前管理员密码是: {current_password}")
-            reset = input("是否重置为默认密码 'admin123'? (y/N): ").strip().lower()
+            reset = input("是否重置为默认密码 'CHANGE_ME_ADMIN_PASSWORD'? (y/N): ").strip().lower()
             if reset == 'y':
-                config = {"password": "admin123"}
+                config = {"password": "CHANGE_ME_ADMIN_PASSWORD"}
                 with open(config_file, "w", encoding="utf-8") as f:
                     json.dump(config, f, ensure_ascii=False, indent=2)
-                print("✅ 管理员密码已重置为: admin123")
-                current_password = "admin123"
+                print("✅ 管理员密码已重置为: CHANGE_ME_ADMIN_PASSWORD")
+                current_password = "CHANGE_ME_ADMIN_PASSWORD"
             else:
                 print("✓ 保持当前密码不变")
         else:
             # 确保配置文件存在
-            config = {"password": "admin123"}
+            config = {"password": "CHANGE_ME_ADMIN_PASSWORD"}
             with open(config_file, "w", encoding="utf-8") as f:
                 json.dump(config, f, ensure_ascii=False, indent=2)
-            print("✅ 管理员密码配置已确认: admin123")
+            print("✅ 管理员密码配置已确认: CHANGE_ME_ADMIN_PASSWORD")
         
         return current_password
         
     except Exception as e:
         print(f"❌ 修复管理员密码配置失败: {e}")
-        return "admin123"
+        return "CHANGE_ME_ADMIN_PASSWORD"
 
 def create_web_users_config():
     """创建 Web 应用用户配置"""
@@ -79,7 +79,7 @@ def create_web_users_config():
         
         default_users = {
             "admin": {
-                "password_hash": hash_password("admin123"),
+                "password_hash": hash_password("CHANGE_ME_ADMIN_PASSWORD"),
                 "role": "admin",
                 "permissions": ["analysis", "config", "admin"],
                 "created_at": time.time()
@@ -96,7 +96,7 @@ def create_web_users_config():
             json.dump(default_users, f, indent=2, ensure_ascii=False)
         
         print("✅ Web 用户配置创建成功")
-        print("   - admin / admin123 (管理员)")
+        print("   - admin / CHANGE_ME_ADMIN_PASSWORD (管理员)")
         print("   - user / user123 (普通用户)")
         
         return True
@@ -165,13 +165,13 @@ def create_basic_mongodb_data(client):
         else:
             # 读取管理员密码
             config_file = project_root / "config" / "admin_password.json"
-            admin_password = "admin123"
+            admin_password = "CHANGE_ME_ADMIN_PASSWORD"
             
             if config_file.exists():
                 try:
                     with open(config_file, "r", encoding="utf-8") as f:
                         config = json.load(f)
-                        admin_password = config.get("password", "admin123")
+                        admin_password = config.get("password", "CHANGE_ME_ADMIN_PASSWORD")
                 except:
                     pass
             
@@ -289,7 +289,7 @@ def main():
         print(f"- 后端 API 用户名: admin")
         print(f"- 后端 API 密码: {admin_password}")
         print(f"- Web 应用用户名: admin")
-        print(f"- Web 应用密码: admin123")
+        print(f"- Web 应用密码: CHANGE_ME_ADMIN_PASSWORD")
         
         print(f"\n🌐 访问地址:")
         print(f"- 前端应用: http://localhost:80")

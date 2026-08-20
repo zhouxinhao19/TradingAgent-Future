@@ -127,7 +127,7 @@ TradingAgent-Future 绿色安装版是一个**免安装、开箱即用**的便�
    ```
 
 2. **首次启动说明**：
-   - 第一次启动时，系统会自动导入配置数据和创建默认管理员账号（admin/admin123）
+   - 第一次启动时，系统会自动导入配置数据和创建默认管理员账号（admin/CHANGE_ME_ADMIN_PASSWORD）
    - 这个过程只在首次启动时执行一次，后续启动会自动跳过
    - 如果需要重新导入配置，可以使用 `-ForceImport` 参数：
      ```powershell
@@ -154,7 +154,7 @@ TradingAgent-Future 绿色安装版是一个**免安装、开箱即用**的便�
 
    Default Login:
      Username: admin
-     Password: admin123
+     Password: CHANGE_ME_ADMIN_PASSWORD
    ```
 
 ### 第五步：访问应用
@@ -163,7 +163,7 @@ TradingAgent-Future 绿色安装版是一个**免安装、开箱即用**的便�
 2. 首次访问会自动跳转到登录页面
 3. 使用默认账号登录：
    - **用户名**：admin
-   - **密码**：admin123
+   - **密码**：CHANGE_ME_ADMIN_PASSWORD
 
 ---
 
@@ -386,13 +386,13 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
 MONGODB_HOST=localhost
 MONGODB_PORT=27017
 MONGODB_USER=admin
-MONGODB_PASSWORD=tradingagents123
+MONGODB_PASSWORD=CHANGE_ME_LOCAL_PASSWORD
 MONGODB_DATABASE=tradingagents
 
 # Redis
 REDIS_HOST=localhost
 REDIS_PORT=6379
-REDIS_PASSWORD=tradingagents123
+REDIS_PASSWORD=CHANGE_ME_LOCAL_PASSWORD
 REDIS_DB=0
 
 # ============================================================================

@@ -2,7 +2,7 @@
 from pymongo import MongoClient
 
 # 连接 MongoDB
-mongo_uri = "mongodb://admin:tradingagents123@localhost:27017/"
+mongo_uri = "mongodb://admin:CHANGE_ME_LOCAL_PASSWORD@localhost:27017/"
 client = MongoClient(mongo_uri)
 
 db = client["tradingagents"]

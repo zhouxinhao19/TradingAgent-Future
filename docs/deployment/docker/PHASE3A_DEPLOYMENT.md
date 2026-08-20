@@ -280,7 +280,7 @@ docker compose logs mongodb | tail -20
 #    MONGODB_HOST=localhost           # 开发模式 OK
 #    MONGODB_PORT=27017
 #    MONGODB_USERNAME=admin
-#    MONGODB_PASSWORD=tradingagents123
+#    MONGODB_PASSWORD=CHANGE_ME_LOCAL_PASSWORD
 #    MONGODB_AUTH_SOURCE=admin
 
 # 3. docker compose down && docker compose up -d(完整重启)
@@ -418,13 +418,13 @@ Copy-Item .env.example .env
 MONGODB_HOST=localhost
 MONGODB_PORT=27017
 MONGODB_USERNAME=admin
-MONGODB_PASSWORD=tradingagents123
+MONGODB_PASSWORD=CHANGE_ME_LOCAL_PASSWORD
 MONGODB_DATABASE=tradingagentscn
 MONGODB_AUTH_SOURCE=admin
 
 REDIS_HOST=localhost
 REDIS_PORT=6379
-REDIS_PASSWORD=tradingagents123
+REDIS_PASSWORD=CHANGE_ME_LOCAL_PASSWORD
 
 # Phase 3a flag
 FEATURE_COMMODITY_ENABLED=true

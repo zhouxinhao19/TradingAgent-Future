@@ -3,7 +3,7 @@
 创建默认管理员用户
 
 功能：
-- 创建默认管理员用户（admin/admin123）
+- 创建默认管理员用户（admin/CHANGE_ME_ADMIN_PASSWORD）
 - 如果用户已存在，可选择覆盖或跳过
 
 使用方法：
@@ -26,7 +26,7 @@ from pymongo import MongoClient
 
 
 # 配置
-MONGO_URI = "mongodb://admin:tradingagents123@localhost:27017/tradingagentscn?authSource=admin"
+MONGO_URI = "mongodb://admin:CHANGE_ME_LOCAL_PASSWORD@localhost:27017/tradingagentscn?authSource=admin"
 DB_NAME = "tradingagentscn"
 
 
@@ -153,7 +153,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
-  # 创建默认管理员（admin/admin123）
+  # 创建默认管理员（admin/CHANGE_ME_ADMIN_PASSWORD）
   python scripts/create_default_admin.py
   
   # 覆盖已存在的用户
@@ -174,8 +174,8 @@ def main():
     )
     parser.add_argument(
         "--password",
-        default="admin123",
-        help="密码（默认: admin123）"
+        default="CHANGE_ME_ADMIN_PASSWORD",
+        help="密码（默认: CHANGE_ME_ADMIN_PASSWORD）"
     )
     parser.add_argument(
         "--email",

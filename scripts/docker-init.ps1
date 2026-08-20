@@ -224,7 +224,7 @@ Write-Host "  API文档:  http://localhost:8000/docs" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "默认账号:"
 Write-Host "  用户名: admin"
-Write-Host "  密码: admin123"
+Write-Host "  密码: CHANGE_ME_ADMIN_PASSWORD"
 Write-Host ""
 Write-Host "⚠️  重要: 请在首次登录后立即修改密码！" -ForegroundColor Yellow
 Write-Host ""

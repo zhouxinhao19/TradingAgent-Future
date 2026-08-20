@@ -8,7 +8,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime
 
 # MongoDB 连接配置
-MONGODB_URL = "mongodb://admin:tradingagents123@localhost:27017"
+MONGODB_URL = "mongodb://admin:CHANGE_ME_LOCAL_PASSWORD@localhost:27017"
 DATABASE_NAME = "tradingagents"
 
 # 任务元数据定义

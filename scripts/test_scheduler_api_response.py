@@ -9,7 +9,7 @@ import json
 # 配置
 BASE_URL = "http://localhost:8000"
 USERNAME = "admin"
-PASSWORD = "admin123"
+PASSWORD = "CHANGE_ME_ADMIN_PASSWORD"
 
 
 def login() -> str:

@@ -12,7 +12,7 @@ import requests
 
 BASE_URL = "http://localhost:8000"
 USERNAME = "admin"
-PASSWORD = "admin123"
+PASSWORD = "CHANGE_ME_ADMIN_PASSWORD"
 
 STOCKS = ["000001", "000002"]
 

@@ -14,7 +14,7 @@ async def main():
     
     try:
         # 直接连接 MongoDB
-        client = AsyncIOMotorClient("mongodb://admin:tradingagents123@localhost:27017/?authSource=admin")
+        client = AsyncIOMotorClient("mongodb://admin:CHANGE_ME_LOCAL_PASSWORD@localhost:27017/?authSource=admin")
         db = client['tradingagents']
         
         # 获取当前配置

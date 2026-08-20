@@ -17,14 +17,14 @@
 
 # ===== LLM配置 =====
 # DeepSeek配置
-DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+DEEPSEEK_API_KEY=YOUR_API_KEY_HERE
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 
 # 阿里百炼配置
-DASHSCOPE_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+DASHSCOPE_API_KEY=YOUR_API_KEY_HERE
 
 # OpenAI配置 (可选)
-OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+OPENAI_API_KEY=YOUR_API_KEY_HERE
 
 # Google Gemini配置 (可选)
 GOOGLE_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

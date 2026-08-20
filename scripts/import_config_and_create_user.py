@@ -4,7 +4,7 @@
 
 功能：
 1. 从导出的 JSON 文件导入配置数据到 MongoDB
-2. 创建默认管理员用户（admin/admin123）
+2. 创建默认管理员用户（admin/CHANGE_ME_ADMIN_PASSWORD）
 3. 支持选择性导入集合
 4. 支持覆盖或跳过已存在的数据
 
@@ -47,7 +47,7 @@ def load_env_config(script_dir: Path) -> dict:
         'mongodb_port': 27017,  # 默认端口
         'mongodb_host': 'localhost',
         'mongodb_username': 'admin',
-        'mongodb_password': 'tradingagents123',
+        'mongodb_password': 'CHANGE_ME_LOCAL_PASSWORD',
         'mongodb_database': 'tradingagents',
         'mongodb_auth_source': 'admin',
         'mongodb_connection_string': None,
@@ -96,7 +96,7 @@ def load_env_config(script_dir: Path) -> dict:
 # 默认管理员用户
 DEFAULT_ADMIN = {
     "username": "admin",
-    "password": "admin123",
+    "password": "CHANGE_ME_ADMIN_PASSWORD",
     "email": "admin@tradingagents.cn"
 }
 
@@ -294,7 +294,7 @@ def connect_mongodb(use_docker: bool = True, config: dict = None) -> MongoClient
             'mongodb_port': 27017,
             'mongodb_host': 'localhost',
             'mongodb_username': 'admin',
-            'mongodb_password': 'tradingagents123',
+            'mongodb_password': 'CHANGE_ME_LOCAL_PASSWORD',
             'mongodb_database': 'tradingagents',
             'mongodb_auth_source': 'admin',
             'mongodb_connection_string': None,

@@ -100,7 +100,7 @@ scripts\user_manager.bat reset
 
 ### 重置配置 (reset)
 将用户配置重置为默认设置，包含以下默认用户：
-- `admin` / `admin123` (管理员)
+- `admin` / `CHANGE_ME_ADMIN_PASSWORD` (管理员)
 - `user` / `user123` (普通用户)
 
 ## 安全注意事项

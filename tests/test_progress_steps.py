@@ -10,7 +10,7 @@ from datetime import datetime
 # 配置
 BASE_URL = "http://localhost:8000"
 USERNAME = "admin"
-PASSWORD = "admin123"
+PASSWORD = "CHANGE_ME_ADMIN_PASSWORD"
 
 async def login() -> str:
     """登录并获取token"""

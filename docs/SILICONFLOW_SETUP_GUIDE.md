@@ -102,12 +102,12 @@
 
 ```bash
 # 硅基流动 API 密钥
-SILICONFLOW_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+SILICONFLOW_API_KEY=YOUR_API_KEY_HERE
 ```
 
 **示例**（使用您提供的百炼 Key 格式）：
 ```bash
-SILICONFLOW_API_KEY=sk-990547695d6046cf9be4e8d095235d91
+SILICONFLOW_API_KEY=YOUR_API_KEY_HERE
 ```
 
 #### 步骤 2：重启后端服务

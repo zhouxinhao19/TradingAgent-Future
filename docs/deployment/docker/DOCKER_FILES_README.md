@@ -259,7 +259,7 @@ docker exec -it tradingagents-backend bash
 docker exec -it tradingagents-frontend sh
 
 # 进入MongoDB容器
-docker exec -it tradingagents-mongodb mongo -u admin -p tradingagents123
+docker exec -it tradingagents-mongodb mongo -u admin -p CHANGE_ME_LOCAL_PASSWORD
 ```
 
 ---

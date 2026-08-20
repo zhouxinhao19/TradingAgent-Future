@@ -285,7 +285,7 @@ class UserService:
             logger.error(f"❌ 重置密码失败: {e}")
             return False
     
-    async def create_admin_user(self, username: str = "admin", password: str = "admin123", email: str = "admin@tradingagents.cn") -> Optional[User]:
+    async def create_admin_user(self, username: str = "admin", password: str = "", email: str = "admin@tradingagents.cn") -> Optional[User]:
         """创建管理员用户"""
         try:
             # 检查是否已存在管理员

@@ -317,6 +317,6 @@ Write-Host "  3. Run start_all.ps1 to start all services" -ForegroundColor Gray
 Write-Host "  4. Visit http://localhost to access the application" -ForegroundColor Gray
 Write-Host ""
 
-Write-Host "Note: First-time startup will automatically import configuration and create default user (admin/admin123)" -ForegroundColor Yellow
+Write-Host "Note: First-time startup will automatically import configuration and create default user (admin/CHANGE_ME_ADMIN_PASSWORD)" -ForegroundColor Yellow
 Write-Host ""
 

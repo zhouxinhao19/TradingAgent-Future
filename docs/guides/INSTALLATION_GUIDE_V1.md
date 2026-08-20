@@ -156,7 +156,7 @@ OPENAI_API_KEY=your_openai_api_key_here
 
 默认管理员账号：
 - **用户名**: `admin`
-- **密码**: `admin123`
+- **密码**: `CHANGE_ME_ADMIN_PASSWORD`
 
 ⚠️ **重要**: 首次登录后请立即修改密码！
 
@@ -535,7 +535,7 @@ python scripts/import_config_and_create_user.py
 
 # 创建默认管理员账号
 # 用户名: admin
-# 密码: admin123
+# 密码: CHANGE_ME_ADMIN_PASSWORD
 ```
 
 #### 6. 启动后端服务
@@ -585,7 +585,7 @@ npm run dev
 
 默认管理员账号：
 - **用户名**: `admin`
-- **密码**: `admin123`
+- **密码**: `CHANGE_ME_ADMIN_PASSWORD`
 
 ⚠️ **重要**: 首次登录后请立即修改密码！
 

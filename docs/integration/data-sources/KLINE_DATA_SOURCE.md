@@ -160,7 +160,7 @@ stock_daily_quotes
 
 ```bash
 # 连接 MongoDB
-mongo mongodb://admin:tradingagents123@localhost:27017/tradingagents
+mongo mongodb://admin:CHANGE_ME_LOCAL_PASSWORD@localhost:27017/tradingagents
 
 # 查询数据
 db.stock_daily_quotes.find({

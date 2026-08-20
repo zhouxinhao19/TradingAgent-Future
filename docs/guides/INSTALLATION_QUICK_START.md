@@ -123,16 +123,16 @@ python -m app
 
 ```env
 # 阿里百炼（推荐）
-DASHSCOPE_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+DASHSCOPE_API_KEY=YOUR_API_KEY_HERE
 
 # DeepSeek（推荐）
-DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+DEEPSEEK_API_KEY=YOUR_API_KEY_HERE
 
 # Google AI（推荐）
 GOOGLE_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # OpenAI（可选）
-OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+OPENAI_API_KEY=YOUR_API_KEY_HERE
 ```
 
 ---
@@ -142,7 +142,7 @@ OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 所有部署方式的默认管理员账号：
 
 - **用户名**: `admin`
-- **密码**: `admin123`
+- **密码**: `CHANGE_ME_ADMIN_PASSWORD`
 
 ⚠️ **重要**: 首次登录后请立即修改密码！
 

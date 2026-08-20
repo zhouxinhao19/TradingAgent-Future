@@ -305,7 +305,7 @@ cd release\TradingAgentsCN-portable
 
 # 4. 访问
 # 浏览器打开: http://localhost
-# 默认账号: admin/admin123
+# 默认账号: admin/CHANGE_ME_ADMIN_PASSWORD
 ```
 
 ---

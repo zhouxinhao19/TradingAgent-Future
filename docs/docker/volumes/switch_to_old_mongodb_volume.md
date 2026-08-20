@@ -97,7 +97,7 @@ docker run -d \
   -v tradingagents_mongodb_data:/data/db \
   -v ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro \
   -e MONGO_INITDB_ROOT_USERNAME=admin \
-  -e MONGO_INITDB_ROOT_PASSWORD=tradingagents123 \
+  -e MONGO_INITDB_ROOT_PASSWORD=CHANGE_ME_LOCAL_PASSWORD \
   -e MONGO_INITDB_DATABASE=tradingagents \
   -e TZ="Asia/Shanghai" \
   --restart unless-stopped \
@@ -118,7 +118,7 @@ sleep 10
 
 # 连接到 MongoDB 并查看数据
 docker exec tradingagents-mongodb mongo tradingagents \
-  -u admin -p tradingagents123 --authenticationDatabase admin \
+  -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin \
   --eval "db.system_configs.findOne({is_active: true}).llm_configs.filter(c => c.enabled).map(c => c.provider + ': ' + c.model_name)"
 ```
 
@@ -186,7 +186,7 @@ docker-compose -f docker-compose.hub.yml up -d
 ```bash
 # 1. 导出新数据卷的数据
 docker exec tradingagents-mongodb mongodump \
-  -u admin -p tradingagents123 --authenticationDatabase admin \
+  -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin \
   -d tradingagents -o /tmp/new_backup
 
 docker cp tradingagents-mongodb:/tmp/new_backup ./mongodb_new_backup
@@ -197,7 +197,7 @@ docker cp tradingagents-mongodb:/tmp/new_backup ./mongodb_new_backup
 docker cp ./mongodb_new_backup tradingagents-mongodb:/tmp/new_backup
 
 docker exec tradingagents-mongodb mongorestore \
-  -u admin -p tradingagents123 --authenticationDatabase admin \
+  -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin \
   -d tradingagents /tmp/new_backup/tradingagents
 ```
 
@@ -224,7 +224,7 @@ docker run -d `
   -v tradingagents_mongodb_data:/data/db `
   -v ${PWD}/scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro `
   -e MONGO_INITDB_ROOT_USERNAME=admin `
-  -e MONGO_INITDB_ROOT_PASSWORD=tradingagents123 `
+  -e MONGO_INITDB_ROOT_PASSWORD=CHANGE_ME_LOCAL_PASSWORD `
   -e MONGO_INITDB_DATABASE=tradingagents `
   -e TZ="Asia/Shanghai" `
   --restart unless-stopped `
@@ -237,7 +237,7 @@ Start-Sleep -Seconds 15
 # 验证数据
 Write-Host "验证数据..." -ForegroundColor Yellow
 docker exec tradingagents-mongodb mongo tradingagents `
-  -u admin -p tradingagents123 --authenticationDatabase admin `
+  -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin `
   --quiet --eval "print('启用的 LLM 数量: ' + db.system_configs.findOne({is_active: true}).llm_configs.filter(c => c.enabled).length)"
 
 Write-Host "✅ 切换完成！" -ForegroundColor Green
@@ -264,7 +264,7 @@ docker run -d \
   -v tradingagents_mongodb_data:/data/db \
   -v $(pwd)/scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro \
   -e MONGO_INITDB_ROOT_USERNAME=admin \
-  -e MONGO_INITDB_ROOT_PASSWORD=tradingagents123 \
+  -e MONGO_INITDB_ROOT_PASSWORD=CHANGE_ME_LOCAL_PASSWORD \
   -e MONGO_INITDB_DATABASE=tradingagents \
   -e TZ="Asia/Shanghai" \
   --restart unless-stopped \
@@ -277,7 +277,7 @@ sleep 15
 # 验证数据
 echo "验证数据..."
 docker exec tradingagents-mongodb mongo tradingagents \
-  -u admin -p tradingagents123 --authenticationDatabase admin \
+  -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin \
   --quiet --eval "print('启用的 LLM 数量: ' + db.system_configs.findOne({is_active: true}).llm_configs.filter(c => c.enabled).length)"
 
 echo "✅ 切换完成！"
@@ -336,7 +336,7 @@ echo "✅ 切换完成！"
 | **停止临时容器** | `docker stop temp_old_mongodb && docker rm temp_old_mongodb` |
 | **停止当前容器** | `docker stop tradingagents-mongodb && docker rm tradingagents-mongodb` |
 | **使用旧数据卷启动** | `docker run -d --name tradingagents-mongodb -v tradingagents_mongodb_data:/data/db ...` |
-| **验证数据** | `docker exec tradingagents-mongodb mongo tradingagents -u admin -p tradingagents123 --authenticationDatabase admin --eval "db.system_configs.find()"` |
+| **验证数据** | `docker exec tradingagents-mongodb mongo tradingagents -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin --eval "db.system_configs.find()"` |
 
 **关键点**：
 - ✅ 旧数据卷 `tradingagents_mongodb_data` 包含完整的配置数据（15个LLM）

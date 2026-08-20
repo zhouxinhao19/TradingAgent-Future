@@ -155,7 +155,7 @@ docker inspect tradingagents-redis -f '{{range .Mounts}}{{.Name}} {{end}}'
 
 ```bash
 docker exec tradingagents-mongodb mongo tradingagents \
-  -u admin -p tradingagents123 --authenticationDatabase admin \
+  -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin \
   --eval "db.system_configs.findOne({is_active: true})"
 ```
 
@@ -205,7 +205,7 @@ docker-compose -f docker-compose.v1.0.0.yml up -d
 ```bash
 # 备份 MongoDB 数据
 docker exec tradingagents-mongodb mongodump \
-  -u admin -p tradingagents123 --authenticationDatabase admin \
+  -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin \
   -d tradingagents -o /tmp/backup
 
 docker cp tradingagents-mongodb:/tmp/backup ./mongodb_backup_$(date +%Y%m%d)

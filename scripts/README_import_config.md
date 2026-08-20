@@ -4,7 +4,7 @@
 
 `import_config_and_create_user.py` 脚本用于：
 1. 从导出的 JSON 文件导入配置数据到 MongoDB
-2. 创建默认管理员用户（admin/admin123）
+2. 创建默认管理员用户（admin/CHANGE_ME_ADMIN_PASSWORD）
 3. 支持在 Docker 容器内或宿主机上运行
 
 ## 运行环境
@@ -27,7 +27,7 @@ python scripts/import_config_and_create_user.py /path/to/export.json
 **连接信息：**
 - MongoDB 地址：`mongodb:27017`（Docker 内部服务名）
 - 数据库：`tradingagents`
-- 认证：`admin/tradingagents123`
+- 认证：`admin/CHANGE_ME_LOCAL_PASSWORD`
 
 ### 2. 在宿主机上运行
 
@@ -44,7 +44,7 @@ python scripts/import_config_and_create_user.py --host /path/to/export.json
 **连接信息：**
 - MongoDB 地址：`localhost:27017`（宿主机端口映射）
 - 数据库：`tradingagents`
-- 认证：`admin/tradingagents123`
+- 认证：`admin/CHANGE_ME_LOCAL_PASSWORD`
 
 **前提条件：**
 - MongoDB 容器已启动
@@ -129,7 +129,7 @@ python scripts/import_config_and_create_user.py --skip-user
 脚本会创建以下默认管理员用户：
 
 - **用户名：** `admin`
-- **密码：** `admin123`
+- **密码：** `CHANGE_ME_ADMIN_PASSWORD`
 - **邮箱：** `admin@tradingagents.cn`
 - **角色：** 管理员
 - **状态：** 已激活、已验证
@@ -207,7 +207,7 @@ docker restart tradingagents-backend
 
 # 5. 访问前端并登录
 # 用户名: admin
-# 密码: admin123
+# 密码: CHANGE_ME_ADMIN_PASSWORD
 ```
 
 ### 场景 2：开发机测试

@@ -23,7 +23,7 @@ docker run -d \
     --name tradingagents-mongodb \
     -p 27017:27017 \
     -e MONGO_INITDB_ROOT_USERNAME=admin \
-    -e MONGO_INITDB_ROOT_PASSWORD=tradingagents123 \
+    -e MONGO_INITDB_ROOT_PASSWORD=CHANGE_ME_LOCAL_PASSWORD \
     -e MONGO_INITDB_DATABASE=tradingagents \
     -v mongodb_data:/data/db \
     --restart unless-stopped \
@@ -42,7 +42,7 @@ docker run -d \
     -p 6379:6379 \
     -v redis_data:/data \
     --restart unless-stopped \
-    redis:latest redis-server --appendonly yes --requirepass tradingagents123
+    redis:latest redis-server --appendonly yes --requirepass CHANGE_ME_LOCAL_PASSWORD
 
 if [ $? -eq 0 ]; then
     echo "✅ Redis启动成功 - 端口: 6379"
@@ -59,7 +59,7 @@ echo "🖥️ 启动Redis Commander..."
 docker run -d \
     --name tradingagents-redis-commander \
     -p 8081:8081 \
-    -e REDIS_HOSTS=local:tradingagents-redis:6379:0:tradingagents123 \
+    -e REDIS_HOSTS=local:tradingagents-redis:6379:0:CHANGE_ME_LOCAL_PASSWORD \
     --link tradingagents-redis:redis \
     --restart unless-stopped \
     rediscommander/redis-commander:latest
@@ -80,15 +80,15 @@ echo "🎉 Docker服务启动完成！"
 echo "========================================"
 echo ""
 echo "📊 MongoDB:"
-echo "   - 连接地址: mongodb://admin:tradingagents123@localhost:27017/tradingagents"
+echo "   - 连接地址: mongodb://admin:CHANGE_ME_LOCAL_PASSWORD@localhost:27017/tradingagents"
 echo "   - 端口: 27017"
 echo "   - 用户名: admin"
-echo "   - 密码: tradingagents123"
+echo "   - 密码: CHANGE_ME_LOCAL_PASSWORD"
 echo ""
 echo "📦 Redis:"
 echo "   - 连接地址: redis://localhost:6379"
 echo "   - 端口: 6379"
-echo "   - 密码: tradingagents123"
+echo "   - 密码: CHANGE_ME_LOCAL_PASSWORD"
 echo ""
 echo "🖥️ Redis Commander:"
 echo "   - 管理界面: http://localhost:8081"

@@ -14,7 +14,7 @@
 - 15 个 LLM 模型配置（Google Gemini、DeepSeek、百度千帆、阿里百炼、OpenRouter）
 - 系统配置和平台设置
 - 用户标签和市场分类
-- 默认管理员账号（admin/admin123）
+- 默认管理员账号（admin/CHANGE_ME_ADMIN_PASSWORD）
 
 ❌ **不包含的内容**：
 - 历史分析报告
@@ -71,7 +71,7 @@ curl -fsSL https://raw.githubusercontent.com/your-org/TradingAgent-Future/main/s
 5. ✅ 拉取 Docker 镜像
 6. ✅ 启动服务（MongoDB、Redis、Backend、Frontend）
 7. ✅ 导入配置数据（9 个集合、48 个文档）
-8. ✅ 创建默认管理员（admin/admin123）
+8. ✅ 创建默认管理员（admin/CHANGE_ME_ADMIN_PASSWORD）
 9. ✅ 验证部署
 10. ✅ 显示访问信息
 
@@ -136,7 +136,7 @@ docker restart tradingagents-backend
 
 - 前端：`http://your-server:3000`
 - 用户名：`admin`
-- 密码：`admin123`
+- 密码：`CHANGE_ME_ADMIN_PASSWORD`
 
 **预计时间**：15-20 分钟
 
@@ -230,7 +230,7 @@ graph LR
 - [ ] 4 个容器都在运行（mongodb、redis、backend、frontend）
 - [ ] 后端 API 健康检查通过（`/api/health`）
 - [ ] 前端可以访问（`http://server:3000`）
-- [ ] 可以使用 admin/admin123 登录
+- [ ] 可以使用 admin/CHANGE_ME_ADMIN_PASSWORD 登录
 - [ ] 系统配置页面显示 15 个 LLM 模型
 - [ ] 数据库管理页面显示连接正常
 
@@ -307,7 +307,7 @@ graph LR
 ```python
 {
   "username": "admin",
-  "password": "admin123",  # SHA256 哈希后存储
+  "password": "CHANGE_ME_ADMIN_PASSWORD",  # SHA256 哈希后存储
   "email": "admin@tradingagents.cn",
   "is_admin": True,
   "is_active": True,

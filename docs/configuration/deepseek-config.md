@@ -25,7 +25,7 @@ DeepSeek V3是一个性能强大、性价比极高的大语言模型，在推理
 2. 进入"API Keys"页面
 3. 点击"Create API Key"
 4. 设置密钥名称（如：TradingAgents）
-5. 复制生成的API密钥（格式：sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx）
+5. 复制生成的API密钥（格式：YOUR_API_KEY_HERE）
 
 ## ⚙️ 配置步骤
 

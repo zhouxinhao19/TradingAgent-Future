@@ -12,12 +12,12 @@ def test_connections():
     # 测试连接配置
     test_configs = [
         {
-            "name": "Docker配置 (admin/tradingagents123)",
-            "uri": "mongodb://admin:tradingagents123@localhost:27017/tradingagents?authSource=admin"
+            "name": "Docker配置 (admin/CHANGE_ME_LOCAL_PASSWORD)",
+            "uri": "mongodb://admin:CHANGE_ME_LOCAL_PASSWORD@localhost:27017/tradingagents?authSource=admin"
         },
         {
             "name": "之前导入时使用的配置",
-            "uri": "mongodb://admin:admin123@localhost:27017/tradingagents?authSource=admin"
+            "uri": "mongodb://admin:CHANGE_ME_ADMIN_PASSWORD@localhost:27017/tradingagents?authSource=admin"
         },
         {
             "name": "无认证连接",

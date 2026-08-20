@@ -81,8 +81,8 @@ Write-Host "  - tradingagents_test_mongodb_data" -ForegroundColor White
 Write-Host "  - tradingagents_test_redis_data" -ForegroundColor White
 Write-Host ""
 Write-Host "[INFO] Connection strings:" -ForegroundColor Cyan
-Write-Host "  MongoDB: mongodb://admin:tradingagents123@localhost:27017/tradingagents?authSource=admin" -ForegroundColor White
-Write-Host "  Redis:   redis://:tradingagents123@localhost:6379/0" -ForegroundColor White
+Write-Host "  MongoDB: mongodb://admin:CHANGE_ME_LOCAL_PASSWORD@localhost:27017/tradingagents?authSource=admin" -ForegroundColor White
+Write-Host "  Redis:   redis://:CHANGE_ME_LOCAL_PASSWORD@localhost:6379/0" -ForegroundColor White
 Write-Host ""
 Write-Host "[INFO] Check container status:" -ForegroundColor Yellow
 Write-Host "  docker ps | Select-String 'test'" -ForegroundColor Gray

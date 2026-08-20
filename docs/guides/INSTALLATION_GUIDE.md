@@ -200,7 +200,7 @@ docker-compose logs -f web
 打开浏览器访问以下地址：
 
 - **主应用**: http://localhost:8501
-- **Redis管理**: http://localhost:8081 (用户名/密码: admin/tradingagents123)
+- **Redis管理**: http://localhost:8081 (用户名/密码: admin/CHANGE_ME_LOCAL_PASSWORD)
 - **MongoDB管理**: http://localhost:8082 (可选，需要启动管理服务)
 
 ## 💻 本地安装

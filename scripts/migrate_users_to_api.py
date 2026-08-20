@@ -37,7 +37,7 @@ async def load_old_users():
         print("❌ 老用户文件不存在，创建默认用户")
         return {
             "admin": {
-                "password_hash": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",  # admin123的SHA256
+                "password_hash": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",  # CHANGE_ME_ADMIN_PASSWORD的SHA256
                 "role": "admin",
                 "permissions": ["analysis", "config", "admin"],
                 "created_at": datetime.now().timestamp()
@@ -72,7 +72,7 @@ async def migrate_users():
     
     # 已知的默认密码映射
     default_passwords = {
-        "admin": "admin123",
+        "admin": "CHANGE_ME_ADMIN_PASSWORD",
         "user": "user123"
     }
     
@@ -121,7 +121,7 @@ async def migrate_users():
     
     print(f"\n🎉 用户迁移完成！共迁移 {migrated_count} 个用户")
     print("\n📋 迁移后的用户信息:")
-    print("   - admin / admin123 (管理员)")
+    print("   - admin / CHANGE_ME_ADMIN_PASSWORD (管理员)")
     print("   - user / user123 (普通用户)")
     print("\n💡 提示: 用户可以在前端修改邮箱和密码")
 

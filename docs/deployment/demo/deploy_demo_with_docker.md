@@ -649,7 +649,7 @@ docker exec -it tradingagents-backend python scripts/import_config_and_create_us
 
 # 10. 访问系统
 # 浏览器打开: http://localhost 或 http://你的服务器IP
-# 默认账号: admin / admin123
+# 默认账号: admin / CHANGE_ME_ADMIN_PASSWORD
 # ⚠️ 登录后请立即修改默认密码！
 ```
 
@@ -704,7 +704,7 @@ docker exec -it tradingagents-backend python scripts/import_config_and_create_us
 
 # 10. 访问系统
 # 浏览器打开: http://localhost 或 http://你的服务器IP
-# 默认账号: admin / admin123
+# 默认账号: admin / CHANGE_ME_ADMIN_PASSWORD
 # ⚠️ 登录后请立即修改默认密码！
 ```
 
@@ -759,7 +759,7 @@ docker exec -it tradingagents-backend python scripts/import_config_and_create_us
 
 # 10. 访问系统
 # 浏览器打开: http://localhost
-# 默认账号: admin / admin123
+# 默认账号: admin / CHANGE_ME_ADMIN_PASSWORD
 # ⚠️ 登录后请立即修改默认密码！
 ```
 
@@ -1050,7 +1050,7 @@ docker exec -it tradingagents-backend python scripts/import_config_and_create_us
 
 🔐 登录信息:
    用户名: admin
-   密码: admin123
+   密码: CHANGE_ME_ADMIN_PASSWORD
 ```
 
 **说明**：
@@ -1076,7 +1076,7 @@ http://你的服务器IP
 
 **默认登录信息**：
 - 用户名：`admin`
-- 密码：`admin123`
+- 密码：`CHANGE_ME_ADMIN_PASSWORD`
 
 **首次登录后建议**：
 1. ✅ 修改默认密码（设置 → 个人设置 → 修改密码）
@@ -1334,7 +1334,7 @@ curl http://localhost:8000/api/health
 
 ```bash
 # 检查 MongoDB 状态
-docker exec -it tradingagents-mongodb mongo -u admin -p tradingagents123 --authenticationDatabase admin
+docker exec -it tradingagents-mongodb mongo -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin
 
 # 重启 MongoDB
 docker-compose -f docker-compose.hub.nginx.yml restart mongodb
@@ -1491,14 +1491,14 @@ services:
 ```yaml
 services:
   redis:
-    command: redis-server --appendonly yes --requirepass tradingagents123 --maxmemory 2gb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --requirepass CHANGE_ME_LOCAL_PASSWORD --maxmemory 2gb --maxmemory-policy allkeys-lru
 ```
 
 #### 2. MongoDB 索引优化
 
 ```bash
 # 进入 MongoDB
-docker exec -it tradingagents-mongodb mongo -u admin -p tradingagents123 --authenticationDatabase admin
+docker exec -it tradingagents-mongodb mongo -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin
 
 # 创建索引
 use tradingagents

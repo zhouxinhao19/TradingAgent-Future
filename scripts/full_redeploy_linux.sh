@@ -177,7 +177,7 @@ echo -e "${GREEN}  API文档: http://$(hostname -I | awk '{print $1}'):8000/docs
 echo ""
 echo -e "${BLUE}默认登录信息:${NC}"
 echo -e "${GREEN}  用户名: admin${NC}"
-echo -e "${GREEN}  密码: admin123 或 1234567${NC}"
+echo -e "${GREEN}  密码: CHANGE_ME_ADMIN_PASSWORD 或 1234567${NC}"
 echo ""
 echo -e "${YELLOW}建议:${NC}"
 echo -e "${YELLOW}  1. 立即登录并修改默认密码${NC}"

@@ -66,14 +66,14 @@ echo ""
 # 测试连接（使用 admin 用户）
 echo "📋 步骤 7: 测试连接（使用 admin 用户）"
 echo "--------------------------------------------------------------------------------"
-if docker exec -it mongodb-test mongo -u admin -p tradingagents123 --authenticationDatabase admin --eval "db.version()" 2>/dev/null; then
+if docker exec -it mongodb-test mongo -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin --eval "db.version()" 2>/dev/null; then
     echo "✅ admin 用户认证成功"
     echo ""
     
     # 查看用户列表
     echo "📋 步骤 8: 查看用户列表"
     echo "--------------------------------------------------------------------------------"
-    docker exec -it mongodb-test mongo -u admin -p tradingagents123 --authenticationDatabase admin --eval "
+    docker exec -it mongodb-test mongo -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin --eval "
         use admin;
         print('=== Admin 数据库用户 ===');
         db.getUsers().forEach(function(user) {
@@ -87,7 +87,7 @@ if docker exec -it mongodb-test mongo -u admin -p tradingagents123 --authenticat
     # 查看数据库列表
     echo "📋 步骤 9: 查看数据库列表"
     echo "--------------------------------------------------------------------------------"
-    docker exec -it mongodb-test mongo -u admin -p tradingagents123 --authenticationDatabase admin --eval "
+    docker exec -it mongodb-test mongo -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin --eval "
         print('=== 数据库列表 ===');
         db.adminCommand('listDatabases').databases.forEach(function(db) {
             print(db.name + ' (' + (db.sizeOnDisk / 1024 / 1024).toFixed(2) + ' MB)');
@@ -98,7 +98,7 @@ if docker exec -it mongodb-test mongo -u admin -p tradingagents123 --authenticat
     # 查看 tradingagents 数据库
     echo "📋 步骤 10: 查看 tradingagents 数据库"
     echo "--------------------------------------------------------------------------------"
-    docker exec -it mongodb-test mongo -u admin -p tradingagents123 --authenticationDatabase admin --eval "
+    docker exec -it mongodb-test mongo -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin --eval "
         use tradingagents;
         print('=== TradingAgents 数据库 ===');
         print('集合数量: ' + db.getCollectionNames().length);
@@ -118,7 +118,7 @@ import sys
 
 try:
     # 测试连接
-    uri = 'mongodb://admin:tradingagents123@localhost:27017/tradingagents?authSource=admin'
+    uri = 'mongodb://admin:CHANGE_ME_LOCAL_PASSWORD@localhost:27017/tradingagents?authSource=admin'
     client = MongoClient(uri, serverSelectionTimeoutMS=5000)
     
     # 测试 ping

@@ -12,7 +12,7 @@
 
 **功能**：
 - ✅ 导入配置数据（从导出的 JSON 文件）
-- ✅ 创建默认管理员用户（admin/admin123）
+- ✅ 创建默认管理员用户（admin/CHANGE_ME_ADMIN_PASSWORD）
 - ✅ 支持选择性导入集合
 - ✅ 支持覆盖或增量模式
 
@@ -119,7 +119,7 @@ python scripts/import_config_and_create_user.py database_export_config_2025-10-1
 👤 创建默认管理员用户...
 ✅ 默认管理员用户创建成功
    用户名: admin
-   密码: admin123
+   密码: CHANGE_ME_ADMIN_PASSWORD
    邮箱: admin@tradingagents.cn
    角色: 管理员
 
@@ -129,7 +129,7 @@ python scripts/import_config_and_create_user.py database_export_config_2025-10-1
 
 🔐 登录信息:
    用户名: admin
-   密码: admin123
+   密码: CHANGE_ME_ADMIN_PASSWORD
 
 📝 后续步骤:
    1. 重启后端服务: docker restart tradingagents-backend
@@ -148,7 +148,7 @@ docker restart tradingagents-backend
 1. 访问前端：`http://new-server:3000`
 2. 使用默认账号登录：
    - 用户名：`admin`
-   - 密码：`admin123`
+   - 密码：`CHANGE_ME_ADMIN_PASSWORD`
 3. 检查系统配置页面，确认 LLM 配置已导入
 
 ---
@@ -158,7 +158,7 @@ docker restart tradingagents-backend
 如果您只需要创建默认管理员用户（不导入配置数据）：
 
 ```bash
-# 创建默认管理员（admin/admin123）
+# 创建默认管理员（admin/CHANGE_ME_ADMIN_PASSWORD）
 python scripts/create_default_admin.py
 ```
 
@@ -173,7 +173,7 @@ python scripts/create_default_admin.py
 
 ✅ 管理员用户创建成功
    用户名: admin
-   密码: admin123
+   密码: CHANGE_ME_ADMIN_PASSWORD
    邮箱: admin@tradingagents.cn
    角色: 管理员
    配额: 10000 次/天
@@ -190,7 +190,7 @@ admin           admin@tradingagents.cn         管理员     激活       2025-1
 
 🔐 登录信息:
    用户名: admin
-   密码: admin123
+   密码: CHANGE_ME_ADMIN_PASSWORD
 
 📝 后续步骤:
    1. 访问前端并使用上述账号登录
@@ -261,7 +261,7 @@ python scripts/create_default_admin.py --list
 脚本默认使用以下连接配置：
 
 ```python
-MONGO_URI = "mongodb://admin:tradingagents123@localhost:27017/tradingagents?authSource=admin"
+MONGO_URI = "mongodb://admin:CHANGE_ME_LOCAL_PASSWORD@localhost:27017/tradingagents?authSource=admin"
 DB_NAME = "tradingagents"
 ```
 
@@ -282,7 +282,7 @@ DB_NAME = "your_db"
 ```python
 DEFAULT_ADMIN = {
     "username": "admin",
-    "password": "admin123",
+    "password": "CHANGE_ME_ADMIN_PASSWORD",
     "email": "admin@tradingagents.cn"
 }
 ```
@@ -360,7 +360,7 @@ docker ps | grep mongodb
 docker logs tradingagents-mongodb --tail 50
 
 # 3. 测试连接
-docker exec -it tradingagents-mongodb mongo -u admin -p tradingagents123 --authenticationDatabase admin
+docker exec -it tradingagents-mongodb mongo -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin
 ```
 
 ### 问题 2：文件格式错误
@@ -388,11 +388,11 @@ docker exec -it tradingagents-mongodb mongo -u admin -p tradingagents123 --authe
 python scripts/create_default_admin.py --overwrite
 
 # 方法 2：创建不同的用户名
-python scripts/create_default_admin.py --username admin2 --password admin123
+python scripts/create_default_admin.py --username admin2 --password CHANGE_ME_ADMIN_PASSWORD
 
 # 方法 3：手动删除用户
 docker exec -it tradingagents-mongodb mongo tradingagents \
-  -u admin -p tradingagents123 --authenticationDatabase admin \
+  -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin \
   --eval "db.users.deleteOne({username: 'admin'})"
 ```
 
@@ -408,7 +408,7 @@ docker logs tradingagents-backend --tail 100
 
 # 3. 验证数据是否导入
 docker exec -it tradingagents-mongodb mongo tradingagents \
-  -u admin -p tradingagents123 --authenticationDatabase admin \
+  -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin \
   --eval "db.system_configs.countDocuments()"
 ```
 
@@ -429,7 +429,7 @@ docker exec -it tradingagents-mongodb mongo tradingagents \
 ```bash
 # 在新服务器上导入前，先备份现有数据
 docker exec tradingagents-mongodb mongodump \
-  -u admin -p tradingagents123 --authenticationDatabase admin \
+  -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin \
   -d tradingagents -o /tmp/backup
 
 docker cp tradingagents-mongodb:/tmp/backup ./backup_before_import
@@ -440,12 +440,12 @@ docker cp tradingagents-mongodb:/tmp/backup ./backup_before_import
 ```bash
 # 检查集合数量
 docker exec -it tradingagents-mongodb mongo tradingagents \
-  -u admin -p tradingagents123 --authenticationDatabase admin \
+  -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin \
   --eval "db.getCollectionNames().length"
 
 # 检查 LLM 配置
 docker exec -it tradingagents-mongodb mongo tradingagents \
-  -u admin -p tradingagents123 --authenticationDatabase admin \
+  -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin \
   --eval "var config = db.system_configs.findOne({is_active: true}); print('LLM 数量: ' + config.llm_configs.filter(c => c.enabled).length);"
 ```
 

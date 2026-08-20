@@ -167,7 +167,7 @@ if (-not $SkipMongoDB -and (Test-Path -LiteralPath $mongoExe)) {
             if (Test-Path $initScript) {
                 try {
                     Write-Host "  Running: $pythonExe $initScript 127.0.0.1 27017 admin ***" -ForegroundColor Gray
-                    $output = & $pythonExe $initScript 127.0.0.1 27017 admin tradingagents123 2>&1
+                    $output = & $pythonExe $initScript 127.0.0.1 27017 admin CHANGE_ME_LOCAL_PASSWORD 2>&1
 
                     # Print all output
                     if ($output) {
@@ -234,7 +234,7 @@ if (-not $SkipRedis -and (Test-Path -LiteralPath $redisExe)) {
         "bind 127.0.0.1",
         "port $redisPort",
         "dir $redisDataUnix",
-        "requirepass tradingagents123",
+        "requirepass CHANGE_ME_LOCAL_PASSWORD",
         "appendonly yes",
         "save 900 1",
         "save 300 10",

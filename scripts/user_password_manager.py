@@ -148,7 +148,7 @@ def reset_to_default():
     """重置为默认用户配置"""
     default_users = {
         "admin": {
-            "password_hash": hash_password("admin123"),
+            "password_hash": hash_password("CHANGE_ME_ADMIN_PASSWORD"),
             "role": "admin",
             "permissions": ["analysis", "config", "admin"],
             "created_at": time.time()
@@ -164,7 +164,7 @@ def reset_to_default():
     if save_users(default_users):
         print("✅ 用户配置已重置为默认设置")
         print("   默认用户:")
-        print("   - admin / admin123 (管理员)")
+        print("   - admin / CHANGE_ME_ADMIN_PASSWORD (管理员)")
         print("   - user / user123 (普通用户)")
         return True
     else:

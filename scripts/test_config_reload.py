@@ -31,7 +31,7 @@ def get_test_token():
     
     # 尝试使用测试用户登录
     test_users = [
-        {"username": "admin", "password": "admin123"},
+        {"username": "admin", "password": "CHANGE_ME_ADMIN_PASSWORD"},
         {"username": "test", "password": "test123"},
     ]
     

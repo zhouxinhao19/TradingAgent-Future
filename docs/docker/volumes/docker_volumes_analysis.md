@@ -252,7 +252,7 @@ docker exec -it tradingagents-mongodb bash
 ls -lh /data/db
 
 # 连接 MongoDB
-mongosh -u admin -p tradingagents123 --authenticationDatabase admin
+mongosh -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin
 
 # 查看数据库
 show dbs
@@ -270,7 +270,7 @@ docker exec -it tradingagents-redis sh
 ls -lh /data
 
 # 连接 Redis
-redis-cli -a tradingagents123
+redis-cli -a CHANGE_ME_LOCAL_PASSWORD
 
 # 查看键
 KEYS *

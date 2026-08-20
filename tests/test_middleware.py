@@ -23,7 +23,7 @@ async def test_middleware():
             print("\n🔐 测试1: 登录请求")
             login_data = {
                 "username": "admin",
-                "password": "admin123"
+                "password": "CHANGE_ME_ADMIN_PASSWORD"
             }
             
             response = await client.post(f"{base_url}/api/auth/login", json=login_data)

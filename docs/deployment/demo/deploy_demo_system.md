@@ -15,7 +15,7 @@
 
 部署一个包含完整配置的演示系统：
 - ✅ 15 个 LLM 模型配置（Google Gemini、DeepSeek、百度千帆、阿里百炼、OpenRouter）
-- ✅ 默认管理员账号（admin/admin123）
+- ✅ 默认管理员账号（admin/CHANGE_ME_ADMIN_PASSWORD）
 - ✅ 系统配置和用户标签
 - ❌ 不包含历史数据（分析报告、期货数据等）
 
@@ -357,7 +357,7 @@ python3 scripts/import_config_and_create_user.py
 👤 创建默认管理员用户...
 ✅ 管理员用户创建成功
    用户名: admin
-   密码: admin123
+   密码: CHANGE_ME_ADMIN_PASSWORD
 
 ================================================================================
 ✅ 操作完成！
@@ -422,7 +422,7 @@ http://your-server-ip:3000
 
 使用默认管理员账号：
 - **用户名**：`admin`
-- **密码**：`admin123`
+- **密码**：`CHANGE_ME_ADMIN_PASSWORD`
 
 #### 5. 验证配置
 
@@ -594,7 +594,7 @@ sudo systemctl restart nginx
 - [ ] 默认管理员账号已创建
 - [ ] 前端可以访问
 - [ ] 后端 API 可以访问
-- [ ] 可以使用 admin/admin123 登录
+- [ ] 可以使用 admin/CHANGE_ME_ADMIN_PASSWORD 登录
 - [ ] 系统配置显示 15 个 LLM 模型
 - [ ] 已修改默认密码
 - [ ] 防火墙已配置
@@ -607,7 +607,7 @@ sudo systemctl restart nginx
 
 **登录信息**：
 - 用户名：`admin`
-- 密码：`admin123`
+- 密码：`CHANGE_ME_ADMIN_PASSWORD`
 - 前端地址：`http://your-server:3000`
 - 后端地址：`http://your-server:8000`
 

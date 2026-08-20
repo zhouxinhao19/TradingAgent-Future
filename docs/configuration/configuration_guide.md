@@ -81,7 +81,7 @@ npm run dev
 
 默认管理员账号：
 - **用户名**: `admin`
-- **密码**: `admin123`
+- **密码**: `CHANGE_ME_ADMIN_PASSWORD`
 
 ⚠️ **重要**: 首次登录后请立即修改密码！
 

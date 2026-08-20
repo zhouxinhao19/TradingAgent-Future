@@ -129,7 +129,7 @@ docker-compose exec web pip list
 docker-compose logs mongodb
 
 # 连接MongoDB测试
-docker-compose exec mongodb mongo -u admin -p tradingagents123
+docker-compose exec mongodb mongo -u admin -p CHANGE_ME_LOCAL_PASSWORD
 
 # 检查数据库状态
 docker-compose exec mongodb mongo --eval "db.adminCommand('ping')"
@@ -141,10 +141,10 @@ docker-compose exec mongodb mongo --eval "db.adminCommand('ping')"
 docker-compose logs redis
 
 # 连接Redis测试
-docker-compose exec redis redis-cli -a tradingagents123
+docker-compose exec redis redis-cli -a CHANGE_ME_LOCAL_PASSWORD
 
 # 检查Redis状态
-docker-compose exec redis redis-cli -a tradingagents123 ping
+docker-compose exec redis redis-cli -a CHANGE_ME_LOCAL_PASSWORD ping
 ```
 
 ## 🚨 紧急修复命令

@@ -208,7 +208,7 @@ docker exec -it tradingagents-backend python scripts/import_config_and_create_us
 
 🔐 登录信息:
    用户名: admin
-   密码: admin123
+   密码: CHANGE_ME_ADMIN_PASSWORD
 ```
 
 **说明**：
@@ -262,7 +262,7 @@ docker exec -it tradingagents-backend python scripts/import_config_and_create_us
 
 🔐 登录信息:
    用户名: admin
-   密码: admin123
+   密码: CHANGE_ME_ADMIN_PASSWORD
 ```
 
 **预期输出（仅创建用户）**：
@@ -283,7 +283,7 @@ docker exec -it tradingagents-backend python scripts/import_config_and_create_us
 
 🔐 登录信息:
    用户名: admin
-   密码: admin123
+   密码: CHANGE_ME_ADMIN_PASSWORD
 ```
 
 ### 步骤 6：重启后端服务
@@ -320,7 +320,7 @@ http://localhost
 
 **默认登录信息**：
 - 用户名：`admin`
-- 密码：`admin123`
+- 密码：`CHANGE_ME_ADMIN_PASSWORD`
 
 **首次登录后建议**：
 1. 修改默认密码（右上角用户菜单 → 个人设置）
@@ -441,7 +441,7 @@ curl http://localhost:8000/api/health
 
 ```bash
 # 检查 MongoDB 状态
-docker exec -it tradingagents-mongodb mongo -u admin -p tradingagents123 --authenticationDatabase admin
+docker exec -it tradingagents-mongodb mongo -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin
 
 # 重启 MongoDB
 docker-compose -f docker-compose.hub.nginx.yml restart mongodb
@@ -480,7 +480,7 @@ docker-compose -f docker-compose.hub.nginx.yml up -d
 ```bash
 # 导出 MongoDB 数据
 docker exec tradingagents-mongodb mongodump \
-  -u admin -p tradingagents123 --authenticationDatabase admin \
+  -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin \
   -d tradingagents -o /data/backup
 
 # 复制备份到宿主机

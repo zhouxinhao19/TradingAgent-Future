@@ -181,14 +181,14 @@ async def create_default_admin_user(db):
         from app.services.user_service import user_service
 
         # 读取当前管理员密码配置
-        admin_password = "admin123"  # 默认密码
+        admin_password = "CHANGE_ME_ADMIN_PASSWORD"  # 默认密码
         config_file = project_root / "config" / "admin_password.json"
 
         if config_file.exists():
             try:
                 with open(config_file, "r", encoding="utf-8") as f:
                     config = json.load(f)
-                    admin_password = config.get("password", "admin123")
+                    admin_password = config.get("password", "CHANGE_ME_ADMIN_PASSWORD")
                 logger.info(f"✓ 从配置文件读取管理员密码")
             except Exception as e:
                 logger.warning(f"⚠️ 读取密码配置失败，使用默认密码: {e}")
@@ -298,14 +298,14 @@ async def setup_admin_password():
         
         # 如果配置文件不存在，创建默认配置
         if not config_file.exists():
-            default_config = {"password": "admin123"}
+            default_config = {"password": "CHANGE_ME_ADMIN_PASSWORD"}
             with open(config_file, "w", encoding="utf-8") as f:
                 json.dump(default_config, f, ensure_ascii=False, indent=2)
-            logger.info("✅ 创建默认管理员密码配置: admin123")
+            logger.info("✅ 创建默认管理员密码配置: CHANGE_ME_ADMIN_PASSWORD")
         else:
             with open(config_file, "r", encoding="utf-8") as f:
                 config = json.load(f)
-                current_password = config.get("password", "admin123")
+                current_password = config.get("password", "CHANGE_ME_ADMIN_PASSWORD")
             logger.info(f"✅ 当前管理员密码: {current_password}")
         
         return True
@@ -376,12 +376,12 @@ async def main():
         
         # 读取当前管理员密码
         config_file = project_root / "config" / "admin_password.json"
-        admin_password = "admin123"
+        admin_password = "CHANGE_ME_ADMIN_PASSWORD"
         if config_file.exists():
             try:
                 with open(config_file, "r", encoding="utf-8") as f:
                     config = json.load(f)
-                    admin_password = config.get("password", "admin123")
+                    admin_password = config.get("password", "CHANGE_ME_ADMIN_PASSWORD")
             except:
                 pass
         

@@ -24,7 +24,7 @@ def check_mongodb_data():
         from pymongo import MongoClient
 
         # 直接连接 MongoDB
-        client = MongoClient("mongodb://admin:tradingagents123@localhost:27017/")
+        client = MongoClient("mongodb://admin:CHANGE_ME_LOCAL_PASSWORD@localhost:27017/")
         db = client["tradingagents"]
         print(f"✅ MongoDB 连接成功")
         

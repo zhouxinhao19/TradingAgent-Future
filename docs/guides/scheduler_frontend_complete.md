@@ -123,7 +123,7 @@
 ### 访问页面
 1. 启动后端服务：`python -m app`
 2. 启动前端服务：`cd frontend && npm run dev`
-3. 登录系统（用户名: `admin`, 密码: `admin123`）
+3. 登录系统（用户名: `admin`, 密码: `CHANGE_ME_ADMIN_PASSWORD`）
 4. 点击左侧菜单 "设置" → "系统管理" → "定时任务"
 
 ### 查看任务

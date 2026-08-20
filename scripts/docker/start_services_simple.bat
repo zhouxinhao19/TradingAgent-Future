@@ -14,16 +14,16 @@ if %errorlevel% neq 0 (
 )
 
 echo Starting MongoDB...
-docker run -d --name tradingagents-mongodb -p 27017:27017 -e MONGO_INITDB_ROOT_USERNAME=admin -e MONGO_INITDB_ROOT_PASSWORD=tradingagents123 -e MONGO_INITDB_DATABASE=tradingagents -v mongodb_data:/data/db --restart unless-stopped mongo:4.4
+docker run -d --name tradingagents-mongodb -p 27017:27017 -e MONGO_INITDB_ROOT_USERNAME=admin -e MONGO_INITDB_ROOT_PASSWORD=CHANGE_ME_LOCAL_PASSWORD -e MONGO_INITDB_DATABASE=tradingagents -v mongodb_data:/data/db --restart unless-stopped mongo:4.4
 
 echo Starting Redis...
-docker run -d --name tradingagents-redis -p 6379:6379 -v redis_data:/data --restart unless-stopped redis:latest redis-server --appendonly yes --requirepass tradingagents123
+docker run -d --name tradingagents-redis -p 6379:6379 -v redis_data:/data --restart unless-stopped redis:latest redis-server --appendonly yes --requirepass CHANGE_ME_LOCAL_PASSWORD
 
 echo Waiting 5 seconds...
 timeout /t 5 /nobreak >nul
 
 echo Starting Redis Commander...
-docker run -d --name tradingagents-redis-commander -p 8081:8081 -e REDIS_HOSTS=local:tradingagents-redis:6379:0:tradingagents123 --link tradingagents-redis:redis --restart unless-stopped rediscommander/redis-commander:latest
+docker run -d --name tradingagents-redis-commander -p 8081:8081 -e REDIS_HOSTS=local:tradingagents-redis:6379:0:CHANGE_ME_LOCAL_PASSWORD --link tradingagents-redis:redis --restart unless-stopped rediscommander/redis-commander:latest
 
 echo.
 echo Service Status:
@@ -38,7 +38,7 @@ echo Redis: localhost:6379
 echo Redis Commander: http://localhost:8081
 echo.
 echo Username: admin
-echo Password: tradingagents123
+echo Password: CHANGE_ME_LOCAL_PASSWORD
 echo.
 
 pause

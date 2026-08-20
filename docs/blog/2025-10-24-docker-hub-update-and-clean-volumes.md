@@ -68,12 +68,12 @@ docker compose -f docker-compose.hub.nginx.yml logs -f --tail=100
 
 若计划“清理数据卷”或担心升级影响数据，请先备份。
 
-MongoDB 备份（默认 root 账户：`admin` / `tradingagents123`；认证库 `admin`）：
+MongoDB 备份（默认 root 账户：`admin` / `CHANGE_ME_LOCAL_PASSWORD`；认证库 `admin`）：
 
 ```bash
 # 导出到容器内 /dump
 docker exec tradingagents-mongodb sh -c \
-  'mongodump -u admin -p "tradingagents123" --authenticationDatabase admin -o /dump'
+  'mongodump -u admin -p "CHANGE_ME_LOCAL_PASSWORD" --authenticationDatabase admin -o /dump'
 # 拷贝到宿主机（按需修改目标路径）
 docker cp tradingagents-mongodb:/dump ./backup/mongo-$(date +%F)
 ```

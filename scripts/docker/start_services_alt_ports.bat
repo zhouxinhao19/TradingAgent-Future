@@ -18,16 +18,16 @@ docker stop tradingagents-mongodb tradingagents-redis tradingagents-redis-comman
 docker rm tradingagents-mongodb tradingagents-redis tradingagents-redis-commander 2>nul
 
 echo Starting MongoDB on port 27018...
-docker run -d --name tradingagents-mongodb -p 27018:27017 -e MONGO_INITDB_ROOT_USERNAME=admin -e MONGO_INITDB_ROOT_PASSWORD=tradingagents123 -e MONGO_INITDB_DATABASE=tradingagents -v tradingagents_mongodb_data:/data/db --restart unless-stopped mongo:4.4
+docker run -d --name tradingagents-mongodb -p 27018:27017 -e MONGO_INITDB_ROOT_USERNAME=admin -e MONGO_INITDB_ROOT_PASSWORD=CHANGE_ME_LOCAL_PASSWORD -e MONGO_INITDB_DATABASE=tradingagents -v tradingagents_mongodb_data:/data/db --restart unless-stopped mongo:4.4
 
 echo Starting Redis on port 6380...
-docker run -d --name tradingagents-redis -p 6380:6379 -v tradingagents_redis_data:/data --restart unless-stopped redis:latest redis-server --appendonly yes --requirepass tradingagents123
+docker run -d --name tradingagents-redis -p 6380:6379 -v tradingagents_redis_data:/data --restart unless-stopped redis:latest redis-server --appendonly yes --requirepass CHANGE_ME_LOCAL_PASSWORD
 
 echo Waiting 10 seconds for services to start...
 timeout /t 10 /nobreak >nul
 
 echo Starting Redis Commander on port 8082...
-docker run -d --name tradingagents-redis-commander -p 8082:8081 -e REDIS_HOSTS=local:tradingagents-redis:6379:0:tradingagents123 --link tradingagents-redis:redis --restart unless-stopped rediscommander/redis-commander:latest
+docker run -d --name tradingagents-redis-commander -p 8082:8081 -e REDIS_HOSTS=local:tradingagents-redis:6379:0:CHANGE_ME_LOCAL_PASSWORD --link tradingagents-redis:redis --restart unless-stopped rediscommander/redis-commander:latest
 
 echo.
 echo Service Status:
@@ -42,7 +42,7 @@ echo Redis: localhost:6380
 echo Redis Commander: http://localhost:8082
 echo.
 echo Username: admin
-echo Password: tradingagents123
+echo Password: CHANGE_ME_LOCAL_PASSWORD
 echo.
 echo Next Steps:
 echo 1. Update .env file with new ports:

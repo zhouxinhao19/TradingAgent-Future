@@ -79,7 +79,7 @@ def test_existing_result(task_id, stock_symbol):
         print("1. 登录获取token...")
         login_data = {
             "username": "admin",
-            "password": "admin123"
+            "password": "CHANGE_ME_ADMIN_PASSWORD"
         }
         
         login_response = requests.post(

@@ -2,7 +2,7 @@
 from pymongo import MongoClient
 from bson import ObjectId
 
-client = MongoClient('mongodb://admin:tradingagents123@localhost:27017/')
+client = MongoClient('mongodb://admin:CHANGE_ME_LOCAL_PASSWORD@localhost:27017/')
 db = client['tradingagents']
 
 user_id = '68a1edf6b2c2b49285449e20'

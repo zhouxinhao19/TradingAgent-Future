@@ -13,7 +13,7 @@
 2. 注册账号并完成认证
 3. 进入控制台 → API Keys
 4. 创建新的API Key
-5. 复制API Key（格式：sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx）
+5. 复制API Key（格式：YOUR_API_KEY_HERE）
 
 #### 配置环境变量
 ```bash

@@ -21,7 +21,7 @@ async def login():
     
     login_data = {
         "username": "admin",
-        "password": "admin123"
+        "password": "CHANGE_ME_ADMIN_PASSWORD"
     }
     
     async with aiohttp.ClientSession() as session:

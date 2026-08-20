@@ -35,13 +35,13 @@ async def migrate_config_file_auth():
     try:
         # 1. 读取现有的配置文件密码
         config_file = project_root / "config" / "admin_password.json"
-        admin_password = "admin123"  # 默认密码
+        admin_password = "CHANGE_ME_ADMIN_PASSWORD"  # 默认密码
         
         if config_file.exists():
             try:
                 with open(config_file, "r", encoding="utf-8") as f:
                     config = json.load(f)
-                    admin_password = config.get("password", "admin123")
+                    admin_password = config.get("password", "CHANGE_ME_ADMIN_PASSWORD")
                 logger.info(f"✅ 从配置文件读取管理员密码")
             except Exception as e:
                 logger.warning(f"⚠️ 读取配置文件失败，使用默认密码: {e}")
@@ -186,13 +186,13 @@ async def verify_migration():
         
         # 测试认证
         config_file = project_root / "config" / "admin_password.json"
-        admin_password = "admin123"
+        admin_password = "CHANGE_ME_ADMIN_PASSWORD"
         
         if config_file.exists():
             try:
                 with open(config_file, "r", encoding="utf-8") as f:
                     config = json.load(f)
-                    admin_password = config.get("password", "admin123")
+                    admin_password = config.get("password", "CHANGE_ME_ADMIN_PASSWORD")
             except:
                 pass
         

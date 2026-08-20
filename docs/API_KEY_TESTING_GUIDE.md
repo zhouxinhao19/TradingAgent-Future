@@ -73,7 +73,7 @@
 ### 场景 4：编辑厂家 - MongoDB 有 Key
 
 **初始状态**：
-- MongoDB `deepseek` 厂家：`api_key = "sk-abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"`
+- MongoDB `deepseek` 厂家：`api_key = "YOUR_API_KEY_HERE"`
 
 **测试步骤**：
 1. 访问"设置 → 大模型厂家管理"
@@ -90,7 +90,7 @@
 
 **初始状态**：
 - MongoDB `dashscope` 厂家：`api_key = ""` 或 `null`
-- .env 文件：`DASHSCOPE_API_KEY=sk-def456ghi789jkl012mno345pqr678stu901vwx234yz567`
+- .env 文件：`DASHSCOPE_API_KEY=YOUR_API_KEY_HERE`
 
 **测试步骤**：
 1. 访问"设置 → 大模型厂家管理"
@@ -136,7 +136,7 @@
 **测试步骤**：
 1. 访问"设置 → 大模型厂家管理"
 2. 点击"编辑" `dashscope` 厂家
-3. 填写新的 API Key：`sk-new456ghi789jkl012mno345pqr678stu901vwx234yz567`
+3. 填写新的 API Key：`YOUR_API_KEY_HERE`
 4. 点击"保存"
 5. 访问"设置 → 配置验证"
 6. 点击"验证配置"按钮
@@ -154,7 +154,7 @@
 ### 场景 8：用户不修改缩略 Key（保持原值）
 
 **初始状态**：
-- MongoDB `deepseek` 厂家：`api_key = "sk-abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"`
+- MongoDB `deepseek` 厂家：`api_key = "YOUR_API_KEY_HERE"`
 
 **测试步骤**：
 1. 访问"设置 → 大模型厂家管理"

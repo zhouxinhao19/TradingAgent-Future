@@ -12,7 +12,7 @@ def test_summary_recommendation():
     # 登录获取token
     login_data = {
         "username": "admin",
-        "password": "admin123"
+        "password": "CHANGE_ME_ADMIN_PASSWORD"
     }
     
     response = requests.post(

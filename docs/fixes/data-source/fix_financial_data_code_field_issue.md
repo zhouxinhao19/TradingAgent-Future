@@ -211,7 +211,7 @@ tail -f logs/tradingagents.log | grep "财务数据"
 
 ```bash
 # 连接 MongoDB
-docker exec -it tradingagents-mongodb mongo tradingagents -u admin -p tradingagents123 --authenticationDatabase admin
+docker exec -it tradingagents-mongodb mongo tradingagents -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin
 
 # 检查 stock_financial_data 集合
 db.stock_financial_data.find({}, {code: 1, symbol: 1, report_period: 1, data_source: 1}).limit(5)
@@ -232,7 +232,7 @@ db.stock_financial_data.find({}, {code: 1, symbol: 1, report_period: 1, data_sou
 
 ```javascript
 // 连接 MongoDB
-docker exec -it tradingagents-mongodb mongo tradingagents -u admin -p tradingagents123 --authenticationDatabase admin
+docker exec -it tradingagents-mongodb mongo tradingagents -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin
 
 // 查看有多少条 code 为 null 的记录
 db.stock_financial_data.count({ code: null })

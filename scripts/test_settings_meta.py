@@ -16,7 +16,7 @@ def main():
         # 登录获取 token
         login_response = requests.post(
             "http://127.0.0.1:8000/api/auth/login",
-            json={"username": "admin", "password": "admin123"},
+            json={"username": "admin", "password": "CHANGE_ME_ADMIN_PASSWORD"},
             timeout=5
         )
         

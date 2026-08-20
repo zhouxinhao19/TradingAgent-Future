@@ -24,7 +24,7 @@ def check_redis_cache():
         redis_client = redis.Redis(
             host='127.0.0.1',
             port=6379,
-            password='tradingagents123',
+            password='CHANGE_ME_LOCAL_PASSWORD',
             db=0,
             decode_responses=False  # 不自动解码，因为数据是 pickle 序列化的
         )

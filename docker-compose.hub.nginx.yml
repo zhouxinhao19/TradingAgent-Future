@@ -27,7 +27,7 @@ services:
       # 应用会在首次运行时自动创建所需的集合和索引
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: tradingagents123
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD:?Set MONGODB_PASSWORD in .env}
       MONGO_INITDB_DATABASE: tradingagentscn
       TZ: "Asia/Shanghai"
     networks:
@@ -50,11 +50,11 @@ services:
       - tradingagents_redis_data:/data
     environment:
       TZ: "Asia/Shanghai"
-    command: redis-server --appendonly yes --requirepass tradingagents123
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
     networks:
       - tradingagents-network
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "tradingagents123", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a $${REDIS_PASSWORD} ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -90,24 +90,24 @@ services:
       MONGODB_HOST: "mongodb"
       MONGODB_PORT: "27017"
       MONGODB_USERNAME: "admin"
-      MONGODB_PASSWORD: "tradingagents123"
+      MONGODB_PASSWORD: "${MONGODB_PASSWORD:?Set MONGODB_PASSWORD in .env}"
       MONGODB_DATABASE: "tradingagentscn"
       MONGODB_AUTH_SOURCE: "admin"
       # 注意：authSource=admin 表示在 admin 数据库中验证用户
-      MONGODB_URL: "mongodb://admin:tradingagents123@mongodb:27017/tradingagentscn?authSource=admin"
-      MONGODB_CONNECTION_STRING: "mongodb://admin:tradingagents123@mongodb:27017/tradingagentscn?authSource=admin"
+      MONGODB_URL: "${MONGODB_URL:?Set MONGODB_URL in .env}"
+      MONGODB_CONNECTION_STRING: "${MONGODB_CONNECTION_STRING:?Set MONGODB_CONNECTION_STRING in .env}"
       # Redis配置
       REDIS_HOST: "redis"
       REDIS_PORT: "6379"
-      REDIS_PASSWORD: "tradingagents123"
-      REDIS_URL: "redis://:tradingagents123@redis:6379/0"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}"
+      REDIS_URL: "${REDIS_URL:?Set REDIS_URL in .env}"
       DOCKER_CONTAINER: "true"
       # 安全配置
-      JWT_SECRET: "docker-jwt-secret-key-change-in-production-2024"
+      JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in .env}"
       JWT_ALGORITHM: "HS256"
       ACCESS_TOKEN_EXPIRE_MINUTES: "480"
       REFRESH_TOKEN_EXPIRE_DAYS: "30"
-      CSRF_SECRET: "docker-csrf-secret-key-change-in-production-2024"
+      CSRF_SECRET: "${CSRF_SECRET:?Set CSRF_SECRET in .env}"
       BCRYPT_ROUNDS: "12"
       # CORS配置（允许 Nginx 代理）
       CORS_ORIGINS: "*"

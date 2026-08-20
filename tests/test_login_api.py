@@ -9,7 +9,7 @@ async def test_login_api():
     # 测试数据
     login_data = {
         "username": "admin",
-        "password": "admin123"
+        "password": "CHANGE_ME_ADMIN_PASSWORD"
     }
     
     try:

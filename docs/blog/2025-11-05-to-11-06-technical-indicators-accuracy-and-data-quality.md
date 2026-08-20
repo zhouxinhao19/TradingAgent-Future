@@ -986,7 +986,7 @@ Get-Content logs\webapi.log -Tail 50
 9. **测试技术指标**
 
 - 访问 http://localhost
-- 登录系统（admin/admin123）
+- 登录系统（admin/CHANGE_ME_ADMIN_PASSWORD）
 - 打开任意股票（如 000001、300750）
 - 运行市场分析
 - 查看日志中的技术指标详情：
@@ -1013,7 +1013,7 @@ Get-Content logs\webapi.log | Select-String "技术指标详情"
 # 进入 MongoDB 容器备份数据
 docker exec tradingagents-mongodb mongodump \
     --host localhost --port 27017 \
-    --username admin --password tradingagents123 --authenticationDatabase admin \
+    --username admin --password CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin \
     --db tradingagents \
     --out /data/db/backup_$(date +%Y%m%d_%H%M%S)
 
@@ -1133,7 +1133,7 @@ print('自选品种:', db.user_favorites.countDocuments())
 ```bash
 # Docker 版
 docker exec tradingagents-mongodb mongosh \
-    --username admin --password tradingagents123 --authenticationDatabase admin \
+    --username admin --password CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin \
     tradingagents --eval "
 print('股票日线数据:', db.stock_daily_quotes.countDocuments());
 print('股票基本信息:', db.stock_basic_info.countDocuments());
@@ -1208,7 +1208,7 @@ grep MARKET_ANALYST_LOOKBACK_DAYS .env
 ```bash
 # Docker 版 - 删除 MongoDB 中的旧数据
 docker exec tradingagents-mongodb mongosh \
-    --username admin --password tradingagents123 --authenticationDatabase admin \
+    --username admin --password CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin \
     tradingagents --eval "
 db.stock_daily_quotes.deleteMany({data_source: 'tushare'})
 "
@@ -1227,7 +1227,7 @@ db.stock_daily_quotes.deleteMany({data_source: 'tushare'})
 ```bash
 # Docker 版
 docker exec -i tradingagents-mongodb mongorestore \
-    --username admin --password tradingagents123 --authenticationDatabase admin \
+    --username admin --password CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin \
     --db tradingagents --drop \
     /data/db/backup_20251106_120000/tradingagents
 ```

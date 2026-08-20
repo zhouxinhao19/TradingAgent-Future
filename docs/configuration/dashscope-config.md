@@ -76,7 +76,7 @@ export FINNHUB_API_KEY=your_finnhub_api_key_here
 cp .env.example .env
 
 # 编辑 .env 文件，填入真实的API密钥
-DASHSCOPE_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+DASHSCOPE_API_KEY=YOUR_API_KEY_HERE
 FINNHUB_API_KEY=your_finnhub_api_key_here
 ```
 

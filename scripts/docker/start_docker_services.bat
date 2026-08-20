@@ -27,7 +27,7 @@ docker run -d ^
     --name tradingagents-mongodb ^
     -p 27017:27017 ^
     -e MONGO_INITDB_ROOT_USERNAME=admin ^
-    -e MONGO_INITDB_ROOT_PASSWORD=tradingagents123 ^
+    -e MONGO_INITDB_ROOT_PASSWORD=CHANGE_ME_LOCAL_PASSWORD ^
     -e MONGO_INITDB_DATABASE=tradingagents ^
     -v mongodb_data:/data/db ^
     --restart unless-stopped ^
@@ -46,7 +46,7 @@ docker run -d ^
     -p 6379:6379 ^
     -v redis_data:/data ^
     --restart unless-stopped ^
-    redis:latest redis-server --appendonly yes --requirepass tradingagents123
+    redis:latest redis-server --appendonly yes --requirepass CHANGE_ME_LOCAL_PASSWORD
 
 if %errorlevel% equ 0 (
     echo [OK] Redis started successfully - Port: 6379
@@ -63,7 +63,7 @@ echo Starting Redis Commander...
 docker run -d ^
     --name tradingagents-redis-commander ^
     -p 8081:8081 ^
-    -e REDIS_HOSTS=local:tradingagents-redis:6379:0:tradingagents123 ^
+    -e REDIS_HOSTS=local:tradingagents-redis:6379:0:CHANGE_ME_LOCAL_PASSWORD ^
     --link tradingagents-redis:redis ^
     --restart unless-stopped ^
     rediscommander/redis-commander:latest
@@ -84,15 +84,15 @@ echo Docker services startup completed!
 echo ========================================
 echo.
 echo MongoDB:
-echo    - Connection: mongodb://admin:tradingagents123@localhost:27017/tradingagents
+echo    - Connection: mongodb://admin:CHANGE_ME_LOCAL_PASSWORD@localhost:27017/tradingagents
 echo    - Port: 27017
 echo    - Username: admin
-echo    - Password: tradingagents123
+echo    - Password: CHANGE_ME_LOCAL_PASSWORD
 echo.
 echo Redis:
 echo    - Connection: redis://localhost:6379
 echo    - Port: 6379
-echo    - Password: tradingagents123
+echo    - Password: CHANGE_ME_LOCAL_PASSWORD
 echo.
 echo Redis Commander:
 echo    - Web Interface: http://localhost:8081

@@ -186,7 +186,7 @@ tail -f logs/tradingagents.log | grep "未找到"
 
 ```bash
 # 连接 MongoDB
-docker exec -it tradingagents-mongodb mongo tradingagents -u admin -p tradingagents123 --authenticationDatabase admin
+docker exec -it tradingagents-mongodb mongo tradingagents -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin
 
 # 检查 market_quotes 集合中的品种代码
 db.market_quotes.find({}, {code: 1}).limit(10)

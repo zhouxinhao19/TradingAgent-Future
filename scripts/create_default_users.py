@@ -59,7 +59,7 @@ def main():
         {
             "username": "admin",
             "email": "admin@tradingagents.cn",
-            "password": "admin123"
+            "password": "CHANGE_ME_ADMIN_PASSWORD"
         },
         {
             "username": "user",
@@ -78,7 +78,7 @@ def main():
     
     if created_count > 0:
         print("\n📋 默认用户信息:")
-        print("   - admin / admin123 (管理员)")
+        print("   - admin / CHANGE_ME_ADMIN_PASSWORD (管理员)")
         print("   - user / user123 (普通用户)")
         print("\n💡 提示: 现在可以使用这些账号登录前端系统")
     else:

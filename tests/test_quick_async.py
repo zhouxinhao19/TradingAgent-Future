@@ -21,7 +21,7 @@ def test_api_non_blocking():
     try:
         login_response = requests.post(f"{base_url}/api/auth/login", json={
             "username": "admin",
-            "password": "admin123"
+            "password": "CHANGE_ME_ADMIN_PASSWORD"
         }, timeout=10)
         
         if login_response.status_code != 200:

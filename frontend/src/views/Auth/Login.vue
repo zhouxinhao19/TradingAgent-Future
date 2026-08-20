@@ -56,7 +56,7 @@
           <el-form-item>
             <div class="login-tip">
               <el-text type="info" size="small">
-                开源版使用默认账号：admin / admin123
+                开源版使用默认账号：admin / CHANGE_ME_ADMIN_PASSWORD
               </el-text>
             </div>
           </el-form-item>

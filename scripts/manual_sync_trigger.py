@@ -17,7 +17,7 @@ def get_auth_token():
     try:
         response = requests.post(
             f"{BASE_URL}/api/auth/login",
-            json={"username": "admin", "password": "admin123"}
+            json={"username": "admin", "password": "CHANGE_ME_ADMIN_PASSWORD"}
         )
         if response.status_code == 200:
             return response.json().get("access_token")

@@ -83,7 +83,7 @@ docker run -d `
   -v tradingagents_mongodb_data:/data/db `
   -v ${PWD}/scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro `
   -e MONGO_INITDB_ROOT_USERNAME=admin `
-  -e MONGO_INITDB_ROOT_PASSWORD=tradingagents123 `
+  -e MONGO_INITDB_ROOT_PASSWORD=CHANGE_ME_LOCAL_PASSWORD `
   -e MONGO_INITDB_DATABASE=tradingagents `
   -e TZ="Asia/Shanghai" `
   --restart unless-stopped `
@@ -106,7 +106,7 @@ docker run -d `
   -v tradingagents_redis_data:/data `
   -e TZ="Asia/Shanghai" `
   --restart unless-stopped `
-  redis:7-alpine redis-server --appendonly yes --requirepass tradingagents123
+  redis:7-alpine redis-server --appendonly yes --requirepass CHANGE_ME_LOCAL_PASSWORD
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "  ✅ Redis 容器已启动" -ForegroundColor Green
@@ -140,7 +140,7 @@ Write-Host "`n9️⃣ 验证 MongoDB 数据..." -ForegroundColor Yellow
 Start-Sleep -Seconds 5
 
 Write-Host "  正在查询数据库..." -ForegroundColor Cyan
-$dbCheck = docker exec tradingagents-mongodb mongo tradingagents -u admin -p tradingagents123 --authenticationDatabase admin --quiet --eval "db.system_configs.countDocuments()" 2>$null
+$dbCheck = docker exec tradingagents-mongodb mongo tradingagents -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin --quiet --eval "db.system_configs.countDocuments()" 2>$null
 
 if ($dbCheck) {
     Write-Host "  ✅ 数据库连接成功" -ForegroundColor Green
@@ -217,6 +217,6 @@ Write-Host "=" * 80 -ForegroundColor Cyan
 
 Write-Host "`n📝 后续步骤:" -ForegroundColor Yellow
 Write-Host "  1. 检查容器状态: docker ps" -ForegroundColor Cyan
-Write-Host "  2. 检查 MongoDB 数据: docker exec tradingagents-mongodb mongo tradingagents -u admin -p tradingagents123 --authenticationDatabase admin" -ForegroundColor Cyan
+Write-Host "  2. 检查 MongoDB 数据: docker exec tradingagents-mongodb mongo tradingagents -u admin -p CHANGE_ME_LOCAL_PASSWORD --authenticationDatabase admin" -ForegroundColor Cyan
 Write-Host "  3. 重启后端服务（如果需要）: docker restart tradingagents-backend" -ForegroundColor Cyan
 

@@ -25,7 +25,7 @@ async def main():
         mongo_host = os.getenv("MONGODB_HOST", "localhost")
         mongo_port = int(os.getenv("MONGODB_PORT", "27017"))
         mongo_username = os.getenv("MONGODB_USERNAME", "admin")
-        mongo_password = os.getenv("MONGODB_PASSWORD", "tradingagents123")
+        mongo_password = os.getenv("MONGODB_PASSWORD", "CHANGE_ME_LOCAL_PASSWORD")
         mongo_auth_source = os.getenv("MONGODB_AUTH_SOURCE", "admin")
         db_name = os.getenv("MONGODB_DATABASE", "tradingagents")
 

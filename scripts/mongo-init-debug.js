@@ -36,7 +36,7 @@ print('\n📋 创建 root 用户 (admin)...');
 try {
   db.createUser({
     user: 'admin',
-    pwd: 'tradingagents123',
+    pwd: 'CHANGE_ME_LOCAL_PASSWORD',
     roles: [
       {
         role: 'root',
@@ -54,7 +54,7 @@ print('\n📋 创建应用用户 (tradingagents)...');
 try {
   db.createUser({
     user: 'tradingagents',
-    pwd: 'tradingagents123',
+    pwd: 'CHANGE_ME_LOCAL_PASSWORD',
     roles: [
       {
         role: 'readWrite',

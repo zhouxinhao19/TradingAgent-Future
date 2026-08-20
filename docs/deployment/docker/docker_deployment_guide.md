@@ -104,11 +104,11 @@ python scripts/quick_login_fix.py
 ### 后端 API 登录
 - **用户名**: `admin`
 - **密码**: 查看 `config/admin_password.json` 文件中的密码
-  - 如果文件不存在或为空，默认密码是 `admin123`
+  - 如果文件不存在或为空，默认密码是 `CHANGE_ME_ADMIN_PASSWORD`
   - 当前配置文件中的密码是 `1234567`
 
 ### Web 应用登录
-- **管理员**: `admin` / `admin123`
+- **管理员**: `admin` / `CHANGE_ME_ADMIN_PASSWORD`
 - **普通用户**: `user` / `user123`
 
 ## 常见问题
