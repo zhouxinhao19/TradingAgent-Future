@@ -7,7 +7,7 @@ commodity_perf_diagnostic.py — 全品种数据层 + 特征层性能诊断 (Pha
   3. 识别慢品种、空数据模块、性能瓶颈
 
 用法:
-  cd D:\改造\TradingAgent-CN
+    cd <project-root>
   python scripts/commodity_perf_diagnostic.py
   python scripts/commodity_perf_diagnostic.py --limit 5
   python scripts/commodity_perf_diagnostic.py --categories metal,energy

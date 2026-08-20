@@ -42,7 +42,7 @@ TradingAgent-Future 是一个面向中文用户的多智能体期货分析平台
 ### 2. 安装
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/zhouxinhao19/TradingAgent-Future.git
 cd TradingAgent-Future
 python -m venv .venv
 # Windows

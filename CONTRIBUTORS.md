@@ -13,7 +13,7 @@
 
 ### 📄 报告导出功能
 
-- **[@baiyuxiong](https://github.com/baiyuxiong)** (baiyuxiong@163.com)
+- **[@baiyuxiong](https://github.com/baiyuxiong)**
   - 贡献内容：设计并实现了完整的多格式报告导出系统
   - 技术细节：包括Word、PDF、Markdown格式支持
   - 影响：为用户提供了灵活的分析报告输出选项

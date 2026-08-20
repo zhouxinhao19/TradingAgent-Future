@@ -1,7 +1,7 @@
 """commodity_debug.py — 商品分析链路逐步骤调试
 
 用法:
-  cd D:\改造\TradingAgent-CN
+    cd <project-root>
   python scripts/commodity_debug.py
 """
 import asyncio

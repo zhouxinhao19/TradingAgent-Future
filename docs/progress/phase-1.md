@@ -136,7 +136,7 @@ $ open http://localhost:3000/commodity/detail/CU2501.SHF
 
 ```bash
 # 1. 翻 flag
-cd "C:\Users\59608\Desktop\TradingAgent-CN"
+cd <project-root>
 sed -i 's/^FEATURE_COMMODITY_ENABLED=false/FEATURE_COMMODITY_ENABLED=true/' .env
 sed -i 's/^FEATURE_COMMODITY_DATA=false/FEATURE_COMMODITY_DATA=true/' .env
 

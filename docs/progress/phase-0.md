@@ -29,7 +29,7 @@
 
 ### 1. 单元测试
 ```bash
-cd "C:\Users\59608\Desktop\TradingAgent-CN"
+cd <project-root>
 python -m pytest tests/test_instrument.py -v
 ```
 **结果**: 57 passed, 5 deselected, 0 failed ✅
@@ -113,7 +113,7 @@ curl http://localhost:8000/api/config/features
 
 ```bash
 # 1. 启动后端
-cd "C:\Users\59608\Desktop\TradingAgent-CN"
+cd <project-root>
 docker compose up -d mongodb redis
 python -m uvicorn app.main:app --reload --port 8000
 

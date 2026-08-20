@@ -2,7 +2,7 @@
 commodity_quick_diag.py — 快速诊断单个品种各数据接口耗时
 
 用法:
-  cd D:\改造\TradingAgent-CN
+    cd <project-root>
   python scripts/commodity_quick_diag.py CU  # 品种代码
   python scripts/commodity_quick_diag.py --all  # 所有品种(精简版)
 """

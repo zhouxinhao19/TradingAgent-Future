@@ -1,7 +1,7 @@
 # Phase P0: Agent 输出 Schema 硬约束补强（2026-07-31 ~ 2026-08-01）
 
 > 目标：给 commodity 决策链节点的 LLM 输出加 Pydantic 后置校验，保证输出结构稳定。
-> Plan: `C:\Users\59608\.claude\plans\polymorphic-swinging-raven.md`（v0.2 final）
+> Plan: repository-internal implementation plan（v0.2 final）
 > Commit: `ee2fa957` (Day 1-3 基础设施 + 6 节点接入 + 死代码清理) + Day 4-5 commit
 
 ---
@@ -297,8 +297,8 @@ git revert <commit>
 
 ## 九、相关引用
 
-- Plan：`C:\Users\59608\.claude\plans\polymorphic-swinging-raven.md`
-- 记忆进度：`C:\Users\59608\.claude\projects\D-----TradingAgent-Future\memory\p0-schema-validation-progress.md`
+- Plan：repository-internal implementation plan
+- 进度记录：已合并到本文件和 Git 提交记录
 - 提交记录：`ee2fa957`（Day 1-3 全量）+ Day 4-5 commit
 - 相关进度文档：`docs/progress/phase-3b.md`（决策链 commodity 化） / `docs/progress/phase-4.md`（商品模拟交易）
 
